@@ -184,8 +184,8 @@ async function loadApps(){
       +'<div class="sub3">'+esc(s.region)+' · '+esc(s.type)+' · '+esc(s.students)+' · 희망 '+esc(s.d1)
       +'<br>담당 '+esc(s.teacher)+' '+esc(s.phone)+(s.assignedName?' · <b style="color:#0f766e">배정: '+esc(s.assignedName)+'</b>':'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +(st==='접수'?'<button class="btn-sub" onclick="setStatus(''+d.id+'','선정')">선정</button><button class="btn-sub" style="background:#8a919d" onclick="setStatus(''+d.id+'','미선정')">미선정</button>':'')
-      +(st==='선정'&&!s.assignedName?'<button class="btn-sub" style="background:#8a919d" onclick="setStatus(''+d.id+'','접수')">선정취소</button>':'')
+      +(st==='접수'?'<button class="btn-sub" onclick="setStatus(\''+d.id+'\',\'선정\')">선정</button><button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'미선정\')">미선정</button>':'')
+      +(st==='선정'&&!s.assignedName?'<button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'접수\')">선정취소</button>':'')
       +'</div></div>';
   }).join(''):'<div class="bempty">신청이 없습니다.</div>';
 }
@@ -211,7 +211,10 @@ async function autoAssign(){
   const apps=await DB.collection('schoolApplications').where('status','==','선정').get();
   const users=await DB.collection('users').where('status','==','approved').get();
   const pool={};
-  users.docs.forEach(u=>{const r=u.data().region;(pool[r]=pool[r]||[]).push({uid:u.id,name:u.data().name,cnt:0})});
+  users.docs.forEach(u=>{
+    const d=u.data(),f=d.instructorFor||{};
+    (pool[d.region]=pool[d.region]||[]).push({uid:u.id,name:d.name,cnt:0,school:!!f.school,after:!!f.after});
+  });
   let done=0,skip=0;
   for(const d of apps.docs){
     const s=d.data();
@@ -222,8 +225,9 @@ async function autoAssign(){
       await d.ref.update({assignedUid:slot.data().claimedBy,assignedName:slot.data().claimedName,status:'배정완료'});
       done++;continue;
     }
-    const cands=pool[s.region];
-    if(!cands||!cands.length){skip++;continue}
+    const wantAfter=(s.type||'').indexOf('방과후')>=0;
+    const cands=(pool[s.region]||[]).filter(c=>wantAfter?c.after:c.school);
+    if(!cands.length){skip++;continue}
     cands.sort((a,b)=>a.cnt-b.cnt);
     const pick=cands[0];pick.cnt++;
     await d.ref.update({assignedUid:pick.uid,assignedName:pick.name,status:'배정완료'});
@@ -261,7 +265,7 @@ async function loadUsers(){
   el.innerHTML=snap.docs.map(d=>{
     const v=d.data(),lv=lvOf(v.points||0);
     return '<div class="urow"><div class="grow"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span>'
-      +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+' · '+(v.edu2026?'연수이수':'미이수')+' · '+(v.points||0)+'P</div></div>'
+      +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+' · '+(v.edu2026?'연수이수':'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+'</div></div>'
       +(v.status==='approved'
         ?'<span style="font-size:13px;font-weight:800;color:#0f766e">승인됨</span>'
         :'<button class="btn-sub" onclick="approve(\''+d.id+'\')">승인하기</button>')

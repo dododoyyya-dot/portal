@@ -118,6 +118,23 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
 <section><div class="wrap" style="max-width:900px">
   <div id="jGate" class="pending-banner" style="display:none"></div>
   <div id="jBody" style="display:none">
+    <div class="sec-label">STEP 1</div>
+    <h2 class="sec-title" style="font-size:24px">강사 활동 지원</h2>
+    <p class="sec-desc" style="margin-bottom:20px">활동을 원하는 사업에 지원해두면 권역별 자동배정 대상이 됩니다. (중복 지원 가능 · 언제든 취소)</p>
+    <div class="biz-grid" style="margin-bottom:40px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
+      <div class="card" style="cursor:default">
+        <h3>🏫 학교체육 강습 강사</h3>
+        <p>정규 체육수업 연계 · 학교당 24회차 · 1일 10만원</p>
+        <button class="btn-sub" id="btnSchool" style="margin-top:14px" onclick="toggleApply('school')">지원하기</button>
+      </div>
+      <div class="card" style="cursor:default">
+        <h3>🌱 방과후 · 늘봄학교 강사</h3>
+        <p>방과후·늘봄·돌봄교실 24회차 프로그램 · 1일 10만원</p>
+        <button class="btn-sub" id="btnAfter" style="margin-top:14px" onclick="toggleApply('after')">지원하기</button>
+      </div>
+    </div>
+    <div class="sec-label">STEP 2</div>
+    <h2 class="sec-title" style="font-size:24px">선정 학교 지명 신청 (선착순)</h2>
     <div class="note" style="margin-bottom:22px"><b>선착순 안내</b> — "지명 신청" 버튼을 먼저 누른 리더에게 우선 배정됩니다. 최종 확정은 사무국 검토 후 개별 연락드립니다. 본인 권역의 학교만 신청 가능합니다.</div>
     <div class="board-tools"><div class="cats" id="jCats">
       <button class="bcat on" data-r="전체">전체</button>
@@ -138,10 +155,38 @@ AUTH.onAuthStateChanged(async u=>{
   if(!u){g.style.display='block';g.innerHTML='🔒 승인 회원 전용입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a>';return}
   JME=u;const d=await DB.collection('users').doc(u.uid).get();JMY=d.data();
   if(!JMY||JMY.status!=='approved'){g.style.display='block';g.innerHTML='⏳ 사무국 승인 후 이용 가능합니다.';return}
-  document.getElementById('jBody').style.display='block';loadSlots();
+  document.getElementById('jBody').style.display='block';renderApply();loadSlots();
 });
+function renderApply(){
+  const f=JMY.instructorFor||{};
+  const b1=document.getElementById('btnSchool'),b2=document.getElementById('btnAfter');
+  b1.textContent=f.school?'✓ 지원 완료 (취소하기)':'지원하기';
+  b1.style.background=f.school?'#0f766e':'';
+  b2.textContent=f.after?'✓ 지원 완료 (취소하기)':'지원하기';
+  b2.style.background=f.after?'#0f766e':'';
+}
+async function toggleApply(k){
+  const f=Object.assign({},JMY.instructorFor||{});
+  f[k]=!f[k];
+  await DB.collection('users').doc(JME.uid).update({instructorFor:f,instructorAppliedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  JMY.instructorFor=f;renderApply();
+}
 document.querySelectorAll('#jCats .bcat').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('#jCats .bcat').forEach(x=>x.classList.remove('on'));
+  function renderApply(){
+  const f=JMY.instructorFor||{};
+  const b1=document.getElementById('btnSchool'),b2=document.getElementById('btnAfter');
+  b1.textContent=f.school?'✓ 지원 완료 (취소하기)':'지원하기';
+  b1.style.background=f.school?'#0f766e':'';
+  b2.textContent=f.after?'✓ 지원 완료 (취소하기)':'지원하기';
+  b2.style.background=f.after?'#0f766e':'';
+}
+async function toggleApply(k){
+  const f=Object.assign({},JMY.instructorFor||{});
+  f[k]=!f[k];
+  await DB.collection('users').doc(JME.uid).update({instructorFor:f,instructorAppliedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  JMY.instructorFor=f;renderApply();
+}
+document.querySelectorAll('#jCats .bcat').forEach(x=>x.classList.remove('on'));
   b.classList.add('on');JR=b.dataset.r;loadSlots();
 });
 async function loadSlots(){
