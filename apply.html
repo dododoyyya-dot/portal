@@ -46,8 +46,9 @@
       </div></div>
     <div><a href="apply.html" class="top active">신청마당</a>
       <div class="drop">
-        <a href="apply.html">학교 강습 신청 (학교·교사)</a>
-        <a href="jobs.html">강습 지명 신청 (리더 선착순)</a>
+        <a href="apply.html?type=school">학교체육 강습 신청 (학교·교사)</a>
+        <a href="apply.html?type=after">방과후·늘봄학교 신청 (학교·교사)</a>
+        <a href="jobs.html">강사 활동 지원 · 지명 (리더)</a>
         <a href="login.html">리더 회원가입 · 로그인</a>
       </div></div>
     <a href="apply.html" class="cta">강습 신청</a>
@@ -112,19 +113,41 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
 
 <div class="phero"><div class="wrap">
   <div class="crumb">HOME &nbsp;›&nbsp; <b>강습 신청</b></div>
-  <h1>학교 강습 온라인 신청</h1>
+  <h1>강습 프로그램 온라인 신청</h1>
   <p>2026 유소년 스포츠 기반구축사업 — 전문 지도자 파견 + 용품 50만원 무상지원 (전액 무료)</p>
 </div></div>
 <section><div class="wrap" style="max-width:760px">
-  <div class="note" style="margin-bottom:26px"><b>신청 마감 2026. 8. 14.(금) 18:00</b> — 직무연수 이수 교원 소속교는 최우선 선정됩니다. 접수 즉시 자동 저장되며 선정 결과는 8. 21.(금) 개별 통보됩니다.</div>
-  <div class="authbox" style="max-width:none" id="applyBox">
+  <div class="note" style="margin-bottom:26px"><b>신청 마감 2026. 8. 14.(금) 18:00</b> — 직무연수 이수 교원 소속교는 최우선 선정됩니다. 접수 즉시 자동 저장되며 선정 결과는 8. 21.(금) 개별 통보됩니다.<br>
+  <b style="color:#8c1622">학교체육 강습과 방과후·늘봄학교는 별개 사업입니다.</b> 한 학교가 두 유형을 모두 신청할 수 있으며, 유형별로 신청서를 각각 제출해 주세요. (중복 처리되지 않습니다)</div>
+
+  <div id="typePick">
+    <h3 style="font-size:20px;font-weight:900;margin-bottom:16px">신청할 프로그램을 선택하세요</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+      <div class="authbox" style="max-width:none;cursor:pointer;border:2px solid var(--line)" onclick="pickType('school')" id="cardSchool">
+        <div style="font-size:36px">🏫</div>
+        <h3 style="margin:8px 0 6px">학교체육 강습</h3>
+        <p style="font-size:14px;color:var(--gray)">정규 체육수업·학교스포츠클럽 연계<br>24회차 · 전문 지도자 파견 + 용품 50만원</p>
+        <button class="btn-sub" style="margin-top:14px;background:var(--red)">이 유형으로 신청 →</button>
+      </div>
+      <div class="authbox" style="max-width:none;cursor:pointer;border:2px solid var(--line)" onclick="pickType('after')" id="cardAfter">
+        <div style="font-size:36px">🌱</div>
+        <h3 style="margin:8px 0 6px">방과후 · 늘봄학교</h3>
+        <p style="font-size:14px;color:var(--gray)">방과후·늘봄·돌봄교실 프로그램 운영<br>24회차 · 전문 강사 파견 + 용품 50만원</p>
+        <button class="btn-sub" style="margin-top:14px;background:#0f766e">이 유형으로 신청 →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="authbox" style="max-width:none;display:none" id="applyBox">
+    <div id="typeBanner" style="border-radius:12px;padding:14px 18px;margin-bottom:18px;font-weight:800;color:#fff;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <span id="typeBannerTxt"></span>
+      <a href="javascript:changeType()" style="color:#fff;font-size:13px;text-decoration:underline;font-weight:700">유형 변경</a>
+    </div>
     <h3>신청서 작성</h3>
     <label>학교명 *</label><input id="fSchool" placeholder="예: ○○초등학교">
     <label>시도 / 시군구 *</label><input id="fCity" placeholder="예: 경기도 김포시">
     <label>권역 *</label>
     <select id="fRegion"><option>서울·경기</option><option>강원</option><option>충청</option><option>전라</option><option>경상</option><option>제주</option></select>
-    <label>신청 유형 *</label>
-    <select id="fType"><option>학교체육 강습</option><option>방과후·늘봄·돌봄</option></select>
     <label>참가 대상 · 인원 *</label><input id="fStudents" placeholder="예: 3~4학년 약 60명">
     <label>운영 공간</label>
     <select id="fSpace"><option>체육관(실내)</option><option>운동장</option><option>다목적실</option><option>기타</option></select>
@@ -159,12 +182,42 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
   <div class="authbox" style="max-width:none;display:none;text-align:center" id="doneBox">
     <div style="font-size:52px">✅</div>
     <h3 style="margin-top:10px">신청이 접수되었습니다!</h3>
-    <p style="font-size:15px;color:var(--gray)">접수번호: <b id="doneId" style="color:var(--red)"></b><br>
+    <p style="font-size:15px;color:var(--gray)"><span id="doneType" style="font-weight:800"></span><br>접수번호: <b id="doneId" style="color:var(--red)"></b><br>
     선정 결과는 8. 21.(금) 담당교사 연락처로 개별 통보됩니다.<br>문의: 031-984-3248 / kfdf60@hanmail.net</p>
+    <button class="btn-sub" style="margin-top:18px" onclick="applyOther()" id="otherBtn"></button>
   </div>
 </div></section>
 <script>
 let SELF_UID='', SELF_NAME='';
+let APPLY_TYPE='';
+const TYPE_INFO={
+  school:{label:'학교체육 강습', store:'학교체육 강습', color:'#8c1622', prefix:'S', desc:'정규 체육수업 연계 · 24회차'},
+  after:{label:'방과후 · 늘봄학교', store:'방과후·늘봄·돌봄', color:'#0f766e', prefix:'A', desc:'방과후·늘봄·돌봄교실 · 24회차'}
+};
+function pickType(t){
+  APPLY_TYPE=t;const i=TYPE_INFO[t];
+  document.getElementById('typePick').style.display='none';
+  document.getElementById('applyBox').style.display='block';
+  document.getElementById('doneBox').style.display='none';
+  const b=document.getElementById('typeBanner');
+  b.style.background=i.color;
+  document.getElementById('typeBannerTxt').textContent=(t==='school'?'🏫 ':'🌱 ')+i.label+' 신청서 — '+i.desc;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function changeType(){
+  document.getElementById('applyBox').style.display='none';
+  document.getElementById('typePick').style.display='block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function applyOther(){
+  pickType(APPLY_TYPE==='school'?'after':'school');
+  document.getElementById('fMsg').textContent='학교·담당교사 정보는 그대로 유지됩니다. 내용 확인 후 제출해 주세요.';
+  document.getElementById('fMsg').className='msg ok';
+}
+(function(){
+  const p=new URLSearchParams(location.search).get('type');
+  if(p==='after'||p==='school')pickType(p);
+})();
 AUTH.onAuthStateChanged(async u=>{
   if(!u)return;
   const d=await DB.collection('users').doc(u.uid).get();
@@ -179,16 +232,19 @@ function selfToggle(){
   if(on&&!SELF_UID)document.getElementById('selfGuest').style.display='inline';
 }
 function v(id){return document.getElementById(id).value.trim()}
+let SUBMITTING=false;
 async function submitApply(){
   const m=document.getElementById('fMsg');
+  if(!APPLY_TYPE){m.textContent='프로그램 유형을 먼저 선택해주세요';m.className='msg err';return}
+  if(SUBMITTING)return;
   const req={school:v('fSchool'),city:v('fCity'),teacher:v('fTeacher'),phone:v('fPhone'),students:v('fStudents'),d1:v('fD1')};
   for(const k in req){if(!req[k]){m.textContent='* 표시된 필수 항목을 모두 입력해주세요';m.className='msg err';return}}
   if(!document.getElementById('fAgree').checked){m.textContent='개인정보 수집·이용에 동의해주세요';m.className='msg err';return}
-  m.textContent='제출 중…';m.className='msg';
+  m.textContent='제출 중…';m.className='msg';SUBMITTING=true;
   try{
     const doc=await DB.collection('schoolApplications').add({
       school:req.school, city:req.city,
-      region:v('fRegion'), type:v('fType'),
+      region:v('fRegion'), type:TYPE_INFO[APPLY_TYPE].store, typeKey:APPLY_TYPE,
       students:req.students, space:v('fSpace'), insurance:v('fIns'),
       teacher:req.teacher, phone:req.phone, email:v('fEmail'),
       eduName:v('fEdu'), d1:req.d1, d2:v('fD2'), reason:v('fReason'),
@@ -199,9 +255,12 @@ async function submitApply(){
     });
     document.getElementById('applyBox').style.display='none';
     document.getElementById('doneBox').style.display='block';
-    document.getElementById('doneId').textContent=doc.id.slice(0,8).toUpperCase();
+    document.getElementById('doneType').textContent=(APPLY_TYPE==='school'?'🏫 ':'🌱 ')+TYPE_INFO[APPLY_TYPE].label;
+    document.getElementById('doneId').textContent=TYPE_INFO[APPLY_TYPE].prefix+'-'+doc.id.slice(0,8).toUpperCase();
+    document.getElementById('otherBtn').textContent=(APPLY_TYPE==='school'?'🌱 방과후·늘봄학교도 이어서 신청하기':'🏫 학교체육 강습도 이어서 신청하기');
+    SUBMITTING=false;
     window.scrollTo({top:0,behavior:'smooth'});
-  }catch(e){m.textContent='제출 실패: '+e.message;m.className='msg err'}
+  }catch(e){m.textContent='제출 실패: '+e.message;m.className='msg err';SUBMITTING=false}
 }
 </script>
 

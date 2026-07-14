@@ -46,8 +46,9 @@
       </div></div>
     <div><a href="apply.html" class="top">신청마당</a>
       <div class="drop">
-        <a href="apply.html">학교 강습 신청 (학교·교사)</a>
-        <a href="jobs.html">강습 지명 신청 (리더 선착순)</a>
+        <a href="apply.html?type=school">학교체육 강습 신청 (학교·교사)</a>
+        <a href="apply.html?type=after">방과후·늘봄학교 신청 (학교·교사)</a>
+        <a href="jobs.html">강사 활동 지원 · 지명 (리더)</a>
         <a href="login.html">리더 회원가입 · 로그인</a>
       </div></div>
     <a href="apply.html" class="cta">강습 신청</a>
@@ -129,6 +130,11 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
         <button class="btn-sub" style="background:#7c3aed" onclick="autoAssign()">⚡ 권역별 자동배정 (미배정 선정교)</button>
         <button class="btn-sub" style="background:#0f766e" onclick="exportCSV()">⬇ 전체 CSV 내려받기</button>
       </div>
+      <div style="display:flex;gap:8px;margin:0 0 14px">
+        <button class="btn-sub afl on" data-f="전체" onclick="appFilter('전체',this)">전체</button>
+        <button class="btn-sub afl" data-f="학교체육" onclick="appFilter('학교체육',this)" style="background:#8a919d">🏫 학교체육 강습</button>
+        <button class="btn-sub afl" data-f="방과후" onclick="appFilter('방과후',this)" style="background:#8a919d">🌱 방과후·늘봄</button>
+      </div>
       <div class="board" id="appList"><div class="bempty">불러오는 중…</div></div>
     </div>
     <div id="v2" style="display:none">
@@ -168,12 +174,21 @@ function tab(n){
   });
   if(n===3)loadApps();
 }
-let APPS=[];
+let APPS=[];let AFL='전체';
+function appFilter(f,btn){
+  AFL=f;
+  document.querySelectorAll('.afl').forEach(b=>{b.style.background=b.dataset.f===f?'':'#8a919d'});
+  renderApps();
+}
 async function loadApps(){
   const snap=await DB.collection('schoolApplications').orderBy('createdAt','desc').get();
   APPS=snap.docs;
+  renderApps();
+}
+function renderApps(){
+  const docs=AFL==='전체'?APPS:APPS.filter(d=>String(d.data().type||'').indexOf(AFL)>=0);
   const el=document.getElementById('appList');
-  el.innerHTML=snap.docs.length?snap.docs.map(d=>{
+  el.innerHTML=docs.length?docs.map(d=>{
     const s=d.data();
     const st=s.status||'접수';
     const stc={'접수':'#8a919d','선정':'#1F4E9C','배정완료':'#0f766e','미선정':'#C41E2F'}[st]||'#8a919d';
@@ -181,13 +196,14 @@ async function loadApps(){
       +'<span style="font-size:12px;font-weight:800;color:#fff;background:'+stc+';padding:2px 10px;border-radius:999px">'+st+'</span>'
       +(s.eduName?' <span style="font-size:11px;font-weight:800;color:#C41E2F">★이수자교('+esc(s.eduName)+')</span>':'')
       +(s.selfTeach?' <span style="font-size:11px;font-weight:800;color:#0f766e">◉본인지도 희망'+(s.selfName?'('+esc(s.selfName)+')':'')+'</span>':'')
-      +'<div class="sub3">'+esc(s.region)+' · '+esc(s.type)+' · '+esc(s.students)+' · 희망 '+esc(s.d1)
+      +' <span style="font-size:11px;font-weight:800;color:#fff;background:'+(String(s.type||'').indexOf('방과후')>=0?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(String(s.type||'').indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+'</span>'
+      +'<div class="sub3">'+esc(s.region)+' · '+esc(s.students)+' · 희망 '+esc(s.d1)
       +'<br>담당 '+esc(s.teacher)+' '+esc(s.phone)+(s.assignedName?' · <b style="color:#0f766e">배정: '+esc(s.assignedName)+'</b>':'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
       +(st==='접수'?'<button class="btn-sub" onclick="setStatus(\''+d.id+'\',\'선정\')">선정</button><button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'미선정\')">미선정</button>':'')
       +(st==='선정'&&!s.assignedName?'<button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'접수\')">선정취소</button>':'')
       +'</div></div>';
-  }).join(''):'<div class="bempty">신청이 없습니다.</div>';
+  }).join(''):'<div class="bempty">해당 유형의 신청이 없습니다.</div>';
 }
 async function setStatus(id,st){
   const s=APPS.find(d=>d.id===id).data();
