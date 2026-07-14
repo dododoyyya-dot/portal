@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="google-site-verification" content="sMiNgrZBGPS1NWfFR2JWjhrM25dn2Pq0LsDR2DbDrQc" />
 <meta name="naver-site-verification" content="f2bba301d1f9ca2d37efa24800dcad9676123d09" />
-<title>커뮤니티 | 대한민국플라잉디스크연맹</title>
+<title>강습 지명 신청 | 대한민국플라잉디스크연맹</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -107,90 +107,69 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
 </style>
 
 <div class="phero"><div class="wrap">
-  <div class="crumb">HOME &nbsp;›&nbsp; <b>커뮤니티</b></div>
-  <h1>리더 커뮤니티</h1><p>리더 회원 전용 공간 — 활동 후기와 정보를 나눠보세요.</p>
+  <div class="crumb">HOME &nbsp;›&nbsp; <b>강사 배정</b></div>
+  <h1>강습 지명 신청 (선착순)</h1>
+  <p>선정된 학교 중 아직 강사가 배정되지 않은 곳을 선착순으로 지명할 수 있습니다. (승인 회원 전용)</p>
 </div></div>
-<section><div class="wrap" style="max-width:1000px">
-  <div id="gate" class="pending-banner" style="display:none"></div>
-  <div id="commBody" style="display:none">
-    <div class="board-tools">
-      <div class="cats" id="catBtns">
-        <button class="bcat on" data-c="전체">전체</button>
-        <button class="bcat" data-c="자유">자유</button>
-        <button class="bcat" data-c="활동후기">활동후기</button>
-        <button class="bcat" data-c="질문">질문</button>
-      </div>
-      <div class="bsearch"><button class="btn-sub" onclick="document.getElementById('pForm').classList.toggle('show')">✏️ 글쓰기</button></div>
-    </div>
-    <div class="post-form" id="pForm">
-      <select id="pCat"><option>자유</option><option>활동후기</option><option>질문</option></select>
-      <input id="pTitle" placeholder="제목">
-      <textarea id="pBody" rows="5" placeholder="내용을 입력하세요"></textarea>
-      <button class="btn-sub" onclick="writePost()">등록</button>
-      <span class="msg" id="pMsg" style="margin-left:10px"></span>
-    </div>
-    <div class="board" id="postList"><div class="bempty">불러오는 중…</div></div>
+<section><div class="wrap" style="max-width:900px">
+  <div id="jGate" class="pending-banner" style="display:none"></div>
+  <div id="jBody" style="display:none">
+    <div class="note" style="margin-bottom:22px"><b>선착순 안내</b> — "지명 신청" 버튼을 먼저 누른 리더에게 우선 배정됩니다. 최종 확정은 사무국 검토 후 개별 연락드립니다. 본인 권역의 학교만 신청 가능합니다.</div>
+    <div class="board-tools"><div class="cats" id="jCats">
+      <button class="bcat on" data-r="전체">전체</button>
+      <button class="bcat" data-r="서울·경기">서울·경기</button>
+      <button class="bcat" data-r="강원">강원</button>
+      <button class="bcat" data-r="충청">충청</button>
+      <button class="bcat" data-r="전라">전라</button>
+      <button class="bcat" data-r="경상">경상</button>
+      <button class="bcat" data-r="제주">제주</button>
+    </div></div>
+    <div class="board" id="slotList"><div class="bempty">불러오는 중…</div></div>
   </div>
 </div></section>
 <script>
-let ME=null, MYDOC=null, CAT='전체';
+let JME=null,JMY=null,JR='전체';
 AUTH.onAuthStateChanged(async u=>{
-  const gate=document.getElementById('gate');
-  if(!u){gate.style.display='block';gate.innerHTML='🔒 회원 전용 공간입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 하러 가기 →</a>';return}
-  ME=u;
-  const doc=await DB.collection('users').doc(u.uid).get(); MYDOC=doc.data();
-  if(!MYDOC||MYDOC.status!=='approved'){gate.style.display='block';gate.innerHTML='⏳ 사무국 승인 후 이용할 수 있습니다. 승인 상태는 <a href="mypage.html" style="font-weight:800;color:var(--red)">마이페이지</a>에서 확인하세요.';return}
-  document.getElementById('commBody').style.display='block';
-  load();
+  const g=document.getElementById('jGate');
+  if(!u){g.style.display='block';g.innerHTML='🔒 승인 회원 전용입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a>';return}
+  JME=u;const d=await DB.collection('users').doc(u.uid).get();JMY=d.data();
+  if(!JMY||JMY.status!=='approved'){g.style.display='block';g.innerHTML='⏳ 사무국 승인 후 이용 가능합니다.';return}
+  document.getElementById('jBody').style.display='block';loadSlots();
 });
-document.querySelectorAll('#catBtns .bcat').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('#catBtns .bcat').forEach(x=>x.classList.remove('on'));
-  b.classList.add('on');CAT=b.dataset.c;load();
+document.querySelectorAll('#jCats .bcat').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#jCats .bcat').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');JR=b.dataset.r;loadSlots();
 });
-async function load(){
-  let q=DB.collection('posts').orderBy('createdAt','desc').limit(50);
-  const snap=await q.get();
-  const list=snap.docs.filter(d=>CAT==='전체'||d.data().cat===CAT);
-  const el=document.getElementById('postList');
+async function loadSlots(){
+  const snap=await DB.collection('openSlots').orderBy('createdAt','desc').limit(100).get();
+  const list=snap.docs.filter(d=>JR==='전체'||d.data().region===JR);
+  const el=document.getElementById('slotList');
   el.innerHTML=list.length?list.map(d=>{
-    const v=d.data(),lv=v.level||1;
-    return '<div class="brow" id="p-'+d.id+'"><div class="head" onclick="openPost(\''+d.id+'\')" style="grid-template-columns:70px 1fr 190px 90px">'
-      +'<div class="cat">'+esc(v.cat)+'</div><div class="tt">'+esc(v.title)+'</div>'
-      +'<div style="font-size:13px;text-align:center"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';font-size:11px;font-weight:900;color:#fff;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span></div>'
-      +'<div class="dt">'+fmtDate(v.createdAt)+'</div></div>'
-      +'<div class="body" id="b-'+d.id+'"></div></div>';
-  }).join(''):'<div class="bempty">아직 게시글이 없습니다. 첫 글을 남겨보세요!</div>';
+    const s=d.data();
+    const mine=s.claimedBy===JME.uid;
+    const taken=!!s.claimedBy;
+    return '<div class="urow"><div class="grow"><b>'+esc(s.school)+'</b> <span style="font-size:12px;color:var(--blue);font-weight:800">'+esc(s.region)+'</span>'
+      +'<div class="sub3">'+esc(s.type)+' · 희망 '+esc(s.d1||'')+' · 24회차</div></div>'
+      +(mine?'<span style="font-size:13px;font-weight:800;color:#0f766e">✓ 내가 지명함 (검토 중)</span>'
+        :taken?'<span style="font-size:13px;font-weight:700;color:#a8aeb8">마감 ('+esc(s.claimedName)+')</span>'
+        :'<button class="btn-sub" onclick="claim(\''+d.id+'\')">지명 신청</button>')
+      +'</div>';
+  }).join(''):'<div class="bempty">현재 배정 가능한 학교가 없습니다. 선정 발표 후 열립니다.</div>';
 }
-async function openPost(id){
-  const row=document.getElementById('p-'+id);
-  if(row.classList.contains('open')){row.classList.remove('open');return}
-  row.classList.add('open');
-  const box=document.getElementById('b-'+id);
-  const doc=await DB.collection('posts').doc(id).get(); const v=doc.data();
-  const cs=await DB.collection('posts').doc(id).collection('comments').orderBy('createdAt').get();
-  box.innerHTML='<div style="white-space:pre-line;padding-bottom:14px">'+esc(v.body)+'</div>'
-    +'<div style="font-size:13px;font-weight:800;color:var(--gray)">댓글 '+cs.size+'</div>'
-    +cs.docs.map(c=>{const w=c.data();return '<div class="cmt"><b>'+esc(w.name)+'</b><span class="lvmini" style="background:'+LVC[w.level||1]+'">Lv.'+(w.level||1)+'</span> '+esc(w.body)+' <span style="color:#a8aeb8;font-size:12px">'+fmtDate(w.createdAt)+'</span></div>'}).join('')
-    +'<div class="cmt-form"><input id="c-'+id+'" placeholder="댓글 입력"><button class="btn-sub" onclick="writeCmt(\''+id+'\')">등록</button></div>'
-    +((ME&&(v.uid===ME.uid||MYDOC.role==='admin'))?'<div style="margin-top:10px"><button class="btn-sub" style="background:#8a919d" onclick="delPost(\''+id+'\')">글 삭제</button></div>':'');
-}
-async function writePost(){
-  const t=document.getElementById('pTitle').value.trim(), b=document.getElementById('pBody').value.trim();
-  if(!t||!b){document.getElementById('pMsg').textContent='제목과 내용을 입력하세요';document.getElementById('pMsg').className='msg err';return}
-  await DB.collection('posts').add({uid:ME.uid,name:MYDOC.name,level:lvOf(MYDOC.points||0),
-    cat:document.getElementById('pCat').value,title:t,body:b,
-    createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-  document.getElementById('pTitle').value='';document.getElementById('pBody').value='';
-  document.getElementById('pForm').classList.remove('show');load();
-}
-async function writeCmt(id){
-  const inp=document.getElementById('c-'+id); const b=inp.value.trim(); if(!b)return;
-  await DB.collection('posts').doc(id).collection('comments').add({uid:ME.uid,name:MYDOC.name,level:lvOf(MYDOC.points||0),body:b,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-  document.getElementById('p-'+id).classList.remove('open');openPost(id);
-}
-async function delPost(id){
-  if(!confirm('이 글을 삭제할까요?'))return;
-  await DB.collection('posts').doc(id).delete();load();
+async function claim(id){
+  if(JMY.region && JR!=='전체'){} // region check below
+  const ref=DB.collection('openSlots').doc(id);
+  try{
+    await DB.runTransaction(async t=>{
+      const doc=await t.get(ref);
+      if(!doc.exists)throw new Error('마감된 학교입니다');
+      if(doc.data().claimedBy)throw new Error('이미 다른 리더가 지명했습니다');
+      if(doc.data().region!==JMY.region)throw new Error('본인 권역('+JMY.region+')의 학교만 신청할 수 있습니다');
+      t.update(ref,{claimedBy:JME.uid,claimedName:JMY.name,claimedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    });
+    alert('지명 완료! 사무국 확정 후 개별 연락드립니다.');
+  }catch(e){alert(e.message)}
+  loadSlots();
 }
 </script>
 
