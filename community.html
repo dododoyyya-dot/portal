@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>커뮤니티 | 대한민국플라잉디스크연맹</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="util"><div class="wrap">
+  <div><b>대한민국플라잉디스크연맹</b> · 대한체육회 인정단체</div>
+  <div><a href="mailto:kfdf60@hanmail.net">kfdf60@hanmail.net</a> &nbsp;|&nbsp; 031-984-3248 &nbsp;|&nbsp; <a href="login.html" style="color:#fff;font-weight:700">로그인</a> · <a href="mypage.html" style="color:#fff;font-weight:700">마이페이지</a></div>
+</div></div>
+<header><div class="wrap nav">
+  <a href="index.html" class="brand">
+    <img src="kfdf_logo.png" alt="대한민국플라잉디스크연맹 로고">
+    <div><div class="t1">대한민국플라잉디스크연맹</div><div class="t2">KOREA FLYING DISC FEDERATION</div></div>
+  </a>
+  <button class="hamb" onclick="document.querySelector('.menu').classList.toggle('open')">☰</button>
+  <nav class="menu">
+    <div><a href="about.html" class="top">연맹소개</a>
+      <div class="drop">
+        <a href="about.html#greet">인사말 · 미션</a>
+        <a href="about.html#org">조직도</a>
+        <a href="about.html#rule">정관 · 규정</a>
+        <a href="about.html#region">시도연맹</a>
+        <a href="about.html#way">오시는 길</a>
+      </div></div>
+    <div><a href="business.html" class="top">주요사업</a>
+      <div class="drop">
+        <a href="business.html#youth">유소년 스포츠 기반구축</a>
+        <a href="certification.html">체육지도자 자격검정</a>
+        <a href="competition.html">대회 · 심판</a>
+        <a href="leader.html">지도자 연수 · 마스터 리더</a>
+      </div></div>
+    <div><a href="certification.html" class="top">자격검정</a></div>
+    <div><a href="competition.html" class="top">대회</a></div>
+    <div><a href="leader.html" class="top">마스터 리더</a></div>
+    <div><a href="community.html" class="top active">커뮤니티</a></div>
+    <div><a href="notice.html" class="top">알림마당</a>
+      <div class="drop">
+        <a href="notice.html">공지사항 · 공고</a>
+        <a href="archive.html">자료실 (서식 다운로드)</a>
+      </div></div>
+    <a href="2026_kfdf_portal.html" class="cta">유소년사업 포털</a>
+  </nav>
+</div></header>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",
+  authDomain: "koreaflyingdiscfederation.firebaseapp.com",
+  projectId: "koreaflyingdiscfederation",
+  storageBucket: "koreaflyingdiscfederation.firebasestorage.app",
+  messagingSenderId: "1081847355343",
+  appId: "1:1081847355343:web:ca40ed9a52e13f607f64ba"
+};
+firebase.initializeApp(firebaseConfig);
+const AUTH = firebase.auth();
+const DB = firebase.firestore();
+const LVS = [[0,'어쏘 리더'],[100,'필드 리더'],[300,'치프 리더'],[600,'엘리트 리더'],[1000,'마스터 리더']];
+const LVC = {1:'#8a919d',2:'#1F4E9C',3:'#7c3aed',4:'#C41E2F',5:'#b8860b'};
+function lvOf(p){let l=0;LVS.forEach((v,i)=>{if(p>=v[0])l=i});return l+1}
+function lvName(p){return LVS[lvOf(p)-1][1]}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')}
+</script>
+<style>
+.authbox{max-width:460px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:38px;box-shadow:0 14px 34px rgba(17,17,20,.06)}
+.authbox h3{font-size:22px;font-weight:900;margin-bottom:20px}
+.authbox label{display:block;font-size:13.5px;font-weight:700;color:var(--gray);margin:14px 0 6px}
+.authbox input,.authbox select,.authbox textarea{width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;font-family:inherit}
+.authbox input:focus,.authbox select:focus,.authbox textarea:focus{outline:none;border-color:var(--blue)}
+.btn-main{width:100%;margin-top:22px;background:var(--red);color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit}
+.btn-main:hover{background:var(--red-dark)}
+.btn-sub{background:var(--black);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-sub:hover{background:var(--red)}
+.authtabs{display:flex;gap:8px;margin-bottom:22px}
+.authtabs button{flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit}
+.authtabs button.on{background:var(--black);color:#fff;border-color:var(--black)}
+.msg{margin-top:14px;font-size:13.5px;font-weight:700;min-height:20px}
+.msg.err{color:var(--red)} .msg.ok{color:#0f766e}
+.lvchip2{display:inline-block;color:#fff;font-weight:900;font-size:13px;padding:5px 14px;border-radius:999px}
+.pending-banner{background:#fff8e6;border:1.5px solid #e6b422;border-radius:12px;padding:16px 20px;font-size:14.5px;color:#7a5b00;margin-bottom:24px}
+.mycard{background:linear-gradient(120deg,#0f1013,#1a1c22 60%,#153A77);border-radius:20px;padding:36px;color:#fff}
+.post-form{background:var(--bg-soft);border-radius:14px;padding:24px;margin-bottom:26px;display:none}
+.post-form.show{display:block}
+.post-form input,.post-form select,.post-form textarea{width:100%;padding:11px 13px;border:1.5px solid var(--line);border-radius:10px;font-size:14.5px;font-family:inherit;margin-bottom:10px;background:#fff}
+.cmt{padding:10px 0;border-top:1px dashed var(--line);font-size:14px}
+.cmt b{font-size:13.5px}
+.cmt .lvmini{font-size:11px;font-weight:900;color:#fff;padding:2px 8px;border-radius:999px;margin-left:6px}
+.cmt-form{display:flex;gap:8px;margin-top:12px}
+.cmt-form input{flex:1;padding:10px 13px;border:1.5px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit}
+.admin-tab{display:flex;gap:8px;margin-bottom:24px}
+.admin-tab button{padding:10px 20px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-weight:800;cursor:pointer;font-family:inherit}
+.admin-tab button.on{background:var(--black);color:#fff;border-color:var(--black)}
+.urow{display:flex;align-items:center;gap:14px;padding:14px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.urow .grow{flex:1;min-width:200px}
+.urow b{font-size:15.5px}
+.urow .sub3{font-size:12.5px;color:var(--gray)}
+</style>
+
+<div class="phero"><div class="wrap">
+  <div class="crumb">HOME &nbsp;›&nbsp; <b>커뮤니티</b></div>
+  <h1>리더 커뮤니티</h1><p>마스터 리더 회원 전용 공간 — 활동 후기와 정보를 나눠보세요.</p>
+</div></div>
+<section><div class="wrap" style="max-width:1000px">
+  <div id="gate" class="pending-banner" style="display:none"></div>
+  <div id="commBody" style="display:none">
+    <div class="board-tools">
+      <div class="cats" id="catBtns">
+        <button class="bcat on" data-c="전체">전체</button>
+        <button class="bcat" data-c="자유">자유</button>
+        <button class="bcat" data-c="활동후기">활동후기</button>
+        <button class="bcat" data-c="질문">질문</button>
+      </div>
+      <div class="bsearch"><button class="btn-sub" onclick="document.getElementById('pForm').classList.toggle('show')">✏️ 글쓰기</button></div>
+    </div>
+    <div class="post-form" id="pForm">
+      <select id="pCat"><option>자유</option><option>활동후기</option><option>질문</option></select>
+      <input id="pTitle" placeholder="제목">
+      <textarea id="pBody" rows="5" placeholder="내용을 입력하세요"></textarea>
+      <button class="btn-sub" onclick="writePost()">등록</button>
+      <span class="msg" id="pMsg" style="margin-left:10px"></span>
+    </div>
+    <div class="board" id="postList"><div class="bempty">불러오는 중…</div></div>
+  </div>
+</div></section>
+<script>
+let ME=null, MYDOC=null, CAT='전체';
+AUTH.onAuthStateChanged(async u=>{
+  const gate=document.getElementById('gate');
+  if(!u){gate.style.display='block';gate.innerHTML='🔒 회원 전용 공간입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 하러 가기 →</a>';return}
+  ME=u;
+  const doc=await DB.collection('users').doc(u.uid).get(); MYDOC=doc.data();
+  if(!MYDOC||MYDOC.status!=='approved'){gate.style.display='block';gate.innerHTML='⏳ 사무국 승인 후 이용할 수 있습니다. 승인 상태는 <a href="mypage.html" style="font-weight:800;color:var(--red)">마이페이지</a>에서 확인하세요.';return}
+  document.getElementById('commBody').style.display='block';
+  load();
+});
+document.querySelectorAll('#catBtns .bcat').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#catBtns .bcat').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');CAT=b.dataset.c;load();
+});
+async function load(){
+  let q=DB.collection('posts').orderBy('createdAt','desc').limit(50);
+  const snap=await q.get();
+  const list=snap.docs.filter(d=>CAT==='전체'||d.data().cat===CAT);
+  const el=document.getElementById('postList');
+  el.innerHTML=list.length?list.map(d=>{
+    const v=d.data(),lv=v.level||1;
+    return '<div class="brow" id="p-'+d.id+'"><div class="head" onclick="openPost(\''+d.id+'\')" style="grid-template-columns:70px 1fr 190px 90px">'
+      +'<div class="cat">'+esc(v.cat)+'</div><div class="tt">'+esc(v.title)+'</div>'
+      +'<div style="font-size:13px;text-align:center"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';font-size:11px;font-weight:900;color:#fff;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span></div>'
+      +'<div class="dt">'+fmtDate(v.createdAt)+'</div></div>'
+      +'<div class="body" id="b-'+d.id+'"></div></div>';
+  }).join(''):'<div class="bempty">아직 게시글이 없습니다. 첫 글을 남겨보세요!</div>';
+}
+async function openPost(id){
+  const row=document.getElementById('p-'+id);
+  if(row.classList.contains('open')){row.classList.remove('open');return}
+  row.classList.add('open');
+  const box=document.getElementById('b-'+id);
+  const doc=await DB.collection('posts').doc(id).get(); const v=doc.data();
+  const cs=await DB.collection('posts').doc(id).collection('comments').orderBy('createdAt').get();
+  box.innerHTML='<div style="white-space:pre-line;padding-bottom:14px">'+esc(v.body)+'</div>'
+    +'<div style="font-size:13px;font-weight:800;color:var(--gray)">댓글 '+cs.size+'</div>'
+    +cs.docs.map(c=>{const w=c.data();return '<div class="cmt"><b>'+esc(w.name)+'</b><span class="lvmini" style="background:'+LVC[w.level||1]+'">Lv.'+(w.level||1)+'</span> '+esc(w.body)+' <span style="color:#a8aeb8;font-size:12px">'+fmtDate(w.createdAt)+'</span></div>'}).join('')
+    +'<div class="cmt-form"><input id="c-'+id+'" placeholder="댓글 입력"><button class="btn-sub" onclick="writeCmt(\''+id+'\')">등록</button></div>'
+    +((ME&&(v.uid===ME.uid||MYDOC.role==='admin'))?'<div style="margin-top:10px"><button class="btn-sub" style="background:#8a919d" onclick="delPost(\''+id+'\')">글 삭제</button></div>':'');
+}
+async function writePost(){
+  const t=document.getElementById('pTitle').value.trim(), b=document.getElementById('pBody').value.trim();
+  if(!t||!b){document.getElementById('pMsg').textContent='제목과 내용을 입력하세요';document.getElementById('pMsg').className='msg err';return}
+  await DB.collection('posts').add({uid:ME.uid,name:MYDOC.name,level:lvOf(MYDOC.points||0),
+    cat:document.getElementById('pCat').value,title:t,body:b,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  document.getElementById('pTitle').value='';document.getElementById('pBody').value='';
+  document.getElementById('pForm').classList.remove('show');load();
+}
+async function writeCmt(id){
+  const inp=document.getElementById('c-'+id); const b=inp.value.trim(); if(!b)return;
+  await DB.collection('posts').doc(id).collection('comments').add({uid:ME.uid,name:MYDOC.name,level:lvOf(MYDOC.points||0),body:b,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  document.getElementById('p-'+id).classList.remove('open');openPost(id);
+}
+async function delPost(id){
+  if(!confirm('이 글을 삭제할까요?'))return;
+  await DB.collection('posts').doc(id).delete();load();
+}
+</script>
+
+<footer><div class="wrap">
+  <div class="top">
+    <div class="f-brand"><img src="kfdf_logo.png" alt="로고">
+      <div><b>대한민국플라잉디스크연맹</b><span>KOREA FLYING DISC FEDERATION</span></div></div>
+    <div class="links">
+      <a href="about.html">연맹소개</a><a href="business.html">주요사업</a>
+      <a href="notice.html">알림마당</a><a href="archive.html">자료실</a>
+      <a href="2026_kfdf_portal.html">유소년사업 포털</a>
+    </div>
+  </div>
+  <div class="bottom">
+    <b>사단법인 대한민국플라잉디스크연맹</b> &nbsp;|&nbsp; 경기도 김포시 김포대로 1185 (장기동)<br>
+    TEL 031-984-3248 &nbsp;|&nbsp; EMAIL kfdf60@hanmail.net<br>
+    © 2026 KOREA FLYING DISC FEDERATION. All rights reserved.
+  </div>
+</div></footer>
+</body>
+</html>
