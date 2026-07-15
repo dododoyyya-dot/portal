@@ -3,9 +3,9 @@
 // 접수확인·선정통보·회원승인 메일이 자동 발송됩니다. 비워두면 메일 없이 정상 작동합니다.
 window.KFDF_CONFIG = {
   emailjs: {
-    publicKey: "",     // EmailJS > Account > Public Key
-    serviceId: "",     // EmailJS > Email Services > Service ID
-    templateId: ""     // EmailJS > Email Templates > Template ID (변수: to_email, subject, message)
+    publicKey: "mF6dxXDbXHdbJ3Ihb",     // EmailJS > Account > Public Key
+    serviceId: "kfdf60",     // EmailJS > Email Services > Service ID
+    templateId: "template_l4vtrwe"     // EmailJS > Email Templates > Template ID (변수: to_email, subject, message)
   },
   adminEmail: "kfdf60@hanmail.net"
 };
