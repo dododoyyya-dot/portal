@@ -153,6 +153,11 @@ function orgChip(o,region,title){
       <button class="btn-sub" style="background:#b8860b;font-size:15px;padding:12px 22px" onclick="printCert()">이수증 발급 (인쇄·PDF)</button>
     </div>
   </div>
+  <div id="contractBox" style="display:none;margin-top:44px">
+    <h3 class="sub">위촉 계약 (배정 학교)</h3>
+    <div class="board" id="contractList"></div>
+    <div class="note" style="margin-top:14px">계약서를 확인한 뒤 <b>전자 동의</b>하면 서면 서명을 대체하는 동의 일시가 기록되며, 언제든 계약서를 인쇄·PDF 저장할 수 있습니다. 수당 지급 정보(계좌 등)는 사무국이 별도 안내하는 방법으로 제출합니다.</div>
+  </div>
   <h3 class="sub" style="margin-top:44px">위촉 전자동의</h3>
   <div class="authbox" style="max-width:none" id="consentBox">
     <div id="consentDone" style="display:none;color:#0f766e;font-weight:800;font-size:15px"></div>
@@ -174,7 +179,7 @@ function orgChip(o,region,title){
   <div class="note" style="margin-top:20px"><b>포인트 반영 안내</b> — 연맹 주관 활동(강습·심판·연수)은 사무국이 확인 후 자동 반영됩니다. 외부 공식행사는 증빙(위촉장·확인서)을 kfdf60@hanmail.net 으로 보내주세요.</div>
 </div></section>
 <script>
-let MYD=null;
+let MYD=null;let MYASG=[];
 async function doConsent(){
   const m=document.getElementById('cMsg');
   if(!document.getElementById('c1').checked||!document.getElementById('c2').checked||!document.getElementById('c3').checked){
@@ -197,6 +202,11 @@ AUTH.onAuthStateChanged(async u=>{
     document.getElementById('certBox').style.display='block';
     document.getElementById('certNo').textContent=certNo();
   }
+  try{
+    const asg=await DB.collection('schoolApplications').where('assignedUid','==',u.uid).get();
+    MYASG=asg.docs.filter(x=>x.data().status==='배정완료');
+    if(MYASG.length){document.getElementById('contractBox').style.display='block';renderContracts();}
+  }catch(e){}
   const lv=lvOf(d.points||0);
   const chip=document.getElementById('myLv');
   chip.textContent='Lv.'+lv+' '+lvName(d.points||0); chip.style.background=LVC[lv];
@@ -217,6 +227,62 @@ AUTH.onAuthStateChanged(async u=>{
   el.innerHTML=acts.empty?'<div class="bempty">아직 기록된 활동이 없습니다.</div>':
     acts.docs.map(a=>{const v=a.data();return '<div class="brow"><div class="head" style="grid-template-columns:110px 1fr 90px"><div class="dt">'+esc(v.date)+'</div><div class="tt" style="font-size:15px">'+esc(v.label)+'</div><div class="cat" style="color:var(--red);font-weight:900">+'+v.points+'P</div></div></div>'}).join('');
 });
+function renderContracts(){
+  const done=(MYD.contracts||{});
+  document.getElementById('contractList').innerHTML=MYASG.map(x=>{
+    const a=x.data();const ag=done[x.id];
+    const period=(a.start&&a.start.indexOf('8월')>=0)?'2026. 8. ~ 12. (여름방학 개강)':'2026. 9. ~ 12.';
+    return '<div class="urow"><div class="grow"><b>'+esc(a.school)+'</b> <span style="font-size:11.5px;color:var(--gray)">'+esc(a.type)+' · 24회차 · '+period+'</span>'
+      +'<div class="sub3">'+(ag?'<b style="color:#0f766e">✓ 전자 동의 완료 ('+fmtDate(ag.agreedAt)+')</b>':'<b style="color:#C41E2F">동의 전 — 계약서 확인 후 동의해주세요</b>')+'</div></div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +'<button class="btn-sub" onclick="printContract(\''+x.id+'\')">'+(ag?'계약서 인쇄·PDF':'계약서 보기')+'</button>'
+      +(ag?'':'<button class="btn-sub" style="background:#0f766e" onclick="agreeContract(\''+x.id+'\')">전자 동의하기</button>')
+      +'</div></div>';
+  }).join('');
+}
+async function agreeContract(id){
+  const a=MYASG.find(x=>x.id===id).data();
+  if(!confirm('['+a.school+'] 강습 위촉계약 내용을 확인하였으며 이에 동의합니다.\n동의 일시가 전자적으로 기록되어 서면 서명을 대체합니다.'))return;
+  const c=Object.assign({},MYD.contracts||{});
+  c[id]={school:a.school,agreedAt:firebase.firestore.Timestamp.now()};
+  await DB.collection('users').doc(AUTH.currentUser.uid).update({contracts:c});
+  MYD.contracts=c;renderContracts();
+}
+function printContract(id){
+  const a=MYASG.find(x=>x.id===id).data();
+  const ag=(MYD.contracts||{})[id];
+  const logo=new URL('kfdf_logo.png',location.href).href;
+  const seal=new URL('\uc9c1\uc778.png',location.href).href;
+  const period=(a.start&&a.start.indexOf('8월')>=0)?'2026. 8. ~ 2026. 12.':'2026. 9. ~ 2026. 12.';
+  const w=window.open('','_blank');
+  if(!w){alert('\ud31d\uc5c5\uc774 \ucc28\ub2e8\ub418\uc5b4 \uc788\uc2b5\ub2c8\ub2e4. \ud31d\uc5c5 \ud5c8\uc6a9 \ud6c4 \ub2e4\uc2dc \uc2dc\ub3c4\ud574\uc8fc\uc138\uc694.');return}
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>\uc704\ucd09\uacc4\uc57d\uc11c</title>'
+  +'<style>@page{size:A4;margin:0}body{margin:0;font-family:"Malgun Gothic",sans-serif;display:flex;justify-content:center;background:#f2f2f2}'
+  +'.doc{width:210mm;min-height:297mm;background:#fff;box-sizing:border-box;padding:22mm 20mm;font-size:13.5px;line-height:1.85;color:#222;word-break:keep-all}'
+  +'h1{text-align:center;font-size:24px;margin:4mm 0 8mm}'
+  +'.sub0{text-align:center;color:#666;font-size:13px;margin-bottom:2mm}'
+  +'h2{font-size:14.5px;color:#1F4E9C;margin:6mm 0 1mm}'
+  +'table{width:100%;border-collapse:collapse;margin-top:8mm}td{border:1px solid #999;padding:2.4mm 3mm;font-size:13px}'
+  +'.k{background:#f2f5fa;font-weight:700;width:26mm;text-align:center}'
+  +'.org{display:flex;align-items:center;gap:10px;justify-content:center;font-size:20px;font-weight:800;letter-spacing:3px;margin-top:8mm;position:relative}'
+  +'.org img.lg{width:44px;height:44px;object-fit:contain}'
+  +'.orgwrap{position:relative;display:inline-flex;align-items:center;gap:10px;white-space:nowrap}'
+  +'.seal{position:absolute;right:-34px;top:50%;transform:translateY(-52%);width:64px;height:64px;object-fit:contain;mix-blend-mode:multiply;opacity:.92}'
+  +'@media print{body{background:#fff}}</style></head><body><div class="doc">'
+  +'<div class="sub0">2026\ub144 \uc720\uc18c\ub144 \uc2a4\ud3ec\uce20 \uae30\ubc18\uad6c\ucd95\uc0ac\uc5c5</div>'
+  +'<h1>\uac15\uc2b5 \uac15\uc0ac \uc704\ucd09\uacc4\uc57d\uc11c</h1>'
+  +'<p>\uc0ac\ub2e8\ubc95\uc778 \ub300\ud55c\ubbfc\uad6d\ud50c\ub77c\uc789\ub514\uc2a4\ud06c\uc5f0\ub9f9(\uc774\ud558 "\uac11")\uacfc \uac15\uc0ac <b>'+esc(MYD.name)+'</b>(\uc774\ud558 "\uc744")\uc740 \ub2e4\uc74c\uacfc \uac19\uc774 \uacc4\uc57d\uc744 \uccb4\uacb0\ud55c\ub2e4.</p>'
+  +'<h2>\uc81c1\uc870 (\uc704\ucd09 \uc5c5\ubb34)</h2><p>\uac11\uc740 \uc744\uc744 \uc544\ub798 \ud559\uad50\uc758 \ud50c\ub77c\uc789\ub514\uc2a4\ud06c \uac15\uc2b5 \uac15\uc0ac\ub85c \uc704\ucd09\ud558\uace0, \uc744\uc740 \ud574\ub2f9 \ud504\ub85c\uadf8\ub7a8(24\ud68c\ucc28)\uc744 \uc131\uc2e4\ud788 \uc9c0\ub3c4\ud55c\ub2e4.<br>\u2022 \ubc30\uc815 \ud559\uad50: <b>'+esc(a.school)+'</b> ('+esc(a.type)+')<br>\u2022 \uc6b4\uc601 \uae30\uac04: '+period+' (\uc138\ubd80 \uc77c\uc815\uc740 \ud559\uad50\uc640 \ud611\uc758)</p>'
+  +'<h2>\uc81c2\uc870 (\uac15\uc0ac\ub8cc)</h2><p>\uac15\uc0ac\ub8cc\ub294 \uc2dc\uac04\ub2f9 50,000\uc6d0\uc73c\ub85c \ud558\uba70, \uac11\uc740 \uad00\ub828 \ubc95\ub839\uc5d0 \ub530\ub978 \uc81c\uc138\uacf5\uacfc\uae08\uc744 \uc6d0\ucc9c\uc9d5\uc218\ud55c \ud6c4 \uc744\uc774 \uc9c0\uc815\ud558\ub294 \uacc4\uc88c\ub85c \uc6d4\ubcc4 \uc9c0\uae09\ud55c\ub2e4. (\uc6b4\uc601\uc77c\uc9c0 \uc81c\ucd9c \ud655\uc778 \ud6c4)</p>'
+  +'<h2>\uc81c3\uc870 (\uc131\uc2e4\u00b7\uc548\uc804 \uc758\ubb34)</h2><p>\uc744\uc740 \uc720\uc18c\ub144 \uc548\uc804\uc744 \ucd5c\uc6b0\uc120\uc73c\ub85c \ud558\uba70, \uc6b4\uc601\uc77c\uc9c0 \uc791\uc131 \ub4f1 \uac11\uc774 \uc694\uccad\ud558\ub294 \uc99d\ube59\uc5d0 \ud611\uc870\ud55c\ub2e4. \uc544\ub3d9\ud559\ub300\u00b7\uc131\ubc94\uc8c4 \uacb0\uaca9\uc0ac\uc720\uac00 \ud655\uc778\ub420 \uacbd\uc6b0 \uc704\ucd09\uc740 \uc989\uc2dc \ud574\uc9c0\ub41c\ub2e4.</p>'
+  +'<h2>\uc81c4\uc870 (\uac1c\uc778\uc815\ubcf4)</h2><p>\uac11\uc740 \uac15\uc0ac\ub8cc \uc9c0\uae09\u00b7\uc6d0\ucc9c\uc9d5\uc218 \uc2e0\uace0\uc5d0 \ud544\uc694\ud55c \ucd5c\uc18c\ud55c\uc758 \uac1c\uc778\uc815\ubcf4\ub97c \uc218\uc9d1\u00b7\uc774\uc6a9\ud558\uba70 \ubcf4\uc874\uae30\uac04 \uacbd\uacfc \ud6c4 \ud30c\uae30\ud55c\ub2e4.</p>'
+  +'<h2>\uc81c5\uc870 (\uc804\uc790\uc11c\uba85)</h2><p>\ubcf8 \uacc4\uc57d\uc740 \uc744\uc774 \uc5f0\ub9f9 \ud648\ud398\uc774\uc9c0\uc5d0\uc11c \ubcf8\uc778 \uc778\uc99d \ud6c4 \uc804\uc790\uc801\uc73c\ub85c \ub3d9\uc758\ud55c \uc2dc\uc810\uc5d0 \uc131\ub9bd\ud558\uba70, \uae30\ub85d\ub41c \ub3d9\uc758 \uc77c\uc2dc\ub294 \uc11c\uba74 \uc11c\uba85\uc744 \uac08\uc74c\ud55c\ub2e4.</p>'
+  +'<table><tr><td class="k">\uac11</td><td>\uc0ac\ub2e8\ubc95\uc778 \ub300\ud55c\ubbfc\uad6d\ud50c\ub77c\uc789\ub514\uc2a4\ud06c\uc5f0\ub9f9 \ud68c\uc7a5 &nbsp;(\uc9c1\uc778)</td></tr>'
+  +'<tr><td class="k">\uc744</td><td>'+esc(MYD.name)+' &nbsp;\u2014&nbsp; '+(ag?'<b style="color:#0f766e">\uc804\uc790 \ub3d9\uc758 \uc644\ub8cc: '+fmtDate(ag.agreedAt)+'</b>':'(\uc804\uc790 \ub3d9\uc758 \uc804)')+'</td></tr></table>'
+  +'<div class="org"><span class="orgwrap"><img class="lg" src="'+logo+'">\ub300\ud55c\ubbfc\uad6d\ud50c\ub77c\uc789\ub514\uc2a4\ud06c\uc5f0\ub9f9<img class="seal" src="'+seal+'" onerror="this.style.display=\'none\'"></span></div>'
+  +'</div><script>window.onload=function(){window.print()}<'+'/script></body></html>');
+  w.document.close();
+}
 function certNo(){return 'KFDF-2026-EDU-'+AUTH.currentUser.uid.slice(0,6).toUpperCase()}
 function printCert(){
   const d=MYD;if(!d||!d.edu2026)return;
