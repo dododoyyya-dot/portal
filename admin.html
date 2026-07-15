@@ -81,6 +81,8 @@ function orgChip(o,region,title){
   if(o==='regional')return '<span style="background:#1F4E9C;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83d\udea9 '+esc(region||'')+' \uc5f0\ub9f9'+(title?' \u00b7 '+esc(title):'')+'</span>';
   return '';
 }
+const EDU_ROSTER='강다연,강수경,강유라,경미선,권남혁,권태수,권희찬,김나리,김나연,김남영,김다윤,김미영,김민정,김상훈,김선미,김연상,김연우,김영빈,김유진,김이현,김재우,김정심,김정희,김주현,김지아,김한효,김현서,남궁영민,노현정,류선주,문상우,문현민,박규미,박규성,박기정,박미리,박선희,박성곤,박이슬,박주송,박찬혜,방서인,방수림,방수민,배성호,백지은,성연선,손성민,송희은,신고운이,신세란,신우진,신은상,신호철,안미진,안환기,양지선,엄혁주,여인찬,연선주,염정선,오경민,오주연,우소라,유정미,윤경희,윤연진,윤태경,은보라,이가영,이다봄,이대천,이소희,이솔지,이수환,이승훈,이영진,이영철,이용기,이은실,이은지,이재우,이재천,이지영,이한민,이현표,임성경,임아륜,장경숙,전경윤,전성현,정광섭,정예온,정인용,정지수,정진호,정창윤,조용대,조현숙,조혜진,조홍익,지미연,천관문,천효정,최문규,최윤형,최인향,최종선,최종욱,최종은,최지안,최창훈,한문아,한미향,허지범,황규빈,황성하,황윤경,황인중'.split(',');
+function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>=0}
 </script>
 <style>
 .authbox{max-width:460px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:38px;box-shadow:0 14px 34px rgba(17,17,20,.06)}
@@ -331,7 +333,7 @@ async function loadUsers(){
   el.innerHTML=snap.docs.map(d=>{
     const v=d.data(),lv=lvOf(v.points||0);
     return '<div class="urow"><div class="grow"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span>'
-      +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+' · '+(v.edu2026?'연수이수':'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+'</div></div>'
+      +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+' · '+(v.edu2026?('연수이수 '+(inRoster(v.name)?'<b style="color:#0f766e">✓명단확인</b>':'<b style="color:#C41E2F">⚠명단에없음</b>')):'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+'</div></div>'
       +(v.status==='approved'
         ?'<span style="font-size:13px;font-weight:800;color:#0f766e">승인됨</span>'
         :'<button class="btn-sub" onclick="approve(\''+d.id+'\')">승인하기</button>')
@@ -374,6 +376,22 @@ async function setOrg(uid){
 async function approve(uid){
   const doc=await DB.collection('users').doc(uid).get();
   const d=doc.data();
+  if(d.edu2026){
+    if(inRoster(d.name)){
+      if(!confirm('📋 명단 일치 — ['+d.name+'] 연수 이수자 명단에 있습니다.\n이수 인증(🎓뱃지 + 50P + 이수증 발급)과 함께 승인할까요?'))return;
+    }else{
+      if(confirm('⚠ ['+d.name+'] 연수 이수자 명단에 없습니다!\n\n[확인] = 그래도 이수 인증으로 승인 (명단 누락 등 직접 확인한 경우만)\n[취소] = 다음 단계로')){
+        // 예외 승인 진행
+      }else{
+        if(confirm('['+d.name+'] 을(를) 일반 회원으로 승인할까요?\n(이수 체크 해제, 🎓·50P·이수증 혜택 없음)')){
+          await DB.collection('users').doc(uid).update({status:'approved',edu2026:false});
+          kfdfMail(d.email,'[플라잉디스크연맹] 리더 회원 승인 완료','안녕하세요 '+d.name+' 님, 리더 회원 승인이 완료되었습니다.\n홈페이지에 로그인하여 활동을 시작해보세요.\n※ 연수 이수 확인이 필요하면 사무국(031-984-3248)으로 문의해주세요.');
+          loadDash();loadUsers();return;
+        }
+        return;
+      }
+    }
+  }
   if(d.edu2026&&!(d.points>0)){
     await DB.collection('users').doc(uid).update({status:'approved',points:50});
     await DB.collection('users').doc(uid).collection('activities').add({
