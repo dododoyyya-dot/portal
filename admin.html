@@ -334,11 +334,18 @@ async function loadUsers(){
   el.innerHTML=snap.docs.map(d=>{
     const v=d.data(),lv=lvOf(v.points||0);
     return '<div class="urow"><div class="grow"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span>'
-      +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+' · '+(v.edu2026?('연수이수 '+(inRoster(v.name)?'<b style="color:#0f766e">✓명단확인</b>':'<b style="color:#C41E2F">⚠명단에없음</b>')):'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+((v.instructorFor&&v.instructorFor.referee)?' · <b style="color:#7c3aed">심판요원 지원</b>':'')+((v.instructorFor&&v.instructorFor.staff)?' · <b style="color:#b8860b">운영요원 지원</b>':'')+'</div></div>'
+      +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+' · '+(v.edu2026?('연수이수 '+(inRoster(v.name)?'<b style="color:#0f766e">✓명단확인</b>':'<b style="color:#C41E2F">⚠명단에없음</b>')):'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+((v.instructorFor&&v.instructorFor.referee)?' · <b style="color:#7c3aed">심판요원 지원</b>':'')+((v.instructorFor&&v.instructorFor.staff)?' · <b style="color:#b8860b">운영요원 지원</b>':'')+'</div>'
+      +'<div class="sub3" style="margin-top:3px">위촉검증: '
+      +((v.consents&&v.consents.agreedAt)?'<b style="color:#0f766e">✓전자동의 '+fmtDate(v.consents.agreedAt)+'</b>':'<b style="color:#C41E2F">✗전자동의 전</b>')
+      +' · '
+      +(v.crimDoc?'<b style="color:#0f766e">✓회보서 수령</b>':'<b style="color:#C41E2F">✗회보서 미수령</b>')
+      +((v.consents&&v.consents.agreedAt&&v.crimDoc)?' <span style="background:#0f766e;color:#fff;font-weight:900;font-size:11px;padding:2px 10px;border-radius:999px">위촉 가능</span>':'')
+      +'</div></div>'
       +(v.status==='approved'
         ?'<span style="font-size:13px;font-weight:800;color:#0f766e">승인됨</span>'
         :'<button class="btn-sub" onclick="approve(\''+d.id+'\')">승인하기</button>')
       +'<button class="btn-sub" style="background:#1F4E9C" onclick="setOrg(\''+d.id+'\')">직책</button>'
+      +'<button class="btn-sub" style="background:'+(v.crimDoc?'#0f766e':'#8a919d')+'" onclick="toggleCrim(\''+d.id+'\')">'+(v.crimDoc?'회보서 ✓':'회보서 체크')+'</button>'
       +'</div>';
   }).join('')||'<div class="bempty">회원이 없습니다.</div>';
   const sel=document.getElementById('axUser');
@@ -369,6 +376,13 @@ async function backfillCerts(){
   }
   alert('완료 — 검증코드 '+cert+'건 / 50P 소급 지급 '+pt+'명');
   loadDash();loadUsers();
+}
+async function toggleCrim(uid){
+  const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
+  const now=!d.crimDoc;
+  if(!confirm(now?('['+d.name+'] 범죄경력회보서를 이메일로 받아 확인했습니까?\n(수령 처리)'):('['+d.name+'] 회보서 수령을 취소 처리할까요?')))return;
+  await DB.collection('users').doc(uid).update({crimDoc:now,crimDocAt:firebase.firestore.FieldValue.serverTimestamp()});
+  loadUsers();
 }
 async function setOrg(uid){
   const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
