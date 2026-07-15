@@ -132,10 +132,23 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <button id="t2" onclick="tab(2)">포인트 부여</button>
       <button id="t3" onclick="tab(3)">강습 신청 관리</button>
       <button id="t4" onclick="tab(4)">대회 요원</button>
+      <button id="t5" onclick="tab(5)">단체 메일</button>
     </div>
     <div id="v1">
       <div style="margin-bottom:14px"><button class="btn-sub" style="background:#b8860b" onclick="backfillCerts()">🎓 이수자 일괄 정리 (검증코드 생성 + 연수 50P 소급 지급)</button></div>
       <div class="board" id="userList"><div class="bempty">불러오는 중…</div></div></div>
+    <div id="v5" style="display:none">
+      <div class="authbox" style="max-width:720px;margin:0">
+        <h3>단체 메일 발송</h3>
+        <p style="font-size:13px;color:var(--gray)">받는 사람마다 개별 발송됩니다 (주소 상호 노출 없음). EmailJS 발송량이 차감되니 필요한 만큼만 보내세요.</p>
+        <label>받는 사람 이메일 (한 줄에 하나씩, 쉼표도 가능)</label>
+        <textarea id="bmTo" rows="7" placeholder="hong@school.kr&#10;kim@school.kr"></textarea>
+        <label>제목</label><input id="bmSubject" placeholder="[대한민국플라잉디스크연맹] 공식 홈페이지 오픈 안내">
+        <label>내용</label><textarea id="bmBody" rows="12"></textarea>
+        <button class="btn-main" onclick="bulkMail()" id="bmBtn">발송 시작</button>
+        <div class="msg" id="bmMsg"></div>
+      </div>
+    </div>
     <div id="v4" style="display:none">
       <div class="authbox" style="max-width:640px;margin:0 0 26px">
         <h3>대회 요원 모집 등록</h3>
@@ -197,7 +210,7 @@ AUTH.onAuthStateChanged(async u=>{
   loadUsers();
 });
 function tab(n){
-  [1,2,3,4].forEach(i=>{
+  [1,2,3,4,5].forEach(i=>{
     document.getElementById('t'+i).classList.toggle('on',i===n);
     document.getElementById('v'+i).style.display=i===n?'block':'none';
   });
@@ -422,6 +435,32 @@ async function backfillCerts(){
   }
   alert('완료 — 검증코드 '+cert+'건 / 50P 소급 지급 '+pt+'명');
   loadDash();loadUsers();
+}
+async function bulkMail(){
+  const m=document.getElementById('bmMsg'),btn=document.getElementById('bmBtn');
+  const subj=document.getElementById('bmSubject').value.trim();
+  const body=document.getElementById('bmBody').value;
+  const raw=document.getElementById('bmTo').value;
+  const list=[...new Set(raw.split(/[\n,;]+/).map(x=>x.trim()).filter(x=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)))];
+  if(!list.length){m.textContent='유효한 이메일 주소가 없습니다';m.className='msg err';return}
+  if(!subj||!body.trim()){m.textContent='제목과 내용을 입력하세요';m.className='msg err';return}
+  if(!window.KFDF_CONFIG.emailjs.publicKey){m.textContent='site_config.js에 EmailJS 설정이 없습니다';m.className='msg err';return}
+  if(!confirm(list.length+'명에게 개별 발송합니다. 진행할까요?'))return;
+  btn.disabled=true;
+  let ok=0;const fail=[];
+  for(let i=0;i<list.length;i++){
+    m.textContent='발송 중… '+(i+1)+'/'+list.length;m.className='msg';
+    try{
+      const c=window.KFDF_CONFIG.emailjs;
+      if(!window.emailjs){await new Promise((r,j)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';sc.onload=r;sc.onerror=j;document.head.appendChild(sc)});window.emailjs.init({publicKey:c.publicKey});}
+      await window.emailjs.send(c.serviceId,c.templateId,{to_email:list[i],subject:subj,message:body});
+      ok++;
+    }catch(e){fail.push(list[i])}
+    await new Promise(r=>setTimeout(r,400));
+  }
+  btn.disabled=false;
+  m.textContent='완료 — 성공 '+ok+'건'+(fail.length?' / 실패 '+fail.length+'건: '+fail.join(', '):'');
+  m.className=fail.length?'msg err':'msg ok';
 }
 async function addComp(){
   const m=document.getElementById('cpMsg');
