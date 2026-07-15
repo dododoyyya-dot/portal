@@ -291,7 +291,17 @@ async function loadUsers(){
   sel.innerHTML=snap.docs.filter(d=>d.data().status==='approved').map(d=>'<option value="'+d.id+'">'+esc(d.data().name)+' ('+esc(d.data().region)+', '+(d.data().points||0)+'P)</option>').join('');
 }
 async function approve(uid){
-  await DB.collection('users').doc(uid).update({status:'approved'});loadUsers();
+  const doc=await DB.collection('users').doc(uid).get();
+  const d=doc.data();
+  if(d.edu2026&&!(d.points>0)){
+    await DB.collection('users').doc(uid).update({status:'approved',points:50});
+    await DB.collection('users').doc(uid).collection('activities').add({
+      title:'2026 지도자 직무연수 이수 인증',points:50,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  }else{
+    await DB.collection('users').doc(uid).update({status:'approved'});
+  }
+  loadUsers();
 }
 async function givePt(){
   const uid=document.getElementById('axUser').value;

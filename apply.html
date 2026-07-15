@@ -190,6 +190,8 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
 <script>
 let SELF_UID='', SELF_NAME='';
 let APPLY_TYPE='';
+const DEADLINE=new Date('2026-08-14T18:00:00+09:00'); // 마감 연장 시 이 날짜만 수정
+
 const TYPE_INFO={
   school:{label:'학교체육 강습', store:'학교체육 강습', color:'#8c1622', prefix:'S', desc:'정규 체육수업 연계 · 24회차'},
   after:{label:'방과후 · 늘봄학교', store:'방과후·늘봄·돌봄', color:'#0f766e', prefix:'A', desc:'방과후·늘봄·돌봄교실 · 24회차'}
@@ -215,6 +217,10 @@ function applyOther(){
   document.getElementById('fMsg').className='msg ok';
 }
 (function(){
+  if(new Date()>DEADLINE){
+    document.getElementById('typePick').innerHTML='<div class="authbox" style="max-width:none;text-align:center"><div style="font-size:44px">⏰</div><h3 style="margin-top:8px">2026년 접수가 마감되었습니다</h3><p style="font-size:14.5px;color:var(--gray)">신청 기간: ~ 2026. 8. 14.(금) 18:00<br>추가 접수 및 문의: 031-984-3248 / kfdf60@hanmail.net</p></div>';
+    return;
+  }
   const p=new URLSearchParams(location.search).get('type');
   if(p==='after'||p==='school')pickType(p);
 })();
@@ -239,6 +245,7 @@ async function submitApply(){
   if(SUBMITTING)return;
   const req={school:v('fSchool'),city:v('fCity'),teacher:v('fTeacher'),phone:v('fPhone'),students:v('fStudents'),d1:v('fD1')};
   for(const k in req){if(!req[k]){m.textContent='* 표시된 필수 항목을 모두 입력해주세요';m.className='msg err';return}}
+  if(!/^01[016789][-. ]?\d{3,4}[-. ]?\d{4}$/.test(req.phone)){m.textContent='담당교사 휴대전화 번호를 확인해주세요 (예: 010-1234-5678)';m.className='msg err';return}
   if(!document.getElementById('fAgree').checked){m.textContent='개인정보 수집·이용에 동의해주세요';m.className='msg err';return}
   m.textContent='제출 중…';m.className='msg';SUBMITTING=true;
   try{

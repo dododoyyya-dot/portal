@@ -46,8 +46,9 @@
       </div></div>
     <div><a href="apply.html" class="top">신청마당</a>
       <div class="drop">
-        <a href="apply.html">학교 강습 신청 (학교·교사)</a>
-        <a href="jobs.html">강습 지명 신청 (리더 선착순)</a>
+        <a href="apply.html?type=school">학교체육 강습 신청 (학교·교사)</a>
+        <a href="apply.html?type=after">방과후·늘봄학교 신청 (학교·교사)</a>
+        <a href="jobs.html">강사 활동 지원 · 지명 (리더)</a>
         <a href="login.html">리더 회원가입 · 로그인</a>
       </div></div>
     <a href="apply.html" class="cta">강습 신청</a>
@@ -119,6 +120,7 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
   <div class="mycard" id="myCard" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
       <div><b id="myName" style="font-size:26px;font-weight:900"></b>
+        <span id="eduBadge" style="display:none;margin-left:10px;vertical-align:middle;background:linear-gradient(120deg,#b8860b,#e6b422);color:#fff;font-size:12px;font-weight:900;padding:4px 12px;border-radius:999px">🎓 2026 직무연수 이수</span>
         <span id="mySub" style="display:block;font-size:13px;color:#9aa1ad;margin-top:4px"></span></div>
       <span class="lvchip2" id="myLv" style="font-size:17px;padding:8px 20px"></span>
     </div>
@@ -133,6 +135,16 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
       <a href="jobs.html" class="btn-sub" style="text-decoration:none;display:inline-block;background:#0f766e">강습 지명 신청</a>
       <button class="btn-sub" onclick="AUTH.signOut().then(()=>location.href='index.html')" style="background:rgba(255,255,255,.15)">로그아웃</button>
       <button class="btn-sub" id="adminBtn" style="display:none;background:#7c3aed" onclick="location.href='admin.html'">관리자 페이지</button>
+    </div>
+  </div>
+  <div id="certBox" style="display:none;margin-top:44px">
+    <h3 class="sub">이수증 온라인 발급</h3>
+    <div style="background:#fffdf5;border:2px solid #e6b422;border-radius:16px;padding:26px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:900;font-size:17px">🎓 2026 지도자 직무연수 이수증</div>
+        <div style="font-size:13.5px;color:var(--gray);margin-top:6px">이수번호 <b id="certNo"></b> · 2026. 7. 4. ~ 7. 5. (10시간) · KT대전인재개발원<br>본인 명의로 언제든 발급됩니다. 학교·기관 제출 시 인쇄 또는 PDF로 저장하세요.</div>
+      </div>
+      <button class="btn-sub" style="background:#b8860b;font-size:15px;padding:12px 22px" onclick="printCert()">이수증 발급 (인쇄·PDF)</button>
     </div>
   </div>
   <h3 class="sub" style="margin-top:44px">위촉 전자동의</h3>
@@ -156,6 +168,7 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
   <div class="note" style="margin-top:20px"><b>포인트 반영 안내</b> — 연맹 주관 활동(강습·심판·연수)은 사무국이 확인 후 자동 반영됩니다. 외부 공식행사는 증빙(위촉장·확인서)을 kfdf60@hanmail.net 으로 보내주세요.</div>
 </div></section>
 <script>
+let MYD=null;
 async function doConsent(){
   const m=document.getElementById('cMsg');
   if(!document.getElementById('c1').checked||!document.getElementById('c2').checked||!document.getElementById('c3').checked){
@@ -168,10 +181,15 @@ AUTH.onAuthStateChanged(async u=>{
   if(!u){location.href='login.html';return}
   const doc=await DB.collection('users').doc(u.uid).get();
   if(!doc.exists){location.href='login.html';return}
-  const d=doc.data();
+  const d=doc.data();MYD=d;
   document.getElementById('myCard').style.display='block';
   document.getElementById('myName').textContent=d.name;
   document.getElementById('mySub').textContent=d.region+' 권역 · '+(d.edu2026?'2026 직무연수 이수':'연수 미이수')+' · '+d.email;
+  if(d.edu2026){
+    document.getElementById('eduBadge').style.display='inline-block';
+    document.getElementById('certBox').style.display='block';
+    document.getElementById('certNo').textContent=certNo();
+  }
   const lv=lvOf(d.points||0);
   const chip=document.getElementById('myLv');
   chip.textContent='Lv.'+lv+' '+lvName(d.points||0); chip.style.background=LVC[lv];

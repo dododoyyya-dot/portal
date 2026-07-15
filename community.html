@@ -46,8 +46,9 @@
       </div></div>
     <div><a href="apply.html" class="top">신청마당</a>
       <div class="drop">
-        <a href="apply.html">학교 강습 신청 (학교·교사)</a>
-        <a href="jobs.html">강습 지명 신청 (리더 선착순)</a>
+        <a href="apply.html?type=school">학교체육 강습 신청 (학교·교사)</a>
+        <a href="apply.html?type=after">방과후·늘봄학교 신청 (학교·교사)</a>
+        <a href="jobs.html">강사 활동 지원 · 지명 (리더)</a>
         <a href="login.html">리더 회원가입 · 로그인</a>
       </div></div>
     <a href="apply.html" class="cta">강습 신청</a>
@@ -160,7 +161,7 @@ async function load(){
     const v=d.data(),lv=v.level||1;
     return '<div class="brow" id="p-'+d.id+'"><div class="head" onclick="openPost(\''+d.id+'\')" style="grid-template-columns:70px 1fr 190px 90px">'
       +'<div class="cat">'+esc(v.cat)+'</div><div class="tt">'+esc(v.title)+'</div>'
-      +'<div style="font-size:13px;text-align:center"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';font-size:11px;font-weight:900;color:#fff;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span></div>'
+      +'<div style="font-size:13px;text-align:center"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';font-size:11px;font-weight:900;color:#fff;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span>'+(v.edu?' <span style="font-size:11px">🎓</span>':'')+'</div>'
       +'<div class="dt">'+fmtDate(v.createdAt)+'</div></div>'
       +'<div class="body" id="b-'+d.id+'"></div></div>';
   }).join(''):'<div class="bempty">아직 게시글이 없습니다. 첫 글을 남겨보세요!</div>';
@@ -181,7 +182,7 @@ async function openPost(id){
 async function writePost(){
   const t=document.getElementById('pTitle').value.trim(), b=document.getElementById('pBody').value.trim();
   if(!t||!b){document.getElementById('pMsg').textContent='제목과 내용을 입력하세요';document.getElementById('pMsg').className='msg err';return}
-  await DB.collection('posts').add({uid:ME.uid,name:MYDOC.name,level:lvOf(MYDOC.points||0),
+  await DB.collection('posts').add({uid:ME.uid,name:MYDOC.name,level:lvOf(MYDOC.points||0),edu:!!MYDOC.edu2026,
     cat:document.getElementById('pCat').value,title:t,body:b,
     createdAt:firebase.firestore.FieldValue.serverTimestamp()});
   document.getElementById('pTitle').value='';document.getElementById('pBody').value='';
