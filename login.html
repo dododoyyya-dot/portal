@@ -122,6 +122,7 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
     </div>
     <div id="fS" style="display:none">
       <label>이름 (실명)</label><input id="sName" placeholder="홍길동">
+      <label>휴대전화 (배정·위촉 연락용)</label><input id="sPhone" placeholder="010-0000-0000">
       <label>활동 권역</label>
       <select id="sRegion"><option>서울·경기</option><option>강원</option><option>충청</option><option>전라</option><option>경상</option><option>제주</option></select>
       <label>2026 자율연수 이수 여부</label>
@@ -154,10 +155,13 @@ async function go(){
       location.href='mypage.html';
     }else{
       const name=document.getElementById('sName').value.trim();
+      const phone=document.getElementById('sPhone').value.trim();
+      if(!/^01[016789][-. ]?\d{3,4}[-. ]?\d{4}$/.test(phone)){say('휴대전화 번호를 확인해주세요 (예: 010-1234-5678)');return}
       if(!name)return say('이름을 입력하세요');
       const cred=await AUTH.createUserWithEmailAndPassword(email,pw);
       await DB.collection('users').doc(cred.user.uid).set({
         name:name, email:email,
+        phone:phone,
         region:document.getElementById('sRegion').value,
         edu2026:document.getElementById('sEdu').value==='y',
         role:'member', status:'pending', points:0,
