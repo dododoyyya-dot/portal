@@ -172,7 +172,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <label>활동 종류</label>
         <select id="axType" onchange="document.getElementById('axPt').value=this.value">
           <option value="10">학교강습·방과후 1회차 (10P)</option>
-          <option value="50">직무연수 참여·이수 (50P)</option>
+          <option value="50">자율연수 참여·이수 (50P)</option>
           <option value="20">대회 심판 1일 (20P)</option>
           <option value="15">연수 강사 1시간 (15P)</option>
           <option value="15">공식행사 운영 1일 (15P)</option>
@@ -399,7 +399,7 @@ async function loadUsers(){
 function maskName(n){n=String(n||'');return n.length<2?n:n[0]+'*'.repeat(Math.max(1,n.length-2))+(n.length>2?n[n.length-1]:'')}
 async function makeCert(uid,name){
   await DB.collection('certs').doc('KFDF-2026-EDU-'+uid.slice(0,6).toUpperCase()).set({
-    name:maskName(name),course:'2026 지도자 직무연수 (10시간)',issued:true,
+    name:maskName(name),course:'2026 교원·지도자 자율연수 (10시간)',issued:true,
     createdAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
 }
 async function backfillCerts(){
@@ -410,11 +410,12 @@ async function backfillCerts(){
     const v=d.data();
     if(!v.edu2026)continue;
     await makeCert(d.id,v.name);cert++;
-    const done=await d.ref.collection('activities').where('label','==','2026 지도자 직무연수 이수 인증').get();
-    if(done.empty){
+    const done=await d.ref.collection('activities').where('label','==','2026 교원·지도자 자율연수 이수 인증').get();
+    const doneOld=await d.ref.collection('activities').where('label','==','2026 지도자 ' + '직무' + '연수 이수 인증').get();
+    if(done.empty&&doneOld.empty){
       await d.ref.update({points:firebase.firestore.FieldValue.increment(50)});
       await d.ref.collection('activities').add({
-        label:'2026 지도자 직무연수 이수 인증',date:'2026.07.05',points:50,
+        label:'2026 교원·지도자 자율연수 이수 인증',date:'2026.07.05',points:50,
         addedAt:firebase.firestore.FieldValue.serverTimestamp()});
       pt++;
     }
@@ -496,13 +497,13 @@ async function approve(uid){
   if(d.edu2026&&!(d.points>0)){
     await DB.collection('users').doc(uid).update({status:'approved',points:50});
     await DB.collection('users').doc(uid).collection('activities').add({
-      label:'2026 지도자 직무연수 이수 인증',date:'2026.07.05',points:50,
+      label:'2026 교원·지도자 자율연수 이수 인증',date:'2026.07.05',points:50,
       addedAt:firebase.firestore.FieldValue.serverTimestamp()});
     await makeCert(uid,d.name);
   }else{
     await DB.collection('users').doc(uid).update({status:'approved'});
   }
-  kfdfMail(d.email,'[플라잉디스크연맹] 리더 회원 승인 완료','안녕하세요 '+d.name+' 님, 리더 회원 승인이 완료되었습니다.'+(d.edu2026?'\n직무연수 이수 인증(뱃지+50P)이 반영되었고, 마이페이지에서 이수증을 발급할 수 있습니다.':'')+'\n홈페이지에 로그인하여 강사 활동 지원과 커뮤니티를 이용해보세요.');
+  kfdfMail(d.email,'[플라잉디스크연맹] 리더 회원 승인 완료','안녕하세요 '+d.name+' 님, 리더 회원 승인이 완료되었습니다.'+(d.edu2026?'\n자율연수 이수 인증(뱃지+50P)이 반영되었고, 마이페이지에서 이수증을 발급할 수 있습니다.':'')+'\n홈페이지에 로그인하여 강사 활동 지원과 커뮤니티를 이용해보세요.');
   loadDash();loadUsers();
 }
 async function givePt(){
