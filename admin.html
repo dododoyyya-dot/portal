@@ -81,7 +81,7 @@ function orgChip(o,region,title){
   if(o==='regional')return '<span style="background:#1F4E9C;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83d\udea9 '+esc(region||'')+' \uc5f0\ub9f9'+(title?' \u00b7 '+esc(title):'')+'</span>';
   return '';
 }
-const EDU_ROSTER='강다연,강수경,강유라,경미선,권남혁,권태수,권희찬,김나리,김나연,김남영,김다윤,김미영,김민정,김상훈,김선미,김연상,김연우,김영빈,김유진,김이현,김재우,김정심,김정희,김주현,김지아,김한효,김현서,남궁영민,노현정,류선주,문상우,문현민,박규미,박규성,박기정,박미리,박선희,박성곤,박이슬,박주송,박찬혜,방서인,방수림,방수민,배성호,백지은,성연선,손성민,송희은,신고운이,신세란,신우진,신은상,신호철,안미진,안환기,양지선,엄혁주,여인찬,연선주,염정선,오경민,오주연,우소라,유정미,윤경희,윤연진,윤태경,은보라,이가영,이다봄,이대천,이소희,이솔지,이수환,이승훈,이영진,이영철,이용기,이은실,이은지,이재우,이재천,이지영,이한민,이현표,임성경,임아륜,장경숙,전경윤,전성현,정광섭,정예온,정인용,정지수,정진호,정창윤,조용대,조현숙,조혜진,조홍익,지미연,천관문,천효정,최문규,최윤형,최인향,최종선,최종욱,최종은,최지안,최창훈,한문아,한미향,허지범,황규빈,황성하,황윤경,황인중'.split(',');
+const EDU_ROSTER='김도야,강다연,강수경,강유라,경미선,권남혁,권태수,권희찬,김나리,김나연,김남영,김다윤,김미영,김민정,김상훈,김선미,김연상,김연우,김영빈,김유진,김이현,김재우,김정심,김정희,김주현,김지아,김한효,김현서,남궁영민,노현정,류선주,문상우,문현민,박규미,박규성,박기정,박미리,박선희,박성곤,박이슬,박주송,박찬혜,방서인,방수림,방수민,배성호,백지은,성연선,손성민,송희은,신고운이,신세란,신우진,신은상,신호철,안미진,안환기,양지선,엄혁주,여인찬,연선주,염정선,오경민,오주연,우소라,유정미,윤경희,윤연진,윤태경,은보라,이가영,이다봄,이대천,이소희,이솔지,이수환,이승훈,이영진,이영철,이용기,이은실,이은지,이재우,이재천,이지영,이한민,이현표,임성경,임아륜,장경숙,전경윤,전성현,정광섭,정예온,정인용,정지수,정진호,정창윤,조용대,조현숙,조혜진,조홍익,지미연,천관문,천효정,최문규,최윤형,최인향,최종선,최종욱,최종은,최지안,최창훈,한문아,한미향,허지범,황규빈,황성하,황윤경,황인중'.split(',');
 function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>=0}
 </script>
 <style>
@@ -133,7 +133,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <button id="t3" onclick="tab(3)">강습 신청 관리</button>
     </div>
     <div id="v1">
-      <div style="margin-bottom:14px"><button class="btn-sub" style="background:#b8860b" onclick="backfillCerts()">🎓 기승인 이수자 이수증 검증코드 일괄 생성</button></div>
+      <div style="margin-bottom:14px"><button class="btn-sub" style="background:#b8860b" onclick="backfillCerts()">🎓 이수자 일괄 정리 (검증코드 생성 + 연수 50P 소급 지급)</button></div>
       <div class="board" id="userList"><div class="bempty">불러오는 중…</div></div></div>
     <div id="v3" style="display:none">
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
@@ -350,11 +350,24 @@ async function makeCert(uid,name){
     createdAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
 }
 async function backfillCerts(){
-  if(!confirm('이미 승인된 연수 이수자 전원의 이수증 검증코드를 생성/갱신합니다.'))return;
+  if(!confirm('이미 승인된 연수 이수자 전원에 대해:\n① 이수증 검증코드 생성/갱신\n② 연수 50P 미지급자에게 소급 지급 (+활동이력 기록)\n을 실행합니다. 이미 받은 사람은 자동으로 건너뜁니다.'))return;
   const snap=await DB.collection('users').where('status','==','approved').get();
-  let n=0;
-  for(const d of snap.docs){if(d.data().edu2026){await makeCert(d.id,d.data().name);n++}}
-  alert('이수증 검증코드 '+n+'건 생성 완료');
+  let cert=0,pt=0;
+  for(const d of snap.docs){
+    const v=d.data();
+    if(!v.edu2026)continue;
+    await makeCert(d.id,v.name);cert++;
+    const done=await d.ref.collection('activities').where('label','==','2026 지도자 직무연수 이수 인증').get();
+    if(done.empty){
+      await d.ref.update({points:firebase.firestore.FieldValue.increment(50)});
+      await d.ref.collection('activities').add({
+        label:'2026 지도자 직무연수 이수 인증',date:'2026.07.05',points:50,
+        addedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      pt++;
+    }
+  }
+  alert('완료 — 검증코드 '+cert+'건 / 50P 소급 지급 '+pt+'명');
+  loadDash();loadUsers();
 }
 async function setOrg(uid){
   const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
