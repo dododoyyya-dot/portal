@@ -156,6 +156,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" onclick="loadApps()">↻ 새로고침</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="autoAssign()">⚡ 권역별 자동배정 (미배정 선정교)</button>
         <button class="btn-sub" style="background:#0f766e" onclick="exportCSV()">⬇ 전체 CSV 내려받기</button>
+        <button class="btn-sub" style="background:#e6b422" onclick="fixCounters()">⚙ 선착순 카운터 보정</button>
       </div>
       <div style="display:flex;gap:8px;margin:0 0 14px">
         <button class="btn-sub afl on" data-f="전체" onclick="appFilter('전체',this)">전체</button>
@@ -221,9 +222,9 @@ function renderApps(){
   el.innerHTML=docs.length?docs.map(d=>{
     const s=d.data();
     const st=s.status||'접수';
-    const stc={'접수':'#8a919d','선정':'#1F4E9C','배정완료':'#0f766e','미선정':'#C41E2F'}[st]||'#8a919d';
+    const stc={'접수':'#8a919d','대기':'#e6b422','선정':'#1F4E9C','배정완료':'#0f766e','미선정':'#C41E2F'}[st]||'#8a919d';
     return '<div class="urow"><div class="grow"><b>'+esc(s.school)+'</b> '
-      +'<span style="font-size:12px;font-weight:800;color:#fff;background:'+stc+';padding:2px 10px;border-radius:999px">'+st+'</span>'
+      +'<span style="font-size:12px;font-weight:800;color:#fff;background:'+stc+';padding:2px 10px;border-radius:999px">'+st+(st==='대기'&&s.waitNo?' '+s.waitNo+'번':'')+'</span>'
       +(s.eduName?' <span style="font-size:11px;font-weight:800;color:#C41E2F">★이수자교('+esc(s.eduName)+')</span>':'')
       +(s.selfTeach?' <span style="font-size:11px;font-weight:800;color:#0f766e">◉본인지도 희망'+(s.selfName?'('+esc(s.selfName)+')':'')+'</span>':'')
       +((dupKey[(s.school||'').replace(/\s/g,'')+'|'+(s.type||'')]>1)?' <span style="font-size:11px;font-weight:800;color:#fff;background:#e6b422;padding:2px 8px;border-radius:999px">⚠ 중복의심</span>':'')
@@ -231,7 +232,8 @@ function renderApps(){
       +'<div class="sub3">'+(s.code?'<b>'+esc(s.code)+'</b> · ':'')+esc(s.region)+' · '+esc(s.students)+' · 희망 '+esc(s.d1)
       +'<br>담당 '+esc(s.teacher)+' '+esc(s.phone)+(s.assignedName?' · <b style="color:#0f766e">배정: '+esc(s.assignedName)+'</b>':'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +(st==='접수'?'<button class="btn-sub" onclick="setStatus(\''+d.id+'\',\'선정\')">선정</button><button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'미선정\')">미선정</button>':'')
+      +(st==='접수'?'<button class="btn-sub" onclick="setStatus(\''+d.id+'\',\'선정\')">선정</button><button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'미선정\')">미선정</button><button class="btn-sub" style="background:#e6b422" onclick="toWait(\''+d.id+'\')">대기 전환</button>':'')
+      +(st==='대기'?'<button class="btn-sub" style="background:#0f766e" onclick="setStatus(\''+d.id+'\',\'접수\')">접수 전환</button>':'')
       +(st==='선정'&&!s.assignedName?'<button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'접수\')">선정취소</button>':'')
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delApp(\''+d.id+'\')">🗑</button>' 
       +'</div></div>';
@@ -239,7 +241,7 @@ function renderApps(){
 }
 async function syncStatus(app,st){
   if(app&&app.code)await DB.collection('appStatus').doc(app.code).set({
-    school:app.school,type:app.type,status:st,
+    school:app.school,type:app.type,status:st,waitNo:app.waitNo||0,
     updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
 }
 async function loadDash(){
@@ -255,6 +257,7 @@ async function loadDash(){
       +box(u.filter(x=>x.status==='approved').length,'승인 회원','#0f766e')
       +box(a.filter(x=>String(x.type||'').indexOf('방과후')<0).length,'🏫 학교체육 신청','#8c1622')
       +box(a.filter(x=>String(x.type||'').indexOf('방과후')>=0).length,'🌱 방과후·늘봄 신청','#0f766e')
+      +box(a.filter(x=>x.status==='대기').length,'⏳ 선착순 대기','#e6b422')
       +box(a.filter(x=>x.status==='선정').length,'선정 (배정 대기)','#1F4E9C')
       +box(a.filter(x=>x.status==='배정완료').length,'배정 완료','#0f766e')
       +box(sl.docs.filter(d=>d.data().claimedBy).length,'지명 확정 대기 ⚡','#C41E2F');
@@ -266,6 +269,31 @@ async function delApp(id){
   await DB.collection('schoolApplications').doc(id).delete();
   await DB.collection('openSlots').doc(id).delete().catch(()=>{});
   if(s.code)await DB.collection('appStatus').doc(s.code).delete().catch(()=>{});
+  loadApps();loadDash();
+}
+async function fixCounters(){
+  if(!confirm('선착순 카운터를 실제 신청 수와 동기화합니다.\n(테스트 삭제 후·기존 신청 반영 시 실행)\n카운터 = 유효 접수(접수·선정·배정완료) + 대기 건수'))return;
+  const snap=await DB.collection('schoolApplications').get();
+  const cnt={school:0,after:0};
+  snap.docs.forEach(d=>{
+    const s=d.data();
+    if(['접수','선정','배정완료','대기'].indexOf(s.status)<0)return;
+    const k=(s.typeKey==='after'||String(s.type||'').indexOf('방과후')>=0)?'after':'school';
+    cnt[k]++;
+  });
+  await DB.collection('counters').doc('school').set({count:cnt.school});
+  await DB.collection('counters').doc('after').set({count:cnt.after});
+  alert('보정 완료 — 학교체육 '+cnt.school+'건 / 방과후·늘봄 '+cnt.after+'건 반영\n다음 접수는 각각 '+(cnt.school+1)+', '+(cnt.after+1)+'번째부터 계산됩니다.');
+  loadDash();
+}
+async function toWait(id){
+  const s=APPS.find(d=>d.id===id).data();
+  const sameType=APPS.filter(d=>d.data().type===s.type&&d.data().status==='대기');
+  const maxNo=sameType.reduce((m,d)=>Math.max(m,d.data().waitNo||0),0);
+  const no=parseInt(prompt('['+s.school+'] 대기번호를 입력하세요 (현재 '+s.type+' 대기 최대 '+maxNo+'번)',maxNo+1));
+  if(!no)return;
+  await DB.collection('schoolApplications').doc(id).update({status:'대기',waitNo:no});
+  if(s.code)await DB.collection('appStatus').doc(s.code).set({school:s.school,type:s.type,status:'대기',waitNo:no,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
   loadApps();loadDash();
 }
 async function setStatus(id,st){
