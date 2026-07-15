@@ -301,6 +301,7 @@ async function syncLogPoints(){
     await d.ref.update({doneSessions:logged});
     done++;pts+=diff*10;
   }
+  if(done)await updateLeaderboard();
   alert(done?('반영 완료 — '+done+'개교, 총 '+pts+'P 지급'):'반영할 신규 일지가 없습니다.');
   loadApps();
 }
@@ -483,6 +484,7 @@ async function recordSessions(id){
     addedAt:firebase.firestore.FieldValue.serverTimestamp()});
   alert(s.assignedName+' 리더에게 +'+(n*10)+'P 지급 완료! (마이페이지 이력에 자동 반영)');
   loadApps();
+  updateLeaderboard();
 }
 function exportCSV(){
   const rows=[['학교','권역','유형','인원','희망1','희망2','담당교사','연락처','이메일','이수자','상태','배정강사','신청사유']];
@@ -522,6 +524,17 @@ async function makeCert(uid,name){
     name:maskName(name),course:'2026 교원·지도자 자율연수 (10시간)',issued:true,
     createdAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
 }
+async function updateLeaderboard(){
+  try{
+    const snap=await DB.collection('users').where('status','==','approved').get();
+    const rows=snap.docs.map(d=>{const v=d.data();return {
+      n:maskName(v.name),r:v.region||'',p:v.points||0,
+      edu:!!v.edu2026,org:v.org||'',t:v.orgTitle||''};})
+      .sort((a,b)=>b.p-a.p).slice(0,50);
+    await DB.collection('public').doc('leaderboard').set({
+      rows:rows,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  }catch(e){console.warn('리더보드 갱신 실패',e)}
+}
 async function backfillCerts(){
   if(!confirm('이미 승인된 연수 이수자 전원에 대해:\n① 이수증 검증코드 생성/갱신\n② 연수 50P 미지급자에게 소급 지급 (+활동이력 기록)\n을 실행합니다. 이미 받은 사람은 자동으로 건너뜁니다.'))return;
   const snap=await DB.collection('users').where('status','==','approved').get();
@@ -540,6 +553,7 @@ async function backfillCerts(){
       pt++;
     }
   }
+  await updateLeaderboard();
   alert('완료 — 검증코드 '+cert+'건 / 50P 소급 지급 '+pt+'명');
   loadDash();loadUsers();
 }
@@ -649,6 +663,7 @@ async function approve(uid){
   }else{
     await DB.collection('users').doc(uid).update({status:'approved'});
   }
+  updateLeaderboard();
   kfdfMail(d.email,'[플라잉디스크연맹] 리더 회원 승인 완료','안녕하세요 '+d.name+' 님, 리더 회원 승인이 완료되었습니다.'+(d.edu2026?'\n자율연수 이수 인증(뱃지+50P)이 반영되었고, 마이페이지에서 이수증을 발급할 수 있습니다.':'')+'\n홈페이지에 로그인하여 강사 활동 지원과 커뮤니티를 이용해보세요.');
   loadDash();loadUsers();
 }
@@ -663,6 +678,7 @@ async function givePt(){
   await DB.collection('users').doc(uid).update({points:firebase.firestore.FieldValue.increment(pt)});
   m.textContent='부여 완료! (+'+pt+'P)';m.className='msg ok';
   document.getElementById('axLabel').value='';loadUsers();
+  updateLeaderboard();
 }
 </script>
 

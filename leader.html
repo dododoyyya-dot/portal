@@ -109,8 +109,18 @@
 <div class="phero"><div class="wrap">
   <div class="crumb">HOME &nbsp;›&nbsp; <b>리더 레벨 시스템</b></div>
   <h1>리더 레벨 시스템 · 성장하는 지도자 등급</h1>
-  <p>연수 이수로 시작해, 활동을 증명할수록 레벨과 권한이 커지는 지도자 성장 시스템입니다. (2026년 말 정식 오픈)</p>
+  <p>연수 이수로 시작해, 활동을 증명할수록 레벨과 권한이 커지는 지도자 성장 시스템입니다. 순위는 실시간으로 공개됩니다.</p>
 </div></div>
+
+<section style="background:linear-gradient(120deg,#0f1013,#1a1c22 60%,#153A77);padding:64px 0"><div class="wrap">
+  <div class="sec-label" style="color:#e6b422">LIVE RANKING</div>
+  <h2 class="sec-title" style="color:#fff">🏆 리더 순위 <span style="font-size:14px;font-weight:700;color:#9aa1ad" id="lbTime"></span></h2>
+  <p class="sec-desc" style="color:#c3c9d4">활동 포인트 실시간 순위입니다. 개인정보 보호를 위해 이름 일부만 표시되며, 내 순위와 전체 이력은 마이페이지에서 확인하세요.</p>
+  <div class="note" style="background:#fff8e6;border-color:#e6b422;margin-bottom:24px"><b>📢 안내</b> — 레벨별 <b>활동비 및 기타 지원 비용은 2027년 하반기부터 적용 예정</b>입니다. 그 전까지의 포인트·레벨은 모두 유지되며 우선 배정·위촉 혜택은 즉시 적용됩니다.</div>
+  <div id="lbTop" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px"></div>
+  <div id="lbList" style="background:rgba(255,255,255,.06);border-radius:16px;padding:10px 22px"></div>
+  <div id="lbRegion" style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap"></div>
+</div></section>
 
 <section><div class="wrap">
   <div class="sec-label">GROWTH SYSTEM</div>
@@ -122,9 +132,9 @@
     <div class="lv l2"><span class="badge">Lv.2</span><h4>필드 리더</h4><div class="xp">100P 달성</div>
       <ul><li>강습 학교 우선 배정</li><li>대회 심판 우선 위촉</li><li>리더맵 프로필 공개</li></ul></div>
     <div class="lv l3"><span class="badge">Lv.3</span><h4>치프 리더</h4><div class="xp">300P 달성</div>
-      <ul><li>자율연수 보조강사 위촉</li><li>권역 대회 심판장 후보</li><li>활동비 가산 지급</li></ul></div>
+      <ul><li>자율연수 보조강사 위촉</li><li>권역 대회 심판장 후보</li><li>활동비 가산 지급 (2027 하반기~)</li></ul></div>
     <div class="lv l4"><span class="badge">Lv.4</span><h4>엘리트 리더</h4><div class="xp">600P 달성</div>
-      <ul><li>권역 리더(멘토) 위촉</li><li>연맹 행사 기획 참여</li><li>연간 활동비 지원</li></ul></div>
+      <ul><li>권역 리더(멘토) 위촉</li><li>연맹 행사 기획 참여</li><li>연간 활동비 지원 (2027 하반기~)</li></ul></div>
     <div class="lv l5"><span class="badge">Lv.5</span><h4>마스터 리더</h4><div class="xp">1,000P 달성</div>
       <ul><li>명예의 전당 등재</li><li>전국대회 심판장 후보</li><li>자율연수 주강사 후보</li></ul></div>
   </div>
@@ -138,7 +148,7 @@
     <tr><td class="l">연맹 공식행사 운영 참여</td><td><b>1일 15P</b></td><td class="l">참여확인서 또는 위촉장 제출</td></tr>
     <tr><td class="l">외부 공식행사 (학교 · 교육청 등)</td><td><b>1일 10P</b></td><td class="l">위촉장·확인서·현장사진 제출 → 사무국 검증 후 반영</td></tr>
   </table>
-  <div class="note"><b>증빙 제출</b> — 외부 활동 증빙은 kfdf60@hanmail.net 으로 제출하면 사무국 확인 후 5일 이내 포인트가 반영됩니다. 2026 자율연수 이수자는 시스템 오픈 시 이수·활동 이력이 전부 소급 반영됩니다.</div>
+  <div class="note"><b>증빙 제출</b> — 외부 활동 증빙은 kfdf60@hanmail.net 으로 제출하면 사무국 확인 후 5일 이내 포인트가 반영됩니다. 2026 자율연수 이수자는 가입 승인 시 이수 이력(50P)이 자동 반영됩니다.</div>
 </div></section>
 
 <section style="background:var(--bg-soft)"><div class="wrap">
@@ -248,6 +258,60 @@ function show(rg){
     © 2026 KOREA FLYING DISC FEDERATION. All rights reserved. &nbsp;|&nbsp; <a href="privacy.html" style="color:#9aa1ad">개인정보처리방침</a>
   </div>
 </div></footer>
+<script>
+(function(){
+  const LVS=[[0,'어쏘'],[100,'필드'],[300,'치프'],[600,'엘리트'],[1000,'마스터']];
+  const LVC={1:'#8a919d',2:'#1F4E9C',3:'#7c3aed',4:'#C41E2F',5:'#b8860b'};
+  function lvOf(p){let l=0;LVS.forEach((v,i)=>{if(p>=v[0])l=i});return l+1}
+  function esc(x){return String(x||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+  function chip(v){return (v.edu?' 🎓':'')+(v.org==='central'?' 🏛':'')+(v.org==='regional'?' 🚩':'')}
+  function load(){
+    if(!firebase.apps.length)return;
+    if(!firebase.firestore){return}
+    firebase.firestore().collection('public').doc('leaderboard').get().then(doc=>{
+      const top=document.getElementById('lbTop'),list=document.getElementById('lbList'),reg=document.getElementById('lbRegion');
+      if(!doc.exists||!doc.data().rows||!doc.data().rows.length){
+        list.innerHTML='<div style="padding:18px 0;color:#9aa1ad;font-size:14px">첫 순위 집계를 준비 중입니다. 활동이 기록되면 이곳에 실시간 반영됩니다.</div>';return}
+      const d=doc.data();const rows=d.rows;
+      if(d.updatedAt)document.getElementById('lbTime').textContent='· 갱신 '+new Date(d.updatedAt.toDate()).toLocaleDateString('ko-KR');
+      const medals=['🥇','🥈','🥉'];
+      top.innerHTML=rows.slice(0,3).map((v,i)=>{
+        const lv=lvOf(v.p);
+        return '<div style="background:rgba(255,255,255,.08);border:1.5px solid '+(i===0?'#e6b422':'rgba(255,255,255,.15)')+';border-radius:16px;padding:20px;text-align:center">'
+          +'<div style="font-size:34px">'+medals[i]+'</div>'
+          +'<div style="font-size:19px;font-weight:900;color:#fff;margin-top:4px">'+esc(v.n)+chip(v)+'</div>'
+          +'<div style="font-size:12.5px;color:#9aa1ad">'+esc(v.r)+'</div>'
+          +'<span style="display:inline-block;margin-top:8px;background:'+LVC[lv]+';color:#fff;font-size:12px;font-weight:900;padding:3px 12px;border-radius:999px">Lv.'+lv+' '+LVS[lv-1][1]+' · '+v.p+'P</span></div>';
+      }).join('');
+      list.innerHTML=rows.slice(3,20).map((v,i)=>{
+        const lv=lvOf(v.p);const next=LVS[lv]?LVS[lv][0]:v.p;const base=LVS[lv-1][0];
+        const pct=LVS[lv]?Math.min(100,Math.round((v.p-base)/(next-base)*100)):100;
+        return '<div style="display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px dashed rgba(255,255,255,.12)">'
+          +'<b style="color:#9aa1ad;width:28px;text-align:right">'+(i+4)+'</b>'
+          +'<b style="color:#fff;min-width:90px">'+esc(v.n)+chip(v)+'</b>'
+          +'<span style="font-size:12px;color:#9aa1ad;min-width:60px">'+esc(v.r)+'</span>'
+          +'<span style="background:'+LVC[lv]+';color:#fff;font-size:11px;font-weight:900;padding:2px 10px;border-radius:999px;white-space:nowrap">Lv.'+lv+'</span>'
+          +'<div style="flex:1;height:8px;background:rgba(255,255,255,.12);border-radius:999px;overflow:hidden;min-width:60px"><i style="display:block;height:100%;width:'+pct+'%;background:linear-gradient(90deg,#C41E2F,#ff7a5c)"></i></div>'
+          +'<b style="color:#e6b422;min-width:52px;text-align:right">'+v.p+'P</b></div>';
+      }).join('');
+      const best={};rows.forEach(v=>{if(!best[v.r]||v.p>best[v.r].p)best[v.r]=v});
+      reg.innerHTML=Object.keys(best).map(r=>'<span style="background:rgba(255,255,255,.1);color:#fff;font-size:12.5px;font-weight:700;padding:6px 14px;border-radius:999px">👑 '+esc(r)+' 1위 — '+esc(best[r].n)+' ('+best[r].p+'P)</span>').join('');
+    }).catch(e=>{document.getElementById('lbList').innerHTML='<div style="padding:18px 0;color:#9aa1ad;font-size:14px">순위를 불러오지 못했습니다.</div>'});
+  }
+  // firestore SDK 동적 로드 후 실행 (auth_ui가 app을 준비)
+  function boot(n){
+    if(window.firebase&&firebase.apps.length&&firebase.firestore){load();return}
+    if(n>40)return;
+    if(window.firebase&&firebase.apps.length&&!firebase.firestore){
+      const sc=document.createElement('script');
+      sc.src='https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js';
+      sc.onload=()=>load();document.head.appendChild(sc);return;
+    }
+    setTimeout(()=>boot(n+1),250);
+  }
+  boot(0);
+})();
+</script>
 <script src="auth_ui.js"></script>
 </body>
 </html>
