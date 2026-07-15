@@ -120,18 +120,28 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
   <div id="jGate" class="pending-banner" style="display:none"></div>
   <div id="jBody" style="display:none">
     <div class="sec-label">STEP 1</div>
-    <h2 class="sec-title" style="font-size:24px">강사 활동 지원</h2>
-    <p class="sec-desc" style="margin-bottom:20px">활동을 원하는 사업에 지원해두면 권역별 자동배정 대상이 됩니다. (중복 지원 가능 · 언제든 취소)</p>
+    <h2 class="sec-title" style="font-size:24px">강사 · 대회요원 활동 지원</h2>
+    <p class="sec-desc" style="margin-bottom:20px">활동을 원하는 분야에 지원해두면 권역별 배정 대상이 됩니다. (중복 지원 가능 · 언제든 취소)</p>
     <div class="biz-grid" style="margin-bottom:40px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
       <div class="card" style="cursor:default">
         <h3>🏫 학교체육 강습 강사</h3>
-        <p>정규 체육수업 연계 · 학교당 24회차 · 1일 10만원</p>
+        <p>정규 체육수업 연계 · 학교당 24회차 · 시간당 5만원 (2시간 기준 1일 10만원) · 강습 10P/회차</p>
         <button class="btn-sub" id="btnSchool" style="margin-top:14px" onclick="toggleApply('school')">지원하기</button>
       </div>
       <div class="card" style="cursor:default">
         <h3>🌱 방과후 · 늘봄학교 강사</h3>
-        <p>방과후·늘봄·돌봄교실 24회차 프로그램 · 1일 10만원</p>
+        <p>방과후·늘봄·돌봄교실 24회차 프로그램 · 시간당 5만원 (2시간 기준 1일 10만원) · 강습 10P/회차</p>
         <button class="btn-sub" id="btnAfter" style="margin-top:14px" onclick="toggleApply('after')">지원하기</button>
+      </div>
+      <div class="card" style="cursor:default">
+        <h3>🏁 권역별대회 심판요원</h3>
+        <p>유소년 올림피아드 심판 · 1일 7만원 이내 (4시간 이내 4만원) · 심판 활동 20P/일</p>
+        <button class="btn-sub" id="btnRef" style="margin-top:14px" onclick="toggleApply('referee')">지원하기</button>
+      </div>
+      <div class="card" style="cursor:default">
+        <h3>🎪 권역별대회 운영요원</h3>
+        <p>기록·진행·안전관리 등 대회 운영 지원 · 행사 활동 15P/일</p>
+        <button class="btn-sub" id="btnStaff" style="margin-top:14px" onclick="toggleApply('staff')">지원하기</button>
       </div>
     </div>
     <div class="sec-label">STEP 2</div>
@@ -160,11 +170,11 @@ AUTH.onAuthStateChanged(async u=>{
 });
 function renderApply(){
   const f=JMY.instructorFor||{};
-  const b1=document.getElementById('btnSchool'),b2=document.getElementById('btnAfter');
-  b1.textContent=f.school?'✓ 지원 완료 (취소하기)':'지원하기';
-  b1.style.background=f.school?'#0f766e':'';
-  b2.textContent=f.after?'✓ 지원 완료 (취소하기)':'지원하기';
-  b2.style.background=f.after?'#0f766e':'';
+  [['btnSchool','school'],['btnAfter','after'],['btnRef','referee'],['btnStaff','staff']].forEach(function(x){
+    const b=document.getElementById(x[0]);if(!b)return;
+    b.textContent=f[x[1]]?'✓ 지원 완료 (취소하기)':'지원하기';
+    b.style.background=f[x[1]]?'#0f766e':'';
+  });
 }
 async function toggleApply(k){
   try{
