@@ -248,9 +248,11 @@ function renderApps(){
       +(st==='접수'?'<button class="btn-sub" onclick="setStatus(\''+d.id+'\',\'선정\')">선정</button><button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'미선정\')">미선정</button><button class="btn-sub" style="background:#e6b422" onclick="toWait(\''+d.id+'\')">대기 전환</button>':'')
       +(st==='대기'?'<button class="btn-sub" style="background:#0f766e" onclick="setStatus(\''+d.id+'\',\'접수\')">접수 전환</button>':'')
       +(st==='선정'&&!s.assignedName?'<button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'접수\')">선정취소</button>':'')
+      +(st==='배정완료'?'<button class="btn-sub" style="background:#7c3aed" onclick="toggleLogs(\''+d.id+'\')">📒 일지</button>':'')
       +'<button class="btn-sub" style="background:'+(s.start&&s.start.indexOf('8월')>=0?'#C41E2F':'#8a919d')+'" onclick="setStart(\''+d.id+'\')">'+(s.start&&s.start.indexOf('8월')>=0?'⚡긴급(방학)':s.start?'일반(9월)':'개강시기?')+'</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delApp(\''+d.id+'\')">🗑</button>' 
-      +'</div></div>';
+      +'</div></div>'
+      +'<div id="logs_'+d.id+'" style="display:none;background:var(--bg-soft);border-radius:12px;padding:14px 18px;margin:-6px 0 10px"></div>';
   }).join(''):'<div class="bempty">해당 유형의 신청이 없습니다.</div>';
 }
 async function syncStatus(app,st){
@@ -276,6 +278,22 @@ async function loadDash(){
       +box(a.filter(x=>x.status==='배정완료').length,'배정 완료','#0f766e')
       +box(sl.docs.filter(d=>d.data().claimedBy).length,'지명 확정 대기 ⚡','#C41E2F');
   }catch(e){}
+}
+async function toggleLogs(id){
+  const el=document.getElementById('logs_'+id);
+  if(el.style.display==='block'){el.style.display='none';return}
+  el.style.display='block';el.innerHTML='<span style="font-size:13px;color:var(--gray)">불러오는 중…</span>';
+  try{
+    const snap=await DB.collection('sessionLogs').where('appId','==',id).get();
+    const logs=snap.docs.map(d=>d.data()).sort((a,b)=>(a.session||0)-(b.session||0));
+    if(!logs.length){el.innerHTML='<span style="font-size:13px;color:var(--gray)">제출된 일지가 없습니다.</span>';return}
+    el.innerHTML='<b style="font-size:13.5px">운영일지 '+logs.length+'건 (강사: '+esc(logs[0].name)+')</b>'
+      +logs.map(l=>'<div style="border-top:1px dashed #d5d9e0;padding:8px 0;font-size:13px">'
+        +'<b>'+l.session+'회차</b> · '+esc(l.date)+' — '+esc(l.content)
+        +(l.note?' · <span style="color:#C41E2F">'+esc(l.note)+'</span>':'')
+        +(l.photos&&l.photos.length?'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">'+l.photos.map(p=>'<a href="'+p+'" target="_blank"><img src="'+p+'" style="width:90px;height:66px;object-fit:cover;border-radius:8px"></a>').join('')+'</div>':'')
+        +'</div>').join('');
+  }catch(e){el.innerHTML='<span style="font-size:13px;color:var(--red)">불러오기 실패: '+esc(e.message)+'</span>'}
 }
 async function setStart(id){
   const s=APPS.find(d=>d.id===id).data();
@@ -405,14 +423,14 @@ async function loadUsers(){
       +'<div class="sub3" style="margin-top:3px">위촉검증: '
       +((v.consents&&v.consents.agreedAt)?'<b style="color:#0f766e">✓전자동의 '+fmtDate(v.consents.agreedAt)+'</b>':'<b style="color:#C41E2F">✗전자동의 전</b>')
       +' · '
-      +(v.crimDoc?'<b style="color:#0f766e">✓회보서 수령</b>':'<b style="color:#C41E2F">✗회보서 미수령</b>')+(v.contracts&&Object.keys(v.contracts).length?' · <b style="color:#0f766e">✓위촉계약 '+Object.keys(v.contracts).length+'건 동의</b>':'')
+      +(v.crimDoc?'<b style="color:#0f766e">✓경력확인</b>':'<b style="color:#C41E2F">✗경력확인 전</b>')+(v.contracts&&Object.keys(v.contracts).length?' · <b style="color:#0f766e">✓위촉계약 '+Object.keys(v.contracts).length+'건 동의</b>':'')
       +((v.consents&&v.consents.agreedAt&&v.crimDoc)?' <span style="background:#0f766e;color:#fff;font-weight:900;font-size:11px;padding:2px 10px;border-radius:999px">위촉 가능</span>':'')
       +'</div></div>'
       +(v.status==='approved'
         ?'<span style="font-size:13px;font-weight:800;color:#0f766e">승인됨</span>'
         :'<button class="btn-sub" onclick="approve(\''+d.id+'\')">승인하기</button>')
       +'<button class="btn-sub" style="background:#1F4E9C" onclick="setOrg(\''+d.id+'\')">직책</button>'
-      +'<button class="btn-sub" style="background:'+(v.crimDoc?'#0f766e':'#8a919d')+'" onclick="toggleCrim(\''+d.id+'\')">'+(v.crimDoc?'회보서 ✓':'회보서 체크')+'</button>'
+      +'<button class="btn-sub" style="background:'+(v.crimDoc?'#0f766e':'#8a919d')+'" onclick="toggleCrim(\''+d.id+'\')">'+(v.crimDoc?'경력확인 ✓':'경력확인 체크')+'</button>'
       +'</div>';
   }).join('')||'<div class="bempty">회원이 없습니다.</div>';
   const sel=document.getElementById('axUser');
@@ -502,7 +520,7 @@ async function delComp(id){
 async function toggleCrim(uid){
   const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
   const now=!d.crimDoc;
-  if(!confirm(now?('['+d.name+'] 범죄경력회보서를 이메일로 받아 확인했습니까?\n(수령 처리)'):('['+d.name+'] 회보서 수령을 취소 처리할까요?')))return;
+  if(!confirm(now?('['+d.name+'] 경력 확인이 완료되었습니까? (학교 조회 협조 확인 또는 회보서 수령)\n(완료 처리)'):('['+d.name+'] 경력확인 완료를 취소 처리할까요?')))return;
   await DB.collection('users').doc(uid).update({crimDoc:now,crimDocAt:firebase.firestore.FieldValue.serverTimestamp()});
   loadUsers();
 }

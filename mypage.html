@@ -57,6 +57,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",
@@ -158,6 +159,24 @@ function orgChip(o,region,title){
     <div class="board" id="contractList"></div>
     <div class="note" style="margin-top:14px">계약서를 확인한 뒤 <b>전자 동의</b>하면 서면 서명을 대체하는 동의 일시가 기록되며, 언제든 계약서를 인쇄·PDF 저장할 수 있습니다. 수당 지급 정보(계좌 등)는 사무국이 별도 안내하는 방법으로 제출합니다.</div>
   </div>
+  <div id="logBox" style="display:none;margin-top:44px">
+    <h3 class="sub">회차 보고 (운영일지)</h3>
+    <div class="authbox" style="max-width:none">
+      <label>학교 선택</label><select id="lgApp"></select>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label>회차 *</label><input id="lgSession" type="number" min="1" max="24"></div>
+        <div><label>수업일 *</label><input id="lgDate" type="date"></div>
+      </div>
+      <label>수업 내용 *</label><textarea id="lgContent" rows="3" placeholder="예: 백핸드 스로우 기초, 캐치 게임 (3학년 2반 24명)"></textarea>
+      <label>특이사항</label><input id="lgNote" placeholder="안전사고·결석 등 (없으면 비워두세요)">
+      <label>수업 사진 (최대 3장, 자동 압축 업로드)</label>
+      <input id="lgPhotos" type="file" accept="image/*" multiple style="border:none;padding:6px 0">
+      <button class="btn-main" onclick="submitLog()" id="lgBtn">회차 보고 제출</button>
+      <div class="msg" id="lgMsg"></div>
+    </div>
+    <h4 style="font-weight:800;margin:22px 0 10px;font-size:15px">내가 제출한 보고</h4>
+    <div class="board" id="lgList"><div class="bempty">불러오는 중…</div></div>
+  </div>
   <h3 class="sub" style="margin-top:44px">위촉 전자동의</h3>
   <div class="authbox" style="max-width:none" id="consentBox">
     <div id="consentDone" style="display:none;color:#0f766e;font-weight:800;font-size:15px"></div>
@@ -169,7 +188,7 @@ function orgChip(o,region,title){
       <label style="display:flex;gap:8px;align-items:flex-start;font-size:13.5px;font-weight:600;margin:8px 0"><input type="checkbox" id="c2" style="width:auto;margin-top:3px">
         (필수) 고유식별정보(주민등록번호) 수집·이용 동의 — 소득세법에 따른 원천징수 신고·지급명세서 제출 목적에 한함</label>
       <label style="display:flex;gap:8px;align-items:flex-start;font-size:13.5px;font-weight:600;margin:8px 0"><input type="checkbox" id="c3" style="width:auto;margin-top:3px">
-        (필수) 아동학대·성범죄 결격사유 확인 협조 동의 — 본인이 경찰청 온라인 발급시스템(crims.police.go.kr)에서 범죄경력회보서를 발급받아 kfdf60@hanmail.net 으로 제출 (메일 제목: "회보서_성명")</label>
+        (필수) 아동학대·성범죄 결격사유 없음 확인 및 조회 협조 동의 — 본인은 아동학대·성범죄 등 관련 법령상 결격사유가 없음을 확인하며, 연맹 또는 배정 학교가 관계 법령에 따라 경력조회를 실시하는 것에 동의하고 협조합니다 (허위 확인 시 위촉 즉시 해지)</label>
       <button class="btn-main" style="margin-top:14px" onclick="doConsent()">전자 동의하기</button>
       <div class="msg" id="cMsg"></div>
     </div>
@@ -205,7 +224,13 @@ AUTH.onAuthStateChanged(async u=>{
   try{
     const asg=await DB.collection('schoolApplications').where('assignedUid','==',u.uid).get();
     MYASG=asg.docs.filter(x=>x.data().status==='배정완료');
-    if(MYASG.length){document.getElementById('contractBox').style.display='block';renderContracts();}
+    if(MYASG.length){
+      document.getElementById('contractBox').style.display='block';renderContracts();
+      document.getElementById('logBox').style.display='block';
+      document.getElementById('lgApp').innerHTML=MYASG.map(x=>'<option value="'+x.id+'">'+esc(x.data().school)+' ('+esc(x.data().type)+')</option>').join('');
+      document.getElementById('lgDate').value=new Date().toISOString().slice(0,10);
+      loadMyLogs();
+    }
   }catch(e){}
   const lv=lvOf(d.points||0);
   const chip=document.getElementById('myLv');
@@ -227,6 +252,67 @@ AUTH.onAuthStateChanged(async u=>{
   el.innerHTML=acts.empty?'<div class="bempty">아직 기록된 활동이 없습니다.</div>':
     acts.docs.map(a=>{const v=a.data();return '<div class="brow"><div class="head" style="grid-template-columns:110px 1fr 90px"><div class="dt">'+esc(v.date)+'</div><div class="tt" style="font-size:15px">'+esc(v.label)+'</div><div class="cat" style="color:var(--red);font-weight:900">+'+v.points+'P</div></div></div>'}).join('');
 });
+function compressImg(file){
+  return new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>{
+      const sc=Math.min(1,1280/Math.max(img.width,img.height));
+      const c=document.createElement('canvas');
+      c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      c.toBlob(b=>res(b),'image/jpeg',0.8);
+    };
+    img.src=URL.createObjectURL(file);
+  });
+}
+let LGBUSY=false;
+async function submitLog(){
+  const m=document.getElementById('lgMsg');
+  if(LGBUSY)return;
+  const appId=document.getElementById('lgApp').value;
+  const sess=parseInt(document.getElementById('lgSession').value);
+  const date=document.getElementById('lgDate').value;
+  const content=document.getElementById('lgContent').value.trim();
+  if(!appId||!sess||sess<1||sess>24||!date||!content){m.textContent='회차·수업일·수업 내용을 입력해주세요';m.className='msg err';return}
+  const files=[...document.getElementById('lgPhotos').files].slice(0,3);
+  LGBUSY=true;
+  try{
+    const photos=[];
+    for(let i=0;i<files.length;i++){
+      m.textContent='사진 업로드 중… '+(i+1)+'/'+files.length;m.className='msg';
+      const blob=await compressImg(files[i]);
+      const ref=firebase.storage().ref('logs/'+appId+'/'+sess+'_'+Date.now()+'_'+i+'.jpg');
+      await ref.put(blob,{contentType:'image/jpeg'});
+      photos.push(await ref.getDownloadURL());
+    }
+    m.textContent='저장 중…';
+    const a=MYASG.find(x=>x.id===appId).data();
+    await DB.collection('sessionLogs').add({
+      appId:appId,school:a.school,type:a.type,uid:AUTH.currentUser.uid,name:MYD.name,
+      session:sess,date:date,content:content,note:document.getElementById('lgNote').value.trim(),
+      photos:photos,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    m.textContent='✓ '+sess+'회차 보고가 제출되었습니다. 사무국 확인 후 포인트가 반영됩니다.';m.className='msg ok';
+    document.getElementById('lgContent').value='';document.getElementById('lgNote').value='';
+    document.getElementById('lgPhotos').value='';document.getElementById('lgSession').value='';
+    loadMyLogs();
+  }catch(e){m.textContent='제출 실패: '+e.message;m.className='msg err'}
+  LGBUSY=false;
+}
+async function loadMyLogs(){
+  const el=document.getElementById('lgList');
+  try{
+    const snap=await DB.collection('sessionLogs').where('uid','==',AUTH.currentUser.uid).get();
+    const logs=snap.docs.map(d=>d.data()).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    // 다음 회차 자동 제안
+    const cur=document.getElementById('lgApp').value;
+    const mine=logs.filter(l=>l.appId===cur);
+    if(!document.getElementById('lgSession').value)document.getElementById('lgSession').value=(mine.length?Math.max(...mine.map(l=>l.session||0)):0)+1;
+    el.innerHTML=logs.length?logs.slice(0,30).map(l=>
+      '<div class="urow"><div class="grow"><b>'+esc(l.school)+' '+l.session+'회차</b> <span style="font-size:12px;color:var(--gray)">'+esc(l.date)+'</span>'
+      +'<div class="sub3">'+esc(l.content)+(l.note?' · <span style="color:#C41E2F">'+esc(l.note)+'</span>':'')+(l.photos&&l.photos.length?' · 📷'+l.photos.length:'')+'</div></div></div>'
+    ).join(''):'<div class="bempty">아직 제출한 보고가 없습니다.</div>';
+  }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+esc(e.message)+'</div>'}
+}
 function renderContracts(){
   const done=(MYD.contracts||{});
   document.getElementById('contractList').innerHTML=MYASG.map(x=>{
