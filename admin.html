@@ -208,6 +208,7 @@ function renderApps(){
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
       +(st==='접수'?'<button class="btn-sub" onclick="setStatus(\''+d.id+'\',\'선정\')">선정</button><button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'미선정\')">미선정</button>':'')
       +(st==='선정'&&!s.assignedName?'<button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'접수\')">선정취소</button>':'')
+      +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delApp(\''+d.id+'\')">🗑</button>' 
       +'</div></div>';
   }).join(''):'<div class="bempty">해당 유형의 신청이 없습니다.</div>';
 }
@@ -233,6 +234,14 @@ async function loadDash(){
       +box(a.filter(x=>x.status==='배정완료').length,'배정 완료','#0f766e')
       +box(sl.docs.filter(d=>d.data().claimedBy).length,'지명 확정 대기 ⚡','#C41E2F');
   }catch(e){}
+}
+async function delApp(id){
+  const s=APPS.find(d=>d.id===id).data();
+  if(!confirm('['+s.school+' / '+s.type+'] 신청을 완전히 삭제합니다.\n접수 조회·지명 슬롯 데이터도 함께 삭제됩니다.'))return;
+  await DB.collection('schoolApplications').doc(id).delete();
+  await DB.collection('openSlots').doc(id).delete().catch(()=>{});
+  if(s.code)await DB.collection('appStatus').doc(s.code).delete().catch(()=>{});
+  loadApps();loadDash();
 }
 async function setStatus(id,st){
   const s=APPS.find(d=>d.id===id).data();
