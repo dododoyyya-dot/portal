@@ -170,6 +170,8 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#7c3aed" onclick="autoAssign()">⚡ 권역별 자동배정 (미배정 선정교)</button>
         <button class="btn-sub" style="background:#0f766e" onclick="exportCSV()">⬇ 전체 CSV 내려받기</button>
         <button class="btn-sub" style="background:#e6b422" onclick="fixCounters()">⚙ 선착순 카운터 보정</button>
+        <button class="btn-sub" style="background:#7c3aed" onclick="syncLogPoints()">⚡ 일지 기준 포인트 반영</button>
+        <button class="btn-sub" style="background:#b8860b" onclick="payrollCSV()">💰 월 지급 계산 CSV</button>
       </div>
       <div style="display:flex;gap:8px;margin:0 0 14px">
         <button class="btn-sub afl on" data-f="전체" onclick="appFilter('전체',this)">전체</button>
@@ -249,6 +251,7 @@ function renderApps(){
       +(st==='대기'?'<button class="btn-sub" style="background:#0f766e" onclick="setStatus(\''+d.id+'\',\'접수\')">접수 전환</button>':'')
       +(st==='선정'&&!s.assignedName?'<button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'접수\')">선정취소</button>':'')
       +(st==='배정완료'?'<button class="btn-sub" style="background:#7c3aed" onclick="toggleLogs(\''+d.id+'\')">📒 일지</button>':'')
+      +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:#1F4E9C" onclick="copyNotice(\''+d.id+'\')">📋 통보문</button>':'')
       +'<button class="btn-sub" style="background:'+(s.start&&s.start.indexOf('8월')>=0?'#C41E2F':'#8a919d')+'" onclick="setStart(\''+d.id+'\')">'+(s.start&&s.start.indexOf('8월')>=0?'⚡긴급(방학)':s.start?'일반(9월)':'개강시기?')+'</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delApp(\''+d.id+'\')">🗑</button>' 
       +'</div></div>'
@@ -278,6 +281,78 @@ async function loadDash(){
       +box(a.filter(x=>x.status==='배정완료').length,'배정 완료','#0f766e')
       +box(sl.docs.filter(d=>d.data().claimedBy).length,'지명 확정 대기 ⚡','#C41E2F');
   }catch(e){}
+}
+async function syncLogPoints(){
+  if(!confirm('제출된 회차 보고(일지) 수와 기록된 회차를 대조하여,\n차이만큼 강사 포인트(회차당 10P)를 일괄 지급합니다.'))return;
+  const logs=await DB.collection('sessionLogs').get();
+  const cnt={};
+  logs.docs.forEach(d=>{const l=d.data();cnt[l.appId]=(cnt[l.appId]||0)+1});
+  const apps=await DB.collection('schoolApplications').where('status','==','배정완료').get();
+  let done=0,pts=0;
+  for(const d of apps.docs){
+    const s=d.data();
+    const logged=cnt[d.id]||0, recorded=s.doneSessions||0;
+    const diff=logged-recorded;
+    if(diff<=0||!s.assignedUid)continue;
+    await DB.collection('users').doc(s.assignedUid).update({points:firebase.firestore.FieldValue.increment(diff*10)});
+    await DB.collection('users').doc(s.assignedUid).collection('activities').add({
+      label:s.school+' 강습 '+diff+'회차 (일지 확인)',date:new Date().toISOString().slice(0,10).replace(/-/g,'.'),
+      points:diff*10,addedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await d.ref.update({doneSessions:logged});
+    done++;pts+=diff*10;
+  }
+  alert(done?('반영 완료 — '+done+'개교, 총 '+pts+'P 지급'):'반영할 신규 일지가 없습니다.');
+  loadApps();
+}
+async function payrollCSV(){
+  const ym=prompt('지급 계산할 월을 입력하세요 (YYYY-MM)',new Date().toISOString().slice(0,7));
+  if(!ym||!/^\d{4}-\d{2}$/.test(ym)){if(ym!==null)alert('형식: 2026-09');return}
+  const logs=await DB.collection('sessionLogs').get();
+  const by={};
+  logs.docs.forEach(d=>{
+    const l=d.data();
+    if(!String(l.date||'').startsWith(ym))return;
+    const k=l.uid;
+    by[k]=by[k]||{name:l.name,schools:{},n:0};
+    by[k].n++;by[k].schools[l.school]=(by[k].schools[l.school]||0)+1;
+  });
+  const keys=Object.keys(by);
+  if(!keys.length){alert(ym+' 월에 제출된 일지가 없습니다.');return}
+  const rows=[['성명','학교(회차)','총 회차','시간(회차×2h)','지급총액(시간당 5만원)','소득세(8%)','지방소득세(0.8%)','공제계','실지급액']];
+  keys.forEach(k=>{
+    const v=by[k];
+    const hours=v.n*2, amt=hours*50000;
+    const tax1=Math.floor(amt*0.08/10)*10, tax2=Math.floor(amt*0.008/10)*10;
+    rows.push([v.name,Object.entries(v.schools).map(x=>x[0]+'('+x[1]+')').join(' / '),v.n,hours,amt,tax1,tax2,tax1+tax2,amt-tax1-tax2]);
+  });
+  rows.push([]);rows.push(['※ 기타소득 필요경비 60% 기준 원천징수(8.8%). 소액부징수(소득세 1천원 미만) 등은 신고 시 확인. 주민번호·계좌는 보안 대장에서 결합.']);
+  const csv='\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='강사지급계산_'+ym+'.csv';a.click();
+}
+function copyNotice(id){
+  const s=APPS.find(d=>d.id===id).data();
+  const isAug=s.start&&s.start.indexOf('8월')>=0;
+  const period=isAug?'8월 여름방학 중':'9월';
+  let txt='';
+  if(s.status==='선정'){
+    txt='[학교용 — 담당교사 '+s.teacher+' '+s.phone+']\n'
+      +'[플라잉디스크연맹] '+s.school+' '+s.type+' 신청이 선정되었습니다. 접수번호 '+(s.code||'')+'. '
+      +'개강은 '+period+' 예정이며, 담당 강사 배정 후 성명·연락처를 전달드리니 귀교 외부강사 절차에 따른 경력조회 협조를 부탁드립니다. '
+      +'선정 통보 공문은 학교 메일로 발송됩니다. 문의 031-984-3248';
+  }else{
+    txt='[학교용 — 담당교사 '+s.teacher+' '+s.phone+']\n'
+      +'[플라잉디스크연맹] '+s.school+' '+s.type+' 담당 강사가 배정되었습니다. 강사: '+s.assignedName+' (연락처: 직접 기입). '
+      +'귀교 외부강사 관리 절차에 따른 경력조회 협조 부탁드리며, 강사가 일정 협의차 연락드릴 예정입니다. 문의 031-984-3248'
+      +'\n\n[강사용 — '+s.assignedName+']\n'
+      +'[플라잉디스크연맹] '+s.school+' ('+s.type+', '+period+' 개강, 24회차) 강사로 배정되었습니다. '
+      +'홈페이지 마이페이지에서 ①위촉 전자동의 ②위촉계약 전자동의를 완료해주세요. '
+      +'담당교사: '+s.teacher+' '+s.phone+' — 위촉 완료 후 일정 협의 연락 바랍니다. '
+      +'수당 지급용 주민등록번호·계좌번호는 이 번호로 회신해주세요. 문의 031-984-3248';
+  }
+  navigator.clipboard.writeText(txt).then(()=>alert('통보문이 복사되었습니다. 문자·메일에 붙여넣으세요.\n\n'+txt.slice(0,120)+'…'))
+    .catch(()=>prompt('아래 내용을 복사하세요',txt));
 }
 async function toggleLogs(id){
   const el=document.getElementById('logs_'+id);
