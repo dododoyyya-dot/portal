@@ -76,6 +76,11 @@ function lvOf(p){let l=0;LVS.forEach((v,i)=>{if(p>=v[0])l=i});return l+1}
 function lvName(p){return LVS[lvOf(p)-1][1]}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')}
+function orgChip(o,region,title){
+  if(o==='central')return '<span style="background:linear-gradient(120deg,#111114,#3a3a44);color:#e6b422;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83c\udfdb \uc911\uc559\uc5f0\ub9f9'+(title?' \u00b7 '+esc(title):'')+'</span>';
+  if(o==='regional')return '<span style="background:#1F4E9C;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83d\udea9 '+esc(region||'')+' \uc5f0\ub9f9'+(title?' \u00b7 '+esc(title):'')+'</span>';
+  return '';
+}
 </script>
 <style>
 .authbox{max-width:460px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:38px;box-shadow:0 14px 34px rgba(17,17,20,.06)}
@@ -330,6 +335,7 @@ async function loadUsers(){
       +(v.status==='approved'
         ?'<span style="font-size:13px;font-weight:800;color:#0f766e">승인됨</span>'
         :'<button class="btn-sub" onclick="approve(\''+d.id+'\')">승인하기</button>')
+      +'<button class="btn-sub" style="background:#1F4E9C" onclick="setOrg(\''+d.id+'\')">직책</button>'
       +'</div>';
   }).join('')||'<div class="bempty">회원이 없습니다.</div>';
   const sel=document.getElementById('axUser');
@@ -347,6 +353,19 @@ async function backfillCerts(){
   let n=0;
   for(const d of snap.docs){if(d.data().edu2026){await makeCert(d.id,d.data().name);n++}}
   alert('이수증 검증코드 '+n+'건 생성 완료');
+}
+async function setOrg(uid){
+  const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
+  const cur=d.org==='central'?'중앙연맹':d.org==='regional'?'시도연맹':'일반';
+  const pick=prompt('['+d.name+'] 직책 지정 — 번호 입력\n현재: '+cur+(d.orgTitle?' ('+d.orgTitle+')':'')+'\n\n0 = 일반 회원 (뱃지 없음)\n1 = 시도연맹 임원 ('+d.region+')\n2 = 중앙연맹','');
+  if(pick===null)return;
+  if(pick!=='0'&&pick!=='1'&&pick!=='2'){alert('0, 1, 2 중 하나를 입력하세요');return}
+  let org='',title='';
+  if(pick==='1')org='regional';
+  if(pick==='2')org='central';
+  if(org){title=prompt('직함 입력 (선택 — 예: 회장, 사무국장, 이사)\n비워두면 직함 없이 뱃지만 표시됩니다','')||''}
+  await DB.collection('users').doc(uid).update({org:org,orgTitle:title});
+  loadUsers();
 }
 async function approve(uid){
   const doc=await DB.collection('users').doc(uid).get();

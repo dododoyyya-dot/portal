@@ -75,6 +75,11 @@ function lvOf(p){let l=0;LVS.forEach((v,i)=>{if(p>=v[0])l=i});return l+1}
 function lvName(p){return LVS[lvOf(p)-1][1]}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')}
+function orgChip(o,region,title){
+  if(o==='central')return '<span style="background:linear-gradient(120deg,#111114,#3a3a44);color:#e6b422;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83c\udfdb \uc911\uc559\uc5f0\ub9f9'+(title?' \u00b7 '+esc(title):'')+'</span>';
+  if(o==='regional')return '<span style="background:#1F4E9C;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83d\udea9 '+esc(region||'')+' \uc5f0\ub9f9'+(title?' \u00b7 '+esc(title):'')+'</span>';
+  return '';
+}
 </script>
 <style>
 .authbox{max-width:460px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:38px;box-shadow:0 14px 34px rgba(17,17,20,.06)}
@@ -121,6 +126,7 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
       <div><b id="myName" style="font-size:26px;font-weight:900"></b>
         <span id="eduBadge" style="display:none;margin-left:10px;vertical-align:middle;background:linear-gradient(120deg,#b8860b,#e6b422);color:#fff;font-size:12px;font-weight:900;padding:4px 12px;border-radius:999px">🎓 2026 직무연수 이수</span>
+        <span id="orgBadge" style="margin-left:8px;vertical-align:middle"></span>
         <span id="mySub" style="display:block;font-size:13px;color:#9aa1ad;margin-top:4px"></span></div>
       <span class="lvchip2" id="myLv" style="font-size:17px;padding:8px 20px"></span>
     </div>
@@ -185,6 +191,7 @@ AUTH.onAuthStateChanged(async u=>{
   document.getElementById('myCard').style.display='block';
   document.getElementById('myName').textContent=d.name;
   document.getElementById('mySub').textContent=d.region+' 권역 · '+(d.edu2026?'2026 직무연수 이수':'연수 미이수')+' · '+d.email;
+  document.getElementById('orgBadge').innerHTML=orgChip(d.org,d.region,d.orgTitle);
   if(d.edu2026){
     document.getElementById('eduBadge').style.display='inline-block';
     document.getElementById('certBox').style.display='block';
