@@ -135,12 +135,12 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
       </div>
       <div class="card" style="cursor:default">
         <h3>🏁 권역별대회 심판요원</h3>
-        <p>유소년 올림피아드 심판 · 1일 7만원 이내 (4시간 이내 4만원) · 심판 활동 20P/일</p>
+        <p>유소년 올림피아드 심판 · 1일 7만원 이내 (4시간 이내 4만원) · 심판 활동 20P/일<br><b style="color:#8c1622">※ 연맹 심판 자격증 보유자만 지원 가능</b></p>
         <button class="btn-sub" id="btnRef" style="margin-top:14px" onclick="toggleApply('referee')">지원하기</button>
       </div>
       <div class="card" style="cursor:default">
         <h3>🎪 권역별대회 운영요원</h3>
-        <p>기록·진행·안전관리 등 대회 운영 지원 · 행사 활동 15P/일</p>
+        <p>기록·진행·안전관리 등 대회 운영 지원 · 행사 활동 15P/일<br><b style="color:#8c1622">※ 연맹 지도자 자격증 보유자만 지원 가능</b></p>
         <button class="btn-sub" id="btnStaff" style="margin-top:14px" onclick="toggleApply('staff')">지원하기</button>
       </div>
     </div>
@@ -157,6 +157,11 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
       <button class="bcat" data-r="제주">제주</button>
     </div></div>
     <div class="board" id="slotList"><div class="bempty">불러오는 중…</div></div>
+
+    <div class="sec-label" style="margin-top:48px">STEP 3</div>
+    <h2 class="sec-title" style="font-size:24px">권역별대회 요원 지명 신청 (선착순)</h2>
+    <div class="note" style="margin-bottom:22px"><b>대회 요원 안내</b> — 심판 지명은 심판요원 지원자(연맹 심판 자격), 운영 지명은 운영요원 지원자(연맹 지도자 자격)만 가능합니다. 정원 도달 시 마감되며, 최종 확정은 사무국이 자격 확인 후 개별 연락드립니다.</div>
+    <div class="board" id="compList"><div class="bempty">불러오는 중…</div></div>
   </div>
 </div></section>
 <script>
@@ -166,7 +171,7 @@ AUTH.onAuthStateChanged(async u=>{
   if(!u){g.style.display='block';g.innerHTML='🔒 승인 회원 전용입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a>';return}
   JME=u;const d=await DB.collection('users').doc(u.uid).get();JMY=d.data();
   if(!JMY||JMY.status!=='approved'){g.style.display='block';g.innerHTML='⏳ 사무국 승인 후 이용 가능합니다.';return}
-  document.getElementById('jBody').style.display='block';renderApply();loadSlots();
+  document.getElementById('jBody').style.display='block';renderApply();loadSlots();loadComps();
 });
 function renderApply(){
   const f=JMY.instructorFor||{};
@@ -179,6 +184,8 @@ function renderApply(){
 async function toggleApply(k){
   try{
     const f=Object.assign({},JMY.instructorFor||{});
+    if(!f[k]&&k==='referee'&&!confirm('연맹 심판 자격증을 보유하고 계십니까?\n대회 배정 확정 시 자격증 확인이 진행됩니다.'))return;
+    if(!f[k]&&k==='staff'&&!confirm('연맹 지도자 자격증을 보유하고 계십니까?\n대회 배정 확정 시 자격증 확인이 진행됩니다.'))return;
     f[k]=!f[k];
     await DB.collection('users').doc(JME.uid).update({instructorFor:f,instructorAppliedAt:firebase.firestore.FieldValue.serverTimestamp()});
     JMY.instructorFor=f;renderApply();
@@ -188,6 +195,45 @@ document.querySelectorAll('#jCats .bcat').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#jCats .bcat').forEach(x=>x.classList.remove('on'));
   b.classList.add('on');JR=b.dataset.r;loadSlots();
 });
+async function loadComps(){
+  const el=document.getElementById('compList');
+  try{
+    const snap=await DB.collection('compSlots').orderBy('date').limit(50).get();
+    if(snap.empty){el.innerHTML='<div class="bempty">현재 모집 중인 대회가 없습니다. 대회 일정 확정 시 이곳에 게시됩니다.</div>';return}
+    el.innerHTML=snap.docs.map(d=>{
+      const s=d.data();
+      const claimed=s.claimed||[];
+      const mine=claimed.some(c=>c.uid===JME.uid);
+      const full=claimed.length>=s.quota;
+      const eligible=s.role==='심판'?(JMY.instructorFor&&JMY.instructorFor.referee):(JMY.instructorFor&&JMY.instructorFor.staff);
+      const rc=s.role==='심판'?'#7c3aed':'#b8860b';
+      let btn;
+      if(mine)btn='<span style="background:#0f766e;color:#fff;font-weight:900;font-size:12.5px;padding:6px 14px;border-radius:999px">✓ 지명 완료</span>';
+      else if(full)btn='<span style="background:#8a919d;color:#fff;font-weight:900;font-size:12.5px;padding:6px 14px;border-radius:999px">마감</span>';
+      else if(!eligible)btn='<span style="color:#8a919d;font-size:12.5px;font-weight:700">'+(s.role==='심판'?'심판요원':'운영요원')+' 지원 후 신청 가능 (STEP 1)</span>';
+      else btn='<button class="btn-sub" onclick="claimComp(\''+d.id+'\')">지명 신청</button>';
+      return '<div class="urow"><div class="grow"><b>'+esc(s.title)+'</b> <span style="font-size:11.5px;font-weight:900;color:#fff;background:'+rc+';padding:2px 10px;border-radius:999px">'+esc(s.role)+'</span>'
+        +'<div class="sub3">'+esc(s.region)+' · '+esc(s.date)+' · 정원 '+claimed.length+'/'+s.quota+'명</div></div>'
+        +'<div>'+btn+'</div></div>';
+    }).join('');
+  }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+esc(e.message)+'</div>'}
+}
+async function claimComp(id){
+  if(!confirm('이 대회에 지명 신청할까요?\n확정 시 사무국에서 자격증 확인 후 개별 연락드립니다.'))return;
+  const ref=DB.collection('compSlots').doc(id);
+  try{
+    await DB.runTransaction(async tx=>{
+      const doc=await tx.get(ref);
+      const s=doc.data();const claimed=s.claimed||[];
+      if(claimed.some(c=>c.uid===JME.uid))throw new Error('이미 지명 신청한 대회입니다');
+      if(claimed.length>=s.quota)throw new Error('정원이 마감되었습니다');
+      claimed.push({uid:JME.uid,name:JMY.name});
+      tx.update(ref,{claimed:claimed});
+    });
+    alert('지명 신청 완료! 확정 시 개별 연락드립니다.');
+  }catch(e){alert(e.message)}
+  loadComps();
+}
 async function loadSlots(){
   const snap=await DB.collection('openSlots').orderBy('createdAt','desc').limit(100).get();
   const list=snap.docs.filter(d=>JR==='전체'||d.data().region===JR);
