@@ -364,7 +364,11 @@ async function setOrg(uid){
   if(pick==='1')org='regional';
   if(pick==='2')org='central';
   if(org){title=prompt('직함 입력 (선택 — 예: 회장, 사무국장, 이사)\n비워두면 직함 없이 뱃지만 표시됩니다','')||''}
-  await DB.collection('users').doc(uid).update({org:org,orgTitle:title});
+  const RGS=['서울·경기','강원','충청','전라','경상','제주'];
+  let region=d.region;
+  const rp=prompt('권역 확인 — 현재: '+d.region+'\n맞으면 그냥 [확인], 수정하려면 번호 입력\n\n1=서울·경기  2=강원  3=충청\n4=전라  5=경상  6=제주','');
+  if(rp&&RGS[parseInt(rp)-1])region=RGS[parseInt(rp)-1];
+  await DB.collection('users').doc(uid).update({org:org,orgTitle:title,region:region});
   loadUsers();
 }
 async function approve(uid){
