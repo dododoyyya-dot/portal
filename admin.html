@@ -13,7 +13,7 @@
 <body>
 <div class="util"><div class="wrap">
   <div><b>대한민국플라잉디스크연맹</b> · 대한체육회 인정단체</div>
-  <div><a href="mailto:kfdf60@hanmail.net">kfdf60@hanmail.net</a> &nbsp;|&nbsp; 031-984-3248 &nbsp;|&nbsp; <a href="login.html" style="color:#fff;font-weight:700">로그인</a> · <a href="mypage.html" style="color:#fff;font-weight:700">마이페이지</a></div>
+  <div><a href="mailto:kfdf60@hanmail.net">kfdf60@hanmail.net</a> &nbsp;|&nbsp; 031-984-3248 &nbsp;|&nbsp; <a href="login.html" id="utilAuth" style="color:#fff;font-weight:700">로그인</a> · <a href="mypage.html" style="color:#fff;font-weight:700">마이페이지</a></div>
 </div></div>
 <header><div class="wrap nav">
   <a href="index.html" class="brand">
@@ -155,6 +155,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <label>활동 종류</label>
         <select id="axType" onchange="document.getElementById('axPt').value=this.value">
           <option value="10">학교강습·방과후 1회차 (10P)</option>
+          <option value="50">직무연수 참여·이수 (50P)</option>
           <option value="20">대회 심판 1일 (20P)</option>
           <option value="15">연수 강사 1시간 (15P)</option>
           <option value="15">공식행사 운영 1일 (15P)</option>
@@ -333,7 +334,7 @@ async function loadUsers(){
   el.innerHTML=snap.docs.map(d=>{
     const v=d.data(),lv=lvOf(v.points||0);
     return '<div class="urow"><div class="grow"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span>'
-      +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+' · '+(v.edu2026?('연수이수 '+(inRoster(v.name)?'<b style="color:#0f766e">✓명단확인</b>':'<b style="color:#C41E2F">⚠명단에없음</b>')):'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+'</div></div>'
+      +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+' · '+(v.edu2026?('연수이수 '+(inRoster(v.name)?'<b style="color:#0f766e">✓명단확인</b>':'<b style="color:#C41E2F">⚠명단에없음</b>')):'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+((v.instructorFor&&v.instructorFor.referee)?' · <b style="color:#7c3aed">심판요원 지원</b>':'')+((v.instructorFor&&v.instructorFor.staff)?' · <b style="color:#b8860b">운영요원 지원</b>':'')+'</div></div>'
       +(v.status==='approved'
         ?'<span style="font-size:13px;font-weight:800;color:#0f766e">승인됨</span>'
         :'<button class="btn-sub" onclick="approve(\''+d.id+'\')">승인하기</button>')
@@ -447,5 +448,6 @@ async function givePt(){
     © 2026 KOREA FLYING DISC FEDERATION. All rights reserved.
   </div>
 </div></footer>
+<script src="auth_ui.js"></script>
 </body>
 </html>
