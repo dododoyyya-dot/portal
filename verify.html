@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="google-site-verification" content="sMiNgrZBGPS1NWfFR2JWjhrM25dn2Pq0LsDR2DbDrQc" />
+<meta name="naver-site-verification" content="f2bba301d1f9ca2d37efa24800dcad9676123d09" />
+<title>이수증 진위 확인 | 대한민국플라잉디스크연맹</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="style.css">
+<script src="site_config.js"></script>
+</head>
+<body>
+<div class="util"><div class="wrap">
+  <div><b>대한민국플라잉디스크연맹</b> · 대한체육회 인정단체</div>
+  <div><a href="mailto:kfdf60@hanmail.net">kfdf60@hanmail.net</a> &nbsp;|&nbsp; 031-984-3248 &nbsp;|&nbsp; <a href="login.html" style="color:#fff;font-weight:700">로그인</a> · <a href="mypage.html" style="color:#fff;font-weight:700">마이페이지</a></div>
+</div></div>
+<header><div class="wrap nav">
+  <a href="index.html" class="brand">
+    <img src="kfdf_logo.png" alt="대한민국플라잉디스크연맹 로고">
+    <div><div class="t1">대한민국플라잉디스크연맹</div><div class="t2">KOREA FLYING DISC FEDERATION</div></div>
+  </a>
+  <button class="hamb" onclick="document.querySelector('.menu').classList.toggle('open')">☰</button>
+  <nav class="menu">
+    <div><a href="about.html" class="top">연맹소개</a>
+      <div class="drop">
+        <a href="about.html#greet">인사말 · 미션</a>
+        <a href="about.html#org">조직도</a>
+        <a href="about.html#rule">정관 · 규정</a>
+        <a href="about.html#region">시도연맹</a>
+        <a href="about.html#way">오시는 길</a>
+      </div></div>
+    <div><a href="business.html" class="top active">주요사업</a>
+      <div class="drop">
+        <a href="business.html#youth">유소년 스포츠 기반구축사업</a>
+        <a href="certification.html">체육지도자 실기 · 구술</a>
+        <a href="leader.html">레벨업 시스템</a>
+      </div></div>
+    <div><a href="certification.html" class="top">자격검정</a></div>
+    <div><a href="competition.html" class="top">대회</a></div>
+    <div><a href="leader.html" class="top">리더 시스템</a></div>
+    <div><a href="community.html" class="top">커뮤니티</a></div>
+    <div><a href="notice.html" class="top">알림마당</a>
+      <div class="drop">
+        <a href="notice.html">공지사항 · 공고</a>
+        <a href="archive.html">자료실 (서식 다운로드)</a>
+      </div></div>
+    <div><a href="apply.html" class="top active">신청마당</a>
+      <div class="drop">
+        <a href="apply.html?type=school">학교체육 강습 신청 (학교·교사)</a>
+        <a href="apply.html?type=after">방과후·늘봄학교 신청 (학교·교사)</a>
+        <a href="jobs.html">강사 활동 지원 · 지명 (리더)</a>
+        <a href="login.html">리더 회원가입 · 로그인</a>
+      </div></div>
+    <a href="apply.html" class="cta">강습 신청</a>
+  </nav>
+</div></header>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",
+  authDomain: "koreaflyingdiscfederation.firebaseapp.com",
+  projectId: "koreaflyingdiscfederation",
+  storageBucket: "koreaflyingdiscfederation.firebasestorage.app",
+  messagingSenderId: "1081847355343",
+  appId: "1:1081847355343:web:ca40ed9a52e13f607f64ba"
+};
+firebase.initializeApp(firebaseConfig);
+const AUTH = firebase.auth();
+const DB = firebase.firestore();
+const LVS = [[0,'어쏘 리더'],[100,'필드 리더'],[300,'치프 리더'],[600,'엘리트 리더'],[1000,'마스터 리더']];
+const LVC = {1:'#8a919d',2:'#1F4E9C',3:'#7c3aed',4:'#C41E2F',5:'#b8860b'};
+function lvOf(p){let l=0;LVS.forEach((v,i)=>{if(p>=v[0])l=i});return l+1}
+function lvName(p){return LVS[lvOf(p)-1][1]}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')}
+</script>
+<style>
+.authbox{max-width:460px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:38px;box-shadow:0 14px 34px rgba(17,17,20,.06)}
+.authbox h3{font-size:22px;font-weight:900;margin-bottom:20px}
+.authbox label{display:block;font-size:13.5px;font-weight:700;color:var(--gray);margin:14px 0 6px}
+.authbox input,.authbox select,.authbox textarea{width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;font-family:inherit}
+.authbox input:focus,.authbox select:focus,.authbox textarea:focus{outline:none;border-color:var(--blue)}
+.btn-main{width:100%;margin-top:22px;background:var(--red);color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit}
+.btn-main:hover{background:var(--red-dark)}
+.btn-sub{background:var(--black);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-sub:hover{background:var(--red)}
+.authtabs{display:flex;gap:8px;margin-bottom:22px}
+.authtabs button{flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit}
+.authtabs button.on{background:var(--black);color:#fff;border-color:var(--black)}
+.msg{margin-top:14px;font-size:13.5px;font-weight:700;min-height:20px}
+.msg.err{color:var(--red)} .msg.ok{color:#0f766e}
+.lvchip2{display:inline-block;color:#fff;font-weight:900;font-size:13px;padding:5px 14px;border-radius:999px}
+.pending-banner{background:#fff8e6;border:1.5px solid #e6b422;border-radius:12px;padding:16px 20px;font-size:14.5px;color:#7a5b00;margin-bottom:24px}
+.mycard{background:linear-gradient(120deg,#0f1013,#1a1c22 60%,#153A77);border-radius:20px;padding:36px;color:#fff}
+.post-form{background:var(--bg-soft);border-radius:14px;padding:24px;margin-bottom:26px;display:none}
+.post-form.show{display:block}
+.post-form input,.post-form select,.post-form textarea{width:100%;padding:11px 13px;border:1.5px solid var(--line);border-radius:10px;font-size:14.5px;font-family:inherit;margin-bottom:10px;background:#fff}
+.cmt{padding:10px 0;border-top:1px dashed var(--line);font-size:14px}
+.cmt b{font-size:13.5px}
+.cmt .lvmini{font-size:11px;font-weight:900;color:#fff;padding:2px 8px;border-radius:999px;margin-left:6px}
+.cmt-form{display:flex;gap:8px;margin-top:12px}
+.cmt-form input{flex:1;padding:10px 13px;border:1.5px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit}
+.admin-tab{display:flex;gap:8px;margin-bottom:24px}
+.admin-tab button{padding:10px 20px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-weight:800;cursor:pointer;font-family:inherit}
+.admin-tab button.on{background:var(--black);color:#fff;border-color:var(--black)}
+.urow{display:flex;align-items:center;gap:14px;padding:14px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.urow .grow{flex:1;min-width:200px}
+.urow b{font-size:15.5px}
+.urow .sub3{font-size:12.5px;color:var(--gray)}
+</style>
+
+<div class="phero"><div class="wrap">
+  <div class="crumb">HOME &nbsp;›&nbsp; <b>이수증 진위 확인</b></div>
+  <h1>이수증 진위 확인</h1>
+  <p>대한민국플라잉디스크연맹이 발급한 직무연수 이수증의 유효성을 확인합니다.</p>
+</div></div>
+<section><div class="wrap" style="max-width:640px">
+  <div class="authbox" style="max-width:none">
+    <h3>🎓 이수번호 조회</h3>
+    <p style="font-size:13.5px;color:var(--gray)">이수증에 기재된 이수번호를 입력하세요. (예: KFDF-2026-EDU-A1B2C3)</p>
+    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+      <input id="vfCode" placeholder="KFDF-2026-EDU-______" style="flex:1;min-width:220px;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;font-family:inherit;text-transform:uppercase">
+      <button class="btn-sub" style="padding:12px 22px;font-size:15px" onclick="verify()">확인</button>
+    </div>
+    <div id="vfResult" style="margin-top:18px"></div>
+    <div style="margin-top:22px;font-size:12.5px;color:var(--gray)">개인정보 보호를 위해 성명은 일부만 표시됩니다. 추가 확인이 필요한 기관은 사무국(kfdf60@hanmail.net / 031-984-3248)으로 문의해주세요.</div>
+  </div>
+</div></section>
+<script>
+async function verify(){
+  const el=document.getElementById('vfResult');
+  let code=document.getElementById('vfCode').value.trim().toUpperCase().replace(/\s/g,'');
+  if(code&&!code.startsWith('KFDF-'))code='KFDF-2026-EDU-'+code.replace(/^KFDF-2026-EDU-/,'');
+  if(!/^KFDF-2026-EDU-[A-Z0-9]{6}$/.test(code)){el.innerHTML='<span style="color:var(--red);font-weight:700;font-size:14px">이수번호 형식이 올바르지 않습니다 (예: KFDF-2026-EDU-A1B2C3)</span>';return}
+  el.innerHTML='<span style="font-size:14px;color:var(--gray)">확인 중…</span>';
+  try{
+    const doc=await DB.collection('certs').doc(code).get();
+    if(doc.exists&&doc.data().issued){
+      const d=doc.data();
+      el.innerHTML='<div style="background:#f2faf7;border:2px solid #0f766e;border-radius:12px;padding:20px 22px">'
+        +'<b style="color:#0f766e;font-size:17px">✅ 유효한 이수증입니다</b>'
+        +'<div style="font-size:14.5px;margin-top:10px;line-height:1.9">이수번호: <b>'+esc(code)+'</b><br>성명: <b>'+esc(d.name)+'</b><br>과정: '+esc(d.course||'2026 지도자 직무연수 (10시간)')+'<br>발급기관: 대한민국플라잉디스크연맹</div></div>';
+    }else{
+      el.innerHTML='<div style="background:#fdf3f4;border:2px solid var(--red);border-radius:12px;padding:20px 22px">'
+        +'<b style="color:var(--red);font-size:17px">❌ 등록되지 않은 이수번호입니다</b>'
+        +'<div style="font-size:13.5px;color:var(--gray);margin-top:8px">번호를 다시 확인하시거나 사무국으로 문의해주세요.</div></div>';
+    }
+  }catch(e){el.innerHTML='<span style="color:var(--red);font-size:14px">확인 실패: '+esc(e.message)+'</span>'}
+}
+document.getElementById('vfCode').addEventListener('keydown',e=>{if(e.key==='Enter')verify()});
+</script>
+<footer><div class="wrap">
+  <div class="top">
+    <div class="f-brand"><img src="kfdf_logo.png" alt="로고">
+      <div><b>대한민국플라잉디스크연맹</b><span>KOREA FLYING DISC FEDERATION</span></div></div>
+    <div class="links">
+      <a href="about.html">연맹소개</a><a href="business.html">주요사업</a>
+      <a href="notice.html">알림마당</a><a href="archive.html">자료실</a>
+      <a href="apply.html">학교 강습 신청</a>
+    </div>
+  </div>
+  <div class="bottom">
+    <b>사단법인 대한민국플라잉디스크연맹</b> &nbsp;|&nbsp; 경기도 김포시 김포대로 1185 (장기동)<br>
+    TEL 031-984-3248 &nbsp;|&nbsp; EMAIL kfdf60@hanmail.net<br>
+    © 2026 KOREA FLYING DISC FEDERATION. All rights reserved.
+  </div>
+</div></footer>
+</body>
+</html>

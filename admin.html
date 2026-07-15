@@ -8,6 +8,7 @@
 <title>관리자 | 대한민국플라잉디스크연맹</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <link rel="stylesheet" href="style.css">
+<script src="site_config.js"></script>
 </head>
 <body>
 <div class="util"><div class="wrap">
@@ -118,12 +119,15 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
 <section><div class="wrap" style="max-width:1000px">
   <div id="deny" class="pending-banner" style="display:none">🔒 관리자 권한이 필요합니다.</div>
   <div id="adminBody" style="display:none">
+    <div id="dash" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:22px"></div>
     <div class="admin-tab">
       <button id="t1" class="on" onclick="tab(1)">회원 승인 · 목록</button>
       <button id="t2" onclick="tab(2)">포인트 부여</button>
       <button id="t3" onclick="tab(3)">강습 신청 관리</button>
     </div>
-    <div id="v1"><div class="board" id="userList"><div class="bempty">불러오는 중…</div></div></div>
+    <div id="v1">
+      <div style="margin-bottom:14px"><button class="btn-sub" style="background:#b8860b" onclick="backfillCerts()">🎓 기승인 이수자 이수증 검증코드 일괄 생성</button></div>
+      <div class="board" id="userList"><div class="bempty">불러오는 중…</div></div></div>
     <div id="v3" style="display:none">
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
         <button class="btn-sub" onclick="loadApps()">↻ 새로고침</button>
@@ -164,7 +168,7 @@ AUTH.onAuthStateChanged(async u=>{
   if(!u){document.getElementById('deny').style.display='block';return}
   const me=await DB.collection('users').doc(u.uid).get();
   if(!me.exists||me.data().role!=='admin'){document.getElementById('deny').style.display='block';return}
-  document.getElementById('adminBody').style.display='block';
+  document.getElementById('adminBody').style.display='block';loadDash();
   loadUsers();
 });
 function tab(n){
@@ -186,6 +190,7 @@ async function loadApps(){
   renderApps();
 }
 function renderApps(){
+  const dupKey={};APPS.forEach(d=>{const x=d.data();const k=(x.school||'').replace(/\s/g,'')+'|'+(x.type||'');dupKey[k]=(dupKey[k]||0)+1});
   const docs=AFL==='전체'?APPS:APPS.filter(d=>String(d.data().type||'').indexOf(AFL)>=0);
   const el=document.getElementById('appList');
   el.innerHTML=docs.length?docs.map(d=>{
@@ -196,8 +201,9 @@ function renderApps(){
       +'<span style="font-size:12px;font-weight:800;color:#fff;background:'+stc+';padding:2px 10px;border-radius:999px">'+st+'</span>'
       +(s.eduName?' <span style="font-size:11px;font-weight:800;color:#C41E2F">★이수자교('+esc(s.eduName)+')</span>':'')
       +(s.selfTeach?' <span style="font-size:11px;font-weight:800;color:#0f766e">◉본인지도 희망'+(s.selfName?'('+esc(s.selfName)+')':'')+'</span>':'')
+      +((dupKey[(s.school||'').replace(/\s/g,'')+'|'+(s.type||'')]>1)?' <span style="font-size:11px;font-weight:800;color:#fff;background:#e6b422;padding:2px 8px;border-radius:999px">⚠ 중복의심</span>':'')
       +' <span style="font-size:11px;font-weight:800;color:#fff;background:'+(String(s.type||'').indexOf('방과후')>=0?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(String(s.type||'').indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+'</span>'
-      +'<div class="sub3">'+esc(s.region)+' · '+esc(s.students)+' · 희망 '+esc(s.d1)
+      +'<div class="sub3">'+(s.code?'<b>'+esc(s.code)+'</b> · ':'')+esc(s.region)+' · '+esc(s.students)+' · 희망 '+esc(s.d1)
       +'<br>담당 '+esc(s.teacher)+' '+esc(s.phone)+(s.assignedName?' · <b style="color:#0f766e">배정: '+esc(s.assignedName)+'</b>':'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
       +(st==='접수'?'<button class="btn-sub" onclick="setStatus(\''+d.id+'\',\'선정\')">선정</button><button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'미선정\')">미선정</button>':'')
@@ -205,14 +211,42 @@ function renderApps(){
       +'</div></div>';
   }).join(''):'<div class="bempty">해당 유형의 신청이 없습니다.</div>';
 }
+async function syncStatus(app,st){
+  if(app&&app.code)await DB.collection('appStatus').doc(app.code).set({
+    school:app.school,type:app.type,status:st,
+    updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+}
+async function loadDash(){
+  try{
+    const [us,ap,sl]=await Promise.all([
+      DB.collection('users').get(),
+      DB.collection('schoolApplications').get(),
+      DB.collection('openSlots').get()]);
+    const u=us.docs.map(d=>d.data()),a=ap.docs.map(d=>d.data());
+    const box=(n,l,c)=>'<div style="background:#fff;border:1.5px solid var(--line);border-left:4px solid '+c+';border-radius:12px;padding:14px 16px"><b style="font-size:22px">'+n+'</b><div style="font-size:12px;color:var(--gray);font-weight:700">'+l+'</div></div>';
+    document.getElementById('dash').innerHTML=
+      box(u.filter(x=>x.status==='pending').length,'승인 대기 회원','#e6b422')
+      +box(u.filter(x=>x.status==='approved').length,'승인 회원','#0f766e')
+      +box(a.filter(x=>String(x.type||'').indexOf('방과후')<0).length,'🏫 학교체육 신청','#8c1622')
+      +box(a.filter(x=>String(x.type||'').indexOf('방과후')>=0).length,'🌱 방과후·늘봄 신청','#0f766e')
+      +box(a.filter(x=>x.status==='선정').length,'선정 (배정 대기)','#1F4E9C')
+      +box(a.filter(x=>x.status==='배정완료').length,'배정 완료','#0f766e')
+      +box(sl.docs.filter(d=>d.data().claimedBy).length,'지명 확정 대기 ⚡','#C41E2F');
+  }catch(e){}
+}
 async function setStatus(id,st){
   const s=APPS.find(d=>d.id===id).data();
   if(st==='선정'&&s.selfTeach&&s.selfUid){
     // 본인 직접 지도: 선정과 동시에 자동 배정 (지명 게시판 미공개)
     await DB.collection('schoolApplications').doc(id).update({status:'배정완료',assignedUid:s.selfUid,assignedName:s.selfName});
-    loadApps();return;
+    await syncStatus(s,'배정완료');
+    kfdfMail(s.email,'[플라잉디스크연맹] 강습 선정 안내 — '+s.school,s.school+' ('+s.type+') 신청이 선정되었으며, 신청하신 본인지도로 강사 배정까지 완료되었습니다.\n접수번호: '+(s.code||'')+'\n일정 협의를 위해 곧 연락드리겠습니다.');
+    loadApps();loadDash();return;
   }
   await DB.collection('schoolApplications').doc(id).update({status:st});
+  await syncStatus(s,st);
+  if(st==='선정')kfdfMail(s.email,'[플라잉디스크연맹] 강습 선정 안내 — '+s.school,s.school+' ('+s.type+') 신청이 선정되었습니다!\n접수번호: '+(s.code||'')+'\n강사 배정 후 확정 연락을 드립니다.');
+  if(st==='미선정')kfdfMail(s.email,'[플라잉디스크연맹] 강습 심사 결과 안내 — '+s.school,'아쉽게도 이번에는 선정되지 못했습니다. 추가 모집 시 우선 안내드리겠습니다.\n접수번호: '+(s.code||''));
   if(st==='선정'){
     await DB.collection('openSlots').doc(id).set({
       school:s.school,region:s.region,type:s.type,d1:s.d1||'',
@@ -220,7 +254,7 @@ async function setStatus(id,st){
   }else{
     await DB.collection('openSlots').doc(id).delete().catch(()=>{});
   }
-  loadApps();
+  loadApps();loadDash();
 }
 async function autoAssign(){
   if(!confirm('선정 상태이면서 미배정인 학교를 같은 권역 승인 회원에게 자동배정합니다. (지명신청 완료분은 지명자 우선 확정)'))return;
@@ -239,6 +273,7 @@ async function autoAssign(){
     const slot=await DB.collection('openSlots').doc(d.id).get();
     if(slot.exists&&slot.data().claimedBy){
       await d.ref.update({assignedUid:slot.data().claimedBy,assignedName:slot.data().claimedName,status:'배정완료'});
+      await syncStatus(s,'배정완료');
       done++;continue;
     }
     const wantAfter=(s.type||'').indexOf('방과후')>=0;
@@ -247,11 +282,12 @@ async function autoAssign(){
     cands.sort((a,b)=>a.cnt-b.cnt);
     const pick=cands[0];pick.cnt++;
     await d.ref.update({assignedUid:pick.uid,assignedName:pick.name,status:'배정완료'});
+    await syncStatus(s,'배정완료');
     await DB.collection('openSlots').doc(d.id).delete().catch(()=>{});
     done++;
   }
   alert('자동배정 완료: '+done+'건 / 건너뜀: '+skip+'건');
-  loadApps();
+  loadApps();loadDash();
 }
 async function recordSessions(id){
   const s=APPS.find(d=>d.id===id).data();
@@ -290,18 +326,33 @@ async function loadUsers(){
   const sel=document.getElementById('axUser');
   sel.innerHTML=snap.docs.filter(d=>d.data().status==='approved').map(d=>'<option value="'+d.id+'">'+esc(d.data().name)+' ('+esc(d.data().region)+', '+(d.data().points||0)+'P)</option>').join('');
 }
+function maskName(n){n=String(n||'');return n.length<2?n:n[0]+'*'.repeat(Math.max(1,n.length-2))+(n.length>2?n[n.length-1]:'')}
+async function makeCert(uid,name){
+  await DB.collection('certs').doc('KFDF-2026-EDU-'+uid.slice(0,6).toUpperCase()).set({
+    name:maskName(name),course:'2026 지도자 직무연수 (10시간)',issued:true,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+}
+async function backfillCerts(){
+  if(!confirm('이미 승인된 연수 이수자 전원의 이수증 검증코드를 생성/갱신합니다.'))return;
+  const snap=await DB.collection('users').where('status','==','approved').get();
+  let n=0;
+  for(const d of snap.docs){if(d.data().edu2026){await makeCert(d.id,d.data().name);n++}}
+  alert('이수증 검증코드 '+n+'건 생성 완료');
+}
 async function approve(uid){
   const doc=await DB.collection('users').doc(uid).get();
   const d=doc.data();
   if(d.edu2026&&!(d.points>0)){
     await DB.collection('users').doc(uid).update({status:'approved',points:50});
     await DB.collection('users').doc(uid).collection('activities').add({
-      title:'2026 지도자 직무연수 이수 인증',points:50,
-      createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+      label:'2026 지도자 직무연수 이수 인증',date:'2026.07.05',points:50,
+      addedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await makeCert(uid,d.name);
   }else{
     await DB.collection('users').doc(uid).update({status:'approved'});
   }
-  loadUsers();
+  kfdfMail(d.email,'[플라잉디스크연맹] 리더 회원 승인 완료','안녕하세요 '+d.name+' 님, 리더 회원 승인이 완료되었습니다.'+(d.edu2026?'\n직무연수 이수 인증(뱃지+50P)이 반영되었고, 마이페이지에서 이수증을 발급할 수 있습니다.':'')+'\n홈페이지에 로그인하여 강사 활동 지원과 커뮤니티를 이용해보세요.');
+  loadDash();loadUsers();
 }
 async function givePt(){
   const uid=document.getElementById('axUser').value;
