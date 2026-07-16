@@ -141,6 +141,7 @@ function orgChip(o,region,title){
       <a href="community.html" class="btn-sub" style="text-decoration:none;display:inline-block">커뮤니티</a>
       <a href="jobs.html" class="btn-sub" style="text-decoration:none;display:inline-block;background:#0f766e">강습 지명 신청</a>
       <button class="btn-sub" onclick="AUTH.signOut().then(()=>location.href='index.html')" style="background:rgba(255,255,255,.15)">로그아웃</button>
+      <button class="btn-sub" onclick="reqWithdraw()" style="background:rgba(255,255,255,.08);color:#c3c9d4">회원 탈퇴 요청</button>
       <button class="btn-sub" id="adminBtn" style="display:none;background:#7c3aed" onclick="location.href='admin.html'">관리자 페이지</button>
     </div>
   </div>
@@ -177,6 +178,10 @@ function orgChip(o,region,title){
       <label>특이사항</label><input id="lgNote" placeholder="안전사고·결석 등 (없으면 비워두세요)">
       <label>수업 사진 (최대 3장, 자동 압축 업로드)</label>
       <input id="lgPhotos" type="file" accept="image/*" multiple style="border:none;padding:6px 0">
+      <div style="background:#fdf3f4;border:1.5px solid #f3c2c7;border-radius:9px;padding:10px 13px;margin-top:8px;font-size:12.5px;color:#8c1622;line-height:1.6">
+        📸 <b>촬영 유의</b> — 학생 얼굴이 식별되지 않도록 뒷모습·활동 장면·원거리 위주로 촬영해 주세요. 얼굴이 나오는 사진은 <b>소속 학교의 사진 활용 동의</b>를 받은 경우에만 업로드해야 합니다.
+        <label style="display:flex;gap:7px;align-items:flex-start;margin-top:8px;font-weight:700;color:#8c1622"><input type="checkbox" id="lgConsent" style="width:auto;margin-top:2px">(필수) 위 촬영·동의 기준을 확인했습니다</label>
+      </div>
       <button class="btn-main" onclick="submitLog()" id="lgBtn">회차 보고 제출</button>
       <div class="msg" id="lgMsg"></div>
     </div>
@@ -205,6 +210,13 @@ function orgChip(o,region,title){
 </div></section>
 <script>
 let MYD=null;let MYASG=[];
+async function reqWithdraw(){
+  if(!confirm('회원 탈퇴를 요청합니다.\n사무국 확인 후 계정과 개인정보가 삭제됩니다. (진행 중인 위촉·정산 건이 있으면 관계 법령상 보존 기간 경과 후 삭제)\n계속할까요?'))return;
+  try{
+    await DB.collection('users').doc(AUTH.currentUser.uid).update({withdrawReq:firebase.firestore.FieldValue.serverTimestamp()});
+    alert('탈퇴 요청이 접수되었습니다. 사무국 확인 후 처리됩니다. (문의 031-984-3248)');
+  }catch(e){alert('요청 실패: '+e.message)}
+}
 async function savePhone(){
   const el=document.getElementById('phMsg');
   const p=document.getElementById('myPhone').value.trim();
@@ -299,6 +311,7 @@ async function submitLog(){
   const content=document.getElementById('lgContent').value.trim();
   if(!appId||!sess||sess<1||sess>24||!date||!content){m.textContent='회차·수업일·수업 내용을 입력해주세요';m.className='msg err';return}
   const files=[...document.getElementById('lgPhotos').files].slice(0,3);
+  if(files.length&&!document.getElementById('lgConsent').checked){m.textContent='사진을 첨부하려면 촬영·동의 기준 확인에 체크해주세요';m.className='msg err';return}
   LGBUSY=true;
   try{
     const photos=[];
@@ -385,8 +398,8 @@ function printContract(id){
   +'<h2>\uc81c1\uc870 (\uc704\ucd09 \uc5c5\ubb34)</h2><p>\uac11\uc740 \uc744\uc744 \uc544\ub798 \ud559\uad50\uc758 \ud50c\ub77c\uc789\ub514\uc2a4\ud06c \uac15\uc2b5 \uac15\uc0ac\ub85c \uc704\ucd09\ud558\uace0, \uc744\uc740 \ud574\ub2f9 \ud504\ub85c\uadf8\ub7a8(24\ud68c\ucc28)\uc744 \uc131\uc2e4\ud788 \uc9c0\ub3c4\ud55c\ub2e4.<br>\u2022 \ubc30\uc815 \ud559\uad50: <b>'+esc(a.school)+'</b> ('+esc(a.type)+')<br>\u2022 \uc6b4\uc601 \uae30\uac04: '+period+' (\uc138\ubd80 \uc77c\uc815\uc740 \ud559\uad50\uc640 \ud611\uc758)</p>'
   +'<h2>\uc81c2\uc870 (\uac15\uc0ac\ub8cc)</h2><p>\uac15\uc0ac\ub8cc\ub294 \uc2dc\uac04\ub2f9 50,000\uc6d0\uc73c\ub85c \ud558\uba70, \uac11\uc740 \uad00\ub828 \ubc95\ub839\uc5d0 \ub530\ub978 \uc81c\uc138\uacf5\uacfc\uae08\uc744 \uc6d0\ucc9c\uc9d5\uc218\ud55c \ud6c4 \uc744\uc774 \uc9c0\uc815\ud558\ub294 \uacc4\uc88c\ub85c \uc6d4\ubcc4 \uc9c0\uae09\ud55c\ub2e4. (\uc6b4\uc601\uc77c\uc9c0 \uc81c\ucd9c \ud655\uc778 \ud6c4)</p>'
   +'<h2>\uc81c3\uc870 (\uc131\uc2e4\u00b7\uc548\uc804 \uc758\ubb34)</h2><p>\uc744\uc740 \uc720\uc18c\ub144 \uc548\uc804\uc744 \ucd5c\uc6b0\uc120\uc73c\ub85c \ud558\uba70, \uc6b4\uc601\uc77c\uc9c0 \uc791\uc131 \ub4f1 \uac11\uc774 \uc694\uccad\ud558\ub294 \uc99d\ube59\uc5d0 \ud611\uc870\ud55c\ub2e4. \uc544\ub3d9\ud559\ub300\u00b7\uc131\ubc94\uc8c4 \uacb0\uaca9\uc0ac\uc720\uac00 \ud655\uc778\ub420 \uacbd\uc6b0 \uc704\ucd09\uc740 \uc989\uc2dc \ud574\uc9c0\ub41c\ub2e4.</p>'
-  +'<h2>\uc81c4\uc870 (\uac1c\uc778\uc815\ubcf4)</h2><p>\uac11\uc740 \uac15\uc0ac\ub8cc \uc9c0\uae09\u00b7\uc6d0\ucc9c\uc9d5\uc218 \uc2e0\uace0\uc5d0 \ud544\uc694\ud55c \ucd5c\uc18c\ud55c\uc758 \uac1c\uc778\uc815\ubcf4\ub97c \uc218\uc9d1\u00b7\uc774\uc6a9\ud558\uba70 \ubcf4\uc874\uae30\uac04 \uacbd\uacfc \ud6c4 \ud30c\uae30\ud55c\ub2e4.</p>'
-  +'<h2>\uc81c5\uc870 (\uc804\uc790\uc11c\uba85)</h2><p>\ubcf8 \uacc4\uc57d\uc740 \uc744\uc774 \uc5f0\ub9f9 \ud648\ud398\uc774\uc9c0\uc5d0\uc11c \ubcf8\uc778 \uc778\uc99d \ud6c4 \uc804\uc790\uc801\uc73c\ub85c \ub3d9\uc758\ud55c \uc2dc\uc810\uc5d0 \uc131\ub9bd\ud558\uba70, \uae30\ub85d\ub41c \ub3d9\uc758 \uc77c\uc2dc\ub294 \uc11c\uba74 \uc11c\uba85\uc744 \uac08\uc74c\ud55c\ub2e4.</p>'
+  +'<h2>\uc81c4\uc870 (\uad50\uc6d0\uc758 \uacb8\uc9c1\u00b7\uadfc\ubb34\uc2dc\uac04 \uc900\uc218)</h2><p>\uc744\uc774 \ud604\uc9c1 \uad50\uc6d0\uc778 \uacbd\uc6b0, \uc18c\uc18d \ud559\uad50\uc7a5\uc758 \uacb8\uc9c1\ud5c8\uac00\ub97c \ubc1b\uc740 \ud6c4 \ud65c\ub3d9\ud558\uba70, \uac15\uc2b5\uc740 \uc815\uaddc \uadfc\ubb34\uc2dc\uac04 \uc678(\ubc29\uacfc\ud6c4\u00b7\ub298\ubd04\u00b70\uad50\uc2dc\u00b7\uc2a4\ud3ec\uce20\ud074\ub7fd \ub4f1)\uc5d0 \uc6b4\uc601\ud55c\ub2e4. \uc815\uaddc \uc218\uc5c5\uc2dc\uac04 \ub0b4 \ubcf8\uc778 \ub2f4\ub2f9 \uc218\uc5c5 \uc9c0\ub3c4\uc5d0 \ub300\ud574\uc11c\ub294 \uac15\uc0ac\ub8cc\uac00 \uc9c0\uae09\ub418\uc9c0 \uc54a\ub294\ub2e4. (\uad50\uc6d0\uc774 \uc544\ub2cc \uc678\ubd80 \uac15\uc0ac\ub294 \ubcf8 \uc870\ud56d\uc744 \uc801\uc6a9\ubc1b\uc9c0 \uc54a\ub294\ub2e4.)</p>'+'<h2>\uc81c5\uc870 (\uac1c\uc778\uc815\ubcf4)</h2><p>\uac11\uc740 \uac15\uc0ac\ub8cc \uc9c0\uae09\u00b7\uc6d0\ucc9c\uc9d5\uc218 \uc2e0\uace0\uc5d0 \ud544\uc694\ud55c \ucd5c\uc18c\ud55c\uc758 \uac1c\uc778\uc815\ubcf4\ub97c \uc218\uc9d1\u00b7\uc774\uc6a9\ud558\uba70 \ubcf4\uc874\uae30\uac04 \uacbd\uacfc \ud6c4 \ud30c\uae30\ud55c\ub2e4.</p>'
+  +'<h2>\uc81c6\uc870 (\uc804\uc790\uc11c\uba85)</h2><p>\ubcf8 \uacc4\uc57d\uc740 \uc744\uc774 \uc5f0\ub9f9 \ud648\ud398\uc774\uc9c0\uc5d0\uc11c \ubcf8\uc778 \uc778\uc99d \ud6c4 \uc804\uc790\uc801\uc73c\ub85c \ub3d9\uc758\ud55c \uc2dc\uc810\uc5d0 \uc131\ub9bd\ud558\uba70, \uae30\ub85d\ub41c \ub3d9\uc758 \uc77c\uc2dc\ub294 \uc11c\uba74 \uc11c\uba85\uc744 \uac08\uc74c\ud55c\ub2e4.</p>'
   +'<table><tr><td class="k">\uac11</td><td>\uc0ac\ub2e8\ubc95\uc778 \ub300\ud55c\ubbfc\uad6d\ud50c\ub77c\uc789\ub514\uc2a4\ud06c\uc5f0\ub9f9 \ud68c\uc7a5 &nbsp;(\uc9c1\uc778)</td></tr>'
   +'<tr><td class="k">\uc744</td><td>'+esc(MYD.name)+' &nbsp;\u2014&nbsp; '+(ag?'<b style="color:#0f766e">\uc804\uc790 \ub3d9\uc758 \uc644\ub8cc: '+fmtDate(ag.agreedAt)+'</b>':'(\uc804\uc790 \ub3d9\uc758 \uc804)')+'</td></tr></table>'
   +'<div class="org"><span class="orgwrap"><img class="lg" src="'+logo+'">\ub300\ud55c\ubbfc\uad6d\ud50c\ub77c\uc789\ub514\uc2a4\ud06c\uc5f0\ub9f9<img class="seal" src="'+seal+'" onerror="this.style.display=\'none\'"></span></div>'

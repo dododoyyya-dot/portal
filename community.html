@@ -182,7 +182,10 @@ async function openPost(id){
     +'<div style="font-size:13px;font-weight:800;color:var(--gray)">댓글 '+cs.size+'</div>'
     +cs.docs.map(c=>{const w=c.data();return '<div class="cmt"><b>'+esc(w.name)+'</b><span class="lvmini" style="background:'+LVC[w.level||1]+'">Lv.'+(w.level||1)+'</span>'+(w.org?' '+orgChip(w.org,w.region,w.orgTitle):'')+' '+esc(w.body)+' <span style="color:#a8aeb8;font-size:12px">'+fmtDate(w.createdAt)+'</span></div>'}).join('')
     +'<div class="cmt-form"><input id="c-'+id+'" placeholder="댓글 입력"><button class="btn-sub" onclick="writeCmt(\''+id+'\')">등록</button></div>'
-    +((ME&&(v.uid===ME.uid||MYDOC.role==='admin'))?'<div style="margin-top:10px"><button class="btn-sub" style="background:#8a919d" onclick="delPost(\''+id+'\')">글 삭제</button></div>':'');
+    +'<div style="margin-top:10px;display:flex;gap:6px">'
+    +((ME&&(v.uid===ME.uid||MYDOC.role==='admin'))?'<button class="btn-sub" style="background:#8a919d" onclick="delPost(\''+id+'\')">글 삭제</button>':'')
+    +((ME&&v.uid!==ME.uid)?'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="reportPost(\''+id+'\',\''+esc(v.title).replace(/\'/g,"")+'\')">🚩 신고</button>':'')
+    +'</div>';
 }
 async function writePost(){
   const t=document.getElementById('pTitle').value.trim(), b=document.getElementById('pBody').value.trim();
@@ -197,6 +200,15 @@ async function writeCmt(id){
   const inp=document.getElementById('c-'+id); const b=inp.value.trim(); if(!b)return;
   await DB.collection('posts').doc(id).collection('comments').add({uid:ME.uid,name:MYDOC.name,level:lvOf(MYDOC.points||0),org:MYDOC.org||'',orgTitle:MYDOC.orgTitle||'',region:MYDOC.region||'',body:b,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
   document.getElementById('p-'+id).classList.remove('open');openPost(id);
+}
+async function reportPost(id,title){
+  const reason=prompt('이 게시글을 사무국에 신고합니다.\n사유를 입력해주세요 (욕설·허위·광고·부적절 등)','');
+  if(reason===null)return;
+  try{
+    await DB.collection('reports').add({postId:id,title:title,reason:reason,
+      byUid:ME.uid,byName:MYDOC.name,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    alert('신고가 접수되었습니다. 사무국이 확인 후 조치합니다.');
+  }catch(e){alert('신고 실패: '+e.message)}
 }
 async function delPost(id){
   if(!confirm('이 글을 삭제할까요?'))return;
