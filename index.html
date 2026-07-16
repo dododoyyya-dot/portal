@@ -107,13 +107,15 @@
   <p class="sec-desc" style="color:#c3c9d4">신청·선정·강습 진행 상황이 실시간으로 집계됩니다.</p>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
     <div style="background:rgba(255,255,255,.07);border-radius:16px;padding:24px">
-      <div style="font-size:13px;font-weight:800;color:#9aa1ad">🏫 학교체육 선정</div>
+      <div style="font-size:13px;font-weight:800;color:#9aa1ad">🏫 학교체육 접수</div>
       <div style="font-size:34px;font-weight:900;color:#fff;margin:6px 0"><span id="lsSchool">0</span><span style="font-size:16px;color:#9aa1ad"> / 70교</span></div>
+      <div style="font-size:12px;color:#2dd4bf;font-weight:700;margin-bottom:6px">선정 확정 <span id="lsSchoolSel">0</span>교</div>
       <div style="height:8px;background:rgba(255,255,255,.12);border-radius:999px;overflow:hidden"><i id="lsSchoolBar" style="display:block;height:100%;width:0;background:linear-gradient(90deg,#C41E2F,#ff7a5c);transition:width 1s"></i></div>
     </div>
     <div style="background:rgba(255,255,255,.07);border-radius:16px;padding:24px">
-      <div style="font-size:13px;font-weight:800;color:#9aa1ad">🌱 방과후·늘봄 선정</div>
+      <div style="font-size:13px;font-weight:800;color:#9aa1ad">🌱 방과후·늘봄 접수</div>
       <div style="font-size:34px;font-weight:900;color:#fff;margin:6px 0"><span id="lsAfter">0</span><span style="font-size:16px;color:#9aa1ad"> / 30교</span></div>
+      <div style="font-size:12px;color:#2dd4bf;font-weight:700;margin-bottom:6px">선정 확정 <span id="lsAfterSel">0</span>교</div>
       <div style="height:8px;background:rgba(255,255,255,.12);border-radius:999px;overflow:hidden"><i id="lsAfterBar" style="display:block;height:100%;width:0;background:linear-gradient(90deg,#0f766e,#2dd4bf);transition:width 1s"></i></div>
     </div>
     <div style="background:rgba(255,255,255,.07);border-radius:16px;padding:24px">
@@ -237,11 +239,12 @@
       const d=doc.data();
       document.getElementById('liveStats').style.display='block';
       if(d.updatedAt)document.getElementById('lsTime').textContent='· '+new Date(d.updatedAt.toDate()).toLocaleDateString('ko-KR')+' 집계';
-      countUp('lsSchool',d.schoolSel||0);countUp('lsAfter',d.afterSel||0);
+      countUp('lsSchool',d.schoolRecv!=null?d.schoolRecv:(d.schoolSel||0));countUp('lsAfter',d.afterRecv!=null?d.afterRecv:(d.afterSel||0));
+      countUp('lsSchoolSel',d.schoolSel||0);countUp('lsAfterSel',d.afterSel||0);
       countUp('lsInst',d.instructors||0);countUp('lsMembers',d.members||0);countUp('lsSessions',d.sessions||0);
       setTimeout(()=>{
-        document.getElementById('lsSchoolBar').style.width=Math.min(100,(d.schoolSel||0)/(d.schoolQuota||70)*100)+'%';
-        document.getElementById('lsAfterBar').style.width=Math.min(100,(d.afterSel||0)/(d.afterQuota||30)*100)+'%';
+        document.getElementById('lsSchoolBar').style.width=Math.min(100,((d.schoolRecv!=null?d.schoolRecv:d.schoolSel)||0)/(d.schoolQuota||70)*100)+'%';
+        document.getElementById('lsAfterBar').style.width=Math.min(100,((d.afterRecv!=null?d.afterRecv:d.afterSel)||0)/(d.afterQuota||30)*100)+'%';
       },150);
       const sc=(d.schools||[]).slice(-14).reverse();
       document.getElementById('lsSchools').innerHTML=sc.map(x=>'<span style="background:rgba(255,255,255,.1);color:#fff;font-size:12.5px;font-weight:700;padding:6px 14px;border-radius:999px">'+(x.t==='after'?'🌱':'🏫')+' '+esc(x.n)+' <span style="color:#9aa1ad">'+esc(x.r)+'</span>'+(x.a?' ✓':'')+'</span>').join('')

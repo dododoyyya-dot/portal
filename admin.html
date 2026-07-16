@@ -648,9 +648,11 @@ async function updateLeaderboard(){
       rows:rows,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
     // ── 공개 사업현황 (학교명·숫자만, 개인정보 없음) ──
     const apps=await DB.collection('schoolApplications').get();
-    const regions={};let schoolSel=0,afterSel=0,sessions=0;const schools=[];
+    const regions={};let schoolSel=0,afterSel=0,schoolRecv=0,afterRecv=0,sessions=0;const schools=[];
     apps.docs.forEach(d=>{
       const v=d.data();
+      const isAfter0=String(v.type||'').indexOf('방과후')>=0;
+      if(['접수','대기','선정','배정완료'].indexOf(v.status)>=0){if(isAfter0)afterRecv++;else schoolRecv++;}
       if(['선정','배정완료'].indexOf(v.status)<0)return;
       const isAfter=String(v.type||'').indexOf('방과후')>=0;
       if(isAfter)afterSel++;else schoolSel++;
@@ -670,6 +672,7 @@ async function updateLeaderboard(){
     await DB.collection('public').doc('stats').set({
       updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
       schoolSel:schoolSel,schoolQuota:70,afterSel:afterSel,afterQuota:30,
+      schoolRecv:schoolRecv,afterRecv:afterRecv,
       members:snap.size,instructors:instructors,sessions:sessions,
       schools:schools,regions:regions});
   }catch(e){console.warn('리더보드 갱신 실패',e)}
