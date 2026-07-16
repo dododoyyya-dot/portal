@@ -135,7 +135,11 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <button id="t5" onclick="tab(5)">단체 메일</button>
     </div>
     <div id="v1">
-      <div style="margin-bottom:14px"><button class="btn-sub" style="background:#b8860b" onclick="backfillCerts()">🎓 이수자 일괄 정리 (검증코드 생성 + 연수 50P 소급 지급)</button></div>
+      <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-sub" style="background:#b8860b" onclick="backfillCerts()">🎓 이수자 일괄 정리 (검증코드 생성 + 연수 50P 소급 지급)</button>
+        <button class="btn-sub" style="background:#1F4E9C" onclick="auditEdu()">🔍 이수자 명단 대조 점검</button>
+      </div>
+      <div id="auditBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:16px"></div>
       <div class="board" id="userList"><div class="bempty">불러오는 중…</div></div></div>
     <div id="v5" style="display:none">
       <div class="authbox" style="max-width:720px;margin:0">
@@ -534,6 +538,46 @@ async function updateLeaderboard(){
     await DB.collection('public').doc('leaderboard').set({
       rows:rows,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
   }catch(e){console.warn('리더보드 갱신 실패',e)}
+}
+async function auditEdu(){
+  const box=document.getElementById('auditBox');
+  box.style.display='block';box.innerHTML='<span style="color:var(--gray)">점검 중…</span>';
+  const snap=await DB.collection('users').where('status','==','approved').get();
+  const rows=[];
+  for(const d of snap.docs){
+    const v=d.data();
+    if(!v.edu2026)continue;
+    const inList=inRoster(v.name);
+    let hasCert=false;
+    try{const c=await DB.collection('certs').doc('KFDF-2026-EDU-'+d.id.slice(0,6).toUpperCase()).get();hasCert=c.exists&&c.data().issued;}catch(e){}
+    rows.push({uid:d.id,name:v.name,region:v.region||'',inList:inList,hasCert:hasCert,pts:v.points||0});
+  }
+  if(!rows.length){box.innerHTML='<b>이수 표시된 승인 회원이 없습니다.</b>';return}
+  const bad=rows.filter(r=>!r.inList);
+  const okNoCert=rows.filter(r=>r.inList&&!r.hasCert);
+  box.innerHTML='<b style="font-size:15px">🔍 이수자 명단 대조 결과</b> <span style="font-size:13px;color:var(--gray)">(이수 표시 '+rows.length+'명 / 내장 명단 '+EDU_ROSTER.length+'명)</span>'
+    +'<div style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap;font-size:13.5px">'
+    +'<span>✅ 명단 일치: <b style="color:#0f766e">'+(rows.length-bad.length)+'명</b></span>'
+    +'<span>⚠ 명단에 없음: <b style="color:#C41E2F">'+bad.length+'명</b></span>'
+    +'<span>🎓 이수증 발급 가능: <b>'+rows.filter(r=>r.hasCert).length+'명</b></span></div>'
+    +(bad.length?'<div style="margin-top:14px;padding:12px 14px;background:#fdf3f4;border:1.5px solid #f3c2c7;border-radius:10px"><b style="color:#C41E2F">⚠ 명단에 없는데 이수로 표시된 회원 — 확인 필요</b>'
+      +bad.map(r=>'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px dashed #f3c2c7;font-size:13.5px"><b style="min-width:70px">'+esc(r.name)+'</b><span style="color:var(--gray)">'+esc(r.region)+' · '+r.pts+'P · '+(r.hasCert?'<b style="color:#C41E2F">이수증 발급됨</b>':'이수증 미발급')+'</span>'
+        +'<button class="btn-sub" style="background:#C41E2F;font-size:12px;padding:6px 12px" onclick="revokeEdu(\''+r.uid+'\',\''+esc(r.name)+'\')">이수 취소</button></div>').join('')
+      +'</div>':'<div style="margin-top:12px;color:#0f766e;font-weight:700">✅ 이상 없음 — 이수 표시된 회원 전원이 명단과 일치합니다.</div>')
+    +(okNoCert.length?'<div style="margin-top:12px;font-size:13px;color:#b8860b">🎓 명단엔 있으나 이수증 코드 미생성 '+okNoCert.length+'명 — 위 "이수자 일괄 정리" 버튼을 누르면 생성됩니다.</div>':'');
+}
+async function revokeEdu(uid,name){
+  if(!confirm('['+name+'] 회원의 이수 자격을 취소합니다.\n- 이수 표시(edu2026) 해제\n- 이수증 검증코드 무효화\n- 지급된 연수 50P 회수\n계속할까요?'))return;
+  try{
+    await DB.collection('users').doc(uid).update({edu2026:false,points:firebase.firestore.FieldValue.increment(-50)});
+    await DB.collection('certs').doc('KFDF-2026-EDU-'+uid.slice(0,6).toUpperCase()).delete().catch(()=>{});
+    await DB.collection('users').doc(uid).collection('activities').add({
+      label:'연수 이수 취소 (명단 대조)',date:new Date().toISOString().slice(0,10).replace(/-/g,'.'),points:-50,
+      addedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await updateLeaderboard();
+    alert('['+name+'] 이수 자격이 취소되었습니다.');
+    auditEdu();loadUsers();
+  }catch(e){alert('실패: '+e.message)}
 }
 async function backfillCerts(){
   if(!confirm('이미 승인된 연수 이수자 전원에 대해:\n① 이수증 검증코드 생성/갱신\n② 연수 50P 미지급자에게 소급 지급 (+활동이력 기록)\n을 실행합니다. 이미 받은 사람은 자동으로 건너뜁니다.'))return;
