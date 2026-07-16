@@ -326,6 +326,7 @@ async function syncLogPoints(){
       label:s.school+' 강습 '+diff+'회차 (일지 확인)',date:new Date().toISOString().slice(0,10).replace(/-/g,'.'),
       points:diff*10,addedAt:firebase.firestore.FieldValue.serverTimestamp()});
     await d.ref.update({doneSessions:logged});
+    await syncStatus(Object.assign({},s,{doneSessions:logged}),'배정완료',{doneSessions:logged});
     done++;pts+=diff*10;
   }
   if(done)await updateLeaderboard();
