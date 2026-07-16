@@ -175,6 +175,14 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
         </div>
       </div>
     </div>
+    <label>지원 방식 *</label>
+    <select id="fSupport" onchange="supportToggle()">
+      <option value="강사파견+용품">전문 지도자 파견 + 용품 50만원 지원 (기본)</option>
+      <option value="용품만">용품 50만원 지원만 (학교 자체 지도 · 강사 미파견)</option>
+    </select>
+    <div id="supportNote" style="display:none;background:#e0f2ef;border:1.5px solid #b9e2da;border-radius:10px;padding:12px 14px;margin-top:8px;font-size:13px;color:#0f766e;line-height:1.6">
+      🎁 <b>용품만 지원</b>을 선택하셨습니다. 전문 강사 파견 없이 학교에서 자체적으로 프로그램을 운영하며, 50만원 상당 용품 세트만 지원받습니다. (강사 배정·강사비 관련 절차가 없습니다)
+    </div>
     <label>개강 희망 시기 *</label>
     <select id="fStart"><option>9월 (2학기 개강)</option><option>8월 여름방학 중 (7/29까지 신청 시)</option></select>
     <label>희망 요일·시간 1순위 *</label><input id="fD1" placeholder="예: 화요일 13:00~15:00">
@@ -253,6 +261,12 @@ AUTH.onAuthStateChanged(async u=>{
     el.textContent='✓ '+d.data().name+' 리더로 로그인됨 — 선정 시 자동으로 본인이 강사 지정됩니다';
     el.style.display='inline';document.getElementById('selfGuest').style.display='none';}
 });
+function supportToggle(){
+  const on=document.getElementById('fSupport').value==='용품만';
+  document.getElementById('supportNote').style.display=on?'block':'none';
+  // 용품만이면 본인지도 체크 영역 숨김
+  var sb=document.getElementById('fSelf'); if(sb){sb.closest('div').style.display=on?'none':'';}
+}
 function selfToggle(){
   const on=document.getElementById('fSelf').checked;
   document.getElementById('selfInfo').style.display=on?'block':'none';
@@ -302,7 +316,7 @@ async function submitApply(){
       region:v('fRegion'), type:TYPE_INFO[APPLY_TYPE].store, typeKey:APPLY_TYPE,
       students:req.students, space:v('fSpace'), insurance:v('fIns'),
       teacher:req.teacher, phone:req.phone, email:v('fEmail'),
-      eduName:v('fEdu'), start:v('fStart'), d1:req.d1, d2:v('fD2'), reason:v('fReason'),
+      eduName:v('fEdu'), start:v('fStart'), support:v('fSupport'), d1:req.d1, d2:v('fD2'), reason:v('fReason'),
       selfTeach:document.getElementById('fSelf').checked,
       selfUid:SELF_UID, selfName:SELF_NAME,
       status:st, assignedName:'', assignedUid:'',
