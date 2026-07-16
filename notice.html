@@ -58,6 +58,13 @@
   <div class="crumb">HOME &nbsp;›&nbsp; <b>알림마당</b></div>
   <h1>공지사항 · 공고</h1><p>연맹의 모든 공고와 소식을 이곳에서 확인하세요.</p>
 </div></div>
+<section id="selNotice" style="display:none;background:var(--bg-soft)"><div class="wrap">
+  <div class="sec-label">OFFICIAL</div>
+  <h2 class="sec-title">참여학교 선정 결과 공고 <span id="snTime" style="font-size:14px;font-weight:700;color:var(--gray)"></span></h2>
+  <p class="sec-desc">수시 선정 결과가 실시간으로 게시됩니다. 학교명·권역만 공개하며 개인정보는 포함되지 않습니다.</p>
+  <div id="snBody"></div>
+</div></section>
+
 <section><div class="wrap">
   <div class="board-tools">
     <div class="cats">
@@ -147,6 +154,38 @@ render();
     © 2026 KOREA FLYING DISC FEDERATION. All rights reserved. &nbsp;|&nbsp; <a href="privacy.html" style="color:#9aa1ad">개인정보처리방침</a>
   </div>
 </div></footer>
+<script>
+(function(){
+  function esc(x){return String(x||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+  function load(){
+    firebase.firestore().collection('public').doc('stats').get().then(doc=>{
+      if(!doc.exists)return;
+      const d=doc.data();const schools=d.schools||[];
+      if(!schools.length)return;
+      document.getElementById('selNotice').style.display='block';
+      if(d.updatedAt)document.getElementById('snTime').textContent='· '+new Date(d.updatedAt.toDate()).toLocaleDateString('ko-KR')+' 기준';
+      const byR={};schools.forEach(x=>{(byR[x.r]=byR[x.r]||[]).push(x)});
+      document.getElementById('snBody').innerHTML=
+        '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px">'
+        +'<span style="font-weight:900;font-size:15px">🏫 학교체육 '+(d.schoolSel||0)+'/'+(d.schoolQuota||70)+'교</span>'
+        +'<span style="font-weight:900;font-size:15px">🌱 방과후·늘봄 '+(d.afterSel||0)+'/'+(d.afterQuota||30)+'교</span></div>'
+        +Object.keys(byR).map(r=>'<div style="margin-bottom:14px"><b style="font-size:14.5px;color:var(--blue)">📍 '+esc(r)+' ('+byR[r].length+'교)</b><div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px">'
+          +byR[r].map(x=>'<span style="background:#fff;border:1.5px solid var(--line);font-size:12.5px;font-weight:700;padding:5px 13px;border-radius:999px">'+(x.t==='after'?'🌱':'🏫')+' '+esc(x.n)+(x.a?' <span style=\'color:#0f766e\'>✓배정</span>':'')+'</span>').join('')
+          +'</div></div>').join('');
+    }).catch(()=>{});
+  }
+  function boot(n){
+    if(window.firebase&&firebase.apps.length&&firebase.firestore){load();return}
+    if(n>40)return;
+    if(window.firebase&&firebase.apps.length&&!firebase.firestore){
+      const sc=document.createElement('script');sc.src='https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js';
+      sc.onload=()=>load();document.head.appendChild(sc);return;
+    }
+    setTimeout(()=>boot(n+1),250);
+  }
+  boot(0);
+})();
+</script>
 <script src="auth_ui.js"></script>
 </body>
 </html>
