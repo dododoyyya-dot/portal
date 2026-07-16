@@ -234,9 +234,16 @@ AUTH.onAuthStateChanged(async u=>{
   document.getElementById('myPhone').value=d.phone||'';
   if(!d.phone){document.getElementById('phMsg').textContent='배정·위촉 연락을 위해 등록해주세요';document.getElementById('phMsg').style.color='#C41E2F'}
   if(d.edu2026){
-    document.getElementById('eduBadge').style.display='inline-block';
-    document.getElementById('certBox').style.display='block';
-    document.getElementById('certNo').textContent=certNo();
+    let verified=false;
+    try{const cd=await DB.collection('certs').doc(certNo()).get();verified=cd.exists&&cd.data().issued;}catch(e){}
+    if(verified){
+      document.getElementById('eduBadge').style.display='inline-block';
+      document.getElementById('certBox').style.display='block';
+      document.getElementById('certNo').textContent=certNo();
+    }else{
+      document.getElementById('certBox').style.display='block';
+      document.getElementById('certBox').innerHTML='<h3 class="sub">이수증 발급</h3><div class="note" style="background:#fff8e6;border-color:#e6b422">🕓 <b>사무국 확인 대기 중</b> — 연수 이수자 명단 대조·승인이 완료되면 이곳에서 이수증을 발급할 수 있습니다. (문의 031-984-3248)</div>';
+    }
   }
   try{
     const asg=await DB.collection('schoolApplications').where('assignedUid','==',u.uid).get();
@@ -387,8 +394,9 @@ function printContract(id){
   w.document.close();
 }
 function certNo(){return 'KFDF-2026-EDU-'+AUTH.currentUser.uid.slice(0,6).toUpperCase()}
-function printCert(){
+async function printCert(){
   const d=MYD;if(!d||!d.edu2026)return;
+  try{const cd=await DB.collection('certs').doc(certNo()).get();if(!cd.exists||!cd.data().issued){alert('사무국의 이수자 명단 확인 후 발급 가능합니다.');return;}}catch(e){alert('확인 중 오류가 발생했습니다.');return;}
   const logo=new URL('kfdf_logo.png',location.href).href;
   const today=new Date();
   const dateStr=today.getFullYear()+'\ub144 '+(today.getMonth()+1)+'\uc6d4 '+today.getDate()+'\uc77c';

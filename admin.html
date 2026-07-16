@@ -319,14 +319,14 @@ async function payrollCSV(){
   });
   const keys=Object.keys(by);
   if(!keys.length){alert(ym+' 월에 제출된 일지가 없습니다.');return}
-  const rows=[['성명','학교(회차)','총 회차','시간(회차×2h)','지급총액(시간당 5만원)','소득세(8%)','지방소득세(0.8%)','공제계','실지급액']];
+  const rows=[['성명','학교(회차)','총 회차','지급총액(회당 5만원)','소득세(8%)','지방소득세(0.8%)','공제계','실지급액']];
   keys.forEach(k=>{
     const v=by[k];
-    const hours=v.n*2, amt=hours*50000;
+    const amt=v.n*50000;
     const tax1=Math.floor(amt*0.08/10)*10, tax2=Math.floor(amt*0.008/10)*10;
-    rows.push([v.name,Object.entries(v.schools).map(x=>x[0]+'('+x[1]+')').join(' / '),v.n,hours,amt,tax1,tax2,tax1+tax2,amt-tax1-tax2]);
+    rows.push([v.name,Object.entries(v.schools).map(x=>x[0]+'('+x[1]+')').join(' / '),v.n,amt,tax1,tax2,tax1+tax2,amt-tax1-tax2]);
   });
-  rows.push([]);rows.push(['※ 기타소득 필요경비 60% 기준 원천징수(8.8%). 소액부징수(소득세 1천원 미만) 등은 신고 시 확인. 주민번호·계좌는 보안 대장에서 결합.']);
+  rows.push([]);rows.push(['※ 예산 기준: 지도자 수당 회당(1시간 수업) 50,000원 — 사업계획서 유형③·⑤. 기타소득 8.8% 원천징수, 소액부징수는 신고 시 확인. 주민번호·계좌는 보안 대장에서 결합.']);
   const csv='\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
