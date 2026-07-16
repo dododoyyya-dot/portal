@@ -185,6 +185,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#e6b422" onclick="fixCounters()">⚙ 선착순 카운터 보정</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="syncLogPoints()">⚡ 일지 기준 포인트 반영</button>
         <button class="btn-sub" style="background:#b8860b" onclick="payrollCSV()">💰 월 지급 계산 CSV</button>
+        <button class="btn-sub" style="background:#555" onclick="closeWaitlist()">⏳ 대기자 일괄 종료</button>
       </div>
       <div style="display:flex;gap:8px;margin:0 0 14px">
         <button class="btn-sub afl on" data-f="전체" onclick="appFilter('전체',this)">전체</button>
@@ -250,7 +251,7 @@ function renderApps(){
   el.innerHTML=docs.length?docs.map(d=>{
     const s=d.data();
     const st=s.status||'접수';
-    const stc={'접수':'#8a919d','대기':'#e6b422','선정':'#1F4E9C','배정완료':'#0f766e','미선정':'#C41E2F'}[st]||'#8a919d';
+    const stc={'접수':'#8a919d','대기':'#e6b422','선정':'#1F4E9C','배정완료':'#0f766e','미선정':'#C41E2F','취소':'#555555'}[st]||'#8a919d';
     return '<div class="urow"><div class="grow"><b>'+esc(s.school)+'</b> '
       +'<span style="font-size:12px;font-weight:800;color:#fff;background:'+stc+';padding:2px 10px;border-radius:999px">'+st+(st==='대기'&&s.waitNo?' '+s.waitNo+'번':'')+'</span>'
       +(s.eduName?' <span style="font-size:11px;font-weight:800;color:#C41E2F">★이수자교('+esc(s.eduName)+')</span>':'')
@@ -263,8 +264,11 @@ function renderApps(){
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
       +(st==='접수'?'<button class="btn-sub" onclick="setStatus(\''+d.id+'\',\'선정\')">선정</button><button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'미선정\')">미선정</button><button class="btn-sub" style="background:#e6b422" onclick="toWait(\''+d.id+'\')">대기 전환</button>':'')
       +(st==='대기'?'<button class="btn-sub" style="background:#0f766e" onclick="setStatus(\''+d.id+'\',\'접수\')">접수 전환</button>':'')
+      +((st==='취소'||st==='미선정')?'<button class="btn-sub" style="background:#0f766e" onclick="setStatus(\''+d.id+'\',\'접수\')">접수로 복원</button>':'')
       +(st==='선정'&&!s.assignedName?'<button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'접수\')">선정취소</button>':'')
       +(st==='배정완료'?'<button class="btn-sub" style="background:#7c3aed" onclick="toggleLogs(\''+d.id+'\')">📒 일지</button>':'')
+      +(st==='배정완료'?'<button class="btn-sub" style="background:#e6b422" onclick="unassign(\''+d.id+'\')">👤 배정해제</button>':'')
+      +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:#fff;color:#8a919d;border:1.5px solid #8a919d" onclick="cancelSchool(\''+d.id+'\')">학교취소</button>':'')
       +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:#1F4E9C" onclick="copyNotice(\''+d.id+'\')">📋 통보문</button>':'')
       +'<button class="btn-sub" style="background:'+(s.start&&s.start.indexOf('8월')>=0?'#C41E2F':'#8a919d')+'" onclick="setStart(\''+d.id+'\')">'+(s.start&&s.start.indexOf('8월')>=0?'⚡긴급(방학)':s.start?'일반(9월)':'개강시기?')+'</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delApp(\''+d.id+'\')">🗑</button>' 
@@ -272,10 +276,18 @@ function renderApps(){
       +'<div id="logs_'+d.id+'" style="display:none;background:var(--bg-soft);border-radius:12px;padding:14px 18px;margin:-6px 0 10px"></div>';
   }).join(''):'<div class="bempty">해당 유형의 신청이 없습니다.</div>';
 }
-async function syncStatus(app,st){
+async function syncStatus(app,st,extra){
+  extra=extra||{};
   if(app&&app.code)await DB.collection('appStatus').doc(app.code).set({
     school:app.school,type:app.type,status:st,waitNo:app.waitNo||0,
+    assignedName:(extra.assignedName!==undefined?extra.assignedName:(app.assignedName||'')),
+    doneSessions:(extra.doneSessions!==undefined?extra.doneSessions:(app.doneSessions||0)),
+    support:app.support||'강사파견+용품',
     updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+}
+async function syncStatusById(id){
+  const d=await DB.collection('schoolApplications').doc(id).get();
+  if(d.exists)await syncStatus(d.data(),d.data().status);
 }
 async function loadDash(){
   try{
@@ -397,6 +409,31 @@ async function toggleLogs(id){
         +'</div>').join('');
   }catch(e){el.innerHTML='<span style="font-size:13px;color:var(--red)">불러오기 실패: '+esc(e.message)+'</span>'}
 }
+async function unassign(id){
+  const s=APPS.find(d=>d.id===id).data();
+  if(!confirm('['+s.school+'] 배정 강사 '+(s.assignedName||'')+'의 배정을 해제합니다.\n\n· 학교는 다시 「선정(배정 대기)」 상태로 돌아갑니다\n· 지명 슬롯이 다시 열려 재배정할 수 있습니다\n· 이미 지급된 회차 포인트는 회수되지 않습니다(별도 처리)\n계속할까요?'))return;
+  await DB.collection('schoolApplications').doc(id).update({status:'선정',assignedUid:'',assignedName:''});
+  await syncStatus(Object.assign({},s,{waitNo:s.waitNo||0}),'선정');
+  // 지명 슬롯 재오픈 (용품만이 아닌 경우)
+  if(s.support!=='용품만'){
+    await DB.collection('openSlots').doc(id).set({
+      school:s.school,region:s.region,type:s.type,d1:s.d1||'',
+      claimedBy:null,claimedName:'',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  }
+  alert('배정이 해제되었습니다. 자동배정 또는 지명으로 재배정할 수 있습니다.');
+  loadApps();loadDash();
+}
+async function cancelSchool(id){
+  const s=APPS.find(d=>d.id===id).data();
+  const reason=prompt('['+s.school+'] 참여를 취소(반려) 처리합니다.\n사유를 입력하세요 (학교 포기·중복·요건 미충족 등). 취소 사유는 기록으로 남습니다.','학교 사정으로 참여 취소');
+  if(reason===null)return;
+  await DB.collection('schoolApplications').doc(id).update({status:'취소',cancelReason:reason,assignedUid:'',assignedName:''});
+  await syncStatus(s,'취소');
+  await DB.collection('openSlots').doc(id).delete().catch(()=>{});
+  kfdfMail(s.email,'[플라잉디스크연맹] 강습 참여 취소 안내 — '+s.school, s.school+' '+s.type+' 강습 참여가 취소 처리되었습니다.\n사유: '+reason+'\n문의: 031-984-3248');
+  alert('취소 처리되었습니다. (대기자가 있으면 승격을 검토하세요)');
+  loadApps();loadDash();
+}
 async function setStart(id){
   const s=APPS.find(d=>d.id===id).data();
   const cur=s.start||'(미지정)';
@@ -411,6 +448,20 @@ async function delApp(id){
   await DB.collection('schoolApplications').doc(id).delete();
   await DB.collection('openSlots').doc(id).delete().catch(()=>{});
   if(s.code)await DB.collection('appStatus').doc(s.code).delete().catch(()=>{});
+  loadApps();loadDash();
+}
+async function closeWaitlist(){
+  const waits=APPS.filter(d=>d.data().status==='대기');
+  if(!waits.length){alert('대기 상태인 신청이 없습니다.');return}
+  if(!confirm('대기 '+waits.length+'건을 모두 「미선정」으로 종료 처리합니다.\n(결원 승격이 모두 끝난 뒤, 사업 마감 시에만 실행하세요)\n각 학교에 안내 메일이 자동 발송됩니다.'))return;
+  for(const d of waits){
+    const s=d.data();
+    await d.ref.update({status:'미선정'});
+    await syncStatus(s,'미선정');
+    kfdfMail(s.email,'[플라잉디스크연맹] 강습 심사 결과 안내 — '+s.school,
+      s.school+' '+s.type+' 신청이 대기자 정리에 따라 최종 미선정 처리되었습니다. 관심에 감사드리며, 차년도 사업 시 우선 안내드리겠습니다.\n접수번호: '+(s.code||''));
+  }
+  alert(waits.length+'건 종료 처리 완료.');
   loadApps();loadDash();
 }
 async function fixCounters(){
@@ -443,7 +494,7 @@ async function setStatus(id,st){
   if(st==='선정'&&s.selfTeach&&s.selfUid){
     // 본인 직접 지도: 선정과 동시에 자동 배정 (지명 게시판 미공개)
     await DB.collection('schoolApplications').doc(id).update({status:'배정완료',assignedUid:s.selfUid,assignedName:s.selfName});
-    await syncStatus(s,'배정완료');
+    await syncStatus(s,'배정완료',{assignedName:s.selfName});
     kfdfMail(s.email,'[플라잉디스크연맹] 강습 선정 안내 — '+s.school,s.school+' ('+s.type+') 신청이 선정되었으며, 신청하신 본인지도로 강사 배정까지 완료되었습니다.\n접수번호: '+(s.code||'')+'\n일정 협의를 위해 곧 연락드리겠습니다.');
     loadApps();loadDash();return;
   }
@@ -478,7 +529,7 @@ async function autoAssign(){
     const slot=await DB.collection('openSlots').doc(d.id).get();
     if(slot.exists&&slot.data().claimedBy){
       await d.ref.update({assignedUid:slot.data().claimedBy,assignedName:slot.data().claimedName,status:'배정완료'});
-      await syncStatus(s,'배정완료');
+      await syncStatus(s,'배정완료',{assignedName:slot.data().claimedName});
       done++;continue;
     }
     const wantAfter=(s.type||'').indexOf('방과후')>=0;
@@ -487,7 +538,7 @@ async function autoAssign(){
     cands.sort((a,b)=>a.cnt-b.cnt);
     const pick=cands[0];pick.cnt++;
     await d.ref.update({assignedUid:pick.uid,assignedName:pick.name,status:'배정완료'});
-    await syncStatus(s,'배정완료');
+    await syncStatus(s,'배정완료',{assignedName:pick.name});
     await DB.collection('openSlots').doc(d.id).delete().catch(()=>{});
     done++;
   }
@@ -496,17 +547,30 @@ async function autoAssign(){
 }
 async function recordSessions(id){
   const s=APPS.find(d=>d.id===id).data();
-  const n=parseInt(prompt(s.school+' — '+s.assignedName+' 강사\n\n운영일지로 확인된 완료 회차 수를 입력하세요 (회차당 10P 자동 지급):','1'));
-  if(!n||n<=0)return;
+  if(!s.assignedUid){alert('배정된 강사가 없습니다.');return}
+  const cur=s.doneSessions||0;
+  const tgt=parseInt(prompt(s.school+' — '+s.assignedName+' 강사\n\n지금까지 완료된 누적 회차 수(총 몇 회차까지 마쳤는지)를 입력하세요.\n현재 기록: '+cur+' / 24회차\n(차이만큼만 회차당 10P가 지급되어 중복 지급되지 않습니다)', String(Math.min(cur+1,24))));
+  if(tgt===null)return;
+  if(isNaN(tgt)||tgt<0||tgt>24){alert('0~24 사이 숫자를 입력하세요.');return}
+  const diff=tgt-cur;
+  if(diff===0){alert('변동이 없습니다. (이미 '+cur+'회차로 기록됨)');return}
   const today=new Date().toISOString().slice(0,10);
-  await DB.collection('schoolApplications').doc(id).update({doneSessions:firebase.firestore.FieldValue.increment(n)});
-  await DB.collection('users').doc(s.assignedUid).update({points:firebase.firestore.FieldValue.increment(n*10)});
-  await DB.collection('users').doc(s.assignedUid).collection('activities').add({
-    label:s.school+' 학교강습 '+n+'회차 완료',date:today,points:n*10,
-    addedAt:firebase.firestore.FieldValue.serverTimestamp()});
-  alert(s.assignedName+' 리더에게 +'+(n*10)+'P 지급 완료! (마이페이지 이력에 자동 반영)');
-  loadApps();
-  updateLeaderboard();
+  await DB.collection('schoolApplications').doc(id).update({doneSessions:tgt});
+  if(diff>0){
+    await DB.collection('users').doc(s.assignedUid).update({points:firebase.firestore.FieldValue.increment(diff*10)});
+    await DB.collection('users').doc(s.assignedUid).collection('activities').add({
+      label:s.school+' 학교강습 '+diff+'회차 완료 (누적 '+tgt+'/24)',date:today,points:diff*10,
+      addedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    alert(s.assignedName+' 리더에게 +'+(diff*10)+'P 지급 (누적 '+tgt+'/24회차)');
+  }else{
+    await DB.collection('users').doc(s.assignedUid).update({points:firebase.firestore.FieldValue.increment(diff*10)});
+    await DB.collection('users').doc(s.assignedUid).collection('activities').add({
+      label:s.school+' 회차 정정 ('+cur+'→'+tgt+')',date:today,points:diff*10,
+      addedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    alert('회차를 '+tgt+'/24로 정정하고 '+(diff*10)+'P 조정했습니다.');
+  }
+  await syncStatusById(id);
+  loadApps();updateLeaderboard();
 }
 function exportCSV(){
   const rows=[['학교','권역','유형','지원방식','인원','희망1','희망2','담당교사','연락처','이메일','이수자','상태','배정강사','신청사유']];
@@ -689,11 +753,38 @@ async function loadCompsAdmin(){
   const snap=await DB.collection('compSlots').orderBy('date').limit(100).get();
   el.innerHTML=snap.empty?'<div class="bempty">등록된 대회 모집이 없습니다.</div>':snap.docs.map(d=>{
     const s=d.data();const claimed=s.claimed||[];
+    const confirmed=s.confirmed||[];
     return '<div class="urow"><div class="grow"><b>'+esc(s.title)+'</b> <span style="font-size:11px;font-weight:800;color:#fff;background:'+(s.role==='심판'?'#7c3aed':'#b8860b')+';padding:2px 8px;border-radius:999px">'+esc(s.role)+'</span>'
-      +'<div class="sub3">'+esc(s.region)+' · '+esc(s.date)+' · '+claimed.length+'/'+s.quota+'명'
-      +(claimed.length?' · 지명자: <b>'+claimed.map(c=>esc(c.name)).join(', ')+'</b>':'')+'</div></div>'
-      +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delComp(\''+d.id+'\')">🗑</button></div>';
+      +(confirmed.length>=s.quota?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">확정 완료</span>':'')
+      +'<div class="sub3">'+esc(s.region)+' · '+esc(s.date)+' · 지명 '+claimed.length+'/'+s.quota+'명 · 확정 '+confirmed.length+'명'
+      +(claimed.length?'<br>지명자: '+claimed.map(c=>(confirmed.indexOf(c.uid)>=0?'<b style="color:#0f766e">✓'+esc(c.name)+'</b>':esc(c.name))).join(', '):'')+'</div></div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +(claimed.length?'<button class="btn-sub" style="background:#0f766e" onclick="confirmComp(\''+d.id+'\')">✓ 확정 처리</button>':'')
+      +(claimed.length?'<button class="btn-sub" style="background:#1F4E9C" onclick="copyCompNotice(\''+d.id+'\')">📋 통보문</button>':'')
+      +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delComp(\''+d.id+'\')">🗑</button></div></div>';
   }).join('');
+}
+async function confirmComp(id){
+  const doc=await DB.collection('compSlots').doc(id).get();const s=doc.data();
+  const claimed=s.claimed||[];const confirmed=s.confirmed||[];
+  const names=claimed.map((c,i)=>(i+1)+'. '+c.name+(confirmed.indexOf(c.uid)>=0?' (확정됨)':'')).join('\n');
+  const pick=prompt('['+s.title+' / '+s.role+'] 확정할 지명자 번호를 쉼표로 입력하세요.\n(자격 확인 완료자만 — 전원이면 "전체" 입력)\n\n'+names,'전체');
+  if(pick===null)return;
+  let sel;
+  if(pick.trim()==='전체')sel=claimed.map(c=>c.uid);
+  else sel=pick.split(',').map(x=>claimed[parseInt(x.trim())-1]).filter(Boolean).map(c=>c.uid);
+  if(!sel.length){alert('선택된 지명자가 없습니다.');return}
+  await DB.collection('compSlots').doc(id).update({confirmed:[...new Set([...confirmed,...sel])]});
+  alert(sel.length+'명 확정 처리되었습니다. 통보문 버튼으로 안내 문자를 복사하세요.\n대회 종료 후에는 [포인트 부여]에서 심판 20P/일·운영 15P/일을 지급하면 됩니다.');
+  loadCompsAdmin();
+}
+async function copyCompNotice(id){
+  const doc=await DB.collection('compSlots').doc(id).get();const s=doc.data();
+  const confirmed=s.confirmed||[];const claimed=s.claimed||[];
+  const names=claimed.filter(c=>confirmed.indexOf(c.uid)>=0).map(c=>c.name);
+  const txt='[플라잉디스크연맹] '+s.title+' '+s.role+'요원으로 확정되었습니다.\n일자: '+s.date+' / 권역: '+s.region+'\n자격증 사본을 지참해 주시고, 세부 집결 시간·장소는 추후 안내드립니다.\n수당: '+(s.role==='심판'?'1일 7만원 이내(4시간 이내 4만원)':'운영요원 수당 기준')+' · 활동 포인트 자동 지급\n문의 031-984-3248'
+    +(names.length?'\n\n[확정자] '+names.join(', '):'');
+  navigator.clipboard.writeText(txt).then(()=>alert('✓ 통보문이 복사되었습니다.\n\n'+txt)).catch(()=>prompt('아래 내용을 복사하세요',txt));
 }
 async function delComp(id){
   if(!confirm('이 대회 모집을 삭제할까요? (지명 기록도 함께 삭제)'))return;

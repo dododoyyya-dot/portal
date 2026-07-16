@@ -205,12 +205,15 @@ async function loadComps(){
     el.innerHTML=snap.docs.map(d=>{
       const s=d.data();
       const claimed=s.claimed||[];
+      const confirmed=s.confirmed||[];
       const mine=claimed.some(c=>c.uid===JME.uid);
+      const mineConfirmed=confirmed.indexOf(JME.uid)>=0;
       const full=claimed.length>=s.quota;
       const eligible=s.role==='심판'?(JMY.instructorFor&&JMY.instructorFor.referee):(JMY.instructorFor&&JMY.instructorFor.staff);
       const rc=s.role==='심판'?'#7c3aed':'#b8860b';
       let btn;
-      if(mine)btn='<span style="background:#0f766e;color:#fff;font-weight:900;font-size:12.5px;padding:6px 14px;border-radius:999px">✓ 지명 완료</span>';
+      if(mine&&mineConfirmed)btn='<span style="background:#b8860b;color:#fff;font-weight:900;font-size:12.5px;padding:6px 14px;border-radius:999px">🏅 확정 — 개별 안내 예정</span>';
+      else if(mine)btn='<span style="background:#0f766e;color:#fff;font-weight:900;font-size:12.5px;padding:6px 14px;border-radius:999px">✓ 지명 완료 (확정 대기)</span>';
       else if(full)btn='<span style="background:#8a919d;color:#fff;font-weight:900;font-size:12.5px;padding:6px 14px;border-radius:999px">마감</span>';
       else if(!eligible)btn='<span style="color:#8a919d;font-size:12.5px;font-weight:700">'+(s.role==='심판'?'심판요원':'운영요원')+' 지원 후 신청 가능 (STEP 1)</span>';
       else btn='<button class="btn-sub" onclick="claimComp(\''+d.id+'\')">지명 신청</button>';
