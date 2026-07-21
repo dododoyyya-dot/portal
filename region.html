@@ -43,10 +43,52 @@ const DB = firebase.firestore();
 </div></div>
 
 <style>
-.rgGrid{display:grid;grid-template-columns:1.15fr 1fr;gap:24px;align-items:start}
-.rgCol2{position:sticky;top:16px}
-@media(max-width:940px){.rgGrid{grid-template-columns:1fr}.rgCol2{position:static}}
-.rgSelRow{border:2px solid #1F4E9C !important;background:#eef3fa !important;border-radius:12px}
+.rgGrid{display:grid;grid-template-columns:1.15fr 1fr;gap:28px;align-items:start}
+.rgCol2{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow-y:auto;padding:4px}
+@media(max-width:940px){.rgGrid{grid-template-columns:1fr}.rgCol2{position:static;max-height:none}}
+
+/* ── 툴바 ── */
+.kbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+.kchip{border:1.5px solid #dfe5ee;background:#fff;color:#5b6472;font-weight:800;font-size:13px;padding:7px 14px;border-radius:999px;cursor:pointer;transition:.15s}
+.kchip:hover{border-color:#153A77;color:#153A77}
+.kchip.on{background:#153A77;border-color:#153A77;color:#fff}
+.ksearch{flex:1;min-width:180px;padding:9px 14px;border:1.5px solid #dfe5ee;border-radius:999px;font-size:13.5px;outline:none}
+.ksearch:focus{border-color:#153A77}
+.kcount{font-size:12.5px;font-weight:800;color:#8a919d;white-space:nowrap}
+.kdl{border:none;background:#f1f4f9;color:#153A77;font-weight:800;font-size:12.5px;padding:8px 14px;border-radius:999px;cursor:pointer}
+.kdl:hover{background:#e2e9f5}
+
+/* ── 카드 ── */
+.kcard{display:flex;align-items:stretch;background:#fff;border:1.5px solid #e8ecf2;border-radius:14px;margin-bottom:10px;overflow:hidden;transition:.15s;box-shadow:0 1px 3px rgba(15,20,40,.04)}
+.kcard:hover{border-color:#c6d2e5;box-shadow:0 3px 10px rgba(15,20,40,.07)}
+.kcard.ksel{border:2px solid #153A77;background:#f4f8ff;box-shadow:0 4px 14px rgba(21,58,119,.15)}
+.kstat{width:5px;flex:0 0 5px}
+.kbody{flex:1;padding:13px 16px;min-width:0}
+.khead{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px}
+.kname{font-size:15.5px;font-weight:900;color:#171a20}
+.ktag{font-size:10.5px;font-weight:900;color:#fff;padding:2.5px 9px;border-radius:999px;letter-spacing:.2px}
+.ktag.line{color:#153A77;background:#eef3fa;border:1px solid #d4e0f2}
+.kmeta{font-size:12.5px;color:#6a7280;line-height:1.75}
+.kmeta b{color:#153A77}
+.kacts{display:flex;flex-direction:column;gap:5px;justify-content:center;padding:12px 14px 12px 0;flex:0 0 auto}
+.kbtn{border:none;font-size:12px;font-weight:800;padding:7px 13px;border-radius:9px;cursor:pointer;color:#fff;white-space:nowrap;transition:.12s}
+.kbtn:hover{filter:brightness(1.12)}
+.kbtn.ghost{background:#fff;color:#8a919d;border:1.5px solid #d8dee8}
+.kbtn.ghost:hover{color:#C41E2F;border-color:#C41E2F;filter:none}
+
+/* ── 강사 카드 ── */
+.icard{display:flex;align-items:center;gap:12px;background:#fff;border:1.5px solid #e8ecf2;border-radius:13px;margin-bottom:8px;padding:11px 14px;transition:.15s}
+.icard:hover{border-color:#c6d2e5}
+.iav{flex:0 0 40px;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;color:#fff}
+.ibody{flex:1;min-width:0}
+.ihead{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.iname{font-size:14.5px;font-weight:900;color:#171a20}
+.imeta{font-size:12px;color:#6a7280;line-height:1.65;margin-top:2px}
+.itag{font-size:10px;font-weight:900;color:#fff;padding:2px 8px;border-radius:999px}
+
+/* ── 배정 대상 배너 ── */
+.ktarget{background:linear-gradient(120deg,#153A77,#1F4E9C);color:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;font-size:14px;font-weight:800;box-shadow:0 4px 14px rgba(21,58,119,.25)}
+.ktarget a{color:#e6b422;margin-left:10px;font-size:12.5px}
 </style>
 <section><div class="wrap" style="max-width:1240px">
   <div id="rgGate" class="pending-banner" style="display:none"></div>
@@ -56,22 +98,22 @@ const DB = firebase.firestore();
 
     <div class="sec-label">SCHOOLS</div>
     <h2 class="sec-title" style="font-size:24px">신청 학교 (전 권역)</h2>
-    <div style="display:flex;gap:6px;margin:0 0 10px;flex-wrap:wrap" id="rgRegChips">
-      <button class="btn-sub rreg on" data-r="전체" onclick="rgRegion('전체',this)">전 권역</button>
-      <button class="btn-sub rreg" data-r="서울·경기" onclick="rgRegion('서울·경기',this)" style="background:#8a919d">서울·경기</button>
-      <button class="btn-sub rreg" data-r="강원" onclick="rgRegion('강원',this)" style="background:#8a919d">강원</button>
-      <button class="btn-sub rreg" data-r="충청" onclick="rgRegion('충청',this)" style="background:#8a919d">충청</button>
-      <button class="btn-sub rreg" data-r="전라" onclick="rgRegion('전라',this)" style="background:#8a919d">전라</button>
-      <button class="btn-sub rreg" data-r="경상" onclick="rgRegion('경상',this)" style="background:#8a919d">경상</button>
-      <button class="btn-sub rreg" data-r="제주" onclick="rgRegion('제주',this)" style="background:#8a919d">제주</button>
+    <div class="kbar" id="rgRegChips">
+      <button class="kchip rreg on" data-r="전체" onclick="rgRegion('전체',this)">전 권역</button>
+      <button class="kchip rreg" data-r="서울·경기" onclick="rgRegion('서울·경기',this)">서울·경기</button>
+      <button class="kchip rreg" data-r="강원" onclick="rgRegion('강원',this)">강원</button>
+      <button class="kchip rreg" data-r="충청" onclick="rgRegion('충청',this)">충청</button>
+      <button class="kchip rreg" data-r="전라" onclick="rgRegion('전라',this)">전라</button>
+      <button class="kchip rreg" data-r="경상" onclick="rgRegion('경상',this)">경상</button>
+      <button class="kchip rreg" data-r="제주" onclick="rgRegion('제주',this)">제주</button>
     </div>
-    <div style="display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap">
-      <button class="btn-sub rfl on" data-f="전체" onclick="rgFilter('전체',this)">전체</button>
-      <button class="btn-sub rfl" data-f="학교체육" onclick="rgFilter('학교체육',this)" style="background:#8a919d">🏫 학교체육</button>
-      <button class="btn-sub rfl" data-f="방과후" onclick="rgFilter('방과후',this)" style="background:#8a919d">🌱 방과후·늘봄</button>
-      <input id="rgSearch" oninput="renderSchools()" placeholder="🔍 학교명·시군구·교사 검색" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px">
-      <button class="btn-sub" style="background:#1F4E9C" onclick="exportSchools()">⬇ 학교 CSV</button>
-      <span id="rgCount" style="align-self:center;font-size:13px;font-weight:800;color:#1F4E9C"></span>
+    <div class="kbar">
+      <button class="kchip rfl on" data-f="전체" onclick="rgFilter('전체',this)">전체</button>
+      <button class="kchip rfl" data-f="학교체육" onclick="rgFilter('학교체육',this)">🏫 학교체육</button>
+      <button class="kchip rfl" data-f="방과후" onclick="rgFilter('방과후',this)">🌱 방과후·늘봄</button>
+      <input id="rgSearch" class="ksearch" oninput="renderSchools()" placeholder="학교명·시군구·교사 검색">
+      <button class="kdl" onclick="exportSchools()">⬇ CSV</button>
+      <span id="rgCount" class="kcount"></span>
     </div>
     <div class="board" id="rgSchools"><div class="bempty">불러오는 중…</div></div>
 
@@ -80,15 +122,15 @@ const DB = firebase.firestore();
 
     <div class="sec-label">LEADERS</div>
     <h2 class="sec-title" style="font-size:24px">강사 리스트</h2>
-    <div id="rgTarget" style="display:none;background:#153A77;color:#fff;border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:14px;font-weight:800;display:none">
+    <div id="rgTarget" class="ktarget" style="display:none">
       <span id="rgTargetTxt"></span>
-      <a href="javascript:clearSel()" style="color:#e6b422;margin-left:8px;font-size:12.5px">선택 해제</a>
+      <a href="javascript:clearSel()">선택 해제 ✕</a>
     </div>
     <p class="sec-desc" style="margin-bottom:12px;font-size:13px" id="rgInstHint">좌측 학교의 [👤 강사 배정]을 누르면 이곳에서 강사를 골라 바로 확정할 수 있습니다.</p>
-    <div style="display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap">
-      <input id="rgISearch" oninput="renderInst()" placeholder="🔍 이름·시군구 검색" style="flex:1;min-width:160px;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px">
-      <button class="btn-sub" style="background:#0f766e" onclick="exportInst()">⬇ CSV</button>
-      <span id="rgICount" style="align-self:center;font-size:13px;font-weight:800;color:#0f766e"></span>
+    <div class="kbar">
+      <input id="rgISearch" class="ksearch" oninput="renderInst()" placeholder="이름·시군구 검색">
+      <button class="kdl" onclick="exportInst()">⬇ CSV</button>
+      <span id="rgICount" class="kcount"></span>
     </div>
     <div class="board" id="rgInst"><div class="bempty">불러오는 중…</div></div>
 
@@ -116,14 +158,20 @@ AUTH.onAuthStateChanged(async u=>{
 
 function rgFilter(f,btn){
   RFL=f;
-  document.querySelectorAll('.rfl').forEach(b=>{b.style.background=b.dataset.f===f?'':'#8a919d'});
+  document.querySelectorAll('.rfl').forEach(b=>b.classList.toggle('on',b.dataset.f===f));
   renderSchools();
 }
 function rgRegion(r,btn){
   RREG=r;
-  document.querySelectorAll('.rreg').forEach(b=>{b.style.background=b.dataset.r===r?'':'#8a919d'});
+  document.querySelectorAll('.rreg').forEach(b=>b.classList.toggle('on',b.dataset.r===r));
   renderSchools();
 }
+// 배정 대상 선택 후 다른 곳을 클릭하면 자동 해제
+document.addEventListener('click',function(e){
+  if(!SEL)return;
+  if(e.target.closest('.kcard,.icard,.ktarget'))return; // 학교·강사 카드, 대상 배너 내부는 유지
+  clearSel();
+});
 
 async function loadSchools(){
   const snap=await DB.collection('schoolApplications').get();
@@ -152,20 +200,26 @@ function renderSchools(){
     const s=d.data();const st=s.status||'접수';
     const stc={'접수':'#8a919d','대기':'#e6b422','선정':'#1F4E9C','배정완료':'#0f766e','미선정':'#C41E2F','취소':'#555555'}[st]||'#8a919d';
     const isAfter=String(s.type||'').indexOf('방과후')>=0;
-    return '<div class="urow'+(SEL===d.id?' rgSelRow':'')+'"><div class="grow"><b>'+esc(s.school)+'</b> '
-      +'<span style="font-size:12px;font-weight:800;color:#fff;background:'+stc+';padding:2px 10px;border-radius:999px">'+st+(st==='대기'&&s.waitNo?' '+s.waitNo+'번':'')+'</span>'
-      +' <span style="font-size:11px;font-weight:800;color:#fff;background:'+(isAfter?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(isAfter?'방과후·늘봄':'학교체육')+'</span>'
-      +' <span style="font-size:11px;font-weight:800;color:#1F4E9C;background:#eef3fa;padding:2px 8px;border-radius:999px">'+esc(s.region||'')+'</span>'
-      +(s.support==='용품만'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">🎁 용품만</span>':'')
-      +'<div class="sub3">'+(s.code?'<b>'+esc(s.code)+'</b> · ':'')+(s.city?'<b style="color:#1F4E9C">📍'+esc(s.city)+'</b>':'<b style="color:#C41E2F">시군구 미입력</b>')
-      +' · 담당 '+esc(s.teacher)+' '+esc(s.phone)
-      +(s.assignedName?' · <b style="color:#0f766e">배정: '+esc(s.assignedName)+'</b>':'')+'</div></div>'
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +(st==='접수'?'<button class="btn-sub" onclick="setSt(\''+d.id+'\',\'선정\')">선정</button>':'')
-      +(st==='선정'&&s.support!=='용품만'?'<button class="btn-sub" style="background:'+(SEL===d.id?'#153A77':'#0f766e')+'" onclick="selectApp(\''+d.id+'\')">'+(SEL===d.id?'✔ 배정 대상 선택됨':'👤 강사 배정')+'</button>':'')
-      +(st==='선정'?'<button class="btn-sub" style="background:#8a919d" onclick="setSt(\''+d.id+'\',\'접수\')">선정취소</button>':'')
-      +(st==='배정완료'?'<button class="btn-sub" style="background:#e6b422" onclick="unassign(\''+d.id+'\')">배정해제</button>':'')
-      +'<button class="btn-sub" style="background:'+(s.city?'#8a919d':'#C41E2F')+'" onclick="editCity(\''+d.id+'\')">📍시군구</button>'
+    return '<div class="kcard'+(SEL===d.id?' ksel':'')+'">'
+      +'<div class="kstat" style="background:'+stc+'"></div>'
+      +'<div class="kbody">'
+      +'<div class="khead"><span class="kname">'+esc(s.school)+'</span>'
+      +'<span class="ktag" style="background:'+stc+'">'+st+(st==='대기'&&s.waitNo?' '+s.waitNo+'번':'')+'</span>'
+      +'<span class="ktag" style="background:'+(isAfter?'#0f766e':'#8c1622')+'">'+(isAfter?'방과후·늘봄':'학교체육')+'</span>'
+      +'<span class="ktag line">'+esc(s.region||'')+'</span>'
+      +(s.support==='용품만'?'<span class="ktag" style="background:#b8860b">🎁 용품만</span>':'')
+      +'</div>'
+      +'<div class="kmeta">'+(s.code?'<b>'+esc(s.code)+'</b> &nbsp;':'')
+      +(s.city?'📍 '+esc(s.city):'<span style="color:#C41E2F;font-weight:800">📍 시군구 미입력</span>')
+      +' &nbsp;·&nbsp; 담당 '+esc(s.teacher)+' '+esc(s.phone)
+      +(s.assignedName?'<br><b style="color:#0f766e">👤 배정 강사: '+esc(s.assignedName)+'</b>':'')
+      +'</div></div>'
+      +'<div class="kacts">'
+      +(st==='접수'?'<button class="kbtn" style="background:#1F4E9C" onclick="setSt(\''+d.id+'\',\'선정\')">선정</button>':'')
+      +(st==='선정'&&s.support!=='용품만'?'<button class="kbtn" style="background:'+(SEL===d.id?'#153A77':'#0f766e')+'" onclick="selectApp(\''+d.id+'\')">'+(SEL===d.id?'✔ 선택됨':'👤 강사 배정')+'</button>':'')
+      +(st==='선정'?'<button class="kbtn ghost" onclick="setSt(\''+d.id+'\',\'접수\')">선정취소</button>':'')
+      +(st==='배정완료'?'<button class="kbtn" style="background:#e6b422" onclick="unassign(\''+d.id+'\')">배정해제</button>':'')
+      +'<button class="kbtn ghost" onclick="editCity(\''+d.id+'\')">📍 시군구</button>'
       +'</div></div>';
   }).join('');
 }
@@ -324,24 +378,29 @@ function renderInst(){
   }
   document.getElementById('rgICount').textContent=docs.length+'명';
   if(!docs.length){el.innerHTML='<div class="bempty">'+(s?'해당 분야 지원 강사가 없습니다.':'배정 가능한 강사가 없습니다.')+'</div>';return}
-  el.innerHTML=docs.map(d=>{
+  const AVC=['#0f766e','#1F4E9C','#7c3aed','#b8860b','#8c1622','#153A77'];
+  el.innerHTML=docs.map((d,idx)=>{
     const v=d.data();const f=v.instructorFor||{};
     const ok=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc);
     const ld=loadOf(d.id);
     const p=s?proxScore(v,s):null;
     const near=p!==null&&p<=1;
-    const badge=(p!==null&&PROX_BADGE[p])?'<span style="font-size:11px;font-weight:900;color:#fff;background:'+PROX_BADGE[p][1]+';padding:2px 8px;border-radius:999px">'+PROX_BADGE[p][0]+'</span> ':'';
-    return '<div class="urow"'+(near?' style="border-left:4px solid #0f766e"':(p===2?' style="border-left:4px solid #1F4E9C"':''))+'><div class="grow"><b>'+esc(v.name)+'</b> '
-      +badge
-      +(ok?'<span style="font-size:11px;font-weight:900;color:#fff;background:#1F4E9C;padding:2px 8px;border-radius:999px">위촉 가능</span>':'<span style="font-size:11px;font-weight:900;color:#fff;background:#e6b422;padding:2px 8px;border-radius:999px">검증 미완</span>')
-      +(ld.n?' <span style="font-size:11px;font-weight:900;color:#fff;background:#7c3aed;padding:2px 8px;border-radius:999px">담당 '+ld.n+'개교</span>':'')
-      +'<div class="sub3">'+(v.baseCity?'📍'+esc(v.baseCity):'거점 미입력')+' · 거주 '+esc(v.region||'')
-      +((v.activityRegions&&v.activityRegions.length)?' · 🗺'+esc(v.activityRegions.join('·')):'')
-      +(v.phone?' · '+esc(v.phone):'')
+    const av=AVC[(String(v.name||'').charCodeAt(0)||idx)%AVC.length];
+    const badge=(p!==null&&PROX_BADGE[p])?'<span class="itag" style="background:'+PROX_BADGE[p][1]+'">'+PROX_BADGE[p][0]+'</span>':'';
+    return '<div class="icard"'+(near?' style="border-left:4px solid #0f766e"':(p===2?' style="border-left:4px solid #1F4E9C"':''))+'>'
+      +'<div class="iav" style="background:'+av+'">'+esc(String(v.name||'?').charAt(0))+'</div>'
+      +'<div class="ibody">'
+      +'<div class="ihead"><span class="iname">'+esc(v.name)+'</span>'+badge
+      +(ok?'<span class="itag" style="background:#1F4E9C">위촉 가능</span>':'<span class="itag" style="background:#e6b422">검증 미완</span>')
+      +(ld.n?'<span class="itag" style="background:#7c3aed">담당 '+ld.n+'개교</span>':'')
+      +'</div>'
+      +'<div class="imeta">'+(v.baseCity?'📍 '+esc(v.baseCity):'거점 미입력')+' · '+esc(v.region||'')
+      +((v.activityRegions&&v.activityRegions.length)?' · 🗺 '+esc(v.activityRegions.join('·')):'')
       +' · '+[f.school?'학교체육':'',f.after?'방과후':'',f.referee?'심판':'',f.staff?'운영':''].filter(Boolean).join('/')
+      +(v.phone?'<br>☎ '+esc(v.phone):'')
       +(ld.n?'<br><span style="color:#7c3aed;font-weight:700">담당 중: '+esc(ld.names.join(', '))+'</span>':'')
       +'</div></div>'
-      +(s?'<button class="btn-sub" style="background:'+(near?'#0f766e':(p===2?'#1F4E9C':'#8a919d'))+'" onclick="confirmAssign(\''+d.id+'\')">이 강사로 배정 ✓</button>':'')
+      +(s?'<button class="kbtn" style="background:'+(near?'#0f766e':(p===2?'#1F4E9C':'#8a919d'))+'" onclick="confirmAssign(\''+d.id+'\')">배정 ✓</button>':'')
       +'</div>';
   }).join('');
 }
