@@ -42,9 +42,17 @@ const DB = firebase.firestore();
   <p>전 권역의 신청 학교와 강사를 확인하고 배정(매칭)·조정할 수 있습니다.</p>
 </div></div>
 
-<section><div class="wrap" style="max-width:1000px">
+<style>
+.rgGrid{display:grid;grid-template-columns:1.15fr 1fr;gap:24px;align-items:start}
+.rgCol2{position:sticky;top:16px}
+@media(max-width:940px){.rgGrid{grid-template-columns:1fr}.rgCol2{position:static}}
+.rgSelRow{border:2px solid #1F4E9C !important;background:#eef3fa !important;border-radius:12px}
+</style>
+<section><div class="wrap" style="max-width:1240px">
   <div id="rgGate" class="pending-banner" style="display:none"></div>
   <div id="rgBody" style="display:none">
+  <div class="rgGrid">
+  <div>
 
     <div class="sec-label">SCHOOLS</div>
     <h2 class="sec-title" style="font-size:24px">신청 학교 (전 권역)</h2>
@@ -67,22 +75,31 @@ const DB = firebase.firestore();
     </div>
     <div class="board" id="rgSchools"><div class="bempty">불러오는 중…</div></div>
 
-    <div class="sec-label" style="margin-top:48px">LEADERS</div>
-    <h2 class="sec-title" style="font-size:24px">배정 가능 강사 (전 권역)</h2>
-    <p class="sec-desc" style="margin-bottom:14px">학교체육·방과후 분야 지원을 완료한 승인 강사 전체입니다. 배정 시 학교 권역과 일치·활동가능한 강사가 목록 상단에 표시됩니다.</p>
+  </div>
+  <div class="rgCol2">
+
+    <div class="sec-label">LEADERS</div>
+    <h2 class="sec-title" style="font-size:24px">강사 리스트</h2>
+    <div id="rgTarget" style="display:none;background:#153A77;color:#fff;border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:14px;font-weight:800;display:none">
+      <span id="rgTargetTxt"></span>
+      <a href="javascript:clearSel()" style="color:#e6b422;margin-left:8px;font-size:12.5px">선택 해제</a>
+    </div>
+    <p class="sec-desc" style="margin-bottom:12px;font-size:13px" id="rgInstHint">좌측 학교의 [👤 강사 배정]을 누르면 이곳에서 강사를 골라 바로 확정할 수 있습니다.</p>
     <div style="display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap">
-      <input id="rgISearch" oninput="renderInst()" placeholder="🔍 이름·시군구 검색" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px">
-      <button class="btn-sub" style="background:#0f766e" onclick="exportInst()">⬇ 강사 CSV</button>
+      <input id="rgISearch" oninput="renderInst()" placeholder="🔍 이름·시군구 검색" style="flex:1;min-width:160px;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px">
+      <button class="btn-sub" style="background:#0f766e" onclick="exportInst()">⬇ CSV</button>
       <span id="rgICount" style="align-self:center;font-size:13px;font-weight:800;color:#0f766e"></span>
     </div>
     <div class="board" id="rgInst"><div class="bempty">불러오는 중…</div></div>
 
   </div>
+  </div>
+  </div>
 </div></section>
 
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-let RME=null,RMY=null,RAPPS=[],RUSERS=[],RFL='전체',RREG='전체';
+let RME=null,RMY=null,RAPPS=[],RUSERS=[],RFL='전체',RREG='전체',SEL=null;
 
 AUTH.onAuthStateChanged(async u=>{
   const g=document.getElementById('rgGate');
@@ -135,7 +152,7 @@ function renderSchools(){
     const s=d.data();const st=s.status||'접수';
     const stc={'접수':'#8a919d','대기':'#e6b422','선정':'#1F4E9C','배정완료':'#0f766e','미선정':'#C41E2F','취소':'#555555'}[st]||'#8a919d';
     const isAfter=String(s.type||'').indexOf('방과후')>=0;
-    return '<div class="urow"><div class="grow"><b>'+esc(s.school)+'</b> '
+    return '<div class="urow'+(SEL===d.id?' rgSelRow':'')+'"><div class="grow"><b>'+esc(s.school)+'</b> '
       +'<span style="font-size:12px;font-weight:800;color:#fff;background:'+stc+';padding:2px 10px;border-radius:999px">'+st+(st==='대기'&&s.waitNo?' '+s.waitNo+'번':'')+'</span>'
       +' <span style="font-size:11px;font-weight:800;color:#fff;background:'+(isAfter?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(isAfter?'방과후·늘봄':'학교체육')+'</span>'
       +' <span style="font-size:11px;font-weight:800;color:#1F4E9C;background:#eef3fa;padding:2px 8px;border-radius:999px">'+esc(s.region||'')+'</span>'
@@ -145,7 +162,7 @@ function renderSchools(){
       +(s.assignedName?' · <b style="color:#0f766e">배정: '+esc(s.assignedName)+'</b>':'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
       +(st==='접수'?'<button class="btn-sub" onclick="setSt(\''+d.id+'\',\'선정\')">선정</button>':'')
-      +(st==='선정'&&s.support!=='용품만'?'<button class="btn-sub" style="background:#0f766e" onclick="assign(\''+d.id+'\')">👤 강사 배정</button>':'')
+      +(st==='선정'&&s.support!=='용품만'?'<button class="btn-sub" style="background:'+(SEL===d.id?'#153A77':'#0f766e')+'" onclick="selectApp(\''+d.id+'\')">'+(SEL===d.id?'✔ 배정 대상 선택됨':'👤 강사 배정')+'</button>':'')
       +(st==='선정'?'<button class="btn-sub" style="background:#8a919d" onclick="setSt(\''+d.id+'\',\'접수\')">선정취소</button>':'')
       +(st==='배정완료'?'<button class="btn-sub" style="background:#e6b422" onclick="unassign(\''+d.id+'\')">배정해제</button>':'')
       +'<button class="btn-sub" style="background:'+(s.city?'#8a919d':'#C41E2F')+'" onclick="editCity(\''+d.id+'\')">📍시군구</button>'
@@ -183,28 +200,72 @@ function eligibleInst(app){
 function instRegs(v){
   return (v.activityRegions&&v.activityRegions.length)?v.activityRegions:[v.region];
 }
-async function assign(id){
-  const doc=RAPPS.find(d=>d.id===id);if(!doc)return;
-  const s=doc.data();
-  const list=eligibleInst(s);
-  if(!list.length){alert('해당 분야 지원 강사가 없습니다.');return}
-  const menu=list.map((d,i)=>{
-    const v=d.data();
-    const chk=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc)?'✅위촉가능':'⚠️검증미완';
-    const match=instRegs(v).indexOf(s.region||'')>=0?'★권역일치 ':'';
-    return (i+1)+'. '+match+v.name+' ('+(v.baseCity||v.region||'')+') '+chk;
-  }).join('\n');
-  const n=prompt(s.school+' 에 배정할 강사 번호를 입력하세요:\n\n'+menu+'\n\n※ ⚠️검증미완 강사 배정 시 위촉 전 검증(전자동의·경력·자격) 완료 필요');
-  if(n===null)return;
-  const pick=list[parseInt(n.trim(),10)-1];
-  if(!pick){alert('번호가 올바르지 않습니다.');return}
+// ── 인접 권역 정의 ──
+const ADJ={'서울·경기':['강원','충청'],'강원':['서울·경기','충청','경상'],'충청':['서울·경기','강원','전라','경상'],'전라':['충청','경상','제주'],'경상':['강원','충청','전라'],'제주':['전라']};
+// 시도·시군구 추출 (표기 흔들림 흡수)
+const SIDO_KEYS=[['서울','서울'],['인천','인천'],['경기','경기'],['강원','강원'],['대전','대전'],['세종','세종'],['충청북','충북'],['충북','충북'],['충청남','충남'],['충남','충남'],['광주','광주'],['전라북','전북'],['전북','전북'],['전라남','전남'],['전남','전남'],['부산','부산'],['대구','대구'],['울산','울산'],['경상북','경북'],['경북','경북'],['경상남','경남'],['경남','경남'],['제주','제주']];
+function sidoOf(str){
+  str=String(str||'').trim();
+  for(const[k,c]of SIDO_KEYS){if(str.indexOf(k)===0)return c}
+  return '';
+}
+function sigOf(str){
+  const t=String(str||'').trim().split(/\s+/);
+  return t.length>1?t[1]:'';
+}
+// 근접도 점수: 0=동일 시군구, 1=동일 시도, 2=권역일치(활동가능), 3=인접권역, 4=기타
+function proxScore(v,s){
+  const sS=sidoOf(s.city),iS=sidoOf(v.baseCity);
+  if(sS&&iS&&sS===iS){
+    const a=sigOf(s.city),b=sigOf(v.baseCity);
+    if(a&&b&&a===b)return 0;
+    return 1;
+  }
+  if(instRegs(v).indexOf(s.region||'')>=0)return 2;
+  if((ADJ[s.region]||[]).some(r=>instRegs(v).indexOf(r)>=0))return 3;
+  return 4;
+}
+const PROX_BADGE={0:['📍동일 시군구','#0f766e'],1:['📍동일 시도','#0f766e'],2:['★권역일치','#1F4E9C'],3:['인접권역','#b8860b']};
+// 강사별 현재 담당(배정완료) 학교 수·목록
+function loadOf(uid){
+  const mine=RAPPS.filter(d=>d.data().assignedUid===uid&&d.data().status==='배정완료');
+  return {n:mine.length,names:mine.map(d=>d.data().school)};
+}
+// ── 좌우 대조 배정: 학교 선택 → 우측 강사 카드에서 확정 ──
+function selectApp(id){
+  SEL=(SEL===id)?null:id;
+  renderSchools();renderInst();
+  if(SEL){
+    const s=RAPPS.find(d=>d.id===SEL).data();
+    document.getElementById('rgTarget').style.display='block';
+    document.getElementById('rgTargetTxt').textContent='🎯 배정 대상: '+s.school+' ('+(s.region||'')+(s.city?' · '+s.city:'')+') — '+(String(s.type||'').indexOf('방과후')>=0?'방과후·늘봄':'학교체육');
+    document.getElementById('rgInstHint').style.display='none';
+    if(window.innerWidth<=940)document.getElementById('rgTarget').scrollIntoView({behavior:'smooth',block:'center'});
+  }else clearSel(false);
+}
+function clearSel(rerender){
+  SEL=null;
+  document.getElementById('rgTarget').style.display='none';
+  document.getElementById('rgInstHint').style.display='block';
+  if(rerender!==false){renderSchools();renderInst();}
+}
+async function confirmAssign(uid){
+  if(!SEL)return;
+  const appDoc=RAPPS.find(d=>d.id===SEL);if(!appDoc)return;
+  const s=appDoc.data();
+  const pick=RUSERS.find(d=>d.id===uid);if(!pick)return;
   const v=pick.data();
-  if(!confirm(s.school+' ← '+v.name+' ('+(v.baseCity||'')+') 배정할까요?'))return;
+  const ok=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc);
+  const ld=loadOf(uid);
+  if(!confirm(s.school+' ← '+v.name+' ('+(v.baseCity||v.region||'')+') 배정 확정할까요?'
+    +(ld.n?'\n\n※ 이 강사는 현재 '+ld.n+'개교 담당 중: '+ld.names.join(', ')+'\n(추가 배정 가능 — 회차보고·일지는 학교별로 따로 제출됩니다)':'')
+    +(ok?'':'\n\n⚠️ 이 강사는 위촉 검증(전자동의·경력·자격)이 아직 완료되지 않았습니다. 배정은 가능하지만 위촉 전 검증 완료가 필요합니다.')))return;
   try{
-    await DB.collection('schoolApplications').doc(id).update({assignedUid:pick.id,assignedName:v.name,status:'배정완료'});
+    await DB.collection('schoolApplications').doc(SEL).update({assignedUid:pick.id,assignedName:v.name,status:'배정완료'});
     await syncStatus(s,'배정완료',{assignedName:v.name});
-    alert('배정 완료. 위촉계약·통보는 사무국 절차에 따라 진행됩니다.');
-    await loadSchools();
+    clearSel(false);
+    await loadSchools();renderInst();
+    alert('배정 완료: '+s.school+' ← '+v.name+'\n위촉계약·통보는 사무국 절차에 따라 진행됩니다.');
   }catch(e){alert('실패: '+e.message)}
 }
 async function unassign(id){
@@ -244,23 +305,44 @@ async function loadInst(){
 function renderInst(){
   const el=document.getElementById('rgInst');
   const q=(document.getElementById('rgISearch').value||'').trim().toLowerCase();
-  const docs=RUSERS.filter(d=>{
-    if(!q)return true;
-    const v=d.data();
-    return [v.name,v.baseCity,v.region].map(x=>String(x||'').toLowerCase()).join(' ').indexOf(q)>=0;
+  const app=SEL?RAPPS.find(d=>d.id===SEL):null;
+  const s=app?app.data():null;
+  const isAfter=s?String(s.type||'').indexOf('방과후')>=0:false;
+  let docs=RUSERS.filter(d=>{
+    const v=d.data();const f=v.instructorFor||{};
+    if(s&&!(isAfter?f.after:f.school))return false; // 선택된 학교의 유형에 맞는 강사만
+    if(q&&[v.name,v.baseCity,v.region].map(x=>String(x||'').toLowerCase()).join(' ').indexOf(q)<0)return false;
+    return true;
   });
+  if(s){
+    docs=docs.slice().sort((a,b)=>{
+      const pa=proxScore(a.data(),s),pb=proxScore(b.data(),s);
+      if(pa!==pb)return pa-pb;
+      // 동순위면 담당 학교 적은 강사 우선 (부담 분산)
+      return loadOf(a.id).n-loadOf(b.id).n;
+    });
+  }
   document.getElementById('rgICount').textContent=docs.length+'명';
-  if(!docs.length){el.innerHTML='<div class="bempty">배정 가능한 강사가 없습니다.</div>';return}
+  if(!docs.length){el.innerHTML='<div class="bempty">'+(s?'해당 분야 지원 강사가 없습니다.':'배정 가능한 강사가 없습니다.')+'</div>';return}
   el.innerHTML=docs.map(d=>{
     const v=d.data();const f=v.instructorFor||{};
     const ok=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc);
-    return '<div class="urow"><div class="grow"><b>'+esc(v.name)+'</b> '
-      +(ok?'<span style="font-size:11px;font-weight:900;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">위촉 가능</span>':'<span style="font-size:11px;font-weight:900;color:#fff;background:#e6b422;padding:2px 8px;border-radius:999px">검증 미완</span>')
+    const ld=loadOf(d.id);
+    const p=s?proxScore(v,s):null;
+    const near=p!==null&&p<=1;
+    const badge=(p!==null&&PROX_BADGE[p])?'<span style="font-size:11px;font-weight:900;color:#fff;background:'+PROX_BADGE[p][1]+';padding:2px 8px;border-radius:999px">'+PROX_BADGE[p][0]+'</span> ':'';
+    return '<div class="urow"'+(near?' style="border-left:4px solid #0f766e"':(p===2?' style="border-left:4px solid #1F4E9C"':''))+'><div class="grow"><b>'+esc(v.name)+'</b> '
+      +badge
+      +(ok?'<span style="font-size:11px;font-weight:900;color:#fff;background:#1F4E9C;padding:2px 8px;border-radius:999px">위촉 가능</span>':'<span style="font-size:11px;font-weight:900;color:#fff;background:#e6b422;padding:2px 8px;border-radius:999px">검증 미완</span>')
+      +(ld.n?' <span style="font-size:11px;font-weight:900;color:#fff;background:#7c3aed;padding:2px 8px;border-radius:999px">담당 '+ld.n+'개교</span>':'')
       +'<div class="sub3">'+(v.baseCity?'📍'+esc(v.baseCity):'거점 미입력')+' · 거주 '+esc(v.region||'')
       +((v.activityRegions&&v.activityRegions.length)?' · 🗺'+esc(v.activityRegions.join('·')):'')
       +(v.phone?' · '+esc(v.phone):'')
       +' · '+[f.school?'학교체육':'',f.after?'방과후':'',f.referee?'심판':'',f.staff?'운영':''].filter(Boolean).join('/')
-      +'</div></div></div>';
+      +(ld.n?'<br><span style="color:#7c3aed;font-weight:700">담당 중: '+esc(ld.names.join(', '))+'</span>':'')
+      +'</div></div>'
+      +(s?'<button class="btn-sub" style="background:'+(near?'#0f766e':(p===2?'#1F4E9C':'#8a919d'))+'" onclick="confirmAssign(\''+d.id+'\')">이 강사로 배정 ✓</button>':'')
+      +'</div>';
   }).join('');
 }
 function exportInst(){
