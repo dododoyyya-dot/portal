@@ -245,10 +245,12 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
 </div></section>
 <script>
 let USERS=[];
+let IS_OWNER=false;
 AUTH.onAuthStateChanged(async u=>{
   if(!u){document.getElementById('deny').style.display='block';return}
   const me=await DB.collection('users').doc(u.uid).get();
   if(!me.exists||me.data().role!=='admin'){document.getElementById('deny').style.display='block';return}
+  IS_OWNER=me.data().owner===true;
   document.getElementById('adminBody').style.display='block';loadDash();
   loadUsers();
 });
@@ -732,7 +734,8 @@ function renderUsers(){
         ?'<span style="font-size:13px;font-weight:800;color:#0f766e">승인됨</span>'
         :'<button class="btn-sub" onclick="approve(\''+d.id+'\')">승인하기</button>')
       +'<button class="btn-sub" style="background:#1F4E9C" onclick="setOrg(\''+d.id+'\')">직책</button>'
-      +'<button class="btn-sub" style="background:'+(v.role==='regionAdmin'?'#7c3aed':'#8a919d')+'" onclick="setRegionAdmin(\''+d.id+'\')">'+(v.role==='regionAdmin'?'🛡 '+esc(v.managedRegion||'권역?')+' 관리자':'🛡 권역관리자 지정')+'</button>'
+      +(IS_OWNER?'<button class="btn-sub" style="background:'+(v.role==='regionAdmin'?'#7c3aed':'#8a919d')+'" onclick="setRegionAdmin(\''+d.id+'\')">'+(v.role==='regionAdmin'?'🛡 '+esc(v.managedRegion||'권역?')+' 관리자':'🛡 권역관리자 지정')+'</button>'
+        :(v.role==='regionAdmin'?'<span style="font-size:11px;font-weight:900;color:#fff;background:#7c3aed;padding:4px 10px;border-radius:999px;align-self:center">🛡 권역관리자</span>':''))
       +'<button class="btn-sub" style="background:'+(v.crimDoc?'#0f766e':'#8a919d')+'" onclick="toggleCrim(\''+d.id+'\')">'+(v.crimDoc?'경력확인 ✓':'경력확인 체크')+'</button>'
       +'<button class="btn-sub" style="background:'+(v.certDoc?'#0f766e':'#8a919d')+'" onclick="toggleCert(\''+d.id+'\')">'+(v.certDoc?'자격확인 ✓':'자격확인 체크')+'</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delUser(\''+d.id+'\',\''+esc(v.name)+'\')">🗑</button>'
