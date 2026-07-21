@@ -39,7 +39,7 @@ const DB = firebase.firestore();
 <div class="phero"><div class="wrap">
   <div class="crumb">HOME &nbsp;›&nbsp; <b>권역 관리</b></div>
   <h1>권역 관리자 페이지 <span id="rgBadge" style="font-size:16px;color:#e6b422"></span></h1>
-  <p>관할 권역의 신청 학교와 강사를 확인하고 배정(매칭)·조정할 수 있습니다.</p>
+  <p>전 권역의 신청 학교와 강사를 확인하고 배정(매칭)·조정할 수 있습니다.</p>
 </div></div>
 
 <section><div class="wrap" style="max-width:1000px">
@@ -47,7 +47,16 @@ const DB = firebase.firestore();
   <div id="rgBody" style="display:none">
 
     <div class="sec-label">SCHOOLS</div>
-    <h2 class="sec-title" style="font-size:24px">관할 권역 신청 학교</h2>
+    <h2 class="sec-title" style="font-size:24px">신청 학교 (전 권역)</h2>
+    <div style="display:flex;gap:6px;margin:0 0 10px;flex-wrap:wrap" id="rgRegChips">
+      <button class="btn-sub rreg on" data-r="전체" onclick="rgRegion('전체',this)">전 권역</button>
+      <button class="btn-sub rreg" data-r="서울·경기" onclick="rgRegion('서울·경기',this)" style="background:#8a919d">서울·경기</button>
+      <button class="btn-sub rreg" data-r="강원" onclick="rgRegion('강원',this)" style="background:#8a919d">강원</button>
+      <button class="btn-sub rreg" data-r="충청" onclick="rgRegion('충청',this)" style="background:#8a919d">충청</button>
+      <button class="btn-sub rreg" data-r="전라" onclick="rgRegion('전라',this)" style="background:#8a919d">전라</button>
+      <button class="btn-sub rreg" data-r="경상" onclick="rgRegion('경상',this)" style="background:#8a919d">경상</button>
+      <button class="btn-sub rreg" data-r="제주" onclick="rgRegion('제주',this)" style="background:#8a919d">제주</button>
+    </div>
     <div style="display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap">
       <button class="btn-sub rfl on" data-f="전체" onclick="rgFilter('전체',this)">전체</button>
       <button class="btn-sub rfl" data-f="학교체육" onclick="rgFilter('학교체육',this)" style="background:#8a919d">🏫 학교체육</button>
@@ -59,8 +68,8 @@ const DB = firebase.firestore();
     <div class="board" id="rgSchools"><div class="bempty">불러오는 중…</div></div>
 
     <div class="sec-label" style="margin-top:48px">LEADERS</div>
-    <h2 class="sec-title" style="font-size:24px">배정 가능 강사 (관할·활동가능 권역 포함)</h2>
-    <p class="sec-desc" style="margin-bottom:14px">거주 권역이 관할이거나, 활동가능 권역에 관할 권역을 포함한 승인 강사입니다. 배정 버튼에서 번호로 선택합니다.</p>
+    <h2 class="sec-title" style="font-size:24px">배정 가능 강사 (전 권역)</h2>
+    <p class="sec-desc" style="margin-bottom:14px">학교체육·방과후 분야 지원을 완료한 승인 강사 전체입니다. 배정 시 학교 권역과 일치·활동가능한 강사가 목록 상단에 표시됩니다.</p>
     <div style="display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap">
       <input id="rgISearch" oninput="renderInst()" placeholder="🔍 이름·시군구 검색" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px">
       <button class="btn-sub" style="background:#0f766e" onclick="exportInst()">⬇ 강사 CSV</button>
@@ -73,7 +82,7 @@ const DB = firebase.firestore();
 
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-let RME=null,RMY=null,MYREGION='',RAPPS=[],RUSERS=[],RFL='전체';
+let RME=null,RMY=null,RAPPS=[],RUSERS=[],RFL='전체',RREG='전체';
 
 AUTH.onAuthStateChanged(async u=>{
   const g=document.getElementById('rgGate');
@@ -83,9 +92,7 @@ AUTH.onAuthStateChanged(async u=>{
   if(!RMY||(RMY.role!=='regionAdmin'&&RMY.role!=='admin')){
     g.style.display='block';g.innerHTML='⛔ 권역 관리자 권한이 없습니다. 사무국(오너)의 지정이 필요합니다.';return;
   }
-  MYREGION=RMY.role==='admin'?(prompt('(관리자 테스트) 조회할 권역 입력: 서울·경기/강원/충청/전라/경상/제주','경상')||''):(RMY.managedRegion||'');
-  if(!MYREGION){g.style.display='block';g.innerHTML='⛔ 관할 권역(managedRegion)이 설정되지 않았습니다. 사무국에 문의하세요.';return}
-  document.getElementById('rgBadge').textContent='— 관할: '+MYREGION;
+  document.getElementById('rgBadge').textContent='— '+esc(RMY.name||'')+' 님 (전 권역)';
   document.getElementById('rgBody').style.display='block';
   await Promise.all([loadSchools(),loadInst()]);
 });
@@ -95,9 +102,14 @@ function rgFilter(f,btn){
   document.querySelectorAll('.rfl').forEach(b=>{b.style.background=b.dataset.f===f?'':'#8a919d'});
   renderSchools();
 }
+function rgRegion(r,btn){
+  RREG=r;
+  document.querySelectorAll('.rreg').forEach(b=>{b.style.background=b.dataset.r===r?'':'#8a919d'});
+  renderSchools();
+}
 
 async function loadSchools(){
-  const snap=await DB.collection('schoolApplications').where('region','==',MYREGION).get();
+  const snap=await DB.collection('schoolApplications').get();
   RAPPS=snap.docs.sort((a,b)=>{
     const ta=a.data().createdAt?a.data().createdAt.seconds:0,tb=b.data().createdAt?b.data().createdAt.seconds:0;
     return tb-ta;
@@ -109,6 +121,7 @@ function renderSchools(){
   const q=(document.getElementById('rgSearch').value||'').trim().toLowerCase();
   const docs=RAPPS.filter(d=>{
     const s=d.data();
+    if(RREG!=='전체'&&s.region!==RREG)return false;
     if(RFL!=='전체'&&String(s.type||'').indexOf(RFL)<0)return false;
     if(q){
       const hay=[s.school,s.city,s.teacher,s.code,s.assignedName].map(x=>String(x||'').toLowerCase()).join(' ');
@@ -125,6 +138,7 @@ function renderSchools(){
     return '<div class="urow"><div class="grow"><b>'+esc(s.school)+'</b> '
       +'<span style="font-size:12px;font-weight:800;color:#fff;background:'+stc+';padding:2px 10px;border-radius:999px">'+st+(st==='대기'&&s.waitNo?' '+s.waitNo+'번':'')+'</span>'
       +' <span style="font-size:11px;font-weight:800;color:#fff;background:'+(isAfter?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(isAfter?'방과후·늘봄':'학교체육')+'</span>'
+      +' <span style="font-size:11px;font-weight:800;color:#1F4E9C;background:#eef3fa;padding:2px 8px;border-radius:999px">'+esc(s.region||'')+'</span>'
       +(s.support==='용품만'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">🎁 용품만</span>':'')
       +'<div class="sub3">'+(s.code?'<b>'+esc(s.code)+'</b> · ':'')+(s.city?'<b style="color:#1F4E9C">📍'+esc(s.city)+'</b>':'<b style="color:#C41E2F">시군구 미입력</b>')
       +' · 담당 '+esc(s.teacher)+' '+esc(s.phone)
@@ -156,10 +170,18 @@ async function setSt(id,st){
 }
 function eligibleInst(app){
   const isAfter=String(app.type||'').indexOf('방과후')>=0;
+  const reg=app.region||'';
   return RUSERS.filter(d=>{
     const v=d.data();const f=v.instructorFor||{};
     return isAfter?f.after:f.school;
+  }).sort((a,b)=>{
+    const ra=instRegs(a.data()).indexOf(reg)>=0?0:1;
+    const rb=instRegs(b.data()).indexOf(reg)>=0?0:1;
+    return ra-rb;
   });
+}
+function instRegs(v){
+  return (v.activityRegions&&v.activityRegions.length)?v.activityRegions:[v.region];
 }
 async function assign(id){
   const doc=RAPPS.find(d=>d.id===id);if(!doc)return;
@@ -169,7 +191,8 @@ async function assign(id){
   const menu=list.map((d,i)=>{
     const v=d.data();
     const chk=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc)?'✅위촉가능':'⚠️검증미완';
-    return (i+1)+'. '+v.name+' ('+(v.baseCity||v.region||'')+') '+chk;
+    const match=instRegs(v).indexOf(s.region||'')>=0?'★권역일치 ':'';
+    return (i+1)+'. '+match+v.name+' ('+(v.baseCity||v.region||'')+') '+chk;
   }).join('\n');
   const n=prompt(s.school+' 에 배정할 강사 번호를 입력하세요:\n\n'+menu+'\n\n※ ⚠️검증미완 강사 배정 시 위촉 전 검증(전자동의·경력·자격) 완료 필요');
   if(n===null)return;
@@ -207,16 +230,14 @@ function exportSchools(){
   RAPPS.forEach(d=>{const s=d.data();
     rows.push([s.code||'',s.school||'',s.city||'',s.type||'',s.support||'',s.status||'',s.teacher||'',s.phone||'',s.assignedName||'']);
   });
-  dlCSV(rows,MYREGION+'_신청학교.csv');
+  dlCSV(rows,'전체_신청학교.csv');
 }
 
 async function loadInst(){
   const snap=await DB.collection('users').where('status','==','approved').get();
   RUSERS=snap.docs.filter(d=>{
     const v=d.data();const f=v.instructorFor||{};
-    if(!(f.school||f.after))return false;
-    const regs=(v.activityRegions&&v.activityRegions.length)?v.activityRegions:[v.region];
-    return regs.indexOf(MYREGION)>=0;
+    return f.school||f.after;
   });
   renderInst();
 }
@@ -249,7 +270,7 @@ function exportInst(){
       f.school?'O':'',f.after?'O':'',
       (v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc)?'완료':'미완']);
   });
-  dlCSV(rows,MYREGION+'_배정가능강사.csv');
+  dlCSV(rows,'전체_배정가능강사.csv');
 }
 function dlCSV(rows,name){
   const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
