@@ -22,6 +22,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="site_config.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",
@@ -231,11 +232,29 @@ async function syncStatus(app,st,extra){
     assignedName:(extra.assignedName!==undefined?extra.assignedName:(app.assignedName||'')),
     updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
 }
+// ── 선정·취소: 사무국 관리자 페이지와 동일하게 동작 (이메일·지명 게시판 동기화) ──
 async function setSt(id,st){
   const doc=RAPPS.find(d=>d.id===id);if(!doc)return;
+  const s=doc.data();
+  if(st==='선정'&&!confirm(s.school+' 을(를) 선정할까요?\n\n📧 담당교사에게 선정 안내 이메일이 발송되고, 강사 지명 게시판에 공개됩니다.'))return;
   try{
+    // 본인지도 신청교는 선정과 동시에 자동 배정 (admin과 동일)
+    if(st==='선정'&&s.selfTeach&&s.selfUid){
+      await DB.collection('schoolApplications').doc(id).update({status:'배정완료',assignedUid:s.selfUid,assignedName:s.selfName});
+      await syncStatus(s,'배정완료',{assignedName:s.selfName});
+      if(window.kfdfMail)kfdfMail(s.email,'[플라잉디스크연맹] 강습 선정 안내 — '+s.school,s.school+' ('+s.type+') 신청이 선정되었으며, 신청하신 본인지도로 강사 배정까지 완료되었습니다.\n접수번호: '+(s.code||'')+'\n일정 협의를 위해 곧 연락드리겠습니다.');
+      await loadSchools();renderInst();return;
+    }
     await DB.collection('schoolApplications').doc(id).update({status:st});
-    await syncStatus(doc.data(),st);
+    await syncStatus(s,st);
+    if(st==='선정'&&window.kfdfMail)kfdfMail(s.email,'[플라잉디스크연맹] 강습 선정 안내 — '+s.school,s.school+' ('+s.type+') 신청이 선정되었습니다!\n접수번호: '+(s.code||'')+'\n강사 배정 후 확정 연락을 드립니다.');
+    if(st==='선정'&&s.support!=='용품만'){
+      await DB.collection('openSlots').doc(id).set({
+        school:s.school,region:s.region,type:s.type,d1:s.d1||'',
+        claimedBy:null,claimedName:'',createdAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+    }else{
+      await DB.collection('openSlots').doc(id).delete().catch(()=>{});
+    }
     await loadSchools();
   }catch(e){alert('실패: '+e.message)}
 }
@@ -317,6 +336,7 @@ async function confirmAssign(uid){
   try{
     await DB.collection('schoolApplications').doc(SEL).update({assignedUid:pick.id,assignedName:v.name,status:'배정완료'});
     await syncStatus(s,'배정완료',{assignedName:v.name});
+    await DB.collection('openSlots').doc(SEL).delete().catch(()=>{}); // 지명 게시판에서 내림
     clearSel(false);
     await loadSchools();renderInst();
     alert('배정 완료: '+s.school+' ← '+v.name+'\n위촉계약·통보는 사무국 절차에 따라 진행됩니다.');
@@ -324,11 +344,15 @@ async function confirmAssign(uid){
 }
 async function unassign(id){
   const doc=RAPPS.find(d=>d.id===id);if(!doc)return;
-  if(!confirm('배정을 해제하고 [선정] 상태로 되돌릴까요?'))return;
+  const s=doc.data();
+  if(!confirm('배정을 해제하고 [선정] 상태로 되돌릴까요?\n(강사 지명 게시판에 다시 공개됩니다)'))return;
   try{
     await DB.collection('schoolApplications').doc(id).update({assignedUid:'',assignedName:'',status:'선정'});
-    await syncStatus(doc.data(),'선정',{assignedName:''});
-    await loadSchools();
+    await syncStatus(s,'선정',{assignedName:''});
+    if(s.support!=='용품만')await DB.collection('openSlots').doc(id).set({
+      school:s.school,region:s.region,type:s.type,d1:s.d1||'',
+      claimedBy:null,claimedName:'',createdAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+    await loadSchools();renderInst();
   }catch(e){alert('실패: '+e.message)}
 }
 async function editCity(id){
