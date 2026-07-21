@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="google-site-verification" content="sMiNgrZBGPS1NWfFR2JWjhrM25dn2Pq0LsDR2DbDrQc" />
 <meta name="naver-site-verification" content="f2bba301d1f9ca2d37efa24800dcad9676123d09" />
-<title>커뮤니티 | 대한민국플라잉디스크연맹</title>
+<title>자주 묻는 질문 | 대한민국플라잉디스크연맹</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <link rel="stylesheet" href="style.css">
+<script src="site_config.js"></script>
 </head>
 <body>
 <div class="util"><div class="wrap">
@@ -29,7 +30,7 @@
         <a href="about.html#region">시도연맹</a>
         <a href="about.html#way">오시는 길</a>
       </div></div>
-    <div><a href="business.html" class="top">주요사업</a>
+    <div><a href="business.html" class="top active">주요사업</a>
       <div class="drop">
         <a href="business.html#youth">유소년 스포츠 기반구축사업</a>
         <a href="certification.html">체육지도자 실기 · 구술</a>
@@ -38,14 +39,14 @@
     <div><a href="certification.html" class="top">자격검정</a></div>
     <div><a href="competition.html" class="top">대회</a></div>
     <div><a href="leader.html" class="top">리더 시스템</a></div>
-    <div><a href="community.html" class="top active">커뮤니티</a></div>
+    <div><a href="community.html" class="top">커뮤니티</a></div>
     <div><a href="notice.html" class="top">알림마당</a>
       <div class="drop">
         <a href="notice.html">공지사항 · 공고</a>
         <a href="archive.html">자료실 (서식 다운로드)</a>
         <a href="faq.html">자주 묻는 질문</a>
       </div></div>
-    <div><a href="apply.html" class="top">신청마당</a>
+    <div><a href="apply.html" class="top active">신청마당</a>
       <div class="drop">
         <a href="apply.html?type=school">학교체육 강습 신청 (학교·교사)</a>
         <a href="apply.html?type=after">방과후·늘봄학교 신청 (학교·교사)</a>
@@ -76,11 +77,6 @@ function lvOf(p){let l=0;LVS.forEach((v,i)=>{if(p>=v[0])l=i});return l+1}
 function lvName(p){return LVS[lvOf(p)-1][1]}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')}
-function orgChip(o,region,title){
-  if(o==='central')return '<span style="background:linear-gradient(120deg,#111114,#3a3a44);color:#e6b422;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83c\udfdb \uc911\uc559\uc5f0\ub9f9'+(title?' \u00b7 '+esc(title):'')+'</span>';
-  if(o==='regional')return '<span style="background:#1F4E9C;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83d\udea9 '+esc(region||'')+' \uc5f0\ub9f9'+(title?' \u00b7 '+esc(title):'')+'</span>';
-  return '';
-}
 </script>
 <style>
 .authbox{max-width:460px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:38px;box-shadow:0 14px 34px rgba(17,17,20,.06)}
@@ -117,106 +113,8 @@ function orgChip(o,region,title){
 .urow .sub3{font-size:12.5px;color:var(--gray)}
 </style>
 
-<div class="phero"><div class="wrap">
-  <div class="crumb">HOME &nbsp;›&nbsp; <b>커뮤니티</b></div>
-  <h1>리더 커뮤니티</h1><p>리더 회원 전용 공간 — 활동 후기와 정보를 나눠보세요.</p>
-</div></div>
-<section><div class="wrap" style="max-width:1000px">
-  <div id="gate" class="pending-banner" style="display:none"></div>
-  <div id="commBody" style="display:none">
-    <div class="board-tools">
-      <div class="cats" id="catBtns">
-        <button class="bcat on" data-c="전체">전체</button>
-        <button class="bcat" data-c="자유">자유</button>
-        <button class="bcat" data-c="활동후기">활동후기</button>
-        <button class="bcat" data-c="질문">질문</button>
-      </div>
-      <div class="bsearch"><button class="btn-sub" onclick="document.getElementById('pForm').classList.toggle('show')">✏️ 글쓰기</button></div>
-    </div>
-    <div class="post-form" id="pForm">
-      <select id="pCat"><option>자유</option><option>활동후기</option><option>질문</option></select>
-      <input id="pTitle" placeholder="제목">
-      <textarea id="pBody" rows="5" placeholder="내용을 입력하세요"></textarea>
-      <button class="btn-sub" onclick="writePost()">등록</button>
-      <span class="msg" id="pMsg" style="margin-left:10px"></span>
-    </div>
-    <div class="board" id="postList"><div class="bempty">불러오는 중…</div></div>
-  </div>
-</div></section>
-<script>
-let ME=null, MYDOC=null, CAT='전체';
-AUTH.onAuthStateChanged(async u=>{
-  const gate=document.getElementById('gate');
-  if(!u){gate.style.display='block';gate.innerHTML='🔒 회원 전용 공간입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 하러 가기 →</a>';return}
-  ME=u;
-  const doc=await DB.collection('users').doc(u.uid).get(); MYDOC=doc.data();
-  if(!MYDOC||MYDOC.status!=='approved'){gate.style.display='block';gate.innerHTML='⏳ 사무국 승인 후 이용할 수 있습니다. 승인 상태는 <a href="mypage.html" style="font-weight:800;color:var(--red)">마이페이지</a>에서 확인하세요.';return}
-  document.getElementById('commBody').style.display='block';
-  load();
-});
-document.querySelectorAll('#catBtns .bcat').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('#catBtns .bcat').forEach(x=>x.classList.remove('on'));
-  b.classList.add('on');CAT=b.dataset.c;load();
-});
-async function load(){
-  let q=DB.collection('posts').orderBy('createdAt','desc').limit(50);
-  const snap=await q.get();
-  const list=snap.docs.filter(d=>CAT==='전체'||d.data().cat===CAT);
-  const el=document.getElementById('postList');
-  el.innerHTML=list.length?list.map(d=>{
-    const v=d.data(),lv=v.level||1;
-    return '<div class="brow" id="p-'+d.id+'"><div class="head" onclick="openPost(\''+d.id+'\')" style="grid-template-columns:70px 1fr 190px 90px">'
-      +'<div class="cat">'+esc(v.cat)+'</div><div class="tt">'+esc(v.title)+'</div>'
-      +'<div style="font-size:13px;text-align:center"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';font-size:11px;font-weight:900;color:#fff;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span>'+(v.edu?' <span style="font-size:11px">🎓</span>':'')+(v.org?' '+orgChip(v.org,v.region,v.orgTitle):'')+'</div>'
-      +'<div class="dt">'+fmtDate(v.createdAt)+'</div></div>'
-      +'<div class="body" id="b-'+d.id+'"></div></div>';
-  }).join(''):'<div class="bempty">아직 게시글이 없습니다. 첫 글을 남겨보세요!</div>';
-}
-async function openPost(id){
-  const row=document.getElementById('p-'+id);
-  if(row.classList.contains('open')){row.classList.remove('open');return}
-  row.classList.add('open');
-  const box=document.getElementById('b-'+id);
-  const doc=await DB.collection('posts').doc(id).get(); const v=doc.data();
-  const cs=await DB.collection('posts').doc(id).collection('comments').orderBy('createdAt').get();
-  box.innerHTML='<div style="white-space:pre-line;padding-bottom:14px">'+esc(v.body)+'</div>'
-    +'<div style="font-size:13px;font-weight:800;color:var(--gray)">댓글 '+cs.size+'</div>'
-    +cs.docs.map(c=>{const w=c.data();return '<div class="cmt"><b>'+esc(w.name)+'</b><span class="lvmini" style="background:'+LVC[w.level||1]+'">Lv.'+(w.level||1)+'</span>'+(w.org?' '+orgChip(w.org,w.region,w.orgTitle):'')+' '+esc(w.body)+' <span style="color:#a8aeb8;font-size:12px">'+fmtDate(w.createdAt)+'</span></div>'}).join('')
-    +'<div class="cmt-form"><input id="c-'+id+'" placeholder="댓글 입력"><button class="btn-sub" onclick="writeCmt(\''+id+'\')">등록</button></div>'
-    +'<div style="margin-top:10px;display:flex;gap:6px">'
-    +((ME&&(v.uid===ME.uid||MYDOC.role==='admin'))?'<button class="btn-sub" style="background:#8a919d" onclick="delPost(\''+id+'\')">글 삭제</button>':'')
-    +((ME&&v.uid!==ME.uid)?'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="reportPost(\''+id+'\',\''+esc(v.title).replace(/\'/g,"")+'\')">🚩 신고</button>':'')
-    +'</div>';
-}
-async function writePost(){
-  const t=document.getElementById('pTitle').value.trim(), b=document.getElementById('pBody').value.trim();
-  if(!t||!b){document.getElementById('pMsg').textContent='제목과 내용을 입력하세요';document.getElementById('pMsg').className='msg err';return}
-  await DB.collection('posts').add({uid:ME.uid,name:MYDOC.name,level:lvOf(MYDOC.points||0),edu:!!MYDOC.edu2026,org:MYDOC.org||'',orgTitle:MYDOC.orgTitle||'',region:MYDOC.region||'',
-    cat:document.getElementById('pCat').value,title:t,body:b,
-    createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-  document.getElementById('pTitle').value='';document.getElementById('pBody').value='';
-  document.getElementById('pForm').classList.remove('show');load();
-}
-async function writeCmt(id){
-  const inp=document.getElementById('c-'+id); const b=inp.value.trim(); if(!b)return;
-  await DB.collection('posts').doc(id).collection('comments').add({uid:ME.uid,name:MYDOC.name,level:lvOf(MYDOC.points||0),org:MYDOC.org||'',orgTitle:MYDOC.orgTitle||'',region:MYDOC.region||'',body:b,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-  document.getElementById('p-'+id).classList.remove('open');openPost(id);
-}
-async function reportPost(id,title){
-  const reason=prompt('이 게시글을 사무국에 신고합니다.\n사유를 입력해주세요 (욕설·허위·광고·부적절 등)','');
-  if(reason===null)return;
-  try{
-    await DB.collection('reports').add({postId:id,title:title,reason:reason,
-      byUid:ME.uid,byName:MYDOC.name,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-    alert('신고가 접수되었습니다. 사무국이 확인 후 조치합니다.');
-  }catch(e){alert('신고 실패: '+e.message)}
-}
-async function delPost(id){
-  if(!confirm('이 글을 삭제할까요?'))return;
-  await DB.collection('posts').doc(id).delete();load();
-}
-</script>
-
+<div class="phero"><div class="wrap"><div class="crumb">HOME &nbsp;›&nbsp; <b>자주 묻는 질문</b></div><h1>자주 묻는 질문 (FAQ)</h1><p>신청·강사 활동·회원 제도에 대해 가장 많이 묻는 질문들입니다.</p></div></div>
+<section><div class="wrap" style="max-width:860px"><h2 class="sec-title" style="font-size:22px;margin-top:34px">학교·신청</h2><details style="background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:10px"><summary style="font-weight:800;font-size:15.5px;cursor:pointer">Q. 학교체육 강습과 방과후·늘봄, 둘 다 신청해도 되나요?</summary><p style="margin-top:10px;font-size:14.5px;color:#444;line-height:1.8">됩니다. 별개 사업이라 각각 신청·선정되며(접수번호 S-/A- 별도) 중복으로 처리되지 않습니다.</p></details><details style="background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:10px"><summary style="font-weight:800;font-size:15.5px;cursor:pointer">Q. 정원이 마감됐다는데 이제 못 하나요?</summary><p style="margin-top:10px;font-size:14.5px;color:#444;line-height:1.8">정원 초과분은 자동으로 대기번호가 부여되고, 결원 발생 시 순번대로 승격 연락을 드립니다.</p></details><details style="background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:10px"><summary style="font-weight:800;font-size:15.5px;cursor:pointer">Q. 선정 결과는 언제 알 수 있나요?</summary><p style="margin-top:10px;font-size:14.5px;color:#444;line-height:1.8">접수 순 수시 심사로 2주 이내 개별 통보됩니다. 신청 페이지 하단 [접수 확인]에서 접수번호로 실시간 조회할 수 있습니다.</p></details><details style="background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:10px"><summary style="font-weight:800;font-size:15.5px;cursor:pointer">Q. 방학 때 몰아서 수업할 수 있나요?</summary><p style="margin-top:10px;font-size:14.5px;color:#444;line-height:1.8">가능합니다. 주당 횟수 제한이 없어 방학 중 매일 2회차(2시간) 집중 운영도 됩니다.</p></details><details style="background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:10px"><summary style="font-weight:800;font-size:15.5px;cursor:pointer">Q. 강사 없이 용품만 받을 수 있나요?</summary><p style="margin-top:10px;font-size:14.5px;color:#444;line-height:1.8">가능합니다. 신청서에서 "용품만 지원"을 선택하면 학교 자체 지도로 운영하며 용품 세트(50만원 상당)만 지원받습니다.</p></details><details style="background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:10px"><summary style="font-weight:800;font-size:15.5px;cursor:pointer">Q. 비용이 드나요?</summary><p style="margin-top:10px;font-size:14.5px;color:#444;line-height:1.8">전액 무료입니다. 강사비·용품은 연맹이 부담하며, 주최자 배상책임보험도 연맹이 가입합니다.</p></details><h2 class="sec-title" style="font-size:22px;margin-top:34px">강사 활동</h2><details style="background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:10px"><summary style="font-weight:800;font-size:15.5px;cursor:pointer">Q. 교사인데 우리 학교를 직접 가르치고 수당을 받을 수 있나요?</summary><p style="margin-top:10px;font-size:14.5px;color:#444;line-height:1.8">가능합니다. 단 ① 학교장 겸직허가 ② 정규 수업시간 외(0교시·방과후·늘봄·방학) 운영, 두 조건을 충족해야 합니다. 정규 수업시간 내 본인 담당 수업에는 수당이 지급되지 않습니다.</p></details><details style="background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:10px"><summary style="font-weight:800;font-size:15.5px;cursor:pointer">Q. 체육회 등 기관 소속인데 지원해도 되나요?</summary><p style="margin-top:10px;font-size:14.5px;color:#444;line-height:1.8">소속기관 취업규칙의 겸직 규정을 먼저 확인하고, 필요한 허가를 받은 후 지원해 주세요.</p></details><details style="background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:10px"><summary style="font-weight:800;font-size:15.5px;cursor:pointer">Q. 수당은 얼마인가요?</summary><p style="margin-top:10px;font-size:14.5px;color:#444;line-height:1.8">강습 회차(1시간)당 50,000원, 대회 심판·운영요원 1일 최대 70,000원(4시간 이내 40,000원)입니다. 월 합산 125,000원 이상 시 기타소득세 8.8%를 원천징수한 후 지급됩니다.</p></details><details style="background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:10px"><summary style="font-weight:800;font-size:15.5px;cursor:pointer">Q. 계약서는 어디서 쓰나요?</summary><p style="margin-top:10px;font-size:14.5px;color:#444;line-height:1.8">배정 확정 시 마이페이지에 위촉계약서가 자동 생성되며, [전자 동의] 클릭으로 체결됩니다. 종이 서류가 없습니다.</p></details><details style="background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:10px"><summary style="font-weight:800;font-size:15.5px;cursor:pointer">Q. 활동은 어떻게 기록하나요?</summary><p style="margin-top:10px;font-size:14.5px;color:#444;line-height:1.8">매 회차 후 마이페이지 [회차 보고]에서 일지와 사진을 제출합니다. 일지 기준으로 수당이 정산되고 리더 포인트(회차당 10P)가 적립됩니다.</p></details><details style="background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:10px"><summary style="font-weight:800;font-size:15.5px;cursor:pointer">Q. 자격증이 꼭 필요한가요?</summary><p style="margin-top:10px;font-size:14.5px;color:#444;line-height:1.8">네. 스포츠지도사(전문·생활·유소년) 또는 연맹 발급 지도자 자격증이 필요하며, 심판은 연맹 심판 자격증이 필요합니다.</p></details><h2 class="sec-title" style="font-size:22px;margin-top:34px">회원·레벨</h2><details style="background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:10px"><summary style="font-weight:800;font-size:15.5px;cursor:pointer">Q. 연수 이수자 혜택은 무엇인가요?</summary><p style="margin-top:10px;font-size:14.5px;color:#444;line-height:1.8">가입 승인 시 🎓이수 뱃지, 리더 포인트 50P, 마이페이지에서 본인 명의 이수증 발급(인쇄·PDF)이 제공됩니다. 소속교는 강습 최우선 선정됩니다.</p></details><details style="background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:10px"><summary style="font-weight:800;font-size:15.5px;cursor:pointer">Q. 레벨은 어떻게 올라가나요?</summary><p style="margin-top:10px;font-size:14.5px;color:#444;line-height:1.8">활동 포인트 누적으로 어쏘(0)→필드(100)→치프(300)→엘리트(600)→마스터(1,000) 5단계로 승급합니다. 순위는 리더 시스템 페이지에 실시간 공개됩니다.</p></details><details style="background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:10px"><summary style="font-weight:800;font-size:15.5px;cursor:pointer">Q. 회원 탈퇴는 어떻게 하나요?</summary><p style="margin-top:10px;font-size:14.5px;color:#444;line-height:1.8">마이페이지의 [회원 탈퇴 요청] 버튼을 누르면 사무국 확인 후 개인정보가 삭제됩니다.</p></details><div class="note" style="margin-top:28px">더 궁금한 점은 사무국(031-984-3248 / kfdf60@hanmail.net)으로 문의해 주세요.</div></div></section>
 <footer><div class="wrap">
   <div class="top">
     <div class="f-brand"><img src="kfdf_logo.png" alt="로고">
