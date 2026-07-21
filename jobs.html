@@ -58,6 +58,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="region_map.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",
@@ -145,9 +146,34 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
         <button class="btn-sub" id="btnStaff" style="margin-top:14px" onclick="toggleApply('staff')">지원하기</button>
       </div>
     </div>
+    <div style="background:#fff;border:1.5px solid #dfe5ee;border-radius:14px;padding:20px 22px;margin-bottom:40px">
+      <h3 style="margin:0 0 6px;font-size:17px">📍 활동가능 권역 설정</h3>
+      <p style="font-size:13.5px;color:var(--gray);margin:0 0 12px;line-height:1.6">거주 권역 외에도 이동하여 활동할 수 있는 권역을 지도에서 모두 선택해 주세요. 선택한 권역의 학교를 지명할 수 있고, 사무국·시도연맹 배정 시 우선 검토됩니다.</p>
+      <div id="jRegionMap" style="max-width:340px;margin:0 auto"></div>
+      <div style="max-width:420px;margin:14px auto 0">
+        <label style="font-size:13px;font-weight:800;color:var(--blue)">활동 거점 시군구 * <span style="font-weight:600;color:var(--gray)">— 배정·이동거리 검토에 사용됩니다</span></label>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <select id="jSido" style="flex:0 0 46%">
+            <option value="">시도 선택</option>
+            <option>서울특별시</option><option>인천광역시</option><option>경기도</option>
+            <option>강원특별자치도</option>
+            <option>대전광역시</option><option>세종특별자치시</option><option>충청북도</option><option>충청남도</option>
+            <option>광주광역시</option><option>전북특별자치도</option><option>전라남도</option>
+            <option>부산광역시</option><option>대구광역시</option><option>울산광역시</option><option>경상북도</option><option>경상남도</option>
+            <option>제주특별자치도</option>
+          </select>
+          <input id="jSigungu" style="flex:1" placeholder="시군구 (예: 김포시, 수영구)">
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:12px">
+        <span id="jRegionSel" style="display:block;font-size:13px;font-weight:700;color:var(--blue);margin-bottom:8px"></span>
+        <button class="btn-sub" id="jRegionSave" onclick="saveRegions()" style="background:#0f766e">활동가능 권역·거점 저장</button>
+        <span id="jRegionMsg" style="font-size:13px;font-weight:700;margin-left:8px"></span>
+      </div>
+    </div>
     <div class="sec-label">STEP 2</div>
     <h2 class="sec-title" style="font-size:24px">선정 학교 지명 신청 (선착순)</h2>
-    <div class="note" style="margin-bottom:22px"><b>선착순 안내</b> — "지명 신청" 버튼을 먼저 누른 리더에게 우선 배정됩니다. 최종 확정은 사무국 검토 후 개별 연락드립니다. 본인 권역의 학교만 신청 가능합니다.</div>
+    <div class="note" style="margin-bottom:22px"><b>선착순 안내</b> — "지명 신청" 버튼을 먼저 누른 리더에게 우선 배정됩니다. 최종 확정은 사무국 검토 후 개별 연락드립니다. 위에서 설정한 <b>활동가능 권역</b>의 학교만 신청 가능합니다.</div>
     <div class="board-tools"><div class="cats" id="jCats">
       <button class="bcat on" data-r="전체">전체</button>
       <button class="bcat" data-r="서울·경기">서울·경기</button>
@@ -172,8 +198,43 @@ AUTH.onAuthStateChanged(async u=>{
   if(!u){g.style.display='block';g.innerHTML='🔒 승인 회원 전용입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a>';return}
   JME=u;const d=await DB.collection('users').doc(u.uid).get();JMY=d.data();
   if(!JMY||JMY.status!=='approved'){g.style.display='block';g.innerHTML='⏳ 사무국 승인 후 이용 가능합니다.';return}
-  document.getElementById('jBody').style.display='block';renderApply();loadSlots();loadComps();loadMyRegion();
+  document.getElementById('jBody').style.display='block';renderApply();initRegionMap();loadSlots();loadComps();loadMyRegion();
 });
+let JMAP=null;
+function myRegions(){
+  const a=JMY.activityRegions;
+  return (a&&a.length)?a:(JMY.region?[JMY.region]:[]);
+}
+function initRegionMap(){
+  JMAP=KFDF_MAP.render('jRegionMap',{mode:'multi',selected:myRegions(),onChange:showSel});
+  showSel(myRegions());
+  // 기존 저장된 거점 시군구 표시
+  const bc=String(JMY.baseCity||'').trim();
+  if(bc){
+    const sp=bc.split(' ');
+    const sel=document.getElementById('jSido');
+    for(const o of sel.options){if(o.value===sp[0]){sel.value=sp[0];break}}
+    document.getElementById('jSigungu').value=sp.slice(1).join(' ');
+  }
+}
+function showSel(s){
+  document.getElementById('jRegionSel').textContent=s.length?('선택: '+s.join(', ')):'선택된 권역이 없습니다';
+}
+async function saveRegions(){
+  const m=document.getElementById('jRegionMsg');
+  const sel=JMAP?JMAP.get():[];
+  if(!sel.length){m.textContent='권역을 1개 이상 선택해주세요';m.style.color='#8c1622';return}
+  const sido=document.getElementById('jSido').value;
+  const sig=document.getElementById('jSigungu').value.trim();
+  if(!sido||!sig){m.textContent='활동 거점 시도·시군구를 입력해주세요';m.style.color='#8c1622';return}
+  try{
+    const bc=(sido+' '+sig).trim();
+    await DB.collection('users').doc(JME.uid).update({activityRegions:sel,baseCity:bc});
+    JMY.activityRegions=sel;JMY.baseCity=bc;
+    m.textContent='✓ 저장 완료';m.style.color='#0f766e';
+    loadSlots();
+  }catch(e){m.textContent='저장 실패: '+e.message;m.style.color='#8c1622'}
+}
 function renderApply(){
   const f=JMY.instructorFor||{};
   [['btnSchool','school'],['btnAfter','after'],['btnRef','referee'],['btnStaff','staff']].forEach(function(x){
@@ -189,9 +250,22 @@ async function toggleApply(k){
     if(!f[k]&&k==='after'&&!confirm('체육지도자 또는 연맹 지도자 자격을 보유하고 계십니까?\n배정 확정 시 자격증 확인이 진행됩니다.'))return;
     if(!f[k]&&k==='referee'&&!confirm('연맹 심판 자격증을 보유하고 계십니까?\n대회 배정 확정 시 자격증 확인이 진행됩니다.'))return;
     if(!f[k]&&k==='staff'&&!confirm('연맹 지도자 자격증을 보유하고 계십니까?\n대회 배정 확정 시 자격증 확인이 진행됩니다.'))return;
+    // 지원 시 활동 거점 시군구 필수
+    const upd={instructorFor:null,instructorAppliedAt:firebase.firestore.FieldValue.serverTimestamp()};
+    if(!f[k]&&!JMY.baseCity){
+      const sido=document.getElementById('jSido').value,sig=document.getElementById('jSigungu').value.trim();
+      if(sido&&sig){upd.baseCity=(sido+' '+sig).trim();}
+      else{
+        alert('지원 전에 아래 [활동가능 권역 설정]에서 활동 거점 시군구를 입력해주세요.\n(배정·이동거리 검토에 필요합니다)');
+        document.getElementById('jSido').scrollIntoView({behavior:'smooth',block:'center'});
+        return;
+      }
+    }
     f[k]=!f[k];
-    await DB.collection('users').doc(JME.uid).update({instructorFor:f,instructorAppliedAt:firebase.firestore.FieldValue.serverTimestamp()});
-    JMY.instructorFor=f;renderApply();
+    upd.instructorFor=f;
+    await DB.collection('users').doc(JME.uid).update(upd);
+    JMY.instructorFor=f;if(upd.baseCity)JMY.baseCity=upd.baseCity;
+    renderApply();
   }catch(e){alert('처리 실패: '+e.message+'\n(사무국에 문의해주세요)')}
 }
 document.querySelectorAll('#jCats .bcat').forEach(b=>b.onclick=()=>{
@@ -275,7 +349,7 @@ async function claim(id){
       const doc=await t.get(ref);
       if(!doc.exists)throw new Error('마감된 학교입니다');
       if(doc.data().claimedBy)throw new Error('이미 다른 리더가 지명했습니다');
-      if(doc.data().region!==JMY.region)throw new Error('본인 권역('+JMY.region+')의 학교만 신청할 수 있습니다');
+      if(myRegions().indexOf(doc.data().region)<0)throw new Error('활동가능 권역('+myRegions().join(', ')+')의 학교만 신청할 수 있습니다.\n위 지도에서 활동가능 권역을 추가·저장한 후 다시 시도해주세요.');
       t.update(ref,{claimedBy:JME.uid,claimedName:JMY.name,claimedAt:firebase.firestore.FieldValue.serverTimestamp()});
     });
     alert('지명 완료! 사무국 확정 후 개별 연락드립니다.\n확정 시 위촉 절차(동의서 서명 등)를 안내해 드립니다.');

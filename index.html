@@ -103,6 +103,7 @@
   </div>
 </div></section>
 
+<script src="region_map.js"></script>
 <section id="liveStats" style="display:none;background:linear-gradient(120deg,#0f1013,#1a1c22 60%,#153A77);padding:64px 0"><div class="wrap">
   <div class="sec-label" style="color:#e6b422">LIVE</div>
   <h2 class="sec-title" style="color:#fff">사업 현황 <span id="lsTime" style="font-size:14px;font-weight:700;color:#9aa1ad"></span></h2>
@@ -132,6 +133,11 @@
     </div>
   </div>
   <div id="lsSchools" style="margin-top:22px;display:flex;gap:8px;flex-wrap:wrap"></div>
+  <div id="lsMapWrap" style="display:none;margin-top:26px;background:rgba(255,255,255,.96);border-radius:18px;padding:22px 20px 14px;max-width:420px">
+    <div style="font-size:14px;font-weight:900;color:#153A77;margin-bottom:4px">🗺 권역별 현황</div>
+    <div style="font-size:12px;color:#5b7db1;font-weight:600;margin-bottom:8px">선정교 · 강사 (+ 타권역 이동가능 강사)</div>
+    <div id="lsMap"></div>
+  </div>
 </div></section>
 
 <section id="news"><div class="wrap">
@@ -252,6 +258,16 @@
       const sc=(d.schools||[]).slice(-14).reverse();
       document.getElementById('lsSchools').innerHTML=sc.map(x=>'<span style="background:rgba(255,255,255,.1);color:#fff;font-size:12.5px;font-weight:700;padding:6px 14px;border-radius:999px">'+(x.t==='after'?'🌱':'🏫')+' '+esc(x.n)+' <span style="color:#9aa1ad">'+esc(x.r)+'</span>'+(x.a?' ✓':'')+'</span>').join('')
         +((d.schools||[]).length>14?'<span style="color:#9aa1ad;font-size:12.5px;font-weight:700;padding:6px 4px">외 '+((d.schools||[]).length-14)+'개교</span>':'');
+      // ── 권역별 현황 지도 ──
+      if(window.KFDF_MAP&&d.regions){
+        const counts={};
+        KFDF_MAP.REGIONS.forEach(r=>{
+          const g=d.regions[r]||{};
+          counts[r]='선정 '+(g.sel||0)+' · 강사 '+(g.inst||0)+(g.avail?' (+'+g.avail+')':'');
+        });
+        document.getElementById('lsMapWrap').style.display='block';
+        KFDF_MAP.render('lsMap',{mode:'display',counts:counts});
+      }
     }).catch(()=>{});
   }
   function boot(n){

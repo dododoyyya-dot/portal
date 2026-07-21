@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>권역 관리 | 대한민국플라잉디스크연맹</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="util"><div class="wrap">
+  <div><b>대한민국플라잉디스크연맹</b> · 권역 관리자 페이지</div>
+  <div><a href="mailto:kfdf60@hanmail.net">kfdf60@hanmail.net</a> &nbsp;|&nbsp; 031-984-3248 &nbsp;|&nbsp; <a href="login.html" id="utilAuth" style="color:#fff;font-weight:700">로그인</a> · <a href="mypage.html" style="color:#fff;font-weight:700">마이페이지</a></div>
+</div></div>
+<header><div class="wrap nav">
+  <a href="index.html" class="brand">
+    <img src="kfdf_logo.png" alt="대한민국플라잉디스크연맹 로고">
+    <div><div class="t1">대한민국플라잉디스크연맹</div><div class="t2">KOREA FLYING DISC FEDERATION</div></div>
+  </a>
+</div></header>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",
+  authDomain: "koreaflyingdiscfederation.firebaseapp.com",
+  projectId: "koreaflyingdiscfederation",
+  storageBucket: "koreaflyingdiscfederation.firebasestorage.app",
+  messagingSenderId: "1081847355343",
+  appId: "1:1081847355343:web:ca40ed9a52e13f607f64ba"
+};
+firebase.initializeApp(firebaseConfig);
+const AUTH = firebase.auth();
+const DB = firebase.firestore();
+</script>
+
+<div class="phero"><div class="wrap">
+  <div class="crumb">HOME &nbsp;›&nbsp; <b>권역 관리</b></div>
+  <h1>권역 관리자 페이지 <span id="rgBadge" style="font-size:16px;color:#e6b422"></span></h1>
+  <p>관할 권역의 신청 학교와 강사를 확인하고 배정(매칭)·조정할 수 있습니다.</p>
+</div></div>
+
+<section><div class="wrap" style="max-width:1000px">
+  <div id="rgGate" class="pending-banner" style="display:none"></div>
+  <div id="rgBody" style="display:none">
+
+    <div class="sec-label">SCHOOLS</div>
+    <h2 class="sec-title" style="font-size:24px">관할 권역 신청 학교</h2>
+    <div style="display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap">
+      <button class="btn-sub rfl on" data-f="전체" onclick="rgFilter('전체',this)">전체</button>
+      <button class="btn-sub rfl" data-f="학교체육" onclick="rgFilter('학교체육',this)" style="background:#8a919d">🏫 학교체육</button>
+      <button class="btn-sub rfl" data-f="방과후" onclick="rgFilter('방과후',this)" style="background:#8a919d">🌱 방과후·늘봄</button>
+      <input id="rgSearch" oninput="renderSchools()" placeholder="🔍 학교명·시군구·교사 검색" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px">
+      <button class="btn-sub" style="background:#1F4E9C" onclick="exportSchools()">⬇ 학교 CSV</button>
+      <span id="rgCount" style="align-self:center;font-size:13px;font-weight:800;color:#1F4E9C"></span>
+    </div>
+    <div class="board" id="rgSchools"><div class="bempty">불러오는 중…</div></div>
+
+    <div class="sec-label" style="margin-top:48px">LEADERS</div>
+    <h2 class="sec-title" style="font-size:24px">배정 가능 강사 (관할·활동가능 권역 포함)</h2>
+    <p class="sec-desc" style="margin-bottom:14px">거주 권역이 관할이거나, 활동가능 권역에 관할 권역을 포함한 승인 강사입니다. 배정 버튼에서 번호로 선택합니다.</p>
+    <div style="display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap">
+      <input id="rgISearch" oninput="renderInst()" placeholder="🔍 이름·시군구 검색" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px">
+      <button class="btn-sub" style="background:#0f766e" onclick="exportInst()">⬇ 강사 CSV</button>
+      <span id="rgICount" style="align-self:center;font-size:13px;font-weight:800;color:#0f766e"></span>
+    </div>
+    <div class="board" id="rgInst"><div class="bempty">불러오는 중…</div></div>
+
+  </div>
+</div></section>
+
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+let RME=null,RMY=null,MYREGION='',RAPPS=[],RUSERS=[],RFL='전체';
+
+AUTH.onAuthStateChanged(async u=>{
+  const g=document.getElementById('rgGate');
+  if(!u){g.style.display='block';g.innerHTML='🔒 권역 관리자 전용 페이지입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a>';return}
+  RME=u;
+  const d=await DB.collection('users').doc(u.uid).get();RMY=d.data();
+  if(!RMY||(RMY.role!=='regionAdmin'&&RMY.role!=='admin')){
+    g.style.display='block';g.innerHTML='⛔ 권역 관리자 권한이 없습니다. 사무국(오너)의 지정이 필요합니다.';return;
+  }
+  MYREGION=RMY.role==='admin'?(prompt('(관리자 테스트) 조회할 권역 입력: 서울·경기/강원/충청/전라/경상/제주','경상')||''):(RMY.managedRegion||'');
+  if(!MYREGION){g.style.display='block';g.innerHTML='⛔ 관할 권역(managedRegion)이 설정되지 않았습니다. 사무국에 문의하세요.';return}
+  document.getElementById('rgBadge').textContent='— 관할: '+MYREGION;
+  document.getElementById('rgBody').style.display='block';
+  await Promise.all([loadSchools(),loadInst()]);
+});
+
+function rgFilter(f,btn){
+  RFL=f;
+  document.querySelectorAll('.rfl').forEach(b=>{b.style.background=b.dataset.f===f?'':'#8a919d'});
+  renderSchools();
+}
+
+async function loadSchools(){
+  const snap=await DB.collection('schoolApplications').where('region','==',MYREGION).get();
+  RAPPS=snap.docs.sort((a,b)=>{
+    const ta=a.data().createdAt?a.data().createdAt.seconds:0,tb=b.data().createdAt?b.data().createdAt.seconds:0;
+    return tb-ta;
+  });
+  renderSchools();
+}
+function renderSchools(){
+  const el=document.getElementById('rgSchools');
+  const q=(document.getElementById('rgSearch').value||'').trim().toLowerCase();
+  const docs=RAPPS.filter(d=>{
+    const s=d.data();
+    if(RFL!=='전체'&&String(s.type||'').indexOf(RFL)<0)return false;
+    if(q){
+      const hay=[s.school,s.city,s.teacher,s.code,s.assignedName].map(x=>String(x||'').toLowerCase()).join(' ');
+      if(hay.indexOf(q)<0)return false;
+    }
+    return true;
+  });
+  document.getElementById('rgCount').textContent=docs.length+'건';
+  if(!docs.length){el.innerHTML='<div class="bempty">해당 조건의 신청이 없습니다.</div>';return}
+  el.innerHTML=docs.map(d=>{
+    const s=d.data();const st=s.status||'접수';
+    const stc={'접수':'#8a919d','대기':'#e6b422','선정':'#1F4E9C','배정완료':'#0f766e','미선정':'#C41E2F','취소':'#555555'}[st]||'#8a919d';
+    const isAfter=String(s.type||'').indexOf('방과후')>=0;
+    return '<div class="urow"><div class="grow"><b>'+esc(s.school)+'</b> '
+      +'<span style="font-size:12px;font-weight:800;color:#fff;background:'+stc+';padding:2px 10px;border-radius:999px">'+st+(st==='대기'&&s.waitNo?' '+s.waitNo+'번':'')+'</span>'
+      +' <span style="font-size:11px;font-weight:800;color:#fff;background:'+(isAfter?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(isAfter?'방과후·늘봄':'학교체육')+'</span>'
+      +(s.support==='용품만'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">🎁 용품만</span>':'')
+      +'<div class="sub3">'+(s.code?'<b>'+esc(s.code)+'</b> · ':'')+(s.city?'<b style="color:#1F4E9C">📍'+esc(s.city)+'</b>':'<b style="color:#C41E2F">시군구 미입력</b>')
+      +' · 담당 '+esc(s.teacher)+' '+esc(s.phone)
+      +(s.assignedName?' · <b style="color:#0f766e">배정: '+esc(s.assignedName)+'</b>':'')+'</div></div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +(st==='접수'?'<button class="btn-sub" onclick="setSt(\''+d.id+'\',\'선정\')">선정</button>':'')
+      +(st==='선정'&&s.support!=='용품만'?'<button class="btn-sub" style="background:#0f766e" onclick="assign(\''+d.id+'\')">👤 강사 배정</button>':'')
+      +(st==='선정'?'<button class="btn-sub" style="background:#8a919d" onclick="setSt(\''+d.id+'\',\'접수\')">선정취소</button>':'')
+      +(st==='배정완료'?'<button class="btn-sub" style="background:#e6b422" onclick="unassign(\''+d.id+'\')">배정해제</button>':'')
+      +'<button class="btn-sub" style="background:'+(s.city?'#8a919d':'#C41E2F')+'" onclick="editCity(\''+d.id+'\')">📍시군구</button>'
+      +'</div></div>';
+  }).join('');
+}
+
+async function syncStatus(app,st,extra){
+  extra=extra||{};
+  if(app&&app.code)await DB.collection('appStatus').doc(app.code).update({
+    status:st,
+    assignedName:(extra.assignedName!==undefined?extra.assignedName:(app.assignedName||'')),
+    updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+}
+async function setSt(id,st){
+  const doc=RAPPS.find(d=>d.id===id);if(!doc)return;
+  try{
+    await DB.collection('schoolApplications').doc(id).update({status:st});
+    await syncStatus(doc.data(),st);
+    await loadSchools();
+  }catch(e){alert('실패: '+e.message)}
+}
+function eligibleInst(app){
+  const isAfter=String(app.type||'').indexOf('방과후')>=0;
+  return RUSERS.filter(d=>{
+    const v=d.data();const f=v.instructorFor||{};
+    return isAfter?f.after:f.school;
+  });
+}
+async function assign(id){
+  const doc=RAPPS.find(d=>d.id===id);if(!doc)return;
+  const s=doc.data();
+  const list=eligibleInst(s);
+  if(!list.length){alert('해당 분야 지원 강사가 없습니다.');return}
+  const menu=list.map((d,i)=>{
+    const v=d.data();
+    const chk=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc)?'✅위촉가능':'⚠️검증미완';
+    return (i+1)+'. '+v.name+' ('+(v.baseCity||v.region||'')+') '+chk;
+  }).join('\n');
+  const n=prompt(s.school+' 에 배정할 강사 번호를 입력하세요:\n\n'+menu+'\n\n※ ⚠️검증미완 강사 배정 시 위촉 전 검증(전자동의·경력·자격) 완료 필요');
+  if(n===null)return;
+  const pick=list[parseInt(n.trim(),10)-1];
+  if(!pick){alert('번호가 올바르지 않습니다.');return}
+  const v=pick.data();
+  if(!confirm(s.school+' ← '+v.name+' ('+(v.baseCity||'')+') 배정할까요?'))return;
+  try{
+    await DB.collection('schoolApplications').doc(id).update({assignedUid:pick.id,assignedName:v.name,status:'배정완료'});
+    await syncStatus(s,'배정완료',{assignedName:v.name});
+    alert('배정 완료. 위촉계약·통보는 사무국 절차에 따라 진행됩니다.');
+    await loadSchools();
+  }catch(e){alert('실패: '+e.message)}
+}
+async function unassign(id){
+  const doc=RAPPS.find(d=>d.id===id);if(!doc)return;
+  if(!confirm('배정을 해제하고 [선정] 상태로 되돌릴까요?'))return;
+  try{
+    await DB.collection('schoolApplications').doc(id).update({assignedUid:'',assignedName:'',status:'선정'});
+    await syncStatus(doc.data(),'선정',{assignedName:''});
+    await loadSchools();
+  }catch(e){alert('실패: '+e.message)}
+}
+async function editCity(id){
+  const doc=RAPPS.find(d=>d.id===id);if(!doc)return;
+  const val=prompt('시도 + 시군구 (예: 부산광역시 수영구)',doc.data().city||'');
+  if(val===null)return;
+  try{
+    await DB.collection('schoolApplications').doc(id).update({city:val.trim()});
+    await loadSchools();
+  }catch(e){alert('실패: '+e.message)}
+}
+function exportSchools(){
+  const rows=[['접수번호','학교명','시군구','유형','지원방식','상태','담당교사','전화','배정강사']];
+  RAPPS.forEach(d=>{const s=d.data();
+    rows.push([s.code||'',s.school||'',s.city||'',s.type||'',s.support||'',s.status||'',s.teacher||'',s.phone||'',s.assignedName||'']);
+  });
+  dlCSV(rows,MYREGION+'_신청학교.csv');
+}
+
+async function loadInst(){
+  const snap=await DB.collection('users').where('status','==','approved').get();
+  RUSERS=snap.docs.filter(d=>{
+    const v=d.data();const f=v.instructorFor||{};
+    if(!(f.school||f.after))return false;
+    const regs=(v.activityRegions&&v.activityRegions.length)?v.activityRegions:[v.region];
+    return regs.indexOf(MYREGION)>=0;
+  });
+  renderInst();
+}
+function renderInst(){
+  const el=document.getElementById('rgInst');
+  const q=(document.getElementById('rgISearch').value||'').trim().toLowerCase();
+  const docs=RUSERS.filter(d=>{
+    if(!q)return true;
+    const v=d.data();
+    return [v.name,v.baseCity,v.region].map(x=>String(x||'').toLowerCase()).join(' ').indexOf(q)>=0;
+  });
+  document.getElementById('rgICount').textContent=docs.length+'명';
+  if(!docs.length){el.innerHTML='<div class="bempty">배정 가능한 강사가 없습니다.</div>';return}
+  el.innerHTML=docs.map(d=>{
+    const v=d.data();const f=v.instructorFor||{};
+    const ok=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc);
+    return '<div class="urow"><div class="grow"><b>'+esc(v.name)+'</b> '
+      +(ok?'<span style="font-size:11px;font-weight:900;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">위촉 가능</span>':'<span style="font-size:11px;font-weight:900;color:#fff;background:#e6b422;padding:2px 8px;border-radius:999px">검증 미완</span>')
+      +'<div class="sub3">'+(v.baseCity?'📍'+esc(v.baseCity):'거점 미입력')+' · 거주 '+esc(v.region||'')
+      +((v.activityRegions&&v.activityRegions.length)?' · 🗺'+esc(v.activityRegions.join('·')):'')
+      +(v.phone?' · '+esc(v.phone):'')
+      +' · '+[f.school?'학교체육':'',f.after?'방과후':'',f.referee?'심판':'',f.staff?'운영':''].filter(Boolean).join('/')
+      +'</div></div></div>';
+  }).join('');
+}
+function exportInst(){
+  const rows=[['성명','거점 시군구','거주 권역','활동가능 권역','휴대전화','학교체육','방과후','위촉검증']];
+  RUSERS.forEach(d=>{const v=d.data();const f=v.instructorFor||{};
+    rows.push([v.name,v.baseCity||'',v.region||'',(v.activityRegions||[]).join('·'),v.phone||'',
+      f.school?'O':'',f.after?'O':'',
+      (v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc)?'완료':'미완']);
+  });
+  dlCSV(rows,MYREGION+'_배정가능강사.csv');
+}
+function dlCSV(rows,name){
+  const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=name;a.click();
+}
+</script>
+
+<footer><div class="wrap">
+  <div class="bottom">
+    <span style="display:inline-block;margin-bottom:8px;padding:4px 14px;background:rgba(255,255,255,.08);border-radius:999px;font-size:12px;font-weight:700;color:#c3c9d4">유소년 스포츠 기반구축사업은 문화체육관광부 · 국민체육진흥공단 · 대한체육회가 후원하며 국민체육진흥기금을 지원받아 운영됩니다</span><br>
+    <b>사단법인 대한민국플라잉디스크연맹</b> &nbsp;|&nbsp; 경기도 김포시 김포대로 1185 (장기동)<br>
+    TEL 031-984-3248 &nbsp;|&nbsp; EMAIL kfdf60@hanmail.net<br>
+    © 2026 KOREA FLYING DISC FEDERATION. All rights reserved.
+  </div>
+</div></footer>
+<script src="auth_ui.js"></script>
+</body>
+</html>

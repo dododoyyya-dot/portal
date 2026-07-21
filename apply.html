@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <link rel="stylesheet" href="style.css">
 <script src="site_config.js"></script>
+<script src="region_map.js"></script>
 </head>
 <body>
 <div class="util"><div class="wrap">
@@ -160,9 +161,22 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
     </div>
     <h3>신청서 작성</h3>
     <label>학교명 *</label><input id="fSchool" placeholder="예: ○○초등학교">
-    <label>시도 / 시군구 *</label><input id="fCity" placeholder="예: 경기도 김포시">
-    <label>권역 *</label>
-    <select id="fRegion"><option>서울·경기</option><option>강원</option><option>충청</option><option>전라</option><option>경상</option><option>제주</option></select>
+    <label>시도 / 시군구 *</label>
+    <div style="display:flex;gap:8px">
+      <select id="fSido" style="flex:0 0 42%" onchange="cityToRegion()">
+        <option value="">시도 선택</option>
+        <option>서울특별시</option><option>인천광역시</option><option>경기도</option>
+        <option>강원특별자치도</option>
+        <option>대전광역시</option><option>세종특별자치시</option><option>충청북도</option><option>충청남도</option>
+        <option>광주광역시</option><option>전북특별자치도</option><option>전라남도</option>
+        <option>부산광역시</option><option>대구광역시</option><option>울산광역시</option><option>경상북도</option><option>경상남도</option>
+        <option>제주특별자치도</option>
+      </select>
+      <input id="fCity" style="flex:1" placeholder="시군구 (예: 김포시, 강서구)" onblur="cityToRegion()">
+    </div>
+    <label>권역 * <span style="font-weight:600;color:var(--gray);font-size:12px">— 지도를 클릭하세요 (시도/시군구 입력 시 자동 선택)</span></label>
+    <div id="fRegionMap" style="margin:6px auto 8px;max-width:340px"></div>
+    <select id="fRegion" onchange="if(window.APPLY_MAP)APPLY_MAP.set([this.value])"><option>서울·경기</option><option>강원</option><option>충청</option><option>전라</option><option>경상</option><option>제주</option></select>
     <label>참가 대상 · 인원 *</label><input id="fStudents" placeholder="예: 3~4학년 약 60명">
     <label>운영 공간</label>
     <select id="fSpace"><option>체육관(실내)</option><option>운동장</option><option>다목적실</option><option>기타</option></select>
@@ -332,7 +346,8 @@ async function submitApply(){
   const m=document.getElementById('fMsg');
   if(!APPLY_TYPE){m.textContent='프로그램 유형을 먼저 선택해주세요';m.className='msg err';return}
   if(SUBMITTING)return;
-  const req={school:v('fSchool'),city:v('fCity'),teacher:v('fTeacher'),phone:v('fPhone'),students:v('fStudents'),d1:v('fD1')};
+  const req={school:v('fSchool'),city:(v('fSido')+' '+v('fCity')).trim(),sido:v('fSido'),sigungu:v('fCity'),teacher:v('fTeacher'),phone:v('fPhone'),students:v('fStudents'),d1:v('fD1')};
+  if(!v('fSido')){m.textContent='시도를 선택해주세요.';m.className='msg err';SUBMITTING=false;return}
   for(const k in req){if(!req[k]){m.textContent='* 표시된 필수 항목을 모두 입력해주세요';m.className='msg err';return}}
   if(!/^01[016789][-. ]?\d{3,4}[-. ]?\d{4}$/.test(req.phone)){m.textContent='담당교사 휴대전화 번호를 확인해주세요 (예: 010-1234-5678)';m.className='msg err';return}
   if(!document.getElementById('fAgree').checked){m.textContent='개인정보 수집·이용에 동의해주세요';m.className='msg err';return}
@@ -376,6 +391,16 @@ async function submitApply(){
     SUBMITTING=false;
     window.scrollTo({top:0,behavior:'smooth'});
   }catch(e){m.textContent='제출 실패: '+e.message;m.className='msg err';SUBMITTING=false}
+}
+
+// ── 권역 지도 선택 ──
+window.APPLY_MAP=KFDF_MAP.render('fRegionMap',{
+  mode:'single',selected:[document.getElementById('fRegion').value],
+  onChange:function(s){document.getElementById('fRegion').value=s[0];}
+});
+function cityToRegion(){
+  const g=KFDF_MAP.guessRegion(document.getElementById('fSido').value)||KFDF_MAP.guessRegion(document.getElementById('fCity').value);
+  if(g){document.getElementById('fRegion').value=g;if(window.APPLY_MAP)APPLY_MAP.set([g]);}
 }
 </script>
 
