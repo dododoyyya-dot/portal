@@ -381,7 +381,7 @@ async function loadClaims(){
         +'<b>'+esc(c.name)+'</b> → <b>'+esc(c.licenseNo)+'</b> ('+esc(c.licType)+' '+esc(c.licGrade)+(c.licRegion?' · '+esc(c.licRegion):'')+')'
         +' <span class="lctag" style="background:'+(c.nameMatch?'#0f766e':'#C41E2F')+'">'+(c.nameMatch?'✓ 성명 일치':'✗ 성명 불일치')+'</span>'
         +' <span class="lctag" style="background:'+stc+'">'+esc(c.status)+'</span>'
-        +'<div style="font-size:12px;color:var(--gray)">대장 성명(마스킹): '+esc(c.licMask)+(c.phone?' · ☎ '+esc(c.phone):'')+'</div></div>'
+        +'<div style="font-size:12px;color:var(--gray)">대장 성명: '+esc(c.licName||c.licMask)+(c.phone?' · ☎ '+esc(c.phone):'')+'</div></div>'
         +(c.status==='대기'?'<div style="display:flex;gap:6px">'
           +'<button class="lcbtn" style="background:#0f766e" onclick="approveClaim(\''+d.id+'\')">연결 승인</button>'
           +'<button class="lcbtn" style="background:#C41E2F" onclick="rejectClaim(\''+d.id+'\')">거절</button></div>':'')
@@ -524,7 +524,7 @@ async function issueLic(appId){
   if(!confirm(a.name+' 님에게 ['+type+' '+a.grade+'급] 자격을 발급할까요?\n자격번호: '+no+'\n유효기간: 오늘부터 4년'))return;
   const today=now.toISOString().slice(0,10);
   await DB.collection('licenses').doc(no).set({
-    maskName:maskName(a.name),type:type,grade:a.grade+'급',
+    name:a.name,maskName:maskName(a.name),type:type,grade:a.grade+'급',
     issuedAt:today,expireAt:plus4y(today),status:'유효',
     region:(MSIDO||a.sido||rname||''),
     issuer:(LMY.role==='admin'?'중앙연맹':(MSIDO+'연맹')),
@@ -545,7 +545,7 @@ async function renewLic(){
   const doc=await DB.collection('licenses').doc(no).get();
   if(!doc.exists){m.textContent='등록되지 않은 자격번호입니다';m.style.color='#C41E2F';return}
   const l=doc.data();
-  if(!confirm(no+'\n'+l.maskName+' · '+l.type+' '+l.grade+'\n현재 유효기간: ~'+l.expireAt+'\n\n4년 연장할까요? (연장교육 이수·연장료 납부 확인 후 진행)'))return;
+  if(!confirm(no+'\n'+(l.name||l.maskName)+' · '+l.type+' '+l.grade+'\n현재 유효기간: ~'+l.expireAt+'\n\n4년 연장할까요? (연장교육 이수·연장료 납부 확인 후 진행)'))return;
   const base=(l.expireAt&&l.expireAt>=new Date().toISOString().slice(0,10))?l.expireAt:new Date().toISOString().slice(0,10);
   const newExp=plus4y(base);
   await DB.collection('licenses').doc(no).update({expireAt:newExp,status:'유효',renewedAt:new Date().toISOString().slice(0,10)});
@@ -583,7 +583,7 @@ async function bulkImport(){
         if(!us.empty)uid=us.docs[0].id;
       }
       await DB.collection('licenses').doc(no).set({
-        maskName:maskName(name),type:type,grade:grade+'급',
+        name:name,maskName:maskName(name),type:type,grade:grade+'급',
         issuedAt:issuedAt,expireAt:expireAt,status:'유효',region:region||'',
         issuer:'중앙연맹(소급 등록)',uid:uid,
         createdAt:firebase.firestore.FieldValue.serverTimestamp()});
@@ -612,14 +612,14 @@ function renderLics(){
   const today=new Date().toISOString().slice(0,10);
   const docs=LICS.filter(d=>{
     if(!q)return true;
-    return (d.id+' '+(d.data().maskName||'')).toLowerCase().indexOf(q)>=0;
+    const v=d.data();return (d.id+' '+(v.name||'')+' '+(v.maskName||'')).toLowerCase().indexOf(q)>=0;
   });
   document.getElementById('lsCount').textContent=docs.length+'건';
   if(!docs.length){el.innerHTML='<div class="bempty">발급된 자격이 없습니다.</div>';return}
   el.innerHTML=docs.map(d=>{
     const l=d.data();const expired=l.expireAt&&l.expireAt<today;
     return '<div class="lccard" style="padding:11px 16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div>'
-      +'<b>'+esc(d.id)+'</b> · '+esc(l.maskName)+' · '+esc(l.type)+' '+esc(l.grade)
+      +'<b>'+esc(d.id)+'</b> · '+esc(l.name||l.maskName)+' · '+esc(l.type)+' '+esc(l.grade)
       +(l.region?' <span class="lctag" style="background:#b8860b">'+esc(l.region)+'</span>':'')
       +' <span class="lctag" style="background:'+(expired?'#C41E2F':'#0f766e')+'">'+(expired?'만료':'유효')+'</span>'
       +'<div style="font-size:12px;color:var(--gray)">발급 '+esc(l.issuedAt)+' · 유효 ~'+esc(l.expireAt)+' · '+esc(l.issuer||'')+(l.uid?' · 회원연결됨':'')
@@ -633,7 +633,7 @@ async function moveLic(no){
   const doc=LICS.find(d=>d.id===no);if(!doc)return;
   const l=doc.data();
   const T=['서울','부산','대구','인천','광주','대전','울산','경기','강원','충북','충남','전북','전남','경북','경남','제주','세종','전라','중앙'];
-  const tn=prompt(no+' ('+l.maskName+' · '+l.type+' '+l.grade+')\n현재 소속: '+(l.region||'미지정')+'\n\n이관할 소속(시도/연맹) 번호를 입력하세요:\n'+T.map((s,i)=>(i+1)+'='+s).join(' '),' ');
+  const tn=prompt(no+' ('+(l.name||l.maskName)+' · '+l.type+' '+l.grade+')\n현재 소속: '+(l.region||'미지정')+'\n\n이관할 소속(시도/연맹) 번호를 입력하세요:\n'+T.map((s,i)=>(i+1)+'='+s).join(' '),' ');
   if(tn===null)return;
   const target=T[parseInt(tn.trim(),10)-1];
   if(!target){alert('번호가 올바르지 않습니다.');return}
@@ -649,10 +649,10 @@ async function moveLic(no){
   }catch(e){alert('실패: '+e.message+'\n(관할 외 자격은 중앙 또는 현재 관할 연맹이 이관해야 합니다)')}
 }
 function exportLics(){
-  const rows=[['자격번호','성명(마스킹)','종류','급수','발급일','유효기간','상태','발급연맹','회원연결']];
+  const rows=[['자격번호','성명','종류','급수','발급일','유효기간','상태','소속','발급연맹','회원연결']];
   const today=new Date().toISOString().slice(0,10);
   LICS.forEach(d=>{const l=d.data();
-    rows.push([d.id,l.maskName,l.type,l.grade,l.issuedAt,l.expireAt,(l.expireAt<today?'만료':'유효'),l.issuer||'',l.uid?'O':'']);
+    rows.push([d.id,l.name||l.maskName,l.type,l.grade,l.issuedAt,l.expireAt,(l.expireAt<today?'만료':'유효'),l.region||'',l.issuer||'',l.uid?'O':'']);
   });
   const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
