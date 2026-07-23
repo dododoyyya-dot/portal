@@ -356,6 +356,12 @@ async function matchCityAll(){
     +(skip.length?'\n· 매핑표에 없음: '+[...new Set(skip)].join(', '):''));
 }
 
+// 업무별 위임 표시용 태그 — duties 필드 없으면 하위호환(전 업무), 있으면 위임된 업무만 표기
+function dutyTag(v){
+  if(!Array.isArray(v.duties))return '';
+  const t=[];if(v.duties.indexOf('assign')>=0)t.push('강습');if(v.duties.indexOf('license')>=0)t.push('자격');
+  return t.length?' ('+t.join('·')+')':'';
+}
 // ── 권역 관리자 지정 (오너 전용 — 규칙에서 owner:true 계정만 허용) ──
 async function setRegionAdmin(uid){
   const doc=USERS.find(d=>d.id===uid);if(!doc)return;
@@ -363,29 +369,36 @@ async function setRegionAdmin(uid){
   if(v.role==='regionAdmin'){
     if(!confirm(v.name+' 님의 권역 관리자 권한('+(v.managedRegion||'')+')을 해제할까요?'))return;
     try{
-      await DB.collection('users').doc(uid).update({role:'member',managedRegion:firebase.firestore.FieldValue.delete()});
+      await DB.collection('users').doc(uid).update({role:'member',managedRegion:firebase.firestore.FieldValue.delete(),managedSido:firebase.firestore.FieldValue.delete(),duties:firebase.firestore.FieldValue.delete()});
       alert('해제되었습니다.');loadUsers();
     }catch(e){alert('실패: '+e.message+'\n(권한 부여·해제는 오너 계정만 가능합니다)')}
     return;
   }
-  const n=prompt(v.name+' 님을 권역 관리자로 지정합니다.\n관할 권역 번호를 입력하세요:\n1=서울·경기 2=강원 3=충청 4=전라 5=경상 6=제주');
+  // 업무별 위임: 강습배정 / 자격관리를 각각 선택 부여 (겸무 인원은 둘 다, 특정 업무만 맡는 인원은 하나만)
+  const an=prompt(v.name+' 님에게 "강습 배정" 업무(전 권역 학교 신청 열람·강사배정)를 위임할까요?\ny=예  n=아니오 (자격 업무만 위임)','y');
+  if(an===null)return;
+  const wantAssign=an.trim().toLowerCase()!=='n';
+  const n=prompt(v.name+' 님의 소속(표시용) 권역 번호를 입력하세요:\n1=서울·경기 2=강원 3=충청 4=전라 5=경상 6=제주');
   if(n===null)return;
   const R={'1':'서울·경기','2':'강원','3':'충청','4':'전라','5':'경상','6':'제주'}[n.trim()];
   if(!R){alert('1~6 중에서 입력해주세요.');return}
-  const sn=prompt('자격증 업무 관할 연맹 번호를 입력하세요 (시도연맹 관계자인 경우):\n1=경기 2=강원 3=부산 4=경남 5=전라\n※ 복수 관할은 쉼표로: 예) 3,4 (부산+경남)\n(자격 업무 권한이 필요 없으면 0)','0');
+  const sn=prompt('자격증 업무 관할 연맹 번호를 입력하세요 (시도연맹 관계자·자격관리 겸무자):\n1=경기 2=강원 3=부산 4=경남 5=경북 6=광주전남\n※ 복수 관할은 쉼표로: 예) 3,4 (부산+경남)\n(자격 업무 권한이 필요 없으면 0)','0');
   if(sn===null)return;
-  const SIDOS={'1':'경기','2':'강원','3':'부산','4':'경남','5':'전라'};
+  const SIDOS={'1':'경기','2':'강원','3':'부산','4':'경남','5':'경북','6':'광주전남'};
   // 산하 시도 확장 (기존 대장 데이터 커버)
-  const EXP={'경기':['경기','서울','인천'],'강원':['강원'],'부산':['부산'],'경남':['경남','울산'],'전라':['전라','광주','전북','전남']};
+  const EXP={'경기':['경기','서울','인천'],'강원':['강원'],'부산':['부산'],'경남':['경남','울산'],'경북':['경북','대구'],'광주전남':['광주전남','광주','전북','전남']};
   const picked=[...new Set(sn.split(',').map(x=>SIDOS[x.trim()]).filter(Boolean))];
   const S=picked.length?[...new Set(picked.flatMap(f=>EXP[f]))]:null;
   const SLABEL=picked.join('·');
-  if(!confirm(v.name+' 님에게 권역 관리자 권한을 부여할까요?\n\n· 강습 배정: 전 권역 열람·배정 가능 (region.html)\n· 자격증 업무: '+(S?('['+SLABEL+'] 관할 열람·발급 (산하 시도 포함: '+S.join('·')+')'):'권한 없음')+'\n· 회원 삭제·포인트 부여·권한 부여는 불가'))return;
+  const duties=[];if(wantAssign)duties.push('assign');if(S)duties.push('license');
+  if(!duties.length){alert('강습배정·자격 업무 중 최소 하나는 위임해야 합니다.');return}
+  // 참고: 자격 업무를 위임해도 공고 승인·결과보고 승인은 항상 중앙(오너/admin) 전용이며, 이 위임과 무관하게 자동 제외됩니다.
+  if(!confirm(v.name+' 님에게 권역 관리자 권한을 부여할까요?\n\n· 강습 배정: '+(wantAssign?'전 권역 열람·배정 가능 (region.html)':'권한 없음')+'\n· 자격증 업무: '+(S?('['+SLABEL+'] 관할 신청처리·발급 가능 (산하 시도 포함: '+S.join('·')+') — 공고 승인·결과보고 승인은 항상 중앙 전용'):'권한 없음')+'\n· 회원 삭제·포인트 부여·권한 부여는 불가'))return;
   try{
-    const upd={role:'regionAdmin',managedRegion:R};
+    const upd={role:'regionAdmin',managedRegion:R,duties:duties};
     if(S)upd.managedSido=S;else upd.managedSido=firebase.firestore.FieldValue.delete();
     await DB.collection('users').doc(uid).update(upd);
-    alert('지정 완료. '+v.name+' 님에게 region.html 주소를 안내하세요.');loadUsers();
+    alert('지정 완료. '+v.name+' 님에게 '+[wantAssign?'region.html':'',S?'license.html':''].filter(Boolean).join(' · ')+' 주소를 안내하세요.');loadUsers();
   }catch(e){alert('실패: '+e.message+'\n(권한 부여는 오너 계정만 가능합니다 — 규칙 파일의 owner 설정 안내 참고)')}
 }
 async function approveDegree(uid){
@@ -826,8 +839,8 @@ function renderUsers(){
         ?'<span style="font-size:13px;font-weight:800;color:#0f766e">승인됨</span>'
         :'<button class="btn-sub" onclick="approve(\''+d.id+'\')">승인하기</button>')
       +'<button class="btn-sub" style="background:#1F4E9C" onclick="setOrg(\''+d.id+'\')">직책</button>'
-      +(IS_OWNER?'<button class="btn-sub" style="background:'+(v.role==='regionAdmin'?'#7c3aed':'#8a919d')+'" onclick="setRegionAdmin(\''+d.id+'\')">'+(v.role==='regionAdmin'?'🛡 '+esc(v.managedRegion||'권역?')+' 관리자':'🛡 권역관리자 지정')+'</button>'
-        :(v.role==='regionAdmin'?'<span style="font-size:11px;font-weight:900;color:#fff;background:#7c3aed;padding:4px 10px;border-radius:999px;align-self:center">🛡 권역관리자</span>':''))
+      +(IS_OWNER?'<button class="btn-sub" style="background:'+(v.role==='regionAdmin'?'#7c3aed':'#8a919d')+'" onclick="setRegionAdmin(\''+d.id+'\')">'+(v.role==='regionAdmin'?'🛡 '+esc(v.managedRegion||'권역?')+dutyTag(v)+' 관리자':'🛡 권역관리자 지정')+'</button>'
+        :(v.role==='regionAdmin'?'<span style="font-size:11px;font-weight:900;color:#fff;background:#7c3aed;padding:4px 10px;border-radius:999px;align-self:center">🛡 권역관리자'+dutyTag(v)+'</span>':''))
       +'<button class="btn-sub" style="background:'+(v.crimDoc?'#0f766e':'#8a919d')+'" onclick="toggleCrim(\''+d.id+'\')">'+(v.crimDoc?'경력확인 ✓':'경력확인 체크')+'</button>'
       +'<button class="btn-sub" style="background:'+(v.certDoc?'#0f766e':'#8a919d')+'" onclick="toggleCert(\''+d.id+'\')">'+(v.certDoc?'자격확인 ✓':'자격확인 체크')+'</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delUser(\''+d.id+'\',\''+esc(v.name)+'\')">🗑</button>'
