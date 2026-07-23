@@ -106,7 +106,9 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
       </div>
       <label class="lclab" style="margin-top:10px">제목</label><input id="nTitle" class="lcin" placeholder="예: 2026 하반기 지도자 자격 검정 (3급·2급)">
       <label class="lclab" style="margin-top:10px">안내 내용</label><textarea id="nDesc" rows="3" class="lcin" placeholder="준비물, 응시 자격, 입금 계좌 등"></textarea>
-      <div style="margin-top:12px"><button class="lcbtn" style="background:#153A77" onclick="addNotice()">공고 게시</button> <span id="nMsg" style="font-size:13px;font-weight:700"></span></div>
+      <div style="margin-top:12px"><button class="lcbtn" style="background:#153A77" id="nBtn" onclick="addNotice()">공고 게시</button>
+      <a href="javascript:cancelEdit()" id="nCancel" style="display:none;font-size:12.5px;font-weight:800;color:#C41E2F;margin-left:8px">수정 취소 ✕</a>
+      <span id="nMsg" style="font-size:13px;font-weight:700"></span></div>
     </div>
 
     <div id="mg_apps" class="lccard" style="display:none">
@@ -238,7 +240,8 @@ async function loadNotices(){
         +(approved&&!closed?'<button class="lcbtn" style="background:#C41E2F" onclick="applyNotice(\''+d.id+'\')">신청하기</button>':'')
         // 중앙: 승인·반려
         +((!approved&&CENTRAL&&ISMGR&&n.approval==='대기')?'<button class="lcbtn" style="background:#0f766e" onclick="approveNotice(\''+d.id+'\')">✅ 승인 게시</button><button class="lcbtn" style="background:#C41E2F" onclick="remandNotice(\''+d.id+'\')">반려</button>':'')
-        // 주관 연맹: 마감·결과보고
+        // 주관 연맹: 수정·마감·결과보고
+        +(mine?'<button class="lcbtn" style="background:#1F4E9C" onclick="editNotice(\''+d.id+'\')">✏️ 수정</button>':'')
         +(mine&&approved?'<button class="lcbtn" style="background:#8a919d" onclick="closeNotice(\''+d.id+'\','+(closed?'false':'true')+')">'+(closed?'재개':'마감')+'</button>':'')
         +(mine&&approved&&(!rst||rst==='보완요청')?'<button class="lcbtn" style="background:#b8860b" onclick="submitReport(\''+d.id+'\')">📝 결과보고 제출</button>':'')
         // 중앙: 보고 검토
@@ -248,12 +251,22 @@ async function loadNotices(){
     }).join('');
   }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+esc(e.message)+'</div>'}
 }
+let EDIT_ID=null;
 async function addNotice(){
   const m=document.getElementById('nMsg');
   const v=id=>document.getElementById(id).value.trim();
   if(!v('nTitle')||!v('nDate')){m.textContent='제목·일시는 필수입니다';m.style.color='#C41E2F';return}
   const sido=document.getElementById('nSido').value;
   const isCentral=(LMY.role==='admin');
+  if(EDIT_ID){
+    // ── 공고 수정 (승인·보고 상태는 유지, 내용만 갱신) ──
+    await DB.collection('licenseNotices').doc(EDIT_ID).update({
+      type:v('nType'),target:v('nTarget'),title:v('nTitle'),date:v('nDate'),place:v('nPlace'),fee:v('nFee'),acct:v('nAcct'),until:v('nUntil'),desc:v('nDesc'),
+      sido:(sido==='전국(중앙)'?'전국':sido),
+      editedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    m.textContent='✓ 공고가 수정되었습니다';m.style.color='#0f766e';
+    cancelEdit();loadNotices();return;
+  }
   await DB.collection('licenseNotices').add({
     type:v('nType'),target:v('nTarget'),title:v('nTitle'),date:v('nDate'),place:v('nPlace'),fee:v('nFee'),acct:v('nAcct'),until:v('nUntil'),desc:v('nDesc'),
     sido:(sido==='전국(중앙)'?'전국':sido),
@@ -265,6 +278,34 @@ async function addNotice(){
   m.textContent=isCentral?'✓ 게시되었습니다':'✓ 등록되었습니다 — 중앙연맹 승인 후 회원에게 공개됩니다';m.style.color='#0f766e';
   ['nTitle','nDate','nPlace','nFee','nAcct','nUntil','nDesc'].forEach(i=>document.getElementById(i).value='');
   loadNotices();
+}
+function editNotice(id){
+  const doc=NOTICES.find(d=>d.id===id);if(!doc)return;
+  const n=doc.data();
+  EDIT_ID=id;
+  document.getElementById('nType').value=n.type||'자격 검정';
+  document.getElementById('nTarget').value=n.target||'지도자';
+  const ns=document.getElementById('nSido');
+  ns.value=(n.sido==='전국'?'전국(중앙)':n.sido)||ns.value;
+  document.getElementById('nDate').value=n.date||'';
+  document.getElementById('nPlace').value=n.place||'';
+  document.getElementById('nFee').value=n.fee||'';
+  document.getElementById('nAcct').value=n.acct||'';
+  document.getElementById('nUntil').value=n.until||'';
+  document.getElementById('nTitle').value=n.title||'';
+  document.getElementById('nDesc').value=n.desc||'';
+  document.getElementById('nBtn').textContent='✏️ 수정 저장';
+  document.getElementById('nCancel').style.display='inline';
+  document.getElementById('nMsg').textContent='수정 중: '+(n.title||'');document.getElementById('nMsg').style.color='#1F4E9C';
+  mgTab('notice',document.querySelector('.lcchip[data-t="notice"]'));
+  document.getElementById('mg_notice').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function cancelEdit(){
+  EDIT_ID=null;
+  ['nTitle','nDate','nPlace','nFee','nAcct','nUntil','nDesc'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('nBtn').textContent='공고 게시';
+  document.getElementById('nCancel').style.display='none';
+  document.getElementById('nMsg').textContent='';
 }
 async function closeNotice(id,close){
   await DB.collection('licenseNotices').doc(id).update({status:close?'마감':'접수중'});
