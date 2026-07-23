@@ -175,6 +175,10 @@ function orgChip(o,region,title){
         </select>
       </div>
       <div>
+        <label style="font-size:13px;font-weight:800">생년월일 <span style="font-weight:600;color:var(--gray);font-size:11.5px">(자격증 표기용)</span></label>
+        <input type="date" id="pfBirth" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
+      </div>
+      <div>
         <label style="font-size:13px;font-weight:800">의류 사이즈 <span style="font-weight:600;color:var(--gray);font-size:11.5px">(활동 피복·조끼 지급용)</span></label>
         <select id="pfSize" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
           <option value="">선택</option><option>S (90)</option><option>M (95)</option><option>L (100)</option><option>XL (105)</option><option>2XL (110)</option><option>3XL (115)</option>
@@ -323,6 +327,7 @@ function fillProfile(d){
   document.getElementById('pfYouth').checked=!!q.youth;
   document.getElementById('pfCareer').value=d.career||'';
   document.getElementById('pfSize').value=d.clothingSize||'';
+  document.getElementById('pfBirth').value=d.birth||'';
   renderDocList(d.qualDocs||[]);
 }
 function renderDocList(urls){
@@ -358,6 +363,7 @@ async function saveProfile(){
       quals:{leader:document.getElementById('pfLeader').value,referee:document.getElementById('pfRef').value,youth:document.getElementById('pfYouth').checked},
       career:document.getElementById('pfCareer').value.trim(),
       clothingSize:document.getElementById('pfSize').value,
+      birth:document.getElementById('pfBirth').value,
       qualDocs:docs
     };
     await DB.collection('users').doc(AUTH.currentUser.uid).update(upd);
@@ -631,41 +637,26 @@ async function loadMyLics(uid){
 function printLicense(no){
   const doc=MYLICS.find(d=>d.id===no);if(!doc)return;
   const l=doc.data();
-  const logo=new URL('kfdf_logo.png',location.href).href;
-  const seal=new URL('직인.png',location.href).href;
+  // 공식 양식 배경 (대한플라잉디스크연맹 자격증 원본 스캔 기반)
+  const bg=new URL('files/'+(l.type==='심판'?'cert_bg_referee.jpg':'cert_bg_leader.jpg'),location.href).href;
+  const dot=s=>String(s||'').replace(/-/g,'.');
   const w=window.open('','_blank');
   if(!w){alert('팝업이 차단되어 자격증 창을 열 수 없습니다.\n주소창 오른쪽의 팝업 차단 아이콘을 눌러 "허용"으로 바꾼 뒤 다시 시도해주세요.');return}
-  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>자격증</title>'
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>자격증 '+no+'</title>'
   +'<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">'
-  +'<style>@page{size:A4 portrait;margin:0}body{margin:0;font-family:Pretendard,sans-serif;display:flex;justify-content:center;background:#eee}'
-  +'.paper{width:210mm;height:296mm;background:#fff;box-sizing:border-box;padding:22mm 20mm;position:relative}'
-  +'.frame{border:2.5px solid #153A77;height:100%;box-sizing:border-box;padding:16mm 14mm;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative}'
-  +'.frame:before{content:"";position:absolute;inset:2.5mm;border:.6px solid #153A77}'
-  +'.no{align-self:flex-end;font-size:12.5px;font-weight:700;color:#555;z-index:1}'
-  +'.title{font-size:44px;font-weight:900;letter-spacing:14px;margin:16mm 0 4mm;color:#111;z-index:1}'
-  +'.sub{font-size:15px;color:#777;font-weight:700;letter-spacing:2px;z-index:1}'
-  +'.body{margin-top:14mm;font-size:17px;line-height:2.4;z-index:1}'
-  +'.body b{font-size:21px}'
-  +'.decl{margin-top:12mm;font-size:16.5px;line-height:2;z-index:1}'
-  +'.date{margin-top:auto;font-size:15.5px;font-weight:700;z-index:1}'
-  +'.org{margin-top:6mm;font-size:22px;font-weight:900;z-index:1}'
-  +'.orgwrap{position:relative;display:inline-flex;align-items:center;gap:10px}'
-  +'.orgwrap img{height:34px}'
-  +'.orgwrap img.seal{position:absolute;right:-46px;top:-14px;height:64px;opacity:.92}'
-  +'.wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);opacity:.05;width:120mm}'
-  +'@media print{body{background:#fff}}</style></head><body><div class="paper"><div class="frame">'
-  +'<img class="wm" src="'+logo+'">'
-  +'<div class="no">제 '+no+' 호</div>'
-  +'<div class="title">자 격 증</div>'
-  +'<div class="sub">CERTIFICATE OF QUALIFICATION</div>'
-  +'<div class="body">성&nbsp;&nbsp;&nbsp;&nbsp;명 : <b>'+MYD.name+'</b><br>'
-  +'자격종목 : <b>플라잉디스크 '+l.type+' '+l.grade+'</b><br>'
-  +(l.expireAt?'유효기간 : <b>'+(l.issuedAt||'')+' ~ '+l.expireAt+'</b>':'발 급 일 : <b>'+(l.issuedAt||'')+'</b>')+'</div>'
-  +'<div class="decl">위 사람은 본 연맹이 정한 검정 기준을<br>통과하였으므로 위 자격을 갖추었음을 증명합니다.</div>'
-  +'<div class="date">'+(l.issuedAt?l.issuedAt.replace(/-(\d{2})-(\d{2})/,'년 $1월 $2일')+' 발급':'')+'</div>'
-  +'<div class="org"><span class="orgwrap"><img src="'+logo+'">대한플라잉디스크연맹<img class="seal" src="'+seal+'" onerror="this.style.display=\'none\'"></span></div>'
-  +'<div style="font-size:12px;color:#888;margin-top:5mm;z-index:1">등록 민간자격 (국가공인 아님) · 진위확인: 대한민국플라잉디스크연맹 홈페이지 › 진위확인 › 자격번호 입력 (전산 운영: 대한민국플라잉디스크연맹)</div>'
-  +'</div></div><scr'+'ipt>window.onload=()=>setTimeout(()=>window.print(),400)</scr'+'ipt></body></html>');
+  +'<style>@page{size:A4 portrait;margin:0}html,body{margin:0;padding:0;background:#eee}'
+  +'.paper{width:210mm;height:296.5mm;margin:0 auto;position:relative;background:#fff url("'+bg+'") no-repeat center/210mm 296.5mm;font-family:Pretendard,"Noto Sans KR",sans-serif}'
+  +'.f{position:absolute;font-weight:800;color:#111;white-space:nowrap}'
+  +'@media print{body{background:#fff}.paper{margin:0}}'
+  +'</style></head><body><div class="paper">'
+  +'<div class="f" style="left:39.7%;top:33.6%;font-size:8.6mm">'+l.grade+'</div>'
+  +'<div class="f" style="left:31.8%;top:39.3%;font-size:9.2mm;border-bottom:0.6mm solid #111;padding:0 3mm 1mm 1mm">'+MYD.name+'</div>'
+  +'<div class="f" style="left:68.2%;top:33.75%;font-size:4.9mm">'+no+'</div>'
+  +'<div class="f" style="left:68.2%;top:35.85%;font-size:4.9mm">'+dot(l.expireAt)+'</div>'
+  +'<div class="f" style="left:68.2%;top:37.95%;font-size:4.9mm">'+dot(MYD.birth||'')+'</div>'
+  +'<div class="f" style="left:68.2%;top:40.05%;font-size:4.9mm">'+(l.region||'')+'</div>'
+  +'<div class="f" style="left:36.6%;top:70.65%;font-size:6.2mm">'+dot(l.issuedAt)+'</div>'
+  +'</div><scr'+'ipt>window.onload=()=>setTimeout(()=>window.print(),600)</scr'+'ipt></body></html>');
   w.document.close();
 }
 async function printCert(){
