@@ -230,7 +230,9 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
     <div id="v2" style="display:none">
       <div class="authbox" style="max-width:560px;margin:0">
         <h3>활동 포인트 부여</h3>
-        <label>회원 선택</label><select id="axUser"></select>
+        <label>회원 선택</label>
+        <input id="axSearch" placeholder="🔍 이름 검색" oninput="axFilter()" style="width:100%;padding:10px 13px;border:1.5px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit;margin-bottom:6px">
+        <select id="axUser"></select>
         <label>활동 종류</label>
         <select id="axType" onchange="document.getElementById('axPt').value=this.value">
           <option value="10">학교강습·방과후 1회차 (10P)</option>
@@ -385,6 +387,12 @@ async function setRegionAdmin(uid){
     await DB.collection('users').doc(uid).update(upd);
     alert('지정 완료. '+v.name+' 님에게 region.html 주소를 안내하세요.');loadUsers();
   }catch(e){alert('실패: '+e.message+'\n(권한 부여는 오너 계정만 가능합니다 — 규칙 파일의 owner 설정 안내 참고)')}
+}
+async function approveDegree(uid){
+  const u=USERS.find(x=>x.id===uid);if(!u)return;
+  if(!confirm(u.data().name+' 님의 학위('+(u.data().degree||'')+') 증빙을 확인·승인할까요?'))return;
+  await DB.collection('users').doc(uid).update({degreeApproved:true});
+  loadUsers();
 }
 async function setCity(id){
   const doc=APPS.find(d=>d.id===id);if(!doc)return;
@@ -800,12 +808,12 @@ function renderUsers(){
   el.innerHTML=docs.map(d=>{
     const v=d.data(),lv=lvOf(v.points||0);
     return '<div class="urow"><div class="grow"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span>'+(v.withdrawReq?' <span style="font-size:11px;font-weight:900;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px">🚪 탈퇴 요청</span>':'')
-      +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+(v.baseCity?' · <b style="color:#1F4E9C">📍'+esc(v.baseCity)+'</b>':' · <span style="font-size:11px;color:#C41E2F;font-weight:800">시군구 미입력</span>')+((v.activityRegions&&v.activityRegions.length)?' <span style="font-size:11px;font-weight:800;color:#0f766e">🗺활동가능: '+esc(v.activityRegions.join('·'))+'</span>':'')+(v.phone?' · '+esc(v.phone):'')+' · '+(v.edu2026?('연수이수 '+(inRoster(v.name)?'<b style="color:#0f766e">✓명단확인</b>':'<b style="color:#C41E2F">⚠명단에없음</b>')):'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+((v.instructorFor&&v.instructorFor.referee)?' · <b style="color:#7c3aed">심판요원 지원</b>':'')+((v.instructorFor&&v.instructorFor.staff)?' · <b style="color:#b8860b">운영요원 지원</b>':'')+'</div>'
+      +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+(v.gender?' · '+esc(v.gender):'')+(v.birth?' · '+esc(v.birth):'')+(v.baseCity?' · <b style="color:#1F4E9C">📍'+esc(v.baseCity)+'</b>':' · <span style="font-size:11px;color:#C41E2F;font-weight:800">시군구 미입력</span>')+((v.activityRegions&&v.activityRegions.length)?' <span style="font-size:11px;font-weight:800;color:#0f766e">🗺활동가능: '+esc(v.activityRegions.join('·'))+'</span>':'')+(v.phone?' · '+esc(v.phone):'')+' · '+(v.edu2026?('연수이수 '+(inRoster(v.name)?'<b style="color:#0f766e">✓명단확인</b>':'<b style="color:#C41E2F">⚠명단에없음</b>')):'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+((v.instructorFor&&v.instructorFor.referee)?' · <b style="color:#7c3aed">심판요원 지원</b>':'')+((v.instructorFor&&v.instructorFor.staff)?' · <b style="color:#b8860b">운영요원 지원</b>':'')+'</div>'
       +((v.affiliation&&v.affiliation.length)||(v.quals&&(v.quals.leader||v.quals.referee||v.quals.youth))||(v.qualDocs&&v.qualDocs.length)||v.degree
         ?'<div class="sub3" style="margin-top:3px">프로필: '
           +((v.affiliation&&v.affiliation.length)?'🏷 '+esc(v.affiliation.join('·')):'')
           +((v.quals&&(v.quals.leader||v.quals.referee||v.quals.youth))?' · 🎖 '+esc([v.quals.leader,v.quals.referee,v.quals.youth?'유소년지도사':''].filter(Boolean).join('·')):'')
-          +(v.degree?' · 🎓 '+esc(v.degree):'')
+          +(v.degree?' · 🎓 '+esc(v.degree)+(v.degreeDoc?' <a href="'+v.degreeDoc+'" target="_blank" style="color:#153A77;font-weight:800">📎증빙</a> '+(v.degreeApproved?'<b style="color:#0f766e">✓승인</b>':'<button class="btn-sub" style="background:#b8860b;padding:2px 8px;font-size:11px" onclick="approveDegree(\''+d.id+'\')">학위 승인</button>'):' <b style="color:#C41E2F">(증빙 없음)</b>'):'')
           +((v.qualDocs&&v.qualDocs.length)?' · '+v.qualDocs.map((u,i)=>'<a href="'+u+'" target="_blank" style="color:#153A77;font-weight:800">📎자격증'+(i+1)+'</a>').join(' '):'')
         +'</div>':'')
       +'<div class="sub3" style="margin-top:3px">위촉검증: '
@@ -825,16 +833,25 @@ function renderUsers(){
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delUser(\''+d.id+'\',\''+esc(v.name)+'\')">🗑</button>'
       +'</div>';
   }).join('');
-  const sel=document.getElementById('axUser');
-  sel.innerHTML=USERS.filter(d=>d.data().status==='approved').map(d=>'<option value="'+d.id+'">'+esc(d.data().name)+' ('+esc(d.data().region)+', '+(d.data().points||0)+'P)</option>').join('');
+  axFilter();
+}
+function axFilter(){
+  const sel=document.getElementById('axUser');if(!sel)return;
+  const q=((document.getElementById('axSearch')||{}).value||'').trim().toLowerCase();
+  sel.innerHTML=USERS.filter(d=>{
+    const v=d.data();
+    if(v.status!=='approved')return false;
+    if(q&&String(v.name||'').toLowerCase().indexOf(q)<0)return false;
+    return true;
+  }).map(d=>'<option value="'+d.id+'">'+esc(d.data().name)+' ('+esc(d.data().region)+', '+(d.data().points||0)+'P)</option>').join('');
 }
 function exportInstructors(){
-  const rows=[['성명','권역','거점 시군구','활동가능권역','소속','지도자자격','심판자격','유소년지도사','학위','의류사이즈','경력사항','자격증사본','휴대전화','이메일','상태','포인트','학교체육','방과후늘봄','심판','운영','연수이수','명단확인','자격확인','경력확인','전자동의']];
+  const rows=[['성명','성별','생년월일','권역','거점 시군구','활동가능권역','소속','지도자자격','심판자격','유소년지도사','학위','학위승인','의류사이즈','경력사항','자격증사본','휴대전화','이메일','상태','포인트','학교체육','방과후늘봄','심판','운영','연수이수','명단확인','자격확인','경력확인','전자동의']];
   USERS.forEach(d=>{const v=d.data();const f=v.instructorFor||{};
     if(!(f.school||f.after||f.referee||f.staff))return;
     const q=v.quals||{};
-    rows.push([v.name,v.region||'',v.baseCity||'',(v.activityRegions||[]).join('·')||v.region||'',
-      (v.affiliation||[]).join('·'),q.leader||'',q.referee||'',q.youth?'O':'',v.degree||'',v.clothingSize||'',v.career||'',(v.qualDocs||[]).length?(v.qualDocs.length+'장'):'',
+    rows.push([v.name,v.gender||'',v.birth||'',v.region||'',v.baseCity||'',(v.activityRegions||[]).join('·')||v.region||'',
+      (v.affiliation||[]).join('·'),q.leader||'',q.referee||'',q.youth?'O':'',v.degree||'',(v.degree&&v.degreeApproved)?'승인':'',v.clothingSize||'',v.career||'',(v.qualDocs||[]).length?(v.qualDocs.length+'장'):'',
       v.phone||'',v.email||'',v.status||'',v.points||0,
       f.school?'O':'',f.after?'O':'',f.referee?'O':'',f.staff?'O':'',
       v.edu2026?'O':'',(v.edu2026&&inRoster(v.name))?'O':'',v.certDoc?'O':'',v.crimDoc?'O':'',(v.consents&&v.consents.agreedAt)?'O':'']);

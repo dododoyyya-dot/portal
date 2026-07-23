@@ -8,15 +8,26 @@
 <link rel="stylesheet" href="style.css">
 <style>
 .lcbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
-.lcchip{border:1.5px solid #dfe5ee;background:#fff;color:#5b6472;font-weight:800;font-size:13px;padding:7px 14px;border-radius:999px;cursor:pointer}
+.lcchip{border:1.5px solid #dfe5ee;background:#fff;color:#5b6472;font-weight:800;font-size:13px;padding:8px 15px;border-radius:999px;cursor:pointer;transition:.15s}
+.lcchip:hover{border-color:#153A77;color:#153A77}
 .lcchip.on{background:#153A77;border-color:#153A77;color:#fff}
-.lccard{background:#fff;border:1.5px solid #e8ecf2;border-radius:14px;padding:16px 20px;margin-bottom:10px}
-.lccard:hover{border-color:#c6d2e5}
-.lctag{font-size:11px;font-weight:900;color:#fff;padding:2.5px 9px;border-radius:999px}
+.lccard{background:#fff;border:1.5px solid #e8ecf2;border-radius:14px;padding:15px 18px;margin-bottom:9px;transition:.15s;box-shadow:0 1px 3px rgba(15,20,40,.04)}
+.lccard:hover{border-color:#c6d2e5;box-shadow:0 3px 10px rgba(15,20,40,.07)}
+.lctag{font-size:10.5px;font-weight:900;color:#fff;padding:2.5px 9px;border-radius:999px;letter-spacing:.2px}
 .lcin{width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;font-family:inherit;font-size:13.5px;box-sizing:border-box}
-.lcbtn{border:none;font-size:12.5px;font-weight:800;padding:8px 14px;border-radius:9px;cursor:pointer;color:#fff;white-space:nowrap}
+.lcin:focus{outline:none;border-color:#153A77}
+.lcbtn{border:none;font-size:12px;font-weight:800;padding:7px 13px;border-radius:9px;cursor:pointer;color:#fff;white-space:nowrap;transition:.12s}
+.lcbtn:hover{filter:brightness(1.12)}
+.lcbtn.p{background:#153A77}.lcbtn.s{background:#0f766e}.lcbtn.w{background:#b8860b}.lcbtn.b{background:#1F4E9C}.lcbtn.g{background:#8a919d}.lcbtn.d{background:#C41E2F}
+.lcbtn.ghost{background:#fff;color:#C41E2F;border:1.5px solid #f0c7cc}
+.lcbtn.ghost:hover{border-color:#C41E2F;filter:none}
 .lcgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .lclab{font-size:12.5px;font-weight:800;display:block;margin-bottom:4px}
+.lcinfo{background:#fff;border:1.5px solid #e8ecf2;border-left:5px solid #153A77;border-radius:14px;padding:16px 20px;margin-bottom:26px;font-size:13.5px;line-height:1.85}
+.lcinfo details{margin-top:8px}
+.lcinfo summary{cursor:pointer;font-weight:800;color:#153A77;font-size:12.5px}
+.lcinfo .warn{color:#7a5b00}
+.ntacts{display:flex;gap:5px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
 </style>
 </head>
 <body>
@@ -56,16 +67,14 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
 
 <section><div class="wrap" style="max-width:960px">
 
-  <div style="background:#fff8e6;border:1.5px solid #e6b422;border-radius:14px;padding:16px 20px;margin-bottom:14px;font-size:13.5px;line-height:1.8">
-    <b>⚠️ 자격 구분 안내</b> — 본 페이지의 지도자·심판 자격은 민간자격 등록기관인 <b>대한플라잉디스크연맹이 발급·관리하는 등록 민간자격</b>이며, 국가공인 민간자격이 아닙니다.
-    검정 공고·접수 등 전산 운영은 대한민국플라잉디스크연맹 홈페이지가 수행합니다 (양 단체 공동 운용).<br>
-    문화체육관광부 국가자격인 <a href="certification.html" style="font-weight:800;color:#153A77">체육지도자(스포츠지도사) 자격</a>과는 별개의 자격입니다. 체육지도자 실기·구술 검정은 <a href="certification.html" style="font-weight:800;color:#153A77">해당 페이지</a>를 이용해 주세요.
-    <span style="color:#7a5b00">· 민간자격 등록번호: 제 2020-002410 호 (등록기관: 사단법인 대한플라잉디스크연맹)</span>
-  </div>
-  <div style="background:#eef3fa;border:1.5px solid #b9cdec;border-radius:14px;padding:16px 20px;margin-bottom:28px;font-size:13.5px;line-height:1.8">
-    <b>📌 자격 안내</b> — 자격은 검정(교육·시험) 합격 후 발급되며 <b>발급일로부터 4년간 유효</b>합니다. 만료 전 연장교육 이수(또는 연장 절차)를 통해 4년 연장됩니다.<br>
-    신청은 이곳에서 <b>통합 접수</b>되며, 신청 시 선택한 <b>소속 시·도의 연맹이 배정받아 처리</b>합니다.
-    발급된 자격은 <a href="verify.html" style="font-weight:800;color:#153A77">진위확인 페이지</a>에서 자격번호로 조회, 본인은 <a href="mypage.html" style="font-weight:800;color:#153A77">마이페이지</a>에서 자격증 출력이 가능합니다.
+  <div class="lcinfo">
+    <b>연맹 지도자·심판 자격</b> — 민간자격 등록번호 <b>제 2020-002410 호</b> (등록기관: 사단법인 대한플라잉디스크연맹 · 국가공인 아님) · <b>유효기간 4년</b>, 만료 전 갱신·보수(역량강화) 교육으로 4년 갱신<br>
+    신청은 <b>통합 접수</b> — 소속 연맹을 선택하면 해당 연맹이 배정·처리하며, <b>교육 참석은 타 지역 교차 지원 가능</b>합니다.
+    발급 자격은 <a href="verify.html" style="font-weight:800;color:#153A77">진위확인</a>, 본인 출력은 <a href="mypage.html" style="font-weight:800;color:#153A77">마이페이지</a>에서.
+    <details>
+      <summary>자세히 — 국가자격과의 구분</summary>
+      <div style="margin-top:6px;color:#555">본 자격은 문화체육관광부 국가자격 <a href="certification.html" style="font-weight:800;color:#153A77">체육지도자(스포츠지도사)</a>와 별개의 등록 민간자격입니다. 체육지도자 실기·구술 검정은 해당 페이지를 이용해 주세요. 검정 공고·접수 등 전산 운영은 대한민국플라잉디스크연맹 홈페이지가 수행합니다 (양 단체 공동 운용).</div>
+    </details>
   </div>
 
   <div class="sec-label">NOTICES</div>
@@ -87,7 +96,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
       <button class="lcchip on" data-t="notice" onclick="mgTab('notice',this)">📢 공고 등록·관리</button>
       <button class="lcchip" data-t="apps" onclick="mgTab('apps',this)">📋 신청 처리·발급</button>
       <button class="lcchip" data-t="claims" onclick="mgTab('claims',this)">🔗 자격 연결 요청</button>
-      <button class="lcchip" data-t="renew" onclick="mgTab('renew',this)">🔄 연장 처리</button>
+      <button class="lcchip" data-t="renew" onclick="mgTab('renew',this)">🔄 갱신 처리</button>
       <button class="lcchip" data-t="bulk" onclick="mgTab('bulk',this)">📥 기존 자격 일괄 등록</button>
       <button class="lcchip" data-t="list" onclick="mgTab('list',this)">📚 발급 대장</button>
     </div>
@@ -95,7 +104,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
     <div id="mg_notice" class="lccard">
       <h3 style="margin:0 0 12px;font-size:16px">새 공고 등록</h3>
       <div class="lcgrid">
-        <div><label class="lclab">구분</label><select id="nType" class="lcin"><option>자격 검정</option><option>연장 교육</option></select></div>
+        <div><label class="lclab">구분</label><select id="nType" class="lcin"><option>신규</option><option>갱신</option><option>보수(역량강화)</option></select></div>
         <div><label class="lclab">대상 자격</label><select id="nTarget" class="lcin"><option>지도자</option><option>심판</option><option>지도자·심판 공통</option></select></div>
         <div><label class="lclab">주관</label><select id="nSido" class="lcin"><option>전국(중앙)</option><option>경기</option><option>강원</option><option>부산</option><option>경남</option><option>전라</option></select></div>
         <div><label class="lclab">일시</label><input id="nDate" class="lcin" placeholder="예: 2026. 9. 12.(토) 10:00"></div>
@@ -106,7 +115,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
       </div>
       <label class="lclab" style="margin-top:10px">제목</label><input id="nTitle" class="lcin" placeholder="예: 2026 하반기 지도자 자격 검정 (3급·2급)">
       <label class="lclab" style="margin-top:10px">안내 내용</label><textarea id="nDesc" rows="3" class="lcin" placeholder="준비물, 응시 자격, 입금 계좌 등"></textarea>
-      <div style="margin-top:12px"><button class="lcbtn" style="background:#153A77" id="nBtn" onclick="addNotice()">공고 게시</button>
+      <div style="margin-top:12px"><button class="lcbtn p" id="nBtn" onclick="addNotice()">공고 게시</button>
       <a href="javascript:cancelEdit()" id="nCancel" style="display:none;font-size:12.5px;font-weight:800;color:#C41E2F;margin-left:8px">수정 취소 ✕</a>
       <span id="nMsg" style="font-size:13px;font-weight:700"></span></div>
     </div>
@@ -114,7 +123,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
     <div id="mg_apps" class="lccard" style="display:none">
       <h3 style="margin:0 0 8px;font-size:16px">신청 처리 · 발급</h3>
       <div class="lcbar"><select id="apNotice" class="lcin" style="width:auto;min-width:240px" onchange="loadApps()"><option value="">공고 선택</option></select>
-      <button class="lcbtn" style="background:#0f766e" onclick="bulkIssue()">🎖 합격자 일괄 발급</button>
+      <button class="lcbtn s" onclick="bulkIssue()">🎖 합격자 일괄 발급</button>
       <span id="apCount" style="font-size:13px;font-weight:800;color:#153A77"></span></div>
       <div class="board" id="apList"><div class="bempty">공고를 선택하세요.</div></div>
     </div>
@@ -125,11 +134,11 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
       <div class="board" id="claimList"><div class="bempty">불러오는 중…</div></div>
     </div>
     <div id="mg_renew" class="lccard" style="display:none">
-      <h3 style="margin:0 0 8px;font-size:16px">자격 연장 (+4년)</h3>
-      <p style="font-size:13px;color:var(--gray);margin:0 0 10px">연장교육 이수·연장료 납부 확인 후 자격번호를 입력해 연장하세요.</p>
+      <h3 style="margin:0 0 8px;font-size:16px">자격 갱신 (+4년)</h3>
+      <p style="font-size:13px;color:var(--gray);margin:0 0 10px">갱신(보수) 교육 이수·갱신료 납부 확인 후 자격번호를 입력해 갱신하세요.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <input id="rnNo" class="lcin" style="flex:1;min-width:220px" placeholder="자격번호 (예: KFDF-L2-2026-0001)">
-        <button class="lcbtn" style="background:#0f766e" onclick="renewLic()">조회 후 연장</button>
+        <button class="lcbtn s" onclick="renewLic()">조회 후 갱신</button>
       </div>
       <div id="rnMsg" style="font-size:13.5px;font-weight:700;margin-top:10px"></div>
     </div>
@@ -142,15 +151,23 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
         예: <code>0105-23060001,이용기,지도자,1,2023-06-15,2027-06-14,,광주</code>
       </p>
       <textarea id="bkData" rows="8" class="lcin" placeholder="여기에 붙여넣기"></textarea>
-      <div style="margin-top:10px"><button class="lcbtn" style="background:#b8860b" onclick="bulkImport()">일괄 등록 실행</button> <span id="bkMsg" style="font-size:13px;font-weight:700"></span></div>
+      <div style="margin-top:10px"><button class="lcbtn w" onclick="bulkImport()">일괄 등록 실행</button> <span id="bkMsg" style="font-size:13px;font-weight:700"></span></div>
       <div id="bkResult" style="font-size:12.5px;margin-top:8px;line-height:1.7"></div>
     </div>
 
     <div id="mg_list" class="lccard" style="display:none">
       <h3 style="margin:0 0 8px;font-size:16px">발급 대장</h3>
       <div class="lcbar">
+        <select id="lsRegion" class="lcin" style="width:auto" onchange="renderLics()">
+          <option value="">지역 전체</option>
+          <option>서울</option><option>부산</option><option>대구</option><option>인천</option><option>광주</option><option>대전</option><option>울산</option><option>경기</option><option>강원</option><option>충북</option><option>충남</option><option>전북</option><option>전남</option><option>경북</option><option>경남</option><option>제주</option><option>세종</option><option>전라</option><option>중앙</option>
+        </select>
+        <select id="lsStatus" class="lcin" style="width:auto" onchange="renderLics()">
+          <option value="">상태 전체</option><option>유효</option><option>만료</option>
+        </select>
         <input id="lsSearch" class="lcin" style="flex:1;min-width:180px" oninput="renderLics()" placeholder="🔍 자격번호·성명 검색">
-        <button class="lcbtn" style="background:#1F4E9C" onclick="exportLics()">⬇ CSV</button>
+        <button class="lcbtn b" onclick="exportLics()">⬇ CSV</button>
+        <button class="lcbtn w" onclick="expireCleanup()" id="lsCleanBtn" title="유효기간 정보가 없는 과거 자격을 일괄 정리">⏳ 기한미상 만료 정리</button>
         <span id="lsCount" style="font-size:13px;font-weight:800;color:#153A77"></span>
       </div>
       <div class="board" id="licList"><div class="bempty">불러오는 중…</div></div>
@@ -223,7 +240,7 @@ async function loadNotices(){
       const mine=ISMGR&&(CENTRAL||MFEDS.indexOf(n.sido)>=0);
       const rst=n.reportStatus||'';
       let html='<div class="lccard"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center"><div style="flex:1;min-width:240px">'
-        +'<span class="lctag" style="background:'+(n.type==='연장 교육'?'#0f766e':'#153A77')+'">'+esc(n.type)+'</span> '
+        +'<span class="lctag" style="background:'+(n.type==='갱신'?'#0f766e':(n.type==='보수(역량강화)'?'#b8860b':'#153A77'))+'">'+esc(n.type)+' 교육</span> '
         +'<span class="lctag" style="background:#8a919d">'+esc(n.target)+'</span> '
         +(n.sido?'<span class="lctag" style="background:#b8860b">'+esc(n.sido)+'</span> ':'')
         +(!approved?'<span class="lctag" style="background:'+(n.approval==='반려'?'#C41E2F':'#7c3aed')+'">'+(n.approval==='반려'?'반려됨':'중앙승인 대기')+'</span> ':(closed?'<span class="lctag" style="background:#C41E2F">마감</span> ':''))
@@ -236,17 +253,17 @@ async function loadNotices(){
         +((mine||CENTRAL)&&n.approval==='반려'&&n.remandReason?'<br><span style="color:#C41E2F;font-weight:700">⛔ 공고 반려 사유: '+esc(n.remandReason)+'</span>':'')
         +((mine||CENTRAL)&&n.reportStatus==='보완요청'&&n.reportRemand?'<br><span style="color:#C41E2F;font-weight:700">✏️ 보고 보완요청: '+esc(n.reportRemand)+'</span>':'')
         +'</div></div>'
-        +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-        +(approved&&!closed?'<button class="lcbtn" style="background:#C41E2F" onclick="applyNotice(\''+d.id+'\')">신청하기</button>':'')
+        +'<div class="ntacts">'
+        +(approved&&!closed?'<button class="lcbtn d" onclick="applyNotice(\''+d.id+'\')">신청하기</button>':'')
         // 중앙: 승인·반려
-        +((!approved&&CENTRAL&&ISMGR&&n.approval==='대기')?'<button class="lcbtn" style="background:#0f766e" onclick="approveNotice(\''+d.id+'\')">✅ 승인 게시</button><button class="lcbtn" style="background:#C41E2F" onclick="remandNotice(\''+d.id+'\')">반려</button>':'')
+        +((!approved&&CENTRAL&&ISMGR&&n.approval==='대기')?'<button class="lcbtn s" onclick="approveNotice(\''+d.id+'\')">✅ 승인 게시</button><button class="lcbtn d" onclick="remandNotice(\''+d.id+'\')">반려</button>':'')
         // 주관 연맹: 수정·마감·결과보고
-        +(mine?'<button class="lcbtn" style="background:#1F4E9C" onclick="editNotice(\''+d.id+'\')">✏️ 수정</button>':'')
-        +(mine&&approved?'<button class="lcbtn" style="background:#8a919d" onclick="closeNotice(\''+d.id+'\','+(closed?'false':'true')+')">'+(closed?'재개':'마감')+'</button>':'')
-        +(mine&&approved&&(!rst||rst==='보완요청')?'<button class="lcbtn" style="background:#b8860b" onclick="submitReport(\''+d.id+'\')">📝 결과보고 제출</button>':'')
-        +((CENTRAL||(mine&&n.approval==='대기'))?'<button class="lcbtn" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delNotice(\''+d.id+'\')">🗑</button>':'')
+        +(mine?'<button class="lcbtn b" onclick="editNotice(\''+d.id+'\')">✏️ 수정</button>':'')
+        +(mine&&approved?'<button class="lcbtn g" onclick="closeNotice(\''+d.id+'\','+(closed?'false':'true')+')">'+(closed?'재개':'마감')+'</button>':'')
+        +(mine&&approved&&(!rst||rst==='보완요청')?'<button class="lcbtn w" onclick="submitReport(\''+d.id+'\')">📝 결과보고 제출</button>':'')
+        +((CENTRAL||(mine&&n.approval==='대기'))?'<button class="lcbtn ghost" onclick="delNotice(\''+d.id+'\')">🗑</button>':'')
         // 중앙: 보고 검토
-        +((CENTRAL&&ISMGR&&rst==='제출')?'<button class="lcbtn" style="background:#0f766e" onclick="approveReport(\''+d.id+'\')">보고 승인</button><button class="lcbtn" style="background:#C41E2F" onclick="remandReport(\''+d.id+'\')">보완요청</button>':'')
+        +((CENTRAL&&ISMGR&&rst==='제출')?'<button class="lcbtn s" onclick="approveReport(\''+d.id+'\')">보고 승인</button><button class="lcbtn d" onclick="remandReport(\''+d.id+'\')">보완요청</button>':'')
         +'</div></div></div>';
       return html;
     }).join('');
@@ -380,7 +397,7 @@ async function applyNotice(id){
   if(grade===null)return;
   const g=grade.trim();
   if(['1','2','3'].indexOf(g)<0){alert('1~3 중에서 입력해주세요.');return}
-  const sn=prompt('소속(담당) 연맹 번호를 입력하세요 (신청이 해당 시도연맹으로 배정됩니다):\n'+FED_LIST.map((s,i)=>(i+1)+'='+s).join('  '),' ');
+  const sn=prompt('소속(담당) 연맹 번호를 입력하세요 — 교육 장소·주관과 달라도 됩니다(교차 지원 가능):\n'+FED_LIST.map((s,i)=>(i+1)+'='+s).join('  '),' ');
   if(sn===null)return;
   let sido=FED_LIST[parseInt(sn.trim(),10)-1];
   if(!sido){alert('번호가 올바르지 않습니다.');return}
@@ -443,8 +460,8 @@ async function loadClaims(){
         +' <span class="lctag" style="background:'+stc+'">'+esc(c.status)+'</span>'
         +'<div style="font-size:12px;color:var(--gray)">대장 성명: '+esc(c.licName||c.licMask)+(c.phone?' · ☎ '+esc(c.phone):'')+'</div></div>'
         +(c.status==='대기'?'<div style="display:flex;gap:6px">'
-          +'<button class="lcbtn" style="background:#0f766e" onclick="approveClaim(\''+d.id+'\')">연결 승인</button>'
-          +'<button class="lcbtn" style="background:#C41E2F" onclick="rejectClaim(\''+d.id+'\')">거절</button></div>':'')
+          +'<button class="lcbtn s" onclick="approveClaim(\''+d.id+'\')">연결 승인</button>'
+          +'<button class="lcbtn d" onclick="rejectClaim(\''+d.id+'\')">거절</button></div>':'')
         +'</div>';
     };
     el.innerHTML=(pend.length?'<b style="font-size:13.5px">처리 대기 '+pend.length+'건</b>':'')+pend.map(row).join('')
@@ -491,9 +508,10 @@ async function loadApps(){
       +' <span class="lctag" style="background:'+(stc[a.status]||'#8a919d')+'">'+esc(a.status)+'</span>'
       +(a.licenseNo?' <b style="font-size:12px;color:#0f766e">'+esc(a.licenseNo)+'</b>':'')+'</div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +(a.status==='접수'?'<button class="lcbtn" style="background:#1F4E9C" onclick="setApp(\''+d.id+'\',\'합격\')">합격</button><button class="lcbtn" style="background:#C41E2F" onclick="setApp(\''+d.id+'\',\'불합격\')">불합격</button>':'')
-      +(a.status==='합격'?'<button class="lcbtn" style="background:#0f766e" onclick="issueLic(\''+d.id+'\')">🎖 자격 발급</button>':'')
-      +(a.status!=='발급완료'?'<button class="lcbtn" style="background:#8a919d" onclick="transferApp(\''+d.id+'\')">↪ 이관</button>':'')
+      +(a.status==='접수'?'<button class="lcbtn b" onclick="setApp(\''+d.id+'\',\'합격\')">합격</button><button class="lcbtn d" onclick="setApp(\''+d.id+'\',\'불합격\')">불합격</button>':'')
+      +(a.status==='합격'?'<button class="lcbtn s" onclick="issueLic(\''+d.id+'\')">🎖 자격 발급</button>':'')
+      +(a.status!=='발급완료'?'<button class="lcbtn g" onclick="transferApp(\''+d.id+'\')">↪ 이관</button>':'')
+      +(CENTRAL?'<button class="lcbtn ghost" onclick="delLicApp(\''+d.id+'\')">🗑</button>':'')
       +'</div></div>';
   }).join('');
 }
@@ -508,6 +526,16 @@ async function setApp(id,st){
       a.name+' 님, '+a.noticeTitle+' ('+a.target+' '+a.grade+'급) 결과 아쉽게도 [불합격]을 안내드립니다.\n다음 검정 공고는 홈페이지 [연맹 자격증]에서 확인해 주세요.');
   }
   loadApps();
+}
+// ── 신청 내역 삭제 (중앙 전용 — 오접수·테스트 정리) ──
+async function delLicApp(id){
+  const doc=LAPPS.find(d=>d.id===id);if(!doc)return;
+  const a=doc.data();
+  if(!confirm('⚠️ 신청 내역 삭제 — 되돌릴 수 없습니다.\n'+a.name+' · '+a.target+' '+a.grade+'급 ('+(a.status||'')+')\n\n※ 이미 발급된 자격(대장)은 삭제되지 않습니다. 삭제할까요?'))return;
+  try{
+    await DB.collection('licenseApps').doc(id).delete();
+    loadApps();
+  }catch(e){alert('실패: '+e.message+'\n(신청 삭제는 중앙 관리자만 가능합니다)')}
 }
 // ── 신청 건 타 연맹 이관 (특별한 경우 — 이관 즉시 해당 연맹 관할로 넘어감) ──
 async function transferApp(id){
@@ -665,12 +693,12 @@ async function renewLic(){
   const doc=await DB.collection('licenses').doc(no).get();
   if(!doc.exists){m.textContent='등록되지 않은 자격번호입니다';m.style.color='#C41E2F';return}
   const l=doc.data();
-  if(!confirm(no+'\n'+(l.name||l.maskName)+' · '+l.type+' '+l.grade+'\n현재 유효기간: ~'+l.expireAt+'\n\n4년 연장할까요? (연장교육 이수·연장료 납부 확인 후 진행)'))return;
+  if(!confirm(no+'\n'+(l.name||l.maskName)+' · '+l.type+' '+l.grade+'\n현재 유효기간: ~'+(l.expireAt||'기한 정보 없음')+'\n\n4년 갱신할까요? (갱신·보수 교육 이수 및 갱신료 납부 확인 후 진행)'))return;
   const base=(l.expireAt&&l.expireAt>=new Date().toISOString().slice(0,10))?l.expireAt:new Date().toISOString().slice(0,10);
   const newExp=plus4y(base);
   await DB.collection('licenses').doc(no).update({expireAt:newExp,status:'유효',renewedAt:new Date().toISOString().slice(0,10)});
-  await addHist(l.uid,'[자격] '+l.type+' '+l.grade+' 연장 ('+no+' · ~'+newExp+')');
-  m.textContent='✓ 연장 완료 — 새 유효기간: ~'+newExp;m.style.color='#0f766e';
+  await addHist(l.uid,'[자격] '+l.type+' '+l.grade+' 갱신 ('+no+' · ~'+newExp+')');
+  m.textContent='✓ 갱신 완료 — 새 유효기간: ~'+newExp;m.style.color='#0f766e';
 }
 
 // ── 관리: 일괄 등록 ──
@@ -735,24 +763,33 @@ async function loadLics(){
 function renderLics(){
   const el=document.getElementById('licList');if(!el)return;
   const q=(document.getElementById('lsSearch').value||'').trim().toLowerCase();
+  const fr=(document.getElementById('lsRegion')||{}).value||'';
+  const fs=(document.getElementById('lsStatus')||{}).value||'';
   const today=new Date().toISOString().slice(0,10);
   const docs=LICS.filter(d=>{
-    if(!q)return true;
-    const v=d.data();return (d.id+' '+(v.name||'')+' '+(v.maskName||'')).toLowerCase().indexOf(q)>=0;
+    const v=d.data();
+    if(fr&&(v.region||'')!==fr)return false;
+    if(fs){
+      const exp=(v.status==='만료')||(v.expireAt?v.expireAt<today:true);
+      if(fs==='만료'&&!exp)return false;
+      if(fs==='유효'&&exp)return false;
+    }
+    if(q&&(d.id+' '+(v.name||'')+' '+(v.maskName||'')).toLowerCase().indexOf(q)<0)return false;
+    return true;
   });
   document.getElementById('lsCount').textContent=docs.length+'건';
   if(!docs.length){el.innerHTML='<div class="bempty">발급된 자격이 없습니다.</div>';return}
   el.innerHTML=docs.map(d=>{
-    const l=d.data();const expired=l.expireAt&&l.expireAt<today;
+    const l=d.data();const expired=(l.status==='만료')||(l.expireAt?l.expireAt<today:true);
     return '<div class="lccard" style="padding:11px 16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div>'
       +'<b>'+esc(d.id)+'</b> · '+esc(l.name||l.maskName)+' · '+esc(l.type)+' '+esc(l.grade)
       +(l.region?' <span class="lctag" style="background:#b8860b">'+esc(l.region)+'</span>':'')
-      +' <span class="lctag" style="background:'+(expired?'#C41E2F':'#0f766e')+'">'+(expired?'만료':'유효')+'</span>'
+      +(l.status==='이관'?' <span class="lctag" style="background:#8a919d">이관→'+esc(l.movedTo||'')+'</span>':' <span class="lctag" style="background:'+(expired?'#C41E2F':'#0f766e')+'">'+(expired?'만료':'유효')+'</span>')
       +'<div style="font-size:12px;color:var(--gray)">발급 '+esc(l.issuedAt)+' · 유효 ~'+esc(l.expireAt)+' · '+esc(l.issuer||'')+(l.uid?' · 회원연결됨':'')
       +(l.regionMovedFrom?' · 이관: '+esc(l.regionMovedFrom)+'→'+esc(l.region):'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +'<button class="lcbtn" style="background:#8a919d" onclick="moveLic(\''+d.id+'\')">↪ 소속 이관</button>'
-      +(CENTRAL?'<button class="lcbtn" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delLic(\''+d.id+'\')">🗑 삭제</button>':'')
+      +'<button class="lcbtn g" onclick="moveLic(\''+d.id+'\')">↪ 소속 이관</button>'
+      +(CENTRAL?'<button class="lcbtn ghost" onclick="delLic(\''+d.id+'\')">🗑 삭제</button>':'')
       +'</div></div>';
   }).join('');
 }
@@ -778,7 +815,8 @@ async function delLic(no){
     loadLics();
   }catch(e){alert('실패: '+e.message+'\n(자격 삭제는 중앙 관리자만 가능합니다)')}
 }
-// ── 자격 소지자 소속 연맹 이관 (이사 등 — 자격번호는 유지, 관할만 변경) ──
+// ── 자격 소지자 소속 연맹 이관 (이사 등) ──
+// 지도자: 자격번호의 지역코드(조견표)도 새 소속으로 재발번 · 심판: 번호에 지역이 없어 번호 유지
 async function moveLic(no){
   const doc=LICS.find(d=>d.id===no);if(!doc)return;
   const l=doc.data();
@@ -788,21 +826,66 @@ async function moveLic(no){
   const target=T[parseInt(tn.trim(),10)-1];
   if(!target){alert('번호가 올바르지 않습니다.');return}
   if(target===l.region){alert('이미 해당 소속입니다.');return}
-  if(!confirm('소속을 ['+(l.region||'미지정')+'] → ['+target+'] 으로 이관할까요?\n자격번호는 그대로 유지되고, 관할 연맹만 변경됩니다.'))return;
+  // 지도자 + 새 소속에 조견표 코드가 있으면 번호 재발번
+  const m=String(no).match(/^(\d{2})(\d{2})-(\d{6,8})$/);
+  const newCode=REGION_CODE[target];
+  let newNo='';
+  if(l.type==='지도자'&&m&&newCode){
+    newNo=m[1]+newCode+'-'+m[3];
+    const dup=await DB.collection('licenses').doc(newNo).get();
+    if(dup.exists){
+      // 동일 번호 존재 시 신규 순번으로 발번
+      const now=new Date();
+      const yy=String(now.getFullYear()).slice(2), mm=String(now.getMonth()+1).padStart(2,'0');
+      const seq=await nextSeq('licL'+yy+mm);
+      newNo=m[1]+newCode+'-'+yy+mm+String(seq).padStart(4,'0');
+    }
+  }
+  if(!confirm('소속을 ['+(l.region||'미지정')+'] → ['+target+'] 으로 이관할까요?'
+    +(newNo?'\n\n자격번호도 지역코드에 맞춰 변경됩니다:\n'+no+' → '+newNo+'\n(기존 번호는 진위확인에서 "이관됨" 안내로 조회됩니다)':'\n\n(심판 또는 코드 미지정 소속 — 자격번호는 유지됩니다)')))return;
   try{
-    await DB.collection('licenses').doc(no).update({
-      region:target,
-      regionMovedFrom:l.region||'',
-      regionMovedAt:new Date().toISOString().slice(0,10)});
-    alert('이관 완료 — 이제 ['+target+'] 관할 연맹이 이 자격을 관리합니다.');
+    if(newNo){
+      const data=Object.assign({},l,{region:target,regionMovedFrom:l.region||'',regionMovedAt:new Date().toISOString().slice(0,10),prevNo:no});
+      await DB.collection('licenses').doc(newNo).set(data);
+      // 구 번호는 이관 안내용으로 유지
+      await DB.collection('licenses').doc(no).update({status:'이관',movedTo:newNo,region:target});
+      // 신청 건 자격번호 갱신
+      const apps=await DB.collection('licenseApps').where('licenseNo','==',no).get().catch(()=>({docs:[]}));
+      for(const a of apps.docs)await a.ref.update({licenseNo:newNo});
+      if(l.uid)await addHist(l.uid,'[자격] 소속 이관 '+(l.region||'')+'→'+target+' — 자격번호 변경 '+no+' → '+newNo);
+      alert('이관 완료\n새 자격번호: '+newNo+'\n회원 마이페이지에서 새 번호로 자격증을 재출력할 수 있습니다.');
+    }else{
+      await DB.collection('licenses').doc(no).update({
+        region:target,
+        regionMovedFrom:l.region||'',
+        regionMovedAt:new Date().toISOString().slice(0,10)});
+      if(l.uid)await addHist(l.uid,'[자격] 소속 이관 '+(l.region||'')+'→'+target+' ('+no+')');
+      alert('이관 완료 — 이제 ['+target+'] 관할 연맹이 이 자격을 관리합니다.');
+    }
     loadLics();
   }catch(e){alert('실패: '+e.message+'\n(관할 외 자격은 중앙 또는 현재 관할 연맹이 이관해야 합니다)')}
+}
+// ── 기한미상(유효기간 정보 없는 과거 자격) 일괄 만료 정리 — 중앙 전용 ──
+async function expireCleanup(){
+  if(!CENTRAL){alert('중앙 관리자만 실행할 수 있습니다.');return}
+  const targets=LICS.filter(d=>{const v=d.data();return !v.expireAt&&v.status!=='만료'&&v.status!=='이관';});
+  if(!targets.length){alert('정리할 기한미상 자격이 없습니다.');return}
+  if(!confirm('유효기간 정보가 없는 자격 '+targets.length+'건을 정리합니다.\n\n· 발급일이 있는 건: 발급일+4년−1일로 유효기간 기록 (이미 지난 경우 자동 만료 표시)\n· 발급일도 없는 건: [만료] 상태로 처리\n\n※ 해당 자격자는 갱신 절차(갱신·보수 교육)를 통해 재활성화할 수 있습니다. 진행할까요?'))return;
+  let n=0;const cnt=document.getElementById('lsCount');
+  for(const d of targets){
+    const v=d.data();
+    if(v.issuedAt){await d.ref.update({expireAt:plus4y(v.issuedAt)});}
+    else{await d.ref.update({status:'만료'});}
+    n++;if(n%50===0)cnt.textContent='정리 중… '+n+'/'+targets.length;
+  }
+  alert('정리 완료: '+n+'건');
+  loadLics();
 }
 function exportLics(){
   const rows=[['자격번호','성명','종류','급수','발급일','유효기간','상태','소속','발급연맹','회원연결']];
   const today=new Date().toISOString().slice(0,10);
   LICS.forEach(d=>{const l=d.data();
-    rows.push([d.id,l.name||l.maskName,l.type,l.grade,l.issuedAt,l.expireAt,(l.expireAt<today?'만료':'유효'),l.region||'',l.issuer||'',l.uid?'O':'']);
+    rows.push([d.id,l.name||l.maskName,l.type,l.grade,l.issuedAt,l.expireAt,(l.status==='이관'?'이관('+(l.movedTo||'')+')':((l.status==='만료')||(l.expireAt?l.expireAt<today:true)?'만료':'유효')),l.region||'',l.issuer||'',l.uid?'O':'']);
   });
   const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));

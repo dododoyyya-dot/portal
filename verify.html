@@ -177,7 +177,11 @@ async function verifyLic(){
     const doc=await DB.collection('licenses').doc(code).get();
     if(doc.exists){
       const l=doc.data();
-      const expired=l.expireAt&&l.expireAt<new Date().toISOString().slice(0,10);
+      if(l.status==='이관'&&l.movedTo){
+        el.innerHTML='<div style="background:#f1f4f9;border:2px solid #8a919d;border-radius:12px;padding:20px 22px"><b style="color:#555;font-size:17px">↪ 소속 이관으로 자격번호가 변경된 자격입니다</b><div style="font-size:14px;margin-top:8px">새 자격번호: <b>'+esc(l.movedTo)+'</b> — 새 번호로 다시 조회해주세요.</div></div>';
+        return;
+      }
+      const expired=(l.status==='만료')||(l.expireAt?l.expireAt<new Date().toISOString().slice(0,10):true);
       el.innerHTML='<div style="background:'+(expired?'#fdf3f4':'#f2faf7')+';border:2px solid '+(expired?'var(--red)':'#0f766e')+';border-radius:12px;padding:20px 22px">'
         +'<b style="color:'+(expired?'var(--red)':'#0f766e')+';font-size:17px">'+(expired?'⚠️ 만료된 자격입니다':'✅ 유효한 자격증입니다')+'</b>'
         +'<div style="font-size:14.5px;margin-top:10px;line-height:1.9">자격번호: <b>'+esc(code)+'</b><br>성명: <b>'+esc(l.maskName)+'</b><br>자격: <b>플라잉디스크 '+esc(l.type)+' '+esc(l.grade)+'</b><br>유효기간: '+(l.expireAt?esc(l.issuedAt||'')+' ~ '+esc(l.expireAt):(l.issuedAt?esc(l.issuedAt)+' 발급 (유효기간 정보는 사무국 문의)':'사무국 문의'))+'<br>발급기관: 대한플라잉디스크연맹 (등록 민간자격 · 전산운영 대한민국플라잉디스크연맹)'+(l.issuer?' · 처리: '+esc(l.issuer):'')+'</div></div>';

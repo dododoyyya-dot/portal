@@ -160,7 +160,7 @@ function orgChip(o,region,title){
   </div>
 
   <div id="profileBox" style="margin-top:26px;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:20px 22px">
-    <h3 style="margin:0 0 4px;font-size:16px">👤 강사 프로필 <span style="font-weight:600;color:var(--gray);font-size:12.5px">— 배정·위촉 검토에 활용됩니다. 언제든 본인이 수정할 수 있습니다.</span></h3>
+    <h3 style="margin:0 0 4px;font-size:16px">👤 마이 프로필 <span style="font-weight:600;color:var(--gray);font-size:12.5px">— 배정·위촉·자격 관리에 활용됩니다. 언제든 본인이 수정할 수 있습니다.</span></h3>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:14px">
       <div>
         <label style="font-size:13px;font-weight:800">거주 권역</label>
@@ -169,10 +169,18 @@ function orgChip(o,region,title){
         </select>
       </div>
       <div>
-        <label style="font-size:13px;font-weight:800">학위 (체육 전공)</label>
+        <label style="font-size:13px;font-weight:800">성별</label>
+        <select id="pfGender" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
+          <option value="">선택</option><option>남</option><option>여</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:13px;font-weight:800">학위 (체육 전공) <span id="pfDegSt" style="font-size:11px;font-weight:900"></span></label>
         <select id="pfDegree" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
           <option value="">해당 없음</option><option>체육 전문학사</option><option>체육학사</option><option>체육석사</option><option>체육박사</option>
         </select>
+        <input type="file" id="pfDegDoc" accept="image/*" style="display:block;margin-top:6px;font-size:12px">
+        <div id="pfDegLink" style="font-size:12px;margin-top:4px"></div>
       </div>
       <div>
         <label style="font-size:13px;font-weight:800">생년월일 <span style="font-weight:600;color:var(--gray);font-size:11.5px">(자격증 표기용)</span></label>
@@ -328,6 +336,12 @@ function fillProfile(d){
   document.getElementById('pfCareer').value=d.career||'';
   document.getElementById('pfSize').value=d.clothingSize||'';
   document.getElementById('pfBirth').value=d.birth||'';
+  document.getElementById('pfGender').value=d.gender||'';
+  // 학위 증빙 상태
+  const ds=document.getElementById('pfDegSt');
+  if(d.degree&&d.degreeDoc){ds.textContent=d.degreeApproved?'✓ 확인 완료':'⏳ 사무국 확인 대기';ds.style.color=d.degreeApproved?'#0f766e':'#b8860b';}
+  else if(d.degree){ds.textContent='📎 증빙 첨부 필요';ds.style.color='#C41E2F';}
+  document.getElementById('pfDegLink').innerHTML=d.degreeDoc?'<a href="'+d.degreeDoc+'" target="_blank" style="font-weight:800;color:#153A77;background:#eef3fa;border:1px solid #d4e0f2;border-radius:8px;padding:4px 10px">📎 첨부한 학위 증빙 보기</a>':'';
   renderDocList(d.qualDocs||[]);
 }
 function renderDocList(urls){
@@ -356,9 +370,21 @@ async function saveProfile(){
       await ref.put(blob,{contentType:'image/jpeg'});
       docs.push(await ref.getDownloadURL());
     }
+    // 학위 증빙 업로드 (새 파일 선택 시)
+    let degDoc=MYD.degreeDoc||'';
+    const df=document.getElementById('pfDegDoc').files[0];
+    if(df){
+      m.textContent='학위 증빙 업로드 중…';m.style.color='#153A77';
+      const blob=await compressImg(df);
+      const ref=firebase.storage().ref('quals/'+AUTH.currentUser.uid+'/degree_'+Date.now()+'.jpg');
+      await ref.put(blob,{contentType:'image/jpeg'});
+      degDoc=await ref.getDownloadURL();
+    }
     const upd={
       region:document.getElementById('pfRegion').value,
+      gender:document.getElementById('pfGender').value,
       degree:document.getElementById('pfDegree').value,
+      degreeDoc:degDoc,
       affiliation:af,
       quals:{leader:document.getElementById('pfLeader').value,referee:document.getElementById('pfRef').value,youth:document.getElementById('pfYouth').checked},
       career:document.getElementById('pfCareer').value.trim(),
@@ -366,10 +392,11 @@ async function saveProfile(){
       birth:document.getElementById('pfBirth').value,
       qualDocs:docs
     };
+    if(df&&MYD.degreeDoc!==degDoc)upd.degreeApproved=false; // 새 증빙 첨부 시 재확인 대상
     await DB.collection('users').doc(AUTH.currentUser.uid).update(upd);
     Object.assign(MYD,upd);
-    document.getElementById('pfDocs').value='';
-    renderDocList(docs);
+    document.getElementById('pfDocs').value='';document.getElementById('pfDegDoc').value='';
+    renderDocList(docs);fillProfile(MYD);
     m.textContent='✓ 저장되었습니다';m.style.color='#0f766e';
   }catch(e){m.textContent='저장 실패: '+e.message;m.style.color='#C41E2F'}
   PFBUSY=false;
@@ -620,15 +647,16 @@ async function loadMyLics(uid){
     document.getElementById('licBox').style.display='block';
     document.getElementById('licCards').innerHTML=MYLICS.map(d=>{
       const l=d.data();
-      const expired=l.expireAt&&l.expireAt<today;
+      const expired=(l.status==='만료')||(l.expireAt?l.expireAt<today:true);
+      if(l.status==='이관')return ''; // 이관 구번호 카드는 숨김 (새 번호 카드만 표시)
       const dday=l.expireAt?Math.floor((new Date(l.expireAt)-new Date())/86400000):null;
       const warn=!expired&&dday!==null&&dday<=180;
       return '<div style="background:'+(expired?'#fdf3f4':'#fffdf5')+';border:2px solid '+(expired?'#C41E2F':'#e6b422')+';border-radius:16px;padding:22px 26px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">'
         +'<div><div style="font-weight:900;font-size:17px">🎖 '+esc(l.type)+' '+esc(l.grade)
         +(expired?' <span style="font-size:12px;font-weight:900;color:#fff;background:#C41E2F;padding:2px 10px;border-radius:999px">만료</span>':' <span style="font-size:12px;font-weight:900;color:#fff;background:#0f766e;padding:2px 10px;border-radius:999px">유효</span>')+'</div>'
         +'<div style="font-size:13.5px;color:var(--gray);margin-top:6px">자격번호 <b>'+esc(d.id)+'</b>'+(l.issuedAt?' · 발급 '+esc(l.issuedAt):'')+(l.expireAt?' · 유효기간 ~'+esc(l.expireAt):'')
-        +(warn?'<br><b style="color:#b8860b">⏳ 만료까지 '+dday+'일 — 연장교육 공고를 확인하세요 (자격증 페이지)</b>':'')
-        +(expired?'<br><b style="color:#C41E2F">만료된 자격입니다. 연장 절차(연장교육·연장료)를 통해 재활성화할 수 있습니다.</b>':'')+'</div></div>'
+        +(warn?'<br><b style="color:#b8860b">⏳ 만료까지 '+dday+'일 — 갱신·보수(역량강화) 교육 공고를 확인하세요 (자격증 페이지)</b>':'')
+        +(expired?'<br><b style="color:#C41E2F">만료된 자격입니다. 갱신 절차(갱신·보수 교육 이수 및 갱신료)를 통해 재활성화할 수 있습니다.</b>':'')+'</div></div>'
         +'<button class="btn-sub" style="background:#b8860b;font-size:14px;padding:11px 20px" onclick="printLicense(\''+d.id+'\')">자격증 발급 (인쇄·PDF)</button>'
         +'</div>';
     }).join('');
