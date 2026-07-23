@@ -237,6 +237,11 @@ async function saveRegions(){
 }
 function renderApply(){
   const f=JMY.instructorFor||{};
+  const old=document.getElementById('jNoApply');if(old)old.remove();
+  if(!(f.school||f.after||f.referee||f.staff)){
+    document.querySelector('#jBody .sec-label').insertAdjacentHTML('beforebegin',
+      '<div id="jNoApply" style="background:#fdf3f4;border:2px solid #C41E2F;border-radius:14px;padding:16px 20px;margin-bottom:22px;font-size:14.5px;line-height:1.7"><b style="color:#8c1622">⚠ 지원 버튼을 눌러야 배정 대상이 됩니다!</b><br>가입·승인만으로는 강사 명단에 오르지 않습니다. 아래에서 원하는 분야의 <b>[지원하기]</b>를 눌러주세요. (여러 분야 중복 지원 가능)</div>');
+  }
   [['btnSchool','school'],['btnAfter','after'],['btnRef','referee'],['btnStaff','staff']].forEach(function(x){
     const b=document.getElementById(x[0]);if(!b)return;
     b.textContent=f[x[1]]?'✓ 지원 완료 (취소하기)':'지원하기';

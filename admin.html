@@ -372,11 +372,23 @@ async function setRegionAdmin(uid){
 }
 async function setCity(id){
   const doc=APPS.find(d=>d.id===id);if(!doc)return;
-  const cur=doc.data().city||'';
-  const val=prompt('시도 + 시군구를 입력하세요 (예: 경기도 김포시 / 부산광역시 수영구)',cur);
+  const s=doc.data();
+  const val=prompt('시도 + 시군구를 입력하세요 (예: 경기도 김포시 / 부산광역시 수영구)',s.city||'');
   if(val===null)return;
-  await DB.collection('schoolApplications').doc(id).update({city:val.trim()});
-  await loadApps();
+  const upd={city:val.trim()};
+  // 권역도 함께 확인 (잘못 접수된 권역 정정 — 예: 부산 학교가 서울·경기로 접수)
+  const rn=prompt('권역 확인 — 현재 ['+(s.region||'미지정')+']\n맞으면 그냥 [확인], 바꾸려면 번호 입력:\n1=서울·경기 2=강원 3=충청 4=전라 5=경상 6=제주',' ');
+  if(rn!==null){
+    const R={'1':'서울·경기','2':'강원','3':'충청','4':'전라','5':'경상','6':'제주'}[rn.trim()];
+    if(R&&R!==s.region){
+      upd.region=R;
+      // 지명 게시판에 올라가 있으면 권역도 갱신
+      const slot=await DB.collection('openSlots').doc(id).get();
+      if(slot.exists)await DB.collection('openSlots').doc(id).set(Object.assign(slot.data(),{region:R}));
+    }
+  }
+  await DB.collection('schoolApplications').doc(id).update(upd);
+  await loadApps();await updateLeaderboard().catch(()=>{});
 }
 function exportApps(){
   const rows=[['접수번호','학교명','시도/시군구','권역','유형','지원방식','상태','대기번호','담당교사','전화','이메일','이수자','본인지도','개강희망','배정강사','진행회차']];
@@ -515,7 +527,7 @@ async function toggleLogs(id){
     if(!logs.length){el.innerHTML='<span style="font-size:13px;color:var(--gray)">제출된 일지가 없습니다.</span>';return}
     el.innerHTML='<b style="font-size:13.5px">운영일지 '+logs.length+'건 (강사: '+esc(logs[0].name)+')</b>'
       +logs.map(l=>'<div style="border-top:1px dashed #d5d9e0;padding:8px 0;font-size:13px">'
-        +'<b>'+l.session+'회차</b> · '+esc(l.date)+' — '+esc(l.content)
+        +'<b>'+l.session+'회차</b> · '+esc(l.date)+(l.count?' · 👥 '+l.count+'명':'')+' — '+esc(l.content)
         +(l.note?' · <span style="color:#C41E2F">'+esc(l.note)+'</span>':'')
         +(l.photos&&l.photos.length?'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">'+l.photos.map(p=>'<a href="'+p+'" target="_blank"><img src="'+p+'" style="width:90px;height:66px;object-fit:cover;border-radius:8px"></a>').join('')+'</div>':'')
         +'</div>').join('');
@@ -726,6 +738,13 @@ function renderUsers(){
     const v=d.data(),lv=lvOf(v.points||0);
     return '<div class="urow"><div class="grow"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span>'+(v.withdrawReq?' <span style="font-size:11px;font-weight:900;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px">🚪 탈퇴 요청</span>':'')
       +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+(v.baseCity?' · <b style="color:#1F4E9C">📍'+esc(v.baseCity)+'</b>':' · <span style="font-size:11px;color:#C41E2F;font-weight:800">시군구 미입력</span>')+((v.activityRegions&&v.activityRegions.length)?' <span style="font-size:11px;font-weight:800;color:#0f766e">🗺활동가능: '+esc(v.activityRegions.join('·'))+'</span>':'')+(v.phone?' · '+esc(v.phone):'')+' · '+(v.edu2026?('연수이수 '+(inRoster(v.name)?'<b style="color:#0f766e">✓명단확인</b>':'<b style="color:#C41E2F">⚠명단에없음</b>')):'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+((v.instructorFor&&v.instructorFor.referee)?' · <b style="color:#7c3aed">심판요원 지원</b>':'')+((v.instructorFor&&v.instructorFor.staff)?' · <b style="color:#b8860b">운영요원 지원</b>':'')+'</div>'
+      +((v.affiliation&&v.affiliation.length)||(v.quals&&(v.quals.leader||v.quals.referee||v.quals.youth))||(v.qualDocs&&v.qualDocs.length)||v.degree
+        ?'<div class="sub3" style="margin-top:3px">프로필: '
+          +((v.affiliation&&v.affiliation.length)?'🏷 '+esc(v.affiliation.join('·')):'')
+          +((v.quals&&(v.quals.leader||v.quals.referee||v.quals.youth))?' · 🎖 '+esc([v.quals.leader,v.quals.referee,v.quals.youth?'유소년지도사':''].filter(Boolean).join('·')):'')
+          +(v.degree?' · 🎓 '+esc(v.degree):'')
+          +((v.qualDocs&&v.qualDocs.length)?' · '+v.qualDocs.map((u,i)=>'<a href="'+u+'" target="_blank" style="color:#153A77;font-weight:800">📎자격증'+(i+1)+'</a>').join(' '):'')
+        +'</div>':'')
       +'<div class="sub3" style="margin-top:3px">위촉검증: '
       +((v.consents&&v.consents.agreedAt)?'<b style="color:#0f766e">✓전자동의 '+fmtDate(v.consents.agreedAt)+'</b>':'<b style="color:#C41E2F">✗전자동의 전</b>')
       +' · '
@@ -747,10 +766,13 @@ function renderUsers(){
   sel.innerHTML=USERS.filter(d=>d.data().status==='approved').map(d=>'<option value="'+d.id+'">'+esc(d.data().name)+' ('+esc(d.data().region)+', '+(d.data().points||0)+'P)</option>').join('');
 }
 function exportInstructors(){
-  const rows=[['성명','권역','거점 시군구','활동가능권역','휴대전화','이메일','상태','포인트','학교체육','방과후늘봄','심판','운영','연수이수','명단확인','자격확인','경력확인','전자동의']];
+  const rows=[['성명','권역','거점 시군구','활동가능권역','소속','지도자자격','심판자격','유소년지도사','학위','경력사항','자격증사본','휴대전화','이메일','상태','포인트','학교체육','방과후늘봄','심판','운영','연수이수','명단확인','자격확인','경력확인','전자동의']];
   USERS.forEach(d=>{const v=d.data();const f=v.instructorFor||{};
     if(!(f.school||f.after||f.referee||f.staff))return;
-    rows.push([v.name,v.region||'',v.baseCity||'',(v.activityRegions||[]).join('·')||v.region||'',v.phone||'',v.email||'',v.status||'',v.points||0,
+    const q=v.quals||{};
+    rows.push([v.name,v.region||'',v.baseCity||'',(v.activityRegions||[]).join('·')||v.region||'',
+      (v.affiliation||[]).join('·'),q.leader||'',q.referee||'',q.youth?'O':'',v.degree||'',v.career||'',(v.qualDocs||[]).length?(v.qualDocs.length+'장'):'',
+      v.phone||'',v.email||'',v.status||'',v.points||0,
       f.school?'O':'',f.after?'O':'',f.referee?'O':'',f.staff?'O':'',
       v.edu2026?'O':'',(v.edu2026&&inRoster(v.name))?'O':'',v.certDoc?'O':'',v.crimDoc?'O':'',(v.consents&&v.consents.agreedAt)?'O':'']);
   });

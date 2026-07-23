@@ -357,10 +357,21 @@ async function unassign(id){
 }
 async function editCity(id){
   const doc=RAPPS.find(d=>d.id===id);if(!doc)return;
-  const val=prompt('시도 + 시군구 (예: 부산광역시 수영구)',doc.data().city||'');
+  const s=doc.data();
+  const val=prompt('시도 + 시군구 (예: 부산광역시 수영구)',s.city||'');
   if(val===null)return;
+  const upd={city:val.trim()};
+  const rn=prompt('권역 확인 — 현재 ['+(s.region||'미지정')+']\n맞으면 그냥 [확인], 바꾸려면 번호 입력:\n1=서울·경기 2=강원 3=충청 4=전라 5=경상 6=제주',' ');
+  if(rn!==null){
+    const R={'1':'서울·경기','2':'강원','3':'충청','4':'전라','5':'경상','6':'제주'}[rn.trim()];
+    if(R&&R!==s.region){
+      upd.region=R;
+      const slot=await DB.collection('openSlots').doc(id).get().catch(()=>null);
+      if(slot&&slot.exists)await DB.collection('openSlots').doc(id).set(Object.assign(slot.data(),{region:R})).catch(()=>{});
+    }
+  }
   try{
-    await DB.collection('schoolApplications').doc(id).update({city:val.trim()});
+    await DB.collection('schoolApplications').doc(id).update(upd);
     await loadSchools();
   }catch(e){alert('실패: '+e.message)}
 }
@@ -421,6 +432,9 @@ function renderInst(){
       +'<div class="imeta">'+(v.baseCity?'📍 '+esc(v.baseCity):'거점 미입력')+' · '+esc(v.region||'')
       +((v.activityRegions&&v.activityRegions.length)?' · 🗺 '+esc(v.activityRegions.join('·')):'')
       +' · '+[f.school?'학교체육':'',f.after?'방과후':'',f.referee?'심판':'',f.staff?'운영':''].filter(Boolean).join('/')
+      +((v.affiliation&&v.affiliation.length)?'<br>🏷 '+esc(v.affiliation.join('·')):'')
+      +((v.quals&&(v.quals.leader||v.quals.referee||v.quals.youth))?' 🎖 '+esc([v.quals.leader,v.quals.referee,v.quals.youth?'유소년지도사':''].filter(Boolean).join('·')):'')
+      +(v.degree?' 🎓 '+esc(v.degree):'')
       +(v.phone?'<br>☎ '+esc(v.phone):'')
       +(ld.n?'<br><span style="color:#7c3aed;font-weight:700">담당 중: '+esc(ld.names.join(', '))+'</span>':'')
       +'</div></div>'
