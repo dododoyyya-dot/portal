@@ -112,6 +112,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
     <div id="mg_apps" class="lccard" style="display:none">
       <h3 style="margin:0 0 8px;font-size:16px">신청 처리 · 발급</h3>
       <div class="lcbar"><select id="apNotice" class="lcin" style="width:auto;min-width:240px" onchange="loadApps()"><option value="">공고 선택</option></select>
+      <button class="lcbtn" style="background:#0f766e" onclick="bulkIssue()">🎖 합격자 일괄 발급</button>
       <span id="apCount" style="font-size:13px;font-weight:800;color:#153A77"></span></div>
       <div class="board" id="apList"><div class="bempty">공고를 선택하세요.</div></div>
     </div>
@@ -537,6 +538,66 @@ async function issueLic(appId){
   loadApps();
 }
 
+// ── 합격자 일괄 발급 ──
+async function bulkIssue(){
+  const nid=document.getElementById('apNotice').value;
+  if(!nid){alert('공고를 먼저 선택하세요.');return}
+  // 시도연맹: 결과보고 승인 게이트 (공고 단위 1회 확인)
+  if(MSIDO){
+    const nt=await DB.collection('licenseNotices').doc(nid).get();
+    if(nt.exists&&nt.data().reportStatus!=='승인'){
+      alert('이 공고의 결과보고가 아직 중앙 승인되지 않았습니다.\n결과보고 제출·승인 후 일괄 발급할 수 있습니다.\n(현재: '+(nt.data().reportStatus||'미제출')+')');return;
+    }
+  }
+  const pass=LAPPS.filter(d=>d.data().status==='합격');
+  if(!pass.length){alert('발급 대기(합격) 상태인 신청자가 없습니다.');return}
+  // 지도자인데 시도코드 특정 불가(전라·중앙 등) → 개별 발급으로 분리
+  const ok=[],hold=[];
+  pass.forEach(d=>{
+    const a=d.data();
+    const isRef=a.target.indexOf('심판')>=0;
+    if(!isRef&&!REGION_CODE[a.sido||''])hold.push(d);else ok.push(d);
+  });
+  if(!confirm('합격자 일괄 발급\n\n· 발급 대상: '+ok.length+'명'
+    +(hold.length?'\n· 제외(지도자·시도코드 확인 필요 — 개별 발급): '+hold.map(d=>d.data().name).join(', '):'')
+    +'\n\n발급과 동시에 대장 등록·이력 기록·발급 메일이 발송됩니다. 진행할까요?'))return;
+  const cnt=document.getElementById('apCount');
+  let done=0,fail=[];
+  for(const d of ok){
+    const a=d.data();
+    try{
+      cnt.textContent='발급 중… '+(done+1)+'/'+ok.length;
+      const type=a.target.indexOf('심판')>=0?'심판':'지도자';
+      const now=new Date();
+      const yy=String(now.getFullYear()).slice(2), mm=String(now.getMonth()+1).padStart(2,'0');
+      const g2=String(a.grade).padStart(2,'0');
+      let no='';
+      if(type==='지도자'){
+        const seq=await nextSeq('licL'+yy+mm);
+        no=g2+REGION_CODE[a.sido]+'-'+yy+mm+String(seq).padStart(4,'0');
+      }else{
+        const seq=await nextSeq('licR'+g2+yy);
+        no=g2+'-'+yy+String(seq).padStart(4,'0');
+      }
+      const today=now.toISOString().slice(0,10);
+      await DB.collection('licenses').doc(no).set({
+        name:a.name,maskName:maskName(a.name),type:type,grade:a.grade+'급',
+        issuedAt:today,expireAt:plus4y(today),status:'유효',
+        region:(MSIDO||a.sido||''),
+        issuer:(LMY.role==='admin'?'중앙연맹':(MSIDO+'연맹')),
+        uid:a.uid||'',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+      await DB.collection('licenseApps').doc(d.id).update({status:'발급완료',licenseNo:no});
+      await addHist(a.uid,'[자격] '+type+' '+a.grade+'급 취득 ('+no+' · '+(LMY.role==='admin'?'중앙연맹':MSIDO+'연맹')+')');
+      if(window.kfdfMail&&a.email)kfdfMail(a.email,'[플라잉디스크연맹] 자격 발급 완료 — '+type+' '+a.grade+'급',
+        a.name+' 님의 자격이 발급되었습니다.\n\n· 자격: 플라잉디스크 '+type+' '+a.grade+'급\n· 자격번호: '+no+'\n· 유효기간: 발급일로부터 4년\n\n홈페이지 마이페이지 › 연맹 자격증에서 자격증을 인쇄·PDF로 출력할 수 있습니다.');
+      done++;
+    }catch(e){fail.push(a.name+' ('+e.message+')')}
+  }
+  alert('일괄 발급 완료: '+done+'명'
+    +(hold.length?'\n개별 발급 필요: '+hold.length+'명 (지도자 시도코드 확인)':'')
+    +(fail.length?'\n실패: '+fail.join(', '):''));
+  loadApps();
+}
 // ── 관리: 연장 ──
 async function renewLic(){
   const m=document.getElementById('rnMsg');
@@ -624,9 +685,23 @@ function renderLics(){
       +' <span class="lctag" style="background:'+(expired?'#C41E2F':'#0f766e')+'">'+(expired?'만료':'유효')+'</span>'
       +'<div style="font-size:12px;color:var(--gray)">발급 '+esc(l.issuedAt)+' · 유효 ~'+esc(l.expireAt)+' · '+esc(l.issuer||'')+(l.uid?' · 회원연결됨':'')
       +(l.regionMovedFrom?' · 이관: '+esc(l.regionMovedFrom)+'→'+esc(l.region):'')+'</div></div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
       +'<button class="lcbtn" style="background:#8a919d" onclick="moveLic(\''+d.id+'\')">↪ 소속 이관</button>'
-      +'</div>';
+      +(!MSIDO?'<button class="lcbtn" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delLic(\''+d.id+'\')">🗑 삭제</button>':'')
+      +'</div></div>';
   }).join('');
+}
+// ── 자격 삭제 (중앙 전용 — 오발급·테스트 정리) ──
+async function delLic(no){
+  const doc=LICS.find(d=>d.id===no);if(!doc)return;
+  const l=doc.data();
+  const t=prompt('⚠️ 자격 삭제 — 되돌릴 수 없습니다.\n'+no+' ('+(l.name||l.maskName)+' · '+l.type+' '+l.grade+')\n\n삭제하려면 "삭제"를 입력하세요.');
+  if(t===null||t.trim()!=='삭제')return;
+  try{
+    await DB.collection('licenses').doc(no).delete();
+    alert('삭제되었습니다.');
+    loadLics();
+  }catch(e){alert('실패: '+e.message+'\n(자격 삭제는 중앙 관리자만 가능합니다)')}
 }
 // ── 자격 소지자 소속 연맹 이관 (이사 등 — 자격번호는 유지, 관할만 변경) ──
 async function moveLic(no){
