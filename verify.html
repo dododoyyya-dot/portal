@@ -36,7 +36,12 @@
         <a href="certification.html">체육지도자 실기 · 구술</a>
         <a href="leader.html">레벨업 시스템</a>
       </div></div>
-    <div><a href="certification.html" class="top">자격검정</a></div>
+    <div><a href="certification.html" class="top">자격검정</a>
+      <div class="drop">
+        <a href="certification.html">체육지도자 실기 · 구술</a>
+        <a href="license.html">연맹 자격증 (지도자 · 심판)</a>
+        <a href="verify.html">이수증 · 자격증 진위확인</a>
+      </div></div>
     <div><a href="competition.html" class="top">대회</a></div>
     <div><a href="leader.html" class="top">리더 시스템</a></div>
     <div><a href="community.html" class="top">커뮤니티</a></div>
@@ -115,8 +120,8 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
 
 <div class="phero"><div class="wrap">
   <div class="crumb">HOME &nbsp;›&nbsp; <b>이수증 진위 확인</b></div>
-  <h1>이수증 진위 확인</h1>
-  <p>대한민국플라잉디스크연맹이 발급한 자율연수 이수증의 유효성을 확인합니다.</p>
+  <h1>이수증 · 자격증 진위 확인</h1>
+  <p>대한민국플라잉디스크연맹이 발급한 자율연수 이수증과 지도자·심판 자격증의 유효성을 확인합니다.</p>
 </div></div>
 <section><div class="wrap" style="max-width:640px">
   <div class="authbox" style="max-width:none">
@@ -128,6 +133,16 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
     </div>
     <div id="vfResult" style="margin-top:18px"></div>
     <div style="margin-top:22px;font-size:12.5px;color:var(--gray)">개인정보 보호를 위해 성명은 일부만 표시됩니다. 추가 확인이 필요한 기관은 사무국(kfdf60@hanmail.net / 031-984-3248)으로 문의해주세요.</div>
+  </div>
+
+  <div class="authbox" style="max-width:none;margin-top:24px">
+    <h3>🎖 자격번호 조회 (지도자 · 심판)</h3>
+    <p style="font-size:13.5px;color:var(--gray)">자격증에 기재된 자격번호를 입력하세요. (지도자 예: 0301-09080001 · 심판 예: 01-230001)</p>
+    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+      <input id="vlCode" placeholder="예: 0301-09080001" style="flex:1;min-width:220px;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;font-family:inherit;text-transform:uppercase">
+      <button class="btn-sub" style="padding:12px 22px;font-size:15px;background:#b8860b" onclick="verifyLic()">확인</button>
+    </div>
+    <div id="vlResult" style="margin-top:18px"></div>
   </div>
 </div></section>
 <script>
@@ -152,6 +167,28 @@ async function verify(){
   }catch(e){el.innerHTML='<span style="color:var(--red);font-size:14px">확인 실패: '+esc(e.message)+'</span>'}
 }
 document.getElementById('vfCode').addEventListener('keydown',e=>{if(e.key==='Enter')verify()});
+async function verifyLic(){
+  const el=document.getElementById('vlResult');
+  const code=document.getElementById('vlCode').value.trim().toUpperCase().replace(/\s/g,'');
+  // 지도자: 0000-000000(00) · 심판: 00-000000 또는 000000(구형)
+  if(!/^(\d{4}-\d{6,8}(_\d+)?|\d{2}-\d{6}(_\d+)?|\d{6}(_\d+)?)$/.test(code)){el.innerHTML='<span style="color:var(--red);font-weight:700;font-size:14px">자격번호 형식이 올바르지 않습니다 (지도자 예: 0301-09080001 · 심판 예: 01-230001)</span>';return}
+  el.innerHTML='<span style="font-size:14px;color:var(--gray)">확인 중…</span>';
+  try{
+    const doc=await DB.collection('licenses').doc(code).get();
+    if(doc.exists){
+      const l=doc.data();
+      const expired=l.expireAt&&l.expireAt<new Date().toISOString().slice(0,10);
+      el.innerHTML='<div style="background:'+(expired?'#fdf3f4':'#f2faf7')+';border:2px solid '+(expired?'var(--red)':'#0f766e')+';border-radius:12px;padding:20px 22px">'
+        +'<b style="color:'+(expired?'var(--red)':'#0f766e')+';font-size:17px">'+(expired?'⚠️ 만료된 자격입니다':'✅ 유효한 자격증입니다')+'</b>'
+        +'<div style="font-size:14.5px;margin-top:10px;line-height:1.9">자격번호: <b>'+esc(code)+'</b><br>성명: <b>'+esc(l.maskName)+'</b><br>자격: <b>플라잉디스크 '+esc(l.type)+' '+esc(l.grade)+'</b><br>유효기간: '+(l.expireAt?esc(l.issuedAt||'')+' ~ '+esc(l.expireAt):(l.issuedAt?esc(l.issuedAt)+' 발급 (유효기간 정보는 사무국 문의)':'사무국 문의'))+'<br>발급기관: 대한플라잉디스크연맹 (등록 민간자격 · 전산운영 대한민국플라잉디스크연맹)'+(l.issuer?' · 처리: '+esc(l.issuer):'')+'</div></div>';
+    }else{
+      el.innerHTML='<div style="background:#fdf3f4;border:2px solid var(--red);border-radius:12px;padding:20px 22px">'
+        +'<b style="color:var(--red);font-size:17px">❌ 등록되지 않은 자격번호입니다</b>'
+        +'<div style="font-size:13.5px;color:var(--gray);margin-top:8px">번호를 다시 확인하시거나 사무국으로 문의해주세요.</div></div>';
+    }
+  }catch(e){el.innerHTML='<span style="color:var(--red);font-size:14px">확인 실패: '+esc(e.message)+'</span>'}
+}
+document.getElementById('vlCode').addEventListener('keydown',e=>{if(e.key==='Enter')verifyLic()});
 </script>
 <footer><div class="wrap">
   <div class="top">

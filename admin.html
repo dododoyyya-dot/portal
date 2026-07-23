@@ -36,7 +36,12 @@
         <a href="certification.html">체육지도자 실기 · 구술</a>
         <a href="leader.html">레벨업 시스템</a>
       </div></div>
-    <div><a href="certification.html" class="top">자격검정</a></div>
+    <div><a href="certification.html" class="top">자격검정</a>
+      <div class="drop">
+        <a href="certification.html">체육지도자 실기 · 구술</a>
+        <a href="license.html">연맹 자격증 (지도자 · 심판)</a>
+        <a href="verify.html">이수증 · 자격증 진위확인</a>
+      </div></div>
     <div><a href="competition.html" class="top">대회</a></div>
     <div><a href="leader.html" class="top">리더 시스템</a></div>
     <div><a href="community.html" class="top active">커뮤니티</a></div>
@@ -198,6 +203,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#0f766e" onclick="exportCSV()">⬇ 전체 CSV 내려받기</button>
         <button class="btn-sub" style="background:#e6b422" onclick="fixCounters()">⚙ 선착순 카운터 보정</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="syncLogPoints()">⚡ 일지 기준 포인트 반영</button>
+        <button class="btn-sub" style="background:#153A77" onclick="reviewHist()">📋 이력 승인·포인트 전환</button>
         <button class="btn-sub" style="background:#b8860b" onclick="payrollCSV()">💰 월 지급 계산 CSV</button>
         <button class="btn-sub" style="background:#555" onclick="closeWaitlist()">⏳ 대기자 일괄 종료</button>
       </div>
@@ -364,9 +370,15 @@ async function setRegionAdmin(uid){
   if(n===null)return;
   const R={'1':'서울·경기','2':'강원','3':'충청','4':'전라','5':'경상','6':'제주'}[n.trim()];
   if(!R){alert('1~6 중에서 입력해주세요.');return}
-  if(!confirm(v.name+' 님에게 ['+R+'] 권역 관리자 권한을 부여할까요?\n\n· 자기 권역 신청 학교 열람·강사 배정·상태 변경·시군구 수정 가능\n· 회원 삭제·포인트 부여·타권역 접근은 불가\n· 전용 페이지: region.html'))return;
+  const sn=prompt('자격증 업무 관할 연맹 번호를 입력하세요 (시도연맹 관계자인 경우):\n1=경기 2=강원 3=부산 4=경남 5=전라\n(자격 업무 권한이 필요 없으면 0)','0');
+  if(sn===null)return;
+  const SIDOS={'1':'경기','2':'강원','3':'부산','4':'경남','5':'전라'};
+  const S=SIDOS[sn.trim()]||'';
+  if(!confirm(v.name+' 님에게 권역 관리자 권한을 부여할까요?\n\n· 강습 배정: 전 권역 열람·배정 가능 (region.html)\n· 자격증 업무: '+(S?('['+S+'] 관할만 열람·발급'):'권한 없음')+'\n· 회원 삭제·포인트 부여·권한 부여는 불가'))return;
   try{
-    await DB.collection('users').doc(uid).update({role:'regionAdmin',managedRegion:R});
+    const upd={role:'regionAdmin',managedRegion:R};
+    if(S)upd.managedSido=S;else upd.managedSido=firebase.firestore.FieldValue.delete();
+    await DB.collection('users').doc(uid).update(upd);
     alert('지정 완료. '+v.name+' 님에게 region.html 주소를 안내하세요.');loadUsers();
   }catch(e){alert('실패: '+e.message+'\n(권한 부여는 오너 계정만 가능합니다 — 규칙 파일의 owner 설정 안내 참고)')}
 }
@@ -613,6 +625,50 @@ async function toWait(id){
   if(s.code)await DB.collection('appStatus').doc(s.code).set({school:s.school,type:s.type,status:'대기',waitNo:no,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
   loadApps();loadDash();
 }
+
+// ── 이력 승인 · 포인트 전환 (권역관리자가 기록한 0P 이력을 중앙이 검토) ──
+async function reviewHist(){
+  const box=document.getElementById('auditBox');
+  box.style.display='block';
+  box.innerHTML='<b style="font-size:15px">📋 이력 승인 · 포인트 전환</b><div style="font-size:12.5px;color:var(--gray);margin:4px 0 12px">권역관리자·시도연맹이 기록한 이력(0P) 중 미검토 건입니다. 포인트를 부여하거나 이력만 승인(0P 유지)하세요.</div><div id="histList">불러오는 중…</div>';
+  try{
+    const snap=await DB.collectionGroup('activities').where('points','==',0).get();
+    const pend=snap.docs.filter(d=>!d.data().reviewed);
+    if(!pend.length){document.getElementById('histList').innerHTML='<span style="font-size:13.5px;color:#0f766e;font-weight:700">✓ 검토 대기 중인 이력이 없습니다.</span>';return}
+    const nameOf=uid=>{const u=USERS.find(x=>x.id===uid);return u?u.data().name:'(회원 미확인)'};
+    window._HISTDOCS={};
+    document.getElementById('histList').innerHTML=pend.map((d,i)=>{
+      const v=d.data();const uid=d.ref.parent.parent.id;
+      window._HISTDOCS[i]={path:d.ref.path,uid:uid};
+      return '<div class="urow"><div class="grow"><b>'+esc(nameOf(uid))+'</b> <span class="sub3">'+esc(v.date)+'</span>'
+        +'<div class="sub3">'+esc(v.label)+'</div></div>'
+        +'<button class="btn-sub" style="background:#C41E2F" onclick="grantHist('+i+')">P 부여</button>'
+        +'<button class="btn-sub" style="background:#8a919d" onclick="keepHist('+i+')">이력만 승인 (0P)</button>'
+        +'</div>';
+    }).join('');
+  }catch(e){document.getElementById('histList').innerHTML='<span style="color:var(--red);font-size:13px">불러오기 실패: '+esc(e.message)+'<br><b>첫 실행이라면:</b> ① 규칙 재게시 확인 ② 위 오류 메시지 안에 색인(index) 생성 링크(https://console.firebase.google.com/...)가 있으면 그 주소를 복사해 접속 → [색인 만들기] 클릭 → 1~2분 후 다시 시도하세요.</span>'}
+}
+async function grantHist(i){
+  const h=window._HISTDOCS[i];if(!h)return;
+  const n=parseInt(prompt('부여할 포인트를 입력하세요 (예: 10)',''));
+  if(!n||n<1)return;
+  await DB.doc(h.path).update({points:n,reviewed:true,reviewedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  await DB.collection('users').doc(h.uid).update({points:firebase.firestore.FieldValue.increment(n)});
+  await updateLeaderboard().catch(()=>{});
+  reviewHist();
+}
+async function keepHist(i){
+  const h=window._HISTDOCS[i];if(!h)return;
+  await DB.doc(h.path).update({reviewed:true,reviewedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  reviewHist();
+}
+// 회원 공식 이력 기록 (경력 데이터 축적)
+async function adHist(uid,label){
+  if(!uid)return;
+  try{await DB.collection('users').doc(uid).collection('activities').add({
+    date:new Date().toISOString().slice(0,10),label:label,points:0,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()});}catch(e){}
+}
 async function setStatus(id,st){
   const s=APPS.find(d=>d.id===id).data();
   if(st==='선정'&&!confirm(s.school+' 을(를) 선정할까요?\n\n📧 담당교사에게 선정 안내 이메일이 즉시 발송되고, 강사 지명 게시판에 공개됩니다.'))return;
@@ -620,6 +676,7 @@ async function setStatus(id,st){
   if(st==='선정'&&s.selfTeach&&s.selfUid){
     // 본인 직접 지도: 선정과 동시에 자동 배정 (지명 게시판 미공개)
     await DB.collection('schoolApplications').doc(id).update({status:'배정완료',assignedUid:s.selfUid,assignedName:s.selfName});
+    await adHist(s.selfUid,'[위촉] '+s.school+' 강사 배정 (본인지도 · '+(s.region||'')+')');
     await syncStatus(s,'배정완료',{assignedName:s.selfName});
     kfdfMail(s.email,'[플라잉디스크연맹] 강습 선정 안내 — '+s.school,s.school+' ('+s.type+') 신청이 선정되었으며, 신청하신 본인지도로 강사 배정까지 완료되었습니다.\n접수번호: '+(s.code||'')+'\n일정 협의를 위해 곧 연락드리겠습니다.');
     loadApps();loadDash();return;
@@ -655,6 +712,7 @@ async function autoAssign(){
     const slot=await DB.collection('openSlots').doc(d.id).get();
     if(slot.exists&&slot.data().claimedBy){
       await d.ref.update({assignedUid:slot.data().claimedBy,assignedName:slot.data().claimedName,status:'배정완료'});
+      await adHist(slot.data().claimedBy,'[위촉] '+s.school+' 강사 배정 ('+(String(s.type||'').indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' · '+(s.region||'')+')');
       await syncStatus(s,'배정완료',{assignedName:slot.data().claimedName});
       done++;continue;
     }
@@ -664,6 +722,7 @@ async function autoAssign(){
     cands.sort((a,b)=>a.cnt-b.cnt);
     const pick=cands[0];pick.cnt++;
     await d.ref.update({assignedUid:pick.uid,assignedName:pick.name,status:'배정완료'});
+    await adHist(pick.uid,'[위촉] '+s.school+' 강사 배정 ('+(String(s.type||'').indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' · '+(s.region||'')+')');
     await syncStatus(s,'배정완료',{assignedName:pick.name});
     await DB.collection('openSlots').doc(d.id).delete().catch(()=>{});
     done++;
@@ -766,12 +825,12 @@ function renderUsers(){
   sel.innerHTML=USERS.filter(d=>d.data().status==='approved').map(d=>'<option value="'+d.id+'">'+esc(d.data().name)+' ('+esc(d.data().region)+', '+(d.data().points||0)+'P)</option>').join('');
 }
 function exportInstructors(){
-  const rows=[['성명','권역','거점 시군구','활동가능권역','소속','지도자자격','심판자격','유소년지도사','학위','경력사항','자격증사본','휴대전화','이메일','상태','포인트','학교체육','방과후늘봄','심판','운영','연수이수','명단확인','자격확인','경력확인','전자동의']];
+  const rows=[['성명','권역','거점 시군구','활동가능권역','소속','지도자자격','심판자격','유소년지도사','학위','의류사이즈','경력사항','자격증사본','휴대전화','이메일','상태','포인트','학교체육','방과후늘봄','심판','운영','연수이수','명단확인','자격확인','경력확인','전자동의']];
   USERS.forEach(d=>{const v=d.data();const f=v.instructorFor||{};
     if(!(f.school||f.after||f.referee||f.staff))return;
     const q=v.quals||{};
     rows.push([v.name,v.region||'',v.baseCity||'',(v.activityRegions||[]).join('·')||v.region||'',
-      (v.affiliation||[]).join('·'),q.leader||'',q.referee||'',q.youth?'O':'',v.degree||'',v.career||'',(v.qualDocs||[]).length?(v.qualDocs.length+'장'):'',
+      (v.affiliation||[]).join('·'),q.leader||'',q.referee||'',q.youth?'O':'',v.degree||'',v.clothingSize||'',v.career||'',(v.qualDocs||[]).length?(v.qualDocs.length+'장'):'',
       v.phone||'',v.email||'',v.status||'',v.points||0,
       f.school?'O':'',f.after?'O':'',f.referee?'O':'',f.staff?'O':'',
       v.edu2026?'O':'',(v.edu2026&&inRoster(v.name))?'O':'',v.certDoc?'O':'',v.crimDoc?'O':'',(v.consents&&v.consents.agreedAt)?'O':'']);
@@ -961,6 +1020,14 @@ async function confirmComp(id){
   else sel=pick.split(',').map(x=>claimed[parseInt(x.trim())-1]).filter(Boolean).map(c=>c.uid);
   if(!sel.length){alert('선택된 지명자가 없습니다.');return}
   await DB.collection('compSlots').doc(id).update({confirmed:[...new Set([...confirmed,...sel])]});
+  // 회원 공식 이력 기록
+  for(const u of sel){
+    if(confirmed.indexOf(u)>=0)continue; // 기확정자 중복 방지
+    await DB.collection('users').doc(u).collection('activities').add({
+      date:new Date().toISOString().slice(0,10),
+      label:'[대회] '+s.title+' '+s.role+'요원 확정 ('+(s.region||'')+' · '+(s.date||'')+')',
+      points:0,createdAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+  }
   alert(sel.length+'명 확정 처리되었습니다. 통보문 버튼으로 안내 문자를 복사하세요.\n대회 종료 후에는 [포인트 부여]에서 심판 20P/일·운영 15P/일을 지급하면 됩니다.');
   loadCompsAdmin();
 }

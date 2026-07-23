@@ -35,7 +35,12 @@
         <a href="certification.html">체육지도자 실기 · 구술</a>
         <a href="leader.html">레벨업 시스템</a>
       </div></div>
-    <div><a href="certification.html" class="top">자격검정</a></div>
+    <div><a href="certification.html" class="top">자격검정</a>
+      <div class="drop">
+        <a href="certification.html">체육지도자 실기 · 구술</a>
+        <a href="license.html">연맹 자격증 (지도자 · 심판)</a>
+        <a href="verify.html">이수증 · 자격증 진위확인</a>
+      </div></div>
     <div><a href="competition.html" class="top">대회</a></div>
     <div><a href="leader.html" class="top">리더 시스템</a></div>
     <div><a href="community.html" class="top active">커뮤니티</a></div>
@@ -169,6 +174,12 @@ function orgChip(o,region,title){
           <option value="">해당 없음</option><option>체육 전문학사</option><option>체육학사</option><option>체육석사</option><option>체육박사</option>
         </select>
       </div>
+      <div>
+        <label style="font-size:13px;font-weight:800">의류 사이즈 <span style="font-weight:600;color:var(--gray);font-size:11.5px">(활동 피복·조끼 지급용)</span></label>
+        <select id="pfSize" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
+          <option value="">선택</option><option>S (90)</option><option>M (95)</option><option>L (100)</option><option>XL (105)</option><option>2XL (110)</option><option>3XL (115)</option>
+        </select>
+      </div>
     </div>
     <div style="margin-top:14px">
       <label style="font-size:13px;font-weight:800">소속 (중복 선택 가능)</label>
@@ -219,6 +230,20 @@ function orgChip(o,region,title){
       </div>
       <button class="btn-sub" style="background:#b8860b;font-size:15px;padding:12px 22px" onclick="printCert()">이수증 발급 (인쇄·PDF)</button>
     </div>
+  </div>
+  <div id="licBox" style="display:none;margin-top:44px">
+    <h3 class="sub">연맹 자격증 (지도자 · 심판) <a href="license.html" style="font-size:13px;font-weight:800;color:#153A77;margin-left:8px">검정·연장 공고 보기 →</a></h3>
+    <div id="licCards"></div>
+  </div>
+  <div id="claimBox" style="margin-top:26px;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:18px 20px">
+    <h3 style="margin:0 0 6px;font-size:15.5px">🔗 기존 자격증 연결 (지도자 · 심판)</h3>
+    <p style="font-size:12.5px;color:var(--gray);margin:0 0 10px;line-height:1.7">홈페이지 개설 이전에 발급받은 연맹 지도자·심판 자격이 있다면 자격증에 기재된 <b>자격번호</b>로 연결을 신청하세요. 관할 연맹 확인 후 이곳에 자격증이 표시되고 온라인 발급이 가능해집니다.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input id="clNo" placeholder="자격번호 (예: 0301-09080001 / 01-230001)" style="flex:1;min-width:220px;padding:10px 13px;border:1.5px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit;text-transform:uppercase">
+      <button class="btn-sub" style="background:#0f766e" onclick="claimLic()">연결 신청</button>
+    </div>
+    <div id="clMsg" style="font-size:13px;font-weight:700;margin-top:8px"></div>
+    <div id="clList" style="margin-top:8px;font-size:12.5px;line-height:1.8"></div>
   </div>
   <div id="contractBox" style="display:none;margin-top:44px">
     <h3 class="sub">위촉 계약 (배정 학교)</h3>
@@ -297,6 +322,7 @@ function fillProfile(d){
   document.getElementById('pfRef').value=q.referee||'';
   document.getElementById('pfYouth').checked=!!q.youth;
   document.getElementById('pfCareer').value=d.career||'';
+  document.getElementById('pfSize').value=d.clothingSize||'';
   renderDocList(d.qualDocs||[]);
 }
 function renderDocList(urls){
@@ -331,6 +357,7 @@ async function saveProfile(){
       affiliation:af,
       quals:{leader:document.getElementById('pfLeader').value,referee:document.getElementById('pfRef').value,youth:document.getElementById('pfYouth').checked},
       career:document.getElementById('pfCareer').value.trim(),
+      clothingSize:document.getElementById('pfSize').value,
       qualDocs:docs
     };
     await DB.collection('users').doc(AUTH.currentUser.uid).update(upd);
@@ -370,6 +397,8 @@ AUTH.onAuthStateChanged(async u=>{
   document.getElementById('myPhone').value=d.phone||'';
   if(!d.phone){document.getElementById('phMsg').textContent='배정·위촉 연락을 위해 등록해주세요';document.getElementById('phMsg').style.color='#C41E2F'}
   fillProfile(d);
+  loadMyLics(u.uid);
+  loadMyClaims();
   // 승인됐지만 아직 어떤 분야에도 지원하지 않은 회원 안내
   const fApplied=d.instructorFor&&(d.instructorFor.school||d.instructorFor.after||d.instructorFor.referee||d.instructorFor.staff);
   if(d.status==='approved'&&!fApplied){
@@ -418,7 +447,7 @@ AUTH.onAuthStateChanged(async u=>{
   const acts=await DB.collection('users').doc(u.uid).collection('activities').orderBy('date','desc').limit(50).get();
   const el=document.getElementById('actList');
   el.innerHTML=acts.empty?'<div class="bempty">아직 기록된 활동이 없습니다.</div>':
-    acts.docs.map(a=>{const v=a.data();return '<div class="brow"><div class="head" style="grid-template-columns:110px 1fr 90px"><div class="dt">'+esc(v.date)+'</div><div class="tt" style="font-size:15px">'+esc(v.label)+'</div><div class="cat" style="color:var(--red);font-weight:900">+'+v.points+'P</div></div></div>'}).join('');
+    acts.docs.map(a=>{const v=a.data();return '<div class="brow"><div class="head" style="grid-template-columns:110px 1fr 90px"><div class="dt">'+esc(v.date)+'</div><div class="tt" style="font-size:15px">'+esc(v.label)+'</div><div class="cat" style="font-weight:900;'+(v.points?'color:var(--red)':'color:#153A77')+'">'+(v.points?'+'+v.points+'P':'📋 이력')+'</div></div></div>'}).join('');
 });
 function compressImg(file){
   return new Promise(res=>{
@@ -540,6 +569,105 @@ function printContract(id){
   w.document.close();
 }
 function certNo(){return 'KFDF-2026-EDU-'+AUTH.currentUser.uid.slice(0,6).toUpperCase()}
+// ── 기존 자격 연결 신청 ──
+function maskNm(n){n=String(n||'');return n.length<2?n:n[0]+'*'.repeat(Math.max(1,n.length-2))+(n.length>2?n[n.length-1]:'')}
+async function claimLic(){
+  const m=document.getElementById('clMsg');
+  const no=document.getElementById('clNo').value.trim().toUpperCase().replace(/\s/g,'');
+  if(!no){m.textContent='자격번호를 입력하세요';m.style.color='#C41E2F';return}
+  if(!MYD||MYD.status!=='approved'){m.textContent='사무국 승인 후 이용할 수 있습니다';m.style.color='#C41E2F';return}
+  try{
+    const doc=await DB.collection('licenses').doc(no).get();
+    if(!doc.exists){m.textContent='등록되지 않은 자격번호입니다. 번호 확인 후 다시 시도하거나 사무국에 문의하세요.';m.style.color='#C41E2F';return}
+    const l=doc.data();
+    if(l.uid){m.textContent=(l.uid===AUTH.currentUser.uid?'이미 내 계정에 연결된 자격입니다.':'이미 다른 회원에게 연결된 자격입니다. 본인 자격이 맞다면 사무국에 문의하세요.');m.style.color='#C41E2F';return}
+    const match=(l.maskName===maskNm(MYD.name));
+    await DB.collection('licenseClaims').add({
+      uid:AUTH.currentUser.uid,name:MYD.name,phone:MYD.phone||'',
+      licenseNo:no,licMask:l.maskName,licType:l.type,licGrade:l.grade,licRegion:l.region||'',
+      nameMatch:match,status:'대기',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    m.textContent='✓ 연결 신청이 접수되었습니다. '+(match?'성명 대조 일치 — 관할 연맹 승인 후 표시됩니다.':'성명 대조가 일치하지 않아 관할 연맹에서 추가 확인 후 처리됩니다.');
+    m.style.color='#0f766e';
+    document.getElementById('clNo').value='';
+    loadMyClaims();
+  }catch(e){m.textContent='신청 실패: '+e.message;m.style.color='#C41E2F'}
+}
+async function loadMyClaims(){
+  try{
+    const snap=await DB.collection('licenseClaims').where('uid','==',AUTH.currentUser.uid).get();
+    if(snap.empty)return;
+    const stc={'대기':'#b8860b','승인':'#0f766e','거절':'#C41E2F'};
+    document.getElementById('clList').innerHTML=snap.docs.map(d=>{
+      const c=d.data();
+      return '· '+esc(c.licenseNo)+' ('+esc(c.licType)+' '+esc(c.licGrade)+') — <b style="color:'+(stc[c.status]||'#555')+'">'+esc(c.status)+'</b>';
+    }).join('<br>');
+  }catch(e){}
+}
+// ── 연맹 자격증 (지도자·심판) ──
+let MYLICS=[];
+async function loadMyLics(uid){
+  try{
+    const snap=await DB.collection('licenses').where('uid','==',uid).get();
+    if(snap.empty)return;
+    MYLICS=snap.docs;
+    const today=new Date().toISOString().slice(0,10);
+    document.getElementById('licBox').style.display='block';
+    document.getElementById('licCards').innerHTML=MYLICS.map(d=>{
+      const l=d.data();
+      const expired=l.expireAt&&l.expireAt<today;
+      const dday=l.expireAt?Math.floor((new Date(l.expireAt)-new Date())/86400000):null;
+      const warn=!expired&&dday!==null&&dday<=180;
+      return '<div style="background:'+(expired?'#fdf3f4':'#fffdf5')+';border:2px solid '+(expired?'#C41E2F':'#e6b422')+';border-radius:16px;padding:22px 26px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">'
+        +'<div><div style="font-weight:900;font-size:17px">🎖 '+esc(l.type)+' '+esc(l.grade)
+        +(expired?' <span style="font-size:12px;font-weight:900;color:#fff;background:#C41E2F;padding:2px 10px;border-radius:999px">만료</span>':' <span style="font-size:12px;font-weight:900;color:#fff;background:#0f766e;padding:2px 10px;border-radius:999px">유효</span>')+'</div>'
+        +'<div style="font-size:13.5px;color:var(--gray);margin-top:6px">자격번호 <b>'+esc(d.id)+'</b>'+(l.issuedAt?' · 발급 '+esc(l.issuedAt):'')+(l.expireAt?' · 유효기간 ~'+esc(l.expireAt):'')
+        +(warn?'<br><b style="color:#b8860b">⏳ 만료까지 '+dday+'일 — 연장교육 공고를 확인하세요 (자격증 페이지)</b>':'')
+        +(expired?'<br><b style="color:#C41E2F">만료된 자격입니다. 연장 절차(연장교육·연장료)를 통해 재활성화할 수 있습니다.</b>':'')+'</div></div>'
+        +'<button class="btn-sub" style="background:#b8860b;font-size:14px;padding:11px 20px" onclick="printLicense(\''+d.id+'\')">자격증 발급 (인쇄·PDF)</button>'
+        +'</div>';
+    }).join('');
+  }catch(e){}
+}
+function printLicense(no){
+  const doc=MYLICS.find(d=>d.id===no);if(!doc)return;
+  const l=doc.data();
+  const logo=new URL('kfdf_logo.png',location.href).href;
+  const seal=new URL('직인.png',location.href).href;
+  const w=window.open('','_blank');
+  if(!w){alert('팝업이 차단되어 자격증 창을 열 수 없습니다.\n주소창 오른쪽의 팝업 차단 아이콘을 눌러 "허용"으로 바꾼 뒤 다시 시도해주세요.');return}
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>자격증</title>'
+  +'<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">'
+  +'<style>@page{size:A4 portrait;margin:0}body{margin:0;font-family:Pretendard,sans-serif;display:flex;justify-content:center;background:#eee}'
+  +'.paper{width:210mm;height:296mm;background:#fff;box-sizing:border-box;padding:22mm 20mm;position:relative}'
+  +'.frame{border:2.5px solid #153A77;height:100%;box-sizing:border-box;padding:16mm 14mm;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative}'
+  +'.frame:before{content:"";position:absolute;inset:2.5mm;border:.6px solid #153A77}'
+  +'.no{align-self:flex-end;font-size:12.5px;font-weight:700;color:#555;z-index:1}'
+  +'.title{font-size:44px;font-weight:900;letter-spacing:14px;margin:16mm 0 4mm;color:#111;z-index:1}'
+  +'.sub{font-size:15px;color:#777;font-weight:700;letter-spacing:2px;z-index:1}'
+  +'.body{margin-top:14mm;font-size:17px;line-height:2.4;z-index:1}'
+  +'.body b{font-size:21px}'
+  +'.decl{margin-top:12mm;font-size:16.5px;line-height:2;z-index:1}'
+  +'.date{margin-top:auto;font-size:15.5px;font-weight:700;z-index:1}'
+  +'.org{margin-top:6mm;font-size:22px;font-weight:900;z-index:1}'
+  +'.orgwrap{position:relative;display:inline-flex;align-items:center;gap:10px}'
+  +'.orgwrap img{height:34px}'
+  +'.orgwrap img.seal{position:absolute;right:-46px;top:-14px;height:64px;opacity:.92}'
+  +'.wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);opacity:.05;width:120mm}'
+  +'@media print{body{background:#fff}}</style></head><body><div class="paper"><div class="frame">'
+  +'<img class="wm" src="'+logo+'">'
+  +'<div class="no">제 '+no+' 호</div>'
+  +'<div class="title">자 격 증</div>'
+  +'<div class="sub">CERTIFICATE OF QUALIFICATION</div>'
+  +'<div class="body">성&nbsp;&nbsp;&nbsp;&nbsp;명 : <b>'+MYD.name+'</b><br>'
+  +'자격종목 : <b>플라잉디스크 '+l.type+' '+l.grade+'</b><br>'
+  +(l.expireAt?'유효기간 : <b>'+(l.issuedAt||'')+' ~ '+l.expireAt+'</b>':'발 급 일 : <b>'+(l.issuedAt||'')+'</b>')+'</div>'
+  +'<div class="decl">위 사람은 본 연맹이 정한 검정 기준을<br>통과하였으므로 위 자격을 갖추었음을 증명합니다.</div>'
+  +'<div class="date">'+(l.issuedAt?l.issuedAt.replace(/-(\d{2})-(\d{2})/,'년 $1월 $2일')+' 발급':'')+'</div>'
+  +'<div class="org"><span class="orgwrap"><img src="'+logo+'">대한플라잉디스크연맹<img class="seal" src="'+seal+'" onerror="this.style.display=\'none\'"></span></div>'
+  +'<div style="font-size:12px;color:#888;margin-top:5mm;z-index:1">등록 민간자격 (국가공인 아님) · 진위확인: 대한민국플라잉디스크연맹 홈페이지 › 진위확인 › 자격번호 입력 (전산 운영: 대한민국플라잉디스크연맹)</div>'
+  +'</div></div><scr'+'ipt>window.onload=()=>setTimeout(()=>window.print(),400)</scr'+'ipt></body></html>');
+  w.document.close();
+}
 async function printCert(){
   const d=MYD;if(!d||!d.edu2026)return;
   try{const cd=await DB.collection('certs').doc(certNo()).get();if(!cd.exists||!cd.data().issued){alert('사무국의 이수자 명단 확인 후 발급 가능합니다.');return;}}catch(e){alert('확인 중 오류가 발생했습니다.');return;}

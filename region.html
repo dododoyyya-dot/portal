@@ -337,6 +337,11 @@ async function confirmAssign(uid){
     await DB.collection('schoolApplications').doc(SEL).update({assignedUid:pick.id,assignedName:v.name,status:'배정완료'});
     await syncStatus(s,'배정완료',{assignedName:v.name});
     await DB.collection('openSlots').doc(SEL).delete().catch(()=>{}); // 지명 게시판에서 내림
+    // 회원 공식 이력 기록
+    await DB.collection('users').doc(pick.id).collection('activities').add({
+      date:new Date().toISOString().slice(0,10),
+      label:'[위촉] '+s.school+' 강사 배정 ('+(String(s.type||'').indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' · '+(s.region||'')+')',
+      points:0,createdAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
     clearSel(false);
     await loadSchools();renderInst();
     alert('배정 완료: '+s.school+' ← '+v.name+'\n위촉계약·통보는 사무국 절차에 따라 진행됩니다.');
