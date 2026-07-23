@@ -169,7 +169,7 @@ async function addHist(uid,label){
       createdAt:firebase.firestore.FieldValue.serverTimestamp()});
   }catch(e){}
 }
-let LME=null,LMY=null,ISMGR=false,MSIDO='',NOTICES=[],LAPPS=[],LICS=[];
+let LME=null,LMY=null,ISMGR=false,CENTRAL=false,MSIDOS=[],MFEDS=[],NOTICES=[],LAPPS=[],LICS=[];
 // 자격 업무 활성 시도연맹 (신청 배정 단위 — 연맹 추가 시 이 목록만 수정)
 const FED_LIST=['경기','강원','부산','경남','전라','기타(중앙 처리)'];
 const SIDO_LIST=['서울','부산','대구','인천','광주','대전','울산','경기','강원','충북','충남','전북','전남','경북','경남','제주','세종'];
@@ -178,14 +178,17 @@ AUTH.onAuthStateChanged(async u=>{
   LME=u;
   if(u){
     const d=await DB.collection('users').doc(u.uid).get();LMY=d.data()||{};
-    ISMGR=(LMY.role==='admin'||(LMY.role==='regionAdmin'&&LMY.managedSido));
-    MSIDO=(LMY.role==='admin')?'':(LMY.managedSido||'');
+    ISMGR=(LMY.role==='admin'||(LMY.role==='regionAdmin'&&(Array.isArray(LMY.managedSido)?LMY.managedSido.length:LMY.managedSido)));
+    CENTRAL=(LMY.role==='admin');
+    const _ms=LMY.managedSido;
+    MSIDOS=CENTRAL?[]:(Array.isArray(_ms)?_ms.slice():(_ms?[_ms]:[]));
+    MFEDS=MSIDOS.filter(s=>FED_LIST.indexOf(s)>=0); // 연맹 단위(공고 주관·신청 배정용)
     if(ISMGR){
       document.getElementById('adminPanel').style.display='block';
-      document.getElementById('mgrBadge').textContent='— '+(LMY.role==='admin'?'중앙연맹 (전체 관할)':(MSIDO+'연맹 (관할: '+MSIDO+')'));
-      if(MSIDO){
+      document.getElementById('mgrBadge').textContent='— '+(CENTRAL?'중앙연맹 (전체 관할)':(MFEDS.join('·')+'연맹 (관할: '+MSIDOS.join('·')+')'));
+      if(!CENTRAL){
         const ns=document.getElementById('nSido');
-        ns.value=MSIDO;ns.disabled=true; // 시도연맹은 자기 관할 공고만
+        ns.innerHTML=MFEDS.map(s=>'<option>'+s+'</option>').join(''); // 관할 연맹만 선택 가능
       }
       loadLics();
     }
@@ -208,14 +211,14 @@ async function loadNotices(){
       const approved=(n.approval===undefined||n.approval==='승인');
       if(approved)return true;
       if(!ISMGR)return false;
-      return !MSIDO||n.sido===MSIDO;
+      return CENTRAL||MFEDS.indexOf(n.sido)>=0;
     });
     if(!visible.length){el.innerHTML='<div class="bempty">현재 게시된 공고가 없습니다. 검정·연장교육 일정이 확정되면 이곳에 공고됩니다.</div>';return}
     el.innerHTML=visible.map(d=>{
       const n=d.data();
       const approved=(n.approval===undefined||n.approval==='승인');
       const closed=n.status!=='접수중';
-      const mine=ISMGR&&(!MSIDO||n.sido===MSIDO);
+      const mine=ISMGR&&(CENTRAL||MFEDS.indexOf(n.sido)>=0);
       const rst=n.reportStatus||'';
       let html='<div class="lccard"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center"><div style="flex:1;min-width:240px">'
         +'<span class="lctag" style="background:'+(n.type==='연장 교육'?'#0f766e':'#153A77')+'">'+esc(n.type)+'</span> '
@@ -227,19 +230,19 @@ async function loadNotices(){
         +'<div style="font-size:12.5px;color:var(--gray);margin-top:4px;line-height:1.7">'+esc(n.issuer||'')+' · '+esc(n.date||'')+' · '+esc(n.place||'')+(n.fee?' · '+esc(n.fee):'')+(n.until?' · 마감 '+esc(n.until):'')
         +(n.acct?'<br>💳 수수료 입금: '+esc(n.acct):'')
         +(n.desc?'<br>'+esc(n.desc):'')
-        +((mine||!MSIDO)&&n.report?'<br><span style="color:#153A77;font-weight:700">📝 결과보고: '+esc(n.report.date||'')+' · 참석 '+esc(n.report.attend||0)+' · 합격 '+esc(n.report.pass||0)+' · 불합격 '+esc(n.report.fail||0)+' · 수납 '+esc(n.report.fee||'')+(n.report.note?' · '+esc(n.report.note):'')+'</span>':'')
-        +((mine||!MSIDO)&&n.approval==='반려'&&n.remandReason?'<br><span style="color:#C41E2F;font-weight:700">⛔ 공고 반려 사유: '+esc(n.remandReason)+'</span>':'')
-        +((mine||!MSIDO)&&n.reportStatus==='보완요청'&&n.reportRemand?'<br><span style="color:#C41E2F;font-weight:700">✏️ 보고 보완요청: '+esc(n.reportRemand)+'</span>':'')
+        +((mine||CENTRAL)&&n.report?'<br><span style="color:#153A77;font-weight:700">📝 결과보고: '+esc(n.report.date||'')+' · 참석 '+esc(n.report.attend||0)+' · 합격 '+esc(n.report.pass||0)+' · 불합격 '+esc(n.report.fail||0)+' · 수납 '+esc(n.report.fee||'')+(n.report.note?' · '+esc(n.report.note):'')+'</span>':'')
+        +((mine||CENTRAL)&&n.approval==='반려'&&n.remandReason?'<br><span style="color:#C41E2F;font-weight:700">⛔ 공고 반려 사유: '+esc(n.remandReason)+'</span>':'')
+        +((mine||CENTRAL)&&n.reportStatus==='보완요청'&&n.reportRemand?'<br><span style="color:#C41E2F;font-weight:700">✏️ 보고 보완요청: '+esc(n.reportRemand)+'</span>':'')
         +'</div></div>'
         +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
         +(approved&&!closed?'<button class="lcbtn" style="background:#C41E2F" onclick="applyNotice(\''+d.id+'\')">신청하기</button>':'')
         // 중앙: 승인·반려
-        +((!approved&&!MSIDO&&ISMGR&&n.approval==='대기')?'<button class="lcbtn" style="background:#0f766e" onclick="approveNotice(\''+d.id+'\')">✅ 승인 게시</button><button class="lcbtn" style="background:#C41E2F" onclick="remandNotice(\''+d.id+'\')">반려</button>':'')
+        +((!approved&&CENTRAL&&ISMGR&&n.approval==='대기')?'<button class="lcbtn" style="background:#0f766e" onclick="approveNotice(\''+d.id+'\')">✅ 승인 게시</button><button class="lcbtn" style="background:#C41E2F" onclick="remandNotice(\''+d.id+'\')">반려</button>':'')
         // 주관 연맹: 마감·결과보고
         +(mine&&approved?'<button class="lcbtn" style="background:#8a919d" onclick="closeNotice(\''+d.id+'\','+(closed?'false':'true')+')">'+(closed?'재개':'마감')+'</button>':'')
         +(mine&&approved&&(!rst||rst==='보완요청')?'<button class="lcbtn" style="background:#b8860b" onclick="submitReport(\''+d.id+'\')">📝 결과보고 제출</button>':'')
         // 중앙: 보고 검토
-        +((!MSIDO&&ISMGR&&rst==='제출')?'<button class="lcbtn" style="background:#0f766e" onclick="approveReport(\''+d.id+'\')">보고 승인</button><button class="lcbtn" style="background:#C41E2F" onclick="remandReport(\''+d.id+'\')">보완요청</button>':'')
+        +((CENTRAL&&ISMGR&&rst==='제출')?'<button class="lcbtn" style="background:#0f766e" onclick="approveReport(\''+d.id+'\')">보고 승인</button><button class="lcbtn" style="background:#C41E2F" onclick="remandReport(\''+d.id+'\')">보완요청</button>':'')
         +'</div></div></div>';
       return html;
     }).join('');
@@ -249,12 +252,12 @@ async function addNotice(){
   const m=document.getElementById('nMsg');
   const v=id=>document.getElementById(id).value.trim();
   if(!v('nTitle')||!v('nDate')){m.textContent='제목·일시는 필수입니다';m.style.color='#C41E2F';return}
-  const sido=MSIDO||document.getElementById('nSido').value;
+  const sido=document.getElementById('nSido').value;
   const isCentral=(LMY.role==='admin');
   await DB.collection('licenseNotices').add({
     type:v('nType'),target:v('nTarget'),title:v('nTitle'),date:v('nDate'),place:v('nPlace'),fee:v('nFee'),acct:v('nAcct'),until:v('nUntil'),desc:v('nDesc'),
     sido:(sido==='전국(중앙)'?'전국':sido),
-    issuer:(isCentral?'중앙연맹':(MSIDO+'연맹')),
+    issuer:(isCentral?'중앙연맹':(sido+'연맹')),
     approval:(isCentral?'승인':'대기'),
     status:(isCentral?'접수중':'중앙승인 대기'),
     reportStatus:'',
@@ -290,7 +293,7 @@ async function submitReport(id){
   if(!confirm('결과보고를 제출할까요?\n실시일 '+dt+' · 참석 '+at+' · 합격 '+ps+' · 불합격 '+fl+' · 수납 '+fee+'원\n\n중앙연맹 검토·승인 후 자격 발급이 가능해집니다.'))return;
   await DB.collection('licenseNotices').doc(id).update({
     report:{date:dt.trim(),attend:at.trim(),pass:ps.trim(),fail:fl.trim(),fee:fee.trim(),note:note.trim(),
-      by:(MSIDO?MSIDO+'연맹':'중앙연맹'),submittedAt:new Date().toISOString().slice(0,10)},
+      by:(CENTRAL?'중앙연맹':MFEDS.join('·')+'연맹'),submittedAt:new Date().toISOString().slice(0,10)},
     reportStatus:'제출'});
   alert('결과보고가 제출되었습니다. 중앙연맹 승인 후 [신청 처리·발급]에서 합격자 발급이 가능합니다.');
   loadNotices();
@@ -360,12 +363,8 @@ function mgTab(t,btn){
 // ── 자격 연결 요청 처리 ──
 let CLAIMS=[];
 function inJur(r){
-  if(!MSIDO)return true; // 중앙: 전체
-  if(r===MSIDO)return true;
-  if(MSIDO==='전라'&&['광주','전북','전남','전라'].indexOf(r)>=0)return true;
-  if(MSIDO==='경기'&&['서울','인천','경기'].indexOf(r)>=0)return true;
-  if(MSIDO==='경남'&&['울산','경남'].indexOf(r)>=0)return true;
-  return false;
+  if(CENTRAL)return true; // 중앙: 전체
+  return MSIDOS.indexOf(r)>=0; // 관할 목록(지정 시 산하 시도까지 확장 저장됨)
 }
 async function loadClaims(){
   const el=document.getElementById('claimList');
@@ -414,9 +413,9 @@ async function loadApps(){
   const el=document.getElementById('apList');
   if(!nid){el.innerHTML='<div class="bempty">공고를 선택하세요.</div>';return}
   let snap;
-  if(MSIDO){
-    // 시도연맹: 관할 시도 신청만 (규칙에서도 강제)
-    snap=await DB.collection('licenseApps').where('sido','==',MSIDO).get();
+  if(!CENTRAL){
+    // 시도연맹: 관할 연맹 신청만 (규칙에서도 강제)
+    snap=await DB.collection('licenseApps').where('sido','in',MFEDS.length?MFEDS:['-']).get();
     LAPPS=snap.docs.filter(d=>d.data().noticeId===nid);
   }else{
     snap=await DB.collection('licenseApps').where('noticeId','==',nid).get();
@@ -496,7 +495,7 @@ async function issueLic(appId){
   const doc=LAPPS.find(d=>d.id===appId);if(!doc)return;
   const a=doc.data();
   // 시도연맹 발급은 해당 공고의 결과보고가 중앙 승인된 후에만 가능
-  if(MSIDO&&a.noticeId){
+  if(!CENTRAL&&a.noticeId){
     const nt=await DB.collection('licenseNotices').doc(a.noticeId).get();
     if(nt.exists&&nt.data().reportStatus!=='승인'){
       alert('이 공고의 결과보고가 아직 중앙 승인되지 않았습니다.\n[공고 관리]에서 결과보고를 제출하고 중앙 승인 후 발급할 수 있습니다.\n(현재 상태: '+(nt.data().reportStatus||'미제출')+')');
@@ -527,11 +526,11 @@ async function issueLic(appId){
   await DB.collection('licenses').doc(no).set({
     name:a.name,maskName:maskName(a.name),type:type,grade:a.grade+'급',
     issuedAt:today,expireAt:plus4y(today),status:'유효',
-    region:(MSIDO||a.sido||rname||''),
-    issuer:(LMY.role==='admin'?'중앙연맹':(MSIDO+'연맹')),
+    region:(a.sido||rname||''),
+    issuer:(CENTRAL?'중앙연맹':((a.sido||MFEDS[0]||'')+'연맹')),
     uid:a.uid||'',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
   await DB.collection('licenseApps').doc(appId).update({status:'발급완료',licenseNo:no});
-  await addHist(a.uid,'[자격] '+type+' '+a.grade+'급 취득 ('+no+' · '+(LMY.role==='admin'?'중앙연맹':MSIDO+'연맹')+')');
+  await addHist(a.uid,'[자격] '+type+' '+a.grade+'급 취득 ('+no+' · '+(CENTRAL?'중앙연맹':(a.sido||'')+'연맹')+')');
   if(window.kfdfMail&&a.email)kfdfMail(a.email,'[플라잉디스크연맹] 자격 발급 완료 — '+type+' '+a.grade+'급',
     a.name+' 님의 자격이 발급되었습니다.\n\n· 자격: 플라잉디스크 '+type+' '+a.grade+'급\n· 자격번호: '+no+'\n· 유효기간: 발급일로부터 4년\n\n홈페이지 마이페이지 › 연맹 자격증에서 자격증을 인쇄·PDF로 출력할 수 있습니다.\n진위확인: 홈페이지 › 자격검정 › 진위확인');
   alert('발급 완료\n자격번호: '+no+'\n본인 마이페이지에서 자격증을 출력할 수 있습니다.');
@@ -543,7 +542,7 @@ async function bulkIssue(){
   const nid=document.getElementById('apNotice').value;
   if(!nid){alert('공고를 먼저 선택하세요.');return}
   // 시도연맹: 결과보고 승인 게이트 (공고 단위 1회 확인)
-  if(MSIDO){
+  if(!CENTRAL){
     const nt=await DB.collection('licenseNotices').doc(nid).get();
     if(nt.exists&&nt.data().reportStatus!=='승인'){
       alert('이 공고의 결과보고가 아직 중앙 승인되지 않았습니다.\n결과보고 제출·승인 후 일괄 발급할 수 있습니다.\n(현재: '+(nt.data().reportStatus||'미제출')+')');return;
@@ -583,11 +582,11 @@ async function bulkIssue(){
       await DB.collection('licenses').doc(no).set({
         name:a.name,maskName:maskName(a.name),type:type,grade:a.grade+'급',
         issuedAt:today,expireAt:plus4y(today),status:'유효',
-        region:(MSIDO||a.sido||''),
-        issuer:(LMY.role==='admin'?'중앙연맹':(MSIDO+'연맹')),
+        region:(a.sido||''),
+        issuer:(CENTRAL?'중앙연맹':((a.sido||'')+'연맹')),
         uid:a.uid||'',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
       await DB.collection('licenseApps').doc(d.id).update({status:'발급완료',licenseNo:no});
-      await addHist(a.uid,'[자격] '+type+' '+a.grade+'급 취득 ('+no+' · '+(LMY.role==='admin'?'중앙연맹':MSIDO+'연맹')+')');
+      await addHist(a.uid,'[자격] '+type+' '+a.grade+'급 취득 ('+no+' · '+(CENTRAL?'중앙연맹':(a.sido||'')+'연맹')+')');
       if(window.kfdfMail&&a.email)kfdfMail(a.email,'[플라잉디스크연맹] 자격 발급 완료 — '+type+' '+a.grade+'급',
         a.name+' 님의 자격이 발급되었습니다.\n\n· 자격: 플라잉디스크 '+type+' '+a.grade+'급\n· 자격번호: '+no+'\n· 유효기간: 발급일로부터 4년\n\n홈페이지 마이페이지 › 연맹 자격증에서 자격증을 인쇄·PDF로 출력할 수 있습니다.');
       done++;
@@ -658,13 +657,19 @@ async function bulkImport(){
 
 // ── 관리: 발급 대장 ──
 async function loadLics(){
-  let snap;
-  if(MSIDO){
-    // 관할 확장: 통합 연맹은 산하 시도 포함 (기존 대장 데이터 호환)
-    const J=MSIDO==='전라'?['전라','광주','전북','전남']:(MSIDO==='경기'?['경기','서울','인천']:(MSIDO==='경남'?['경남','울산']:[MSIDO]));
-    snap=await DB.collection('licenses').where('region','in',J).get();
-  }else{snap=await DB.collection('licenses').get();}
-  LICS=snap.docs.sort((a,b)=>(b.data().issuedAt||'').localeCompare(a.data().issuedAt||''));
+  let docs=[];
+  if(!CENTRAL){
+    // 관할 시도 목록(확장 저장분) — 'in' 쿼리 10개 제한 대비 분할 조회
+    const J=MSIDOS.length?MSIDOS:['-'];
+    for(let i=0;i<J.length;i+=10){
+      const snap=await DB.collection('licenses').where('region','in',J.slice(i,i+10)).get();
+      docs=docs.concat(snap.docs);
+    }
+  }else{
+    const snap=await DB.collection('licenses').get();
+    docs=snap.docs;
+  }
+  LICS=docs.sort((a,b)=>(b.data().issuedAt||'').localeCompare(a.data().issuedAt||''));
   renderLics();
 }
 function renderLics(){
@@ -687,7 +692,7 @@ function renderLics(){
       +(l.regionMovedFrom?' · 이관: '+esc(l.regionMovedFrom)+'→'+esc(l.region):'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
       +'<button class="lcbtn" style="background:#8a919d" onclick="moveLic(\''+d.id+'\')">↪ 소속 이관</button>'
-      +(!MSIDO?'<button class="lcbtn" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delLic(\''+d.id+'\')">🗑 삭제</button>':'')
+      +(CENTRAL?'<button class="lcbtn" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delLic(\''+d.id+'\')">🗑 삭제</button>':'')
       +'</div></div>';
   }).join('');
 }

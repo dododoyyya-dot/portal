@@ -370,11 +370,15 @@ async function setRegionAdmin(uid){
   if(n===null)return;
   const R={'1':'서울·경기','2':'강원','3':'충청','4':'전라','5':'경상','6':'제주'}[n.trim()];
   if(!R){alert('1~6 중에서 입력해주세요.');return}
-  const sn=prompt('자격증 업무 관할 연맹 번호를 입력하세요 (시도연맹 관계자인 경우):\n1=경기 2=강원 3=부산 4=경남 5=전라\n(자격 업무 권한이 필요 없으면 0)','0');
+  const sn=prompt('자격증 업무 관할 연맹 번호를 입력하세요 (시도연맹 관계자인 경우):\n1=경기 2=강원 3=부산 4=경남 5=전라\n※ 복수 관할은 쉼표로: 예) 3,4 (부산+경남)\n(자격 업무 권한이 필요 없으면 0)','0');
   if(sn===null)return;
   const SIDOS={'1':'경기','2':'강원','3':'부산','4':'경남','5':'전라'};
-  const S=SIDOS[sn.trim()]||'';
-  if(!confirm(v.name+' 님에게 권역 관리자 권한을 부여할까요?\n\n· 강습 배정: 전 권역 열람·배정 가능 (region.html)\n· 자격증 업무: '+(S?('['+S+'] 관할만 열람·발급'):'권한 없음')+'\n· 회원 삭제·포인트 부여·권한 부여는 불가'))return;
+  // 산하 시도 확장 (기존 대장 데이터 커버)
+  const EXP={'경기':['경기','서울','인천'],'강원':['강원'],'부산':['부산'],'경남':['경남','울산'],'전라':['전라','광주','전북','전남']};
+  const picked=[...new Set(sn.split(',').map(x=>SIDOS[x.trim()]).filter(Boolean))];
+  const S=picked.length?[...new Set(picked.flatMap(f=>EXP[f]))]:null;
+  const SLABEL=picked.join('·');
+  if(!confirm(v.name+' 님에게 권역 관리자 권한을 부여할까요?\n\n· 강습 배정: 전 권역 열람·배정 가능 (region.html)\n· 자격증 업무: '+(S?('['+SLABEL+'] 관할 열람·발급 (산하 시도 포함: '+S.join('·')+')'):'권한 없음')+'\n· 회원 삭제·포인트 부여·권한 부여는 불가'))return;
   try{
     const upd={role:'regionAdmin',managedRegion:R};
     if(S)upd.managedSido=S;else upd.managedSido=firebase.firestore.FieldValue.delete();
