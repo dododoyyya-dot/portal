@@ -244,6 +244,7 @@ async function loadNotices(){
         +(mine?'<button class="lcbtn" style="background:#1F4E9C" onclick="editNotice(\''+d.id+'\')">✏️ 수정</button>':'')
         +(mine&&approved?'<button class="lcbtn" style="background:#8a919d" onclick="closeNotice(\''+d.id+'\','+(closed?'false':'true')+')">'+(closed?'재개':'마감')+'</button>':'')
         +(mine&&approved&&(!rst||rst==='보완요청')?'<button class="lcbtn" style="background:#b8860b" onclick="submitReport(\''+d.id+'\')">📝 결과보고 제출</button>':'')
+        +((CENTRAL||(mine&&n.approval==='대기'))?'<button class="lcbtn" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delNotice(\''+d.id+'\')">🗑</button>':'')
         // 중앙: 보고 검토
         +((CENTRAL&&ISMGR&&rst==='제출')?'<button class="lcbtn" style="background:#0f766e" onclick="approveReport(\''+d.id+'\')">보고 승인</button><button class="lcbtn" style="background:#C41E2F" onclick="remandReport(\''+d.id+'\')">보완요청</button>':'')
         +'</div></div></div>';
@@ -310,6 +311,23 @@ function cancelEdit(){
 async function closeNotice(id,close){
   await DB.collection('licenseNotices').doc(id).update({status:close?'마감':'접수중'});
   loadNotices();
+}
+// ── 공고 삭제 (중앙: 전체 / 시도연맹: 승인 전 자기 공고만) ──
+async function delNotice(id){
+  const doc=NOTICES.find(d=>d.id===id);if(!doc)return;
+  const n=doc.data();
+  // 신청자 존재 여부 확인
+  let cnt=0;
+  try{const s=await DB.collection('licenseApps').where('noticeId','==',id).get();cnt=s.size;}catch(e){}
+  const t=prompt('⚠️ 공고 삭제 — 되돌릴 수 없습니다.\n['+(n.title||'')+']'
+    +(cnt?'\n\n※ 이 공고에 신청 '+cnt+'건이 있습니다. 삭제해도 신청 기록은 남지만 처리 화면에서 공고 선택이 불가능해집니다.\n신청이 있는 공고는 삭제보다 [마감]을 권장합니다.':'')
+    +'\n\n삭제하려면 "삭제"를 입력하세요.');
+  if(t===null||t.trim()!=='삭제')return;
+  try{
+    await DB.collection('licenseNotices').doc(id).delete();
+    alert('삭제되었습니다.');
+    loadNotices();
+  }catch(e){alert('실패: '+e.message+'\n(시도연맹은 중앙 승인 전 공고만 삭제할 수 있습니다 — 승인된 공고는 중앙에 요청하세요)')}
 }
 // ── 중앙: 공고 승인·반려 ──
 async function approveNotice(id){
