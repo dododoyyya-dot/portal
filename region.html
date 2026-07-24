@@ -152,6 +152,10 @@ AUTH.onAuthStateChanged(async u=>{
   if(!RMY||(RMY.role!=='regionAdmin'&&RMY.role!=='admin')){
     g.style.display='block';g.innerHTML='⛔ 권역 관리자 권한이 없습니다. 사무국(오너)의 지정이 필요합니다.';return;
   }
+  // 업무별 위임: duties 필드가 있고 'assign'이 빠져있으면 강습배정 권한 없음(자격관리만 위임된 경우)
+  if(RMY.role==='regionAdmin'&&Array.isArray(RMY.duties)&&RMY.duties.indexOf('assign')<0){
+    g.style.display='block';g.innerHTML='⛔ 강습배정 권한이 없습니다 — 자격 업무만 위임되어 있습니다. <a href="license.html" style="font-weight:800;color:var(--red)">자격증 관리 페이지로 →</a>';return;
+  }
   document.getElementById('rgBadge').textContent='— '+esc(RMY.name||'')+' 님 (전 권역)';
   document.getElementById('rgBody').style.display='block';
   await Promise.all([loadSchools(),loadInst()]);
