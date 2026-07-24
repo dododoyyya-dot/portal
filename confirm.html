@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>강습 확인 · 담당교사 | 대한민국플라잉디스크연맹</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  :root{--red:#C41E2F;--blue:#153A77;--line:#e3e6ea;--gray:#6b7280;--black:#17171a}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Pretendard',sans-serif;background:#eef1f5;color:var(--black);-webkit-text-size-adjust:100%}
+  .top{background:var(--blue);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:10px}
+  .top img{width:34px;height:34px;object-fit:contain}
+  .top b{font-size:15px;font-weight:800;line-height:1.3}
+  .top span{display:block;font-size:11.5px;color:#c3d0e6;font-weight:600}
+  .wrap{max-width:540px;margin:0 auto;padding:20px 16px 60px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:0 6px 22px rgba(17,17,20,.05);margin-bottom:16px}
+  h1{font-size:20px;font-weight:900;margin:0 0 4px}
+  .lead{font-size:13.5px;color:var(--gray);margin:0 0 16px;line-height:1.6}
+  .row{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px dashed var(--line);font-size:14.5px}
+  .row:last-child{border-bottom:none}
+  .row .k{color:var(--gray);font-weight:700;flex:0 0 88px}
+  .row .v{font-weight:700;text-align:right;flex:1;word-break:keep-all}
+  .big{font-size:17px;color:var(--blue);font-weight:900}
+  table.sess{width:100%;border-collapse:collapse;margin:6px 0 4px;font-size:13.5px}
+  table.sess th{background:#f5f8fc;color:var(--gray);font-weight:700;padding:8px 6px;font-size:12px}
+  table.sess td{border-top:1px solid var(--line);padding:9px 6px;text-align:center}
+  table.sess td.l{text-align:left}
+  .ok-badge{color:#0f766e;font-weight:800}
+  .wait-badge{color:#b8860b;font-weight:800}
+  label.fl{display:block;font-size:13.5px;font-weight:800;margin:2px 0 7px}
+  input[type=text]{width:100%;padding:13px 14px;border:1.6px solid var(--line);border-radius:11px;font-size:16px;font-family:inherit}
+  input[type=text]:focus{outline:none;border-color:var(--blue)}
+  .sigwrap{margin-top:16px}
+  .sigbox{position:relative;border:1.6px dashed #b9c2d0;border-radius:12px;background:#fbfcfe;touch-action:none}
+  #sig{display:block;width:100%;height:170px;border-radius:12px}
+  .sighint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#aab3c2;font-size:13.5px;font-weight:700;pointer-events:none}
+  .sigtools{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+  .clr{background:none;border:none;color:var(--red);font-weight:800;font-size:13px;cursor:pointer;padding:4px}
+  .btn{width:100%;margin-top:20px;background:var(--red);color:#fff;border:none;padding:16px;border-radius:12px;font-size:17px;font-weight:800;cursor:pointer;font-family:inherit}
+  .btn:disabled{opacity:.55}
+  .msg{font-size:13.5px;font-weight:700;margin-top:12px;min-height:18px;text-align:center}
+  .msg.err{color:var(--red)} .msg.ok{color:#0f766e}
+  .state{text-align:center;padding:30px 10px;color:var(--gray);font-size:14.5px}
+  .done{text-align:center;padding:8px 0}
+  .done .chk{font-size:52px}
+  .done h2{font-size:20px;margin:6px 0 4px;color:#0f766e}
+  .note{background:#f5f8fc;border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--gray);line-height:1.6;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="top">
+  <img src="kfdf_logo.png" alt="로고">
+  <div><b>강습 실시 확인</b><span>대한민국플라잉디스크연맹 · 담당교사 확인</span></div>
+</div>
+<div class="wrap">
+  <div class="card" id="stage">
+    <div class="state" id="loading">불러오는 중…</div>
+  </div>
+  <div class="note">
+    본 확인은 해당 강습이 실제 귀교에서 진행되었음을 담당교사께서 확인하는 절차입니다.
+    입력하신 성명·서명·시각은 사업 실적 증빙 목적으로만 보관되며, 확인 후에는 수정할 수 없습니다.
+    문의: 사무국 031-984-3248
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig={apiKey:"AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",authDomain:"koreaflyingdiscfederation.firebaseapp.com",projectId:"koreaflyingdiscfederation",storageBucket:"koreaflyingdiscfederation.firebasestorage.app",messagingSenderId:"1081847355343",appId:"1:1081847355343:web:ca40ed9a52e13f607f64ba"};
+firebase.initializeApp(firebaseConfig);
+const DB=firebase.firestore();
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function qs(k){return new URLSearchParams(location.search).get(k)}
+
+let ALLLOGS=[], PENDING=[], INFO={school:'',name:'',type:''}, SIGGED=false;
+
+async function boot(){
+  const stage=document.getElementById('stage');
+  // id(단건) 또는 ids(일괄, 쉼표) 지원
+  let ids=[];
+  if(qs('ids'))ids=qs('ids').split(',').map(s=>s.trim()).filter(Boolean);
+  else if(qs('id'))ids=[qs('id').trim()];
+  if(!ids.length){stage.innerHTML='<div class="state">잘못된 접근입니다. 강사에게 받은 확인 링크/QR로 접속해주세요.</div>';return}
+  try{
+    const snaps=await Promise.all(ids.map(i=>DB.collection('sessionLogs').doc(i).get()));
+    ALLLOGS=snaps.filter(s=>s.exists).map(s=>Object.assign({_id:s.id},s.data()));
+    if(!ALLLOGS.length){stage.innerHTML='<div class="state">확인 대상을 찾을 수 없습니다. 링크를 다시 확인해주세요.</div>';return}
+    ALLLOGS.sort((a,b)=>(a.session||0)-(b.session||0));
+    INFO={school:ALLLOGS[0].school||'',name:ALLLOGS[0].name||'',type:ALLLOGS[0].type||''};
+    PENDING=ALLLOGS.filter(l=>!l.teacherConfirm);
+    if(!PENDING.length){renderDone();return}
+    renderForm();
+  }catch(e){stage.innerHTML='<div class="state">불러오기 실패: '+esc(e.message)+'</div>'}
+}
+
+function sessTable(markConfirmTarget){
+  let h='<table class="sess"><tr><th>회차</th><th>일자</th><th>인원</th><th>상태</th></tr>';
+  ALLLOGS.forEach(l=>{
+    const done=!!l.teacherConfirm;
+    h+='<tr><td><b>'+esc(l.session)+'</b></td><td>'+esc(l.date)+'</td><td>'+(l.count?esc(l.count)+'명':'-')+'</td>'
+      +'<td>'+(done?'<span class="ok-badge">✓ 확인됨</span>':(markConfirmTarget?'<span class="wait-badge">확인 대상</span>':'-'))+'</td></tr>';
+  });
+  return h+'</table>';
+}
+
+function renderForm(){
+  const multi=ALLLOGS.length>1;
+  document.getElementById('stage').innerHTML=
+    '<h1>강습 실시 확인</h1>'
+    +'<p class="lead">아래 강습이 실제로 진행되었음을 확인하시면, 성명과 서명을 한 번 남겨주세요. '
+    +(multi?'미확인 <b>'+PENDING.length+'개 회차</b>가 한 번에 확인됩니다.':'')+'</p>'
+    +'<div class="row"><span class="k">학교</span><span class="v big">'+esc(INFO.school)+'</span></div>'
+    +(INFO.type?'<div class="row"><span class="k">유형</span><span class="v">'+esc(INFO.type)+'</span></div>':'')
+    +'<div class="row"><span class="k">담당 강사</span><span class="v">'+esc(INFO.name)+'</span></div>'
+    +'<div style="margin-top:12px"><label class="fl">'+(multi?'확인 대상 회차 ('+PENDING.length+'개)':'회차')+'</label>'+sessTable(true)+'</div>'
+    +'<div style="margin-top:18px"><label class="fl">담당교사 성명</label>'
+    +'<input type="text" id="tname" placeholder="예: 홍길동" autocomplete="name" maxlength="20"></div>'
+    +'<div class="sigwrap"><label class="fl">서명 <span style="font-weight:600;color:var(--gray)">(손가락/펜으로 서명해주세요)</span></label>'
+    +'<div class="sigbox"><canvas id="sig"></canvas><div class="sighint" id="sighint">여기에 서명</div></div>'
+    +'<div class="sigtools"><span style="font-size:12px;color:var(--gray)">확인 후에는 수정할 수 없습니다</span><button class="clr" onclick="clearSig()">✕ 다시</button></div></div>'
+    +'<button class="btn" id="okbtn" onclick="submitConfirm()">'+(multi?PENDING.length+'개 회차 확인하고 서명 제출':'확인하고 서명 제출')+'</button>'
+    +'<div class="msg" id="msg"></div>';
+  initSig();
+}
+
+function renderDone(tc){
+  const c=tc||(ALLLOGS.find(l=>l.teacherConfirm)||{}).teacherConfirm||{};
+  const cN=ALLLOGS.filter(l=>l.teacherConfirm).length;
+  document.getElementById('stage').innerHTML=
+    '<div class="done"><div class="chk">✅</div><h2>확인 완료</h2>'
+    +'<div style="font-size:14px;color:#555;margin-bottom:12px">'+esc(INFO.school)+' · 총 '+cN+'개 회차 담당교사 확인이 기록되었습니다.</div></div>'
+    +sessTable(false)
+    +'<div class="row" style="margin-top:8px"><span class="k">확인 교사</span><span class="v">'+esc(c.name||'')+'</span></div>'
+    +(c.at?'<div class="row"><span class="k">확인 시각</span><span class="v" style="font-weight:600;color:#777">'+esc(String(c.at).replace('T',' ').slice(0,16))+'</span></div>':'')
+    +(c.sign?'<div style="margin-top:12px;text-align:center"><img src="'+c.sign+'" alt="서명" style="max-width:200px;border:1px solid #eee;border-radius:8px"></div>':'');
+}
+
+let ctx,canvas,drawing=false,last=null;
+function initSig(){
+  canvas=document.getElementById('sig');
+  const r=canvas.getBoundingClientRect();
+  const dpr=window.devicePixelRatio||1;
+  canvas.width=r.width*dpr;canvas.height=170*dpr;
+  ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
+  ctx.lineWidth=2.4;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#12233f';
+  const pos=e=>{const b=canvas.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:t.clientX-b.left,y:t.clientY-b.top}};
+  const start=e=>{e.preventDefault();drawing=true;last=pos(e);if(!SIGGED){SIGGED=true;document.getElementById('sighint').style.display='none'}};
+  const move=e=>{if(!drawing)return;e.preventDefault();const p=pos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p};
+  const end=()=>{drawing=false};
+  canvas.addEventListener('mousedown',start);canvas.addEventListener('mousemove',move);window.addEventListener('mouseup',end);
+  canvas.addEventListener('touchstart',start,{passive:false});canvas.addEventListener('touchmove',move,{passive:false});canvas.addEventListener('touchend',end);
+}
+function clearSig(){if(ctx){ctx.clearRect(0,0,canvas.width,canvas.height);SIGGED=false;document.getElementById('sighint').style.display='block'}}
+
+async function submitConfirm(){
+  const msg=document.getElementById('msg');
+  const name=(document.getElementById('tname').value||'').trim();
+  if(!name){msg.textContent='담당교사 성명을 입력해주세요';msg.className='msg err';return}
+  if(!SIGGED){msg.textContent='서명을 입력해주세요';msg.className='msg err';return}
+  const btn=document.getElementById('okbtn');btn.disabled=true;
+  let sign='';
+  try{
+    const out=document.createElement('canvas');out.width=360;out.height=120;
+    out.getContext('2d').drawImage(canvas,0,0,out.width,out.height);
+    sign=out.toDataURL('image/png');
+    if(sign.length>190000)sign=out.toDataURL('image/jpeg',0.7);
+  }catch(e){sign=''}
+  const tc={name:name,at:new Date().toISOString(),sign:sign};
+  let done=0,fail=0;
+  for(const l of PENDING){
+    msg.textContent='기록 중… '+(done+fail+1)+'/'+PENDING.length;msg.className='msg';
+    try{ await DB.collection('sessionLogs').doc(l._id).update({teacherConfirm:tc}); l.teacherConfirm=tc; done++; }
+    catch(e){ fail++; }
+  }
+  if(done){
+    PENDING=ALLLOGS.filter(l=>!l.teacherConfirm);
+    renderDone(tc);
+  }else{
+    btn.disabled=false;
+    msg.textContent='제출 실패 — 이미 확인되었거나 링크가 만료되었을 수 있습니다.';msg.className='msg err';
+  }
+}
+boot();
+</script>
+</body>
+</html>

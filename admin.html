@@ -122,6 +122,13 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
 .urow .grow{flex:1;min-width:200px}
 .urow b{font-size:15.5px}
 .urow .sub3{font-size:12.5px;color:var(--gray)}
+.rtbl{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff}
+.rtbl th{background:#f4f6fa;color:#5b6472;font-weight:800;padding:9px 8px;text-align:left;white-space:nowrap}
+.rtbl td{border-top:1px solid #eef1f5;padding:9px 8px;vertical-align:middle;white-space:nowrap}
+.rtbl tr:hover td{background:#fafbfd}
+.rtbl .nm{font-weight:800;font-size:13px}
+.rtbl .mut{color:#aab1bb}
+.rtbl .bdg{display:inline-block;font-size:10.5px;font-weight:800;padding:1px 6px;border-radius:999px;color:#fff;margin-right:2px}
 </style>
 
 <div class="phero"><div class="wrap">
@@ -153,6 +160,11 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub ufl" data-f="after" onclick="userFilter('after',this)" style="background:#8a919d">🌱 방과후·늘봄 지원</button>
         <button class="btn-sub ufl" data-f="referee" onclick="userFilter('referee',this)" style="background:#8a919d">🏁 심판 지원</button>
         <button class="btn-sub ufl" data-f="staff" onclick="userFilter('staff',this)" style="background:#8a919d">🎪 운영 지원</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+        <span style="font-size:12.5px;font-weight:800;color:#6b7280">보기 방식</span>
+        <button class="btn-sub vwl on" data-v="table" onclick="setView('table',this)">🗂 명단(표)</button>
+        <button class="btn-sub vwl" data-v="card" onclick="setView('card',this)" style="background:#8a919d">🔖 상세·승인·검증</button>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
         <select id="userSido" onchange="renderUsers()" style="width:auto;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px;font-weight:700">
@@ -561,10 +573,14 @@ async function toggleLogs(id){
     const snap=await DB.collection('sessionLogs').where('appId','==',id).get();
     const logs=snap.docs.map(d=>d.data()).sort((a,b)=>(a.session||0)-(b.session||0));
     if(!logs.length){el.innerHTML='<span style="font-size:13px;color:var(--gray)">제출된 일지가 없습니다.</span>';return}
-    el.innerHTML='<b style="font-size:13.5px">운영일지 '+logs.length+'건 (강사: '+esc(logs[0].name)+')</b>'
+    const cfmN=logs.filter(l=>l.teacherConfirm).length;
+    el.innerHTML='<b style="font-size:13.5px">운영일지 '+logs.length+'건 (강사: '+esc(logs[0].name)+')</b> <span style="font-size:12px;font-weight:800;color:'+(cfmN===logs.length?'#0f766e':'#C41E2F')+'">· 교사확인 '+cfmN+'/'+logs.length+'</span>'
       +logs.map(l=>'<div style="border-top:1px dashed #d5d9e0;padding:8px 0;font-size:13px">'
         +'<b>'+l.session+'회차</b> · '+esc(l.date)+(l.count?' · 👥 '+l.count+'명':'')+' — '+esc(l.content)
         +(l.note?' · <span style="color:#C41E2F">'+esc(l.note)+'</span>':'')
+        +'<div style="margin-top:4px">'+(l.teacherConfirm
+            ?'<span style="font-weight:800;color:#0f766e">✓ 교사확인: '+esc(l.teacherConfirm.name)+'</span>'+(l.teacherConfirm.at?' <span style="color:#8a919d;font-size:11.5px">('+esc(String(l.teacherConfirm.at).replace("T"," ").slice(0,16))+')</span>':'')+(l.teacherConfirm.sign?' <a href="'+l.teacherConfirm.sign+'" target="_blank"><img src="'+l.teacherConfirm.sign+'" style="height:26px;vertical-align:middle;border:1px solid #eee;border-radius:4px;margin-left:4px"></a>':'')
+            :'<span style="font-weight:800;color:#C41E2F">⚠ 교사 미확인</span>')+'</div>'
         +(l.photos&&l.photos.length?'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">'+l.photos.map(p=>'<a href="'+p+'" target="_blank"><img src="'+p+'" style="width:90px;height:66px;object-fit:cover;border-radius:8px"></a>').join('')+'</div>':'')
         +'</div>').join('');
   }catch(e){el.innerHTML='<span style="font-size:13px;color:var(--red)">불러오기 실패: '+esc(e.message)+'</span>'}
@@ -791,6 +807,36 @@ function exportCSV(){
 }
 let UFL='전체';
 function userFilter(f,btn){UFL=f;document.querySelectorAll('.ufl').forEach(b=>{b.style.background=b.dataset.f===f?'':'#8a919d'});renderUsers();}
+let VIEWMODE='table';
+function setView(m,btn){VIEWMODE=m;document.querySelectorAll('.vwl').forEach(b=>b.style.background=b.dataset.v===m?'':'#8a919d');renderUsers();}
+// 명단(표) 뷰 — 한눈에 스캔·검색용 (상세·승인은 카드 뷰)
+function renderRoster(docs){
+  const rows=docs.map(d=>{
+    const v=d.data(),lv=lvOf(v.points||0),f=v.instructorFor||{},q=v.quals||{};
+    const fld=[];
+    if(f.school)fld.push('<span class="bdg" style="background:#1F4E9C">학교</span>');
+    if(f.after)fld.push('<span class="bdg" style="background:#0f766e">방과후</span>');
+    if(f.referee)fld.push('<span class="bdg" style="background:#7c3aed">심판</span>');
+    if(f.staff)fld.push('<span class="bdg" style="background:#b8860b">운영</span>');
+    const quals=[q.leader,q.referee,q.youth?'유소년':''].filter(Boolean).join('·');
+    const hire=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc);
+    return '<tr>'
+      +'<td class="nm">'+esc(v.name)+(v.withdrawReq?' <span title="탈퇴요청">🚪</span>':'')+'</td>'
+      +'<td>'+esc(v.gender||'-')+'</td>'
+      +'<td>'+(v.baseCity?esc(v.baseCity):'<span style="color:#C41E2F">미입력</span>')+'</td>'
+      +'<td>'+(v.phone?esc(v.phone):'<span class="mut">-</span>')+'</td>'
+      +'<td>'+(fld.length?fld.join(''):'<span class="mut">-</span>')+'</td>'
+      +'<td>'+(quals?esc(quals):'<span class="mut">-</span>')+'</td>'
+      +'<td>'+(v.edu2026?'<b style="color:#0f766e">✓</b>':'<span class="mut">-</span>')+'</td>'
+      +'<td>Lv.'+lv+' · '+(v.points||0)+'P</td>'
+      +'<td>'+(hire?'<span class="bdg" style="background:#0f766e">위촉가능</span>':'<span class="mut">-</span>')+'</td>'
+      +'<td>'+(v.status==='approved'?'<b style="color:#0f766e">승인</b>':'<button class="btn-sub" style="padding:3px 10px;font-size:11px" onclick="approve(\''+d.id+'\')">승인</button>')+'</td>'
+      +'</tr>';
+  }).join('');
+  return '<div style="overflow-x:auto"><table class="rtbl"><thead><tr>'
+    +'<th>성명</th><th>성별</th><th>시군구</th><th>휴대전화</th><th>지원분야</th><th>보유자격</th><th>연수</th><th>Lv·P</th><th>위촉</th><th>상태</th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
 function uMatch(v){
   if(UFL==='pending'){if(v.status==='approved')return false}
   else if(UFL!=='전체'){if(!(v.instructorFor&&v.instructorFor[UFL]))return false}
@@ -816,7 +862,8 @@ function renderUsers(){
   const docs=USERS.filter(d=>uMatch(d.data()));
   const uc=document.getElementById('userCount');
   if(uc)uc.textContent=docs.length+'명'+(docs.length!==USERS.length?' (전체 '+USERS.length+'명 중)':'');
-  if(!docs.length){el.innerHTML='<div class="bempty">해당 조건의 회원이 없습니다.</div>';return}
+  if(!docs.length){el.innerHTML='<div class="bempty">해당 조건의 회원이 없습니다.</div>';axFilter();return}
+  if(VIEWMODE==='table'){el.innerHTML=renderRoster(docs);axFilter();return}
   el.innerHTML=docs.map(d=>{
     const v=d.data(),lv=lvOf(v.points||0);
     return '<div class="urow"><div class="grow"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span>'+(v.withdrawReq?' <span style="font-size:11px;font-weight:900;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px">🚪 탈퇴 요청</span>':'')

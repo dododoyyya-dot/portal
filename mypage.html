@@ -521,7 +521,7 @@ async function submitLog(){
     await DB.collection('sessionLogs').add({
       appId:appId,school:a.school,type:a.type,uid:AUTH.currentUser.uid,name:MYD.name,
       session:sess,date:date,count:cnt,content:content,note:document.getElementById('lgNote').value.trim(),
-      photos:photos,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+      photos:photos,teacherConfirm:null,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
     m.textContent='✓ '+sess+'회차 보고가 제출되었습니다. 사무국 확인 후 포인트가 반영됩니다.';m.className='msg ok';
     document.getElementById('lgContent').value='';document.getElementById('lgNote').value='';document.getElementById('lgCount').value='';
     document.getElementById('lgPhotos').value='';document.getElementById('lgSession').value='';
@@ -533,15 +533,33 @@ async function loadMyLogs(){
   const el=document.getElementById('lgList');
   try{
     const snap=await DB.collection('sessionLogs').where('uid','==',AUTH.currentUser.uid).get();
-    const logs=snap.docs.map(d=>d.data()).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    const logs=snap.docs.map(d=>Object.assign({_id:d.id},d.data()));
     // 다음 회차 자동 제안
     const cur=document.getElementById('lgApp').value;
     const mine=logs.filter(l=>l.appId===cur);
     if(!document.getElementById('lgSession').value)document.getElementById('lgSession').value=(mine.length?Math.max(...mine.map(l=>l.session||0)):0)+1;
-    el.innerHTML=logs.length?logs.slice(0,30).map(l=>
-      '<div class="urow"><div class="grow"><b>'+esc(l.school)+' '+l.session+'회차</b> <span style="font-size:12px;color:var(--gray)">'+esc(l.date)+'</span>'
-      +'<div class="sub3">'+esc(l.content)+(l.note?' · <span style="color:#C41E2F">'+esc(l.note)+'</span>':'')+(l.photos&&l.photos.length?' · 📷'+l.photos.length:'')+'</div></div></div>'
-    ).join(''):'<div class="bempty">아직 제출한 보고가 없습니다.</div>';
+    if(!logs.length){el.innerHTML='<div class="bempty">아직 제출한 보고가 없습니다.</div>';return}
+    // 학교(appId)별로 묶어 — 교사 확인은 미확인 회차 "일괄"(월 단위 권장)로 요청
+    const groups={};
+    logs.forEach(l=>{(groups[l.appId]=groups[l.appId]||{school:l.school,logs:[]}).logs.push(l)});
+    window.PENDING_BY_SCHOOL={};
+    el.innerHTML=Object.keys(groups).map(appId=>{
+      const g=groups[appId];
+      g.logs.sort((a,b)=>(a.session||0)-(b.session||0));
+      const pend=g.logs.filter(l=>!l.teacherConfirm);
+      window.PENDING_BY_SCHOOL[appId]={school:g.school,ids:pend.map(l=>l._id)};
+      return '<div style="border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">'
+        +'<b style="font-size:15px">'+esc(g.school)+' <span style="font-size:12.5px;color:var(--gray);font-weight:600">· '+g.logs.length+'회차 제출</span></b>'
+        +(pend.length?'<button class="btn-sub" style="background:#153A77" onclick="reqConfirmBatch(\''+appId+'\')">📱 교사 확인 요청 (미확인 '+pend.length+'회차)</button>'
+                     :'<span style="font-size:12.5px;font-weight:800;color:#0f766e">✓ 전 회차 교사확인 완료</span>')
+        +'</div>'
+        +g.logs.map(l=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:13px">'
+          +'<span><b>'+esc(l.session)+'회차</b> <span style="color:var(--gray)">'+esc(l.date)+'</span>'+(l.count?' · 👥'+esc(l.count):'')+(l.photos&&l.photos.length?' · 📷'+l.photos.length:'')+'</span>'
+          +'<span>'+(l.teacherConfirm?'<b style="color:#0f766e">✓ '+esc(l.teacherConfirm.name)+'</b>':'<b style="color:#C41E2F">미확인</b>')+'</span>'
+          +'</div>').join('')
+        +'</div>';
+    }).join('');
   }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+esc(e.message)+'</div>'}
 }
 function renderContracts(){
@@ -740,6 +758,44 @@ async function printCert(){
     © 2026 KOREA FLYING DISC FEDERATION. All rights reserved. &nbsp;|&nbsp; <a href="privacy.html" style="color:#9aa1ad">개인정보처리방침</a>
   </div>
 </div></footer>
+<!-- 교사 확인 요청 모달 -->
+<div id="cfmModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:18px;max-width:360px;width:100%;padding:26px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.25)">
+    <h3 style="margin:0 0 4px;font-size:18px;font-weight:900">📱 교사 확인 요청</h3>
+    <div id="cfmSub" style="font-size:13px;font-weight:800;color:#153A77;margin-bottom:6px"></div>
+    <p style="font-size:13px;color:#6b7280;margin:0 0 16px;line-height:1.6">담당교사에게 아래 <b>QR을 보여주거나 링크를 전달</b>하세요. 교사가 한 번 확인·서명하면 <b>미확인 회차가 모두</b> 자동 반영됩니다. (월 1회 정도 요청 권장)</p>
+    <div id="cfmQr" style="display:flex;justify-content:center;margin-bottom:14px;min-height:190px;align-items:center"></div>
+    <input id="cfmLink" readonly onclick="this.select()" style="width:100%;padding:10px;border:1.5px solid #e3e6ea;border-radius:9px;font-size:12px;text-align:center;color:#153A77">
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn-sub" style="flex:1;background:#153A77" onclick="copyCfm()">🔗 링크 복사</button>
+      <button class="btn-sub" style="flex:1;background:#8a919d" onclick="closeCfm()">닫기</button>
+    </div>
+    <div style="font-size:11.5px;color:#9aa1ad;margin-top:12px;line-height:1.5">확인이 완료되면 마이페이지 일지 목록에 <b>✓ 교사확인 완료</b>로 표시됩니다.</div>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+function reqConfirmBatch(appId){
+  var g=(window.PENDING_BY_SCHOOL||{})[appId];
+  if(!g||!g.ids.length){alert('미확인 회차가 없습니다.');return}
+  showCfm(new URL('confirm.html?ids='+g.ids.join(','),location.href).href, esc(g.school)+' · 미확인 '+g.ids.length+'회차 일괄');
+}
+function showCfm(url,sub){
+  document.getElementById('cfmLink').value=url;
+  document.getElementById('cfmSub').textContent=sub||'';
+  var qr=document.getElementById('cfmQr');qr.innerHTML='';
+  if(window.QRCode){try{new QRCode(qr,{text:url,width:190,height:190,correctLevel:QRCode.CorrectLevel.L})}catch(e){qr.textContent='링크를 이용해주세요'}}
+  else qr.innerHTML='<span style="font-size:12px;color:#999">QR 로딩 중 — 아래 링크를 복사해 전달하세요</span>';
+  document.getElementById('cfmModal').style.display='flex';
+}
+function closeCfm(){document.getElementById('cfmModal').style.display='none'}
+function copyCfm(){var t=document.getElementById('cfmLink').value;
+  if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){alert('✓ 링크가 복사되었습니다. 교사에게 문자/메신저로 전달하세요.')}).catch(fallbackCopy)}
+  else fallbackCopy();
+  function fallbackCopy(){var i=document.getElementById('cfmLink');i.select();try{document.execCommand('copy');alert('✓ 링크가 복사되었습니다.')}catch(e){alert('링크를 길게 눌러 복사해주세요.')}}
+}
+document.getElementById('cfmModal').addEventListener('click',function(e){if(e.target===this)closeCfm()});
+</script>
 <script src="auth_ui.js"></script>
 </body>
 </html>
