@@ -221,6 +221,22 @@ document.addEventListener('click',function(e){
   clearSel();
 });
 
+
+// ── 권역 보정: region 미저장·비표준(극초반 신청)은 주소로 자동 판정 ──
+const KFDF_REGIONS=['서울·경기','강원','충청','전라','경상','제주'];
+const SIDO2REG={'서울':'서울·경기','인천':'서울·경기','경기':'서울·경기','강원':'강원','대전':'충청','세종':'충청','충청북':'충청','충북':'충청','충청남':'충청','충남':'충청','광주':'전라','전라북':'전라','전북':'전라','전라남':'전라','전남':'전라','부산':'경상','대구':'경상','울산':'경상','경상북':'경상','경북':'경상','경상남':'경상','경남':'경상','제주':'제주'};
+const REG_ALIAS={'서울경기':'서울·경기','수도권':'서울·경기','서울/경기':'서울·경기','충청권':'충청','전라권':'전라','경상권':'경상','제주권':'제주','강원권':'강원'};
+function appRegion(s){
+  const raw=String(s.region||'').trim();
+  if(KFDF_REGIONS.indexOf(raw)>=0)return raw;
+  const norm=REG_ALIAS[raw.replace(/\s/g,'')];
+  if(norm)return norm;
+  const src=String(s.city||'')||String(s.school||'');
+  for(const k in SIDO2REG){if(src.indexOf(k)===0)return SIDO2REG[k]}
+  // 학교명에 시도가 섞인 경우 (예: 부산신남초)
+  for(const k in SIDO2REG){if(String(s.school||'').indexOf(k)===0)return SIDO2REG[k]}
+  return raw||'';
+}
 async function loadSchools(){
   const snap=await DB.collection('schoolApplications').get();
   RAPPS=snap.docs.sort((a,b)=>{
@@ -234,7 +250,7 @@ function renderSchools(){
   const q=(document.getElementById('rgSearch').value||'').trim().toLowerCase();
   const docs=RAPPS.filter(d=>{
     const s=d.data();
-    if(RREG!=='전체'&&s.region!==RREG)return false;
+    if(RREG!=='전체'&&appRegion(s)!==RREG)return false;
     if(RFL!=='전체'&&String(s.type||'').indexOf(RFL)<0)return false;
     if(q){
       const hay=[s.school,s.city,s.teacher,s.code,s.assignedName].map(x=>String(x||'').toLowerCase()).join(' ');
@@ -307,7 +323,7 @@ async function setSt(id,st){
 }
 function eligibleInst(app){
   const isAfter=String(app.type||'').indexOf('방과후')>=0;
-  const reg=app.region||'';
+  const reg=appRegion(app)||'';
   return RUSERS.filter(d=>{
     const v=d.data();const f=v.instructorFor||{};
     return isAfter?f.after:f.school;

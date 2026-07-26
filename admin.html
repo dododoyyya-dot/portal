@@ -306,6 +306,22 @@ async function loadApps(){
   renderApps();
 }
 const SIDO_ALIAS={'서울':['서울'],'인천':['인천'],'경기':['경기'],'강원':['강원'],'대전':['대전'],'세종':['세종'],'충북':['충북','충청북도'],'충남':['충남','충청남도'],'광주':['광주'],'전북':['전북','전라북도'],'전남':['전남','전라남도'],'부산':['부산'],'대구':['대구'],'울산':['울산'],'경북':['경북','경상북도'],'경남':['경남','경상남도'],'제주':['제주']};
+
+// ── 권역 보정: region 미저장·비표준(극초반 신청)은 주소로 자동 판정 ──
+const KFDF_REGIONS=['서울·경기','강원','충청','전라','경상','제주'];
+const SIDO2REG={'서울':'서울·경기','인천':'서울·경기','경기':'서울·경기','강원':'강원','대전':'충청','세종':'충청','충청북':'충청','충북':'충청','충청남':'충청','충남':'충청','광주':'전라','전라북':'전라','전북':'전라','전라남':'전라','전남':'전라','부산':'경상','대구':'경상','울산':'경상','경상북':'경상','경북':'경상','경상남':'경상','경남':'경상','제주':'제주'};
+const REG_ALIAS={'서울경기':'서울·경기','수도권':'서울·경기','서울/경기':'서울·경기','충청권':'충청','전라권':'전라','경상권':'경상','제주권':'제주','강원권':'강원'};
+function appRegion(s){
+  const raw=String(s.region||'').trim();
+  if(KFDF_REGIONS.indexOf(raw)>=0)return raw;
+  const norm=REG_ALIAS[raw.replace(/\s/g,'')];
+  if(norm)return norm;
+  const src=String(s.city||'')||String(s.school||'');
+  for(const k in SIDO2REG){if(src.indexOf(k)===0)return SIDO2REG[k]}
+  // 학교명에 시도가 섞인 경우 (예: 부산신남초)
+  for(const k in SIDO2REG){if(String(s.school||'').indexOf(k)===0)return SIDO2REG[k]}
+  return raw||'';
+}
 function renderApps(){
   const dupKey={};APPS.forEach(d=>{const x=d.data();const k=(x.school||'').replace(/\s/g,'')+'|'+(x.type||'');dupKey[k]=(dupKey[k]||0)+1});
   const sido=(document.getElementById('appSido')||{}).value||'';
@@ -387,7 +403,7 @@ function showSupply(){
   box.style.display='block';
   const REG=['서울·경기','강원','충청','전라','경상','제주'];
   const stat={};REG.forEach(r=>stat[r]={apply:0,sel:0,assigned:0,inst:0});
-  APPS.forEach(d=>{const s=d.data();const r=s.region;if(!stat[r])return;
+  APPS.forEach(d=>{const s=d.data();const r=appRegion(s);if(!stat[r])return;
     const st=s.status||'접수';
     if(['접수','대기','선정','배정완료'].indexOf(st)>=0)stat[r].apply++;
     if(st==='선정'||st==='배정완료')stat[r].sel++;
