@@ -446,7 +446,22 @@ async function applyNotice(id){
   if(!LME){if(confirm('로그인이 필요합니다. 로그인 페이지로 이동할까요?'))location.href='login.html';return}
   if(!LMY||LMY.status!=='approved'){alert('사무국 승인 후 신청할 수 있습니다.');return}
   const n=NOTICES.find(d=>d.id===id).data();
-  const grade=prompt(n.title+'\n\n응시(갱신) 등급을 입력하세요: 1, 2, 3',' ');
+  // ── 프로필 필수 정보 확인 (자격증 표기·실물 발송용 — 미입력 시 신청 불가) ──
+  const missing=[];
+  if(!LMY.birth)missing.push('생년월일 (자격증 표기)');
+  if(!LMY.address)missing.push('집 주소 (자격증·물품 발송)');
+  if(!LMY.phone)missing.push('휴대전화 번호');
+  if(missing.length){
+    if(confirm('신청 전에 마이 프로필에서 아래 정보를 먼저 입력해 주세요:\n\n· '+missing.join('\n· ')+'\n\n※ 한 번만 입력하면 이후 모든 신청에 자동 사용됩니다.\n지금 입력하러 갈까요?'))location.href='mypage.html#profileBox';
+    return;
+  }
+  // ── 신청 구분 선택 (신규/갱신/보수) — 항상 신청자가 직접 선택 (기존 공고 포함 적용)
+  const tdef={'신규':'1','갱신':'2','보수(역량강화)':'3'}[n.type]||'';
+  const tp=prompt(n.title+'\n\n신청 구분을 선택하세요:\n1 = 신규 (자격 취득)\n2 = 갱신 (유효기간 연장)\n3 = 보수(역량강화)',tdef);
+  if(tp===null)return;
+  const appType={'1':'신규','2':'갱신','3':'보수(역량강화)'}[tp.trim()];
+  if(!appType){alert('1~3 중에서 선택해주세요.');return}
+  const grade=prompt(n.title+'\n\n['+appType+'] 응시(갱신) 등급을 입력하세요: 1, 2, 3',' ');
   if(grade===null)return;
   const g=grade.trim();
   if(['1','2','3'].indexOf(g)<0){alert('1~3 중에서 입력해주세요.');return}
@@ -455,10 +470,11 @@ async function applyNotice(id){
   let sido=FED_LIST[parseInt(sn.trim(),10)-1];
   if(!sido){alert('번호가 올바르지 않습니다.');return}
   if(sido==='기타(중앙 처리)')sido='중앙';
-  const phone=LMY.phone||prompt('연락받을 휴대전화 번호를 입력하세요','')||'';
+  const phone=LMY.phone;
   await DB.collection('licenseApps').add({
-    noticeId:id,noticeTitle:n.title,noticeType:n.type,target:n.target,
+    noticeId:id,noticeTitle:n.title,noticeType:n.type,appType:appType,target:n.target,
     uid:LME.uid,name:LMY.name,email:LME.email||'',phone:phone,grade:g,sido:sido,
+    birth:LMY.birth||'',address:LMY.address||'',fedName:LMY.fedName||'',
     status:'접수',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
   if(window.kfdfMail&&LME.email)kfdfMail(LME.email,'[플라잉디스크연맹] 자격 검정·갱신 신청 접수 — '+n.title,
     LMY.name+' 님의 신청이 접수되었습니다.\n\n· 공고: '+n.title+'\n· 구분: '+n.type+' ('+n.target+' '+g+'급)\n· 담당: '+sido+' 연맹 (통합접수 후 관할 배정)'
@@ -564,7 +580,8 @@ async function loadApps(){
   el.innerHTML=LAPPS.map(d=>{
     const a=d.data();
     return '<div class="lccard" style="padding:12px 16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div>'
-      +'<b>'+esc(a.name)+'</b> · '+esc(a.target)+' '+esc(a.grade)+'급'+(a.sido?' · <span class="lctag" style="background:#b8860b">'+esc(a.sido)+'</span>':'')+' · '+esc(a.phone||'')
+      +'<b>'+esc(a.name)+'</b>'+(a.appType?' <span class="lctag" style="background:'+(a.appType==='갱신'?'#0f766e':(a.appType.indexOf('보수')>=0?'#b8860b':'#153A77'))+'">'+esc(a.appType)+'</span>':'')+' · '+esc(a.target)+' '+esc(a.grade)+'급'+(a.sido?' · <span class="lctag" style="background:#b8860b">'+esc(a.sido)+'</span>':'')+' · '+esc(a.phone||'')
+      +((a.birth||a.address)?'<span style="display:block;font-size:12px;color:var(--gray);margin-top:3px">'+(a.birth?'🎂 '+esc(a.birth):'')+(a.address?'  📦 '+esc(a.address):'')+'</span>':'')
       +' <span class="lctag" style="background:'+(stc[a.status]||'#8a919d')+'">'+esc(a.status)+'</span>'
       +(a.licenseNo?' <b style="font-size:12px;color:#0f766e">'+esc(a.licenseNo)+'</b>':'')+'</div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
