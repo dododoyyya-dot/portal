@@ -1247,21 +1247,50 @@ async function delUser(uid,name){
     loadDash();loadUsers();
   }catch(e){alert('삭제 실패: '+e.message)}
 }
+
+// ── 버튼 선택 팝업 (prompt 대체) ──
+function pickDialog(title,options){
+  return new Promise(function(res){
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    var box=document.createElement('div');
+    box.style.cssText='background:#fff;border-radius:16px;padding:22px 20px;max-width:430px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.25)';
+    var h=document.createElement('b');
+    h.style.cssText='font-size:16px;display:block;margin-bottom:14px;line-height:1.5;word-break:keep-all';
+    h.textContent=title;box.appendChild(h);
+    options.forEach(function(o){
+      var b=document.createElement('button');
+      b.textContent=o;
+      b.style.cssText='display:block;width:100%;padding:14px 16px;margin:8px 0;border:1.5px solid #dfe5ee;border-radius:10px;background:#f8fafc;font-size:15px;font-weight:700;cursor:pointer;text-align:left;transition:.12s';
+      b.onmouseover=function(){b.style.background='#eef4ff';b.style.borderColor='#1F4E9C'};
+      b.onmouseout=function(){b.style.background='#f8fafc';b.style.borderColor='#dfe5ee'};
+      b.onclick=function(){document.body.removeChild(ov);res(o)};
+      box.appendChild(b);
+    });
+    var c=document.createElement('button');
+    c.textContent='취소';
+    c.style.cssText='display:block;width:100%;padding:11px;margin-top:10px;border:none;background:none;color:#C41E2F;font-size:14px;font-weight:800;cursor:pointer';
+    c.onclick=function(){document.body.removeChild(ov);res(null)};
+    box.appendChild(c);
+    ov.appendChild(box);
+    ov.addEventListener('click',function(e){if(e.target===ov){document.body.removeChild(ov);res(null)}});
+    document.body.appendChild(ov);
+  });
+}
 async function setOrg(uid){
   const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
   const cur=d.org==='central'?'중앙연맹':d.org==='regional'?'시도연맹':'일반';
-  const pick=prompt('['+d.name+'] 직책 지정 — 번호 입력\n현재: '+cur+(d.orgTitle?' ('+d.orgTitle+')':'')+'\n\n0 = 일반 회원 (뱃지 없음)\n1 = 시도연맹 임원 ('+d.region+')\n2 = 중앙연맹','');
-  if(pick===null)return;
-  if(pick!=='0'&&pick!=='1'&&pick!=='2'){alert('0, 1, 2 중 하나를 입력하세요');return}
+  const psel=await pickDialog('['+d.name+'] 직책 지정 — 현재: '+cur+(d.orgTitle?' ('+d.orgTitle+')':''),['일반 회원 (뱃지 없음)','시도연맹 임원','중앙연맹']);
+  if(psel===null)return;
   let org='',title='';
-  if(pick==='1')org='regional';
-  if(pick==='2')org='central';
+  if(psel==='시도연맹 임원')org='regional';
+  if(psel==='중앙연맹')org='central';
   if(org){title=prompt('직함 입력 (선택 — 예: 회장, 사무국장, 이사)\n비워두면 직함 없이 뱃지만 표시됩니다','')||''}
   let fedName=d.fedName||'';
   if(org==='regional'){
     const FEDS=['경기연맹','강원연맹','대전연맹','부산연맹','대구연맹','울산연맹','경남연맹','경북연맹','전남광주연맹','제주연맹'];
-    const fp=prompt('소속 시도연맹 선택 — 현재: '+(fedName||'미지정')+'\n뱃지는 이 연맹명으로 표기됩니다 (권역명 아님)\n\n'+FEDS.map((x,i)=>(i+1)+'='+x).join('  '),'');
-    if(fp&&FEDS[parseInt(fp)-1])fedName=FEDS[parseInt(fp)-1];
+    const fp=await pickDialog('소속 시도연맹 선택 — 현재: '+(fedName||'미지정')+' (뱃지는 이 연맹명으로 표기됩니다)',FEDS);
+    if(fp)fedName=fp;
     if(!fedName){alert('시도연맹을 선택해야 임원 뱃지를 지정할 수 있습니다');return}
   }
   await DB.collection('users').doc(uid).update({org:org,orgTitle:title,fedName:fedName});

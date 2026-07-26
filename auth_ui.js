@@ -25,16 +25,26 @@
   document.head.appendChild(s1);
 })();
 
-// ── 모바일 메뉴: 배경 스크롤 잠금 + 링크 탭 시 자동 닫힘 (menuScrollLock)
+// ── 모바일 메뉴(좌측 드로어): 닫기버튼·배경딤 주입 + 스크롤 잠금 + 링크 탭 시 닫힘 (menuScrollLock)
 (function(){
   document.addEventListener('DOMContentLoaded',function(){
     var menu=document.querySelector('nav.menu');if(!menu)return;
+    // 배경 딤
+    var bd=document.createElement('div');bd.className='mbackdrop';document.body.appendChild(bd);
+    // 닫기 버튼
+    var cb=document.createElement('button');cb.className='mclose';cb.textContent='✕';cb.setAttribute('aria-label','메뉴 닫기');
+    menu.insertBefore(cb,menu.firstChild);
+    function close(){menu.classList.remove('open');bd.classList.remove('show');document.body.style.overflow='';}
+    cb.addEventListener('click',close);
+    bd.addEventListener('click',close);
     var mo=new MutationObserver(function(){
-      document.body.style.overflow=menu.classList.contains('open')?'hidden':'';
+      var open=menu.classList.contains('open');
+      bd.classList.toggle('show',open);
+      document.body.style.overflow=open?'hidden':'';
     });
     mo.observe(menu,{attributes:true,attributeFilter:['class']});
     menu.addEventListener('click',function(e){
-      if(e.target.tagName==='A'){menu.classList.remove('open');document.body.style.overflow='';}
+      if(e.target.tagName==='A')close();
     });
   });
 })();
