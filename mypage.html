@@ -171,6 +171,12 @@ function orgChip(o,region,title,fed){
 
   <div id="profileBox" style="margin-top:26px;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:20px 22px">
     <h3 style="margin:0 0 4px;font-size:16px">👤 마이 프로필 <span style="font-weight:600;color:var(--gray);font-size:12.5px">— 배정·위촉·자격 관리에 활용됩니다. 언제든 본인이 수정할 수 있습니다.</span></h3>
+    <div id="pfSum" style="display:none;margin-top:12px;align-items:center;gap:12px;flex-wrap:wrap;background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:12px;padding:14px 16px">
+      <span style="font-size:14.5px;font-weight:800;color:#0f766e">✅ 프로필 등록 완료</span>
+      <span id="pfSumTxt" style="font-size:13px;color:var(--gray);flex:1;min-width:200px"></span>
+      <button class="btn-sub" style="background:#153A77" onclick="pfExpand()">✏️ 프로필 수정</button>
+    </div>
+    <div id="pfBody">
 
     <!-- ① 기본 정보 -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:14px">
@@ -205,9 +211,16 @@ function orgChip(o,region,title,fed){
           <option value="">소속 연맹 선택</option>
           <option>경기연맹</option><option>강원연맹</option><option>대전연맹</option><option>부산연맹</option><option>대구연맹</option><option>울산연맹</option><option>경남연맹</option><option>경북연맹</option><option>전남광주연맹</option><option>제주연맹</option><option>기타</option>
         </select>
-        <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="pfAf2" style="width:auto">초·중·고 교사</label>
+        <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="pfAf2" style="width:auto">교사 (교원)</label>
+        <select id="pfTeachLv" style="display:none;padding:7px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px">
+          <option value="">학교급 선택</option><option>초등</option><option>중등</option><option>고등</option>
+        </select>
         <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="pfAf3" style="width:auto">초등스포츠강사 (교육청 소속)</label>
         <input id="pfAfEtc" placeholder="기타 소속 직접 입력" style="flex:1;min-width:160px;padding:7px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px">
+      </div>
+      <div id="pfWorkWrap" style="display:none;margin-top:8px">
+        <label style="font-size:12.5px;font-weight:800">근무지 (학교·기관명) <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 배정·매칭 검토에 사용됩니다</span></label>
+        <input id="pfWork" placeholder="예: 부산신남초등학교" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
       </div>
     </div>
 
@@ -306,6 +319,7 @@ function orgChip(o,region,title,fed){
       <button class="btn-sub" style="background:#0f766e" onclick="saveProfile()">프로필 저장</button>
       <span id="pfMsg" style="font-size:13px;font-weight:700"></span>
     </div>
+    </div><!-- /pfBody -->
   </div>
   <div id="certBox" style="display:none;margin-top:44px">
     <h3 class="sub">이수증 온라인 발급</h3>
@@ -418,6 +432,7 @@ function fillProfile(d){
       for(const o of sel.options){if(o.value===sp[0]){sel.value=sp[0];break}}
       document.getElementById('pfSigungu').value=sp.slice(1).join(' ');}
   }catch(e){console.warn('actmap',e)}
+  if(d.address)pfCollapse(d);
   document.getElementById('pfSize').value=d.clothingSize||'';
   document.getElementById('pfAddr').value=d.address||'';
   document.getElementById('pfSizePants').value=d.sizePants||'';
@@ -425,6 +440,16 @@ function fillProfile(d){
   document.getElementById('pfSizeCap').value=d.sizeCap||'';
   document.getElementById('pfAfFed').value=d.fedName||'';
   document.getElementById('pfAfFed').style.display=document.getElementById('pfAf1').checked?'inline-block':'none';
+  document.getElementById('pfTeachLv').value=d.teacherLevel||'';
+  document.getElementById('pfWork').value=d.workSchool||'';
+  function pfAfSync(){
+    const t=document.getElementById('pfAf2').checked,sc=document.getElementById('pfAf3').checked;
+    document.getElementById('pfTeachLv').style.display=t?'inline-block':'none';
+    document.getElementById('pfWorkWrap').style.display=(t||sc)?'block':'none';
+  }
+  pfAfSync();
+  document.getElementById('pfAf2').addEventListener('change',pfAfSync);
+  document.getElementById('pfAf3').addEventListener('change',pfAfSync);
   document.getElementById('pfAf1').addEventListener('change',e=>{document.getElementById('pfAfFed').style.display=e.target.checked?'inline-block':'none'});
   document.getElementById('pfBirth').value=d.birth||'';
   document.getElementById('pfGender').value=d.gender||'';
@@ -440,6 +465,20 @@ function renderDocList(urls){
     '<a href="'+u+'" target="_blank" style="display:inline-block;font-size:12px;font-weight:800;color:#153A77;background:#eef3fa;border:1px solid #d4e0f2;border-radius:8px;padding:6px 12px">📎 자격증 '+(i+1)+' 보기</a>').join('');
 }
 let PFBUSY=false,PFMAP=null;
+function pfCollapse(d){
+  document.getElementById('pfBody').style.display='none';
+  const sm=document.getElementById('pfSum');sm.style.display='flex';
+  const bits=[];
+  if(d){if(d.fedName)bits.push(d.fedName);
+    if(d.teacherLevel)bits.push(d.teacherLevel+' 교사');
+    if(d.workSchool)bits.push(d.workSchool);
+    if(d.baseCity)bits.push('거점 '+d.baseCity);}
+  document.getElementById('pfSumTxt').textContent=bits.join(' · ');
+}
+function pfExpand(){
+  document.getElementById('pfBody').style.display='block';
+  document.getElementById('pfSum').style.display='none';
+}
 async function saveProfile(){
   if(PFBUSY)return;PFBUSY=true;
   const m=document.getElementById('pfMsg');
@@ -488,6 +527,8 @@ async function saveProfile(){
       sizeShoe:document.getElementById('pfSizeShoe').value,
       sizeCap:document.getElementById('pfSizeCap').value,
       fedName:document.getElementById('pfAfFed').value,
+      teacherLevel:(document.getElementById('pfAf2').checked?document.getElementById('pfTeachLv').value:''),
+      workSchool:document.getElementById('pfWork').value.trim(),
       birth:document.getElementById('pfBirth').value,
       qualDocs:docs
     };
@@ -497,6 +538,7 @@ async function saveProfile(){
     document.getElementById('pfDocs').value='';document.getElementById('pfDegDoc').value='';
     renderDocList(docs);fillProfile(MYD);
     m.textContent='✓ 저장되었습니다';m.style.color='#0f766e';
+    pfCollapse(MYD);window.scrollTo({top:0,behavior:'smooth'});alert('프로필이 저장되었습니다.');
   }catch(e){m.textContent='저장 실패: '+e.message;m.style.color='#C41E2F'}
   PFBUSY=false;
 }

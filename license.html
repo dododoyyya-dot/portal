@@ -147,7 +147,12 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
     <div id="mg_notice" class="lccard">
       <h3 style="margin:0 0 12px;font-size:16px">새 공고 등록</h3>
       <div class="lcgrid">
-        <div><label class="lclab">구분</label><select id="nType" class="lcin"><option>신규</option><option>갱신</option><option>보수(역량강화)</option></select></div>
+        <div><label class="lclab">구분 (복수 선택 가능)</label>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;padding:9px 4px">
+            <label style="display:flex;gap:5px;align-items:center;font-weight:700;font-size:13.5px"><input type="checkbox" id="nT1" style="width:auto" checked>신규</label>
+            <label style="display:flex;gap:5px;align-items:center;font-weight:700;font-size:13.5px"><input type="checkbox" id="nT2" style="width:auto">갱신</label>
+            <label style="display:flex;gap:5px;align-items:center;font-weight:700;font-size:13.5px"><input type="checkbox" id="nT3" style="width:auto">보수(역량강화)</label>
+          </div></div>
         <div><label class="lclab">대상 자격</label><select id="nTarget" class="lcin"><option>지도자</option><option>심판</option><option>지도자·심판 공통</option></select></div>
         <div><label class="lclab">주관</label><select id="nSido" class="lcin"><option>전국(중앙)</option><option>경기</option><option>강원</option><option>부산</option><option>경남</option><option>경북</option><option>전남광주</option></select></div>
         <div><label class="lclab">일시</label><input id="nDate" class="lcin" placeholder="예: 2026. 9. 12.(토) 10:00"></div>
@@ -298,7 +303,7 @@ async function loadNotices(){
       const mine=ISMGR&&(CENTRAL||MFEDS.indexOf(n.sido)>=0);
       const rst=n.reportStatus||'';
       let html='<div class="lccard"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center"><div style="flex:1;min-width:240px">'
-        +'<span class="lctag" style="background:'+(n.type==='갱신'?'#0f766e':((n.type==='보수'||n.type==='보수(역량강화)')?'#b8860b':'#153A77'))+'">'+esc(n.type)+' 교육</span> '
+        +String(n.type||'신규').split('·').map(t=>'<span class="lctag" style="background:'+(t==='갱신'?'#0f766e':(t.indexOf('보수')>=0?'#b8860b':'#153A77'))+'">'+esc(t)+'</span>').join(' ')+' '
         +'<span class="lctag" style="background:#8a919d">'+esc(n.target)+'</span> '
         +(n.sido?'<span class="lctag" style="background:#b8860b">'+esc(n.sido)+'</span> ':'')
         +(!approved?'<span class="lctag" style="background:'+(n.approval==='반려'?'#C41E2F':'#7c3aed')+'">'+(n.approval==='반려'?'반려됨':'중앙승인 대기')+'</span> ':(closed?'<span class="lctag" style="background:#C41E2F">마감</span> ':''))
@@ -356,6 +361,12 @@ async function uploadPoster(){
   await ref.put(blob,{contentType:'image/jpeg'});
   return await ref.getDownloadURL();
 }
+function ntypeVal(){
+  const t=[];if(document.getElementById('nT1').checked)t.push('신규');
+  if(document.getElementById('nT2').checked)t.push('갱신');
+  if(document.getElementById('nT3').checked)t.push('보수(역량강화)');
+  return t.join('·')||'신규';
+}
 async function addNotice(){
   const m=document.getElementById('nMsg');
   const v=id=>document.getElementById(id).value.trim();
@@ -365,7 +376,7 @@ async function addNotice(){
   if(EDIT_ID){
     // ── 공고 수정 (승인·보고 상태는 유지, 내용만 갱신) ──
     const upd={
-      type:v('nType'),target:v('nTarget'),title:v('nTitle'),date:v('nDate'),place:v('nPlace'),fee:v('nFee'),acct:v('nAcct'),until:v('nUntil'),desc:v('nDesc'),
+      type:ntypeVal(),target:v('nTarget'),title:v('nTitle'),date:v('nDate'),place:v('nPlace'),fee:v('nFee'),acct:v('nAcct'),until:v('nUntil'),desc:v('nDesc'),
       schedule:v('nSched'),
       sido:(sido==='전국(중앙)'?'전국':sido),
       editedAt:firebase.firestore.FieldValue.serverTimestamp()};
@@ -376,7 +387,7 @@ async function addNotice(){
   }
   const posterUrl=await uploadPoster();
   await DB.collection('licenseNotices').add({
-    type:v('nType'),target:v('nTarget'),title:v('nTitle'),date:v('nDate'),place:v('nPlace'),fee:v('nFee'),acct:v('nAcct'),until:v('nUntil'),desc:v('nDesc'),
+    type:ntypeVal(),target:v('nTarget'),title:v('nTitle'),date:v('nDate'),place:v('nPlace'),fee:v('nFee'),acct:v('nAcct'),until:v('nUntil'),desc:v('nDesc'),
     schedule:v('nSched'),posterUrl:(posterUrl||''),
     sido:(sido==='전국(중앙)'?'전국':sido),
     issuer:(isCentral?'중앙연맹':(sido+'연맹')),
@@ -392,7 +403,10 @@ function editNotice(id){
   const doc=NOTICES.find(d=>d.id===id);if(!doc)return;
   const n=doc.data();
   EDIT_ID=id;
-  document.getElementById('nType').value=n.type||'신규';
+  const tt=String(n.type||'신규');
+  document.getElementById('nT1').checked=tt.indexOf('신규')>=0;
+  document.getElementById('nT2').checked=tt.indexOf('갱신')>=0;
+  document.getElementById('nT3').checked=tt.indexOf('보수')>=0;
   document.getElementById('nTarget').value=n.target||'지도자';
   const ns=document.getElementById('nSido');
   ns.value=(n.sido==='전국'?'전국(중앙)':n.sido)||ns.value;
@@ -555,14 +569,35 @@ async function loadMyApps(){
   const snap=await DB.collection('licenseApps').where('uid','==',LME.uid).get();
   if(snap.empty)return;
   document.getElementById('myApps').style.display='block';
-  const stc={'접수':'#8a919d','합격':'#1F4E9C','발급완료':'#0f766e','불합격':'#C41E2F'};
+  const stc={'접수':'#b8860b','접수완료':'#8a919d','합격':'#1F4E9C','발급완료':'#0f766e','불합격':'#C41E2F'};
+  const stl={'접수':'신청 접수 (입금 확인 전)','접수완료':'접수 완료 (입금 확인)'};
+  MYAPPS=snap.docs;
   document.getElementById('myAppList').innerHTML=snap.docs.map(d=>{
     const a=d.data();
-    return '<div class="lccard" style="padding:12px 16px"><b>'+esc(a.noticeTitle)+'</b> · '+esc(a.target)+' '+esc(a.grade)+'급 '
-      +'<span class="lctag" style="background:'+(stc[a.status]||'#8a919d')+'">'+esc(a.status)+'</span>'
+    return '<div class="lccard" style="padding:12px 16px"><b>'+esc(a.noticeTitle)+'</b>'
+      +(a.appType?' <span class="lctag" style="background:'+(a.appType==='갱신'?'#0f766e':(String(a.appType).indexOf('보수')>=0?'#b8860b':'#153A77'))+'">'+esc(a.appType)+'</span>':'')
+      +' · '+esc(a.target)+' '+esc(a.grade)+'급 '
+      +'<span class="lctag" style="background:'+(stc[a.status]||'#8a919d')+'">'+esc(stl[a.status]||a.status)+'</span>'
+      +(a.status==='접수'?'<div style="margin-top:8px;display:flex;gap:6px"><button class="lcbtn b" onclick="editMyApp(\''+d.id+'\')">✏️ 수정</button><button class="lcbtn d" onclick="delMyApp(\''+d.id+'\')">삭제</button></div>':'')
       +(a.licenseNo?'<div style="font-size:12.5px;margin-top:4px">자격번호 <b>'+esc(a.licenseNo)+'</b> — <a href="mypage.html" style="font-weight:800;color:#153A77">마이페이지에서 자격증 출력 →</a></div>':'')
       +'</div>';
   }).join('');
+}
+let MYAPPS=[];
+async function editMyApp(id){
+  const doc=MYAPPS.find(d=>d.id===id);if(!doc)return;
+  const a=doc.data();
+  const appType=await pickDialog('신청 구분 변경 (현재: '+esc(a.appType||'-')+')',['신규','갱신','보수(역량강화)']);
+  if(!appType)return;
+  const grade=await pickDialog('등급 선택 (현재: '+esc(a.grade)+'급)',['1급','2급','3급']);
+  if(!grade)return;
+  await DB.collection('licenseApps').doc(id).update({appType:appType,grade:grade.replace('급','')});
+  alert('신청 내용이 수정되었습니다.');loadMyApps();
+}
+async function delMyApp(id){
+  if(!confirm('이 신청을 삭제할까요?\n입금 확인 전에만 삭제할 수 있습니다.'))return;
+  try{await DB.collection('licenseApps').doc(id).delete();alert('삭제되었습니다.');loadMyApps();}
+  catch(e){alert('삭제 실패: '+e.message)}
 }
 
 // ── 관리: 신청 처리·발급 ──
@@ -642,16 +677,18 @@ async function loadApps(){
   }
   document.getElementById('apCount').textContent=LAPPS.length+'명 신청';
   if(!LAPPS.length){el.innerHTML='<div class="bempty">신청자가 없습니다.</div>';return}
-  const stc={'접수':'#8a919d','합격':'#1F4E9C','발급완료':'#0f766e','불합격':'#C41E2F'};
+  const stc={'접수':'#b8860b','접수완료':'#8a919d','합격':'#1F4E9C','발급완료':'#0f766e','불합격':'#C41E2F'};
+  const stl={'접수':'입금 전','접수완료':'입금 확인'};
   el.innerHTML=LAPPS.map(d=>{
     const a=d.data();
     return '<div class="lccard" style="padding:12px 16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div>'
       +'<b>'+esc(a.name)+'</b>'+(a.appType?' <span class="lctag" style="background:'+(a.appType==='갱신'?'#0f766e':(a.appType.indexOf('보수')>=0?'#b8860b':'#153A77'))+'">'+esc(a.appType)+'</span>':'')+' · '+esc(a.target)+' '+esc(a.grade)+'급'+(a.sido?' · <span class="lctag" style="background:#b8860b">'+esc(a.sido)+'</span>':'')+' · '+esc(a.phone||'')
       +((a.birth||a.address)?'<span style="display:block;font-size:12px;color:var(--gray);margin-top:3px">'+(a.birth?'🎂 '+esc(a.birth):'')+(a.address?'  📦 '+esc(a.address):'')+'</span>':'')
-      +' <span class="lctag" style="background:'+(stc[a.status]||'#8a919d')+'">'+esc(a.status)+'</span>'
+      +' <span class="lctag" style="background:'+(stc[a.status]||'#8a919d')+'">'+esc(stl[a.status]||a.status)+'</span>'
       +(a.licenseNo?' <b style="font-size:12px;color:#0f766e">'+esc(a.licenseNo)+'</b>':'')+'</div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +(a.status==='접수'?'<button class="lcbtn b" onclick="setApp(\''+d.id+'\',\'합격\')">합격</button><button class="lcbtn d" onclick="setApp(\''+d.id+'\',\'불합격\')">불합격</button>':'')
+      +(a.status==='접수'?'<button class="lcbtn s" onclick="setApp(\''+d.id+'\',\'접수완료\')">💰 입금 확인</button>':'')
+      +(a.status==='접수완료'?'<button class="lcbtn b" onclick="setApp(\''+d.id+'\',\'합격\')">합격</button><button class="lcbtn d" onclick="setApp(\''+d.id+'\',\'불합격\')">불합격</button>':'')
       +(a.status==='합격'?'<button class="lcbtn s" onclick="issueLic(\''+d.id+'\')">🎖 자격 발급</button>':'')
       +(a.status!=='발급완료'?'<button class="lcbtn g" onclick="transferApp(\''+d.id+'\')">↪ 이관</button>':'')
       +(CENTRAL?'<button class="lcbtn ghost" onclick="delLicApp(\''+d.id+'\')">🗑</button>':'')
