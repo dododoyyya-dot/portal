@@ -322,13 +322,21 @@ function appRegion(s){
   for(const k in SIDO2REG){if(String(s.school||'').indexOf(k)===0)return SIDO2REG[k]}
   return raw||'';
 }
+
+// ── 유형 보정: 극초반 신청의 옛 값(school/after 등) 표준화 ──
+function appTypeOf(s){
+  const t=String((s.type||'')+' '+(s.typeKey||'')).toLowerCase();
+  if(t.indexOf('after')>=0||t.indexOf('방과후')>=0||t.indexOf('늘봄')>=0||t.indexOf('돌봄')>=0)return '방과후·늘봄·돌봄';
+  if(t.indexOf('school')>=0||t.indexOf('학교')>=0)return '학교체육 강습';
+  return String(s.type||'');
+}
 function renderApps(){
   const dupKey={};APPS.forEach(d=>{const x=d.data();const k=(x.school||'').replace(/\s/g,'')+'|'+(x.type||'');dupKey[k]=(dupKey[k]||0)+1});
   const sido=(document.getElementById('appSido')||{}).value||'';
   const q=((document.getElementById('appSearch')||{}).value||'').trim().toLowerCase();
   const docs=APPS.filter(d=>{
     const s=d.data();
-    if(AFL!=='전체'&&String(s.type||'').indexOf(AFL)<0)return false;
+    if(AFL!=='전체'&&appTypeOf(s).indexOf(AFL)<0)return false;
     if(sido){
       const c=String(s.city||'');
       if(!(SIDO_ALIAS[sido]||[sido]).some(a=>c.indexOf(a)===0))return false;
@@ -353,7 +361,7 @@ function renderApps(){
       +(s.selfTeach?' <span style="font-size:11px;font-weight:800;color:#0f766e">◉본인지도 희망'+(s.selfName?'('+esc(s.selfName)+')':'')+'</span>':'')
       +((dupKey[(s.school||'').replace(/\s/g,'')+'|'+(s.type||'')]>1)?' <span style="font-size:11px;font-weight:800;color:#fff;background:#e6b422;padding:2px 8px;border-radius:999px">⚠ 중복의심</span>':'')
       +(s.support==='용품만'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">🎁 용품만</span>':'')
-      +' <span style="font-size:11px;font-weight:800;color:#fff;background:'+(String(s.type||'').indexOf('방과후')>=0?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(String(s.type||'').indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+'</span>'
+      +' <span style="font-size:11px;font-weight:800;color:#fff;background:'+(appTypeOf(s).indexOf('방과후')>=0?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+'</span>'
       +(gc&&gc.teacherConfirm?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px" title="'+esc(gc.teacherConfirm.name)+'">📦 용품수령확인</span>':'')
       +'<div class="sub3">'+(s.code?'<b>'+esc(s.code)+'</b> · ':'')+esc(s.region)+(s.city?' · <b style="color:#1F4E9C">📍'+esc(s.city)+'</b>':' · <b style="color:#C41E2F">시군구 미입력</b>')+' · '+esc(s.students)+(s.start&&s.start.indexOf('8월')>=0?' · <b style="color:#C41E2F">⚡8월 방학 개강 희망</b>':'')+' · 희망 '+esc(s.d1)
       +'<br>담당 '+esc(s.teacher)+' '+esc(s.phone)+(s.assignedName?' · <b style="color:#0f766e">배정: '+esc(s.assignedName)+'</b>':'')+'</div></div>'
@@ -383,7 +391,7 @@ function copyPhoneList(kind){
     const sido=(document.getElementById('appSido')||{}).value||'';
     const q=((document.getElementById('appSearch')||{}).value||'').trim().toLowerCase();
     APPS.forEach(d=>{const s=d.data();
-      if(AFL!=='전체'&&String(s.type||'').indexOf(AFL)<0)return;
+      if(AFL!=='전체'&&appTypeOf(s).indexOf(AFL)<0)return;
       if(sido){const c=String(s.city||'');if(!(SIDO_ALIAS[sido]||[sido]).some(a=>c.indexOf(a)===0))return;}
       if(q){const hay=[s.school,s.city,s.teacher,s.code,s.region,s.assignedName].map(x=>String(x||'').toLowerCase()).join(' ');if(hay.indexOf(q)<0)return;}
       if(s.phone)list.push((s.teacher||'')+'\t'+s.phone+'\t'+(s.school||''));
@@ -690,7 +698,7 @@ async function unassign(id){
   // 지명 슬롯 재오픈 (용품만이 아닌 경우)
   if(s.support!=='용품만'){
     await DB.collection('openSlots').doc(id).set({
-      school:s.school,region:s.region,type:s.type,d1:s.d1||'',
+      school:s.school,region:appRegion(s),type:appTypeOf(s),d1:s.d1||'',
       claimedBy:null,claimedName:'',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
   }
   alert('배정이 해제되었습니다. 자동배정 또는 지명으로 재배정할 수 있습니다.');
@@ -744,7 +752,7 @@ async function fixCounters(){
   snap.docs.forEach(d=>{
     const s=d.data();
     if(['접수','선정','배정완료','대기'].indexOf(s.status)<0)return;
-    const k=(s.typeKey==='after'||String(s.type||'').indexOf('방과후')>=0)?'after':'school';
+    const k=(s.typeKey==='after'||appTypeOf(s).indexOf('방과후')>=0)?'after':'school';
     cnt[k]++;
   });
   await DB.collection('counters').doc('school').set({count:cnt.school});
@@ -849,7 +857,7 @@ async function autoAssign(){
     const slot=await DB.collection('openSlots').doc(d.id).get();
     if(slot.exists&&slot.data().claimedBy){
       await d.ref.update({assignedUid:slot.data().claimedBy,assignedName:slot.data().claimedName,status:'배정완료'});
-      await adHist(slot.data().claimedBy,'[위촉] '+s.school+' 강사 배정 ('+(String(s.type||'').indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' · '+(s.region||'')+')');
+      await adHist(slot.data().claimedBy,'[위촉] '+s.school+' 강사 배정 ('+(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' · '+(s.region||'')+')');
       await syncStatus(s,'배정완료',{assignedName:slot.data().claimedName});
       done++;continue;
     }
@@ -859,7 +867,7 @@ async function autoAssign(){
     cands.sort((a,b)=>a.cnt-b.cnt);
     const pick=cands[0];pick.cnt++;
     await d.ref.update({assignedUid:pick.uid,assignedName:pick.name,status:'배정완료'});
-    await adHist(pick.uid,'[위촉] '+s.school+' 강사 배정 ('+(String(s.type||'').indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' · '+(s.region||'')+')');
+    await adHist(pick.uid,'[위촉] '+s.school+' 강사 배정 ('+(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' · '+(s.region||'')+')');
     await syncStatus(s,'배정완료',{assignedName:pick.name});
     await DB.collection('openSlots').doc(d.id).delete().catch(()=>{});
     done++;
@@ -1395,7 +1403,7 @@ async function givePt(){
 async function reqGoods(appId){
   const doc=APPS.find(x=>x.id===appId);if(!doc)return;
   const s=doc.data();
-  const items=(String(s.type||'').indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' 강습 용품 세트 (50만원 상당)';
+  const items=(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' 강습 용품 세트 (50만원 상당)';
   try{
     await DB.collection('goodsConfirms').doc(appId).set({
       school:s.school,region:s.region||'',type:s.type||'',items:items,

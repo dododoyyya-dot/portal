@@ -237,6 +237,14 @@ function appRegion(s){
   for(const k in SIDO2REG){if(String(s.school||'').indexOf(k)===0)return SIDO2REG[k]}
   return raw||'';
 }
+
+// ── 유형 보정: 극초반 신청의 옛 값(school/after 등) 표준화 ──
+function appTypeOf(s){
+  const t=String((s.type||'')+' '+(s.typeKey||'')).toLowerCase();
+  if(t.indexOf('after')>=0||t.indexOf('방과후')>=0||t.indexOf('늘봄')>=0||t.indexOf('돌봄')>=0)return '방과후·늘봄·돌봄';
+  if(t.indexOf('school')>=0||t.indexOf('학교')>=0)return '학교체육 강습';
+  return String(s.type||'');
+}
 async function loadSchools(){
   const snap=await DB.collection('schoolApplications').get();
   RAPPS=snap.docs.sort((a,b)=>{
@@ -251,7 +259,7 @@ function renderSchools(){
   const docs=RAPPS.filter(d=>{
     const s=d.data();
     if(RREG!=='전체'&&appRegion(s)!==RREG)return false;
-    if(RFL!=='전체'&&String(s.type||'').indexOf(RFL)<0)return false;
+    if(RFL!=='전체'&&appTypeOf(s).indexOf(RFL)<0)return false;
     if(q){
       const hay=[s.school,s.city,s.teacher,s.code,s.assignedName].map(x=>String(x||'').toLowerCase()).join(' ');
       if(hay.indexOf(q)<0)return false;
@@ -263,7 +271,7 @@ function renderSchools(){
   el.innerHTML=docs.map(d=>{
     const s=d.data();const st=s.status||'접수';
     const stc={'접수':'#8a919d','대기':'#e6b422','선정':'#1F4E9C','배정완료':'#0f766e','미선정':'#C41E2F','취소':'#555555'}[st]||'#8a919d';
-    const isAfter=String(s.type||'').indexOf('방과후')>=0;
+    const isAfter=appTypeOf(s).indexOf('방과후')>=0;
     return '<div class="kcard'+(SEL===d.id?' ksel':'')+'">'
       +'<div class="kstat" style="background:'+stc+'"></div>'
       +'<div class="kbody">'
@@ -322,7 +330,7 @@ async function setSt(id,st){
   }catch(e){alert('실패: '+e.message)}
 }
 function eligibleInst(app){
-  const isAfter=String(app.type||'').indexOf('방과후')>=0;
+  const isAfter=appTypeOf(app).indexOf('방과후')>=0;
   const reg=appRegion(app)||'';
   return RUSERS.filter(d=>{
     const v=d.data();const f=v.instructorFor||{};
@@ -464,7 +472,7 @@ function renderInst(){
   const q=(document.getElementById('rgISearch').value||'').trim().toLowerCase();
   const app=SEL?RAPPS.find(d=>d.id===SEL):null;
   const s=app?app.data():null;
-  const isAfter=s?String(s.type||'').indexOf('방과후')>=0:false;
+  const isAfter=s?appTypeOf(s).indexOf('방과후')>=0:false;
   let docs=RUSERS.filter(d=>{
     const v=d.data();const f=v.instructorFor||{};
     if(s&&!(isAfter?f.after:f.school))return false; // 선택된 학교의 유형에 맞는 강사만
