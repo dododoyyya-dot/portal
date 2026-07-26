@@ -214,6 +214,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-main" onclick="addComp()">모집 등록</button>
         <div class="msg" id="cpMsg"></div>
       </div>
+      <input id="cpSearch" oninput="renderCompsAdmin()" placeholder="🔍 대회명·권역·역할·지명자(강사)·확정자 이름 검색" style="width:100%;max-width:420px;padding:9px 13px;border:1.5px solid #dfe5ee;border-radius:10px;margin-bottom:12px">
       <div class="board" id="compAdminList"><div class="bempty">불러오는 중…</div></div>
     </div>
     <div id="v3" style="display:none">
@@ -245,7 +246,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
           <option>부산</option><option>대구</option><option>울산</option><option>경북</option><option>경남</option>
           <option>제주</option>
         </select>
-        <input id="appSearch" oninput="renderApps()" placeholder="🔍 학교명·시군구·교사·접수번호 검색 (예: 부산, 수영구, 망미)" style="flex:1;min-width:220px;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px">
+        <input id="appSearch" oninput="renderApps()" placeholder="🔍 학교명·시군구·담당교사·배정강사·접수번호 검색" style="flex:1;min-width:220px;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px">
         <span id="appCount" style="align-self:center;font-size:13px;font-weight:800;color:#1F4E9C"></span>
       </div>
       <div class="board" id="appList"><div class="bempty">불러오는 중…</div></div>
@@ -1182,10 +1183,22 @@ async function addComp(){
   document.getElementById('cpTitle').value='';
   loadCompsAdmin();
 }
+let CADM=[];
 async function loadCompsAdmin(){
-  const el=document.getElementById('compAdminList');
   const snap=await DB.collection('compSlots').orderBy('date').limit(100).get();
-  el.innerHTML=snap.empty?'<div class="bempty">등록된 대회 모집이 없습니다.</div>':snap.docs.map(d=>{
+  CADM=snap.docs;
+  renderCompsAdmin();
+}
+function renderCompsAdmin(){
+  const el=document.getElementById('compAdminList');
+  const q=((document.getElementById('cpSearch')||{}).value||'').trim().toLowerCase();
+  const docs=CADM.filter(d=>{
+    if(!q)return true;
+    const s=d.data();const claimed=s.claimed||[];
+    const hay=[s.title,s.region,s.role,s.date,claimed.map(c=>c.name).join(' ')].map(x=>String(x||'').toLowerCase()).join(' ');
+    return hay.indexOf(q)>=0;
+  });
+  el.innerHTML=!docs.length?'<div class="bempty">'+(q?'검색 결과가 없습니다.':'등록된 대회 모집이 없습니다.')+'</div>':docs.map(d=>{
     const s=d.data();const claimed=s.claimed||[];
     const confirmed=s.confirmed||[];
     return '<div class="urow"><div class="grow"><b>'+esc(s.title)+'</b> <span style="font-size:11px;font-weight:800;color:#fff;background:'+(s.role==='심판'?'#7c3aed':'#b8860b')+';padding:2px 8px;border-radius:999px">'+esc(s.role)+'</span>'
