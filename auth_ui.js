@@ -24,3 +24,17 @@
   };
   document.head.appendChild(s1);
 })();
+
+// ── 모바일 메뉴: 배경 스크롤 잠금 + 링크 탭 시 자동 닫힘 (menuScrollLock)
+(function(){
+  document.addEventListener('DOMContentLoaded',function(){
+    var menu=document.querySelector('nav.menu');if(!menu)return;
+    var mo=new MutationObserver(function(){
+      document.body.style.overflow=menu.classList.contains('open')?'hidden':'';
+    });
+    mo.observe(menu,{attributes:true,attributeFilter:['class']});
+    menu.addEventListener('click',function(e){
+      if(e.target.tagName==='A'){menu.classList.remove('open');document.body.style.overflow='';}
+    });
+  });
+})();
