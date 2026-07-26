@@ -47,12 +47,15 @@
       <div class="drop">
         <a href="leader.html">레벨업 (포인트) 시스템</a>
         <a href="jobs.html">강사 활동 지원 · 지명</a>
+        <a href="guide.html">강사 가이드 (일지·운영·유의사항)</a>
+        <a href="safety.html">안전교육 이수</a>
         <a href="mypage.html">마이페이지</a>
       </div></div>
     <div><a href="community.html" class="top">커뮤니티</a></div>
     <div><a href="notice.html" class="top">알림마당</a>
       <div class="drop">
         <a href="notice.html">공지사항 · 공고</a>
+        <a href="license.html" style="color:#C41E2F;font-weight:800">📢 연수·검정 공고 (접수)</a>
         <a href="archive.html">자료실 (서식 다운로드)</a>
         <a href="faq.html">자주 묻는 질문</a>
       </div></div>
@@ -70,7 +73,7 @@
     <div class="btns" style="margin-top:0">
       <a class="b-red" href="apply.html?type=school">🏫 학교체육 유형 참여학교 신청</a>
       <a class="b-red" style="background:#0f766e" href="apply.html?type=after">🌱 방과후·늘봄 유형 참여학교 신청</a>
-      <a class="b-line" href="jobs.html">👟 선정학교 강사지원 신청</a>
+      <a class="b-red" style="background:#1F4E9C" href="jobs.html">👟 선정학교 강사지원 신청</a>
     </div>
   </div>
   <div id="dday" style="display:none;margin-top:18px"><span style="background:rgba(196,30,47,.9);color:#fff;font-weight:900;font-size:15px;padding:8px 22px;border-radius:999px" id="ddayTxt"></span></div>
@@ -81,6 +84,15 @@
     <div class="stat"><b>국가공인</b><span>체육지도자 자격검정 주관</span></div>
   </div>
 </div></div>
+
+<!-- ── 접수 중인 공고 (라이브) ── -->
+<section id="liveNotices" style="display:none;background:#fdf8ee;border-bottom:2px solid #e6b422;padding:22px 0"><div class="wrap">
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+    <span style="background:#C41E2F;color:#fff;font-size:13px;font-weight:900;padding:5px 14px;border-radius:999px">📢 접수 중인 공고</span>
+    <span style="font-size:13px;color:#5b6472;font-weight:600">연수·자격검정 신청은 로그인 후 공고에서 바로 접수됩니다</span>
+  </div>
+  <div id="lnList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px"></div>
+</div></section>
 
 <section style="padding:64px 0"><div class="wrap">
   <div class="sec-label">APPLY</div>
@@ -250,6 +262,22 @@
     requestAnimationFrame(tick);
   }
   function load(){
+    // ── 접수 중인 공고 배너 ──
+    firebase.firestore().collection('licenseNotices').orderBy('createdAt','desc').limit(12).get().then(snap=>{
+      const open=[];
+      snap.forEach(d=>{const n=d.data();
+        if((n.approval===undefined||n.approval==='승인')&&n.status==='접수중')open.push(n);});
+      if(!open.length)return;
+      const el=document.getElementById('lnList');
+      el.innerHTML=open.slice(0,6).map(n=>
+        '<a href="license.html" style="display:block;background:#fff;border:1.5px solid #e8dcc8;border-radius:12px;padding:14px 16px;text-decoration:none;color:inherit">'
+        +'<span style="display:inline-block;background:'+(n.type==='갱신'?'#0f766e':((n.type||'').indexOf('보수')>=0?'#b8860b':'#153A77'))+';color:#fff;font-size:11.5px;font-weight:900;padding:3px 10px;border-radius:999px">'+(n.type||'공고')+'</span> '
+        +(n.sido?'<span style="display:inline-block;background:#8a919d;color:#fff;font-size:11.5px;font-weight:900;padding:3px 10px;border-radius:999px">'+n.sido+'</span>':'')
+        +'<b style="display:block;font-size:14.5px;margin-top:7px;line-height:1.5">'+(n.title||'')+'</b>'
+        +'<span style="display:block;font-size:12.5px;color:#5b6472;margin-top:4px">'+(n.date||'')+(n.until?' · 마감 '+n.until:'')+'</span>'
+        +'<span style="display:inline-block;margin-top:8px;font-size:12.5px;font-weight:900;color:#C41E2F">신청하기 →</span></a>').join('');
+      document.getElementById('liveNotices').style.display='block';
+    }).catch(e=>console.warn('notices',e));
     firebase.firestore().collection('public').doc('stats').get().then(doc=>{
       if(!doc.exists)return;
       const d=doc.data();

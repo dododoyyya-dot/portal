@@ -45,6 +45,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="site_config.js"></script>
 <script>
 const firebaseConfig = {
@@ -70,6 +71,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
   <div class="lcinfo">
     <b>연맹 지도자·심판 자격</b> — 민간자격 등록번호 <b>제 2020-002410 호</b> (등록기관: 사단법인 대한플라잉디스크연맹 · 국가공인 아님) · <b>유효기간 4년</b>, 만료 전 갱신·보수(역량강화) 교육으로 4년 갱신<br>
     신청은 <b>통합 접수</b> — 소속 연맹을 선택하면 해당 연맹이 배정·처리하며, <b>교육 참석은 타 지역 교차 지원 가능</b>합니다.
+    <br><span style="font-size:12.5px;color:var(--gray)">관할 안내: <b>울산 → 부산연맹</b> · <b>대구 → 경북연맹</b> 일괄 처리 · 최근 2년간 검정 실적이 없는 연맹은 자격 업무 비활성 — 중앙(전국연맹) 직할로 처리됩니다.</span>
     발급 자격은 <a href="verify.html" style="font-weight:800;color:#153A77">진위확인</a>, 본인 출력은 <a href="mypage.html" style="font-weight:800;color:#153A77">마이페이지</a>에서.
     <details>
       <summary>자세히 — 국가자격과의 구분</summary>
@@ -106,7 +108,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
       <div class="lcgrid">
         <div><label class="lclab">구분</label><select id="nType" class="lcin"><option>신규</option><option>갱신</option><option>보수(역량강화)</option></select></div>
         <div><label class="lclab">대상 자격</label><select id="nTarget" class="lcin"><option>지도자</option><option>심판</option><option>지도자·심판 공통</option></select></div>
-        <div><label class="lclab">주관</label><select id="nSido" class="lcin"><option>전국(중앙)</option><option>경기</option><option>강원</option><option>부산</option><option>경남</option><option>경북</option><option>광주전남</option></select></div>
+        <div><label class="lclab">주관</label><select id="nSido" class="lcin"><option>전국(중앙)</option><option>경기</option><option>강원</option><option>부산</option><option>경남</option><option>경북</option><option>전남광주</option></select></div>
         <div><label class="lclab">일시</label><input id="nDate" class="lcin" placeholder="예: 2026. 9. 12.(토) 10:00"></div>
         <div><label class="lclab">장소</label><input id="nPlace" class="lcin" placeholder="예: 김포 연맹 교육장"></div>
         <div><label class="lclab">응시료·갱신료</label><input id="nFee" class="lcin" placeholder="예: 50,000원"></div>
@@ -115,6 +117,10 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
       </div>
       <label class="lclab" style="margin-top:10px">제목</label><input id="nTitle" class="lcin" placeholder="예: 2026 하반기 지도자 자격 검정 (3급·2급)">
       <label class="lclab" style="margin-top:10px">안내 내용</label><textarea id="nDesc" rows="3" class="lcin" placeholder="준비물, 응시 자격, 입금 계좌 등"></textarea>
+      <label class="lclab" style="margin-top:10px">세부 일정 <span style="font-weight:600;color:var(--gray)">— 한 줄에 하나씩 (예: 09:00~12:00 디스크골프·윷놀이 / 보림초 강당)</span></label><textarea id="nSched" rows="4" class="lcin" placeholder="09:00~12:00  디스크골프, 윷놀이 — 보림초 강당&#10;12:00~13:00  점심시간 (제공)&#10;13:00~15:00  얼티미트 — 신남초 강당&#10;15:00~17:00  심판법 및 평가 — 연맹 사무실"></textarea>
+      <label class="lclab" style="margin-top:10px">포스터 이미지 <span style="font-weight:600;color:var(--gray)">— 신청자에게 공고 카드에 표시됩니다 (자동 압축)</span></label>
+      <input type="file" id="nPoster" accept="image/*" class="lcin" style="padding:8px">
+      <div id="nPosterNow" style="font-size:12px;margin-top:4px"></div>
       <div style="margin-top:12px"><button class="lcbtn p" id="nBtn" onclick="addNotice()">공고 게시</button>
       <a href="javascript:cancelEdit()" id="nCancel" style="display:none;font-size:12.5px;font-weight:800;color:#C41E2F;margin-left:8px">수정 취소 ✕</a>
       <span id="nMsg" style="font-size:13px;font-weight:700"></span></div>
@@ -160,7 +166,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
       <div class="lcbar">
         <select id="lsRegion" class="lcin" style="width:auto" onchange="renderLics()">
           <option value="">지역 전체</option>
-          <option>서울</option><option>부산</option><option>대구</option><option>인천</option><option>광주</option><option>대전</option><option>울산</option><option>경기</option><option>강원</option><option>충북</option><option>충남</option><option>전북</option><option>전남</option><option>경북</option><option>경남</option><option>제주</option><option>세종</option><option>광주전남</option><option>중앙</option>
+          <option>서울</option><option>부산</option><option>대구</option><option>인천</option><option>광주</option><option>대전</option><option>울산</option><option>경기</option><option>강원</option><option>충북</option><option>충남</option><option>전북</option><option>전남</option><option>경북</option><option>경남</option><option>제주</option><option>세종</option><option>전남광주</option><option>중앙</option>
         </select>
         <select id="lsStatus" class="lcin" style="width:auto" onchange="renderLics()">
           <option value="">상태 전체</option><option>유효</option><option>만료</option>
@@ -190,7 +196,7 @@ async function addHist(uid,label){
 }
 let LME=null,LMY=null,ISMGR=false,CENTRAL=false,MSIDOS=[],MFEDS=[],NOTICES=[],LAPPS=[],LICS=[];
 // 자격 업무 활성 시도연맹 (신청 배정 단위 — 연맹 추가 시 이 목록만 수정)
-const FED_LIST=['경기','강원','부산','경남','경북','광주전남','기타(중앙 처리)'];
+const FED_LIST=['경기','강원','부산','경남','경북','전남광주','기타(중앙 처리)'];
 const SIDO_LIST=['서울','부산','대구','인천','광주','대전','울산','경기','강원','충북','충남','전북','전남','경북','경남','제주','세종'];
 
 AUTH.onAuthStateChanged(async u=>{
@@ -249,6 +255,8 @@ async function loadNotices(){
         +'<div style="font-size:12.5px;color:var(--gray);margin-top:4px;line-height:1.7">'+esc(n.issuer||'')+' · '+esc(n.date||'')+' · '+esc(n.place||'')+(n.fee?' · '+esc(n.fee):'')+(n.until?' · 마감 '+esc(n.until):'')
         +(n.acct?'<br>💳 수수료 입금: '+esc(n.acct):'')
         +(n.desc?'<br>'+esc(n.desc):'')
+        +(n.schedule?'<div style="margin-top:8px;padding:10px 12px;background:#f4f7fb;border-radius:9px;font-size:12.5px;line-height:1.9"><b style="color:#153A77">📅 세부 일정</b><br>'+esc(n.schedule).replace(/\n/g,'<br>')+'</div>':'')
+        +(n.posterUrl?'<a href="'+n.posterUrl+'" target="_blank" rel="noopener"><img src="'+n.posterUrl+'" alt="공고 포스터" style="display:block;max-width:230px;width:100%;border-radius:10px;margin-top:10px;border:1px solid #dfe5ee" loading="lazy"></a><span style="font-size:11.5px;color:var(--gray)">포스터를 누르면 크게 보입니다</span>':'')
         +((mine||CENTRAL)&&n.report?'<br><span style="color:#153A77;font-weight:700">📝 결과보고: '+esc(n.report.date||'')+' · 참석 '+esc(n.report.attend||0)+' · 합격 '+esc(n.report.pass||0)+' · 불합격 '+esc(n.report.fail||0)+' · 수납 '+esc(n.report.fee||'')+(n.report.note?' · '+esc(n.report.note):'')+'</span>':'')
         +((mine||CENTRAL)&&n.approval==='반려'&&n.remandReason?'<br><span style="color:#C41E2F;font-weight:700">⛔ 공고 반려 사유: '+esc(n.remandReason)+'</span>':'')
         +((mine||CENTRAL)&&n.reportStatus==='보완요청'&&n.reportRemand?'<br><span style="color:#C41E2F;font-weight:700">✏️ 보고 보완요청: '+esc(n.reportRemand)+'</span>':'')
@@ -270,6 +278,31 @@ async function loadNotices(){
   }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+esc(e.message)+'</div>'}
 }
 let EDIT_ID=null;
+
+async function compressPoster(file){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const MAX=1400;let w=img.width,h=img.height;
+      if(w>MAX){h=h*MAX/w;w=MAX}
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      c.toBlob(b=>b?res(b):rej(new Error('압축 실패')),'image/jpeg',0.85);
+    };
+    img.onerror=rej;
+    img.src=URL.createObjectURL(file);
+  });
+}
+async function uploadPoster(){
+  const f=document.getElementById('nPoster').files[0];
+  if(!f)return null;
+  const m=document.getElementById('nMsg');
+  m.textContent='포스터 업로드 중…';m.style.color='#153A77';
+  const blob=await compressPoster(f);
+  const ref=firebase.storage().ref('notices/'+Date.now()+'.jpg');
+  await ref.put(blob,{contentType:'image/jpeg'});
+  return await ref.getDownloadURL();
+}
 async function addNotice(){
   const m=document.getElementById('nMsg');
   const v=id=>document.getElementById(id).value.trim();
@@ -278,15 +311,20 @@ async function addNotice(){
   const isCentral=(LMY.role==='admin');
   if(EDIT_ID){
     // ── 공고 수정 (승인·보고 상태는 유지, 내용만 갱신) ──
-    await DB.collection('licenseNotices').doc(EDIT_ID).update({
+    const upd={
       type:v('nType'),target:v('nTarget'),title:v('nTitle'),date:v('nDate'),place:v('nPlace'),fee:v('nFee'),acct:v('nAcct'),until:v('nUntil'),desc:v('nDesc'),
+      schedule:v('nSched'),
       sido:(sido==='전국(중앙)'?'전국':sido),
-      editedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      editedAt:firebase.firestore.FieldValue.serverTimestamp()};
+    const pu=await uploadPoster();if(pu)upd.posterUrl=pu;
+    await DB.collection('licenseNotices').doc(EDIT_ID).update(upd);
     m.textContent='✓ 공고가 수정되었습니다';m.style.color='#0f766e';
     cancelEdit();loadNotices();return;
   }
+  const posterUrl=await uploadPoster();
   await DB.collection('licenseNotices').add({
     type:v('nType'),target:v('nTarget'),title:v('nTitle'),date:v('nDate'),place:v('nPlace'),fee:v('nFee'),acct:v('nAcct'),until:v('nUntil'),desc:v('nDesc'),
+    schedule:v('nSched'),posterUrl:(posterUrl||''),
     sido:(sido==='전국(중앙)'?'전국':sido),
     issuer:(isCentral?'중앙연맹':(sido+'연맹')),
     approval:(isCentral?'승인':'대기'),
@@ -294,7 +332,7 @@ async function addNotice(){
     reportStatus:'',
     createdAt:firebase.firestore.FieldValue.serverTimestamp()});
   m.textContent=isCentral?'✓ 게시되었습니다':'✓ 등록되었습니다 — 중앙연맹 승인 후 회원에게 공개됩니다';m.style.color='#0f766e';
-  ['nTitle','nDate','nPlace','nFee','nAcct','nUntil','nDesc'].forEach(i=>document.getElementById(i).value='');
+  ['nTitle','nDate','nPlace','nFee','nAcct','nUntil','nDesc','nSched'].forEach(i=>document.getElementById(i).value='');document.getElementById('nPoster').value='';document.getElementById('nPosterNow').textContent='';
   loadNotices();
 }
 function editNotice(id){
@@ -312,6 +350,9 @@ function editNotice(id){
   document.getElementById('nUntil').value=n.until||'';
   document.getElementById('nTitle').value=n.title||'';
   document.getElementById('nDesc').value=n.desc||'';
+  document.getElementById('nSched').value=n.schedule||'';
+  document.getElementById('nPoster').value='';
+  document.getElementById('nPosterNow').innerHTML=n.posterUrl?('현재 포스터 등록됨 — <a href="'+n.posterUrl+'" target="_blank" style="font-weight:800;color:#153A77">보기</a> (새 파일 선택 시 교체)'):'등록된 포스터 없음';
   document.getElementById('nBtn').textContent='✏️ 수정 저장';
   document.getElementById('nCancel').style.display='inline';
   document.getElementById('nMsg').textContent='수정 중: '+(n.title||'');document.getElementById('nMsg').style.color='#1F4E9C';
@@ -541,7 +582,7 @@ async function delLicApp(id){
 async function transferApp(id){
   const doc=LAPPS.find(d=>d.id===id);if(!doc)return;
   const a=doc.data();
-  const T=['경기','강원','부산','경남','경북','광주전남','중앙'];
+  const T=['경기','강원','부산','경남','경북','전남광주','중앙'];
   const tn=prompt(a.name+' 님 신청 건을 어느 연맹으로 이관할까요?\n'+T.map((s,i)=>(i+1)+'='+s).join('  ')+'\n\n※ 이관하면 이 건은 해당 연맹 관할로 넘어가 내 목록에서 사라집니다.',' ');
   if(tn===null)return;
   const target=T[parseInt(tn.trim(),10)-1];
@@ -560,7 +601,7 @@ async function transferApp(id){
 // ── 연맹 자격번호 규칙 (지역조견표 기준) ──
 // 지도자: {급수2}{지역2}-{년2}{월2}{순번4}  예) 0301-09080001
 // 심판  : {급수2}-{년2}{순번4}              예) 01-230001
-const REGION_CODE={'서울':'01','부산':'02','대구':'03','인천':'04','광주':'05','대전':'06','울산':'07','경기':'08','강원':'09','충북':'10','충남':'11','전북':'12','전남':'13','경북':'14','경남':'15','제주':'16','세종':'17','해외':'20','광주전남':'05','중앙':'01'};
+const REGION_CODE={'서울':'01','부산':'02','대구':'03','인천':'04','광주':'05','대전':'06','울산':'07','경기':'08','강원':'09','충북':'10','충남':'11','전북':'12','전남':'13','경북':'14','경남':'15','제주':'16','세종':'17','해외':'20','전남광주':'05','광주전남':'05','중앙':'01'};
 const REGION_MENU='1=서울 2=부산 3=대구 4=인천 5=광주 6=대전 7=울산 8=경기 9=강원 10=충북 11=충남 12=전북 13=전남 14=경북 15=경남 16=제주 17=세종 20=해외';
 async function nextSeq(key){
   const ref=DB.collection('counters').doc(key);
@@ -638,7 +679,7 @@ async function bulkIssue(){
   }
   const pass=LAPPS.filter(d=>d.data().status==='합격');
   if(!pass.length){alert('발급 대기(합격) 상태인 신청자가 없습니다.');return}
-  // 지도자인데 시도코드 특정 불가(광주전남·중앙 등) → 개별 발급으로 분리
+  // 지도자인데 시도코드 특정 불가(전남광주·중앙 등) → 개별 발급으로 분리
   const ok=[],hold=[];
   pass.forEach(d=>{
     const a=d.data();
@@ -836,7 +877,7 @@ async function delLic(no){
 async function moveLic(no){
   const doc=LICS.find(d=>d.id===no);if(!doc)return;
   const l=doc.data();
-  const T=['서울','부산','대구','인천','광주','대전','울산','경기','강원','충북','충남','전북','전남','경북','경남','제주','세종','광주전남','중앙'];
+  const T=['서울','부산','대구','인천','광주','대전','울산','경기','강원','충북','충남','전북','전남','경북','경남','제주','세종','전남광주','중앙'];
   const tn=prompt(no+' ('+(l.name||l.maskName)+' · '+l.type+' '+l.grade+')\n현재 소속: '+(l.region||'미지정')+'\n\n이관할 소속(시도/연맹) 번호를 입력하세요:\n'+T.map((s,i)=>(i+1)+'='+s).join(' '),' ');
   if(tn===null)return;
   const target=T[parseInt(tn.trim(),10)-1];

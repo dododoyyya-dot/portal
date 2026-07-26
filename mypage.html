@@ -47,6 +47,8 @@
       <div class="drop">
         <a href="leader.html">레벨업 (포인트) 시스템</a>
         <a href="jobs.html">강사 활동 지원 · 지명</a>
+        <a href="guide.html">강사 가이드 (일지·운영·유의사항)</a>
+        <a href="safety.html">안전교육 이수</a>
         <a href="mypage.html">마이페이지</a>
       </div></div>
     <div><a href="community.html" class="top">커뮤니티</a></div>
@@ -63,6 +65,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+<script src="region_map.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",
@@ -120,6 +123,8 @@ function orgChip(o,region,title){
 .urow .grow{flex:1;min-width:200px}
 .urow b{font-size:15.5px}
 .urow .sub3{font-size:12.5px;color:var(--gray)}
+#profileBox label,#profileBox div,.mycard div,.mycard b,#licCards div,#actList div{word-break:keep-all;overflow-wrap:anywhere}
+.mycard{min-width:0}
 </style>
 
 <div class="phero"><div class="wrap">
@@ -128,6 +133,7 @@ function orgChip(o,region,title){
 </div></div>
 <section><div class="wrap" style="max-width:900px">
   <div id="pendBox" class="pending-banner" style="display:none">⏳ <b>승인 대기 중</b> — 사무국이 연수 이수자 명단과 대조해 승인하면 커뮤니티 이용과 포인트 적립이 시작됩니다.</div>
+  <div id="safetyBanner" style="display:none;border-radius:12px;padding:14px 18px;margin-bottom:16px;font-size:14px;font-weight:700"></div>
   <div class="mycard" id="myCard" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
       <div><b id="myName" style="font-size:26px;font-weight:900"></b>
@@ -160,12 +166,12 @@ function orgChip(o,region,title){
 
   <div id="profileBox" style="margin-top:26px;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:20px 22px">
     <h3 style="margin:0 0 4px;font-size:16px">👤 마이 프로필 <span style="font-weight:600;color:var(--gray);font-size:12.5px">— 배정·위촉·자격 관리에 활용됩니다. 언제든 본인이 수정할 수 있습니다.</span></h3>
+
+    <!-- ① 기본 정보 -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:14px">
       <div>
-        <label style="font-size:13px;font-weight:800">거주 권역</label>
-        <select id="pfRegion" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
-          <option>서울·경기</option><option>강원</option><option>충청</option><option>전라</option><option>경상</option><option>제주</option>
-        </select>
+        <label style="font-size:13px;font-weight:800">생년월일 <span style="font-weight:600;color:var(--gray);font-size:11.5px">(자격증 표기용)</span></label>
+        <input type="date" id="pfBirth" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
       </div>
       <div>
         <label style="font-size:13px;font-weight:800">성별</label>
@@ -174,33 +180,33 @@ function orgChip(o,region,title){
         </select>
       </div>
       <div>
-        <label style="font-size:13px;font-weight:800">학위 (체육 전공) <span id="pfDegSt" style="font-size:11px;font-weight:900"></span></label>
-        <select id="pfDegree" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
-          <option value="">해당 없음</option><option>체육 전문학사</option><option>체육학사</option><option>체육석사</option><option>체육박사</option>
-        </select>
-        <input type="file" id="pfDegDoc" accept="image/*" style="display:block;margin-top:6px;font-size:12px">
-        <div id="pfDegLink" style="font-size:12px;margin-top:4px"></div>
-      </div>
-      <div>
-        <label style="font-size:13px;font-weight:800">생년월일 <span style="font-weight:600;color:var(--gray);font-size:11.5px">(자격증 표기용)</span></label>
-        <input type="date" id="pfBirth" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
-      </div>
-      <div>
-        <label style="font-size:13px;font-weight:800">의류 사이즈 <span style="font-weight:600;color:var(--gray);font-size:11.5px">(활동 피복·조끼 지급용)</span></label>
-        <select id="pfSize" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
-          <option value="">선택</option><option>S (90)</option><option>M (95)</option><option>L (100)</option><option>XL (105)</option><option>2XL (110)</option><option>3XL (115)</option>
+        <label style="font-size:13px;font-weight:800">거주 권역</label>
+        <select id="pfRegion" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
+          <option>서울·경기</option><option>강원</option><option>충청</option><option>전라</option><option>경상</option><option>제주</option>
         </select>
       </div>
     </div>
     <div style="margin-top:14px">
+      <label style="font-size:13px;font-weight:800;color:#8c1622">집 주소 (필수) <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 피복·자격증·상장 등 물품 발송에 사용됩니다</span></label>
+      <input id="pfAddr" placeholder="도로명 주소로 입력해 주세요 (예: 경기도 김포시 김포대로 1185, ○동 ○호)" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
+    </div>
+
+    <!-- ② 소속 -->
+    <div style="margin-top:14px">
       <label style="font-size:13px;font-weight:800">소속 (중복 선택 가능)</label>
-      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:13.5px">
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:13.5px;align-items:center">
         <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="pfAf1" style="width:auto">시도연맹 (KFDF)</label>
+        <select id="pfAfFed" style="display:none;padding:7px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px">
+          <option value="">소속 연맹 선택</option>
+          <option>경기연맹</option><option>강원연맹</option><option>대전연맹</option><option>부산연맹</option><option>대구연맹</option><option>울산연맹</option><option>경남연맹</option><option>경북연맹</option><option>전남광주연맹</option><option>제주연맹</option><option>기타</option>
+        </select>
         <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="pfAf2" style="width:auto">초·중·고 교사</label>
         <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="pfAf3" style="width:auto">초등스포츠강사 (교육청 소속)</label>
         <input id="pfAfEtc" placeholder="기타 소속 직접 입력" style="flex:1;min-width:160px;padding:7px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px">
       </div>
     </div>
+
+    <!-- ③ 자격 -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:14px">
       <div>
         <label style="font-size:13px;font-weight:800">KFDF 지도자 자격</label>
@@ -223,10 +229,74 @@ function orgChip(o,region,title){
       <input type="file" id="pfDocs" accept="image/*" multiple style="display:block;margin-top:6px;font-size:13px">
       <div id="pfDocList" style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"></div>
     </div>
+
+    <!-- ④ 학위 -->
+    <div style="margin-top:14px;max-width:340px">
+      <label style="font-size:13px;font-weight:800">학위 (체육 전공) <span id="pfDegSt" style="font-size:11px;font-weight:900"></span></label>
+      <select id="pfDegree" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
+        <option value="">해당 없음</option><option>체육 전문학사</option><option>체육학사</option><option>체육석사</option><option>체육박사</option>
+      </select>
+      <input type="file" id="pfDegDoc" accept="image/*" style="display:block;margin-top:6px;font-size:12px">
+      <div id="pfDegLink" style="font-size:12px;margin-top:4px"></div>
+    </div>
+
+    <!-- ⑤ 경력 -->
     <div style="margin-top:14px">
       <label style="font-size:13px;font-weight:800">경력 사항 <span style="font-weight:600;color:var(--gray);font-size:12px">— 입상·선수 경력, KFDF 주최대회 참가 등 자유 기재</span></label>
       <textarea id="pfCareer" rows="3" style="width:100%;padding:10px 13px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px;font-family:inherit;font-size:13.5px"></textarea>
     </div>
+
+    <!-- ⑥ 활동가능 권역·거점 -->
+    <div style="margin-top:16px;padding:14px 16px;background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:12px">
+        <label style="font-size:13.5px;font-weight:800;color:#0f766e">📍 활동가능 권역·거점 <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 강습 배정·이동거리 검토에 사용됩니다</span></label>
+        <div id="pfActMap" style="max-width:320px;margin:10px auto 0"></div>
+        <span id="pfActSel" style="display:block;text-align:center;font-size:12.5px;font-weight:700;color:#153A77;margin-top:8px"></span>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <select id="pfSido" style="flex:0 0 46%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px">
+            <option value="">거점 시도 선택</option>
+            <option>서울특별시</option><option>인천광역시</option><option>경기도</option>
+            <option>강원특별자치도</option>
+            <option>대전광역시</option><option>세종특별자치시</option><option>충청북도</option><option>충청남도</option>
+            <option>광주광역시</option><option>전북특별자치도</option><option>전라남도</option>
+            <option>부산광역시</option><option>대구광역시</option><option>울산광역시</option><option>경상북도</option><option>경상남도</option>
+            <option>제주특별자치도</option>
+          </select>
+          <input id="pfSigungu" placeholder="시군구 (예: 김포시, 수영구)" style="flex:1;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px">
+        </div>
+        <div style="font-size:11.5px;color:var(--gray);margin-top:6px">활동 권역은 복수 선택할 수 있습니다. 직장·거주지 등 실제로 활동 가능한 권역을 모두 선택하세요.</div>
+      </div>
+
+    <!-- ⑦ 사이즈 (맨 끝) -->
+    <div style="margin-top:16px;padding:14px 16px;background:#fbf7f0;border:1.5px solid #e8dcc8;border-radius:12px">
+      <label style="font-size:13.5px;font-weight:800;color:#8a6d1f">👕 피복 사이즈 <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 활동복·조끼·모자 등 지급용</span></label>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:8px">
+        <div>
+          <label style="font-size:12px;font-weight:800">상의</label>
+          <select id="pfSize" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
+            <option value="">선택</option><option>S (90)</option><option>M (95)</option><option>L (100)</option><option>XL (105)</option><option>2XL (110)</option><option>3XL (115)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:800">하의 (허리)</label>
+          <select id="pfSizePants" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
+            <option value="">선택</option><option>26</option><option>28</option><option>30</option><option>32</option><option>34</option><option>36</option><option>38</option><option>40</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:800">신발 (mm)</label>
+          <select id="pfSizeShoe" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
+            <option value="">선택</option><option>220</option><option>230</option><option>240</option><option>250</option><option>260</option><option>270</option><option>280</option><option>290</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:800">모자</label>
+          <select id="pfSizeCap" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
+            <option value="">선택</option><option>성인</option><option>아동</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
     <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
       <button class="btn-sub" style="background:#0f766e" onclick="saveProfile()">프로필 저장</button>
       <span id="pfMsg" style="font-size:13px;font-weight:700"></span>
@@ -333,7 +403,24 @@ function fillProfile(d){
   document.getElementById('pfRef').value=q.referee||'';
   document.getElementById('pfYouth').checked=!!q.youth;
   document.getElementById('pfCareer').value=d.career||'';
+  // 활동가능 권역·거점
+  try{
+    const acts=(d.activityRegions&&d.activityRegions.length)?d.activityRegions:(d.region?[d.region]:[]);
+    PFMAP=KFDF_MAP.render('pfActMap',{mode:'multi',selected:acts,onChange:v=>{document.getElementById('pfActSel').textContent=v.length?('선택: '+v.join(', ')):'선택된 권역이 없습니다'}});
+    document.getElementById('pfActSel').textContent=acts.length?('선택: '+acts.join(', ')):'선택된 권역이 없습니다';
+    const bc=String(d.baseCity||'').trim();
+    if(bc){const sp=bc.split(' ');const sel=document.getElementById('pfSido');
+      for(const o of sel.options){if(o.value===sp[0]){sel.value=sp[0];break}}
+      document.getElementById('pfSigungu').value=sp.slice(1).join(' ');}
+  }catch(e){console.warn('actmap',e)}
   document.getElementById('pfSize').value=d.clothingSize||'';
+  document.getElementById('pfAddr').value=d.address||'';
+  document.getElementById('pfSizePants').value=d.sizePants||'';
+  document.getElementById('pfSizeShoe').value=d.sizeShoe||'';
+  document.getElementById('pfSizeCap').value=d.sizeCap||'';
+  document.getElementById('pfAfFed').value=d.fedName||'';
+  document.getElementById('pfAfFed').style.display=document.getElementById('pfAf1').checked?'inline-block':'none';
+  document.getElementById('pfAf1').addEventListener('change',e=>{document.getElementById('pfAfFed').style.display=e.target.checked?'inline-block':'none'});
   document.getElementById('pfBirth').value=d.birth||'';
   document.getElementById('pfGender').value=d.gender||'';
   // 학위 증빙 상태
@@ -347,10 +434,11 @@ function renderDocList(urls){
   document.getElementById('pfDocList').innerHTML=urls.map((u,i)=>
     '<a href="'+u+'" target="_blank" style="display:inline-block;font-size:12px;font-weight:800;color:#153A77;background:#eef3fa;border:1px solid #d4e0f2;border-radius:8px;padding:6px 12px">📎 자격증 '+(i+1)+' 보기</a>').join('');
 }
-let PFBUSY=false;
+let PFBUSY=false,PFMAP=null;
 async function saveProfile(){
   if(PFBUSY)return;PFBUSY=true;
   const m=document.getElementById('pfMsg');
+  if(!document.getElementById('pfAddr').value.trim()){m.textContent='⚠ 집 주소는 필수입니다 (물품 발송용)';m.style.color='#8c1622';document.getElementById('pfAddr').focus();PFBUSY=false;return}
   try{
     const af=[];
     if(document.getElementById('pfAf1').checked)af.push('시도연맹');
@@ -381,6 +469,8 @@ async function saveProfile(){
     }
     const upd={
       region:document.getElementById('pfRegion').value,
+      activityRegions:(PFMAP?PFMAP.get():(MYD.activityRegions||[])),
+      baseCity:(function(){const sd=document.getElementById('pfSido').value;const sg=document.getElementById('pfSigungu').value.trim();return (sd&&sg)?(sd+' '+sg):(MYD.baseCity||'')})(),
       gender:document.getElementById('pfGender').value,
       degree:document.getElementById('pfDegree').value,
       degreeDoc:degDoc,
@@ -388,6 +478,11 @@ async function saveProfile(){
       quals:{leader:document.getElementById('pfLeader').value,referee:document.getElementById('pfRef').value,youth:document.getElementById('pfYouth').checked},
       career:document.getElementById('pfCareer').value.trim(),
       clothingSize:document.getElementById('pfSize').value,
+      address:document.getElementById('pfAddr').value.trim(),
+      sizePants:document.getElementById('pfSizePants').value,
+      sizeShoe:document.getElementById('pfSizeShoe').value,
+      sizeCap:document.getElementById('pfSizeCap').value,
+      fedName:document.getElementById('pfAfFed').value,
       birth:document.getElementById('pfBirth').value,
       qualDocs:docs
     };
@@ -468,6 +563,11 @@ AUTH.onAuthStateChanged(async u=>{
   document.getElementById('myXp').textContent=next?(p+'P / '+next+'P'):(p+'P (최고 레벨)');
   document.getElementById('myBar').style.width=(next?Math.min(100,(p-base)/(next-base)*100):100)+'%';
   if(d.status!=='approved')document.getElementById('pendBox').style.display='block';
+  // 안전교육 이수 상태
+  (function(){const sb=document.getElementById('safetyBanner');if(!sb)return;sb.style.display='block';
+    if(d.safetyEdu){sb.style.background='#eafaf3';sb.style.color='#0f766e';sb.innerHTML='🛡 <b>안전교육 이수 완료</b>'+(d.safetyEduAt?' <span style="font-weight:600;color:#555">('+fmtDate(d.safetyEduAt)+')</span>':'');}
+    else{sb.style.background='#fdf3f4';sb.style.color='#8c1622';sb.innerHTML='🛡 <b>안전교육 미이수</b> — 강습 활동 전 필수입니다. <a href="safety.html" style="color:#C41E2F;font-weight:900;text-decoration:underline">안전교육 이수하러 가기 →</a>';}
+  })();
   if(d.role==='admin')document.getElementById('adminBtn').style.display='inline-block';
   if(d.role==='regionAdmin'||d.role==='admin')document.getElementById('regionBtn').style.display='inline-block';
   if(d.consents&&d.consents.agreedAt){

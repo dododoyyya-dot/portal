@@ -77,6 +77,7 @@ let ALLLOGS=[], PENDING=[], INFO={school:'',name:'',type:''}, SIGGED=false;
 
 async function boot(){
   const stage=document.getElementById('stage');
+  if(qs('goods')){return bootGoods(qs('goods').trim());}
   // id(단건) 또는 ids(일괄, 쉼표) 지원
   let ids=[];
   if(qs('ids'))ids=qs('ids').split(',').map(s=>s.trim()).filter(Boolean);
@@ -152,13 +153,7 @@ function initSig(){
   canvas.addEventListener('touchstart',start,{passive:false});canvas.addEventListener('touchmove',move,{passive:false});canvas.addEventListener('touchend',end);
 }
 function clearSig(){if(ctx){ctx.clearRect(0,0,canvas.width,canvas.height);SIGGED=false;document.getElementById('sighint').style.display='block'}}
-
-async function submitConfirm(){
-  const msg=document.getElementById('msg');
-  const name=(document.getElementById('tname').value||'').trim();
-  if(!name){msg.textContent='담당교사 성명을 입력해주세요';msg.className='msg err';return}
-  if(!SIGGED){msg.textContent='서명을 입력해주세요';msg.className='msg err';return}
-  const btn=document.getElementById('okbtn');btn.disabled=true;
+function exportSign(){
   let sign='';
   try{
     const out=document.createElement('canvas');out.width=360;out.height=120;
@@ -166,6 +161,67 @@ async function submitConfirm(){
     sign=out.toDataURL('image/png');
     if(sign.length>190000)sign=out.toDataURL('image/jpeg',0.7);
   }catch(e){sign=''}
+  return sign;
+}
+
+// ── 용품(물품) 수령 확인 ──
+let GOODS=null;
+async function bootGoods(id){
+  const stage=document.getElementById('stage');
+  try{
+    const doc=await DB.collection('goodsConfirms').doc(id).get();
+    if(!doc.exists){stage.innerHTML='<div class="state">확인 대상을 찾을 수 없습니다. 링크를 다시 확인해주세요.</div>';return}
+    GOODS=Object.assign({_id:id},doc.data());
+    if(GOODS.teacherConfirm){renderGoodsDone();return}
+    renderGoodsForm();
+  }catch(e){stage.innerHTML='<div class="state">불러오기 실패: '+esc(e.message)+'</div>'}
+}
+function renderGoodsForm(){
+  document.getElementById('stage').innerHTML=
+    '<h1>용품 수령 확인</h1>'
+    +'<p class="lead">아래 강습 용품을 <b>귀교에서 수령</b>하였음을 확인하시면, 성명과 서명을 남겨주세요.</p>'
+    +'<div class="row"><span class="k">학교</span><span class="v big">'+esc(GOODS.school)+'</span></div>'
+    +(GOODS.type?'<div class="row"><span class="k">유형</span><span class="v">'+esc(GOODS.type)+'</span></div>':'')
+    +'<div class="row"><span class="k">수령 품목</span><span class="v" style="font-weight:600">'+esc(GOODS.items||'강습 용품 세트')+'</span></div>'
+    +'<div style="margin-top:18px"><label class="fl">담당교사(수령자) 성명</label>'
+    +'<input type="text" id="tname" placeholder="예: 홍길동" autocomplete="name" maxlength="20"></div>'
+    +'<div class="sigwrap"><label class="fl">서명 <span style="font-weight:600;color:var(--gray)">(손가락/펜으로 서명해주세요)</span></label>'
+    +'<div class="sigbox"><canvas id="sig"></canvas><div class="sighint" id="sighint">여기에 서명</div></div>'
+    +'<div class="sigtools"><span style="font-size:12px;color:var(--gray)">확인 후에는 수정할 수 없습니다</span><button class="clr" onclick="clearSig()">✕ 다시</button></div></div>'
+    +'<button class="btn" id="okbtn" onclick="submitGoods()">수령 확인하고 서명 제출</button>'
+    +'<div class="msg" id="msg"></div>';
+  initSig();
+}
+function renderGoodsDone(){
+  const c=GOODS.teacherConfirm||{};
+  document.getElementById('stage').innerHTML=
+    '<div class="done"><div class="chk">✅</div><h2>수령 확인 완료</h2>'
+    +'<div style="font-size:14px;color:#555;margin-bottom:10px">'+esc(GOODS.school)+' 용품 수령이 확인되었습니다.</div></div>'
+    +'<div class="row"><span class="k">수령 품목</span><span class="v" style="font-weight:600">'+esc(GOODS.items||'')+'</span></div>'
+    +'<div class="row"><span class="k">확인 교사</span><span class="v">'+esc(c.name||'')+'</span></div>'
+    +(c.at?'<div class="row"><span class="k">확인 시각</span><span class="v" style="font-weight:600;color:#777">'+esc(String(c.at).replace('T',' ').slice(0,16))+'</span></div>':'')
+    +(c.sign?'<div style="margin-top:12px;text-align:center"><img src="'+c.sign+'" alt="서명" style="max-width:200px;border:1px solid #eee;border-radius:8px"></div>':'');
+}
+async function submitGoods(){
+  const msg=document.getElementById('msg');
+  const name=(document.getElementById('tname').value||'').trim();
+  if(!name){msg.textContent='담당교사 성명을 입력해주세요';msg.className='msg err';return}
+  if(!SIGGED){msg.textContent='서명을 입력해주세요';msg.className='msg err';return}
+  const btn=document.getElementById('okbtn');btn.disabled=true;msg.textContent='제출 중…';msg.className='msg';
+  const tc={name:name,at:new Date().toISOString(),sign:exportSign()};
+  try{
+    await DB.collection('goodsConfirms').doc(GOODS._id).update({teacherConfirm:tc});
+    GOODS.teacherConfirm=tc;renderGoodsDone();
+  }catch(e){btn.disabled=false;msg.textContent='제출 실패 — 이미 확인되었거나 링크가 만료되었을 수 있습니다.';msg.className='msg err'}
+}
+
+async function submitConfirm(){
+  const msg=document.getElementById('msg');
+  const name=(document.getElementById('tname').value||'').trim();
+  if(!name){msg.textContent='담당교사 성명을 입력해주세요';msg.className='msg err';return}
+  if(!SIGGED){msg.textContent='서명을 입력해주세요';msg.className='msg err';return}
+  const btn=document.getElementById('okbtn');btn.disabled=true;
+  const sign=exportSign();
   const tc={name:name,at:new Date().toISOString(),sign:sign};
   let done=0,fail=0;
   for(const l of PENDING){

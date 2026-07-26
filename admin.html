@@ -126,7 +126,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
 .urow .sub3{font-size:12.5px;color:var(--gray)}
 .rtbl{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff}
 .rtbl th{background:#f4f6fa;color:#5b6472;font-weight:800;padding:9px 8px;text-align:left;white-space:nowrap}
-.rtbl td{border-top:1px solid #eef1f5;padding:9px 8px;vertical-align:middle;white-space:nowrap}
+.rtbl td{border-top:1px solid #eef1f5;padding:9px 8px;vertical-align:middle;word-break:keep-all;overflow-wrap:anywhere;line-height:1.6}
 .rtbl tr:hover td{background:#fafbfd}
 .rtbl .nm{font-weight:800;font-size:13px}
 .rtbl .mut{color:#aab1bb}
@@ -469,11 +469,11 @@ async function setRegionAdmin(uid){
   if(n===null)return;
   const R={'1':'서울·경기','2':'강원','3':'충청','4':'전라','5':'경상','6':'제주'}[n.trim()];
   if(!R){alert('1~6 중에서 입력해주세요.');return}
-  const sn=prompt('자격증 업무 관할 연맹 번호를 입력하세요 (시도연맹 관계자·자격관리 겸무자):\n1=경기 2=강원 3=부산 4=경남 5=경북 6=광주전남\n※ 복수 관할은 쉼표로: 예) 3,4 (부산+경남)\n(자격 업무 권한이 필요 없으면 0)','0');
+  const sn=prompt('자격증 업무 관할 연맹 번호를 입력하세요 (시도연맹 관계자·자격관리 겸무자):\n1=경기 2=강원 3=부산 4=경남 5=경북 6=전남광주\n※ 복수 관할은 쉼표로: 예) 3,4 (부산+경남)\n(자격 업무 권한이 필요 없으면 0)','0');
   if(sn===null)return;
-  const SIDOS={'1':'경기','2':'강원','3':'부산','4':'경남','5':'경북','6':'광주전남'};
+  const SIDOS={'1':'경기','2':'강원','3':'부산','4':'경남','5':'경북','6':'전남광주'};
   // 산하 시도 확장 (기존 대장 데이터 커버)
-  const EXP={'경기':['경기','서울','인천'],'강원':['강원'],'부산':['부산','울산'],'경남':['경남'],'경북':['경북','대구'],'광주전남':['광주전남','광주','전북','전남']};
+  const EXP={'경기':['경기','서울','인천'],'강원':['강원'],'부산':['부산','울산'],'경남':['경남'],'경북':['경북','대구'],'전남광주':['전남광주','광주전남','광주','전북','전남']};
   const picked=[...new Set(sn.split(',').map(x=>SIDOS[x.trim()]).filter(Boolean))];
   const S=picked.length?[...new Set(picked.flatMap(f=>EXP[f]))]:null;
   const SLABEL=picked.join('·');

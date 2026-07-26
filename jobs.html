@@ -47,6 +47,8 @@
       <div class="drop">
         <a href="leader.html">레벨업 (포인트) 시스템</a>
         <a href="jobs.html">강사 활동 지원 · 지명</a>
+        <a href="guide.html">강사 가이드 (일지·운영·유의사항)</a>
+        <a href="safety.html">안전교육 이수</a>
         <a href="mypage.html">마이페이지</a>
       </div></div>
     <div><a href="community.html" class="top">커뮤니티</a></div>
@@ -120,7 +122,7 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
 <div class="phero"><div class="wrap">
   <div class="crumb">HOME &nbsp;›&nbsp; <b>강사 배정</b></div>
   <h1>강습 지명 신청</h1>
-  <p>선정된 학교 중 아직 강사가 배정되지 않은 곳에 지명 신청할 수 있습니다. 먼저 신청한 순서는 배정 검토 시 우선 반영됩니다. (승인 회원 전용)</p>
+  <p>선정된 학교 중 아직 강사가 배정되지 않은 곳에 지명 신청할 수 있습니다. 먼저 신청한 순서는 배정 검토 시 우선 반영됩니다. (승인 회원 전용) &nbsp;<a href="guide.html" style="color:#e6b422;font-weight:800">📘 강사 가이드 (일지·운영·유의사항) →</a></p>
 </div></div>
 <section><div class="wrap" style="max-width:900px">
   <div id="jGate" class="pending-banner" style="display:none"></div>
@@ -150,30 +152,13 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
         <button class="btn-sub" id="btnStaff" style="margin-top:14px" onclick="toggleApply('staff')">지원하기</button>
       </div>
     </div>
-    <div style="background:#fff;border:1.5px solid #dfe5ee;border-radius:14px;padding:20px 22px;margin-bottom:40px">
-      <h3 style="margin:0 0 6px;font-size:17px">📍 활동가능 권역 설정</h3>
-      <p style="font-size:13.5px;color:var(--gray);margin:0 0 12px;line-height:1.6">거주 권역 외에도 이동하여 활동할 수 있는 권역을 지도에서 모두 선택해 주세요. 선택한 권역의 학교를 지명할 수 있고, 사무국·시도연맹 배정 시 우선 검토됩니다.</p>
-      <div id="jRegionMap" style="max-width:340px;margin:0 auto"></div>
-      <div style="max-width:420px;margin:14px auto 0">
-        <label style="font-size:13px;font-weight:800;color:var(--blue)">활동 거점 시군구 * <span style="font-weight:600;color:var(--gray)">— 배정·이동거리 검토에 사용됩니다</span></label>
-        <div style="display:flex;gap:8px;margin-top:6px">
-          <select id="jSido" style="flex:0 0 46%">
-            <option value="">시도 선택</option>
-            <option>서울특별시</option><option>인천광역시</option><option>경기도</option>
-            <option>강원특별자치도</option>
-            <option>대전광역시</option><option>세종특별자치시</option><option>충청북도</option><option>충청남도</option>
-            <option>광주광역시</option><option>전북특별자치도</option><option>전라남도</option>
-            <option>부산광역시</option><option>대구광역시</option><option>울산광역시</option><option>경상북도</option><option>경상남도</option>
-            <option>제주특별자치도</option>
-          </select>
-          <input id="jSigungu" style="flex:1" placeholder="시군구 (예: 김포시, 수영구)">
-        </div>
+    <div style="background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:14px;padding:18px 22px;margin-bottom:40px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <div style="flex:1;min-width:240px">
+        <h3 style="margin:0 0 4px;font-size:16px">📍 활동가능 권역·거점</h3>
+        <p style="font-size:13.5px;color:var(--gray);margin:0;line-height:1.6">활동 권역과 거점 시군구는 <b>마이페이지 › 마이 프로필</b>에서 설정합니다. 설정한 권역의 학교만 지명 신청할 수 있습니다.</p>
+        <span id="jRegionNow" style="display:block;font-size:13px;font-weight:800;color:#0f766e;margin-top:6px"></span>
       </div>
-      <div style="text-align:center;margin-top:12px">
-        <span id="jRegionSel" style="display:block;font-size:13px;font-weight:700;color:var(--blue);margin-bottom:8px"></span>
-        <button class="btn-sub" id="jRegionSave" onclick="saveRegions()" style="background:#0f766e">활동가능 권역·거점 저장</button>
-        <span id="jRegionMsg" style="font-size:13px;font-weight:700;margin-left:8px"></span>
-      </div>
+      <button class="btn-sub" style="background:#0f766e" onclick="location.href='mypage.html#profileBox'">마이 프로필에서 설정 →</button>
     </div>
     <div class="sec-label">STEP 2</div>
     <h2 class="sec-title" style="font-size:24px">선정 학교 지명 신청</h2>
@@ -202,24 +187,17 @@ AUTH.onAuthStateChanged(async u=>{
   if(!u){g.style.display='block';g.innerHTML='🔒 승인 회원 전용입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a>';return}
   JME=u;const d=await DB.collection('users').doc(u.uid).get();JMY=d.data();
   if(!JMY||JMY.status!=='approved'){g.style.display='block';g.innerHTML='⏳ 사무국 승인 후 이용 가능합니다.';return}
-  document.getElementById('jBody').style.display='block';renderApply();initRegionMap();loadSlots();loadComps();loadMyRegion();
+  document.getElementById('jBody').style.display='block';renderApply();showMyRegions();loadSlots();loadComps();loadMyRegion();
 });
 let JMAP=null;
 function myRegions(){
   const a=JMY.activityRegions;
   return (a&&a.length)?a:(JMY.region?[JMY.region]:[]);
 }
-function initRegionMap(){
-  JMAP=KFDF_MAP.render('jRegionMap',{mode:'multi',selected:myRegions(),onChange:showSel});
-  showSel(myRegions());
-  // 기존 저장된 거점 시군구 표시
-  const bc=String(JMY.baseCity||'').trim();
-  if(bc){
-    const sp=bc.split(' ');
-    const sel=document.getElementById('jSido');
-    for(const o of sel.options){if(o.value===sp[0]){sel.value=sp[0];break}}
-    document.getElementById('jSigungu').value=sp.slice(1).join(' ');
-  }
+function showMyRegions(){
+  const el=document.getElementById('jRegionNow');if(!el)return;
+  const a=myRegions();const bc=String(JMY.baseCity||'').trim();
+  el.textContent=(a.length?('현재 설정: '+a.join(', ')):'⚠ 활동 권역 미설정')+(bc?(' · 거점 '+bc):' · 거점 미입력');
 }
 function showSel(s){
   document.getElementById('jRegionSel').textContent=s.length?('선택: '+s.join(', ')):'선택된 권역이 없습니다';
@@ -265,7 +243,7 @@ async function toggleApply(k){
       const sido=document.getElementById('jSido').value,sig=document.getElementById('jSigungu').value.trim();
       if(sido&&sig){upd.baseCity=(sido+' '+sig).trim();}
       else{
-        alert('지원 전에 아래 [활동가능 권역 설정]에서 활동 거점 시군구를 입력해주세요.\n(배정·이동거리 검토에 필요합니다)');
+        alert('지원 전에 마이페이지 › 마이 프로필에서 활동 권역과 거점 시군구를 입력해주세요.\n(배정·이동거리 검토에 필요합니다)');location.href='mypage.html#profileBox';
         document.getElementById('jSido').scrollIntoView({behavior:'smooth',block:'center'});
         return;
       }

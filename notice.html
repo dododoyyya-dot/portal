@@ -47,6 +47,8 @@
       <div class="drop">
         <a href="leader.html">레벨업 (포인트) 시스템</a>
         <a href="jobs.html">강사 활동 지원 · 지명</a>
+        <a href="guide.html">강사 가이드 (일지·운영·유의사항)</a>
+        <a href="safety.html">안전교육 이수</a>
         <a href="mypage.html">마이페이지</a>
       </div></div>
     <div><a href="community.html" class="top">커뮤니티</a></div>
@@ -64,6 +66,10 @@
   <h1>공지사항 · 공고</h1><p>연맹의 모든 공고와 소식을 이곳에서 확인하세요.</p>
 </div></div>
 <section id="selNotice" style="display:none;background:var(--bg-soft)"><div class="wrap">
+  <div id="lnStrip" style="display:none;background:#fdf8ee;border:2px solid #e6b422;border-radius:14px;padding:16px 18px;margin-bottom:26px">
+    <b style="font-size:14.5px;color:#8a6d1f">📢 접수 중인 연수·검정 공고</b>
+    <div id="lnList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:10px"></div>
+  </div>
   <div class="sec-label">OFFICIAL</div>
   <h2 class="sec-title">참여학교 선정 결과 공고 <span id="snTime" style="font-size:14px;font-weight:700;color:var(--gray)"></span></h2>
   <p class="sec-desc">수시 선정 결과가 실시간으로 게시됩니다. 학교명·권역만 공개하며 개인정보는 포함되지 않습니다.</p>
@@ -164,6 +170,12 @@ render();
 (function(){
   function esc(x){return String(x||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
   function load(){
+    firebase.firestore().collection('licenseNotices').orderBy('createdAt','desc').limit(12).get().then(snap=>{
+      const open=[];snap.forEach(d=>{const n=d.data();if((n.approval===undefined||n.approval==='승인')&&n.status==='접수중')open.push(n);});
+      if(!open.length)return;
+      document.getElementById('lnList').innerHTML=open.slice(0,6).map(n=>'<a href="license.html" style="display:block;background:#fff;border:1px solid #e8dcc8;border-radius:10px;padding:12px 14px;text-decoration:none;color:inherit"><b style="font-size:13.5px">'+(n.title||'')+'</b><span style="display:block;font-size:12px;color:#5b6472;margin-top:3px">'+(n.date||'')+(n.until?' · 마감 '+n.until:'')+'</span></a>').join('');
+      document.getElementById('lnStrip').style.display='block';
+    }).catch(e=>console.warn(e));
     firebase.firestore().collection('public').doc('stats').get().then(doc=>{
       if(!doc.exists)return;
       const d=doc.data();const schools=d.schools||[];
