@@ -999,6 +999,7 @@ function renderUsers(){
         ?'<span style="font-size:13px;font-weight:800;color:#0f766e">승인됨</span>'
         :'<button class="btn-sub" onclick="approve(\''+d.id+'\')">승인하기</button>')
       +'<button class="btn-sub" style="background:#1F4E9C" onclick="setOrg(\''+d.id+'\')">직책</button>'
+      +'<button class="btn-sub" style="background:#0f766e" onclick="setBase(\''+d.id+'\')">📍 거점·권역</button>'
       +(IS_OWNER?'<button class="btn-sub" style="background:'+(v.role==='regionAdmin'?'#7c3aed':'#8a919d')+'" onclick="setRegionAdmin(\''+d.id+'\')">'+(v.role==='regionAdmin'?'🛡 '+esc(v.managedRegion||'권역?')+dutyTag(v)+' 관리자':'🛡 권역관리자 지정')+'</button>'
         :(v.role==='regionAdmin'?'<span style="font-size:11px;font-weight:900;color:#fff;background:#7c3aed;padding:4px 10px;border-radius:999px;align-self:center">🛡 권역관리자'+dutyTag(v)+'</span>':''))
       +((IS_OWNER&&!v.owner)?'<button class="btn-sub" style="background:'+(v.role==='admin'?'#C41E2F':'#8a919d')+'" onclick="setFullAdmin(\''+d.id+'\')">'+(v.role==='admin'?'👑 전체관리자 ✓':'👑 전체관리자 지정')+'</button>'
@@ -1320,6 +1321,24 @@ function pickDialog(title,options){
     ov.addEventListener('click',function(e){if(e.target===ov){document.body.removeChild(ov);res(null)}});
     document.body.appendChild(ov);
   });
+}
+async function setBase(uid){
+  const doc=await DB.collection('users').doc(uid).get();const v=doc.data();
+  const REG=['서울·경기','강원','충청','전라','경상','제주'];
+  const cur=(v.activityRegions&&v.activityRegions.length)?v.activityRegions:(v.region?[v.region]:[]);
+  const rp=prompt('['+v.name+'] 활동 가능 권역 — 번호 입력 (복수는 쉼표: 예 1,5)\n현재: '+(cur.join(', ')||'없음')+'\n\n1=서울·경기  2=강원  3=충청\n4=전라  5=경상  6=제주',
+    cur.map(r=>REG.indexOf(r)+1).filter(n=>n>0).join(','));
+  if(rp===null)return;
+  const regs=[...new Set(rp.split(',').map(x=>REG[parseInt(x.trim(),10)-1]).filter(Boolean))];
+  if(!regs.length){alert('권역 번호를 1개 이상 입력하세요.');return}
+  const bc=prompt('['+v.name+'] 거점 시군구 — "시도 시군구" 형태로 입력\n(예: 부산광역시 수영구 / 서울특별시 강서구)\n비워두면 기존값 유지',v.baseCity||'');
+  if(bc===null)return;
+  const upd={activityRegions:regs};
+  if(String(bc).trim())upd.baseCity=String(bc).trim();
+  if(!v.region||REG.indexOf(v.region)<0)upd.region=regs[0];
+  await DB.collection('users').doc(uid).update(upd);
+  alert('✓ 저장되었습니다.\n활동 권역: '+regs.join(', ')+(upd.baseCity?'\n거점: '+upd.baseCity:''));
+  loadUsers();
 }
 async function setOrg(uid){
   const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
