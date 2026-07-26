@@ -231,6 +231,15 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#C41E2F" onclick="copyPhoneList('apps')">📱 문자명단 복사 (교사·현재 필터)</button>
       </div>
       <div id="supplyBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px"></div>
+      <div id="instLinkBox" style="background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:14px;padding:14px 18px;margin-bottom:14px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <b style="font-size:14.5px;color:#0f766e">👟 강사 지원 현황</b>
+          <span id="instLinkCount" style="font-size:13px;font-weight:800;color:#153A77"></span>
+          <span style="font-size:12px;color:var(--gray)">— 회원명단의 학교체육·방과후 지원 데이터와 실시간 연동 (위 유형 탭·검색과 함께 필터링)</span>
+          <button class="btn-sub" style="background:#0f766e;margin-left:auto" onclick="location.href='region.html'">🛡 권역 관리(매칭)에서 배정 →</button>
+        </div>
+        <div id="instLinkList" style="margin-top:10px;max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:5px"></div>
+      </div>
       <div style="display:flex;gap:8px;margin:0 0 10px;flex-wrap:wrap">
         <button class="btn-sub afl on" data-f="전체" onclick="appFilter('전체',this)">전체</button>
         <button class="btn-sub afl" data-f="학교체육" onclick="appFilter('학교체육',this)" style="background:#8a919d">🏫 학교체육 강습</button>
@@ -291,7 +300,7 @@ function tab(n){
     document.getElementById('t'+i).classList.toggle('on',i===n);
     document.getElementById('v'+i).style.display=i===n?'block':'none';
   });
-  if(n===3)loadApps();
+  if(n===3){loadApps();if(!USERS.length)loadUsers();}
   if(n===4)loadCompsAdmin();
 }
 let APPS=[];let AFL='전체';
@@ -331,7 +340,32 @@ function appTypeOf(s){
   if(t.indexOf('school')>=0||t.indexOf('학교')>=0)return '학교체육 강습';
   return String(s.type||'');
 }
+function renderInstLink(){
+  const box=document.getElementById('instLinkList');if(!box)return;
+  const q=((document.getElementById('appSearch')||{}).value||'').trim().toLowerCase();
+  const list=(USERS||[]).filter(d=>{
+    const v=d.data();if(v.status!=='approved')return false;
+    const f=v.instructorFor||{};
+    const want=AFL==='학교체육'?f.school:(AFL==='방과후'?f.after:(f.school||f.after));
+    if(!want)return false;
+    if(q&&[v.name,v.baseCity,v.region,(v.activityRegions||[]).join(' '),v.workSchool].map(x=>String(x||'').toLowerCase()).join(' ').indexOf(q)<0)return false;
+    return true;
+  });
+  document.getElementById('instLinkCount').textContent=list.length+'명';
+  box.innerHTML=list.length?list.map(d=>{
+    const v=d.data();const f=v.instructorFor||{};
+    return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid #e3ece7;border-radius:9px;padding:7px 12px;font-size:13px">'
+      +'<b>'+esc(v.name)+'</b>'
+      +(f.school?'<span style="font-size:10.5px;font-weight:900;color:#fff;background:#1F4E9C;padding:2px 8px;border-radius:999px">학교체육</span>':'')
+      +(f.after?'<span style="font-size:10.5px;font-weight:900;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">방과후</span>':'')
+      +'<span style="color:var(--gray)">'+esc(v.region||'')+(v.baseCity?' · 📍'+esc(v.baseCity):' · <b style="color:#C41E2F">거점 미입력</b>')
+      +(v.workSchool?' · 🏫'+esc(v.workSchool):'')+(v.phone?' · ☎'+esc(v.phone):'')+'</span>'
+      +'<button class="btn-sub" style="background:#0f766e;padding:4px 12px;min-height:0;margin-left:auto" onclick="setBase(\''+d.id+'\')">📍지정</button>'
+      +'</div>';
+  }).join(''):'<div style="font-size:13px;color:var(--gray);padding:6px">해당 조건의 지원 강사가 없습니다.</div>';
+}
 function renderApps(){
+  renderInstLink();
   const dupKey={};APPS.forEach(d=>{const x=d.data();const k=(x.school||'').replace(/\s/g,'')+'|'+(x.type||'');dupKey[k]=(dupKey[k]||0)+1});
   const sido=(document.getElementById('appSido')||{}).value||'';
   const q=((document.getElementById('appSearch')||{}).value||'').trim().toLowerCase();
