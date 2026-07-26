@@ -83,9 +83,14 @@ function lvOf(p){let l=0;LVS.forEach((v,i)=>{if(p>=v[0])l=i});return l+1}
 function lvName(p){return LVS[lvOf(p)-1][1]}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')}
-function orgChip(o,region,title){
+function orgChip(o,region,title,fed){
   if(o==='central')return '<span style="background:linear-gradient(120deg,#111114,#3a3a44);color:#e6b422;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83c\udfdb \uc911\uc559\uc5f0\ub9f9'+(title?' \u00b7 '+esc(title):'')+'</span>';
-  if(o==='regional')return '<span style="background:#1F4E9C;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83d\udea9 '+esc(region||'')+' \uc5f0\ub9f9'+(title?' \u00b7 '+esc(title):'')+'</span>';
+  if(o==='regional'){
+    // 시도연맹 기준 표기 — 직함(orgTitle)에 이미 연맹명이 있으면 그것만, 없으면 소속연맹(fed) 사용. 권역명은 뱃지에 쓰지 않음(혼선 방지)
+    var t=String(title||''),f=String(fed||'');
+    var label=t.indexOf('연맹')>=0?t:(f?(f+(t?' \u00b7 '+t:'')):((region?esc(region)+' \uad8c\uc5ed':'')+(t?' \u00b7 '+esc(t):'')));
+    return '<span style="background:#1F4E9C;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83d\udea9 '+esc(label).replace(/&amp;middot;/g,'\u00b7')+'</span>';
+  }
   return '';
 }
 const EDU_ROSTER='강다연,강수경,강유라,경미선,권남혁,권태수,권희찬,김나리,김나연,김남영,김다윤,김도야,김미영,김민석,김민정,김상훈,김선미,김성관,김연상,김연우,김영빈,김유진,김이현,김재우,김정심,김정희,김주현,김지아,김한효,김현서,남궁영민,노현정,류선주,문상우,문현민,박광열,박규미,박규성,박기정,박미리,박상명,박선희,박성곤,박영환,박이슬,박주송,박찬혜,방서인,방수림,방수민,배성호,백승호,백지은,성연선,손성민,송희은,신고운이,신세란,신우진,신은상,신호철,안미진,안환기,양지선,엄혁주,여인찬,연선주,염정선,오경민,오주연,우소라,유정미,윤경희,윤연진,윤태경,은보라,이가영,이다봄,이대천,이소희,이솔지,이수환,이승훈,이영진,이영철,이용기,이은실,이은지,이재우,이재천,이지영,이한민,이현표,임성경,임아륜,장경숙,전경윤,전성현,정광섭,정예온,정인용,정지수,정진호,정창윤,조용대,조현숙,조혜진,조홍익,지미연,천관문,천효정,최문규,최윤형,최인향,최종선,최종욱,최종은,최지안,최창훈,한문아,한미향,허지범,황규빈,황성하,황윤경,황인중'.split(',');
@@ -1252,11 +1257,14 @@ async function setOrg(uid){
   if(pick==='1')org='regional';
   if(pick==='2')org='central';
   if(org){title=prompt('직함 입력 (선택 — 예: 회장, 사무국장, 이사)\n비워두면 직함 없이 뱃지만 표시됩니다','')||''}
-  const RGS=['서울·경기','강원','충청','전라','경상','제주'];
-  let region=d.region;
-  const rp=prompt('권역 확인 — 현재: '+d.region+'\n맞으면 그냥 [확인], 수정하려면 번호 입력\n\n1=서울·경기  2=강원  3=충청\n4=전라  5=경상  6=제주','');
-  if(rp&&RGS[parseInt(rp)-1])region=RGS[parseInt(rp)-1];
-  await DB.collection('users').doc(uid).update({org:org,orgTitle:title,region:region});
+  let fedName=d.fedName||'';
+  if(org==='regional'){
+    const FEDS=['경기연맹','강원연맹','대전연맹','부산연맹','대구연맹','울산연맹','경남연맹','경북연맹','전남광주연맹','제주연맹'];
+    const fp=prompt('소속 시도연맹 선택 — 현재: '+(fedName||'미지정')+'\n뱃지는 이 연맹명으로 표기됩니다 (권역명 아님)\n\n'+FEDS.map((x,i)=>(i+1)+'='+x).join('  '),'');
+    if(fp&&FEDS[parseInt(fp)-1])fedName=FEDS[parseInt(fp)-1];
+    if(!fedName){alert('시도연맹을 선택해야 임원 뱃지를 지정할 수 있습니다');return}
+  }
+  await DB.collection('users').doc(uid).update({org:org,orgTitle:title,fedName:fedName});
   loadUsers();
 }
 async function approve(uid){

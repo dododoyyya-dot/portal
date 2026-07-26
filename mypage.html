@@ -84,9 +84,14 @@ function lvOf(p){let l=0;LVS.forEach((v,i)=>{if(p>=v[0])l=i});return l+1}
 function lvName(p){return LVS[lvOf(p)-1][1]}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')}
-function orgChip(o,region,title){
+function orgChip(o,region,title,fed){
   if(o==='central')return '<span style="background:linear-gradient(120deg,#111114,#3a3a44);color:#e6b422;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83c\udfdb \uc911\uc559\uc5f0\ub9f9'+(title?' \u00b7 '+esc(title):'')+'</span>';
-  if(o==='regional')return '<span style="background:#1F4E9C;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83d\udea9 '+esc(region||'')+' \uc5f0\ub9f9'+(title?' \u00b7 '+esc(title):'')+'</span>';
+  if(o==='regional'){
+    // 시도연맹 기준 표기 — 직함(orgTitle)에 이미 연맹명이 있으면 그것만, 없으면 소속연맹(fed) 사용. 권역명은 뱃지에 쓰지 않음(혼선 방지)
+    var t=String(title||''),f=String(fed||'');
+    var label=t.indexOf('연맹')>=0?t:(f?(f+(t?' \u00b7 '+t:'')):((region?esc(region)+' \uad8c\uc5ed':'')+(t?' \u00b7 '+esc(t):'')));
+    return '<span style="background:#1F4E9C;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83d\udea9 '+esc(label).replace(/&amp;middot;/g,'\u00b7')+'</span>';
+  }
   return '';
 }
 </script>
@@ -520,7 +525,7 @@ AUTH.onAuthStateChanged(async u=>{
   document.getElementById('myCard').style.display='block';
   document.getElementById('myName').textContent=d.name;
   document.getElementById('mySub').textContent=d.region+' 권역 · '+(d.edu2026?'2026 자율연수 이수':'연수 미이수')+' · '+d.email;
-  document.getElementById('orgBadge').innerHTML=orgChip(d.org,d.region,d.orgTitle);
+  document.getElementById('orgBadge').innerHTML=orgChip(d.org,d.region,d.orgTitle,d.fedName);
   document.getElementById('myPhone').value=d.phone||'';
   if(!d.phone){document.getElementById('phMsg').textContent='배정·위촉 연락을 위해 등록해주세요';document.getElementById('phMsg').style.color='#C41E2F'}
   fillProfile(d);

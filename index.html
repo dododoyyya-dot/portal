@@ -8,6 +8,10 @@
 <title>대한민국 플라잉디스크의 중심 | 대한민국플라잉디스크연맹</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <link rel="stylesheet" href="style.css">
+<style>
+#heroNotice:hover{opacity:1;transform:translateY(-2px);border-color:rgba(230,180,34,.7)}
+@media(max-width:1080px){#heroNotice{display:none!important}}
+</style>
 </head>
 <body>
 <div class="util"><div class="wrap">
@@ -64,6 +68,12 @@
 </div></header>
 
 <div class="hero"><div class="wrap">
+  <a id="heroNotice" href="license.html" style="display:none;position:absolute;right:32px;top:96px;width:300px;background:rgba(255,255,255,.07);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(230,180,34,.35);border-radius:16px;padding:18px 20px;text-decoration:none;color:#fff;opacity:.82;transition:.25s;z-index:2">
+    <span style="font-size:11.5px;font-weight:900;color:#e6b422;letter-spacing:.5px">📢 접수 중인 공고</span>
+    <b id="hnTitle" style="display:block;font-size:15px;line-height:1.5;margin-top:8px"></b>
+    <span id="hnMeta" style="display:block;font-size:12.5px;color:#c3c9d4;margin-top:6px"></span>
+    <span style="display:inline-block;margin-top:10px;font-size:12.5px;font-weight:900;color:#ff8a76">신청하기 →</span>
+  </a>
   <span class="tag">KOREA FLYING DISC FEDERATION</span>
   <h1>대한민국 플라잉디스크의<br><span class="pt">중심</span>에서, 세계로.</h1>
   <p>대한민국플라잉디스크연맹은 플라잉디스크 종목을 관리·통할하는 유일한 단체로서,
@@ -277,6 +287,13 @@
         +'<span style="display:block;font-size:12.5px;color:#5b6472;margin-top:4px">'+(n.date||'')+(n.until?' · 마감 '+n.until:'')+'</span>'
         +'<span style="display:inline-block;margin-top:8px;font-size:12.5px;font-weight:900;color:#C41E2F">신청하기 →</span></a>').join('');
       document.getElementById('liveNotices').style.display='block';
+      // 히어로 고스트 카드 — 최신 1건만
+      const h=open[0];
+      if(h&&window.innerWidth>1080){
+        document.getElementById('hnTitle').textContent=h.title||'';
+        document.getElementById('hnMeta').textContent=(h.date||'')+(h.until?' · 마감 '+h.until:'');
+        document.getElementById('heroNotice').style.display='block';
+      }
     }).catch(e=>console.warn('notices',e));
     firebase.firestore().collection('public').doc('stats').get().then(doc=>{
       if(!doc.exists)return;
