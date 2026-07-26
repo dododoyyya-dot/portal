@@ -950,7 +950,14 @@ function uMatch(v){
   const sido=(document.getElementById('userSido')||{}).value||'';
   if(sido){
     const c=String(v.baseCity||'');
-    if(!(SIDO_ALIAS[sido]||[sido]).some(a=>c.indexOf(a)===0))return false;
+    const hit=(SIDO_ALIAS[sido]||[sido]).some(a=>c.indexOf(a)===0);
+    if(!hit){
+      // 거점 시군구 미입력 회원: 거주·활동 권역으로 보정 매칭 (숨김 방지)
+      const SR={'서울':'서울·경기','인천':'서울·경기','경기':'서울·경기','강원':'강원','대전':'충청','세종':'충청','충북':'충청','충남':'충청','광주':'전라','전북':'전라','전남':'전라','부산':'경상','대구':'경상','울산':'경상','경북':'경상','경남':'경상','제주':'제주'};
+    const reg=SR[sido];
+      const regHit=(c==='')&&reg&&(v.region===reg||((v.activityRegions||[]).indexOf(reg)>=0));
+      if(!regHit)return false;
+    }
   }
   const q=((document.getElementById('userSearch')||{}).value||'').trim().toLowerCase();
   if(q){
