@@ -157,7 +157,16 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
         <div><label class="lclab">주관</label><select id="nSido" class="lcin"><option>전국(중앙)</option><option>경기</option><option>강원</option><option>부산</option><option>경남</option><option>경북</option><option>전남광주</option></select></div>
         <div><label class="lclab">일시</label><input id="nDate" class="lcin" placeholder="예: 2026. 9. 12.(토) 10:00"></div>
         <div><label class="lclab">장소</label><input id="nPlace" class="lcin" placeholder="예: 김포 연맹 교육장"></div>
-        <div><label class="lclab">응시료·갱신료</label><input id="nFee" class="lcin" placeholder="예: 50,000원"></div>
+        <div style="grid-column:1/-1"><label class="lclab">응시료·갱신료 (구분별 · 원 단위 숫자만, 해당 없으면 비움)</label>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:4px">
+            <input id="nFLn" class="lcin" placeholder="지도자 신규 예:150000" inputmode="numeric">
+            <input id="nFLg" class="lcin" placeholder="지도자 갱신 예:60000" inputmode="numeric">
+            <input id="nFLb" class="lcin" placeholder="지도자 보수 예:20000" inputmode="numeric">
+            <input id="nFRn" class="lcin" placeholder="심판 신규 예:50000" inputmode="numeric">
+            <input id="nFRg" class="lcin" placeholder="심판 갱신 예:30000" inputmode="numeric">
+            <input id="nFRb" class="lcin" placeholder="심판 보수 예:20000" inputmode="numeric">
+          </div>
+          <input id="nFee" class="lcin" style="margin-top:6px" placeholder="(구버전 호환) 금액 안내 문구 — 비워도 됩니다"></div>
         <div><label class="lclab">수수료 입금 계좌 (주관 연맹)</label><input id="nAcct" class="lcin" placeholder="예: 농협 000-0000-0000-00 ○○연맹"></div>
         <div><label class="lclab">신청 마감</label><input id="nUntil" type="date" class="lcin"></div>
       </div>
@@ -361,6 +370,11 @@ async function uploadPoster(){
   await ref.put(blob,{contentType:'image/jpeg'});
   return await ref.getDownloadURL();
 }
+function feesVal(){
+  const f={},m={nFLn:'지도자|신규',nFLg:'지도자|갱신',nFLb:'지도자|보수(역량강화)',nFRn:'심판|신규',nFRg:'심판|갱신',nFRb:'심판|보수(역량강화)'};
+  for(const id in m){const v=parseInt(String(document.getElementById(id).value).replace(/[^0-9]/g,''),10);if(v>0)f[m[id]]=v}
+  return f;
+}
 function ntypeVal(){
   const t=[];if(document.getElementById('nT1').checked)t.push('신규');
   if(document.getElementById('nT2').checked)t.push('갱신');
@@ -377,7 +391,7 @@ async function addNotice(){
     // ── 공고 수정 (승인·보고 상태는 유지, 내용만 갱신) ──
     const upd={
       type:ntypeVal(),target:v('nTarget'),title:v('nTitle'),date:v('nDate'),place:v('nPlace'),fee:v('nFee'),acct:v('nAcct'),until:v('nUntil'),desc:v('nDesc'),
-      schedule:v('nSched'),
+      schedule:v('nSched'),fees:feesVal(),
       sido:(sido==='전국(중앙)'?'전국':sido),
       editedAt:firebase.firestore.FieldValue.serverTimestamp()};
     const pu=await uploadPoster();if(pu)upd.posterUrl=pu;
@@ -388,7 +402,7 @@ async function addNotice(){
   const posterUrl=await uploadPoster();
   await DB.collection('licenseNotices').add({
     type:ntypeVal(),target:v('nTarget'),title:v('nTitle'),date:v('nDate'),place:v('nPlace'),fee:v('nFee'),acct:v('nAcct'),until:v('nUntil'),desc:v('nDesc'),
-    schedule:v('nSched'),posterUrl:(posterUrl||''),
+    schedule:v('nSched'),posterUrl:(posterUrl||''),fees:feesVal(),
     sido:(sido==='전국(중앙)'?'전국':sido),
     issuer:(isCentral?'중앙연맹':(sido+'연맹')),
     approval:(isCentral?'승인':'대기'),
@@ -396,7 +410,7 @@ async function addNotice(){
     reportStatus:'',
     createdAt:firebase.firestore.FieldValue.serverTimestamp()});
   m.textContent=isCentral?'✓ 게시되었습니다':'✓ 등록되었습니다 — 중앙연맹 승인 후 회원에게 공개됩니다';m.style.color='#0f766e';
-  ['nTitle','nDate','nPlace','nFee','nAcct','nUntil','nDesc','nSched'].forEach(i=>document.getElementById(i).value='');document.getElementById('nPoster').value='';document.getElementById('nPosterNow').textContent='';
+  ['nTitle','nDate','nPlace','nFee','nAcct','nUntil','nDesc','nSched','nFLn','nFLg','nFLb','nFRn','nFRg','nFRb'].forEach(i=>document.getElementById(i).value='');document.getElementById('nPoster').value='';document.getElementById('nPosterNow').textContent='';
   loadNotices();
 }
 function editNotice(id){
@@ -418,6 +432,8 @@ function editNotice(id){
   document.getElementById('nTitle').value=n.title||'';
   document.getElementById('nDesc').value=n.desc||'';
   document.getElementById('nSched').value=n.schedule||'';
+  const fm={nFLn:'지도자|신규',nFLg:'지도자|갱신',nFLb:'지도자|보수(역량강화)',nFRn:'심판|신규',nFRg:'심판|갱신',nFRb:'심판|보수(역량강화)'};
+  for(const id in fm)document.getElementById(id).value=(n.fees&&n.fees[fm[id]])||'';
   document.getElementById('nPoster').value='';
   document.getElementById('nPosterNow').innerHTML=n.posterUrl?('현재 포스터 등록됨 — <a href="'+n.posterUrl+'" target="_blank" style="font-weight:800;color:#153A77">보기</a> (새 파일 선택 시 교체)'):'등록된 포스터 없음';
   document.getElementById('nBtn').textContent='✏️ 수정 저장';
@@ -499,6 +515,58 @@ async function remandReport(id){
 // ── 회원 신청 ──
 
 // ── 버튼 선택 팝업 (prompt 대체) ──
+function checkDialog(title,options){
+  return new Promise(function(res){
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    var box=document.createElement('div');
+    box.style.cssText='background:#fff;border-radius:16px;padding:22px 20px;max-width:460px;width:100%;max-height:82vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.25)';
+    var h=document.createElement('b');
+    h.style.cssText='font-size:16px;display:block;margin-bottom:6px;line-height:1.5;word-break:keep-all';
+    h.textContent=title;box.appendChild(h);
+    var sub=document.createElement('span');
+    sub.style.cssText='display:block;font-size:12.5px;color:#5b6472;margin-bottom:12px';
+    sub.textContent='신청할 항목을 모두 선택하세요 (복수 선택 가능)';box.appendChild(sub);
+    var cbs=[];
+    options.forEach(function(o){
+      var lb=document.createElement('label');
+      lb.style.cssText='display:flex;gap:10px;align-items:center;width:100%;padding:13px 14px;margin:7px 0;border:1.5px solid #dfe5ee;border-radius:10px;background:#f8fafc;font-size:15px;font-weight:700;cursor:pointer';
+      var cb=document.createElement('input');cb.type='checkbox';cb.style.cssText='width:19px;height:19px';
+      cb.onchange=function(){lb.style.borderColor=cb.checked?'#1F4E9C':'#dfe5ee';lb.style.background=cb.checked?'#eef4ff':'#f8fafc'};
+      var sp=document.createElement('span');sp.textContent=o.label;sp.style.flex='1';
+      var fe=document.createElement('b');fe.style.cssText='font-size:13.5px;color:#0f766e';fe.textContent=o.fee?o.fee.toLocaleString('ko-KR')+'원':'';
+      lb.appendChild(cb);lb.appendChild(sp);lb.appendChild(fe);
+      cbs.push({cb:cb,o:o});box.appendChild(lb);
+    });
+    var ok=document.createElement('button');
+    ok.textContent='선택 완료';
+    ok.style.cssText='display:block;width:100%;padding:14px;margin-top:12px;border:none;border-radius:10px;background:#0f766e;color:#fff;font-size:15.5px;font-weight:800;cursor:pointer';
+    ok.onclick=function(){
+      var sel=cbs.filter(function(x){return x.cb.checked}).map(function(x){return x.o});
+      if(!sel.length){alert('1개 이상 선택해주세요.');return}
+      document.body.removeChild(ov);res(sel);
+    };
+    box.appendChild(ok);
+    var c=document.createElement('button');
+    c.textContent='취소';
+    c.style.cssText='display:block;width:100%;padding:11px;margin-top:8px;border:none;background:none;color:#C41E2F;font-size:14px;font-weight:800;cursor:pointer';
+    c.onclick=function(){document.body.removeChild(ov);res(null)};
+    box.appendChild(c);
+    ov.appendChild(box);document.body.appendChild(ov);
+  });
+}
+function doneDialog(html){
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  var box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:18px;padding:28px 24px;max-width:480px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.3);text-align:center';
+  box.innerHTML=html;
+  var ok=document.createElement('button');
+  ok.textContent='확인';
+  ok.style.cssText='display:block;width:100%;padding:15px;margin-top:18px;border:none;border-radius:10px;background:#153A77;color:#fff;font-size:16px;font-weight:800;cursor:pointer';
+  ok.onclick=function(){document.body.removeChild(ov)};
+  box.appendChild(ok);ov.appendChild(box);document.body.appendChild(ov);
+}
 function pickDialog(title,options){
   return new Promise(function(res){
     var ov=document.createElement('div');
@@ -540,28 +608,48 @@ async function applyNotice(id){
     if(confirm('신청 전에 마이 프로필에서 아래 정보를 먼저 입력해 주세요:\n\n· '+missing.join('\n· ')+'\n\n※ 한 번만 입력하면 이후 모든 신청에 자동 사용됩니다.\n지금 입력하러 갈까요?'))location.href='mypage.html#profileBox';
     return;
   }
-  // ── 신청 구분 선택 — 버튼 팝업 (항상 신청자가 직접 선택)
-  const tsel=await pickDialog(n.title+' — 신청 구분을 선택하세요',['신규 (자격 취득)','갱신 (유효기간 연장)','보수(역량강화)']);
-  if(tsel===null)return;
-  const appType=tsel.indexOf('신규')===0?'신규':(tsel.indexOf('갱신')===0?'갱신':'보수(역량강화)');
-  const gsel=await pickDialog('['+appType+'] 응시(갱신) 등급을 선택하세요',['1급','2급','3급']);
+  // ── 코스 선택: (지도자/심판) × (신규/갱신/보수) 모든 조합 복수 선택 ──
+  const targets=String(n.target||'지도자·심판 공통').indexOf('공통')>=0?['지도자','심판']:[String(n.target)];
+  const types=String(n.type||'신규·갱신·보수(역량강화)').split('·').map(t=>t.indexOf('보수')>=0?'보수(역량강화)':t);
+  const opts=[];
+  targets.forEach(tg=>types.forEach(tp=>{
+    const key=tg+'|'+tp;
+    opts.push({label:tg+' '+tp,key:key,tg:tg,tp:tp,fee:(n.fees&&n.fees[key])||0});
+  }));
+  const sel=await checkDialog(n.title,opts);
+  if(!sel)return;
+  const gsel=await pickDialog('등급을 선택하세요 (선택한 전 코스에 적용)',['1급','2급','3급']);
   if(gsel===null)return;
   const g=gsel.charAt(0);
   let sido=await pickDialog('소속(담당) 연맹을 선택하세요 — 교육 장소·주관과 달라도 됩니다 (교차 지원 가능)',FED_LIST);
   if(sido===null)return;
   if(sido==='기타(중앙 처리)')sido='중앙';
   const phone=LMY.phone;
+  const courses=sel.map(o=>({target:o.tg,type:o.tp,fee:o.fee}));
+  const totalFee=courses.reduce((a,c)=>a+(c.fee||0),0);
+  const appType=[...new Set(courses.map(c=>c.type))].join('·');
+  const appTarget=[...new Set(courses.map(c=>c.target))].join('·');
   await DB.collection('licenseApps').add({
-    noticeId:id,noticeTitle:n.title,noticeType:n.type,appType:appType,target:n.target,
+    noticeId:id,noticeTitle:n.title,noticeType:n.type,appType:appType,target:appTarget,
+    courses:courses,totalFee:totalFee,
     uid:LME.uid,name:LMY.name,email:LME.email||'',phone:phone,grade:g,sido:sido,
     birth:LMY.birth||'',address:LMY.address||'',fedName:LMY.fedName||'',
     status:'접수',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  const courseTxt=courses.map(c=>'· '+c.target+' '+c.type+' '+g+'급'+(c.fee?' — '+c.fee.toLocaleString('ko-KR')+'원':'')).join('\n');
   if(window.kfdfMail&&LME.email)kfdfMail(LME.email,'[플라잉디스크연맹] 자격 검정·갱신 신청 접수 — '+n.title,
-    LMY.name+' 님의 신청이 접수되었습니다.\n\n· 공고: '+n.title+'\n· 구분: '+n.type+' ('+n.target+' '+g+'급)\n· 담당: '+sido+' 연맹 (통합접수 후 관할 배정)'
-    +(n.fee?'\n· 응시료·갱신료: '+n.fee:'')+(n.acct?'\n· 입금 계좌: '+n.acct:'')
-    +(n.date?'\n· 일시: '+n.date:'')+(n.place?'\n· 장소: '+n.place:'')
-    +'\n\n처리 결과는 홈페이지 [연맹 자격증 › 내 신청 현황]에서 확인할 수 있습니다.');
-  alert('신청이 접수되었습니다.\n담당: '+sido+' 연맹 (통합접수 후 관할 배정)'+(n.fee?'\n응시료·갱신료: '+n.fee:'')+(n.acct?'\n입금 계좌: '+n.acct:'')+'\n접수 확인 메일이 발송되었으며, 처리 결과는 [내 신청 현황]과 개별 연락으로 안내됩니다.');
+    LMY.name+' 님의 신청이 접수되었습니다.\n\n· 공고: '+n.title+'\n'+courseTxt
+    +(totalFee?'\n· 납부 총액: '+totalFee.toLocaleString('ko-KR')+'원':'')
+    +(n.acct?'\n· 입금 계좌: '+n.acct:'')+'\n· 담당: '+sido+' 연맹 (통합접수 후 관할 배정)'
+    +'\n\n입금 확인 후 접수가 확정됩니다. 처리 결과는 홈페이지 [연맹 자격증 › 내 신청 현황]에서 확인할 수 있습니다.');
+  doneDialog('<div style="font-size:44px">✅</div>'
+    +'<b style="font-size:20px;display:block;margin:8px 0 4px">신청이 접수되었습니다</b>'
+    +'<span style="font-size:13px;color:#5b6472">입금이 확인되면 접수가 확정됩니다</span>'
+    +'<div style="text-align:left;background:#f6f8fb;border-radius:12px;padding:16px 18px;margin-top:16px;font-size:14.5px;line-height:2">'
+    +courses.map(c=>'<div style="display:flex;justify-content:space-between"><span>'+esc(c.target)+' '+esc(c.type)+' '+g+'급</span><b>'+(c.fee?c.fee.toLocaleString('ko-KR')+'원':'-')+'</b></div>').join('')
+    +'<div style="border-top:1.5px solid #dfe5ee;margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;font-size:16px"><b>납부 총액</b><b style="color:#C41E2F">'+(totalFee?totalFee.toLocaleString('ko-KR')+'원':'공고 참조')+'</b></div>'
+    +(n.acct?'<div style="margin-top:10px;font-size:13.5px">💳 입금 계좌<br><b>'+esc(n.acct)+'</b></div>':'')
+    +'</div>'
+    +'<span style="display:block;font-size:12.5px;color:#5b6472;margin-top:12px">신청 내역·금액은 [내 신청 현황]에서 언제든 확인할 수 있습니다</span>');
   loadMyApps();
 }
 async function loadMyApps(){
@@ -574,10 +662,13 @@ async function loadMyApps(){
   MYAPPS=snap.docs;
   document.getElementById('myAppList').innerHTML=snap.docs.map(d=>{
     const a=d.data();
-    return '<div class="lccard" style="padding:12px 16px"><b>'+esc(a.noticeTitle)+'</b>'
-      +(a.appType?' <span class="lctag" style="background:'+(a.appType==='갱신'?'#0f766e':(String(a.appType).indexOf('보수')>=0?'#b8860b':'#153A77'))+'">'+esc(a.appType)+'</span>':'')
-      +' · '+esc(a.target)+' '+esc(a.grade)+'급 '
+    const cl=(a.courses&&a.courses.length)?a.courses:[{target:a.target,type:a.appType||a.noticeType,fee:0}];
+    return '<div class="lccard" style="padding:12px 16px"><b>'+esc(a.noticeTitle)+'</b> '
       +'<span class="lctag" style="background:'+(stc[a.status]||'#8a919d')+'">'+esc(stl[a.status]||a.status)+'</span>'
+      +'<div style="margin-top:8px;background:#f6f8fb;border-radius:10px;padding:10px 14px;font-size:13.5px;line-height:1.9">'
+      +cl.map(c=>'<div style="display:flex;justify-content:space-between;gap:10px"><span>'+esc(c.target||'')+' '+esc(c.type||'')+' '+esc(a.grade)+'급</span><b>'+(c.fee?Number(c.fee).toLocaleString('ko-KR')+'원':'')+'</b></div>').join('')
+      +(a.totalFee?'<div style="border-top:1px solid #e3e8f0;margin-top:6px;padding-top:6px;display:flex;justify-content:space-between"><b>납부 총액</b><b style="color:#C41E2F">'+Number(a.totalFee).toLocaleString('ko-KR')+'원</b></div>':'')
+      +'</div>'
       +(a.status==='접수'?'<div style="margin-top:8px;display:flex;gap:6px"><button class="lcbtn b" onclick="editMyApp(\''+d.id+'\')">✏️ 수정</button><button class="lcbtn d" onclick="delMyApp(\''+d.id+'\')">삭제</button></div>':'')
       +(a.licenseNo?'<div style="font-size:12.5px;margin-top:4px">자격번호 <b>'+esc(a.licenseNo)+'</b> — <a href="mypage.html" style="font-weight:800;color:#153A77">마이페이지에서 자격증 출력 →</a></div>':'')
       +'</div>';
@@ -587,11 +678,23 @@ let MYAPPS=[];
 async function editMyApp(id){
   const doc=MYAPPS.find(d=>d.id===id);if(!doc)return;
   const a=doc.data();
-  const appType=await pickDialog('신청 구분 변경 (현재: '+esc(a.appType||'-')+')',['신규','갱신','보수(역량강화)']);
-  if(!appType)return;
-  const grade=await pickDialog('등급 선택 (현재: '+esc(a.grade)+'급)',['1급','2급','3급']);
-  if(!grade)return;
-  await DB.collection('licenseApps').doc(id).update({appType:appType,grade:grade.replace('급','')});
+  const n=(NOTICES.find(x=>x.id===a.noticeId)||{data:()=>null}).data();
+  if(!n){alert('공고 정보를 불러올 수 없습니다. 삭제 후 다시 신청해주세요.');return}
+  const targets=String(n.target||'지도자·심판 공통').indexOf('공통')>=0?['지도자','심판']:[String(n.target)];
+  const types=String(n.type||'신규·갱신·보수(역량강화)').split('·').map(t=>t.indexOf('보수')>=0?'보수(역량강화)':t);
+  const opts=[];
+  targets.forEach(tg=>types.forEach(tp=>{const key=tg+'|'+tp;opts.push({label:tg+' '+tp,tg:tg,tp:tp,fee:(n.fees&&n.fees[key])||0})}));
+  const sel=await checkDialog('신청 내용 변경 — '+n.title,opts);
+  if(!sel)return;
+  const gsel=await pickDialog('등급 선택 (현재: '+esc(a.grade)+'급)',['1급','2급','3급']);
+  if(!gsel)return;
+  const courses=sel.map(o=>({target:o.tg,type:o.tp,fee:o.fee}));
+  const totalFee=courses.reduce((x,c)=>x+(c.fee||0),0);
+  await DB.collection('licenseApps').doc(id).update({
+    courses:courses,totalFee:totalFee,
+    appType:[...new Set(courses.map(c=>c.type))].join('·'),
+    target:[...new Set(courses.map(c=>c.target))].join('·'),
+    grade:gsel.charAt(0)});
   alert('신청 내용이 수정되었습니다.');loadMyApps();
 }
 async function delMyApp(id){
@@ -682,7 +785,7 @@ async function loadApps(){
   el.innerHTML=LAPPS.map(d=>{
     const a=d.data();
     return '<div class="lccard" style="padding:12px 16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div>'
-      +'<b>'+esc(a.name)+'</b>'+(a.appType?' <span class="lctag" style="background:'+(a.appType==='갱신'?'#0f766e':(a.appType.indexOf('보수')>=0?'#b8860b':'#153A77'))+'">'+esc(a.appType)+'</span>':'')+' · '+esc(a.target)+' '+esc(a.grade)+'급'+(a.sido?' · <span class="lctag" style="background:#b8860b">'+esc(a.sido)+'</span>':'')+' · '+esc(a.phone||'')
+      +'<b>'+esc(a.name)+'</b>'+(a.appType?' <span class="lctag" style="background:'+(String(a.appType).indexOf('갱신')>=0?'#0f766e':(String(a.appType).indexOf('보수')>=0?'#b8860b':'#153A77'))+'">'+esc(a.appType)+'</span>':'')+' · '+esc(a.target)+' '+esc(a.grade)+'급'+(a.totalFee?' · <b style="color:#C41E2F">'+Number(a.totalFee).toLocaleString('ko-KR')+'원</b>':'')+(a.sido?' · <span class="lctag" style="background:#b8860b">'+esc(a.sido)+'</span>':'')+' · '+esc(a.phone||'')
       +((a.birth||a.address)?'<span style="display:block;font-size:12px;color:var(--gray);margin-top:3px">'+(a.birth?'🎂 '+esc(a.birth):'')+(a.address?'  📦 '+esc(a.address):'')+'</span>':'')
       +' <span class="lctag" style="background:'+(stc[a.status]||'#8a919d')+'">'+esc(stl[a.status]||a.status)+'</span>'
       +(a.licenseNo?' <b style="font-size:12px;color:#0f766e">'+esc(a.licenseNo)+'</b>':'')+'</div>'
