@@ -266,6 +266,7 @@ function orgChip(o,region,title,fed){
         <div id="aaSidoRow" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:10px"></div>
         <div id="aaSggRow" style="display:none;flex-wrap:wrap;gap:5px;margin-top:8px;padding:10px;background:#fff;border:1px solid #dbe8e0;border-radius:9px"></div>
         <div id="aaSelRow" style="margin-top:10px"></div>
+        <div id="aaMap" style="max-width:300px;margin:12px auto 0"></div>
     </div>
 
     <!-- ⑦ 사이즈 (맨 끝) -->
@@ -454,6 +455,79 @@ function aaRender(){
   }else gr.style.display='none';
   const el=document.getElementById('aaSelRow');
   el.innerHTML=AA.length?('<div style="font-size:12px;font-weight:800;color:#153A77;margin-bottom:5px">선택한 활동 범위 (순서 = 우선순위)</div><div style="display:flex;gap:5px;flex-wrap:wrap">'+AA.map((a,i)=>'<span style="display:inline-flex;align-items:center;gap:5px;background:#153A77;color:#fff;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px">'+(i+1)+'. '+a.s+' '+a.g+'<b style="cursor:pointer;opacity:.75" onclick="aaRm('+i+')">✕</b></span>').join('')+'</div>'):'<span style="font-size:12.5px;color:#C41E2F;font-weight:700">아직 선택된 활동 범위가 없습니다</span>';
+  aaMapDraw();
+}
+// ── 시군구 경계 지도 (행정경계 GeoJSON을 CDN에서 로드, 클릭 = 선택 토글) ──
+let SGG_GEO=null,SGG_LOADING=false,SGG_BUILT=false,SGG_IDX=[];
+const SGG_SIDO_CODE={'11':'서울','21':'부산','22':'대구','23':'인천','24':'광주','25':'대전','26':'울산','29':'세종','31':'경기','32':'강원','33':'충북','34':'충남','35':'전북','36':'전남','37':'경북','38':'경남','39':'제주'};
+function sggMatch(s,g,fs,fn){
+  if(g==='군위군'&&fn==='군위군')return true;               // 대구 편입 (지도는 구 경북)
+  if(s==='인천'&&g==='미추홀구'&&fs==='인천'&&fn==='남구')return true; // 명칭 변경
+  if(fs!==s)return false;
+  if(g==='전지역')return true;
+  if(fn===g)return true;
+  if(fn.indexOf(g)===0)return true;      // '수원시장안구' ⊃ '수원시'
+  return false;
+}
+async function aaMapDraw(){
+  const el=document.getElementById('aaMap');if(!el)return;
+  if(!SGG_GEO){
+    if(SGG_LOADING)return;SGG_LOADING=true;
+    el.innerHTML='<div style="text-align:center;font-size:12px;color:var(--gray);padding:14px">지도 불러오는 중…</div>';
+    try{
+      const r=await fetch('https://cdn.jsdelivr.net/gh/southkorea/southkorea-maps@master/kostat/2013/json/skorea_municipalities_geo_simple.json');
+      SGG_GEO=await r.json();
+    }catch(e){try{
+      const r2=await fetch('https://raw.githubusercontent.com/southkorea/southkorea-maps/master/kostat/2013/json/skorea_municipalities_geo_simple.json');
+      SGG_GEO=await r2.json();
+    }catch(e2){el.innerHTML='';SGG_LOADING=false;return}}
+  }
+  if(!SGG_BUILT){
+    // 투영 (울릉·독도 제외해 본토 확대)
+    let mnx=999,mxx=-999,mny=999,mxy=-999;
+    const feats=SGG_GEO.features.filter(f=>f.properties.name!=='울릉군');
+    const each=(f,cb)=>{const g=f.geometry;const polys=g.type==='Polygon'?[g.coordinates]:g.coordinates;polys.forEach(p=>p.forEach(ring=>ring.forEach(cb)))};
+    feats.forEach(f=>each(f,c=>{if(c[0]<mnx)mnx=c[0];if(c[0]>mxx)mxx=c[0];if(c[1]<mny)mny=c[1];if(c[1]>mxy)mxy=c[1]}));
+    const W=340,kx=W/(mxx-mnx),ky=kx*1.22,H=(mxy-mny)*ky;
+    let paths='';SGG_IDX=[];
+    feats.forEach((f,i)=>{
+      const g=f.geometry;const polys=g.type==='Polygon'?[g.coordinates]:g.coordinates;
+      let d='';
+      polys.forEach(p=>{const ring=p[0];if(!ring||ring.length<3)return;
+        d+='M'+ring.map(c=>(((c[0]-mnx)*kx).toFixed(1))+' '+(((mxy-c[1])*ky).toFixed(1))).join('L')+'Z';});
+      const code=String(f.properties.code||'');
+      const fs=SGG_SIDO_CODE[code.slice(0,2)]||'';
+      const fn=String(f.properties.name||'');
+      SGG_IDX.push({fs,fn});
+      paths+='<path d="'+d+'" data-i="'+i+'" fill="#eef1f4" stroke="#c6ced6" stroke-width="0.5" style="cursor:pointer"><title>'+fs+' '+fn+'</title></path>';
+    });
+    el.innerHTML='<svg viewBox="0 0 '+W+' '+H.toFixed(0)+'" style="width:100%;display:block" id="aaSvg">'+paths+'</svg>'
+      +'<div style="text-align:center;font-size:11px;color:var(--gray);margin-top:4px">지도를 눌러도 선택·해제됩니다 · <b style="color:#C41E2F">■</b> 1순위 시도 <b style="color:#1F4E9C">■</b> 그 외 선택</div>';
+    document.getElementById('aaSvg').addEventListener('click',ev=>{
+      const t=ev.target.closest('path');if(!t)return;
+      const it=SGG_IDX[+t.dataset.i];if(!it)return;
+      let s=it.fs,g=it.fn;
+      if(g==='군위군')s='대구';
+      if(s==='인천'&&g==='남구')g='미추홀구';
+      // 지도 명칭 → 선택지 명칭 (구 단위 분할 시는 모(母)시로)
+      if(AA_SGG[s]&&AA_SGG[s].indexOf(g)<0){
+        const hit=AA_SGG[s].find(x=>g.indexOf(x)===0||x.indexOf(g)===0);
+        if(hit)g=hit;else return;
+      }
+      AA_CUR=s;aaTog(s,g);
+    });
+    SGG_BUILT=true;SGG_LOADING=false;
+  }
+  // 색칠
+  const svg=document.getElementById('aaSvg');if(!svg)return;
+  const first=AA.length?AA[0].s:null;
+  svg.querySelectorAll('path').forEach(pt=>{
+    const it=SGG_IDX[+pt.dataset.i];if(!it)return;
+    let sel=null;
+    for(const a of AA){if(sggMatch(a.s,a.g,it.fs,it.fn)){sel=a;break}}
+    pt.setAttribute('fill',sel?(sel.s===first?'#C41E2F':'#1F4E9C'):'#eef1f4');
+    pt.setAttribute('stroke',sel?'#fff':'#c6ced6');
+  });
 }
 function aaPick(sd){AA_CUR=(AA_CUR===sd?'':sd);aaRender();}
 function aaTog(sd,g){
