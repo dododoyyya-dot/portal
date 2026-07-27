@@ -766,22 +766,17 @@ async function setStart(id){
   loadApps();
 }
 let SIMR=null;
-function simSido(c){c=String(c||'');const M=[['경상남도','경남'],['경상북도','경북'],['충청북도','충북'],['충청남도','충남'],['밀양','경남'],['김해','경남'],['포항','경북'],['구미','경북']];
+function simSido(c){c=String(c||'');const M={'경상남도':'경남','경상북도':'경북','충청북도':'충북','충청남도':'충남','밀양':'경남','김해':'경남','포항':'경북','구미':'경북'};
   for(const s of ['부산','대구','울산','서울','인천','경기','대전','세종','광주','전남','전북','강원','제주','경상남도','경상북도','충청북도','충청남도','경남','경북','충북','충남','밀양','김해','포항','구미']){
-    if(c.indexOf(s)>=0){for(const m of M)if(m[0]===s)return m[1];return s.length>2?s.slice(0,2):s;}}
+    if(c.indexOf(s)>=0)return M[s]||(s.length>2?s.slice(0,2):s);}
   return '';}
-function runSim(){
-  const box=document.getElementById('simBox');
-  if(box.style.display==='block'){box.style.display='none';return}
-  if(!APPS.length){alert('신청 데이터를 먼저 불러오세요 (새로고침)');return}
-  if(!USERS.length){alert('회원 데이터 로딩 중 — 잠시 후 다시 눌러주세요');loadUsers();return}
+function calcSim(){
   const QUOTA={'학교체육 강습':70,'방과후·늘봄·돌봄':30};
   const rows=APPS.map(d=>{const v=d.data();
     const ty=appTypeOf(v);const st=v.status||'';
     let sc=0;if(st==='선정'||st==='배정완료')sc+=10;if(v.eduName||v.selfName)sc+=3;if(st==='접수')sc+=2;if(st==='대기')sc+=1;
     return {id:d.id,school:String(v.school||'').trim(),ty,st,reg:appRegion(v),city:String(v.city||''),sup:String(v.support||''),tea:String(v.teacher||''),E:!!(v.eduName||v.selfName),sc};});
-  const seen={};
-  rows.sort((a,b)=>b.sc-a.sc);
+  const seen={};rows.sort((a,b)=>b.sc-a.sc);
   rows.forEach(r=>{const k=r.school+'|'+r.ty;if(seen[k])r.dup=true;else seen[k]=1;});
   const cand={'학교체육 강습':[],'방과후·늘봄·돌봄':[]};
   rows.forEach(r=>{
@@ -792,11 +787,10 @@ function runSim(){
     cand[r.ty]&&cand[r.ty].push(r);
   });
   Object.keys(cand).forEach(ty=>{cand[ty].forEach((r,i)=>{r.v=i<QUOTA[ty]?'선정(임시)':'예비(정원초과)';});});
-  // 강사 풀
   const pool={};
   USERS.forEach(d=>{const u=d.data();const f=u.instructorFor||{};
     if(!f.school&&!f.after)return;
-    pool[u.name]={uid:d.id,reg:u.region||'',base:String(u.baseCity||''),sch:!!f.school,aft:!!f.after,edu:!!u.edu2026,cap:2};});
+    pool[u.name]={reg:u.region||'',base:String(u.baseCity||''),sch:!!f.school,aft:!!f.after,edu:!!u.edu2026,cap:2};});
   rows.forEach(r=>{
     if(r.v!=='선정(임시)'){r.inst=r.v.indexOf('용품만')>=0?'(용품 발송만)':'';return}
     const teaName=r.tea.split('(')[0].trim();
@@ -811,28 +805,87 @@ function runSim(){
       if(c.reg.slice(0,2)===String(r.reg||'').slice(0,2)){if(!best||(c.edu&&!pool[best].edu))best=nm;}}}
     if(best){pool[best].cap--;r.inst=best;}else r.inst='⚠ 미정(강사부족)';
   });
-  SIMR=rows;
-  // 렌더
+  return rows;
+}
+function renderSim(rows,snapLabel){
+  const box=document.getElementById('simBox');
+  const live=!snapLabel;
   const regs=['서울·경기','강원','충청','전라','경상','제주'];
   const cnt=(rg,f)=>rows.filter(r=>String(r.reg||'').slice(0,2)===rg.slice(0,2)&&f(r)).length;
-  let html='<b style="font-size:15px;color:#0e7490">🧪 가선정 시뮬레이션</b> <span style="font-size:12px;color:var(--gray)">화면 표시일 뿐 서버에는 반영되지 않았습니다 · 정원: 학교체육 70 / 방과후 30 · 강사 1인 2개교</span>';
+  let html='';
+  if(live){
+    html+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:15px;color:#0e7490">🧪 가선정 시뮬레이션 — 지금 데이터 기준</b><span style="font-size:12px;color:var(--gray)">서버에는 반영되지 않았습니다 · 정원 학교체육 70 / 방과후 30 · 강사 1인 2개교</span>'
+      +'<span style="margin-left:auto;display:flex;gap:6px"><button class="btn-sub" style="background:#b8860b;padding:5px 12px;min-height:0" onclick="saveSim()">📸 이 결과 저장</button>'
+      +'<button class="btn-sub" style="background:#8a919d;padding:5px 12px;min-height:0" onclick="listSims()">📂 저장된 결과</button></span></div>';
+  }else{
+    html+='<div style="background:#fff7e0;border:1.5px solid #e6b422;border-radius:10px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+      +'<b style="font-size:14px;color:#b8860b">📂 저장본 보기 — '+esc(snapLabel)+'</b>'
+      +'<span style="font-size:12px;color:#8a6d1a">저장 당시의 결과입니다. 현재 신청 데이터와 다를 수 있으며, 저장본은 서버 반영이 불가합니다.</span>'
+      +'<button class="btn-sub" style="background:#0e7490;padding:5px 12px;min-height:0;margin-left:auto" onclick="runSim(true)">↻ 지금 데이터로 다시 계산</button></div>';
+  }
   html+='<div style="overflow-x:auto;margin-top:10px"><table style="border-collapse:collapse;font-size:12.5px;min-width:520px"><tr style="background:#0e7490;color:#fff">'+['권역','학교체육','방과후','용품만','예비','보류'].map(h=>'<th style="padding:5px 12px">'+h+'</th>').join('')+'</tr>';
   regs.forEach(rg=>{const a=cnt(rg,r=>r.v==='선정(임시)'&&r.ty==='학교체육 강습'),b=cnt(rg,r=>r.v==='선정(임시)'&&r.ty!=='학교체육 강습'),g=cnt(rg,r=>r.v.indexOf('용품만')>=0),e=cnt(rg,r=>r.v.indexOf('예비')>=0),h2=cnt(rg,r=>r.v.indexOf('보류')>=0);
     if(a+b+g+e+h2===0)return;
     html+='<tr>'+[rg,a,b,g,e,h2].map((x,i)=>'<td style="padding:4px 12px;border:1px solid #d5e7ec;text-align:'+(i?'center':'left')+'">'+x+'</td>').join('')+'</tr>';});
   html+='</table></div>';
   const col={'선정(임시)':'#0f766e','선정-용품만(정원외)':'#b8860b','예비(정원초과)':'#8a919d','보류(중복)':'#C41E2F','보류(중등)':'#C41E2F'};
-  html+='<div style="margin-top:10px;max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">';
   const ord={'선정(임시)':0,'선정-용품만(정원외)':1,'예비(정원초과)':2,'보류(중복)':3,'보류(중등)':4};
-  rows.slice().sort((a,b)=>(ord[a.v]-ord[b.v])||String(a.reg).localeCompare(String(b.reg))).forEach(r=>{
+  html+='<div style="margin-top:10px;max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">';
+  rows.slice().sort((a,b)=>((ord[a.v]??9)-(ord[b.v]??9))||String(a.reg).localeCompare(String(b.reg))).forEach(r=>{
     html+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid #e0edf1;border-radius:8px;padding:5px 10px;font-size:12.5px">'
-      +'<span style="font-size:10px;font-weight:900;color:#fff;background:'+(col[r.v]||'#888')+';padding:2px 8px;border-radius:999px">'+r.v+'</span>'
-      +'<b>'+esc(r.school)+'</b><span style="color:var(--gray)">'+esc(r.ty)+' · '+esc(r.reg||'')+' · '+esc(r.st)+(r.E?' · ★이수자교':'')+'</span>'
-      +(r.inst?'<span style="margin-left:auto;font-weight:800;color:'+(r.inst.indexOf('미정')>=0?'#C41E2F':'#153A77')+'">'+esc(r.inst)+'</span>':'');
-    html+='</div>';});
+      +'<span style="font-size:10px;font-weight:900;color:#fff;background:'+(col[r.v]||'#888')+';padding:2px 8px;border-radius:999px">'+esc(r.v)+'</span>'
+      +'<b>'+esc(r.school)+'</b><span style="color:var(--gray)">'+esc(r.ty)+' · '+esc(r.reg||'')+(r.st?' · '+esc(r.st):'')+(r.E?' · ★이수자교':'')+'</span>'
+      +(r.inst?'<span style="margin-left:auto;font-weight:800;color:'+(String(r.inst).indexOf('미정')>=0?'#C41E2F':'#153A77')+'">'+esc(r.inst)+'</span>':'')+'</div>';});
   html+='</div>';
-  html+='<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sub" style="background:#C41E2F" onclick="applySim()">⚡ 시뮬레이션 결과 서버 반영 (선정·예비 상태만)</button><span style="font-size:12px;color:var(--gray);align-self:center">반영 시: 선정(임시)→선정, 예비→대기. 강사 배정·용품만·보류는 변경하지 않습니다.</span></div>';
+  if(live){
+    html+='<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sub" style="background:#C41E2F" onclick="applySim()">⚡ 서버 반영 (선정·예비 상태만)</button><span style="font-size:12px;color:var(--gray);align-self:center">반영 시: 선정(임시)→선정, 예비→대기. 강사배정·용품만·보류는 변경 없음.</span></div>';
+  }
+  html+='<div id="simSnapList" style="margin-top:10px"></div>';
   box.innerHTML=html;box.style.display='block';
+}
+function runSim(force){
+  const box=document.getElementById('simBox');
+  if(!force&&box.style.display==='block'){box.style.display='none';return}
+  if(!APPS.length){alert('신청 데이터를 먼저 불러오세요 (새로고침)');return}
+  if(!USERS.length){alert('회원 데이터 로딩 중 — 잠시 후 다시 눌러주세요');loadUsers();return}
+  SIMR=calcSim();
+  renderSim(SIMR,null);
+}
+async function saveSim(){
+  if(!SIMR){alert('먼저 시뮬레이션을 실행하세요.');return}
+  const now=new Date();
+  const label='가선정 '+now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  const rows=SIMR.map(r=>({s:r.school,t:r.ty==='학교체육 강습'?'학':'방',v:r.v,i:r.inst||'',g:r.reg||'',st:r.st||'',E:r.E?1:0}));
+  try{
+    await DB.collection('simSnapshots').add({label,createdAt:firebase.firestore.FieldValue.serverTimestamp(),by:(firebase.auth().currentUser||{}).email||'',rows});
+    alert('저장되었습니다: '+label+'\n[📂 저장된 결과]에서 언제든 다시 볼 수 있습니다.');
+  }catch(e){alert('저장 실패: '+e.message+'\n(보안규칙에 simSnapshots 항목이 게시되어 있어야 합니다)');}
+}
+async function listSims(){
+  const el=document.getElementById('simSnapList');if(!el)return;
+  if(el.innerHTML){el.innerHTML='';return}
+  el.innerHTML='<span style="font-size:12.5px;color:var(--gray)">불러오는 중...</span>';
+  try{
+    const sn=await DB.collection('simSnapshots').orderBy('createdAt','desc').limit(20).get();
+    if(sn.empty){el.innerHTML='<span style="font-size:12.5px;color:var(--gray)">저장된 결과가 없습니다.</span>';return}
+    el.innerHTML='<b style="font-size:13px">📂 저장된 가선정 결과</b><div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">'+sn.docs.map(d=>{
+      const v=d.data();const sel=(v.rows||[]).filter(r=>r.v==='선정(임시)').length;
+      return '<div style="display:flex;gap:8px;align-items:center;background:#fff;border:1px solid #e0edf1;border-radius:8px;padding:6px 10px;font-size:12.5px"><b>'+esc(v.label)+'</b><span style="color:var(--gray)">선정 '+sel+'건 · '+esc(v.by||'')+'</span>'
+        +'<span style="margin-left:auto;display:flex;gap:6px"><button class="btn-sub" style="background:#0e7490;padding:4px 10px;min-height:0" onclick="viewSim(\''+d.id+'\')">보기</button>'
+        +'<button class="btn-sub" style="background:#C41E2F;padding:4px 10px;min-height:0" onclick="delSim(\''+d.id+'\')">삭제</button></span></div>';
+    }).join('')+'</div>';
+  }catch(e){el.innerHTML='<span style="font-size:12.5px;color:#C41E2F">불러오기 실패: '+esc(e.message)+'</span>';}
+}
+async function viewSim(id){
+  const d=await DB.collection('simSnapshots').doc(id).get();
+  if(!d.exists){alert('저장본을 찾을 수 없습니다.');return}
+  const v=d.data();
+  const rows=(v.rows||[]).map(r=>({school:r.s,ty:r.t==='학'?'학교체육 강습':'방과후·늘봄·돌봄',v:r.v,inst:r.i,reg:r.g,st:r.st,E:!!r.E}));
+  renderSim(rows,v.label);
+}
+async function delSim(id){
+  if(!confirm('이 저장본을 삭제할까요? (가선정 기록만 지워지며 신청 데이터와는 무관합니다)'))return;
+  await DB.collection('simSnapshots').doc(id).delete();listSims();listSims();
 }
 async function applySim(){
   if(!SIMR){alert('먼저 시뮬레이션을 실행하세요.');return}
