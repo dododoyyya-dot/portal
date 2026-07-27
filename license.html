@@ -236,6 +236,15 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
         <select id="lsStatus" class="lcin" style="width:auto" onchange="renderLics()">
           <option value="">상태 전체</option><option>유효</option><option>만료</option>
         </select>
+        <select id="lsType" class="lcin" style="width:auto" onchange="renderLics()">
+          <option value="">종류 전체</option><option>지도자</option><option>심판</option>
+        </select>
+        <select id="lsGrade" class="lcin" style="width:auto" onchange="renderLics()">
+          <option value="">급수 전체</option><option>1급</option><option>2급</option><option>3급</option>
+        </select>
+        <select id="lsYear" class="lcin" style="width:auto" onchange="renderLics()">
+          <option value="">연도 전체</option><option>2026</option><option>2025</option><option>2024</option><option>2023</option><option>2022</option><option>2021</option>
+        </select>
         <input id="lsSearch" class="lcin" style="flex:1;min-width:180px" oninput="renderLics()" placeholder="🔍 자격번호·성명 검색">
         <button class="lcbtn b" onclick="exportLics()">⬇ CSV</button>
         <button class="lcbtn w" onclick="expireCleanup()" id="lsCleanBtn" title="유효기간 정보가 없는 과거 자격을 일괄 정리">⏳ 기한미상 만료 정리</button>
@@ -1062,6 +1071,12 @@ function renderLics(){
   const docs=LICS.filter(d=>{
     const v=d.data();
     if(fr&&(v.region||'')!==fr)return false;
+    const ft=(document.getElementById('lsType')||{}).value||'';
+    const fg=(document.getElementById('lsGrade')||{}).value||'';
+    const fy=(document.getElementById('lsYear')||{}).value||'';
+    if(ft&&String(v.type||'').indexOf(ft)<0)return false;
+    if(fg&&String(v.grade||'')!==fg)return false;
+    if(fy&&String(v.issuedAt||d.id).indexOf(fy)<0)return false;
     if(fs){
       const exp=(v.status==='만료')||(v.expireAt?v.expireAt<today:true);
       if(fs==='만료'&&!exp)return false;

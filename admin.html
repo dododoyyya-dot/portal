@@ -160,7 +160,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#0f766e" onclick="exportInstructors()">⬇ 강사·요원 지원자 CSV</button>
         <button class="btn-sub" style="background:#1F4E9C" onclick="exportApps()">⬇ 신청 학교 CSV (시군구 포함)</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="copyPhoneList('users')">📱 문자명단 복사 (회원·현재 필터)</button>
-        <button class="btn-sub" style="background:#7c3aed" onclick="updateLeaderboard().then(function(){alert('✓ 리더 순위가 실명으로 갱신되었습니다.')}).catch(function(e){alert('실패: '+e.message)})">🔄 리더 순위 갱신(실명)</button>
+        <button class="btn-sub" style="background:#7c3aed" onclick="updateLeaderboard().then(function(){alert('✓ 리더 순위가 갱신되었습니다. (이름은 별표 처리되어 공개됩니다)')}).catch(function(e){alert('실패: '+e.message)})">🔄 리더 순위 갱신</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
         <button class="btn-sub ufl on" data-f="전체" onclick="userFilter('전체',this)">전체 회원</button>
@@ -1073,7 +1073,7 @@ function renderUsers(){
   el.innerHTML=docs.map(d=>{
     const v=d.data(),lv=lvOf(v.points||0);
     return '<div class="urow"><div class="grow"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span>'+(v.withdrawReq?' <span style="font-size:11px;font-weight:900;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px">🚪 탈퇴 요청</span>':'')
-      +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+(v.gender?' · '+esc(v.gender):'')+(v.birth?' · '+esc(v.birth):'')+(v.baseCity?' · <b style="color:#1F4E9C">📍'+esc(v.baseCity)+'</b>':' · <span style="font-size:11px;color:#C41E2F;font-weight:800">시군구 미입력</span>')+((v.activityRegions&&v.activityRegions.length)?' <span style="font-size:11px;font-weight:800;color:#0f766e">🗺활동가능: '+esc(v.activityRegions.join('·'))+'</span>':'')+(v.phone?' · '+esc(v.phone):'')+' · '+(v.edu2026?('연수이수 '+(inRoster(v.name)?'<b style="color:#0f766e">✓명단확인</b>':'<b style="color:#C41E2F">⚠명단에없음</b>')):'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+((v.instructorFor&&v.instructorFor.referee)?' · <b style="color:#7c3aed">심판요원 지원</b>':'')+((v.instructorFor&&v.instructorFor.staff)?' · <b style="color:#b8860b">운영요원 지원</b>':'')+'</div>'
+      +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+(v.gender?' · '+esc(v.gender):'')+(v.birth?' · '+esc(v.birth):'')+(v.baseCity?' · <b style="color:#1F4E9C">📍'+esc(v.baseCity)+'</b>':' · <span style="font-size:11px;color:#C41E2F;font-weight:800">시군구 미입력</span>')+((v.activityRegions&&v.activityRegions.length)?' <span style="font-size:11px;font-weight:800;color:#0f766e">🗺활동가능: '+esc(v.activityRegions.join('·'))+'</span>':'')+(v.phone?' · '+esc(v.phone):'')+(v.bank?' · <b style="color:#b8860b">💳'+esc(v.bank)+' '+esc(v.accountNum||'')+' ('+esc(v.accountHolder||'')+')</b>':'')+' · '+(v.edu2026?('연수이수 '+(inRoster(v.name)?'<b style="color:#0f766e">✓명단확인</b>':'<b style="color:#C41E2F">⚠명단에없음</b>')):'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+((v.instructorFor&&v.instructorFor.referee)?' · <b style="color:#7c3aed">심판요원 지원</b>':'')+((v.instructorFor&&v.instructorFor.staff)?' · <b style="color:#b8860b">운영요원 지원</b>':'')+'</div>'
       +((v.affiliation&&v.affiliation.length)||(v.quals&&(v.quals.leader||v.quals.referee||v.quals.youth))||(v.qualDocs&&v.qualDocs.length)||v.degree
         ?'<div class="sub3" style="margin-top:3px">프로필: '
           +((v.affiliation&&v.affiliation.length)?'🏷 '+esc(v.affiliation.join('·')):'')
@@ -1139,8 +1139,8 @@ async function makeCert(uid,name){
 async function updateLeaderboard(){
   try{
     const snap=await DB.collection('users').where('status','==','approved').get();
-    const rows=snap.docs.map(d=>{const v=d.data();return {
-      n:v.name||'',r:v.region||'',p:v.points||0,
+    const rows=snap.docs.filter(d=>!d.data().deleted).map(d=>{const v=d.data();return {
+      n:maskName(v.name||''),r:v.region||'',p:v.points||0,
       edu:!!v.edu2026,org:v.org||'',t:v.orgTitle||''};})
       .sort((a,b)=>b.p-a.p).slice(0,50);
     await DB.collection('public').doc('leaderboard').set({

@@ -314,6 +314,26 @@ function orgChip(o,region,title,fed){
         </div>
       </div>
     </div>
+    <div style="margin-top:14px;background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:12px;padding:14px 16px">
+      <b style="font-size:13.5px;color:#0f766e">💳 수당 지급 계좌</b>
+      <p style="font-size:12px;color:var(--gray);margin:4px 0 10px">강사·심판·운영요원 수당 및 환급금 지급에 사용됩니다. 본인 명의 계좌만 입력해 주세요.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:12px;font-weight:800">은행</label>
+          <select id="pfBank" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
+            <option value="">선택</option><option>국민</option><option>신한</option><option>우리</option><option>하나</option><option>농협</option><option>기업</option><option>SC제일</option><option>부산</option><option>경남</option><option>대구</option><option>광주</option><option>전북</option><option>제주</option><option>우체국</option><option>새마을금고</option><option>신협</option><option>카카오뱅크</option><option>토스뱅크</option><option>케이뱅크</option><option>기타</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:800">예금주</label>
+          <input id="pfAccHolder" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px" placeholder="본인 성명">
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <label style="font-size:12px;font-weight:800">계좌번호</label>
+        <input id="pfAccNum" inputmode="numeric" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px" placeholder="- 없이 숫자만 입력">
+      </div>
+    </div>
 
     <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
       <button class="btn-sub" style="background:#0f766e" onclick="saveProfile()">프로필 저장</button>
@@ -438,6 +458,9 @@ function fillProfile(d){
   document.getElementById('pfSizePants').value=d.sizePants||'';
   document.getElementById('pfSizeShoe').value=d.sizeShoe||'';
   document.getElementById('pfSizeCap').value=d.sizeCap||'';
+  document.getElementById('pfBank').value=d.bank||'';
+  document.getElementById('pfAccHolder').value=d.accountHolder||'';
+  document.getElementById('pfAccNum').value=d.accountNum||'';
   document.getElementById('pfAfFed').value=d.fedName||'';
   document.getElementById('pfAfFed').style.display=document.getElementById('pfAf1').checked?'inline-block':'none';
   document.getElementById('pfTeachLv').value=d.teacherLevel||'';
@@ -526,6 +549,9 @@ async function saveProfile(){
       sizePants:document.getElementById('pfSizePants').value,
       sizeShoe:document.getElementById('pfSizeShoe').value,
       sizeCap:document.getElementById('pfSizeCap').value,
+      bank:document.getElementById('pfBank').value,
+      accountHolder:document.getElementById('pfAccHolder').value.trim(),
+      accountNum:document.getElementById('pfAccNum').value.replace(/[^0-9]/g,''),
       fedName:document.getElementById('pfAfFed').value,
       teacherLevel:(document.getElementById('pfAf2').checked?document.getElementById('pfTeachLv').value:''),
       workSchool:document.getElementById('pfWork').value.trim(),
