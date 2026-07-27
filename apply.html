@@ -353,8 +353,16 @@ async function submitApply(){
   if(!APPLY_TYPE){m.textContent='프로그램 유형을 먼저 선택해주세요';m.className='msg err';return}
   if(SUBMITTING)return;
   const req={school:v('fSchool'),city:(v('fSido')+' '+v('fCity')).trim(),sido:v('fSido'),sigungu:v('fCity'),teacher:v('fTeacher'),phone:v('fPhone'),students:v('fStudents'),d1:v('fD1')};
-  if(!v('fSido')){m.textContent='시도를 선택해주세요.';m.className='msg err';SUBMITTING=false;return}
-  for(const k in req){if(!req[k]){m.textContent='* 표시된 필수 항목을 모두 입력해주세요';m.className='msg err';return}}
+  const FN={school:['fSchool','학교명'],sido:['fSido','시도'],sigungu:['fCity','시군구'],teacher:['fTeacher','담당교사 성명'],phone:['fPhone','담당교사 휴대전화'],students:['fStudents','대상 학년·인원'],d1:['fD1','희망 요일·시간(1지망)'],city:['fCity','시군구']};
+  for(const k of ['school','sido','sigungu','teacher','phone','students','d1']){
+    if(!req[k]){
+      const [id,label]=FN[k];
+      m.textContent='「'+label+'」 항목을 입력해야 다음으로 진행할 수 있습니다';m.className='msg err';
+      const el2=document.getElementById(id);
+      if(el2){el2.style.border='2px solid #C41E2F';el2.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>el2.focus(),300);setTimeout(()=>{el2.style.border=''},4000);}
+      return;
+    }
+  }
   if(!/^01[016789][-. ]?\d{3,4}[-. ]?\d{4}$/.test(req.phone)){m.textContent='담당교사 휴대전화 번호를 확인해주세요 (예: 010-1234-5678)';m.className='msg err';return}
   if(!document.getElementById('fAgree').checked){m.textContent='개인정보 수집·이용에 동의해주세요';m.className='msg err';return}
   m.textContent='제출 중…';m.className='msg';SUBMITTING=true;

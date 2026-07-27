@@ -154,13 +154,18 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <button id="t5" onclick="tab(5)">단체 메일</button>
     </div>
     <div id="v1">
-      <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
+      <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
+        <button class="btn-sub" style="background:#0f766e" onclick="exportInstructors()">⬇ 강사·요원 지원자 CSV</button>
+        <button class="btn-sub" style="background:#C41E2F" onclick="copyPhoneList('users')">📱 문자명단 복사 (현재 필터)</button>
+        <details style="display:inline-block">
+          <summary style="cursor:pointer;padding:9px 16px;background:#8a919d;color:#fff;border-radius:10px;font-weight:800;font-size:13.5px;list-style:none">🧰 관리 도구 더보기 ▾</summary>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;padding:10px;background:#f4f6f9;border-radius:10px">
         <button class="btn-sub" style="background:#b8860b" onclick="backfillCerts()">🎓 이수자 일괄 정리 (검증코드 생성 + 연수 50P 소급 지급)</button>
         <button class="btn-sub" style="background:#1F4E9C" onclick="auditEdu()">🔍 이수자 명단 대조 점검</button>
-        <button class="btn-sub" style="background:#0f766e" onclick="exportInstructors()">⬇ 강사·요원 지원자 CSV</button>
         <button class="btn-sub" style="background:#1F4E9C" onclick="exportApps()">⬇ 신청 학교 CSV (시군구 포함)</button>
-        <button class="btn-sub" style="background:#C41E2F" onclick="copyPhoneList('users')">📱 문자명단 복사 (회원·현재 필터)</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="updateLeaderboard().then(function(){alert('✓ 리더 순위가 갱신되었습니다. (이름은 별표 처리되어 공개됩니다)')}).catch(function(e){alert('실패: '+e.message)})">🔄 리더 순위 갱신</button>
+          </div>
+        </details>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
         <button class="btn-sub ufl on" data-f="전체" onclick="userFilter('전체',this)">전체 회원</button>
@@ -175,6 +180,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <span style="font-size:12.5px;font-weight:800;color:#6b7280">보기 방식</span>
         <button class="btn-sub vwl on" data-v="table" onclick="setView('table',this)">🗂 명단(표)</button>
         <button class="btn-sub vwl" data-v="card" onclick="setView('card',this)" style="background:#8a919d">🔖 상세·승인·검증</button>
+        <button class="btn-sub vwl" data-v="inst" onclick="setView('inst',this)" style="background:#8a919d">👟 강사명단</button>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
         <select id="userSido" onchange="renderUsers()" style="width:auto;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px;font-weight:700">
@@ -182,7 +188,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
           <option value="__none">📍 시군구 미입력</option>
           <option>서울</option><option>인천</option><option>경기</option><option>강원</option>
           <option>대전</option><option>세종</option><option>충북</option><option>충남</option>
-          <option>광주</option><option>전북</option><option>전남</option>
+          <option value="전남광주">전남광주 (통합)</option><option>광주</option><option>전북</option><option>전남</option>
           <option>부산</option><option>대구</option><option>울산</option><option>경북</option><option>경남</option>
           <option>제주</option>
         </select>
@@ -222,8 +228,13 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
     <div id="v3" style="display:none">
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
         <button class="btn-sub" onclick="loadApps()">↻ 새로고침</button>
+        <button class="btn-sub" style="background:#0e7490" onclick="runSim()">🧪 가선정 시뮬레이션</button>
+        <button class="btn-sub" style="background:#0f766e" onclick="exportCSV()">⬇ 전체 CSV</button>
+        <button class="btn-sub" style="background:#8a919d" onclick="showTrash()">🗑 휴지통</button>
+        <details style="display:inline-block">
+          <summary style="cursor:pointer;padding:9px 16px;background:#8a919d;color:#fff;border-radius:10px;font-weight:800;font-size:13.5px;list-style:none">🧰 관리 도구 더보기 ▾</summary>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;padding:10px;background:#f4f6f9;border-radius:10px">
         <button class="btn-sub" style="background:#7c3aed" onclick="autoAssign()">⚡ 권역별 자동배정 (미배정 선정교)</button>
-        <button class="btn-sub" style="background:#0f766e" onclick="exportCSV()">⬇ 전체 CSV 내려받기</button>
         <button class="btn-sub" style="background:#e6b422" onclick="fixCounters()">⚙ 접수 카운터 보정</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="syncLogPoints()">⚡ 일지 기준 포인트 반영</button>
         <button class="btn-sub" style="background:#153A77" onclick="reviewHist()">📋 이력 승인·포인트 전환</button>
@@ -231,8 +242,8 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#555" onclick="closeWaitlist()">⏳ 대기자 일괄 종료</button>
         <button class="btn-sub" style="background:#0f766e" onclick="showSupply()">🧭 권역별 수급 현황</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="copyPhoneList('apps')">📱 문자명단 복사 (교사·현재 필터)</button>
-        <button class="btn-sub" style="background:#8a919d" onclick="showTrash()">🗑 휴지통</button>
-        <button class="btn-sub" style="background:#0e7490" onclick="runSim()">🧪 가선정 시뮬레이션</button>
+          </div>
+        </details>
       </div>
       <div id="supplyBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px"></div>
       <div id="trashBox" style="display:none;background:#faf8f4;border:1.5px solid #e5e0d8;border-radius:14px;padding:14px 18px;margin-bottom:14px"></div>
@@ -260,6 +271,9 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
           <option>광주</option><option>전북</option><option>전남</option>
           <option>부산</option><option>대구</option><option>울산</option><option>경북</option><option>경남</option>
           <option>제주</option>
+        </select>
+        <select id="appRegF" onchange="renderApps()" style="width:auto;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px;font-weight:700">
+          <option value="">권역 전체</option><option>서울·경기</option><option>강원</option><option>충청</option><option>전라</option><option>경상</option><option>제주</option>
         </select>
         <input id="appSearch" oninput="renderApps()" placeholder="🔍 학교명·시군구·담당교사·배정강사·접수번호 검색" style="flex:1;min-width:220px;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px">
         <span id="appCount" style="align-self:center;font-size:13px;font-weight:800;color:#1F4E9C"></span>
@@ -323,7 +337,7 @@ async function loadApps(){
   try{const g=await DB.collection('goodsConfirms').get();window.GOODS={};g.docs.forEach(x=>window.GOODS[x.id]=x.data());}catch(e){window.GOODS={};}
   renderApps();
 }
-const SIDO_ALIAS={'서울':['서울'],'인천':['인천'],'경기':['경기'],'강원':['강원'],'대전':['대전'],'세종':['세종'],'충북':['충북','충청북도'],'충남':['충남','충청남도'],'광주':['광주'],'전북':['전북','전라북도'],'전남':['전남','전라남도'],'부산':['부산'],'대구':['대구'],'울산':['울산'],'경북':['경북','경상북도'],'경남':['경남','경상남도'],'제주':['제주']};
+const SIDO_ALIAS={'서울':['서울'],'인천':['인천'],'경기':['경기'],'강원':['강원'],'대전':['대전'],'세종':['세종'],'충북':['충북','충청북도'],'충남':['충남','충청남도'],'광주':['광주'],'전북':['전북','전라북도'],'전남':['전남','전라남도'],'부산':['부산'],'대구':['대구'],'울산':['울산'],'경북':['경북','경상북도'],'경남':['경남','경상남도'],'제주':['제주'],'전남광주':['광주','전남','전라남도']};
 
 // ── 권역 보정: region 미저장·비표준(극초반 신청)은 주소로 자동 판정 ──
 const KFDF_REGIONS=['서울·경기','강원','충청','전라','경상','제주'];
@@ -378,6 +392,8 @@ function renderApps(){
   const sido=(document.getElementById('appSido')||{}).value||'';
   const q=((document.getElementById('appSearch')||{}).value||'').trim().toLowerCase();
   const docs=APPS.filter(d=>{
+    const _rf=(document.getElementById('appRegF')||{}).value||'';
+    if(_rf&&appRegion(d.data())!==_rf)return false;
     const s=d.data();
     if(AFL!=='전체'&&appTypeOf(s).indexOf(AFL)<0)return false;
     if(sido){
@@ -1217,12 +1233,30 @@ async function loadUsers(){
   USERS=snap.docs.filter(d=>!d.data().deleted);
   renderUsers();
 }
+function renderInstTable(docs){
+  const list=docs.filter(d=>{const v=d.data();const f=v.instructorFor||{};return v.status==='approved'&&(f.school||f.after||f.referee||f.staff)});
+  if(!list.length)return '<div class="bempty">해당 조건의 사업 지원 강사·요원이 없습니다.</div>';
+  const bg={school:'#1F4E9C',after:'#0f766e',referee:'#7c3aed',staff:'#b8860b'};
+  const lb={school:'학교체육',after:'방과후',referee:'심판',staff:'운영'};
+  const rows=list.map(d=>{const v=d.data();const f=v.instructorFor||{};
+    const sup=['school','after','referee','staff'].filter(k=>f[k]).map(k=>'<span style="font-size:10px;font-weight:900;color:#fff;background:'+bg[k]+';padding:2px 7px;border-radius:999px;margin-right:2px">'+lb[k]+'</span>').join('');
+    const area=(v.activityAreas&&v.activityAreas.length)?v.activityAreas.map(a=>String(a).replace(/(특별자치도|특별자치시|광역시|특별시)/,'')).join(', '):(v.baseCity?String(v.baseCity).replace(/(특별자치도|특별자치시|광역시|특별시)/,''):((v.activityRegions||[]).join('·')||'-'));
+    return '<tr><td><b>'+esc(v.name)+'</b></td><td>'+esc(v.region||'')+'</td><td style="max-width:260px">'+esc(area)+'</td><td>'+sup+'</td>'
+      +'<td>'+(v.edu2026?(inRoster(v.name)?'<b style="color:#0f766e">✓</b>':'<b style="color:#C41E2F">⚠</b>'):'-')+'</td>'
+      +'<td>'+(v.phone?esc(v.phone):'-')+'</td>'
+      +'<td>'+(v.bank?esc(v.bank)+' '+esc(v.accountNum||''):'-')+'</td>'
+      +'<td><button class="btn-sub" style="background:#0f766e;padding:4px 10px;min-height:0" onclick="setBase(\''+d.id+'\')">📍지정</button></td></tr>';
+  }).join('');
+  return '<div style="font-size:12.5px;color:var(--gray);margin-bottom:6px">사업 지원(학교체육·방과후·심판·운영) 강사·요원만 표시 · '+list.length+'명 · 위 검색·시도 필터와 연동</div>'
+    +'<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th>성명</th><th>권역</th><th>활동 가능 범위</th><th>지원</th><th>연수</th><th>휴대전화</th><th>계좌</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
 function renderUsers(){
   const el=document.getElementById('userList');
   const docs=USERS.filter(d=>uMatch(d.data()));
   const uc=document.getElementById('userCount');
   if(uc)uc.textContent=docs.length+'명'+(docs.length!==USERS.length?' (전체 '+USERS.length+'명 중)':'');
   if(!docs.length){el.innerHTML='<div class="bempty">해당 조건의 회원이 없습니다.</div>';axFilter();return}
+  if(VIEWMODE==='inst'){el.innerHTML=renderInstTable(docs);axFilter();return}
   if(VIEWMODE==='table'){el.innerHTML=renderRoster(docs);axFilter();return}
   el.innerHTML=docs.map(d=>{
     const v=d.data(),lv=lvOf(v.points||0);
