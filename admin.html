@@ -179,6 +179,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
         <select id="userSido" onchange="renderUsers()" style="width:auto;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px;font-weight:700">
           <option value="">시도 전체</option>
+          <option value="__none">📍 시군구 미입력</option>
           <option>서울</option><option>인천</option><option>경기</option><option>강원</option>
           <option>대전</option><option>세종</option><option>충북</option><option>충남</option>
           <option>광주</option><option>전북</option><option>전남</option>
@@ -1188,13 +1189,15 @@ function uMatch(v){
   else if(UFL==='any'){const f=v.instructorFor||{};if(v.status!=='approved')return false;if(!(f.school||f.after||f.referee||f.staff))return false}
   else if(UFL!=='전체'){if(!(v.instructorFor&&v.instructorFor[UFL]))return false}
   const sido=(document.getElementById('userSido')||{}).value||'';
-  if(sido){
+  if(sido==='__none'){
+    if(String(v.baseCity||'').trim()!=='')return false;
+  }else if(sido){
     const c=String(v.baseCity||'');
     const hit=(SIDO_ALIAS[sido]||[sido]).some(a=>c.indexOf(a)===0);
     if(!hit){
-      // 거점 시군구 미입력 회원: 거주·활동 권역으로 보정 매칭 (숨김 방지)
-      const SR={'서울':'서울·경기','인천':'서울·경기','경기':'서울·경기','강원':'강원','대전':'충청','세종':'충청','충북':'충청','충남':'충청','광주':'전라','전북':'전라','전남':'전라','부산':'경상','대구':'경상','울산':'경상','경북':'경상','경남':'경상','제주':'제주'};
-    const reg=SR[sido];
+      // 시군구 미입력 회원은 권역이 시도와 1:1인 경우(강원·제주)만 보정 매칭 — 그 외는 [📍 시군구 미입력] 필터에서 확인
+      const SINGLE={'강원':'강원','제주':'제주'};
+      const reg=SINGLE[sido];
       const regHit=(c==='')&&reg&&(v.region===reg||((v.activityRegions||[]).indexOf(reg)>=0));
       if(!regHit)return false;
     }
