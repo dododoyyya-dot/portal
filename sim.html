@@ -18,13 +18,15 @@ td{border:1px solid #e0e8ec;padding:5px 10px}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head><body>
 <div class="wrap">
-  <h1>🧪 가선정 시뮬레이션 <span style="font-size:13px;font-weight:600;color:var(--gray)">— 참고용 · 서버에 아무것도 반영되지 않습니다</span></h1>
-  <div style="font-size:12.5px;color:var(--gray);margin-bottom:14px">기준: 학교체육 70 · 방과후 30 / 기존 선정·배정 유지 → 이수자교(연수명단 대조) → 접수 우선 / 용품만·분진중은 정원 외 / 강사 1인 최대 2개교 (본인지도 → 같은 시도 → 같은 권역)</div>
+  <h1>🧪 선정·배정 예행연습 <span style="font-size:13px;font-weight:600;color:var(--gray)">— 실제 신청 데이터로 연습만 · 서버에 아무것도 반영되지 않습니다</span></h1>
+  <div style="font-size:12.5px;color:var(--gray);margin-bottom:14px">표에서 <b>판정과 배정강사를 직접 바꿔가며</b> 실제 선정처럼 연습하세요. 위 집계표는 바꿀 때마다 자동 갱신됩니다. 정원: 학교체육 70 · 방과후 30 / 강사 1인 최대 2개교 권장(초과 시 빨간 표시).</div>
   <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-    <button class="btn" style="background:#0e7490" onclick="run()">↻ 다시 계산</button>
-    <button class="btn" style="background:#0f766e" onclick="dlCSV()" id="dlBtn" disabled>⬇ 결과 엑셀(CSV) 저장</button>
+    <button class="btn" style="background:#0e7490" onclick="run(true)">⚡ 자동 가선정으로 채우기</button>
+    <button class="btn" style="background:#8a919d" onclick="run(false)">⬜ 빈 상태로 시작 (전부 미정)</button>
+    <button class="btn" style="background:#0f766e" onclick="dlCSV()" id="dlBtn" disabled>⬇ 현재 화면 엑셀(CSV) 저장</button>
     <span id="stamp" style="align-self:center;font-size:12.5px;color:var(--gray)"></span>
   </div>
+  <div id="poolBox" style="margin-bottom:12px"></div>
   <div id="deny" style="display:none;background:#fff;border-radius:12px;padding:30px;text-align:center;font-weight:800">🔒 관리자 로그인이 필요합니다. <a href="login.html">로그인 하러 가기</a></div>
   <div id="sumBox" style="overflow-x:auto;margin-bottom:16px"></div>
   <div id="listBox" style="overflow-x:auto"></div>
@@ -67,8 +69,8 @@ function simSido(c){c=String(c||'');const M={'경상남도':'경남','경상북�
   for(const s of ['부산','대구','울산','서울','인천','경기','대전','세종','광주','전남','전북','강원','제주','경상남도','경상북도','충청북도','충청남도','경남','경북','충북','충남','밀양','김해','포항','구미']){
     if(c.indexOf(s)>=0)return M[s]||(s.length>2?s.slice(0,2):s);}
   return '';}
-let ROWS=null;
-async function run(){
+let ROWS=null;let POOL={};
+async function run(auto){if(auto===undefined)auto=true;
   const u=AUTH.currentUser;
   if(!u){document.getElementById('deny').style.display='block';return}
   document.getElementById('stamp').textContent='계산 중…';
@@ -113,29 +115,58 @@ async function run(){
       if(c.reg.slice(0,2)===String(r.reg||'').slice(0,2)){if(!best||(c.edu&&!pool[best].edu))best=nm;}}}
     if(best){pool[best].cap--;r.inst=best;}else r.inst='⚠ 미정(강사부족)';
   });
+  POOL=pool;
+  if(!auto){rows.forEach(r=>{if(!r.dup&&r.v!=='보류(중등)'){r.v='미정';r.inst='';}});}
   ROWS=rows;
   render();
   document.getElementById('dlBtn').disabled=false;
   document.getElementById('stamp').textContent=new Date().toLocaleString('ko-KR')+' 기준 · 신청 '+rows.length+'건';
 }
+function instCount(){
+  const c={};ROWS.forEach(r=>{const n=String(r.inst||'').replace(' ✦본인지도','');if(n&&n.indexOf('미정')<0&&n.indexOf('용품')<0)c[n]=(c[n]||0)+1;});
+  return c;
+}
 function render(){
   const rows=ROWS;
   const regs=['서울·경기','강원','충청','전라','경상','제주'];
   const cnt=(rg,f)=>rows.filter(r=>String(r.reg||'').slice(0,2)===rg.slice(0,2)&&f(r)).length;
-  let h='<table><tr><th>권역</th><th>학교체육</th><th>방과후</th><th>용품만</th><th>예비</th><th>보류</th></tr>';
-  let ta=0,tb=0,tg=0,te=0,th2=0;
-  regs.forEach(rg=>{const a=cnt(rg,r=>r.v==='선정(임시)'&&r.ty==='학교체육 강습'),b=cnt(rg,r=>r.v==='선정(임시)'&&r.ty!=='학교체육 강습'),g=cnt(rg,r=>r.v.indexOf('용품만')>=0),e=cnt(rg,r=>r.v.indexOf('예비')>=0),hh=cnt(rg,r=>r.v.indexOf('보류')>=0);
-    if(a+b+g+e+hh===0)return;ta+=a;tb+=b;tg+=g;te+=e;th2+=hh;
-    h+='<tr><td>'+rg+'</td><td align="center">'+a+'</td><td align="center">'+b+'</td><td align="center">'+g+'</td><td align="center">'+e+'</td><td align="center">'+hh+'</td></tr>';});
-  h+='<tr style="font-weight:800;background:#eef4f6"><td>합계</td><td align="center">'+ta+'</td><td align="center">'+tb+'</td><td align="center">'+tg+'</td><td align="center">'+te+'</td><td align="center">'+th2+'</td></tr></table>';
+  let h='<table><tr><th>권역</th><th>학교체육 선정</th><th>방과후 선정</th><th>용품만</th><th>예비</th><th>보류</th><th>미정</th></tr>';
+  let ta=0,tb=0,tg=0,te=0,th2=0,tm=0;
+  regs.forEach(rg=>{const a=cnt(rg,r=>r.v==='선정(임시)'&&r.ty==='학교체육 강습'),b=cnt(rg,r=>r.v==='선정(임시)'&&r.ty!=='학교체육 강습'),g=cnt(rg,r=>String(r.v).indexOf('용품만')>=0),e=cnt(rg,r=>String(r.v).indexOf('예비')>=0),hh=cnt(rg,r=>String(r.v).indexOf('보류')>=0),mm=cnt(rg,r=>r.v==='미정');
+    if(a+b+g+e+hh+mm===0)return;ta+=a;tb+=b;tg+=g;te+=e;th2+=hh;tm+=mm;
+    h+='<tr><td>'+rg+'</td><td align="center">'+a+'</td><td align="center">'+b+'</td><td align="center">'+g+'</td><td align="center">'+e+'</td><td align="center">'+hh+'</td><td align="center">'+mm+'</td></tr>';});
+  const overA=ta>70?' style="color:#C41E2F"':'';const overB=tb>30?' style="color:#C41E2F"':'';
+  h+='<tr style="font-weight:800;background:#eef4f6"><td>합계 (정원 70/30)</td><td align="center"'+overA+'>'+ta+' / 70</td><td align="center"'+overB+'>'+tb+' / 30</td><td align="center">'+tg+'</td><td align="center">'+te+'</td><td align="center">'+th2+'</td><td align="center">'+tm+'</td></tr></table>';
   document.getElementById('sumBox').innerHTML=h;
-  const col={'선정(임시)':'#0f766e','선정-용품만(정원외)':'#b8860b','예비(정원초과)':'#8a919d','보류(중복)':'#C41E2F','보류(중등)':'#C41E2F'};
-  const ord={'선정(임시)':0,'선정-용품만(정원외)':1,'예비(정원초과)':2,'보류(중복)':3,'보류(중등)':4};
-  let l='<table><tr><th>판정</th><th>권역</th><th>학교</th><th>유형</th><th>현재상태</th><th>이수자교</th><th>담당교사</th><th>배정강사(임시)</th></tr>';
+  // 강사 배정 현황
+  const ic=instCount();
+  const over=Object.keys(ic).filter(n=>ic[n]>2);
+  document.getElementById('poolBox').innerHTML=Object.keys(ic).length?('<div style="font-size:12px;font-weight:800;margin-bottom:4px">👟 강사 배정 현황 <span style="font-weight:600;color:var(--gray)">(권장 1인 2개교'+(over.length?' — <b style=\'color:#C41E2F\'>초과: '+over.join(', ')+'</b>':'')+')</span></div><div style="display:flex;gap:5px;flex-wrap:wrap">'+Object.keys(ic).sort((a,b)=>ic[b]-ic[a]).map(n=>'<span style="font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;background:'+(ic[n]>2?'#C41E2F':'#153A77')+';color:#fff">'+esc(n)+' '+ic[n]+'</span>').join('')+'</div>'):'';
+  // 편집형 목록
+  const VS=['미정','선정(임시)','예비(정원초과)','선정-용품만(정원외)','보류(중복)','보류(중등)','보류(기타)'];
+  const col={'선정(임시)':'#0f766e','선정-용품만(정원외)':'#b8860b','예비(정원초과)':'#8a919d','보류(중복)':'#C41E2F','보류(중등)':'#C41E2F','보류(기타)':'#C41E2F','미정':'#555'};
+  const ord={'미정':0,'선정(임시)':1,'선정-용품만(정원외)':2,'예비(정원초과)':3,'보류(중복)':4,'보류(중등)':5,'보류(기타)':6};
+  const names=Object.keys(POOL).sort();
+  let l='<table><tr><th>판정 (직접 변경)</th><th>권역</th><th>학교</th><th>유형</th><th>현재상태</th><th>이수자교</th><th>담당교사</th><th>배정강사 (직접 변경)</th></tr>';
+  rows.forEach((r,i2)=>{r._i=i2;});
   rows.slice().sort((a,b)=>((ord[a.v]!==undefined?ord[a.v]:9)-(ord[b.v]!==undefined?ord[b.v]:9))||String(a.reg).localeCompare(String(b.reg))).forEach(r=>{
-    l+='<tr><td><span class="tag" style="background:'+(col[r.v]||'#888')+'">'+esc(r.v)+'</span></td><td>'+esc(r.reg||'')+'</td><td><b>'+esc(r.school)+'</b></td><td>'+esc(r.ty)+'</td><td>'+esc(r.st)+'</td><td align="center">'+(r.E?'★':'')+'</td><td>'+esc(r.tea)+'</td><td>'+esc(r.inst||'')+'</td></tr>';});
+    const vSel='<select onchange="chV('+r._i+',this.value)" style="padding:4px 6px;border-radius:7px;border:1.5px solid '+(col[r.v]||'#ccc')+';font-weight:800;font-size:12px;color:'+(col[r.v]||'#333')+'">'+VS.map(v=>'<option'+(v===r.v?' selected':'')+'>'+v+'</option>').join('')+'</select>';
+    const cur=String(r.inst||'').replace(' ✦본인지도','');
+    const iSel='<select onchange="chI('+r._i+',this.value)" style="padding:4px 6px;border-radius:7px;border:1.5px solid #d6dee2;font-size:12px;max-width:170px">'
+      +'<option value="">(강사 없음)</option>'
+      +names.map(n=>'<option value="'+esc(n)+'"'+(n===cur?' selected':'')+'>'+esc(n)+(POOL[n].edu?' ✓연수':'')+'</option>').join('')
+      +'</select>'+(String(r.inst||'').indexOf('본인지도')>=0?' <span style="font-size:10.5px;font-weight:900;color:#0f766e">✦본인지도</span>':'')+(String(r.inst||'').indexOf('미정')>=0?' <span style="font-size:10.5px;font-weight:900;color:#C41E2F">⚠부족</span>':'');
+    l+='<tr><td>'+vSel+'</td><td>'+esc(r.reg||'')+'</td><td><b>'+esc(r.school)+'</b></td><td>'+esc(r.ty==='학교체육 강습'?'학교체육':'방과후')+'</td><td>'+esc(r.st)+'</td><td align="center">'+(r.E?'★':'')+'</td><td>'+esc(r.tea)+'</td><td>'+iSel+'</td></tr>';});
   l+='</table>';
   document.getElementById('listBox').innerHTML=l;
+}
+function chV(i,v){ROWS[i].v=v;if(String(v).indexOf('선정')<0)ROWS[i].inst='';render();}
+function chI(i,n){
+  const r=ROWS[i];
+  if(!n){r.inst='';render();return}
+  const self=r.tea.split('(')[0].trim()===n;
+  r.inst=n+(self?' ✦본인지도':'');
+  render();
 }
 function dlCSV(){
   if(!ROWS)return;
