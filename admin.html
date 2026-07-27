@@ -230,9 +230,11 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#0f766e" onclick="showSupply()">🧭 권역별 수급 현황</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="copyPhoneList('apps')">📱 문자명단 복사 (교사·현재 필터)</button>
         <button class="btn-sub" style="background:#8a919d" onclick="showTrash()">🗑 휴지통</button>
+        <button class="btn-sub" style="background:#0e7490" onclick="runSim()">🧪 가선정 시뮬레이션</button>
       </div>
       <div id="supplyBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px"></div>
       <div id="trashBox" style="display:none;background:#faf8f4;border:1.5px solid #e5e0d8;border-radius:14px;padding:14px 18px;margin-bottom:14px"></div>
+      <div id="simBox" style="display:none;background:#f0f9fb;border:1.5px solid #bae0e8;border-radius:14px;padding:16px 18px;margin-bottom:14px"></div>
       <div id="instLinkBox" style="background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:14px;padding:14px 18px;margin-bottom:14px">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <b style="font-size:14.5px;color:#0f766e">👟 강사 지원 현황</b>
@@ -762,6 +764,87 @@ async function setStart(id){
   if(p!=='1'&&p!=='2')return;
   await DB.collection('schoolApplications').doc(id).update({start:p==='1'?'8월 여름방학 중 (7/29까지 신청 시)':'9월 (2학기 개강)'});
   loadApps();
+}
+let SIMR=null;
+function simSido(c){c=String(c||'');const M=[['경상남도','경남'],['경상북도','경북'],['충청북도','충북'],['충청남도','충남'],['밀양','경남'],['김해','경남'],['포항','경북'],['구미','경북']];
+  for(const s of ['부산','대구','울산','서울','인천','경기','대전','세종','광주','전남','전북','강원','제주','경상남도','경상북도','충청북도','충청남도','경남','경북','충북','충남','밀양','김해','포항','구미']){
+    if(c.indexOf(s)>=0){for(const m of M)if(m[0]===s)return m[1];return s.length>2?s.slice(0,2):s;}}
+  return '';}
+function runSim(){
+  const box=document.getElementById('simBox');
+  if(box.style.display==='block'){box.style.display='none';return}
+  if(!APPS.length){alert('신청 데이터를 먼저 불러오세요 (새로고침)');return}
+  if(!USERS.length){alert('회원 데이터 로딩 중 — 잠시 후 다시 눌러주세요');loadUsers();return}
+  const QUOTA={'학교체육 강습':70,'방과후·늘봄·돌봄':30};
+  const rows=APPS.map(d=>{const v=d.data();
+    const ty=appTypeOf(v);const st=v.status||'';
+    let sc=0;if(st==='선정'||st==='배정완료')sc+=10;if(v.eduName||v.selfName)sc+=3;if(st==='접수')sc+=2;if(st==='대기')sc+=1;
+    return {id:d.id,school:String(v.school||'').trim(),ty,st,reg:appRegion(v),city:String(v.city||''),sup:String(v.support||''),tea:String(v.teacher||''),E:!!(v.eduName||v.selfName),sc};});
+  const seen={};
+  rows.sort((a,b)=>b.sc-a.sc);
+  rows.forEach(r=>{const k=r.school+'|'+r.ty;if(seen[k])r.dup=true;else seen[k]=1;});
+  const cand={'학교체육 강습':[],'방과후·늘봄·돌봄':[]};
+  rows.forEach(r=>{
+    const mid=/중학교|중학고|고등학교|여중|여고/.test(r.school);
+    if(r.dup){r.v='보류(중복)';return}
+    if(mid){r.v=r.school.indexOf('분진')>=0?'선정-용품만(정원외)':'보류(중등)';return}
+    if(r.sup.indexOf('용품만')>=0){r.v='선정-용품만(정원외)';return}
+    cand[r.ty]&&cand[r.ty].push(r);
+  });
+  Object.keys(cand).forEach(ty=>{cand[ty].forEach((r,i)=>{r.v=i<QUOTA[ty]?'선정(임시)':'예비(정원초과)';});});
+  // 강사 풀
+  const pool={};
+  USERS.forEach(d=>{const u=d.data();const f=u.instructorFor||{};
+    if(!f.school&&!f.after)return;
+    pool[u.name]={uid:d.id,reg:u.region||'',base:String(u.baseCity||''),sch:!!f.school,aft:!!f.after,edu:!!u.edu2026,cap:2};});
+  rows.forEach(r=>{
+    if(r.v!=='선정(임시)'){r.inst=r.v.indexOf('용품만')>=0?'(용품 발송만)':'';return}
+    const teaName=r.tea.split('(')[0].trim();
+    if(pool[teaName]){r.inst=teaName+' ✦본인지도';return}
+    const need=r.ty==='학교체육 강습'?'sch':'aft';
+    const ssd=simSido(r.city);let best=null;
+    for(const nm in pool){const c=pool[nm];
+      if(!c[need]||c.cap<=0)continue;
+      if(ssd&&c.base.replace('경상남도','경남').replace('경상북도','경북').indexOf(ssd)>=0){if(!best||(c.edu&&!pool[best].edu))best=nm;}}
+    if(!best){for(const nm in pool){const c=pool[nm];
+      if(!c[need]||c.cap<=0)continue;
+      if(c.reg.slice(0,2)===String(r.reg||'').slice(0,2)){if(!best||(c.edu&&!pool[best].edu))best=nm;}}}
+    if(best){pool[best].cap--;r.inst=best;}else r.inst='⚠ 미정(강사부족)';
+  });
+  SIMR=rows;
+  // 렌더
+  const regs=['서울·경기','강원','충청','전라','경상','제주'];
+  const cnt=(rg,f)=>rows.filter(r=>String(r.reg||'').slice(0,2)===rg.slice(0,2)&&f(r)).length;
+  let html='<b style="font-size:15px;color:#0e7490">🧪 가선정 시뮬레이션</b> <span style="font-size:12px;color:var(--gray)">화면 표시일 뿐 서버에는 반영되지 않았습니다 · 정원: 학교체육 70 / 방과후 30 · 강사 1인 2개교</span>';
+  html+='<div style="overflow-x:auto;margin-top:10px"><table style="border-collapse:collapse;font-size:12.5px;min-width:520px"><tr style="background:#0e7490;color:#fff">'+['권역','학교체육','방과후','용품만','예비','보류'].map(h=>'<th style="padding:5px 12px">'+h+'</th>').join('')+'</tr>';
+  regs.forEach(rg=>{const a=cnt(rg,r=>r.v==='선정(임시)'&&r.ty==='학교체육 강습'),b=cnt(rg,r=>r.v==='선정(임시)'&&r.ty!=='학교체육 강습'),g=cnt(rg,r=>r.v.indexOf('용품만')>=0),e=cnt(rg,r=>r.v.indexOf('예비')>=0),h2=cnt(rg,r=>r.v.indexOf('보류')>=0);
+    if(a+b+g+e+h2===0)return;
+    html+='<tr>'+[rg,a,b,g,e,h2].map((x,i)=>'<td style="padding:4px 12px;border:1px solid #d5e7ec;text-align:'+(i?'center':'left')+'">'+x+'</td>').join('')+'</tr>';});
+  html+='</table></div>';
+  const col={'선정(임시)':'#0f766e','선정-용품만(정원외)':'#b8860b','예비(정원초과)':'#8a919d','보류(중복)':'#C41E2F','보류(중등)':'#C41E2F'};
+  html+='<div style="margin-top:10px;max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">';
+  const ord={'선정(임시)':0,'선정-용품만(정원외)':1,'예비(정원초과)':2,'보류(중복)':3,'보류(중등)':4};
+  rows.slice().sort((a,b)=>(ord[a.v]-ord[b.v])||String(a.reg).localeCompare(String(b.reg))).forEach(r=>{
+    html+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid #e0edf1;border-radius:8px;padding:5px 10px;font-size:12.5px">'
+      +'<span style="font-size:10px;font-weight:900;color:#fff;background:'+(col[r.v]||'#888')+';padding:2px 8px;border-radius:999px">'+r.v+'</span>'
+      +'<b>'+esc(r.school)+'</b><span style="color:var(--gray)">'+esc(r.ty)+' · '+esc(r.reg||'')+' · '+esc(r.st)+(r.E?' · ★이수자교':'')+'</span>'
+      +(r.inst?'<span style="margin-left:auto;font-weight:800;color:'+(r.inst.indexOf('미정')>=0?'#C41E2F':'#153A77')+'">'+esc(r.inst)+'</span>':'');
+    html+='</div>';});
+  html+='</div>';
+  html+='<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sub" style="background:#C41E2F" onclick="applySim()">⚡ 시뮬레이션 결과 서버 반영 (선정·예비 상태만)</button><span style="font-size:12px;color:var(--gray);align-self:center">반영 시: 선정(임시)→선정, 예비→대기. 강사 배정·용품만·보류는 변경하지 않습니다.</span></div>';
+  box.innerHTML=html;box.style.display='block';
+}
+async function applySim(){
+  if(!SIMR){alert('먼저 시뮬레이션을 실행하세요.');return}
+  const sel=SIMR.filter(r=>r.v==='선정(임시)'&&r.st!=='선정'&&r.st!=='배정완료');
+  const wait=SIMR.filter(r=>r.v==='예비(정원초과)'&&(r.st==='접수'||r.st==='선정'));
+  if(!confirm('서버에 반영합니다.\n· 선정 처리: '+sel.length+'건 (접수·대기 → 선정)\n· 대기 전환: '+wait.length+'건\n· 배정완료·보류·용품만은 건드리지 않습니다.\n\n계속할까요?'))return;
+  if(!confirm('한 번 더 확인 — 정말 반영할까요? (되돌리려면 상태를 수동 변경해야 합니다)'))return;
+  let ok=0,er=0;
+  for(const r of sel){try{await DB.collection('schoolApplications').doc(r.id).update({status:'선정'});ok++;}catch(e){er++;}}
+  for(const r of wait){try{await DB.collection('schoolApplications').doc(r.id).update({status:'대기'});ok++;}catch(e){er++;}}
+  alert('반영 완료: '+ok+'건'+(er?' / 실패 '+er+'건':''));
+  loadApps();loadDash();
 }
 async function chgType(id){
   const doc=APPS.find(d=>d.id===id);if(!doc)return;
