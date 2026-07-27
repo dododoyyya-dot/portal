@@ -774,8 +774,9 @@ function calcSim(){
   const QUOTA={'학교체육 강습':70,'방과후·늘봄·돌봄':30};
   const rows=APPS.map(d=>{const v=d.data();
     const ty=appTypeOf(v);const st=v.status||'';
-    let sc=0;if(st==='선정'||st==='배정완료')sc+=10;if(v.eduName||v.selfName)sc+=3;if(st==='접수')sc+=2;if(st==='대기')sc+=1;
-    return {id:d.id,school:String(v.school||'').trim(),ty,st,reg:appRegion(v),city:String(v.city||''),sup:String(v.support||''),tea:String(v.teacher||''),E:!!(v.eduName||v.selfName),sc};});
+    const isE=inRoster(String(v.eduName||''))||inRoster(String(v.selfName||''))||inRoster(String(v.teacher||''));
+    let sc=0;if(st==='선정'||st==='배정완료')sc+=10;if(isE)sc+=3;if(st==='접수')sc+=2;if(st==='대기')sc+=1;
+    return {id:d.id,school:String(v.school||'').trim(),ty,st,reg:appRegion(v),city:String(v.city||''),sup:String(v.support||''),tea:String(v.teacher||''),E:isE,sc};});
   const seen={};rows.sort((a,b)=>b.sc-a.sc);
   rows.forEach(r=>{const k=r.school+'|'+r.ty;if(seen[k])r.dup=true;else seen[k]=1;});
   const cand={'학교체육 강습':[],'방과후·늘봄·돌봄':[]};
