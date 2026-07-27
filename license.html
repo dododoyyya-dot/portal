@@ -669,8 +669,8 @@ async function loadMyApps(){
   document.getElementById('myApps').style.display='block';
   const stc={'접수':'#b8860b','접수완료':'#8a919d','합격':'#1F4E9C','발급완료':'#0f766e','불합격':'#C41E2F'};
   const stl={'접수':'신청 접수 (입금 확인 전)','접수완료':'접수 완료 (입금 확인)'};
-  MYAPPS=snap.docs;
-  document.getElementById('myAppList').innerHTML=snap.docs.map(d=>{
+  MYAPPS=snap.docs.filter(d=>!d.data().deleted);
+  document.getElementById('myAppList').innerHTML=MYAPPS.map(d=>{
     const a=d.data();
     const cl=(a.courses&&a.courses.length)?a.courses:[{target:a.target,type:a.appType||a.noticeType,fee:0}];
     return '<div class="lccard" style="padding:12px 16px"><b>'+esc(a.noticeTitle)+'</b> '
@@ -783,10 +783,10 @@ async function loadApps(){
   if(!CENTRAL){
     // 시도연맹: 관할 연맹 신청만 (규칙에서도 강제)
     snap=await DB.collection('licenseApps').where('sido','in',MFEDS.length?MFEDS:['-']).get();
-    LAPPS=snap.docs.filter(d=>d.data().noticeId===nid);
+    LAPPS=snap.docs.filter(d=>d.data().noticeId===nid&&!d.data().deleted);
   }else{
     snap=await DB.collection('licenseApps').where('noticeId','==',nid).get();
-    LAPPS=snap.docs;
+    LAPPS=snap.docs.filter(d=>!d.data().deleted);
   }
   document.getElementById('apCount').textContent=LAPPS.length+'명 신청';
   if(!LAPPS.length){el.innerHTML='<div class="bempty">신청자가 없습니다.</div>';return}
@@ -824,9 +824,9 @@ async function setApp(id,st){
 async function delLicApp(id){
   const doc=LAPPS.find(d=>d.id===id);if(!doc)return;
   const a=doc.data();
-  if(!confirm('⚠️ 신청 내역 삭제 — 되돌릴 수 없습니다.\n'+a.name+' · '+a.target+' '+a.grade+'급 ('+(a.status||'')+')\n\n※ 이미 발급된 자격(대장)은 삭제되지 않습니다. 삭제할까요?'))return;
+  if(!confirm('신청 내역을 휴지통으로 이동합니다 (7일 후 자동 완전삭제, 그 전 복구 가능 — 관리자 페이지 > 강습 신청 관리 > 🗑 휴지통).\n'+a.name+' · '+a.target+' '+a.grade+'급 ('+(a.status||'')+')\n\n※ 이미 발급된 자격(대장)은 삭제되지 않습니다.'))return;
   try{
-    await DB.collection('licenseApps').doc(id).delete();
+    await DB.collection('licenseApps').doc(id).update({deleted:true,deletedAt:firebase.firestore.FieldValue.serverTimestamp(),delBy:(firebase.auth().currentUser||{}).email||''});
     loadApps();
   }catch(e){alert('실패: '+e.message+'\n(신청 삭제는 중앙 관리자만 가능합니다)')}
 }

@@ -229,8 +229,10 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#555" onclick="closeWaitlist()">⏳ 대기자 일괄 종료</button>
         <button class="btn-sub" style="background:#0f766e" onclick="showSupply()">🧭 권역별 수급 현황</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="copyPhoneList('apps')">📱 문자명단 복사 (교사·현재 필터)</button>
+        <button class="btn-sub" style="background:#8a919d" onclick="showTrash()">🗑 휴지통</button>
       </div>
       <div id="supplyBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px"></div>
+      <div id="trashBox" style="display:none;background:#faf8f4;border:1.5px solid #e5e0d8;border-radius:14px;padding:14px 18px;margin-bottom:14px"></div>
       <div id="instLinkBox" style="background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:14px;padding:14px 18px;margin-bottom:14px">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <b style="font-size:14.5px;color:#0f766e">👟 강사 지원 현황</b>
@@ -294,6 +296,7 @@ AUTH.onAuthStateChanged(async u=>{
   IS_OWNER=me.data().owner===true;
   document.getElementById('adminBody').style.display='block';loadDash();
   loadUsers();
+  purgeOldTrash();
 });
 function tab(n){
   [1,2,3,4,5].forEach(i=>{
@@ -303,7 +306,7 @@ function tab(n){
   if(n===3){loadApps();if(!USERS.length)loadUsers();}
   if(n===4)loadCompsAdmin();
 }
-let APPS=[];let AFL='전체';
+let APPS=[];let AFL='전체';let TRASH={apps:[],users:[]};
 function appFilter(f,btn){
   AFL=f;
   document.querySelectorAll('.afl').forEach(b=>{b.style.background=b.dataset.f===f?'':'#8a919d'});
@@ -311,7 +314,8 @@ function appFilter(f,btn){
 }
 async function loadApps(){
   const snap=await DB.collection('schoolApplications').orderBy('createdAt','desc').get();
-  APPS=snap.docs;
+  TRASH.apps=snap.docs.filter(d=>d.data().deleted);
+  APPS=snap.docs.filter(d=>!d.data().deleted);
   try{const g=await DB.collection('goodsConfirms').get();window.GOODS={};g.docs.forEach(x=>window.GOODS[x.id]=x.data());}catch(e){window.GOODS={};}
   renderApps();
 }
@@ -760,11 +764,64 @@ async function setStart(id){
 }
 async function delApp(id){
   const s=APPS.find(d=>d.id===id).data();
-  if(!confirm('['+s.school+' / '+s.type+'] 신청을 완전히 삭제합니다.\n접수 조회·지명 슬롯 데이터도 함께 삭제됩니다.'))return;
-  await DB.collection('schoolApplications').doc(id).delete();
+  if(!confirm('['+s.school+' / '+s.type+'] 신청을 휴지통으로 이동합니다.\n7일 후 자동으로 완전 삭제되며, 그 전에는 [🗑 휴지통]에서 복구할 수 있습니다.'))return;
+  await DB.collection('schoolApplications').doc(id).update({deleted:true,deletedAt:firebase.firestore.FieldValue.serverTimestamp(),delBy:(firebase.auth().currentUser||{}).email||''});
   await DB.collection('openSlots').doc(id).delete().catch(()=>{});
   if(s.code)await DB.collection('appStatus').doc(s.code).delete().catch(()=>{});
   loadApps();loadDash();
+}
+async function purgeUserDoc(uid){
+  const acts=await DB.collection('users').doc(uid).collection('activities').get();
+  for(const a of acts.docs)await a.ref.delete();
+  await DB.collection('certs').doc('KFDF-2026-EDU-'+uid.slice(0,6).toUpperCase()).delete().catch(()=>{});
+  await DB.collection('users').doc(uid).delete();
+}
+async function purgeOldTrash(){
+  try{
+    const cut=Date.now()/1000-7*86400;
+    for(const col of ['schoolApplications','licenseApps','users']){
+      const sn=await DB.collection(col).where('deleted','==',true).get().catch(()=>null);
+      if(!sn)continue;
+      for(const d of sn.docs){
+        const t=d.data().deletedAt;
+        if(t&&t.seconds<cut){ if(col==='users')await purgeUserDoc(d.id).catch(()=>{}); else await d.ref.delete().catch(()=>{}); }
+      }
+    }
+  }catch(e){}
+}
+async function showTrash(){
+  const box=document.getElementById('trashBox');
+  if(box.style.display==='block'){box.style.display='none';return}
+  box.style.display='block';box.innerHTML='<span style="font-size:13px;color:var(--gray)">불러오는 중...</span>';
+  let lap=[];try{const sn=await DB.collection('licenseApps').where('deleted','==',true).get();lap=sn.docs;}catch(e){}
+  const rows=[];
+  const mk=(d,col,label)=>{
+    const v=d.data();const t=v.deletedAt?v.deletedAt.seconds*1000:Date.now();
+    const left=Math.max(0,7-Math.floor((Date.now()-t)/86400000));
+    rows.push('<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid #e5e0d8;border-radius:9px;padding:8px 12px;font-size:13px">'
+     +'<span style="font-size:10.5px;font-weight:900;color:#fff;background:#8a919d;padding:2px 8px;border-radius:999px">'+label+'</span><b>'+esc(v.school||v.name||'')+'</b>'
+     +'<span style="color:var(--gray)">'+esc(v.type||v.target||'')+(v.teacher?' · '+esc(v.teacher):'')+' · 삭제 '+new Date(t).toLocaleDateString('ko-KR')+(v.delBy?' · '+esc(v.delBy):'')+' · <b style="color:#C41E2F">'+left+'일 후 영구삭제</b></span>'
+     +'<span style="margin-left:auto;display:flex;gap:6px">'
+     +'<button class="btn-sub" style="background:#0f766e;padding:4px 12px;min-height:0" onclick="restoreTrash(\''+col+'\',\''+d.id+'\')">↩ 복구</button>'
+     +'<button class="btn-sub" style="background:#C41E2F;padding:4px 12px;min-height:0" onclick="purgeNow(\''+col+'\',\''+d.id+'\')">✖ 즉시 영구삭제</button></span></div>');
+  };
+  (TRASH.apps||[]).forEach(d=>mk(d,'schoolApplications','강습신청'));
+  lap.forEach(d=>mk(d,'licenseApps','자격신청'));
+  (TRASH.users||[]).forEach(d=>mk(d,'users','회원'));
+  box.innerHTML='<b style="font-size:14.5px">🗑 휴지통</b> <span style="font-size:12px;color:var(--gray)">삭제 항목은 7일간 보관 후 자동 영구삭제됩니다 (관리자 접속 시 정리 실행)</span><div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">'+(rows.join('')||'<div style="font-size:13px;color:var(--gray)">비어 있습니다.</div>')+'</div>';
+}
+async function restoreTrash(col,id){
+  const FV=firebase.firestore.FieldValue;
+  await DB.collection(col).doc(id).update({deleted:FV.delete(),deletedAt:FV.delete(),delBy:FV.delete()});
+  alert('복구되었습니다.'+(col==='schoolApplications'?'\n※ 접수번호 조회·지명 슬롯은 필요 시 다시 생성하세요.':''));
+  await loadApps();await loadUsers();
+  document.getElementById('trashBox').style.display='none';showTrash();
+}
+async function purgeNow(col,id){
+  if(!confirm('지금 즉시 완전히 삭제합니다. 복구할 수 없습니다.'))return;
+  if(col==='users')await purgeUserDoc(id).catch(()=>{});else await DB.collection(col).doc(id).delete().catch(()=>{});
+  await loadApps();await loadUsers();
+  document.getElementById('trashBox').style.display='none';showTrash();
 }
 async function closeWaitlist(){
   const waits=APPS.filter(d=>d.data().status==='대기');
@@ -1002,7 +1059,8 @@ function uMatch(v){
 }
 async function loadUsers(){
   const snap=await DB.collection('users').orderBy('createdAt','desc').get();
-  USERS=snap.docs;
+  TRASH.users=snap.docs.filter(d=>d.data().deleted);
+  USERS=snap.docs.filter(d=>!d.data().deleted);
   renderUsers();
 }
 function renderUsers(){
@@ -1310,21 +1368,15 @@ async function toggleCrim(uid){
   loadUsers();
 }
 async function delUser(uid,name){
-  const typed=prompt('['+name+'] 회원을 완전히 삭제합니다.\n- 회원 정보·활동 이력·이수증 검증코드가 모두 삭제됩니다\n- 배정된 강습이 있으면 먼저 배정해제 하세요\n\n삭제하려면 회원 이름을 똑같이 입력하세요:','');
+  const typed=prompt('['+name+'] 회원을 휴지통으로 이동합니다.\n- 7일 후 회원 정보·활동 이력·이수증 검증코드가 자동으로 완전 삭제됩니다\n- 그 전에는 [강습 신청 관리 > 🗑 휴지통]에서 복구할 수 있습니다\n\n이동하려면 회원 이름을 똑같이 입력하세요:','');
   if(typed===null)return;
   if(typed.trim()!==name){alert('이름이 일치하지 않아 취소되었습니다.');return}
   try{
-    // 활동 이력 삭제
-    const acts=await DB.collection('users').doc(uid).collection('activities').get();
-    for(const a of acts.docs)await a.ref.delete();
-    // 이수증 검증코드 삭제
-    await DB.collection('certs').doc('KFDF-2026-EDU-'+uid.slice(0,6).toUpperCase()).delete().catch(()=>{});
-    // 회원 문서 삭제
-    await DB.collection('users').doc(uid).delete();
+    await DB.collection('users').doc(uid).update({deleted:true,deletedAt:firebase.firestore.FieldValue.serverTimestamp(),delBy:(firebase.auth().currentUser||{}).email||''});
     await updateLeaderboard();
-    alert('['+name+'] 삭제 완료.\n※ 로그인 계정(이메일) 자체는 Firebase 콘솔 > Authentication에서 별도 삭제할 수 있습니다. (문서 삭제로 개인정보는 이미 제거됨)');
+    alert('['+name+'] 휴지통 이동 완료. 7일 내 복구 가능합니다.\n※ 로그인 계정(이메일)은 Firebase 콘솔 > Authentication에서 별도 관리됩니다.');
     loadDash();loadUsers();
-  }catch(e){alert('삭제 실패: '+e.message)}
+  }catch(e){alert('실패: '+e.message)}
 }
 
 // ── 버튼 선택 팝업 (prompt 대체) ──

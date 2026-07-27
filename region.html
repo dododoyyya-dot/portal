@@ -247,7 +247,7 @@ function appTypeOf(s){
 }
 async function loadSchools(){
   const snap=await DB.collection('schoolApplications').get();
-  RAPPS=snap.docs.sort((a,b)=>{
+  RAPPS=snap.docs.filter(d=>!d.data().deleted).sort((a,b)=>{
     const ta=a.data().createdAt?a.data().createdAt.seconds:0,tb=b.data().createdAt?b.data().createdAt.seconds:0;
     return tb-ta;
   });
