@@ -190,12 +190,7 @@ function orgChip(o,region,title,fed){
           <option value="">선택</option><option>남</option><option>여</option>
         </select>
       </div>
-      <div>
-        <label style="font-size:13px;font-weight:800">거주 권역</label>
-        <select id="pfRegion" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
-          <option>서울·경기</option><option>강원</option><option>충청</option><option>전라</option><option>경상</option><option>제주</option>
-        </select>
-      </div>
+
     </div>
     <div style="margin-top:14px">
       <label style="font-size:13px;font-weight:800;color:#8c1622">집 주소 (필수) <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 피복·자격증·상장 등 물품 발송에 사용됩니다</span></label>
@@ -491,7 +486,6 @@ function aaLoad(d){
   AA_CUR='';aaRender();
 }
 function fillProfile(d){
-  document.getElementById('pfRegion').value=d.region||'서울·경기';
   document.getElementById('pfDegree').value=d.degree||'';
   const af=d.affiliation||[];
   document.getElementById('pfAf1').checked=af.indexOf('시도연맹')>=0;
@@ -589,7 +583,13 @@ async function saveProfile(){
       degDoc=await ref.getDownloadURL();
     }
     const upd={
-      region:document.getElementById('pfRegion').value,
+      region:(function(){
+        const addr=document.getElementById('pfAddr').value.trim();
+        const R={'서울':'서울·경기','인천':'서울·경기','경기':'서울·경기','강원':'강원','대전':'충청','세종':'충청','충북':'충청','충남':'충청','충청':'충청','광주':'전라','전북':'전라','전남':'전라','전라':'전라','부산':'경상','대구':'경상','울산':'경상','경북':'경상','경남':'경상','경상':'경상','제주':'제주'};
+        for(const k in R){if(addr.indexOf(k)===0||addr.indexOf(' '+k)>=0)return R[k]}
+        const ar=aaRegions();if(ar.length)return ar[0];
+        return MYD.region||'서울·경기';
+      })(),
       activityAreas:aaSave(),
       activityRegions:aaRegions(),
       baseCity:aaBase()||MYD.baseCity||'',
