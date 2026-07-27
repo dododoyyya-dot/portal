@@ -923,6 +923,8 @@ async function purgeUserDoc(uid){
   const acts=await DB.collection('users').doc(uid).collection('activities').get();
   for(const a of acts.docs)await a.ref.delete();
   await DB.collection('certs').doc('KFDF-2026-EDU-'+uid.slice(0,6).toUpperCase()).delete().catch(()=>{});
+  try{const ud=await DB.collection('users').doc(uid).get();const ph=String((ud.data()||{}).phone||'').replace(/[^0-9]/g,'');
+    if(ph)await DB.collection('phoneIndex').doc(ph).delete().catch(()=>{});}catch(e){}
   await DB.collection('users').doc(uid).delete();
 }
 async function purgeOldTrash(){

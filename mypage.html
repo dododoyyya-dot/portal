@@ -573,7 +573,12 @@ async function savePhone(){
   const p=document.getElementById('myPhone').value.trim();
   if(!/^01[016789][-. ]?\d{3,4}[-. ]?\d{4}$/.test(p)){el.textContent='번호 형식을 확인해주세요';el.style.color='#C41E2F';return}
   try{
+    const pn=p.replace(/[^0-9]/g,'');
+    try{const dup=await DB.collection('phoneIndex').doc(pn).get();
+      if(dup.exists&&dup.data().uid!==AUTH.currentUser.uid){el.textContent='이미 다른 회원이 사용 중인 번호입니다';el.style.color='#C41E2F';return}
+    }catch(e){}
     await DB.collection('users').doc(AUTH.currentUser.uid).update({phone:p});
+    await DB.collection('phoneIndex').doc(pn).set({uid:AUTH.currentUser.uid,name:MYD.name||''}).catch(()=>{});
     MYD.phone=p;el.textContent='✓ 저장되었습니다';el.style.color='#0f766e';
   }catch(e){el.textContent='저장 실패: '+e.message;el.style.color='#C41E2F'}
 }
