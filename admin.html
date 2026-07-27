@@ -416,6 +416,7 @@ function renderApps(){
       +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:'+(gc&&gc.teacherConfirm?'#0f766e':'#b8860b')+'" onclick="reqGoods(\''+d.id+'\')">📦 '+(gc&&gc.teacherConfirm?'수령확인✓':'용품수령 확인요청')+'</button>':'')
       +'<button class="btn-sub" style="background:'+(s.start&&s.start.indexOf('8월')>=0?'#C41E2F':'#8a919d')+'" onclick="setStart(\''+d.id+'\')">'+(s.start&&s.start.indexOf('8월')>=0?'⚡긴급(방학)':s.start?'일반(9월)':'개강시기?')+'</button>'
       +'<button class="btn-sub" style="background:'+(s.city?'#8a919d':'#C41E2F')+'" onclick="setCity(\''+d.id+'\')">📍시군구</button>'
+      +'<button class="btn-sub" style="background:#fff;color:#7c3aed;border:1.5px solid #7c3aed" title="학교체육 ↔ 방과후 유형 전환" onclick="chgType(\''+d.id+'\')">🔁 유형</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delApp(\''+d.id+'\')">🗑</button>'
       +'</div></div>'
       +'<div id="logs_'+d.id+'" style="display:none;background:var(--bg-soft);border-radius:12px;padding:14px 18px;margin:-6px 0 10px"></div>';
@@ -761,6 +762,15 @@ async function setStart(id){
   if(p!=='1'&&p!=='2')return;
   await DB.collection('schoolApplications').doc(id).update({start:p==='1'?'8월 여름방학 중 (7/29까지 신청 시)':'9월 (2학기 개강)'});
   loadApps();
+}
+async function chgType(id){
+  const doc=APPS.find(d=>d.id===id);if(!doc)return;
+  const v=doc.data();
+  const cur=appTypeOf(v);
+  const nxt=cur==='학교체육 강습'?'방과후·늘봄·돌봄':'학교체육 강습';
+  if(!confirm('['+v.school+']\n'+cur+' → '+nxt+' 으로 유형을 변경합니다.\n(접수번호·배정·상태는 그대로 유지됩니다)'))return;
+  await DB.collection('schoolApplications').doc(id).update({type:nxt});
+  loadApps();loadDash();
 }
 async function delApp(id){
   const s=APPS.find(d=>d.id===id).data();
