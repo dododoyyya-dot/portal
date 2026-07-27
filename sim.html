@@ -1,0 +1,156 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>가선정 시뮬레이션 | 대한민국플라잉디스크연맹</title>
+<style>
+:root{--line:#e2e6ec;--gray:#7a8290}
+body{font-family:'Pretendard','맑은 고딕',sans-serif;margin:0;background:#f4f6f9;color:#1c2430}
+.wrap{max-width:1100px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:20px;margin:0 0 4px}
+.btn{display:inline-block;padding:10px 18px;border-radius:10px;border:0;font-weight:800;font-size:14px;cursor:pointer;color:#fff}
+.btn:disabled{opacity:.45;cursor:default}
+table{border-collapse:collapse;width:100%;background:#fff;font-size:12.5px}
+th{background:#0e7490;color:#fff;padding:6px 10px;white-space:nowrap}
+td{border:1px solid #e0e8ec;padding:5px 10px}
+.tag{font-size:10px;font-weight:900;color:#fff;padding:2px 8px;border-radius:999px;white-space:nowrap}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+</head><body>
+<div class="wrap">
+  <h1>🧪 가선정 시뮬레이션 <span style="font-size:13px;font-weight:600;color:var(--gray)">— 참고용 · 서버에 아무것도 반영되지 않습니다</span></h1>
+  <div style="font-size:12.5px;color:var(--gray);margin-bottom:14px">기준: 학교체육 70 · 방과후 30 / 기존 선정·배정 유지 → 이수자교(연수명단 대조) → 접수 우선 / 용품만·분진중은 정원 외 / 강사 1인 최대 2개교 (본인지도 → 같은 시도 → 같은 권역)</div>
+  <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+    <button class="btn" style="background:#0e7490" onclick="run()">↻ 다시 계산</button>
+    <button class="btn" style="background:#0f766e" onclick="dlCSV()" id="dlBtn" disabled>⬇ 결과 엑셀(CSV) 저장</button>
+    <span id="stamp" style="align-self:center;font-size:12.5px;color:var(--gray)"></span>
+  </div>
+  <div id="deny" style="display:none;background:#fff;border-radius:12px;padding:30px;text-align:center;font-weight:800">🔒 관리자 로그인이 필요합니다. <a href="login.html">로그인 하러 가기</a></div>
+  <div id="sumBox" style="overflow-x:auto;margin-bottom:16px"></div>
+  <div id="listBox" style="overflow-x:auto"></div>
+</div>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",
+  authDomain: "koreaflyingdiscfederation.firebaseapp.com",
+  projectId: "koreaflyingdiscfederation",
+  storageBucket: "koreaflyingdiscfederation.firebasestorage.app",
+  messagingSenderId: "1081847355343",
+  appId: "1:1081847355343:web:ca40ed9a52e13f607f64ba"
+};
+firebase.initializeApp(firebaseConfig);
+const AUTH=firebase.auth();const DB=firebase.firestore();
+function esc(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+const EDU_ROSTER='강다연,강수경,강유라,경미선,권남혁,권태수,권희찬,김나리,김나연,김남영,김다윤,김도야,김미영,김민석,김민정,김상훈,김선미,김성관,김연상,김연우,김영빈,김유진,김이현,김재우,김정심,김정희,김주현,김지아,김한효,김현서,남궁영민,노현정,류선주,문상우,문현민,박광열,박규미,박규성,박기정,박미리,박상명,박선희,박성곤,박영환,박이슬,박주송,박찬혜,방서인,방수림,방수민,배성호,백승호,백지은,성연선,손성민,송희은,신고운이,신세란,신우진,신은상,신호철,안미진,안환기,양지선,엄혁주,여인찬,연선주,염정선,오경민,오주연,우소라,유정미,윤경희,윤연진,윤태경,은보라,이가영,이다봄,이대천,이소희,이솔지,이수환,이승훈,이영진,이영철,이용기,이은실,이은지,이재우,이재천,이지영,이한민,이현표,임성경,임아륜,장경숙,전경윤,전성현,정광섭,정예온,정인용,정지수,정진호,정창윤,조용대,조현숙,조혜진,조홍익,지미연,천관문,천효정,최문규,최윤형,최인향,최종선,최종욱,최종은,최지안,최창훈,한문아,한미향,허지범,황규빈,황성하,황윤경,황인중'.split(',');
+function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>=0}
+const KFDF_REGIONS=['서울·경기','강원','충청','전라','경상','제주'];
+const SIDO2REG={'서울':'서울·경기','인천':'서울·경기','경기':'서울·경기','강원':'강원','대전':'충청','세종':'충청','충청북':'충청','충북':'충청','충청남':'충청','충남':'충청','광주':'전라','전라북':'전라','전북':'전라','전라남':'전라','전남':'전라','부산':'경상','대구':'경상','울산':'경상','경상북':'경상','경북':'경상','경상남':'경상','경남':'경상','제주':'제주'};
+const REG_ALIAS={'서울경기':'서울·경기','수도권':'서울·경기','서울/경기':'서울·경기','충청권':'충청','전라권':'전라','경상권':'경상','제주권':'제주','강원권':'강원'};
+function appRegion(s){
+  const raw=String(s.region||'').trim();
+  if(KFDF_REGIONS.indexOf(raw)>=0)return raw;
+  const norm=REG_ALIAS[raw.replace(/\s/g,'')];
+  if(norm)return norm;
+  const src=String(s.city||'')||String(s.school||'');
+  for(const k in SIDO2REG){if(src.indexOf(k)===0)return SIDO2REG[k]}
+  // 학교명에 시도가 섞인 경우 (예: 부산신남초)
+  for(const k in SIDO2REG){if(String(s.school||'').indexOf(k)===0)return SIDO2REG[k]}
+  return raw||'';
+}
+function appTypeOf(s){
+  const t=String((s.type||'')+' '+(s.typeKey||'')).toLowerCase();
+  if(t.indexOf('after')>=0||t.indexOf('방과후')>=0||t.indexOf('늘봄')>=0||t.indexOf('돌봄')>=0)return '방과후·늘봄·돌봄';
+  if(t.indexOf('school')>=0||t.indexOf('학교')>=0)return '학교체육 강습';
+  return String(s.type||'');
+}
+function simSido(c){c=String(c||'');const M={'경상남도':'경남','경상북도':'경북','충청북도':'충북','충청남도':'충남','밀양':'경남','김해':'경남','포항':'경북','구미':'경북'};
+  for(const s of ['부산','대구','울산','서울','인천','경기','대전','세종','광주','전남','전북','강원','제주','경상남도','경상북도','충청북도','충청남도','경남','경북','충북','충남','밀양','김해','포항','구미']){
+    if(c.indexOf(s)>=0)return M[s]||(s.length>2?s.slice(0,2):s);}
+  return '';}
+let ROWS=null;
+async function run(){
+  const u=AUTH.currentUser;
+  if(!u){document.getElementById('deny').style.display='block';return}
+  document.getElementById('stamp').textContent='계산 중…';
+  let apps,users;
+  try{
+    apps=(await DB.collection('schoolApplications').get()).docs.filter(d=>!d.data().deleted);
+    users=(await DB.collection('users').where('status','==','approved').get()).docs.filter(d=>!d.data().deleted);
+  }catch(e){document.getElementById('deny').style.display='block';document.getElementById('stamp').textContent='';return}
+  document.getElementById('deny').style.display='none';
+  const QUOTA={'학교체육 강습':70,'방과후·늘봄·돌봄':30};
+  const rows=apps.map(d=>{const v=d.data();
+    const ty=appTypeOf(v);const st=v.status||'';
+    const isE=inRoster(String(v.eduName||''))||inRoster(String(v.selfName||''))||inRoster(String(v.teacher||''));
+    let sc=0;if(st==='선정'||st==='배정완료')sc+=10;if(isE)sc+=3;if(st==='접수')sc+=2;if(st==='대기')sc+=1;
+    return {school:String(v.school||'').trim(),ty,st,reg:appRegion(v),city:String(v.city||''),sup:String(v.support||''),tea:String(v.teacher||''),E:isE,sc};});
+  const seen={};rows.sort((a,b)=>b.sc-a.sc);
+  rows.forEach(r=>{const k=r.school+'|'+r.ty;if(seen[k])r.dup=true;else seen[k]=1;});
+  const cand={'학교체육 강습':[],'방과후·늘봄·돌봄':[]};
+  rows.forEach(r=>{
+    const mid=/중학교|중학고|고등학교|여중|여고/.test(r.school);
+    if(r.dup){r.v='보류(중복)';return}
+    if(mid){r.v=r.school.indexOf('분진')>=0?'선정-용품만(정원외)':'보류(중등)';return}
+    if(r.sup.indexOf('용품만')>=0){r.v='선정-용품만(정원외)';return}
+    cand[r.ty]&&cand[r.ty].push(r);
+  });
+  Object.keys(cand).forEach(ty=>{cand[ty].forEach((r,i)=>{r.v=i<QUOTA[ty]?'선정(임시)':'예비(정원초과)';});});
+  const pool={};
+  users.forEach(d=>{const uu=d.data();const f=uu.instructorFor||{};
+    if(!f.school&&!f.after)return;
+    pool[uu.name]={base:String(uu.baseCity||''),reg:uu.region||'',sch:!!f.school,aft:!!f.after,edu:!!uu.edu2026,cap:2};});
+  rows.forEach(r=>{
+    if(r.v!=='선정(임시)'){r.inst=r.v.indexOf('용품만')>=0?'(용품 발송만)':'';return}
+    const teaName=r.tea.split('(')[0].trim();
+    if(pool[teaName]){r.inst=teaName+' ✦본인지도';return}
+    const need=r.ty==='학교체육 강습'?'sch':'aft';
+    const ssd=simSido(r.city);let best=null;
+    for(const nm in pool){const c=pool[nm];
+      if(!c[need]||c.cap<=0)continue;
+      if(ssd&&c.base.replace('경상남도','경남').replace('경상북도','경북').indexOf(ssd)>=0){if(!best||(c.edu&&!pool[best].edu))best=nm;}}
+    if(!best){for(const nm in pool){const c=pool[nm];
+      if(!c[need]||c.cap<=0)continue;
+      if(c.reg.slice(0,2)===String(r.reg||'').slice(0,2)){if(!best||(c.edu&&!pool[best].edu))best=nm;}}}
+    if(best){pool[best].cap--;r.inst=best;}else r.inst='⚠ 미정(강사부족)';
+  });
+  ROWS=rows;
+  render();
+  document.getElementById('dlBtn').disabled=false;
+  document.getElementById('stamp').textContent=new Date().toLocaleString('ko-KR')+' 기준 · 신청 '+rows.length+'건';
+}
+function render(){
+  const rows=ROWS;
+  const regs=['서울·경기','강원','충청','전라','경상','제주'];
+  const cnt=(rg,f)=>rows.filter(r=>String(r.reg||'').slice(0,2)===rg.slice(0,2)&&f(r)).length;
+  let h='<table><tr><th>권역</th><th>학교체육</th><th>방과후</th><th>용품만</th><th>예비</th><th>보류</th></tr>';
+  let ta=0,tb=0,tg=0,te=0,th2=0;
+  regs.forEach(rg=>{const a=cnt(rg,r=>r.v==='선정(임시)'&&r.ty==='학교체육 강습'),b=cnt(rg,r=>r.v==='선정(임시)'&&r.ty!=='학교체육 강습'),g=cnt(rg,r=>r.v.indexOf('용품만')>=0),e=cnt(rg,r=>r.v.indexOf('예비')>=0),hh=cnt(rg,r=>r.v.indexOf('보류')>=0);
+    if(a+b+g+e+hh===0)return;ta+=a;tb+=b;tg+=g;te+=e;th2+=hh;
+    h+='<tr><td>'+rg+'</td><td align="center">'+a+'</td><td align="center">'+b+'</td><td align="center">'+g+'</td><td align="center">'+e+'</td><td align="center">'+hh+'</td></tr>';});
+  h+='<tr style="font-weight:800;background:#eef4f6"><td>합계</td><td align="center">'+ta+'</td><td align="center">'+tb+'</td><td align="center">'+tg+'</td><td align="center">'+te+'</td><td align="center">'+th2+'</td></tr></table>';
+  document.getElementById('sumBox').innerHTML=h;
+  const col={'선정(임시)':'#0f766e','선정-용품만(정원외)':'#b8860b','예비(정원초과)':'#8a919d','보류(중복)':'#C41E2F','보류(중등)':'#C41E2F'};
+  const ord={'선정(임시)':0,'선정-용품만(정원외)':1,'예비(정원초과)':2,'보류(중복)':3,'보류(중등)':4};
+  let l='<table><tr><th>판정</th><th>권역</th><th>학교</th><th>유형</th><th>현재상태</th><th>이수자교</th><th>담당교사</th><th>배정강사(임시)</th></tr>';
+  rows.slice().sort((a,b)=>((ord[a.v]!==undefined?ord[a.v]:9)-(ord[b.v]!==undefined?ord[b.v]:9))||String(a.reg).localeCompare(String(b.reg))).forEach(r=>{
+    l+='<tr><td><span class="tag" style="background:'+(col[r.v]||'#888')+'">'+esc(r.v)+'</span></td><td>'+esc(r.reg||'')+'</td><td><b>'+esc(r.school)+'</b></td><td>'+esc(r.ty)+'</td><td>'+esc(r.st)+'</td><td align="center">'+(r.E?'★':'')+'</td><td>'+esc(r.tea)+'</td><td>'+esc(r.inst||'')+'</td></tr>';});
+  l+='</table>';
+  document.getElementById('listBox').innerHTML=l;
+}
+function dlCSV(){
+  if(!ROWS)return;
+  const hdr=['판정','권역','학교','유형','현재상태','이수자교','담당교사','배정강사(임시)','비고'];
+  const lines=[hdr.join(',')];
+  ROWS.forEach(r=>{
+    lines.push([r.v,r.reg||'',r.school,r.ty,r.st,r.E?'★':'',r.tea,r.inst||'','참고용 가선정 — 확정 아님'].map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(','));
+  });
+  const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  const now=new Date();
+  a.download='가선정시뮬레이션_'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'_'+String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0')+'.csv';
+  a.click();
+}
+AUTH.onAuthStateChanged(u=>{if(u)run();else document.getElementById('deny').style.display='block';});
+</script>
+</body></html>
