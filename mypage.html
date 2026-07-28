@@ -505,8 +505,38 @@ async function aaMapDraw(){
       paths+='<path d="'+d+'" data-i="'+i+'" fill="#eef1f4" stroke="#c6ced6" stroke-width="0.5" style="cursor:pointer"><title>'+fs+' '+fn+'</title></path>';
     });
     el.innerHTML='<svg viewBox="0 0 '+W+' '+H.toFixed(0)+'" style="width:100%;display:block" id="aaSvg">'+paths+'</svg>'
-      +'<div style="text-align:center;font-size:11px;color:var(--gray);margin-top:4px">지도를 눌러도 선택·해제됩니다 · <b style="color:#C41E2F">■</b> 1순위 시도 <b style="color:#1F4E9C">■</b> 그 외 선택</div>';
+      +'<div style="text-align:center;font-size:11px;color:var(--gray);margin-top:4px">지도 클릭 = 선택·해제 · 마우스휠 = 확대 · 드래그 = 이동 · 더블클릭 = 원래대로 · <b style="color:#C41E2F">■</b> 1순위 시도 <b style="color:#1F4E9C">■</b> 그 외 선택</div>';
+    // ── 휠 확대·드래그 이동 ──
+    (function(){
+      const svg=document.getElementById('aaSvg');
+      const vb0=svg.getAttribute('viewBox').split(' ').map(Number);
+      let vb=vb0.slice();
+      const apply=()=>svg.setAttribute('viewBox',vb.map(n=>n.toFixed(1)).join(' '));
+      svg.addEventListener('wheel',ev=>{
+        ev.preventDefault();
+        const k=ev.deltaY<0?0.85:1/0.85;
+        const nw=vb[2]*k,nh=vb[3]*k;
+        if(nw>vb0[2]){vb=vb0.slice();apply();return}   // 원본보다 축소 금지 = 리셋
+        if(nw<vb0[2]*0.12)return;                       // 최대 ~8배
+        const r=svg.getBoundingClientRect();
+        const px=vb[0]+(ev.clientX-r.left)/r.width*vb[2];
+        const py=vb[1]+(ev.clientY-r.top)/r.height*vb[3];
+        vb=[px-(px-vb[0])*k,py-(py-vb[1])*k,nw,nh];apply();
+      },{passive:false});
+      let drag=null;
+      svg.addEventListener('pointerdown',ev=>{drag={x:ev.clientX,y:ev.clientY,vb:vb.slice(),moved:false};svg.setPointerCapture(ev.pointerId);});
+      svg.addEventListener('pointermove',ev=>{
+        if(!drag)return;
+        const r=svg.getBoundingClientRect();
+        const dx=(ev.clientX-drag.x)/r.width*vb[2],dy=(ev.clientY-drag.y)/r.height*vb[3];
+        if(Math.abs(ev.clientX-drag.x)+Math.abs(ev.clientY-drag.y)>6)drag.moved=true;
+        if(drag.moved){vb[0]=drag.vb[0]-dx;vb[1]=drag.vb[1]-dy;apply();}
+      });
+      svg.addEventListener('pointerup',ev=>{if(drag&&drag.moved)svg._justDragged=true;drag=null;setTimeout(()=>{svg._justDragged=false},50);});
+      svg.addEventListener('dblclick',()=>{vb=vb0.slice();apply();});
+    })();
     document.getElementById('aaSvg').addEventListener('click',ev=>{
+      if(document.getElementById('aaSvg')._justDragged)return;
       const t=ev.target.closest('path');if(!t)return;
       const it=SGG_IDX[+t.dataset.i];if(!it)return;
       let s=it.fs,g=it.fn;
@@ -631,7 +661,23 @@ function pfExpand(){
 async function saveProfile(){
   if(PFBUSY)return;PFBUSY=true;
   const m=document.getElementById('pfMsg');
-  if(!document.getElementById('pfAddr').value.trim()){m.textContent='⚠ 집 주소는 필수입니다 (물품 발송용)';m.style.color='#8c1622';document.getElementById('pfAddr').focus();PFBUSY=false;return}
+  function req(id,label){
+    const el=document.getElementById(id);
+    if(!el||el.value.trim()!=='')return false;
+    m.textContent='⚠ 「'+label+'」은(는) 필수 입력입니다';m.style.color='#8c1622';
+    el.style.border='2px solid #C41E2F';el.scrollIntoView({behavior:'smooth',block:'center'});
+    setTimeout(()=>el.focus(),250);setTimeout(()=>{el.style.border=''},4000);
+    PFBUSY=false;return true;
+  }
+  if(req('pfBirth','생년월일'))return;
+  if(req('pfGender','성별'))return;
+  if(req('pfAddr','집 주소'))return;
+  if(!AA.length&&!window._AA_LEGACY&&!(MYD&&MYD.baseCity)){
+    m.textContent='⚠ 「활동 가능 범위」를 최소 1곳 이상 선택해주세요 (강습 배정에 필수)';m.style.color='#8c1622';
+    const box=document.getElementById('aaSidoRow');
+    if(box){box.scrollIntoView({behavior:'smooth',block:'center'});box.style.outline='2px solid #C41E2F';setTimeout(()=>{box.style.outline=''},4000);}
+    PFBUSY=false;return;
+  }
   try{
     const af=[];
     if(document.getElementById('pfAf1').checked)af.push('시도연맹');
@@ -741,7 +787,7 @@ AUTH.onAuthStateChanged(async u=>{
   const fApplied=d.instructorFor&&(d.instructorFor.school||d.instructorFor.after||d.instructorFor.referee||d.instructorFor.staff);
   if(d.status==='approved'&&!fApplied){
     document.getElementById('phoneBox').insertAdjacentHTML('beforebegin',
-      '<div style="margin-top:26px;background:#fdf3f4;border:2px solid #C41E2F;border-radius:14px;padding:16px 20px;font-size:14px;line-height:1.7"><b style="color:#8c1622">⚠ 아직 강사·요원 활동에 지원하지 않으셨습니다.</b><br>가입·승인만으로는 배정 대상이 되지 않습니다. <a href="jobs.html" style="font-weight:900;color:#C41E2F">강사 활동 지원 페이지에서 [지원하기] 버튼을 눌러주세요 →</a></div>');
+      '<div style="margin-top:26px;background:#C41E2F;border-radius:16px;padding:20px 22px;font-size:15px;line-height:1.75;color:#fff;box-shadow:0 6px 18px rgba(196,30,47,.35);animation:kfdfPulse 1.6s ease-in-out infinite"><b style="font-size:17px">🚨 긴급 — 아직 강사·요원 지원을 하지 않으셨습니다!</b><br><b>2026 권역 사업 강사 배정을 받으려면 [지원하기] 클릭이 필수입니다.</b> 가입·승인만으로는 배정 명단에 오르지 않습니다.<br><a href="jobs.html" style="display:inline-block;margin-top:10px;background:#fff;color:#C41E2F;font-weight:900;padding:10px 22px;border-radius:10px;text-decoration:none;font-size:15px">👟 지금 지원하러 가기 →</a></div><style>@keyframes kfdfPulse{0%,100%{box-shadow:0 6px 18px rgba(196,30,47,.35)}50%{box-shadow:0 6px 26px rgba(196,30,47,.65)}}</style>');
   }
   if(d.edu2026){
     let verified=false;
