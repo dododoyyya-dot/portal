@@ -1239,6 +1239,13 @@ function viewContractAdmin(uid,appId){
   +'<h2>제5조 (계약 해지)</h2><p>정당한 사유 없는 강습 불이행, 학교 운영에 중대한 지장 초래, 품위 손상 행위가 있는 경우 갑은 본 계약을 해지할 수 있으며, 이 경우 미수행 회차의 수당은 지급하지 아니한다.</p>'
   +'<h2>제6조 (개인정보)</h2><p>갑은 수당 지급·원천징수 신고에 필요한 최소한의 개인정보를 수집·이용하며, 보존기간(사업 종료 후 5년) 경과 후 지체 없이 파기한다.</p>'
   +'<h2>제7조 (전자서명)</h2><p>본 계약은 을이 연맹 홈페이지에서 본인 인증 후 전자적으로 서명한 시점에 성립하며, 기록된 서명·동의 일시는 서면 서명을 갈음한다. 본 계약에 명시되지 아니한 사항은 관계 법령 및 보조사업 지침에 따른다.</p>'
+  +'<table><tr><td class="k">성명</td><td>'+esc(r.name)+'</td></tr>'
+  +'<tr><td class="k">주민등록번호</td><td>'+maskRrn(r.rrn)+'</td></tr>'
+  +'<tr><td class="k">배정 학교</td><td>'+esc(a.school)+' ('+esc(a.type||'')+')</td></tr>'
+  +'<tr><td class="k">배정 권역</td><td>'+esc(a.region||r.region||'')+'</td></tr>'
+  +'<tr><td class="k">위촉 기간</td><td>'+period+'</td></tr>'
+  +'<tr><td class="k">담당 회차</td><td>학교당 24회차</td></tr>'
+  +'<tr><td class="k">입금 계좌</td><td>'+(r.bank?esc(r.bank)+' '+esc(r.accountNum||'')+' (예금주: '+esc(r.accountHolder||'')+')':'<span style="color:#C41E2F">미등록</span>')+'</td></tr></table>'
   +'<table><tr><td class="k">갑</td><td>사단법인 대한민국플라잉디스크연맹 회장 &nbsp;(직인)</td></tr>'
   +'<tr><td class="k">을</td><td>'+esc(r.name)+(ag&&ag.sign?' <img src="'+ag.sign+'" style="height:34px;vertical-align:middle;margin:0 6px">':'')+' &nbsp;—&nbsp; '+(ag?'<b style="color:#0f766e">전자 서명 완료: '+fmtDate(ag.agreedAt)+'</b>':'<b style="color:#C41E2F">(서명 전 — 강사 본인 마이페이지에서 서명 필요)</b>')+'</td></tr></table>'
   +'<div class="org"><span class="orgwrap"><img class="lg" src="'+logo+'">대한민국플라잉디스크연맹<img class="seal" src="'+seal+'" onerror="this.style.display=\'none\'"></span></div>'
@@ -1246,7 +1253,8 @@ function viewContractAdmin(uid,appId){
   w.document.close();
 }
 // ── 서명계약서 일괄 ZIP PDF (학교강습+대회요원, 인라인 스타일로 html2canvas 캡처) ──
-function schoolDocHTML(name,a,ag){
+function schoolDocHTML(r,a,ag){
+  const name=r.name;
   const period=(a.start&&a.start.indexOf('8월')>=0)?'2026. 8. ~ 2026. 12.':'2026. 9. ~ 2026. 12.';
   const logo=new URL('kfdf_logo.png',location.href).href;
   return '<div style="width:100%;box-sizing:border-box;padding:14mm;font-family:\'Malgun Gothic\',sans-serif;font-size:13.5px;line-height:1.85;color:#222;background:#fff">'
@@ -1260,12 +1268,19 @@ function schoolDocHTML(name,a,ag){
   +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제5조 (계약 해지)</h2><p style="margin:0 0 3mm">정당한 사유 없는 강습 불이행, 학교 운영에 중대한 지장 초래, 품위 손상 행위가 있는 경우 갑은 본 계약을 해지할 수 있으며, 이 경우 미수행 회차의 수당은 지급하지 아니한다.</p>'
   +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제6조 (개인정보)</h2><p style="margin:0 0 3mm">갑은 수당 지급·원천징수 신고에 필요한 최소한의 개인정보를 수집·이용하며, 보존기간(사업 종료 후 5년) 경과 후 지체 없이 파기한다.</p>'
   +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제7조 (전자서명)</h2><p style="margin:0 0 3mm">본 계약은 을이 연맹 홈페이지에서 본인 인증 후 전자적으로 서명한 시점에 성립하며, 기록된 서명·동의 일시는 서면 서명을 갈음한다. 본 계약에 명시되지 아니한 사항은 관계 법령 및 보조사업 지침에 따른다.</p>'
+  +'<table style="width:100%;border-collapse:collapse;margin-top:6mm"><tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">성명</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+esc(name)+'</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">주민등록번호</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+maskRrn(r.rrn)+'</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">배정 학교</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+esc(a.school)+' ('+esc(a.type||'')+')</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">배정 권역</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+esc(a.region||r.region||'')+'</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">위촉 기간</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+period+'</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">입금 계좌</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+(r.bank?esc(r.bank)+' '+esc(r.accountNum||'')+' (예금주: '+esc(r.accountHolder||'')+')':'미등록')+'</td></tr></table>'
   +'<table style="width:100%;border-collapse:collapse;margin-top:6mm"><tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">갑</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">사단법인 대한민국플라잉디스크연맹 회장 &nbsp;(직인)</td></tr>'
   +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">을</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+esc(name)+(ag&&ag.sign?' <img src="'+ag.sign+'" style="height:30px;vertical-align:middle;margin:0 6px">':'')+' &nbsp;—&nbsp; '+(ag?'<b style="color:#0f766e">전자 서명 완료: '+fmtDate(ag.agreedAt)+'</b>':'(서명 전)')+'</td></tr></table>'
   +'<div style="display:flex;align-items:center;gap:10px;justify-content:center;font-size:18px;font-weight:800;letter-spacing:2px;margin-top:7mm"><img src="'+logo+'" style="width:36px;height:36px;object-fit:contain">대한민국플라잉디스크연맹</div>'
   +'</div>';
 }
-function compDocHTML(name,c,ag){
+function compDocHTML(r,c,ag){
+  const name=r.name;
   const payClause=(c.role==='심판')?'심판 수당은 1일 70,000원 이내로 하며, 참여 시간이 4시간 이내인 경우 40,000원을 지급한다.':'운영요원 수당은 사업 예산 기준에 따라 산정하여 지급한다.';
   const logo=new URL('kfdf_logo.png',location.href).href;
   return '<div style="width:100%;box-sizing:border-box;padding:14mm;font-family:\'Malgun Gothic\',sans-serif;font-size:13.5px;line-height:1.85;color:#222;background:#fff">'
@@ -1278,6 +1293,11 @@ function compDocHTML(name,c,ag){
   +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제4조 (계약 해지)</h2><p style="margin:0 0 3mm">정당한 사유 없는 업무 불이행, 대회 운영에 중대한 지장 초래, 품위 손상 행위가 있는 경우 갑은 본 계약을 해지할 수 있다.</p>'
   +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제5조 (개인정보)</h2><p style="margin:0 0 3mm">갑은 수당 지급·원천징수 신고에 필요한 최소한의 개인정보를 수집·이용하며, 보존기간(사업 종료 후 5년) 경과 후 지체 없이 파기한다.</p>'
   +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제6조 (전자서명)</h2><p style="margin:0 0 3mm">본 계약은 을이 연맹 홈페이지에서 본인 인증 후 전자적으로 서명한 시점에 성립하며, 기록된 서명·동의 일시는 서면 서명을 갈음한다. 본 계약에 명시되지 아니한 사항은 관계 법령 및 보조사업 지침에 따른다.</p>'
+  +'<table style="width:100%;border-collapse:collapse;margin-top:6mm"><tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">성명</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+esc(name)+'</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">주민등록번호</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+maskRrn(r.rrn)+'</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">대회명 · 역할</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+esc(c.title)+' ('+esc(c.role)+')</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">일자 · 권역</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+esc(c.date)+' · '+esc(c.region)+'</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">입금 계좌</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+(r.bank?esc(r.bank)+' '+esc(r.accountNum||'')+' (예금주: '+esc(r.accountHolder||'')+')':'미등록')+'</td></tr></table>'
   +'<table style="width:100%;border-collapse:collapse;margin-top:6mm"><tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">갑</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">사단법인 대한민국플라잉디스크연맹 회장 &nbsp;(직인)</td></tr>'
   +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">을</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+esc(name)+(ag&&ag.sign?' <img src="'+ag.sign+'" style="height:30px;vertical-align:middle;margin:0 6px">':'')+' &nbsp;—&nbsp; '+(ag?'<b style="color:#0f766e">전자 서명 완료: '+fmtDate(ag.agreedAt)+'</b>':'(서명 전)')+'</td></tr></table>'
   +'<div style="display:flex;align-items:center;gap:10px;justify-content:center;font-size:18px;font-weight:800;letter-spacing:2px;margin-top:7mm"><img src="'+logo+'" style="width:36px;height:36px;object-fit:contain">대한민국플라잉디스크연맹</div>'
@@ -1293,12 +1313,12 @@ async function downloadAllContractsZip(){
   const targets=[];
   (PAYROWS||[]).forEach(r=>{
     (r.apps||[]).forEach(a=>{
-      if(a.signed){targets.push({name:r.name+'_'+a.school+'_위촉계약서', html:schoolDocHTML(r.name,a,r.contracts[a.appId])});}
+      if(a.signed){targets.push({name:r.name+'_'+a.school+'_위촉계약서', html:schoolDocHTML(r,a,r.contracts[a.appId])});}
     });
   });
   (COMPPAYROWS||[]).forEach(r=>{
     (r.slots||[]).forEach(s=>{
-      if(s.signed){targets.push({name:r.name+'_'+s.title+'_위촉계약서', html:compDocHTML(r.name,s,r.contracts['comp_'+s.compId])});}
+      if(s.signed){targets.push({name:r.name+'_'+s.title+'_위촉계약서', html:compDocHTML(r,s,r.contracts['comp_'+s.compId])});}
     });
   });
   if(!targets.length){alert('서명 완료된 계약서가 없습니다. 위 두 박스의 ↻ 불러오기를 먼저 눌러 현황을 확인해주세요.');return}
@@ -1416,6 +1436,11 @@ function viewCompContractAdmin(uid,compId){
   +'<h2>제4조 (계약 해지)</h2><p>정당한 사유 없는 업무 불이행, 대회 운영에 중대한 지장 초래, 품위 손상 행위가 있는 경우 갑은 본 계약을 해지할 수 있다.</p>'
   +'<h2>제5조 (개인정보)</h2><p>갑은 수당 지급·원천징수 신고에 필요한 최소한의 개인정보를 수집·이용하며, 보존기간(사업 종료 후 5년) 경과 후 지체 없이 파기한다.</p>'
   +'<h2>제6조 (전자서명)</h2><p>본 계약은 을이 연맹 홈페이지에서 본인 인증 후 전자적으로 서명한 시점에 성립하며, 기록된 서명·동의 일시는 서면 서명을 갈음한다. 본 계약에 명시되지 아니한 사항은 관계 법령 및 보조사업 지침에 따른다.</p>'
+  +'<table><tr><td class="k">성명</td><td>'+esc(r.name)+'</td></tr>'
+  +'<tr><td class="k">주민등록번호</td><td>'+maskRrn(r.rrn)+'</td></tr>'
+  +'<tr><td class="k">대회명 · 역할</td><td>'+esc(c.title)+' ('+esc(c.role)+')</td></tr>'
+  +'<tr><td class="k">일자 · 권역</td><td>'+esc(c.date)+' · '+esc(c.region)+'</td></tr>'
+  +'<tr><td class="k">입금 계좌</td><td>'+(r.bank?esc(r.bank)+' '+esc(r.accountNum||'')+' (예금주: '+esc(r.accountHolder||'')+')':'<span style="color:#C41E2F">미등록</span>')+'</td></tr></table>'
   +'<table><tr><td class="k">갑</td><td>사단법인 대한민국플라잉디스크연맹 회장 &nbsp;(직인)</td></tr>'
   +'<tr><td class="k">을</td><td>'+esc(r.name)+(ag&&ag.sign?' <img src="'+ag.sign+'" style="height:34px;vertical-align:middle;margin:0 6px">':'')+' &nbsp;—&nbsp; '+(ag?'<b style="color:#0f766e">전자 서명 완료: '+fmtDate(ag.agreedAt)+'</b>':'<b style="color:#C41E2F">(서명 전 — 본인 마이페이지에서 서명 필요)</b>')+'</td></tr></table>'
   +'<div class="org"><span class="orgwrap"><img class="lg" src="'+logo+'">대한민국플라잉디스크연맹<img class="seal" src="'+seal+'" onerror="this.style.display=\'none\'"></span></div>'
