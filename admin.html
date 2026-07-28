@@ -52,7 +52,7 @@
         <a href="safety.html">안전교육 이수</a>
         <a href="mypage.html">마이페이지</a>
       </div></div>
-    <div><a href="community.html" class="top">커뮤니티</a></div>
+    
     <div><a href="notice.html" class="top">알림마당</a>
       <div class="drop">
         <a href="notice.html">공지사항 · 공고</a>
@@ -186,7 +186,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
         <select id="userSido" onchange="renderUsers()" style="width:auto;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px;font-weight:700">
           <option value="">시도 전체</option>
-          <option value="__none">📍 시군구 미입력 (권역 확인됨)</option>
+          <option value="__none">📍 거점(시군구) 미입력 — 전체</option>
           <option value="__unclass">❓ 미분류 (권역도 미확인)</option>
           <option>서울</option><option>인천</option><option>경기</option><option>강원</option>
           <option>대전</option><option>세종</option><option>충북</option><option>충남</option>
@@ -197,6 +197,11 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <input id="userSearch" oninput="renderUsers()" placeholder="🔍 이름·시군구·이메일·전화 검색" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px">
         <span id="userCount" style="align-self:center;font-size:13px;font-weight:800;color:#1F4E9C"></span>
       </div>
+      <label id="userIncRegWrap" style="display:none;gap:7px;align-items:center;font-size:12.5px;font-weight:700;color:#7a5b00;background:#fff8e6;border:1.5px solid #f0d68a;border-radius:10px;padding:7px 12px;margin-bottom:12px;cursor:pointer">
+        <input type="checkbox" id="userIncReg" onchange="renderUsers()" style="width:auto;margin:0">
+        거점(시군구) 미입력 회원을 <b>권역 기준으로 함께 보기</b>
+        <span style="font-weight:600;color:#8a6d1b">— 켜면 같은 권역의 모든 시도에 중복 표시됩니다 (예: 경상 → 부산·대구·울산·경북·경남)</span>
+      </label>
       <div id="auditBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:16px"></div>
       <div class="board" id="userList"><div class="bempty">불러오는 중…</div></div></div>
     <div id="v5" style="display:none">
@@ -604,10 +609,17 @@ async function setRegionAdmin(uid){
     alert('지정 완료. '+v.name+' 님에게 '+[wantAssign?'region.html':'',S?'license.html':''].filter(Boolean).join(' · ')+' 주소를 안내하세요.');loadUsers();
   }catch(e){alert('실패: '+e.message+'\n(권한 부여는 오너 계정만 가능합니다 — 규칙 파일의 owner 설정 안내 참고)')}
 }
-async function approveDegree(uid){
+async function approveDegree(uid,on){
   const u=USERS.find(x=>x.id===uid);if(!u)return;
-  if(!confirm(u.data().name+' 님의 학위('+(u.data().degree||'')+') 증빙을 확인·승인할까요?'))return;
-  await DB.collection('users').doc(uid).update({degreeApproved:true});
+  const v=u.data();
+  if(on===0){
+    if(!confirm('['+v.name+'] 학위 승인을 취소할까요?'))return;
+    await DB.collection('users').doc(uid).update({degreeApproved:false});loadUsers();return;
+  }
+  const noDoc=!v.degreeDoc;
+  if(!confirm(v.name+' 님의 학위('+(v.degree||'')+')를 승인할까요?'
+    +(noDoc?'\n\n⚠ 증빙 파일이 첨부되어 있지 않습니다. 사무국이 별도 경로(메일·현장 제출 등)로 확인한 경우에만 승인하세요.':'')))return;
+  await DB.collection('users').doc(uid).update({degreeApproved:true,degreeApprovedAt:firebase.firestore.FieldValue.serverTimestamp()});
   loadUsers();
 }
 async function setCity(id){
@@ -1107,9 +1119,8 @@ function uMatch(v){
   const sido=(document.getElementById('userSido')||{}).value||'';
   const hasReg=!!(v.region||(v.activityRegions&&v.activityRegions.length));
   if(sido==='__none'){
-    // 시군구(baseCity)는 없지만 권역(region/activityRegions)은 확인된 회원 — 시도 필터엔 안 걸리지만 미분류는 아님
+    // 거점(시군구) 미입력 회원 전체 — 관리자가 직접 채워 넣을 대상
     if(String(v.baseCity||'').trim()!=='')return false;
-    if(!hasReg)return false;
   }else if(sido==='__unclass'){
     // 시군구도 권역도 전혀 확인 안 된, 진짜 미분류 회원
     if(String(v.baseCity||'').trim()!=='')return false;
@@ -1118,8 +1129,10 @@ function uMatch(v){
     const c=String(v.baseCity||'');
     const hit=(SIDO_ALIAS[sido]||[sido]).some(a=>c.indexOf(a)===0);
     if(!hit){
-      // 거점(baseCity) 미입력 회원은 프로필에 등록된 권역(region)·활동가능권역(activityRegions)으로 보정 매칭
-      // (예전엔 강원·제주만 보정했으나, 거점 미입력자가 시도 필터에서 통째로 안 보이는 문제라 전 권역으로 확장)
+      // 거점(baseCity) 미입력 회원의 권역 보정 매칭 — 기본 OFF
+      // ※ 켜면 같은 권역의 모든 시도에 중복 노출됨(예: 경상 → 부산·대구·울산·경북·경남에 동시 표시)
+      const inc=(document.getElementById('userIncReg')||{}).checked;
+      if(!inc)return false;
       const reg=SIDO2REG[sido];
       const regHit=(c==='')&&reg&&(v.region===reg||((v.activityRegions||[]).indexOf(reg)>=0));
       if(!regHit)return false;
@@ -1464,6 +1477,12 @@ function viewCompContractAdmin(uid,compId){
 }
 function renderUsers(){
   const el=document.getElementById('userList');
+  // 시도 필터 선택 시에만 '권역 보정 포함' 옵션 노출
+  (function(){
+    const sv=(document.getElementById('userSido')||{}).value||'';
+    const w=document.getElementById('userIncRegWrap');
+    if(w)w.style.display=(sv&&sv!=='__none'&&sv!=='__unclass')?'flex':'none';
+  })();
   const docs=USERS.filter(d=>uMatch(d.data()));
   const uc=document.getElementById('userCount');
   if(uc)uc.textContent=docs.length+'명'+(docs.length!==USERS.length?' (전체 '+USERS.length+'명 중)':'');
@@ -1472,13 +1491,16 @@ function renderUsers(){
   if(VIEWMODE==='table'){el.innerHTML=renderRoster(docs);axFilter();return}
   el.innerHTML=docs.map(d=>{
     const v=d.data(),lv=lvOf(v.points||0);
-    return '<div class="urow"><div class="grow"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span>'+(v.withdrawReq?' <span style="font-size:11px;font-weight:900;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px">🚪 탈퇴 요청</span>':'')
-      +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+(v.gender?' · '+esc(v.gender):'')+(v.birth?' · '+esc(v.birth):'')+(v.baseCity?' · <b style="color:#1F4E9C">📍'+esc(v.baseCity)+'</b>':' · <span style="font-size:11px;color:#C41E2F;font-weight:800">시군구 미입력</span>')+((v.activityRegions&&v.activityRegions.length)?' <span style="font-size:11px;font-weight:800;color:#0f766e">🗺활동가능: '+esc(v.activityRegions.join('·'))+'</span>':'')+(v.phone?' · '+esc(v.phone):'')+(v.bank?' · <b style="color:#b8860b">💳'+esc(v.bank)+' '+esc(v.accountNum||'')+' ('+esc(v.accountHolder||'')+')</b>':'')+' · '+(v.edu2026?('연수이수 '+(inRoster(v.name)?'<b style="color:#0f766e">✓명단확인</b>':'<b style="color:#C41E2F">⚠명단에없음</b>')):'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+((v.instructorFor&&v.instructorFor.referee)?' · <b style="color:#7c3aed">심판요원 지원</b>':'')+((v.instructorFor&&v.instructorFor.staff)?' · <b style="color:#b8860b">운영요원 지원</b>':'')+'</div>'
+    return '<div class="urow"><div class="grow"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span>'
+      +(v.org?' '+orgChip(v.org,v.region,v.orgTitle,v.fedName):'')+(v.withdrawReq?' <span style="font-size:11px;font-weight:900;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px">🚪 탈퇴 요청</span>':'')
+      +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+(v.gender?' · '+esc(v.gender):'')+(v.birth?' · '+esc(v.birth):'')+(v.baseCity?' · <b style="color:#1F4E9C">📍'+esc(v.baseCity)+'</b>':' · <span style="font-size:11px;color:#C41E2F;font-weight:800">시군구 미입력</span>')+((v.activityRegions&&v.activityRegions.length)?' <span style="font-size:11px;font-weight:800;color:#0f766e">🗺활동가능: '+esc(v.activityRegions.length>=6?'전국 (전 권역)':v.activityRegions.join('·'))+'</span>':'')+(v.phone?' · '+esc(v.phone):'')+(v.bank?' · <b style="color:#b8860b">💳'+esc(v.bank)+' '+esc(v.accountNum||'')+' ('+esc(v.accountHolder||'')+')</b>':'')+' · '+(v.edu2026?('연수이수 '+(inRoster(v.name)?'<b style="color:#0f766e">✓명단확인</b>':'<b style="color:#C41E2F">⚠명단에없음</b>')):'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+((v.instructorFor&&v.instructorFor.referee)?' · <b style="color:#7c3aed">심판요원 지원</b>':'')+((v.instructorFor&&v.instructorFor.staff)?' · <b style="color:#b8860b">운영요원 지원</b>':'')+'</div>'
       +((v.affiliation&&v.affiliation.length)||(v.quals&&(v.quals.leader||v.quals.referee||v.quals.youth))||(v.qualDocs&&v.qualDocs.length)||v.degree
         ?'<div class="sub3" style="margin-top:3px">프로필: '
           +((v.affiliation&&v.affiliation.length)?'🏷 '+esc(v.affiliation.join('·')):'')
           +((v.quals&&(v.quals.leader||v.quals.referee||v.quals.youth))?' · 🎖 '+esc([v.quals.leader,v.quals.referee,v.quals.youth?'유소년지도사':''].filter(Boolean).join('·')):'')
-          +(v.degree?' · 🎓 '+esc(v.degree)+(v.degreeDoc?' <a href="'+v.degreeDoc+'" target="_blank" style="color:#153A77;font-weight:800">📎증빙</a> '+(v.degreeApproved?'<b style="color:#0f766e">✓승인</b>':'<button class="btn-sub" style="background:#b8860b;padding:2px 8px;font-size:11px" onclick="approveDegree(\''+d.id+'\')">학위 승인</button>'):' <b style="color:#C41E2F">(증빙 없음)</b>'):'')
+          +(v.degree?' · 🎓 '+esc(v.degree)
+            +(v.degreeDoc?' <a href="'+v.degreeDoc+'" target="_blank" style="color:#153A77;font-weight:800">📎증빙</a>':' <b style="color:#C41E2F">(증빙 없음)</b>')
+            +' '+(v.degreeApproved?'<b style="color:#0f766e">✓학위승인</b> <button class="btn-sub" style="background:#8a919d;padding:2px 8px;font-size:11px" onclick="approveDegree(\''+d.id+'\',0)">승인취소</button>':'<button class="btn-sub" style="background:#b8860b;padding:2px 8px;font-size:11px" onclick="approveDegree(\''+d.id+'\',1)">학위 승인</button>'):'')
           +((v.qualDocs&&v.qualDocs.length)?' · '+v.qualDocs.map((u,i)=>'<a href="'+u+'" target="_blank" style="color:#153A77;font-weight:800">📎자격증'+(i+1)+'</a>').join(' '):'')
         +'</div>':'')
       +'<div class="sub3" style="margin-top:3px">위촉검증: '

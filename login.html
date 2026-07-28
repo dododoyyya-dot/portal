@@ -51,7 +51,7 @@
         <a href="safety.html">안전교육 이수</a>
         <a href="mypage.html">마이페이지</a>
       </div></div>
-    <div><a href="community.html" class="top">커뮤니티</a></div>
+    
     <div><a href="notice.html" class="top">알림마당</a>
       <div class="drop">
         <a href="notice.html">공지사항 · 공고</a>
@@ -129,10 +129,43 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
       <button id="tabS" onclick="mode('S')">회원가입</button>
     </div>
     <div id="fS" style="display:none">
-      <label>이름 (실명)</label><input id="sName" placeholder="홍길동">
-      <label>휴대전화 (배정·위촉 연락용)</label><input id="sPhone" placeholder="010-0000-0000">
-      <label>활동 권역</label>
+      <div style="background:#eef3fa;border:1.5px solid #d4e0f2;border-radius:10px;padding:11px 14px;font-size:12.5px;font-weight:700;color:#153A77;margin-bottom:4px">
+        아래 항목은 강습 배정·위촉·정산에 사용되는 <b>필수 정보</b>입니다. 자격증·학위 등은 가입 후 마이페이지에서 등록하시면 됩니다.
+      </div>
+      <label>이름 (실명) <span style="color:#C41E2F">*</span></label><input id="sName" placeholder="홍길동">
+      <label>휴대전화 (배정·위촉 연락용) <span style="color:#C41E2F">*</span></label><input id="sPhone" placeholder="010-0000-0000">
+      <div style="display:flex;gap:10px">
+        <div style="flex:1"><label>성별 <span style="color:#C41E2F">*</span></label>
+          <select id="sGender"><option value="">선택</option><option>남</option><option>여</option></select></div>
+        <div style="flex:1.3"><label>생년월일 <span style="color:#C41E2F">*</span></label>
+          <input id="sBirth" type="date"></div>
+      </div>
+      <label>거주·활동 거점 <span style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:12px">— 강습 학교 배정 기준</span></label>
+      <div style="display:flex;gap:10px">
+        <select id="sSido" style="flex:1" onchange="syncRegion()">
+          <option value="">시·도 선택</option>
+          <option>서울특별시</option><option>인천광역시</option><option>경기도</option>
+          <option>강원특별자치도</option><option>대전광역시</option><option>세종특별자치시</option>
+          <option>충청북도</option><option>충청남도</option><option>광주광역시</option>
+          <option>전북특별자치도</option><option>전라남도</option><option>부산광역시</option>
+          <option>대구광역시</option><option>울산광역시</option><option>경상북도</option>
+          <option>경상남도</option><option>제주특별자치도</option>
+        </select>
+        <input id="sGu" style="flex:1" placeholder="시·군·구 (예: 해운대구)">
+      </div>
+      <label>활동 권역 <span style="font-weight:600;color:var(--gray);font-size:12px">— 거점 선택 시 자동</span></label>
       <select id="sRegion"><option>서울·경기</option><option>강원</option><option>충청</option><option>전라</option><option>경상</option><option>제주</option></select>
+      <label>소속 <span style="color:#C41E2F">*</span></label>
+      <select id="sAff" onchange="syncAff()">
+        <option value="">선택</option>
+        <option>초·중·고 교사</option>
+        <option>초등스포츠강사</option>
+        <option>시도연맹</option>
+        <option>기타</option>
+        <option>소속 없음</option>
+      </select>
+      <div id="sWorkWrap" style="display:none"><label>근무지 (학교·기관명) <span style="color:#C41E2F">*</span></label><input id="sWork" placeholder="예: 부산신남초등학교"></div>
+      <div id="sEtcWrap" style="display:none"><label>소속 직접 입력 <span style="color:#C41E2F">*</span></label><input id="sAffEtc" placeholder="예: ○○클럽, 프리랜서"></div>
       <label>2026 자율연수 이수 여부</label>
       <select id="sEdu"><option value="y">이수 (🎓뱃지 + 50P + 이수증 발급)</option><option value="n">미이수</option></select>
     </div>
@@ -154,6 +187,16 @@ function mode(m){M=m;
   document.getElementById('goBtn').textContent=m==='L'?'로그인':'가입 신청';
 }
 function say(t,ok){const e=document.getElementById('aMsg');e.textContent=t;e.className='msg '+(ok?'ok':'err')}
+const SIDO2REG={'서울특별시':'서울·경기','인천광역시':'서울·경기','경기도':'서울·경기','강원특별자치도':'강원','대전광역시':'충청','세종특별자치시':'충청','충청북도':'충청','충청남도':'충청','광주광역시':'전라','전북특별자치도':'전라','전라남도':'전라','부산광역시':'경상','대구광역시':'경상','울산광역시':'경상','경상북도':'경상','경상남도':'경상','제주특별자치도':'제주'};
+function syncRegion(){
+  const v=document.getElementById('sSido').value;
+  if(SIDO2REG[v])document.getElementById('sRegion').value=SIDO2REG[v];
+}
+function syncAff(){
+  const v=document.getElementById('sAff').value;
+  document.getElementById('sWorkWrap').style.display=(v==='초·중·고 교사'||v==='초등스포츠강사')?'block':'none';
+  document.getElementById('sEtcWrap').style.display=(v==='기타')?'block':'none';
+}
 async function go(){
   const email=document.getElementById('aEmail').value.trim(), pw=document.getElementById('aPw').value;
   if(!email||!pw)return say('이메일과 비밀번호를 입력하세요');
@@ -164,8 +207,22 @@ async function go(){
     }else{
       const name=document.getElementById('sName').value.trim();
       const phone=document.getElementById('sPhone').value.trim();
-      if(!/^01[016789][-. ]?\d{3,4}[-. ]?\d{4}$/.test(phone)){say('휴대전화 번호를 확인해주세요 (예: 010-1234-5678)');return}
       if(!name)return say('이름을 입력하세요');
+      if(!/^01[016789][-. ]?\d{3,4}[-. ]?\d{4}$/.test(phone)){say('휴대전화 번호를 확인해주세요 (예: 010-1234-5678)');return}
+      const gender=document.getElementById('sGender').value;
+      const birth=document.getElementById('sBirth').value;
+      const sido=document.getElementById('sSido').value;
+      const gu=document.getElementById('sGu').value.trim();
+      const aff=document.getElementById('sAff').value;
+      const work=document.getElementById('sWork').value.trim();
+      const affEtc=document.getElementById('sAffEtc').value.trim();
+      if(!gender)return say('성별을 선택해주세요');
+      if(!birth)return say('생년월일을 입력해주세요');
+      if(!sido)return say('거점 시·도를 선택해주세요 — 강습 배정에 꼭 필요합니다');
+      if(!gu)return say('거점 시·군·구를 입력해주세요 (예: 해운대구)');
+      if(!aff)return say('소속을 선택해주세요');
+      if((aff==='초·중·고 교사'||aff==='초등스포츠강사')&&!work)return say('근무지(학교·기관명)를 입력해주세요');
+      if(aff==='기타'&&!affEtc)return say('소속을 직접 입력해주세요');
       const pnorm=phone.replace(/[^0-9]/g,'');
       if(pnorm.length<10){say('휴대전화 번호를 정확히 입력해주세요');return}
       try{
@@ -176,7 +233,12 @@ async function go(){
       await DB.collection('users').doc(cred.user.uid).set({
         name:name, email:email,
         phone:phone,
+        gender:gender, birth:birth,
+        baseCity:sido+' '+gu,
         region:document.getElementById('sRegion').value,
+        activityRegions:[document.getElementById('sRegion').value],
+        affiliation:[aff==='기타'?affEtc:aff],
+        workSchool:work,
         edu2026:document.getElementById('sEdu').value==='y',
         role:'member', status:'pending', points:0,
         createdAt:firebase.firestore.FieldValue.serverTimestamp()

@@ -51,7 +51,7 @@
         <a href="safety.html">안전교육 이수</a>
         <a href="mypage.html">마이페이지</a>
       </div></div>
-    <div><a href="community.html" class="top">커뮤니티</a></div>
+    
     <div><a href="notice.html" class="top">알림마당</a>
       <div class="drop">
         <a href="notice.html">공지사항 · 공고</a>
@@ -231,9 +231,29 @@ function renderApply(){
     b.style.background=f[x[1]]?'#0f766e':'';
   });
 }
+function jMissing(d){
+  d=d||{};const miss=[];
+  if(!d.phone)miss.push('휴대전화');
+  if(!d.gender)miss.push('성별');
+  if(!d.birth)miss.push('생년월일');
+  if(!d.baseCity)miss.push('거점 시·군·구');
+  if(!d.address||!d.addrDetail)miss.push('집 주소(상세주소 포함)');
+  if(!(d.activityRegions&&d.activityRegions.length))miss.push('활동 가능 범위');
+  if(!(d.affiliation&&d.affiliation.length))miss.push('소속');
+  return miss;
+}
 async function toggleApply(k){
   try{
     const f=Object.assign({},JMY.instructorFor||{});
+    // 지원 취소가 아닌 '신규 지원'일 때만 프로필 완성 검사
+    if(!f[k]){
+      const miss=jMissing(JMY);
+      if(miss.length){
+        alert('지원 전에 프로필을 완성해 주세요.\n\n미입력 항목:\n· '+miss.join('\n· ')
+          +'\n\n배정·위촉·물품 발송에 반드시 필요한 정보입니다.\n[확인]을 누르면 프로필 작성 화면으로 이동합니다.');
+        location.href='mypage.html#profileBox';return;
+      }
+    }
     if(!f[k]&&k==='school'&&!confirm('체육지도자(전문·생활·유소년) 또는 연맹 지도자 자격을 보유하고 계십니까?\n배정 확정 시 자격증 확인이 진행됩니다.'))return;
     if(!f[k]&&k==='after'&&!confirm('체육지도자 또는 연맹 지도자 자격을 보유하고 계십니까?\n배정 확정 시 자격증 확인이 진행됩니다.'))return;
     if(!f[k]&&k==='referee'&&!confirm('연맹 심판 자격증을 보유하고 계십니까?\n대회 배정 확정 시 자격증 확인이 진행됩니다.'))return;
