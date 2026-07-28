@@ -454,7 +454,10 @@ function aaRender(){
     }).join('');
   }else gr.style.display='none';
   const el=document.getElementById('aaSelRow');
-  el.innerHTML=AA.length?('<div style="font-size:12px;font-weight:800;color:#153A77;margin-bottom:5px">선택한 활동 범위 (순서 = 우선순위)</div><div style="display:flex;gap:5px;flex-wrap:wrap">'+AA.map((a,i)=>'<span style="display:inline-flex;align-items:center;gap:5px;background:#153A77;color:#fff;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px">'+(i+1)+'. '+a.s+' '+a.g+'<b style="cursor:pointer;opacity:.75" onclick="aaRm('+i+')">✕</b></span>').join('')+'</div>'):'<span style="font-size:12.5px;color:#C41E2F;font-weight:700">아직 선택된 활동 범위가 없습니다</span>';
+  el.innerHTML=AA.length?('<div style="font-size:12px;font-weight:800;color:#153A77;margin-bottom:5px">선택한 활동 범위 (순서 = 우선순위)</div><div style="display:flex;gap:5px;flex-wrap:wrap">'+AA.map((a,i)=>'<span style="display:inline-flex;align-items:center;gap:5px;background:#153A77;color:#fff;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px">'+(i+1)+'. '+a.s+' '+a.g+'<b style="cursor:pointer;opacity:.75" onclick="aaRm('+i+')">✕</b></span>').join('')+'</div>'
+    +'<div style="font-size:12px;font-weight:800;color:#0f766e;margin-top:7px">🚩 권역 자동 분류: '+[...new Set(AA.map(a=>AA_REG[a.s]))].join(' · ')+' <span style="font-weight:600;color:var(--gray)">— 강습 배정·대회는 이 권역 기준으로 처리됩니다</span></div>'):(window._AA_LEGACY
+      ?'<div style="background:#fff7e0;border:1.5px solid #e6b422;border-radius:9px;padding:9px 12px;font-size:12.5px"><b style="color:#8a6d1a">기존 설정 유지 중:</b> <b>'+window._AA_LEGACY.join(' · ')+'</b> 권역으로 등록되어 있습니다.<br>방식이 시군구 선택으로 바뀌었어요 — 위에서 시군구를 새로 선택해 주세요. <b>새로 선택하기 전까지는 저장해도 기존 권역 설정이 그대로 유지됩니다.</b></div>'
+      :'<span style="font-size:12.5px;color:#C41E2F;font-weight:700">아직 선택된 활동 범위가 없습니다</span>');
   aaMapDraw();
 }
 // ── 시군구 경계 지도 (행정경계 GeoJSON을 CDN에서 로드, 클릭 = 선택 토글) ──
@@ -540,8 +543,8 @@ function aaTog(sd,g){
   AA.push({s:sd,g:g});aaRender();
 }
 function aaRm(i){AA.splice(i,1);aaRender();}
-function aaSave(){return AA.map(a=>AA_FULL[a.s]+' '+a.g)}
-function aaRegions(){return [...new Set(AA.map(a=>AA_REG[a.s]))]}
+function aaSave(){if(!AA.length)return (MYD&&MYD.activityAreas)||[];return AA.map(a=>AA_FULL[a.s]+' '+a.g)}
+function aaRegions(){if(!AA.length)return (MYD&&MYD.activityRegions)||[];return [...new Set(AA.map(a=>AA_REG[a.s]))]}
 function aaBase(){if(!AA.length)return '';const a=AA[0];return AA_FULL[a.s]+(a.g==='전지역'?'':' '+a.g)}
 function aaLoad(d){
   AA=[];
@@ -557,6 +560,7 @@ function aaLoad(d){
     if(bc){const sp=bc.split(' ');let short='';for(const k in AA_FULL){if(sp[0]===AA_FULL[k]||sp[0].indexOf(k)===0){short=k;break}}
       if(short)AA.push({s:short,g:sp.slice(1).join(' ')||'전지역'});}
   }
+  window._AA_LEGACY=(!AA.length&&d.activityRegions&&d.activityRegions.length)?d.activityRegions:null;
   AA_CUR='';aaRender();
 }
 function fillProfile(d){
