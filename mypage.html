@@ -318,6 +318,11 @@ function orgChip(o,region,title,fed){
         <label style="font-size:12px;font-weight:800">계좌번호</label>
         <input id="pfAccNum" inputmode="numeric" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px" placeholder="- 없이 숫자만 입력">
       </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px dashed #cfe3d8">
+        <label style="font-size:12px;font-weight:800">주민등록번호 <span style="font-weight:600;color:var(--gray);font-size:11px">— 강사비·심판비 지급(원천징수 신고) 및 행사 단체보험 가입에만 사용</span></label>
+        <input id="pfRrn" inputmode="numeric" maxlength="14" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px" placeholder="000000-0000000">
+        <div id="pfRrnState" style="font-size:11.5px;color:var(--gray);margin-top:4px">🔒 일반 회원정보와 분리된 보안 영역에 저장되며, 본인과 중앙 사무국만 열람할 수 있습니다. (소득세법상 원천징수 목적 수집)</div>
+      </div>
     </div>
 
     <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
@@ -608,6 +613,15 @@ function fillProfile(d){
   document.getElementById('pfCareer').value=d.career||'';
   // 활동 가능 범위
   try{aaLoad(d)}catch(e){console.warn('aa',e)}
+  // 주민번호 등록 여부 (별도 보안 컬렉션)
+  try{
+    DB.collection('privateInfo').doc(AUTH.currentUser.uid).get().then(pd=>{
+      if(pd.exists&&pd.data().rrn){
+        document.getElementById('pfRrn').placeholder='●●●●●●-●●●●●●●  (등록 완료 — 변경할 때만 다시 입력)';
+        document.getElementById('pfRrnState').innerHTML='✅ <b style="color:#0f766e">주민등록번호 등록 완료.</b> 변경이 필요할 때만 다시 입력하세요. 🔒 본인과 중앙 사무국만 열람 가능합니다.';
+      }
+    }).catch(()=>{});
+  }catch(e){}
   if(d.address)pfCollapse(d);
   document.getElementById('pfSize').value=d.clothingSize||'';
   document.getElementById('pfAddr').value=d.address||'';
@@ -739,6 +753,18 @@ async function saveProfile(){
     };
     if(df&&MYD.degreeDoc!==degDoc)upd.degreeApproved=false; // 새 증빙 첨부 시 재확인 대상
     await DB.collection('users').doc(AUTH.currentUser.uid).update(upd);
+    // 주민등록번호 — 별도 보안 컬렉션 저장 (입력했을 때만)
+    const rrnRaw=document.getElementById('pfRrn').value.replace(/[^0-9]/g,'');
+    if(rrnRaw){
+      if(rrnRaw.length!==13){m.textContent='⚠ 주민등록번호는 13자리입니다 (000000-0000000)';m.style.color='#8c1622';PFBUSY=false;return}
+      await DB.collection('privateInfo').doc(AUTH.currentUser.uid).set({
+        rrn:rrnRaw.slice(0,6)+'-'+rrnRaw.slice(6),name:MYD.name||'',
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+      },{merge:true}).catch(e=>{console.warn('rrn',e)});
+      document.getElementById('pfRrn').value='';
+      document.getElementById('pfRrn').placeholder='●●●●●●-●●●●●●●  (등록 완료 — 변경할 때만 다시 입력)';
+      document.getElementById('pfRrnState').innerHTML='✅ <b style="color:#0f766e">주민등록번호 등록 완료.</b> 🔒 본인과 중앙 사무국만 열람 가능합니다.';
+    }
     Object.assign(MYD,upd);
     document.getElementById('pfDocs').value='';document.getElementById('pfDegDoc').value='';
     renderDocList(docs);fillProfile(MYD);
