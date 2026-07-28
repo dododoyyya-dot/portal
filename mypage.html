@@ -195,7 +195,11 @@ function orgChip(o,region,title,fed){
     </div>
     <div style="margin-top:14px">
       <label style="font-size:13px;font-weight:800;color:#8c1622">집 주소 (필수) <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 피복·자격증·상장 등 물품 발송에 사용됩니다</span></label>
-      <input id="pfAddr" placeholder="도로명 주소로 입력해 주세요 (예: 경기도 김포시 김포대로 1185, ○동 ○호)" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <input id="pfZip" readonly placeholder="우편번호" style="width:120px;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;background:#f7f7f8;color:var(--gray)">
+        <button type="button" onclick="openPostcode()" style="flex-shrink:0;padding:9px 16px;border-radius:9px;border:1.5px solid #1F4E9C;background:#fff;color:#1F4E9C;font-weight:800;font-size:13.5px;cursor:pointer">🔍 주소 검색</button>
+      </div>
+      <input id="pfAddr" placeholder="위 [주소 검색]을 눌러 도로명 주소를 찾은 뒤, 뒤에 상세주소(○동 ○호)를 이어서 입력해 주세요" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:6px">
     </div>
 
     <!-- ② 소속 -->
@@ -634,7 +638,12 @@ function fillProfile(d){
   }catch(e){}
   if(d.address)pfCollapse(d);
   document.getElementById('pfSize').value=d.clothingSize||'';
-  document.getElementById('pfAddr').value=d.address||'';
+  (function(){
+    const full=d.address||'';
+    const m=full.match(/^\[(\d{5})\]\s*(.*)$/);
+    document.getElementById('pfZip').value=m?m[1]:'';
+    document.getElementById('pfAddr').value=m?m[2]:full;
+  })();
   document.getElementById('pfSizePants').value=d.sizePants||'';
   document.getElementById('pfSizeShoe').value=d.sizeShoe||'';
   document.getElementById('pfSizeCap').value=d.sizeCap||'';
@@ -666,6 +675,24 @@ function fillProfile(d){
 function renderDocList(urls){
   document.getElementById('pfDocList').innerHTML=urls.map((u,i)=>
     '<a href="'+u+'" target="_blank" style="display:inline-block;font-size:12px;font-weight:800;color:#153A77;background:#eef3fa;border:1px solid #d4e0f2;border-radius:8px;padding:6px 12px">📎 자격증 '+(i+1)+' 보기</a>').join('');
+}
+function openPostcode(){
+  function launch(){
+    new daum.Postcode({
+      oncomplete:function(data){
+        document.getElementById('pfZip').value=data.zonecode||'';
+        const addr=data.roadAddress||data.jibunAddress||data.address||'';
+        document.getElementById('pfAddr').value=addr+' ';
+        document.getElementById('pfAddr').focus();
+      }
+    }).open();
+  }
+  if(window.daum&&window.daum.Postcode){launch();return}
+  const sc=document.createElement('script');
+  sc.src='https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+  sc.onload=launch;
+  sc.onerror=function(){alert('우편번호 검색 서비스를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.')};
+  document.head.appendChild(sc);
 }
 let PFBUSY=false,PFMAP=null;
 function pfCollapse(d){
@@ -748,7 +775,7 @@ async function saveProfile(){
       quals:{leader:document.getElementById('pfLeader').value,referee:document.getElementById('pfRef').value,youth:document.getElementById('pfYouth').checked},
       career:document.getElementById('pfCareer').value.trim(),
       clothingSize:document.getElementById('pfSize').value,
-      address:document.getElementById('pfAddr').value.trim(),
+      address:((document.getElementById('pfZip').value.trim())?('['+document.getElementById('pfZip').value.trim()+'] '):'')+document.getElementById('pfAddr').value.trim(),
       sizePants:document.getElementById('pfSizePants').value,
       sizeShoe:document.getElementById('pfSizeShoe').value,
       sizeCap:document.getElementById('pfSizeCap').value,
