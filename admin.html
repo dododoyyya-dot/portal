@@ -470,9 +470,9 @@ function renderApps(){
 }
 // ── 문자 발송용 명단 복사 (이름[탭]전화) — 실제 발송은 별도 문자 서비스 ──
 function copyPhoneList(kind){
-  let list=[];
+  let list=[];const skipped=[];
   if(kind==='users'){
-    USERS.filter(d=>uMatch(d.data())).forEach(d=>{const v=d.data();if(v.phone)list.push((v.name||'')+'\t'+v.phone)});
+    USERS.filter(d=>uMatch(d.data())).forEach(d=>{const v=d.data();if(v.phone)list.push((v.name||'')+'\t'+v.phone);else skipped.push(v.name||'(이름없음)')});
   }else{
     const sido=(document.getElementById('appSido')||{}).value||'';
     const q=((document.getElementById('appSearch')||{}).value||'').trim().toLowerCase();
@@ -480,13 +480,13 @@ function copyPhoneList(kind){
       if(AFL!=='전체'&&appTypeOf(s).indexOf(AFL)<0)return;
       if(sido){const c=String(s.city||'');if(!(SIDO_ALIAS[sido]||[sido]).some(a=>c.indexOf(a)===0))return;}
       if(q){const hay=[s.school,s.city,s.teacher,s.code,s.region,s.assignedName].map(x=>String(x||'').toLowerCase()).join(' ');if(hay.indexOf(q)<0)return;}
-      if(s.phone)list.push((s.teacher||'')+'\t'+s.phone+'\t'+(s.school||''));
+      if(s.phone)list.push((s.teacher||'')+'\t'+s.phone+'\t'+(s.school||''));else skipped.push(s.teacher||s.school||'(이름없음)');
     });
   }
   const uniq=[...new Set(list)];
-  if(!uniq.length){alert('전화번호가 있는 대상이 없습니다.');return}
+  if(!uniq.length){alert('전화번호가 있는 대상이 없습니다.'+(skipped.length?('\n\n⚠ 전화번호 없어 제외된 '+skipped.length+'명: '+skipped.join(', ')):''));return}
   const text=uniq.join('\n');
-  function done(){alert('✓ '+uniq.length+'명 명단이 복사되었습니다. (이름[탭]전화)\n문자 발송 서비스나 엑셀에 붙여넣으세요.\n\n※ 홈페이지에서는 문자를 직접 발송하지 않습니다 — 별도 문자 서비스가 필요합니다.')}
+  function done(){alert('✓ '+uniq.length+'명 명단이 복사되었습니다. (이름[탭]전화)\n문자 발송 서비스나 엑셀에 붙여넣으세요.\n\n※ 홈페이지에서는 문자를 직접 발송하지 않습니다 — 별도 문자 서비스가 필요합니다.'+(skipped.length?('\n\n⚠ 전화번호가 없어 명단에서 조용히 빠진 '+skipped.length+'명 (별도 확인 필요): '+skipped.join(', ')):''))}
   if(navigator.clipboard){navigator.clipboard.writeText(text).then(done).catch(fb)}else fb();
   function fb(){const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done()}catch(e){alert('복사 실패')}document.body.removeChild(ta)}
 }
