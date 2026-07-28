@@ -130,7 +130,7 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
     </div>
     <div id="fS" style="display:none">
       <div style="background:#eef3fa;border:1.5px solid #d4e0f2;border-radius:10px;padding:11px 14px;font-size:12.5px;font-weight:700;color:#153A77;margin-bottom:4px">
-        아래 항목은 강습 배정·위촉·정산에 사용되는 <b>필수 정보</b>입니다. 자격증·학위 등은 가입 후 마이페이지에서 등록하시면 됩니다.
+        아래 항목은 마이페이지 프로필과 동일한 <b>필수 정보</b>입니다 (강습 배정·위촉·정산·물품 발송에 사용). 자격증·학위·경력·계좌 등은 가입 후 마이페이지에서 등록하시면 됩니다.
       </div>
       <label>이름 (실명) <span style="color:#C41E2F">*</span></label><input id="sName" placeholder="홍길동">
       <label>휴대전화 (배정·위촉 연락용) <span style="color:#C41E2F">*</span></label><input id="sPhone" placeholder="010-0000-0000">
@@ -140,32 +140,61 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
         <div style="flex:1.3"><label>생년월일 <span style="color:#C41E2F">*</span></label>
           <input id="sBirth" type="date"></div>
       </div>
-      <label>거주·활동 거점 <span style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:12px">— 강습 학교 배정 기준</span></label>
-      <div style="display:flex;gap:10px">
-        <select id="sSido" style="flex:1" onchange="syncRegion()">
-          <option value="">시·도 선택</option>
-          <option>서울특별시</option><option>인천광역시</option><option>경기도</option>
-          <option>강원특별자치도</option><option>대전광역시</option><option>세종특별자치시</option>
-          <option>충청북도</option><option>충청남도</option><option>광주광역시</option>
-          <option>전북특별자치도</option><option>전라남도</option><option>부산광역시</option>
-          <option>대구광역시</option><option>울산광역시</option><option>경상북도</option>
-          <option>경상남도</option><option>제주특별자치도</option>
-        </select>
-        <input id="sGu" style="flex:1" placeholder="시·군·구 (예: 해운대구)">
+
+      <label style="color:#8c1622">집 주소 <span style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 피복·자격증·상장 등 물품 발송에 사용됩니다</span></label>
+      <div style="display:flex;gap:6px">
+        <input id="sZip" readonly placeholder="우편번호" style="width:120px;background:#f7f7f8;color:var(--gray)">
+        <button type="button" onclick="openPostcodeS()" style="flex-shrink:0;padding:0 16px;border-radius:10px;border:1.5px solid #1F4E9C;background:#fff;color:#1F4E9C;font-weight:800;font-size:13.5px;cursor:pointer">🔍 주소 검색</button>
       </div>
-      <label>활동 권역 <span style="font-weight:600;color:var(--gray);font-size:12px">— 거점 선택 시 자동</span></label>
-      <select id="sRegion"><option>서울·경기</option><option>강원</option><option>충청</option><option>전라</option><option>경상</option><option>제주</option></select>
-      <label>소속 <span style="color:#C41E2F">*</span></label>
-      <select id="sAff" onchange="syncAff()">
-        <option value="">선택</option>
-        <option>초·중·고 교사</option>
-        <option>초등스포츠강사</option>
-        <option>시도연맹</option>
-        <option>기타</option>
-        <option>소속 없음</option>
-      </select>
-      <div id="sWorkWrap" style="display:none"><label>근무지 (학교·기관명) <span style="color:#C41E2F">*</span></label><input id="sWork" placeholder="예: 부산신남초등학교"></div>
-      <div id="sEtcWrap" style="display:none"><label>소속 직접 입력 <span style="color:#C41E2F">*</span></label><input id="sAffEtc" placeholder="예: ○○클럽, 프리랜서"></div>
+      <input id="sAddr" readonly placeholder="[주소 검색] 버튼을 눌러 도로명 주소를 찾아주세요" style="background:#f7f7f8">
+      <input id="sAddr2" placeholder="상세주소 (필수) — 예: 101동 1203호 / 2층">
+      <div style="font-size:11.5px;color:#8c1622;font-weight:700;margin-top:5px">※ 상세주소(동·호수)가 없으면 우편물이 반송됩니다. 단독주택 등 해당 없으면 「해당없음」이라고 적어주세요.</div>
+
+      <div style="margin-top:16px;padding:14px 16px;background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:12px">
+        <label style="margin:0;font-size:13.5px;font-weight:800;color:#0f766e">📍 활동 가능 범위 <span style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 강습(수업) 배정에 사용됩니다</span></label>
+        <div style="font-size:12px;color:var(--gray);margin-top:4px">실제로 이동해서 수업·활동이 가능한 지역을 선택하세요. <b>시도를 누르면 시군구가 열립니다.</b> 시군구 복수 선택 가능, 최대 4개 시도까지. 먼저 선택한 지역이 우선 배정 검토됩니다.</div>
+        <div id="aaSidoRow" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:10px"></div>
+        <div id="aaSggRow" style="display:none;flex-wrap:wrap;gap:5px;margin-top:8px;padding:10px;background:#fff;border:1px solid #dbe8e0;border-radius:9px"></div>
+        <div id="aaSelRow" style="margin-top:10px"></div>
+        <div id="aaMap" style="max-width:300px;margin:12px auto 0"></div>
+      </div>
+
+      <label>소속 (중복 선택 가능) <span style="color:#C41E2F">*</span></label>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:13.5px;align-items:center">
+        <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="sAf1" style="width:auto" onchange="syncAffS()">시도연맹 (KFDF)</label>
+        <select id="sAfFed" style="display:none;padding:7px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px">
+          <option value="">소속 연맹 선택</option>
+          <option value="없음">없음 (미가입)</option>
+          <option>경기연맹</option><option>강원연맹</option><option>대전연맹</option><option>부산연맹</option><option>대구연맹</option><option>울산연맹</option><option>경남연맹</option><option>경북연맹</option><option>전남광주연맹</option><option>제주연맹</option><option>기타</option>
+        </select>
+        <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="sAf2" style="width:auto" onchange="syncAffS()">교사 (교원)</label>
+        <select id="sTeachLv" style="display:none;padding:7px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px">
+          <option value="">학교급 선택</option><option>초등</option><option>중등</option><option>고등</option>
+        </select>
+        <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="sAf3" style="width:auto" onchange="syncAffS()">초등스포츠강사 (교육청 소속)</label>
+        <label style="display:flex;gap:6px;align-items:center;font-weight:600;color:#6b7280"><input type="checkbox" id="sAf0" style="width:auto">소속 없음</label>
+        <input id="sAfEtc" placeholder="기타 소속 직접 입력 (예: 클럽, 협회, 프리랜서)" style="flex:1;min-width:160px;padding:7px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px">
+      </div>
+      <div id="sWorkWrap" style="display:none;margin-top:8px">
+        <label style="font-size:12.5px;font-weight:800">근무지 (학교·기관명) <span style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 배정·매칭 검토에 사용됩니다</span></label>
+        <input id="sWork" placeholder="예: 부산신남초등학교">
+      </div>
+
+      <div style="margin-top:14px;max-width:340px">
+        <label style="font-size:13px;font-weight:800">학력 확인 (체육 전공) <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 증빙 첨부는 가입 후 마이페이지에서</span></label>
+        <select id="sDegree"><option value="">해당 없음</option><option>체육 전문학사</option><option>체육학사</option><option>체육석사</option><option>체육박사</option></select>
+      </div>
+
+      <div style="margin-top:16px;padding:14px 16px;background:#fbf7f0;border:1.5px solid #e8dcc8;border-radius:12px">
+        <label style="margin:0;font-size:13.5px;font-weight:800;color:#8a6d1f">👕 피복 사이즈 <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 활동복·조끼·모자 등 지급용, 나중에 입력해도 됩니다</span></label>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:8px">
+          <select id="sSize"><option value="">상의</option><option>S (90)</option><option>M (95)</option><option>L (100)</option><option>XL (105)</option><option>2XL (110)</option><option>3XL (115)</option></select>
+          <select id="sSizePants"><option value="">하의(허리)</option><option>26</option><option>28</option><option>30</option><option>32</option><option>34</option><option>36</option><option>38</option><option>40</option></select>
+          <select id="sSizeShoe"><option value="">신발(mm)</option><option>220</option><option>230</option><option>240</option><option>250</option><option>260</option><option>270</option><option>280</option><option>290</option></select>
+          <select id="sSizeCap"><option value="">모자</option><option>성인</option><option>아동</option></select>
+        </div>
+      </div>
+
       <label>2026 자율연수 이수 여부</label>
       <select id="sEdu"><option value="y">이수 (🎓뱃지 + 50P + 이수증 발급)</option><option value="n">미이수</option></select>
     </div>
@@ -185,18 +214,188 @@ function mode(m){M=m;
   document.getElementById('tabS').classList.toggle('on',m==='S');
   document.getElementById('fS').style.display=m==='S'?'block':'none';
   document.getElementById('goBtn').textContent=m==='L'?'로그인':'가입 신청';
+  if(m==='S')aaRender();
 }
 function say(t,ok){const e=document.getElementById('aMsg');e.textContent=t;e.className='msg '+(ok?'ok':'err')}
-const SIDO2REG={'서울특별시':'서울·경기','인천광역시':'서울·경기','경기도':'서울·경기','강원특별자치도':'강원','대전광역시':'충청','세종특별자치시':'충청','충청북도':'충청','충청남도':'충청','광주광역시':'전라','전북특별자치도':'전라','전라남도':'전라','부산광역시':'경상','대구광역시':'경상','울산광역시':'경상','경상북도':'경상','경상남도':'경상','제주특별자치도':'제주'};
-function syncRegion(){
-  const v=document.getElementById('sSido').value;
-  if(SIDO2REG[v])document.getElementById('sRegion').value=SIDO2REG[v];
+function syncAffS(){
+  document.getElementById('sAfFed').style.display=document.getElementById('sAf1').checked?'block':'none';
+  document.getElementById('sTeachLv').style.display=document.getElementById('sAf2').checked?'block':'none';
+  document.getElementById('sWorkWrap').style.display=(document.getElementById('sAf2').checked||document.getElementById('sAf3').checked)?'block':'none';
 }
-function syncAff(){
-  const v=document.getElementById('sAff').value;
-  document.getElementById('sWorkWrap').style.display=(v==='초·중·고 교사'||v==='초등스포츠강사')?'block':'none';
-  document.getElementById('sEtcWrap').style.display=(v==='기타')?'block':'none';
+function openPostcodeS(){
+  function launch(){
+    new daum.Postcode({
+      oncomplete:function(data){
+        document.getElementById('sZip').value=data.zonecode||'';
+        const addr=data.roadAddress||data.jibunAddress||data.address||'';
+        document.getElementById('sAddr').value=addr;
+        document.getElementById('sAddr2').focus();
+      }
+    }).open();
+  }
+  if(window.daum&&window.daum.Postcode){launch();return}
+  const sc=document.createElement('script');
+  sc.src='https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+  sc.onload=launch;
+  sc.onerror=function(){alert('우편번호 검색 서비스를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.')};
+  document.head.appendChild(sc);
 }
+// ══ 활동 가능 범위 (시도→시군구 구조화 선택, 마이페이지와 동일 구성) ══
+const AA_FULL={'서울':'서울특별시','부산':'부산광역시','대구':'대구광역시','인천':'인천광역시','광주':'광주광역시','대전':'대전광역시','울산':'울산광역시','세종':'세종특별자치시','경기':'경기도','강원':'강원특별자치도','충북':'충청북도','충남':'충청남도','전북':'전북특별자치도','전남':'전라남도','경북':'경상북도','경남':'경상남도','제주':'제주특별자치도'};
+const AA_REG={'서울':'서울·경기','인천':'서울·경기','경기':'서울·경기','강원':'강원','대전':'충청','세종':'충청','충북':'충청','충남':'충청','광주':'전라','전북':'전라','전남':'전라','부산':'경상','대구':'경상','울산':'경상','경북':'경상','경남':'경상','제주':'제주'};
+const AA_SGG={
+'서울':['종로구','중구','용산구','성동구','광진구','동대문구','중랑구','성북구','강북구','도봉구','노원구','은평구','서대문구','마포구','양천구','강서구','구로구','금천구','영등포구','동작구','관악구','서초구','강남구','송파구','강동구'],
+'부산':['중구','서구','동구','영도구','부산진구','동래구','남구','북구','해운대구','사하구','금정구','강서구','연제구','수영구','사상구','기장군'],
+'대구':['중구','동구','서구','남구','북구','수성구','달서구','달성군','군위군'],
+'인천':['중구','동구','미추홀구','연수구','남동구','부평구','계양구','서구','강화군','옹진군'],
+'광주':['동구','서구','남구','북구','광산구'],
+'대전':['동구','중구','서구','유성구','대덕구'],
+'울산':['중구','남구','동구','북구','울주군'],
+'세종':['세종시'],
+'경기':['수원시','고양시','용인시','성남시','부천시','안산시','화성시','안양시','평택시','시흥시','김포시','광명시','광주시','군포시','하남시','오산시','이천시','안성시','의왕시','양평군','여주시','과천시','구리시','남양주시','파주시','의정부시','양주시','동두천시','포천시','가평군','연천군'],
+'강원':['춘천시','원주시','강릉시','동해시','태백시','속초시','삼척시','홍천군','횡성군','영월군','평창군','정선군','철원군','화천군','양구군','인제군','고성군','양양군'],
+'충북':['청주시','충주시','제천시','보은군','옥천군','영동군','증평군','진천군','괴산군','음성군','단양군'],
+'충남':['천안시','공주시','보령시','아산시','서산시','논산시','계룡시','당진시','금산군','부여군','서천군','청양군','홍성군','예산군','태안군'],
+'전북':['전주시','군산시','익산시','정읍시','남원시','김제시','완주군','진안군','무주군','장수군','임실군','순창군','고창군','부안군'],
+'전남':['목포시','여수시','순천시','나주시','광양시','담양군','곡성군','구례군','고흥군','보성군','화순군','장흥군','강진군','해남군','영암군','무안군','함평군','영광군','장성군','완도군','진도군','신안군'],
+'경북':['포항시','경주시','김천시','안동시','구미시','영주시','영천시','상주시','문경시','경산시','의성군','청송군','영양군','영덕군','청도군','고령군','성주군','칠곡군','예천군','봉화군','울진군','울릉군'],
+'경남':['창원시','진주시','통영시','사천시','김해시','밀양시','거제시','양산시','의령군','함안군','창녕군','고성군','남해군','하동군','산청군','함양군','거창군','합천군'],
+'제주':['제주시','서귀포시']};
+let AA=[];let AA_CUR='';
+function aaRender(){
+  const sr=document.getElementById('aaSidoRow');if(!sr)return;
+  const sidos=Object.keys(AA_SGG);
+  sr.innerHTML=sidos.map(sd=>{
+    const n=AA.filter(a=>a.s===sd).length;
+    const on=AA_CUR===sd;
+    return '<button type="button" onclick="aaPick(\''+sd+'\')" style="padding:6px 11px;border-radius:999px;border:1.5px solid '+(n?'#0f766e':'#d6dee2')+';background:'+(on?'#0f766e':(n?'#e6f2ec':'#fff'))+';color:'+(on?'#fff':(n?'#0f766e':'#555'))+';font-weight:800;font-size:12.5px;cursor:pointer">'+sd+(n?' '+n:'')+'</button>';
+  }).join('');
+  const gr=document.getElementById('aaSggRow');
+  if(AA_CUR){
+    gr.style.display='flex';
+    const list=['전지역'].concat(AA_SGG[AA_CUR]);
+    gr.innerHTML='<div style="width:100%;font-size:12px;font-weight:800;color:#0f766e">'+AA_CUR+' — 활동 가능한 시군구를 모두 누르세요</div>'+list.map(g=>{
+      const sel=AA.some(a=>a.s===AA_CUR&&a.g===g);
+      return '<button type="button" onclick="aaTog(\''+AA_CUR+'\',\''+g+'\')" style="padding:5px 10px;border-radius:8px;border:1.5px solid '+(sel?'#0f766e':'#e0e6ea')+';background:'+(sel?'#0f766e':'#fff')+';color:'+(sel?'#fff':'#444')+';font-size:12px;font-weight:700;cursor:pointer">'+g+'</button>';
+    }).join('');
+  }else gr.style.display='none';
+  const el=document.getElementById('aaSelRow');
+  el.innerHTML=AA.length?('<div style="font-size:12px;font-weight:800;color:#153A77;margin-bottom:5px">선택한 활동 범위 (순서 = 우선순위)</div><div style="display:flex;gap:5px;flex-wrap:wrap">'+AA.map((a,i)=>'<span style="display:inline-flex;align-items:center;gap:5px;background:#153A77;color:#fff;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px">'+(i+1)+'. '+a.s+' '+a.g+'<b style="cursor:pointer;opacity:.75" onclick="aaRm('+i+')">✕</b></span>').join('')+'</div>'
+    +'<div style="font-size:12px;font-weight:800;color:#0f766e;margin-top:7px">🚩 권역 자동 분류: '+[...new Set(AA.map(a=>AA_REG[a.s]))].join(' · ')+' <span style="font-weight:600;color:var(--gray)">— 강습 배정·대회는 이 권역 기준으로 처리됩니다</span></div>')
+    :'<span style="font-size:12.5px;color:#C41E2F;font-weight:700">아직 선택된 활동 범위가 없습니다</span>';
+  aaMapDraw();
+}
+let SGG_GEO=null,SGG_LOADING=false,SGG_BUILT=false,SGG_IDX=[];
+const SGG_SIDO_CODE={'11':'서울','21':'부산','22':'대구','23':'인천','24':'광주','25':'대전','26':'울산','29':'세종','31':'경기','32':'강원','33':'충북','34':'충남','35':'전북','36':'전남','37':'경북','38':'경남','39':'제주'};
+function sggMatch(s,g,fs,fn){
+  if(g==='군위군'&&fn==='군위군')return true;
+  if(s==='인천'&&g==='미추홀구'&&fs==='인천'&&fn==='남구')return true;
+  if(fs!==s)return false;
+  if(g==='전지역')return true;
+  if(fn===g)return true;
+  if(fn.indexOf(g)===0)return true;
+  return false;
+}
+async function aaMapDraw(){
+  const el=document.getElementById('aaMap');if(!el)return;
+  if(!SGG_GEO){
+    if(SGG_LOADING)return;SGG_LOADING=true;
+    el.innerHTML='<div style="text-align:center;font-size:12px;color:var(--gray);padding:14px">지도 불러오는 중…</div>';
+    try{
+      const r=await fetch('https://cdn.jsdelivr.net/gh/southkorea/southkorea-maps@master/kostat/2013/json/skorea_municipalities_geo_simple.json');
+      SGG_GEO=await r.json();
+    }catch(e){try{
+      const r2=await fetch('https://raw.githubusercontent.com/southkorea/southkorea-maps/master/kostat/2013/json/skorea_municipalities_geo_simple.json');
+      SGG_GEO=await r2.json();
+    }catch(e2){el.innerHTML='';SGG_LOADING=false;return}}
+  }
+  if(!SGG_BUILT){
+    let mnx=999,mxx=-999,mny=999,mxy=-999;
+    const feats=SGG_GEO.features.filter(f=>f.properties.name!=='울릉군');
+    const each=(f,cb)=>{const g=f.geometry;const polys=g.type==='Polygon'?[g.coordinates]:g.coordinates;polys.forEach(p=>p.forEach(ring=>ring.forEach(cb)))};
+    feats.forEach(f=>each(f,c=>{if(c[0]<mnx)mnx=c[0];if(c[0]>mxx)mxx=c[0];if(c[1]<mny)mny=c[1];if(c[1]>mxy)mxy=c[1]}));
+    const W=340,kx=W/(mxx-mnx),ky=kx*1.22,H=(mxy-mny)*ky;
+    let paths='';SGG_IDX=[];
+    feats.forEach((f,i)=>{
+      const g=f.geometry;const polys=g.type==='Polygon'?[g.coordinates]:g.coordinates;
+      let d='';
+      polys.forEach(p=>{const ring=p[0];if(!ring||ring.length<3)return;
+        d+='M'+ring.map(c=>(((c[0]-mnx)*kx).toFixed(1))+' '+(((mxy-c[1])*ky).toFixed(1))).join('L')+'Z';});
+      const code=String(f.properties.code||'');
+      const fs=SGG_SIDO_CODE[code.slice(0,2)]||'';
+      const fn=String(f.properties.name||'');
+      SGG_IDX.push({fs,fn});
+      paths+='<path d="'+d+'" data-i="'+i+'" fill="#eef1f4" stroke="#c6ced6" stroke-width="0.5" style="cursor:pointer"><title>'+fs+' '+fn+'</title></path>';
+    });
+    el.innerHTML='<svg viewBox="0 0 '+W+' '+H.toFixed(0)+'" style="width:100%;display:block" id="aaSvg">'+paths+'</svg>'
+      +'<div style="text-align:center;font-size:11px;color:var(--gray);margin-top:4px">지도 클릭 = 선택·해제 · 마우스휠 = 확대 · 드래그 = 이동 · 더블클릭 = 원래대로 · <b style="color:#C41E2F">■</b> 1순위 시도 <b style="color:#1F4E9C">■</b> 그 외 선택</div>';
+    (function(){
+      const svg=document.getElementById('aaSvg');
+      const vb0=svg.getAttribute('viewBox').split(' ').map(Number);
+      let vb=vb0.slice();
+      const apply=()=>svg.setAttribute('viewBox',vb.map(n=>n.toFixed(1)).join(' '));
+      svg.addEventListener('wheel',ev=>{
+        ev.preventDefault();
+        const k=ev.deltaY<0?0.85:1/0.85;
+        const nw=vb[2]*k,nh=vb[3]*k;
+        if(nw>vb0[2]){vb=vb0.slice();apply();return}
+        if(nw<vb0[2]*0.12)return;
+        const r=svg.getBoundingClientRect();
+        const px=vb[0]+(ev.clientX-r.left)/r.width*vb[2];
+        const py=vb[1]+(ev.clientY-r.top)/r.height*vb[3];
+        vb=[px-(px-vb[0])*k,py-(py-vb[1])*k,nw,nh];apply();
+      },{passive:false});
+      let drag=null;
+      svg.addEventListener('pointerdown',ev=>{drag={x:ev.clientX,y:ev.clientY,vb:vb.slice(),moved:false};svg.setPointerCapture(ev.pointerId);});
+      svg.addEventListener('pointermove',ev=>{
+        if(!drag)return;
+        const r=svg.getBoundingClientRect();
+        const dx=(ev.clientX-drag.x)/r.width*vb[2],dy=(ev.clientY-drag.y)/r.height*vb[3];
+        if(Math.abs(ev.clientX-drag.x)+Math.abs(ev.clientY-drag.y)>6)drag.moved=true;
+        if(drag.moved){vb[0]=drag.vb[0]-dx;vb[1]=drag.vb[1]-dy;apply();}
+      });
+      svg.addEventListener('pointerup',ev=>{if(drag&&drag.moved)svg._justDragged=true;drag=null;setTimeout(()=>{svg._justDragged=false},50);});
+      svg.addEventListener('dblclick',()=>{vb=vb0.slice();apply();});
+    })();
+    document.getElementById('aaSvg').addEventListener('click',ev=>{
+      if(document.getElementById('aaSvg')._justDragged)return;
+      const t=ev.target.closest('path');if(!t)return;
+      const it=SGG_IDX[+t.dataset.i];if(!it)return;
+      let s=it.fs,g=it.fn;
+      if(g==='군위군')s='대구';
+      if(s==='인천'&&g==='남구')g='미추홀구';
+      if(AA_SGG[s]&&AA_SGG[s].indexOf(g)<0){
+        const hit=AA_SGG[s].find(x=>g.indexOf(x)===0||x.indexOf(g)===0);
+        if(hit)g=hit;else return;
+      }
+      AA_CUR=s;aaTog(s,g);
+    });
+    SGG_BUILT=true;SGG_LOADING=false;
+  }
+  const svg=document.getElementById('aaSvg');if(!svg)return;
+  const first=AA.length?AA[0].s:null;
+  svg.querySelectorAll('path').forEach(pt=>{
+    const it=SGG_IDX[+pt.dataset.i];if(!it)return;
+    let sel=null;
+    for(const a of AA){if(sggMatch(a.s,a.g,it.fs,it.fn)){sel=a;break}}
+    pt.setAttribute('fill',sel?(sel.s===first?'#C41E2F':'#1F4E9C'):'#eef1f4');
+    pt.setAttribute('stroke',sel?'#fff':'#c6ced6');
+  });
+}
+function aaPick(sd){AA_CUR=(AA_CUR===sd?'':sd);aaRender();}
+function aaTog(sd,g){
+  const ix=AA.findIndex(a=>a.s===sd&&a.g===g);
+  if(ix>=0){AA.splice(ix,1);aaRender();return}
+  const sidos=[...new Set(AA.map(a=>a.s))];
+  if(sidos.indexOf(sd)<0&&sidos.length>=4){alert('활동 범위는 최대 4개 시도까지 선택할 수 있습니다.');return}
+  if(g==='전지역')AA=AA.filter(a=>!(a.s===sd));
+  else AA=AA.filter(a=>!(a.s===sd&&a.g==='전지역'));
+  AA.push({s:sd,g:g});aaRender();
+}
+function aaRm(i){AA.splice(i,1);aaRender();}
+function aaSave(){return AA.map(a=>AA_FULL[a.s]+' '+a.g)}
+function aaRegions(){return [...new Set(AA.map(a=>AA_REG[a.s]))]}
+function aaBase(){if(!AA.length)return '';const a=AA[0];return AA_FULL[a.s]+(a.g==='전지역'?'':' '+a.g)}
 async function go(){
   const email=document.getElementById('aEmail').value.trim(), pw=document.getElementById('aPw').value;
   if(!email||!pw)return say('이메일과 비밀번호를 입력하세요');
@@ -211,18 +410,24 @@ async function go(){
       if(!/^01[016789][-. ]?\d{3,4}[-. ]?\d{4}$/.test(phone)){say('휴대전화 번호를 확인해주세요 (예: 010-1234-5678)');return}
       const gender=document.getElementById('sGender').value;
       const birth=document.getElementById('sBirth').value;
-      const sido=document.getElementById('sSido').value;
-      const gu=document.getElementById('sGu').value.trim();
-      const aff=document.getElementById('sAff').value;
-      const work=document.getElementById('sWork').value.trim();
-      const affEtc=document.getElementById('sAffEtc').value.trim();
+      const zip=document.getElementById('sZip').value.trim();
+      const addr=document.getElementById('sAddr').value.trim();
+      const addr2=document.getElementById('sAddr2').value.trim();
       if(!gender)return say('성별을 선택해주세요');
       if(!birth)return say('생년월일을 입력해주세요');
-      if(!sido)return say('거점 시·도를 선택해주세요 — 강습 배정에 꼭 필요합니다');
-      if(!gu)return say('거점 시·군·구를 입력해주세요 (예: 해운대구)');
-      if(!aff)return say('소속을 선택해주세요');
-      if((aff==='초·중·고 교사'||aff==='초등스포츠강사')&&!work)return say('근무지(학교·기관명)를 입력해주세요');
-      if(aff==='기타'&&!affEtc)return say('소속을 직접 입력해주세요');
+      if(!addr)return say('집 주소를 [주소 검색]으로 입력해주세요');
+      if(!addr2)return say('상세주소(동·호수)를 입력해주세요 — 해당 없으면 「해당없음」이라고 적어주세요');
+      if(!AA.length)return say('활동 가능 범위를 최소 1곳 이상 선택해주세요 (강습 배정에 필수)');
+      const af=[];
+      if(document.getElementById('sAf1').checked)af.push('시도연맹');
+      if(document.getElementById('sAf2').checked)af.push('초·중·고 교사');
+      if(document.getElementById('sAf3').checked)af.push('초등스포츠강사');
+      const afEtc=document.getElementById('sAfEtc').value.trim();
+      if(afEtc)af.push(afEtc);
+      if(document.getElementById('sAf0').checked&&!af.length)af.push('소속 없음');
+      if(!af.length)return say('소속을 선택해주세요 (해당 없으면 「소속 없음」 체크)');
+      const work=document.getElementById('sWork').value.trim();
+      if((document.getElementById('sAf2').checked||document.getElementById('sAf3').checked)&&!work)return say('근무지(학교·기관명)를 입력해주세요');
       const pnorm=phone.replace(/[^0-9]/g,'');
       if(pnorm.length<10){say('휴대전화 번호를 정확히 입력해주세요');return}
       try{
@@ -230,15 +435,24 @@ async function go(){
         if(dup.exists){say('이미 이 전화번호로 가입된 회원이 있습니다.\n기존 계정으로 로그인하시거나, 계정을 잊으셨으면 사무국(031-984-3248)으로 문의해주세요.');return}
       }catch(e){}
       const cred=await AUTH.createUserWithEmailAndPassword(email,pw);
+      const zipVal=document.getElementById('sZip').value.trim();
       await DB.collection('users').doc(cred.user.uid).set({
         name:name, email:email,
         phone:phone,
         gender:gender, birth:birth,
-        baseCity:sido+' '+gu,
-        region:document.getElementById('sRegion').value,
-        activityRegions:[document.getElementById('sRegion').value],
-        affiliation:[aff==='기타'?affEtc:aff],
+        address:(zipVal?('['+zipVal+'] '):'')+addr+' '+addr2,
+        addrBase:addr, addrDetail:addr2, zipcode:zipVal,
+        activityAreas:aaSave(), activityRegions:aaRegions(), baseCity:aaBase(),
+        region:(aaRegions()[0]||'서울·경기'),
+        affiliation:af,
+        fedName:document.getElementById('sAfFed').value,
+        teacherLevel:(document.getElementById('sAf2').checked?document.getElementById('sTeachLv').value:''),
         workSchool:work,
+        degree:document.getElementById('sDegree').value,
+        clothingSize:document.getElementById('sSize').value,
+        sizePants:document.getElementById('sSizePants').value,
+        sizeShoe:document.getElementById('sSizeShoe').value,
+        sizeCap:document.getElementById('sSizeCap').value,
         edu2026:document.getElementById('sEdu').value==='y',
         role:'member', status:'pending', points:0,
         createdAt:firebase.firestore.FieldValue.serverTimestamp()
