@@ -256,6 +256,32 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         </div>
         <div id="instLinkList" style="margin-top:10px;max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:5px"></div>
       </div>
+      <div id="payBox" style="background:#fff8e6;border:1.5px solid #e6b422;border-radius:14px;padding:14px 18px;margin-bottom:14px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <b style="font-size:14.5px;color:#8a6d1a">💳 강사비 지급·위촉서류 관리</b>
+          <span id="payCount" style="font-size:13px;font-weight:800;color:#153A77"></span>
+          <span style="font-size:12px;color:var(--gray)">— 배정완료 강사 기준 · e나라도움 이체·증빙 제출용</span>
+          <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn-sub" style="background:#8a6d1a" onclick="loadPayBox()">↻ 불러오기</button>
+            <button class="btn-sub" style="background:#0f766e" onclick="exportPayCSV()">⬇ 인적사항 CSV</button>
+            <button class="btn-sub" style="background:#C41E2F" onclick="exportUnsignedCSV()">⬇ 미서명자 CSV</button>
+          </div>
+        </div>
+        <div id="payList" style="margin-top:10px;overflow-x:auto"><div class="bempty">↻ 불러오기를 눌러 배정 강사의 지급·서명 현황을 확인하세요.</div></div>
+      </div>
+      <div id="compPayBox" style="background:#f3f0fb;border:1.5px solid #ceb8f7;border-radius:14px;padding:14px 18px;margin-bottom:14px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <b style="font-size:14.5px;color:#5b21b6">🏅 대회요원(심판·운영) 위촉·서명 현황</b>
+          <span id="compPayCount" style="font-size:13px;font-weight:800;color:#153A77"></span>
+          <span style="font-size:12px;color:var(--gray)">— compSlots 확정자 기준</span>
+          <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn-sub" style="background:#5b21b6" onclick="loadCompPayBox()">↻ 불러오기</button>
+            <button class="btn-sub" style="background:#0f766e" onclick="exportCompPayCSV()">⬇ 인적사항 CSV</button>
+            <button class="btn-sub" style="background:#7c3aed" onclick="downloadAllContractsZip()">📦 서명계약서 전체 ZIP</button>
+          </div>
+        </div>
+        <div id="compPayList" style="margin-top:10px;overflow-x:auto"><div class="bempty">↻ 불러오기를 눌러 대회요원 확정자의 지급·서명 현황을 확인하세요.</div></div>
+      </div>
       <div style="display:flex;gap:8px;margin:0 0 10px;flex-wrap:wrap">
         <button class="btn-sub afl on" data-f="전체" onclick="appFilter('전체',this)">전체</button>
         <button class="btn-sub afl" data-f="학교체육" onclick="appFilter('학교체육',this)" style="background:#8a919d">🏫 학교체육 강습</button>
@@ -1114,6 +1140,313 @@ function renderInstTable(docs){
   return '<div style="font-size:12.5px;color:var(--gray);margin-bottom:6px">사업 지원(학교체육·방과후·심판·운영) 강사·요원만 표시 · '+list.length+'명 · 위 검색·시도 필터와 연동</div>'
     +'<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th>성명</th><th>권역</th><th>활동 가능 범위</th><th>지원</th><th>연수</th><th>휴대전화</th><th>계좌</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
+// ── 강사비 지급 인적사항·위촉계약 서명 관리 (e나라도움 이체·증빙용) ──
+let PAYROWS=[];
+function maskRrn(r){r=String(r||'');if(r.length<8)return '<b style="color:#C41E2F">미등록</b>';return esc(r.slice(0,7))+'●●●●●●'}
+async function loadPayBox(){
+  const listEl=document.getElementById('payList');
+  listEl.innerHTML='불러오는 중…';
+  const assigned=APPS.filter(d=>{const s=d.data();return s.status==='배정완료'&&s.assignedUid});
+  const byUid={};
+  assigned.forEach(d=>{const s=d.data();(byUid[s.assignedUid]=byUid[s.assignedUid]||[]).push({id:d.id,s:s})});
+  const uids=Object.keys(byUid);
+  document.getElementById('payCount').textContent=uids.length+'명 · '+assigned.length+'건 배정';
+  const rows=[];
+  for(const uid of uids){
+    const ud=USERS.find(d=>d.id===uid);
+    const v=ud?ud.data():{};
+    let rrn='';
+    try{const pi=await DB.collection('privateInfo').doc(uid).get();if(pi.exists)rrn=pi.data().rrn||''}catch(e){}
+    const contracts=v.contracts||{};
+    const apps=byUid[uid].map(x=>Object.assign({appId:x.id},x.s,{
+      agreed:!!(contracts[x.id]&&contracts[x.id].agreedAt),
+      signed:!!(contracts[x.id]&&contracts[x.id].sign)
+    }));
+    rows.push({uid:uid,name:v.name||'(이름없음)',region:v.region||'',phone:v.phone||'',bank:v.bank||'',accountNum:v.accountNum||'',accountHolder:v.accountHolder||'',rrn:rrn,apps:apps,contracts:contracts});
+  }
+  rows.sort((a,b)=>String(a.region||'').localeCompare(b.region||'')||a.name.localeCompare(b.name));
+  PAYROWS=rows;
+  renderPayBox();
+}
+function renderPayBox(){
+  const el=document.getElementById('payList');
+  if(!PAYROWS.length){el.innerHTML='<div class="bempty">배정완료된 강사가 없습니다. ↻ 불러오기를 다시 눌러주세요.</div>';return}
+  const rows=PAYROWS.map(r=>{
+    const schools=r.apps.map(a=>esc(a.school)+' '+(a.signed?'<b style="color:#0f766e">✓서명</b>':a.agreed?'<b style="color:#b8860b">동의(미서명)</b>':'<b style="color:#C41E2F">✗미동의</b>')
+      +' <button class="btn-sub" style="background:#153A77;padding:2px 8px;min-height:0;font-size:11px" onclick="viewContractAdmin(\''+r.uid+'\',\''+a.appId+'\')">계약서</button>').join('<br>');
+    return '<tr><td><b>'+esc(r.name)+'</b></td><td>'+esc(r.region)+'</td><td>'+(r.phone?esc(r.phone):'-')+'</td>'
+      +'<td>'+(r.bank?esc(r.bank)+' '+esc(r.accountNum||'')+'<br><span style="color:var(--gray);font-size:11.5px">예금주 '+esc(r.accountHolder||'')+'</span>':'<b style="color:#C41E2F">미등록</b>')+'</td>'
+      +'<td>'+maskRrn(r.rrn)+'</td>'
+      +'<td style="font-size:12.5px">'+schools+'</td></tr>';
+  }).join('');
+  el.innerHTML='<table class="rtbl"><thead><tr><th>이름</th><th>권역</th><th>휴대전화</th><th>계좌</th><th>주민번호</th><th>배정학교 · 계약상태</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<div style="font-size:11.5px;color:var(--gray);margin-top:6px">주민번호는 화면에 마스킹 표시됩니다. 전체 번호는 ⬇ CSV로만 확인할 수 있습니다.</div>';
+}
+function exportPayCSV(){
+  if(!PAYROWS.length){alert('먼저 ↻ 불러오기를 눌러주세요.');return}
+  const rows=[['이름','권역','휴대전화','은행','계좌번호','예금주','주민등록번호','배정학교(계약상태)']];
+  PAYROWS.forEach(r=>{
+    rows.push([r.name,r.region,r.phone,r.bank,r.accountNum,r.accountHolder,r.rrn,r.apps.map(a=>a.school+'('+(a.signed?'서명완료':a.agreed?'동의만':'미동의')+')').join('; ')]);
+  });
+  const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='강사비지급_인적사항_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+function exportUnsignedCSV(){
+  if(!PAYROWS.length){alert('먼저 ↻ 불러오기를 눌러주세요.');return}
+  const rows=[['이름','권역','휴대전화','미서명 학교']];
+  PAYROWS.forEach(r=>{
+    const un=r.apps.filter(a=>!a.signed);
+    if(un.length)rows.push([r.name,r.region,r.phone,un.map(a=>a.school+(a.agreed?'(동의만)':'(미동의)')).join('; ')]);
+  });
+  if(rows.length<2){alert('미서명자가 없습니다. 🎉');return}
+  const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='위촉계약_미서명자_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+function viewContractAdmin(uid,appId){
+  const r=PAYROWS.find(x=>x.uid===uid);if(!r)return;
+  const a=r.apps.find(x=>x.appId===appId);if(!a)return;
+  const ag=r.contracts[appId];
+  const period=(a.start&&a.start.indexOf('8월')>=0)?'2026. 8. ~ 2026. 12.':'2026. 9. ~ 2026. 12.';
+  const logo=new URL('kfdf_logo.png',location.href).href;
+  const seal=new URL('직인.png',location.href).href;
+  const w=window.open('','_blank');
+  if(!w){alert('팝업이 차단되어 있습니다. 팝업 허용 후 다시 시도해주세요.');return}
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>위촉계약서</title>'
+  +'<style>@page{size:A4;margin:0}body{margin:0;font-family:"Malgun Gothic",sans-serif;display:flex;justify-content:center;background:#f2f2f2}'
+  +'.doc{width:210mm;min-height:297mm;background:#fff;box-sizing:border-box;padding:22mm 20mm;font-size:13.5px;line-height:1.85;color:#222;word-break:keep-all}'
+  +'h1{text-align:center;font-size:24px;margin:4mm 0 8mm}'
+  +'.sub0{text-align:center;color:#666;font-size:13px;margin-bottom:2mm}'
+  +'h2{font-size:14.5px;color:#1F4E9C;margin:6mm 0 1mm}'
+  +'table{width:100%;border-collapse:collapse;margin-top:8mm}td{border:1px solid #999;padding:2.4mm 3mm;font-size:13px}'
+  +'.k{background:#f2f5fa;font-weight:700;width:26mm;text-align:center}'
+  +'.org{display:flex;align-items:center;gap:10px;justify-content:center;font-size:20px;font-weight:800;letter-spacing:3px;margin-top:8mm;position:relative}'
+  +'.org img.lg{width:44px;height:44px;object-fit:contain}'
+  +'.orgwrap{position:relative;display:inline-flex;align-items:center;gap:10px;white-space:nowrap}'
+  +'.seal{position:absolute;right:-34px;top:50%;transform:translateY(-52%);width:64px;height:64px;object-fit:contain;mix-blend-mode:multiply;opacity:.92}'
+  +'.admtag{position:fixed;top:6mm;right:8mm;font-size:10.5px;color:#aaa}'
+  +'@media print{.admtag{display:none}body{background:#fff}}</style></head><body>'
+  +'<div class="admtag">관리자 열람용 — '+new Date().toLocaleString('ko-KR')+'</div>'
+  +'<div class="doc">'
+  +'<div class="sub0">2026년 유소년 스포츠 기반구축사업</div>'
+  +'<h1>강습 강사 위촉계약서</h1>'
+  +'<p>사단법인 대한민국플라잉디스크연맹(이하 "갑")과 강사 <b>'+esc(r.name)+'</b>(이하 "을")은 다음과 같이 계약을 체결한다.</p>'
+  +'<h2>제1조 (위촉 업무)</h2><p>갑은 을을 아래 학교의 플라잉디스크 강습 강사로 위촉하고, 을은 해당 프로그램(24회차) 강습 및 이에 부수하는 안전관리·출석 확인·운영일지 작성을 성실히 수행한다.<br>• 배정 학교: <b>'+esc(a.school)+'</b> ('+esc(a.type||'')+')<br>• 운영 기간: '+period+' (세부 일정은 학교와 협의)</p>'
+  +'<h2>제2조 (수당)</h2><p>① 수당은 시간당 50,000원으로 하며, 월별 운영일지(강의확인서)를 기준으로 산정하여 익월 을이 지정하는 계좌로 지급한다.<br>② 월 합산 지급액이 125,000원 이상인 경우 기타소득세 및 지방소득세(합계 8.8%)를 원천징수한 후 지급하며, 교통비·식비는 본 수당에 포함된 것으로 본다.</p>'
+  +'<h2>제3조 (강사의 의무)</h2><p>① 을은 배정 학교와 협의된 일정을 준수하며, 불가피한 일정 변경 시 최소 3일 전 학교와 갑에게 통보한다.<br>② 을은 유소년 안전을 최우선으로 하며, 수업 중 안전사고 발생 시 즉시 학교와 갑에게 보고한다.<br>③ 을은 아동학대·성범죄 경력조회에 동의하며, 결격사유가 확인될 경우 본 계약은 즉시 해지된다.<br>④ 을은 업무상 알게 된 학생·교직원 등의 개인정보를 누설하지 아니한다.</p>'
+  +'<h2>제4조 (교원의 겸직·근무시간 준수)</h2><p>을이 현직 교원인 경우, 소속 학교장의 겸직허가를 받은 후 활동하며, 강습은 정규 근무시간 외(방과후·늘봄·0교시·스포츠클럽 등)에 운영한다. 정규 수업시간 내 본인 담당 수업 지도에 대해서는 강사료가 지급되지 않는다. (교원이 아닌 외부 강사는 본 조항을 적용받지 않는다.)</p>'
+  +'<h2>제5조 (계약 해지)</h2><p>정당한 사유 없는 강습 불이행, 학교 운영에 중대한 지장 초래, 품위 손상 행위가 있는 경우 갑은 본 계약을 해지할 수 있으며, 이 경우 미수행 회차의 수당은 지급하지 아니한다.</p>'
+  +'<h2>제6조 (개인정보)</h2><p>갑은 수당 지급·원천징수 신고에 필요한 최소한의 개인정보를 수집·이용하며, 보존기간(사업 종료 후 5년) 경과 후 지체 없이 파기한다.</p>'
+  +'<h2>제7조 (전자서명)</h2><p>본 계약은 을이 연맹 홈페이지에서 본인 인증 후 전자적으로 서명한 시점에 성립하며, 기록된 서명·동의 일시는 서면 서명을 갈음한다. 본 계약에 명시되지 아니한 사항은 관계 법령 및 보조사업 지침에 따른다.</p>'
+  +'<table><tr><td class="k">성명</td><td>'+esc(r.name)+'</td></tr>'
+  +'<tr><td class="k">주민등록번호</td><td>'+maskRrn(r.rrn)+'</td></tr>'
+  +'<tr><td class="k">배정 학교</td><td>'+esc(a.school)+' ('+esc(a.type||'')+')</td></tr>'
+  +'<tr><td class="k">배정 권역</td><td>'+esc(a.region||r.region||'')+'</td></tr>'
+  +'<tr><td class="k">위촉 기간</td><td>'+period+'</td></tr>'
+  +'<tr><td class="k">담당 회차</td><td>학교당 24회차</td></tr>'
+  +'<tr><td class="k">입금 계좌</td><td>'+(r.bank?esc(r.bank)+' '+esc(r.accountNum||'')+' (예금주: '+esc(r.accountHolder||'')+')':'<span style="color:#C41E2F">미등록</span>')+'</td></tr></table>'
+  +'<table><tr><td class="k">갑</td><td>사단법인 대한민국플라잉디스크연맹 회장 &nbsp;(직인)</td></tr>'
+  +'<tr><td class="k">을</td><td>'+esc(r.name)+(ag&&ag.sign?' <img src="'+ag.sign+'" style="height:34px;vertical-align:middle;margin:0 6px">':'')+' &nbsp;—&nbsp; '+(ag?'<b style="color:#0f766e">전자 서명 완료: '+fmtDate(ag.agreedAt)+'</b>':'<b style="color:#C41E2F">(서명 전 — 강사 본인 마이페이지에서 서명 필요)</b>')+'</td></tr></table>'
+  +'<div class="org"><span class="orgwrap"><img class="lg" src="'+logo+'">대한민국플라잉디스크연맹<img class="seal" src="'+seal+'" onerror="this.style.display=\'none\'"></span></div>'
+  +'</div></body></html>');
+  w.document.close();
+}
+// ── 서명계약서 일괄 ZIP PDF (학교강습+대회요원, 인라인 스타일로 html2canvas 캡처) ──
+function schoolDocHTML(r,a,ag){
+  const name=r.name;
+  const period=(a.start&&a.start.indexOf('8월')>=0)?'2026. 8. ~ 2026. 12.':'2026. 9. ~ 2026. 12.';
+  const logo=new URL('kfdf_logo.png',location.href).href;
+  return '<div style="width:100%;box-sizing:border-box;padding:14mm;font-family:\'Malgun Gothic\',sans-serif;font-size:13.5px;line-height:1.85;color:#222;background:#fff">'
+  +'<div style="text-align:center;color:#666;font-size:13px;margin-bottom:2mm">2026년 유소년 스포츠 기반구축사업</div>'
+  +'<h1 style="text-align:center;font-size:22px;margin:2mm 0 7mm;font-weight:900">강습 강사 위촉계약서</h1>'
+  +'<p style="margin:0 0 3mm">사단법인 대한민국플라잉디스크연맹(이하 "갑")과 강사 <b>'+esc(name)+'</b>(이하 "을")은 다음과 같이 계약을 체결한다.</p>'
+  +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제1조 (위촉 업무)</h2><p style="margin:0 0 3mm">갑은 을을 아래 학교의 플라잉디스크 강습 강사로 위촉하고, 을은 해당 프로그램(24회차) 강습 및 이에 부수하는 안전관리·출석 확인·운영일지 작성을 성실히 수행한다.<br>• 배정 학교: <b>'+esc(a.school)+'</b> ('+esc(a.type||'')+')<br>• 운영 기간: '+period+' (세부 일정은 학교와 협의)</p>'
+  +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제2조 (수당)</h2><p style="margin:0 0 3mm">① 수당은 시간당 50,000원으로 하며, 월별 운영일지(강의확인서)를 기준으로 산정하여 익월 을이 지정하는 계좌로 지급한다.<br>② 월 합산 지급액이 125,000원 이상인 경우 기타소득세 및 지방소득세(합계 8.8%)를 원천징수한 후 지급하며, 교통비·식비는 본 수당에 포함된 것으로 본다.</p>'
+  +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제3조 (강사의 의무)</h2><p style="margin:0 0 3mm">① 을은 배정 학교와 협의된 일정을 준수하며, 불가피한 일정 변경 시 최소 3일 전 학교와 갑에게 통보한다.<br>② 을은 유소년 안전을 최우선으로 하며, 수업 중 안전사고 발생 시 즉시 학교와 갑에게 보고한다.<br>③ 을은 아동학대·성범죄 경력조회에 동의하며, 결격사유가 확인될 경우 본 계약은 즉시 해지된다.<br>④ 을은 업무상 알게 된 학생·교직원 등의 개인정보를 누설하지 아니한다.</p>'
+  +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제4조 (교원의 겸직·근무시간 준수)</h2><p style="margin:0 0 3mm">을이 현직 교원인 경우, 소속 학교장의 겸직허가를 받은 후 활동하며, 강습은 정규 근무시간 외(방과후·늘봄·0교시·스포츠클럽 등)에 운영한다. 정규 수업시간 내 본인 담당 수업 지도에 대해서는 강사료가 지급되지 않는다.</p>'
+  +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제5조 (계약 해지)</h2><p style="margin:0 0 3mm">정당한 사유 없는 강습 불이행, 학교 운영에 중대한 지장 초래, 품위 손상 행위가 있는 경우 갑은 본 계약을 해지할 수 있으며, 이 경우 미수행 회차의 수당은 지급하지 아니한다.</p>'
+  +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제6조 (개인정보)</h2><p style="margin:0 0 3mm">갑은 수당 지급·원천징수 신고에 필요한 최소한의 개인정보를 수집·이용하며, 보존기간(사업 종료 후 5년) 경과 후 지체 없이 파기한다.</p>'
+  +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제7조 (전자서명)</h2><p style="margin:0 0 3mm">본 계약은 을이 연맹 홈페이지에서 본인 인증 후 전자적으로 서명한 시점에 성립하며, 기록된 서명·동의 일시는 서면 서명을 갈음한다. 본 계약에 명시되지 아니한 사항은 관계 법령 및 보조사업 지침에 따른다.</p>'
+  +'<table style="width:100%;border-collapse:collapse;margin-top:6mm"><tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">성명</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+esc(name)+'</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">주민등록번호</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+maskRrn(r.rrn)+'</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">배정 학교</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+esc(a.school)+' ('+esc(a.type||'')+')</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">배정 권역</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+esc(a.region||r.region||'')+'</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">위촉 기간</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+period+'</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">입금 계좌</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+(r.bank?esc(r.bank)+' '+esc(r.accountNum||'')+' (예금주: '+esc(r.accountHolder||'')+')':'미등록')+'</td></tr></table>'
+  +'<table style="width:100%;border-collapse:collapse;margin-top:6mm"><tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">갑</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">사단법인 대한민국플라잉디스크연맹 회장 &nbsp;(직인)</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">을</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+esc(name)+(ag&&ag.sign?' <img src="'+ag.sign+'" style="height:30px;vertical-align:middle;margin:0 6px">':'')+' &nbsp;—&nbsp; '+(ag?'<b style="color:#0f766e">전자 서명 완료: '+fmtDate(ag.agreedAt)+'</b>':'(서명 전)')+'</td></tr></table>'
+  +'<div style="display:flex;align-items:center;gap:10px;justify-content:center;font-size:18px;font-weight:800;letter-spacing:2px;margin-top:7mm"><img src="'+logo+'" style="width:36px;height:36px;object-fit:contain">대한민국플라잉디스크연맹</div>'
+  +'</div>';
+}
+function compDocHTML(r,c,ag){
+  const name=r.name;
+  const payClause=(c.role==='심판')?'심판 수당은 1일 70,000원 이내로 하며, 참여 시간이 4시간 이내인 경우 40,000원을 지급한다.':'운영요원 수당은 사업 예산 기준에 따라 산정하여 지급한다.';
+  const logo=new URL('kfdf_logo.png',location.href).href;
+  return '<div style="width:100%;box-sizing:border-box;padding:14mm;font-family:\'Malgun Gothic\',sans-serif;font-size:13.5px;line-height:1.85;color:#222;background:#fff">'
+  +'<div style="text-align:center;color:#666;font-size:13px;margin-bottom:2mm">2026년 유소년 스포츠 기반구축사업</div>'
+  +'<h1 style="text-align:center;font-size:22px;margin:2mm 0 7mm;font-weight:900">대회요원 위촉계약서</h1>'
+  +'<p style="margin:0 0 3mm">사단법인 대한민국플라잉디스크연맹(이하 "갑")과 '+esc(c.role)+' <b>'+esc(name)+'</b>(이하 "을")은 다음과 같이 계약을 체결한다.</p>'
+  +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제1조 (위촉 업무)</h2><p style="margin:0 0 3mm">갑은 을을 아래 대회의 '+esc(c.role)+'(으)로 위촉하고, 을은 해당 업무 및 이에 부수하는 안전관리·현장 협조를 성실히 수행한다.<br>• 대회명: <b>'+esc(c.title)+'</b><br>• 일자: '+esc(c.date)+'<br>• 권역: '+esc(c.region)+' (세부 장소는 사무국이 개별 안내)</p>'
+  +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제2조 (수당)</h2><p style="margin:0 0 3mm">① '+payClause+'<br>② 월 합산 지급액이 125,000원 이상인 경우 기타소득세 및 지방소득세(합계 8.8%)를 원천징수한 후 을이 지정하는 계좌로 지급하며, 교통비·식비는 본 수당에 포함된 것으로 본다.</p>'
+  +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제3조 (을의 의무)</h2><p style="margin:0 0 3mm">① 을은 대회 일정·장소 등 안내사항을 준수하며, 불가피한 불참 시 최소 3일 전(부득이한 경우 사전) 갑에게 통보한다.<br>② 을은 유소년 안전을 최우선으로 하며, 현장에서 안전사고 발생 시 즉시 갑에게 보고한다.<br>③ 을은 아동학대·성범죄 경력조회에 동의하며, 결격사유가 확인될 경우 본 계약은 즉시 해지된다.<br>④ 을은 업무상 알게 된 참가자 등의 개인정보를 누설하지 아니한다.</p>'
+  +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제4조 (계약 해지)</h2><p style="margin:0 0 3mm">정당한 사유 없는 업무 불이행, 대회 운영에 중대한 지장 초래, 품위 손상 행위가 있는 경우 갑은 본 계약을 해지할 수 있다.</p>'
+  +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제5조 (개인정보)</h2><p style="margin:0 0 3mm">갑은 수당 지급·원천징수 신고에 필요한 최소한의 개인정보를 수집·이용하며, 보존기간(사업 종료 후 5년) 경과 후 지체 없이 파기한다.</p>'
+  +'<h2 style="font-size:14px;color:#1F4E9C;margin:5mm 0 1mm;font-weight:800">제6조 (전자서명)</h2><p style="margin:0 0 3mm">본 계약은 을이 연맹 홈페이지에서 본인 인증 후 전자적으로 서명한 시점에 성립하며, 기록된 서명·동의 일시는 서면 서명을 갈음한다. 본 계약에 명시되지 아니한 사항은 관계 법령 및 보조사업 지침에 따른다.</p>'
+  +'<table style="width:100%;border-collapse:collapse;margin-top:6mm"><tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">성명</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+esc(name)+'</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">주민등록번호</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+maskRrn(r.rrn)+'</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">대회명 · 역할</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+esc(c.title)+' ('+esc(c.role)+')</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">일자 · 권역</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+esc(c.date)+' · '+esc(c.region)+'</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">입금 계좌</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+(r.bank?esc(r.bank)+' '+esc(r.accountNum||'')+' (예금주: '+esc(r.accountHolder||'')+')':'미등록')+'</td></tr></table>'
+  +'<table style="width:100%;border-collapse:collapse;margin-top:6mm"><tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">갑</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">사단법인 대한민국플라잉디스크연맹 회장 &nbsp;(직인)</td></tr>'
+  +'<tr><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px;background:#f2f5fa;font-weight:700;width:26mm;text-align:center">을</td><td style="border:1px solid #999;padding:2.4mm 3mm;font-size:13px">'+esc(name)+(ag&&ag.sign?' <img src="'+ag.sign+'" style="height:30px;vertical-align:middle;margin:0 6px">':'')+' &nbsp;—&nbsp; '+(ag?'<b style="color:#0f766e">전자 서명 완료: '+fmtDate(ag.agreedAt)+'</b>':'(서명 전)')+'</td></tr></table>'
+  +'<div style="display:flex;align-items:center;gap:10px;justify-content:center;font-size:18px;font-weight:800;letter-spacing:2px;margin-top:7mm"><img src="'+logo+'" style="width:36px;height:36px;object-fit:contain">대한민국플라잉디스크연맹</div>'
+  +'</div>';
+}
+function safeFn(s){return String(s).replace(/[\\/:*?"<>|]/g,'_')}
+function waitImages(el){
+  const imgs=[...el.querySelectorAll('img')];
+  return Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(res=>{img.onload=img.onerror=res;setTimeout(res,3000)})));
+}
+async function downloadAllContractsZip(){
+  if(!window.JSZip||!window.jspdf||!window.html2canvas){alert('PDF 라이브러리를 아직 불러오는 중입니다. 잠시 후 다시 시도해주세요.');return}
+  const targets=[];
+  (PAYROWS||[]).forEach(r=>{
+    (r.apps||[]).forEach(a=>{
+      if(a.signed){targets.push({name:r.name+'_'+a.school+'_위촉계약서', html:schoolDocHTML(r,a,r.contracts[a.appId])});}
+    });
+  });
+  (COMPPAYROWS||[]).forEach(r=>{
+    (r.slots||[]).forEach(s=>{
+      if(s.signed){targets.push({name:r.name+'_'+s.title+'_위촉계약서', html:compDocHTML(r,s,r.contracts['comp_'+s.compId])});}
+    });
+  });
+  if(!targets.length){alert('서명 완료된 계약서가 없습니다. 위 두 박스의 ↻ 불러오기를 먼저 눌러 현황을 확인해주세요.');return}
+  if(!confirm('서명 완료된 계약서 '+targets.length+'건을 개인별 PDF로 만들어 ZIP 하나로 내려받습니다.\n건수가 많으면 다소 시간이 걸립니다. 계속할까요?'))return;
+  const holder=document.createElement('div');
+  holder.style.cssText='position:fixed;left:-9999px;top:0;width:210mm;background:#fff';
+  document.body.appendChild(holder);
+  const zip=new JSZip();
+  const {jsPDF}=window.jspdf;
+  let ok=0,fail=0;
+  for(let i=0;i<targets.length;i++){
+    const t=targets[i];
+    try{
+      holder.innerHTML=t.html;
+      await waitImages(holder);
+      const canvas=await html2canvas(holder,{scale:2,useCORS:true,backgroundColor:'#ffffff'});
+      const pdf=new jsPDF('p','mm','a4');
+      const imgData=canvas.toDataURL('image/jpeg',0.92);
+      const w=210,h=Math.min(canvas.height*w/canvas.width,297);
+      pdf.addImage(imgData,'JPEG',0,0,w,h);
+      zip.file(safeFn(t.name)+'.pdf', pdf.output('blob'));
+      ok++;
+    }catch(e){fail++;console.warn('contract pdf fail',t.name,e)}
+  }
+  document.body.removeChild(holder);
+  if(!ok){alert('PDF 생성에 실패했습니다. 잠시 후 다시 시도해주세요.');return}
+  const blob=await zip.generateAsync({type:'blob'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='위촉계약서_서명완료_'+new Date().toISOString().slice(0,10)+'.zip';a.click();
+  alert('완료 — '+ok+'건 저장'+(fail?', '+fail+'건 실패':''));
+}
+// ── 대회요원(심판·운영) 위촉·서명 현황 ──
+let COMPPAYROWS=[];
+async function loadCompPayBox(){
+  const listEl=document.getElementById('compPayList');
+  listEl.innerHTML='불러오는 중…';
+  const snap=await DB.collection('compSlots').orderBy('date').limit(200).get();
+  const slots=snap.docs.filter(d=>(d.data().confirmed||[]).length);
+  const byUid={};
+  slots.forEach(d=>{const s=d.data();(s.confirmed||[]).forEach(uid=>{(byUid[uid]=byUid[uid]||[]).push({id:d.id,s:s})})});
+  const uids=Object.keys(byUid);
+  document.getElementById('compPayCount').textContent=uids.length+'명 · '+slots.reduce((n,d)=>n+(d.data().confirmed||[]).length,0)+'건 확정';
+  const rows=[];
+  for(const uid of uids){
+    const ud=USERS.find(d=>d.id===uid);
+    const v=ud?ud.data():{};
+    let rrn='';
+    try{const pi=await DB.collection('privateInfo').doc(uid).get();if(pi.exists)rrn=pi.data().rrn||''}catch(e){}
+    const contracts=v.contracts||{};
+    const slots2=byUid[uid].map(x=>Object.assign({compId:x.id},x.s,{
+      agreed:!!(contracts['comp_'+x.id]&&contracts['comp_'+x.id].agreedAt),
+      signed:!!(contracts['comp_'+x.id]&&contracts['comp_'+x.id].sign)
+    }));
+    rows.push({uid:uid,name:v.name||'(이름없음)',region:v.region||'',phone:v.phone||'',bank:v.bank||'',accountNum:v.accountNum||'',accountHolder:v.accountHolder||'',rrn:rrn,slots:slots2,contracts:contracts});
+  }
+  rows.sort((a,b)=>String(a.region||'').localeCompare(b.region||'')||a.name.localeCompare(b.name));
+  COMPPAYROWS=rows;
+  renderCompPayBox();
+}
+function renderCompPayBox(){
+  const el=document.getElementById('compPayList');
+  if(!COMPPAYROWS.length){el.innerHTML='<div class="bempty">확정된 대회요원이 없습니다. ↻ 불러오기를 다시 눌러주세요.</div>';return}
+  const rows=COMPPAYROWS.map(r=>{
+    const slots=r.slots.map(s=>esc(s.title)+' ('+esc(s.role)+') '+(s.signed?'<b style="color:#0f766e">✓서명</b>':s.agreed?'<b style="color:#b8860b">동의(미서명)</b>':'<b style="color:#C41E2F">✗미동의</b>')
+      +' <button class="btn-sub" style="background:#5b21b6;padding:2px 8px;min-height:0;font-size:11px" onclick="viewCompContractAdmin(\''+r.uid+'\',\''+s.compId+'\')">계약서</button>').join('<br>');
+    return '<tr><td><b>'+esc(r.name)+'</b></td><td>'+esc(r.region)+'</td><td>'+(r.phone?esc(r.phone):'-')+'</td>'
+      +'<td>'+(r.bank?esc(r.bank)+' '+esc(r.accountNum||'')+'<br><span style="color:var(--gray);font-size:11.5px">예금주 '+esc(r.accountHolder||'')+'</span>':'<b style="color:#C41E2F">미등록</b>')+'</td>'
+      +'<td>'+maskRrn(r.rrn)+'</td>'
+      +'<td style="font-size:12.5px">'+slots+'</td></tr>';
+  }).join('');
+  el.innerHTML='<table class="rtbl"><thead><tr><th>이름</th><th>권역</th><th>휴대전화</th><th>계좌</th><th>주민번호</th><th>대회·역할 · 계약상태</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<div style="font-size:11.5px;color:var(--gray);margin-top:6px">주민번호는 화면에 마스킹 표시됩니다. 전체 번호는 ⬇ CSV로만 확인할 수 있습니다.</div>';
+}
+function exportCompPayCSV(){
+  if(!COMPPAYROWS.length){alert('먼저 ↻ 불러오기를 눌러주세요.');return}
+  const rows=[['이름','권역','휴대전화','은행','계좌번호','예금주','주민등록번호','대회·역할(계약상태)']];
+  COMPPAYROWS.forEach(r=>{
+    rows.push([r.name,r.region,r.phone,r.bank,r.accountNum,r.accountHolder,r.rrn,r.slots.map(s=>s.title+'('+s.role+','+(s.signed?'서명완료':s.agreed?'동의만':'미동의')+')').join('; ')]);
+  });
+  const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='대회요원_지급_인적사항_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+function viewCompContractAdmin(uid,compId){
+  const r=COMPPAYROWS.find(x=>x.uid===uid);if(!r)return;
+  const c=r.slots.find(x=>x.compId===compId);if(!c)return;
+  const ag=r.contracts['comp_'+compId];
+  const logo=new URL('kfdf_logo.png',location.href).href;
+  const seal=new URL('직인.png',location.href).href;
+  const payClause=(c.role==='심판')?'심판 수당은 1일 70,000원 이내로 하며, 참여 시간이 4시간 이내인 경우 40,000원을 지급한다.':'운영요원 수당은 사업 예산 기준에 따라 산정하여 지급한다.';
+  const w=window.open('','_blank');
+  if(!w){alert('팝업이 차단되어 있습니다. 팝업 허용 후 다시 시도해주세요.');return}
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>위촉계약서</title>'
+  +'<style>@page{size:A4;margin:0}body{margin:0;font-family:"Malgun Gothic",sans-serif;display:flex;justify-content:center;background:#f2f2f2}'
+  +'.doc{width:210mm;min-height:297mm;background:#fff;box-sizing:border-box;padding:22mm 20mm;font-size:13.5px;line-height:1.85;color:#222;word-break:keep-all}'
+  +'h1{text-align:center;font-size:24px;margin:4mm 0 8mm}'
+  +'.sub0{text-align:center;color:#666;font-size:13px;margin-bottom:2mm}'
+  +'h2{font-size:14.5px;color:#1F4E9C;margin:6mm 0 1mm}'
+  +'table{width:100%;border-collapse:collapse;margin-top:8mm}td{border:1px solid #999;padding:2.4mm 3mm;font-size:13px}'
+  +'.k{background:#f2f5fa;font-weight:700;width:26mm;text-align:center}'
+  +'.org{display:flex;align-items:center;gap:10px;justify-content:center;font-size:20px;font-weight:800;letter-spacing:3px;margin-top:8mm;position:relative}'
+  +'.org img.lg{width:44px;height:44px;object-fit:contain}'
+  +'.orgwrap{position:relative;display:inline-flex;align-items:center;gap:10px;white-space:nowrap}'
+  +'.seal{position:absolute;right:-34px;top:50%;transform:translateY(-52%);width:64px;height:64px;object-fit:contain;mix-blend-mode:multiply;opacity:.92}'
+  +'.admtag{position:fixed;top:6mm;right:8mm;font-size:10.5px;color:#aaa}'
+  +'@media print{.admtag{display:none}body{background:#fff}}</style></head><body>'
+  +'<div class="admtag">관리자 열람용 — '+new Date().toLocaleString('ko-KR')+'</div>'
+  +'<div class="doc">'
+  +'<div class="sub0">2026년 유소년 스포츠 기반구축사업</div>'
+  +'<h1>대회요원 위촉계약서</h1>'
+  +'<p>사단법인 대한민국플라잉디스크연맹(이하 "갑")과 '+esc(c.role)+' <b>'+esc(r.name)+'</b>(이하 "을")은 다음과 같이 계약을 체결한다.</p>'
+  +'<h2>제1조 (위촉 업무)</h2><p>갑은 을을 아래 대회의 '+esc(c.role)+'(으)로 위촉하고, 을은 해당 업무 및 이에 부수하는 안전관리·현장 협조를 성실히 수행한다.<br>• 대회명: <b>'+esc(c.title)+'</b><br>• 일자: '+esc(c.date)+'<br>• 권역: '+esc(c.region)+' (세부 장소는 사무국이 개별 안내)</p>'
+  +'<h2>제2조 (수당)</h2><p>① '+payClause+'<br>② 월 합산 지급액이 125,000원 이상인 경우 기타소득세 및 지방소득세(합계 8.8%)를 원천징수한 후 을이 지정하는 계좌로 지급하며, 교통비·식비는 본 수당에 포함된 것으로 본다.</p>'
+  +'<h2>제3조 (을의 의무)</h2><p>① 을은 대회 일정·장소 등 안내사항을 준수하며, 불가피한 불참 시 최소 3일 전(부득이한 경우 사전) 갑에게 통보한다.<br>② 을은 유소년 안전을 최우선으로 하며, 현장에서 안전사고 발생 시 즉시 갑에게 보고한다.<br>③ 을은 아동학대·성범죄 경력조회에 동의하며, 결격사유가 확인될 경우 본 계약은 즉시 해지된다.<br>④ 을은 업무상 알게 된 참가자 등의 개인정보를 누설하지 아니한다.</p>'
+  +'<h2>제4조 (계약 해지)</h2><p>정당한 사유 없는 업무 불이행, 대회 운영에 중대한 지장 초래, 품위 손상 행위가 있는 경우 갑은 본 계약을 해지할 수 있다.</p>'
+  +'<h2>제5조 (개인정보)</h2><p>갑은 수당 지급·원천징수 신고에 필요한 최소한의 개인정보를 수집·이용하며, 보존기간(사업 종료 후 5년) 경과 후 지체 없이 파기한다.</p>'
+  +'<h2>제6조 (전자서명)</h2><p>본 계약은 을이 연맹 홈페이지에서 본인 인증 후 전자적으로 서명한 시점에 성립하며, 기록된 서명·동의 일시는 서면 서명을 갈음한다. 본 계약에 명시되지 아니한 사항은 관계 법령 및 보조사업 지침에 따른다.</p>'
+  +'<table><tr><td class="k">성명</td><td>'+esc(r.name)+'</td></tr>'
+  +'<tr><td class="k">주민등록번호</td><td>'+maskRrn(r.rrn)+'</td></tr>'
+  +'<tr><td class="k">대회명 · 역할</td><td>'+esc(c.title)+' ('+esc(c.role)+')</td></tr>'
+  +'<tr><td class="k">일자 · 권역</td><td>'+esc(c.date)+' · '+esc(c.region)+'</td></tr>'
+  +'<tr><td class="k">입금 계좌</td><td>'+(r.bank?esc(r.bank)+' '+esc(r.accountNum||'')+' (예금주: '+esc(r.accountHolder||'')+')':'<span style="color:#C41E2F">미등록</span>')+'</td></tr></table>'
+  +'<table><tr><td class="k">갑</td><td>사단법인 대한민국플라잉디스크연맹 회장 &nbsp;(직인)</td></tr>'
+  +'<tr><td class="k">을</td><td>'+esc(r.name)+(ag&&ag.sign?' <img src="'+ag.sign+'" style="height:34px;vertical-align:middle;margin:0 6px">':'')+' &nbsp;—&nbsp; '+(ag?'<b style="color:#0f766e">전자 서명 완료: '+fmtDate(ag.agreedAt)+'</b>':'<b style="color:#C41E2F">(서명 전 — 본인 마이페이지에서 서명 필요)</b>')+'</td></tr></table>'
+  +'<div class="org"><span class="orgwrap"><img class="lg" src="'+logo+'">대한민국플라잉디스크연맹<img class="seal" src="'+seal+'" onerror="this.style.display=\'none\'"></span></div>'
+  +'</div></body></html>');
+  w.document.close();
+}
 function renderUsers(){
   const el=document.getElementById('userList');
   const docs=USERS.filter(d=>uMatch(d.data()));
@@ -1576,6 +1909,9 @@ async function givePt(){
   </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 async function reqGoods(appId){
   const doc=APPS.find(x=>x.id===appId);if(!doc)return;
