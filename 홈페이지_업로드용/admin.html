@@ -1,0 +1,1723 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="google-site-verification" content="sMiNgrZBGPS1NWfFR2JWjhrM25dn2Pq0LsDR2DbDrQc" />
+<meta name="naver-site-verification" content="f2bba301d1f9ca2d37efa24800dcad9676123d09" />
+<title>관리자 | 대한민국플라잉디스크연맹</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="style.css?v=20260726e">
+<script src="site_config.js"></script>
+</head>
+<body>
+<div class="util"><div class="wrap">
+  <div><b>대한민국플라잉디스크연맹</b> · 대한체육회 인정단체</div>
+  <div><a href="mailto:kfdf60@hanmail.net">kfdf60@hanmail.net</a> &nbsp;|&nbsp; 031-984-3248 &nbsp;|&nbsp; <a href="login.html" id="utilAuth" style="color:#fff;font-weight:700">로그인</a> · <a href="mypage.html" style="color:#fff;font-weight:700">마이페이지</a></div>
+</div></div>
+<header><div class="wrap nav">
+  <a href="index.html" class="brand">
+    <img src="kfdf_logo.png" alt="대한민국플라잉디스크연맹 로고">
+    <div><div class="t1">대한민국플라잉디스크연맹</div><div class="t2">KOREA FLYING DISC FEDERATION</div></div>
+  </a>
+  <button class="hamb" onclick="document.querySelector('.menu').classList.toggle('open')">☰</button>
+  <nav class="menu">
+    <div><a href="about.html" class="top">연맹소개</a>
+      <div class="drop">
+        <a href="about.html#greet">인사말 · 미션</a>
+        <a href="about.html#org">조직도</a>
+        <a href="about.html#rule">정관 · 규정</a>
+        <a href="about.html#region">시도연맹 구성</a>
+        <a href="about.html#way">오시는 길</a>
+      </div></div>
+    <div><a href="business.html" class="top">사업안내</a>
+      <div class="drop">
+        <a href="business.html#youth">2026 유소년 스포츠 기반구축사업</a>
+        <a href="business.html#school">└ 학교체육 강습</a>
+        <a href="business.html#after">└ 방과후 · 늘봄</a>
+        <a href="competition.html">└ 권역별 유소년 대회</a>
+        <a href="business.html#train">└ 교원연수 · 교재개발</a>
+      </div></div>
+    <div><a href="certification.html" class="top">자격검정</a>
+      <div class="drop">
+        <a href="certification.html">체육지도자 실기 · 구술 (국가자격)</a>
+        <a href="license.html">연맹 자격증 (지도자 · 심판)</a>
+        <a href="verify.html">이수증 · 자격증 진위확인</a>
+      </div></div>
+    <div><a href="leader.html" class="top">리더 시스템</a>
+      <div class="drop">
+        <a href="leader.html">레벨업 (포인트) 시스템</a>
+        <a href="jobs.html">강사 활동 지원 · 지명</a>
+        <a href="guide.html">강사 가이드 (일지·운영·유의사항)</a>
+        <a href="safety.html">안전교육 이수</a>
+        <a href="mypage.html">마이페이지</a>
+      </div></div>
+    <div><a href="community.html" class="top">커뮤니티</a></div>
+    <div><a href="notice.html" class="top">알림마당</a>
+      <div class="drop">
+        <a href="notice.html">공지사항 · 공고</a>
+        <a href="archive.html">자료실 (서식 다운로드)</a>
+        <a href="faq.html">자주 묻는 질문</a>
+      </div></div>
+    <a href="apply.html" class="cta">강습 신청</a>
+  </nav>
+</div></header>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",
+  authDomain: "koreaflyingdiscfederation.firebaseapp.com",
+  projectId: "koreaflyingdiscfederation",
+  storageBucket: "koreaflyingdiscfederation.firebasestorage.app",
+  messagingSenderId: "1081847355343",
+  appId: "1:1081847355343:web:ca40ed9a52e13f607f64ba"
+};
+firebase.initializeApp(firebaseConfig);
+const AUTH = firebase.auth();
+const DB = firebase.firestore();
+const LVS = [[0,'어쏘 리더'],[100,'필드 리더'],[300,'치프 리더'],[600,'엘리트 리더'],[1000,'마스터 리더']];
+const LVC = {1:'#8a919d',2:'#1F4E9C',3:'#7c3aed',4:'#C41E2F',5:'#b8860b'};
+function lvOf(p){let l=0;LVS.forEach((v,i)=>{if(p>=v[0])l=i});return l+1}
+function lvName(p){return LVS[lvOf(p)-1][1]}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')}
+function orgChip(o,region,title,fed){
+  if(o==='central')return '<span style="background:linear-gradient(120deg,#111114,#3a3a44);color:#e6b422;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83c\udfdb \uc911\uc559\uc5f0\ub9f9'+(title?' \u00b7 '+esc(title):'')+'</span>';
+  if(o==='regional'){
+    // 시도연맹 기준 표기 — 직함(orgTitle)에 이미 연맹명이 있으면 그것만, 없으면 소속연맹(fed) 사용. 권역명은 뱃지에 쓰지 않음(혼선 방지)
+    var t=String(title||''),f=String(fed||'');
+    var label=t.indexOf('연맹')>=0?t:(f?(f+(t?' \u00b7 '+t:'')):((region?esc(region)+' \uad8c\uc5ed':'')+(t?' \u00b7 '+esc(t):'')));
+    return '<span style="background:#1F4E9C;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83d\udea9 '+esc(label).replace(/&amp;middot;/g,'\u00b7')+'</span>';
+  }
+  return '';
+}
+const EDU_ROSTER='강다연,강수경,강유라,경미선,권남혁,권태수,권희찬,김나리,김나연,김남영,김다윤,김도야,김미영,김민석,김민정,김상훈,김선미,김성관,김연상,김연우,김영빈,김유진,김이현,김재우,김정심,김정희,김주현,김지아,김한효,김현서,남궁영민,노현정,류선주,문상우,문현민,박광열,박규미,박규성,박기정,박미리,박상명,박선희,박성곤,박영환,박이슬,박주송,박찬혜,방서인,방수림,방수민,배성호,백승호,백지은,성연선,손성민,송희은,신고운이,신세란,신우진,신은상,신호철,안미진,안환기,양지선,엄혁주,여인찬,연선주,염정선,오경민,오주연,우소라,유정미,윤경희,윤연진,윤태경,은보라,이가영,이다봄,이대천,이소희,이솔지,이수환,이승훈,이영진,이영철,이용기,이은실,이은지,이재우,이재천,이지영,이한민,이현표,임성경,임아륜,장경숙,전경윤,전성현,정광섭,정예온,정인용,정지수,정진호,정창윤,조용대,조현숙,조혜진,조홍익,지미연,천관문,천효정,최문규,최윤형,최인향,최종선,최종욱,최종은,최지안,최창훈,한문아,한미향,허지범,황규빈,황성하,황윤경,황인중'.split(',');
+function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>=0}
+</script>
+<style>
+.authbox{max-width:460px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:38px;box-shadow:0 14px 34px rgba(17,17,20,.06)}
+.authbox h3{font-size:22px;font-weight:900;margin-bottom:20px}
+.authbox label{display:block;font-size:13.5px;font-weight:700;color:var(--gray);margin:14px 0 6px}
+.authbox input,.authbox select,.authbox textarea{width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;font-family:inherit}
+.authbox input:focus,.authbox select:focus,.authbox textarea:focus{outline:none;border-color:var(--blue)}
+.btn-main{width:100%;margin-top:22px;background:var(--red);color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit}
+.btn-main:hover{background:var(--red-dark)}
+.btn-sub{background:var(--black);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-sub:hover{background:var(--red)}
+.authtabs{display:flex;gap:8px;margin-bottom:22px}
+.authtabs button{flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit}
+.authtabs button.on{background:var(--black);color:#fff;border-color:var(--black)}
+.msg{margin-top:14px;font-size:13.5px;font-weight:700;min-height:20px}
+.msg.err{color:var(--red)} .msg.ok{color:#0f766e}
+.lvchip2{display:inline-block;color:#fff;font-weight:900;font-size:13px;padding:5px 14px;border-radius:999px}
+.pending-banner{background:#fff8e6;border:1.5px solid #e6b422;border-radius:12px;padding:16px 20px;font-size:14.5px;color:#7a5b00;margin-bottom:24px}
+.mycard{background:linear-gradient(120deg,#0f1013,#1a1c22 60%,#153A77);border-radius:20px;padding:36px;color:#fff}
+.post-form{background:var(--bg-soft);border-radius:14px;padding:24px;margin-bottom:26px;display:none}
+.post-form.show{display:block}
+.post-form input,.post-form select,.post-form textarea{width:100%;padding:11px 13px;border:1.5px solid var(--line);border-radius:10px;font-size:14.5px;font-family:inherit;margin-bottom:10px;background:#fff}
+.cmt{padding:10px 0;border-top:1px dashed var(--line);font-size:14px}
+.cmt b{font-size:13.5px}
+.cmt .lvmini{font-size:11px;font-weight:900;color:#fff;padding:2px 8px;border-radius:999px;margin-left:6px}
+.cmt-form{display:flex;gap:8px;margin-top:12px}
+.cmt-form input{flex:1;padding:10px 13px;border:1.5px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit}
+.admin-tab{display:flex;gap:8px;margin-bottom:24px}
+.admin-tab button{padding:10px 20px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-weight:800;cursor:pointer;font-family:inherit}
+.admin-tab button.on{background:var(--black);color:#fff;border-color:var(--black)}
+.urow{display:flex;align-items:center;gap:14px;padding:14px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.urow .grow{flex:1;min-width:260px}
+.urow b{font-size:15.5px}
+.urow .sub3{font-size:12.5px;color:var(--gray);word-break:keep-all;overflow-wrap:anywhere;line-height:1.7;white-space:normal}
+.rtbl{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff}
+.rtbl th{background:#f4f6fa;color:#5b6472;font-weight:800;padding:9px 8px;text-align:left;white-space:nowrap}
+.rtbl td{border-top:1px solid #eef1f5;padding:9px 8px;vertical-align:middle;word-break:keep-all;overflow-wrap:anywhere;line-height:1.6}
+.rtbl tr:hover td{background:#fafbfd}
+.rtbl .nm{font-weight:800;font-size:13px}
+.rtbl .mut{color:#aab1bb}
+.rtbl .bdg{display:inline-block;font-size:10.5px;font-weight:800;padding:1px 6px;border-radius:999px;color:#fff;margin-right:2px}
+</style>
+
+<div class="phero"><div class="wrap">
+  <div class="crumb">HOME &nbsp;›&nbsp; <b>관리자</b></div>
+  <h1>관리자 페이지</h1><p>회원 승인과 포인트 관리 (사무국 전용)</p>
+</div></div>
+<section><div class="wrap" style="max-width:1560px">
+  <div id="deny" class="pending-banner" style="display:none">🔒 관리자 권한이 필요합니다.</div>
+  <div id="adminBody" style="display:none">
+    <div id="dash" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:22px"></div>
+    <div class="admin-tab">
+      <button id="t1" class="on" onclick="tab(1)">회원 승인 · 목록</button>
+      <button id="t2" onclick="tab(2)">포인트 부여</button>
+      <button id="t3" onclick="tab(3)">강습 신청 관리</button>
+      <button id="t4" onclick="tab(4)">대회 요원</button>
+      <button id="t5" onclick="tab(5)">단체 메일</button>
+    </div>
+    <div id="v1">
+      <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
+        <button class="btn-sub" style="background:#0f766e" onclick="exportInstructors()">⬇ 강사·요원 지원자 CSV</button>
+        <button class="btn-sub" style="background:#C41E2F" onclick="copyPhoneList('users')">📱 문자명단 복사 (현재 필터)</button>
+        <details style="display:inline-block">
+          <summary style="cursor:pointer;padding:9px 16px;background:#8a919d;color:#fff;border-radius:10px;font-weight:800;font-size:13.5px;list-style:none">🧰 관리 도구 더보기 ▾</summary>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;padding:10px;background:#f4f6f9;border-radius:10px">
+        <button class="btn-sub" style="background:#b8860b" onclick="backfillCerts()">🎓 이수자 일괄 정리 (검증코드 생성 + 연수 50P 소급 지급)</button>
+        <button class="btn-sub" style="background:#1F4E9C" onclick="auditEdu()">🔍 이수자 명단 대조 점검</button>
+        <button class="btn-sub" style="background:#1F4E9C" onclick="exportApps()">⬇ 신청 학교 CSV (시군구 포함)</button>
+        <button class="btn-sub" style="background:#7c3aed" onclick="updateLeaderboard().then(function(){alert('✓ 리더 순위가 갱신되었습니다. (이름은 별표 처리되어 공개됩니다)')}).catch(function(e){alert('실패: '+e.message)})">🔄 리더 순위 갱신</button>
+          </div>
+        </details>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+        <button class="btn-sub ufl on" data-f="전체" onclick="userFilter('전체',this)">전체 회원</button>
+        <button class="btn-sub ufl" data-f="pending" onclick="userFilter('pending',this)" style="background:#8a919d">⏳ 승인 대기</button>
+        <button class="btn-sub ufl" data-f="any" onclick="userFilter('any',this)" style="background:#8a919d">🙋 사업 지원자 전체</button>
+        <button class="btn-sub ufl" data-f="school" onclick="userFilter('school',this)" style="background:#8a919d">🏫 학교체육 지원</button>
+        <button class="btn-sub ufl" data-f="after" onclick="userFilter('after',this)" style="background:#8a919d">🌱 방과후·늘봄 지원</button>
+        <button class="btn-sub ufl" data-f="referee" onclick="userFilter('referee',this)" style="background:#8a919d">🏁 심판 지원</button>
+        <button class="btn-sub ufl" data-f="staff" onclick="userFilter('staff',this)" style="background:#8a919d">🎪 운영 지원</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+        <span style="font-size:12.5px;font-weight:800;color:#6b7280">보기 방식</span>
+        <button class="btn-sub vwl on" data-v="table" onclick="setView('table',this)">🗂 명단(표)</button>
+        <button class="btn-sub vwl" data-v="card" onclick="setView('card',this)" style="background:#8a919d">🔖 상세·승인·검증</button>
+        <button class="btn-sub vwl" data-v="inst" onclick="setView('inst',this)" style="background:#8a919d">👟 강사명단</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <select id="userSido" onchange="renderUsers()" style="width:auto;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px;font-weight:700">
+          <option value="">시도 전체</option>
+          <option value="__none">📍 시군구 미입력</option>
+          <option>서울</option><option>인천</option><option>경기</option><option>강원</option>
+          <option>대전</option><option>세종</option><option>충북</option><option>충남</option>
+          <option value="전남광주">전남광주 (통합)</option><option>광주</option><option>전북</option><option>전남</option>
+          <option>부산</option><option>대구</option><option>울산</option><option>경북</option><option>경남</option>
+          <option>제주</option>
+        </select>
+        <input id="userSearch" oninput="renderUsers()" placeholder="🔍 이름·시군구·이메일·전화 검색" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px">
+        <span id="userCount" style="align-self:center;font-size:13px;font-weight:800;color:#1F4E9C"></span>
+      </div>
+      <div id="auditBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:16px"></div>
+      <div class="board" id="userList"><div class="bempty">불러오는 중…</div></div></div>
+    <div id="v5" style="display:none">
+      <div class="authbox" style="max-width:720px;margin:0">
+        <h3>단체 메일 발송</h3>
+        <p style="font-size:13px;color:var(--gray)">받는 사람마다 개별 발송됩니다 (주소 상호 노출 없음). EmailJS 발송량이 차감되니 필요한 만큼만 보내세요.</p>
+        <label>받는 사람 이메일 (한 줄에 하나씩, 쉼표도 가능)</label>
+        <textarea id="bmTo" rows="7" placeholder="hong@school.kr&#10;kim@school.kr"></textarea>
+        <label>제목</label><input id="bmSubject" placeholder="[대한민국플라잉디스크연맹] 공식 홈페이지 오픈 안내">
+        <label>내용</label><textarea id="bmBody" rows="12"></textarea>
+        <button class="btn-main" onclick="bulkMail()" id="bmBtn">발송 시작</button>
+        <div class="msg" id="bmMsg"></div>
+      </div>
+    </div>
+    <div id="v4" style="display:none">
+      <div class="authbox" style="max-width:640px;margin:0 0 26px">
+        <h3>대회 요원 모집 등록</h3>
+        <label>대회명</label><input id="cpTitle" placeholder="예: 2026 충청권역 유소년 올림피아드">
+        <label>권역</label>
+        <select id="cpRegion"><option>서울·경기</option><option>강원</option><option>충청</option><option>전라</option><option>경상</option><option>제주</option></select>
+        <label>일자</label><input id="cpDate" type="date">
+        <label>역할</label>
+        <select id="cpRole"><option>심판</option><option>운영</option></select>
+        <label>정원 (명)</label><input id="cpQuota" type="number" value="4" min="1">
+        <button class="btn-main" onclick="addComp()">모집 등록</button>
+        <div class="msg" id="cpMsg"></div>
+      </div>
+      <input id="cpSearch" oninput="renderCompsAdmin()" placeholder="🔍 대회명·권역·역할·지명자(강사)·확정자 이름 검색" style="width:100%;max-width:420px;padding:9px 13px;border:1.5px solid #dfe5ee;border-radius:10px;margin-bottom:12px">
+      <div class="board" id="compAdminList"><div class="bempty">불러오는 중…</div></div>
+    </div>
+    <div id="v3" style="display:none">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+        <button class="btn-sub" onclick="loadApps()">↻ 새로고침</button>
+        <button class="btn-sub" style="background:#0e7490" onclick="window.open('sim.html','_blank')">🧪 가선정 시뮬레이션 (새 창)</button>
+        <button class="btn-sub" style="background:#0f766e" onclick="exportCSV()">⬇ 전체 CSV</button>
+        <button class="btn-sub" style="background:#8a919d" onclick="showTrash()">🗑 휴지통</button>
+        <details style="display:inline-block">
+          <summary style="cursor:pointer;padding:9px 16px;background:#8a919d;color:#fff;border-radius:10px;font-weight:800;font-size:13.5px;list-style:none">🧰 관리 도구 더보기 ▾</summary>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;padding:10px;background:#f4f6f9;border-radius:10px">
+        <button class="btn-sub" style="background:#7c3aed" onclick="autoAssign()">⚡ 권역별 자동배정 (미배정 선정교)</button>
+        <button class="btn-sub" style="background:#e6b422" onclick="fixCounters()">⚙ 접수 카운터 보정</button>
+        <button class="btn-sub" style="background:#7c3aed" onclick="syncLogPoints()">⚡ 일지 기준 포인트 반영</button>
+        <button class="btn-sub" style="background:#153A77" onclick="reviewHist()">📋 이력 승인·포인트 전환</button>
+        <button class="btn-sub" style="background:#b8860b" onclick="payrollCSV()">💰 월 지급 계산 CSV</button>
+        <button class="btn-sub" style="background:#555" onclick="closeWaitlist()">⏳ 대기자 일괄 종료</button>
+        <button class="btn-sub" style="background:#0f766e" onclick="showSupply()">🧭 권역별 수급 현황</button>
+        <button class="btn-sub" style="background:#C41E2F" onclick="copyPhoneList('apps')">📱 문자명단 복사 (교사·현재 필터)</button>
+          </div>
+        </details>
+      </div>
+      <div id="supplyBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px"></div>
+      <div id="trashBox" style="display:none;background:#faf8f4;border:1.5px solid #e5e0d8;border-radius:14px;padding:14px 18px;margin-bottom:14px"></div>
+      <div id="instLinkBox" style="background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:14px;padding:14px 18px;margin-bottom:14px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <b style="font-size:14.5px;color:#0f766e">👟 강사 지원 현황</b>
+          <span id="instLinkCount" style="font-size:13px;font-weight:800;color:#153A77"></span>
+          <span style="font-size:12px;color:var(--gray)">— 회원명단의 학교체육·방과후 지원 데이터와 실시간 연동 (위 유형 탭·검색과 함께 필터링)</span>
+          <button class="btn-sub" style="background:#0f766e;margin-left:auto" onclick="location.href='region.html'">🛡 권역 관리(매칭)에서 배정 →</button>
+        </div>
+        <div id="instLinkList" style="margin-top:10px;max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:5px"></div>
+      </div>
+      <div id="payBox" style="background:#fff8e6;border:1.5px solid #e6b422;border-radius:14px;padding:14px 18px;margin-bottom:14px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <b style="font-size:14.5px;color:#8a6d1a">💳 강사비 지급·위촉서류 관리</b>
+          <span id="payCount" style="font-size:13px;font-weight:800;color:#153A77"></span>
+          <span style="font-size:12px;color:var(--gray)">— 배정완료 강사 기준 · e나라도움 이체·증빙 제출용</span>
+          <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn-sub" style="background:#8a6d1a" onclick="loadPayBox()">↻ 불러오기</button>
+            <button class="btn-sub" style="background:#0f766e" onclick="exportPayCSV()">⬇ 인적사항 CSV</button>
+            <button class="btn-sub" style="background:#C41E2F" onclick="exportUnsignedCSV()">⬇ 미서명자 CSV</button>
+          </div>
+        </div>
+        <div id="payList" style="margin-top:10px;overflow-x:auto"><div class="bempty">↻ 불러오기를 눌러 배정 강사의 지급·서명 현황을 확인하세요.</div></div>
+      </div>
+      <div style="display:flex;gap:8px;margin:0 0 10px;flex-wrap:wrap">
+        <button class="btn-sub afl on" data-f="전체" onclick="appFilter('전체',this)">전체</button>
+        <button class="btn-sub afl" data-f="학교체육" onclick="appFilter('학교체육',this)" style="background:#8a919d">🏫 학교체육 강습</button>
+        <button class="btn-sub afl" data-f="방과후" onclick="appFilter('방과후',this)" style="background:#8a919d">🌱 방과후·늘봄</button>
+        <button class="btn-sub" style="background:#0f766e" onclick="matchCityAll()">🧭 시군구 일괄 매칭</button>
+      </div>
+      <div style="display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap">
+        <select id="appSido" onchange="renderApps()" style="width:auto;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px;font-weight:700">
+          <option value="">시도 전체</option>
+          <option>서울</option><option>인천</option><option>경기</option><option>강원</option>
+          <option>대전</option><option>세종</option><option>충북</option><option>충남</option>
+          <option>광주</option><option>전북</option><option>전남</option>
+          <option>부산</option><option>대구</option><option>울산</option><option>경북</option><option>경남</option>
+          <option>제주</option>
+        </select>
+        <select id="appRegF" onchange="renderApps()" style="width:auto;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px;font-weight:700">
+          <option value="">권역 전체</option><option>서울·경기</option><option>강원</option><option>충청</option><option>전라</option><option>경상</option><option>제주</option>
+        </select>
+        <input id="appSearch" oninput="renderApps()" placeholder="🔍 학교명·시군구·담당교사·배정강사·접수번호 검색" style="flex:1;min-width:220px;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px">
+        <span id="appCount" style="align-self:center;font-size:13px;font-weight:800;color:#1F4E9C"></span>
+      </div>
+      <div class="board" id="appList"><div class="bempty">불러오는 중…</div></div>
+    </div>
+    <div id="v2" style="display:none">
+      <div class="authbox" style="max-width:560px;margin:0">
+        <h3>활동 포인트 부여</h3>
+        <label>회원 선택</label>
+        <input id="axSearch" placeholder="🔍 이름 검색" oninput="axFilter()" style="width:100%;padding:10px 13px;border:1.5px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit;margin-bottom:6px">
+        <select id="axUser"></select>
+        <label>활동 종류</label>
+        <select id="axType" onchange="document.getElementById('axPt').value=this.value">
+          <option value="10">학교강습·방과후 1회차 (10P)</option>
+          <option value="50">자율연수 참여·이수 (50P)</option>
+          <option value="20">대회 심판 1일 (20P)</option>
+          <option value="15">연수 강사 1시간 (15P)</option>
+          <option value="15">공식행사 운영 1일 (15P)</option>
+          <option value="10">외부 공식행사 1일 (10P)</option>
+        </select>
+        <label>활동 내용 (이력에 표시)</label><input id="axLabel" placeholder="예: ○○초 학교강습 3회차">
+        <label>활동일</label><input id="axDate" type="date">
+        <label>포인트 (직접 수정 가능)</label><input id="axPt" type="number" value="10">
+        <button class="btn-main" onclick="givePt()">포인트 부여</button>
+        <div class="msg" id="axMsg"></div>
+      </div>
+    </div>
+  </div>
+</div></section>
+<script>
+let USERS=[];
+let IS_OWNER=false;
+AUTH.onAuthStateChanged(async u=>{
+  if(!u){document.getElementById('deny').style.display='block';return}
+  const me=await DB.collection('users').doc(u.uid).get();
+  if(!me.exists||me.data().role!=='admin'){document.getElementById('deny').style.display='block';return}
+  IS_OWNER=me.data().owner===true;
+  document.getElementById('adminBody').style.display='block';loadDash();
+  loadUsers();
+  purgeOldTrash();
+});
+function tab(n){
+  [1,2,3,4,5].forEach(i=>{
+    document.getElementById('t'+i).classList.toggle('on',i===n);
+    document.getElementById('v'+i).style.display=i===n?'block':'none';
+  });
+  if(n===3){loadApps();if(!USERS.length)loadUsers();}
+  if(n===4)loadCompsAdmin();
+}
+let APPS=[];let AFL='전체';let TRASH={apps:[],users:[]};
+function appFilter(f,btn){
+  AFL=f;
+  document.querySelectorAll('.afl').forEach(b=>{b.style.background=b.dataset.f===f?'':'#8a919d'});
+  renderApps();
+}
+async function loadApps(){
+  const snap=await DB.collection('schoolApplications').orderBy('createdAt','desc').get();
+  TRASH.apps=snap.docs.filter(d=>d.data().deleted);
+  APPS=snap.docs.filter(d=>!d.data().deleted);
+  try{const g=await DB.collection('goodsConfirms').get();window.GOODS={};g.docs.forEach(x=>window.GOODS[x.id]=x.data());}catch(e){window.GOODS={};}
+  renderApps();
+}
+const SIDO_ALIAS={'서울':['서울'],'인천':['인천'],'경기':['경기'],'강원':['강원'],'대전':['대전'],'세종':['세종'],'충북':['충북','충청북도'],'충남':['충남','충청남도'],'광주':['광주'],'전북':['전북','전라북도'],'전남':['전남','전라남도'],'부산':['부산'],'대구':['대구'],'울산':['울산'],'경북':['경북','경상북도'],'경남':['경남','경상남도'],'제주':['제주'],'전남광주':['광주','전남','전라남도']};
+
+// ── 권역 보정: region 미저장·비표준(극초반 신청)은 주소로 자동 판정 ──
+const KFDF_REGIONS=['서울·경기','강원','충청','전라','경상','제주'];
+const SIDO2REG={'서울':'서울·경기','인천':'서울·경기','경기':'서울·경기','강원':'강원','대전':'충청','세종':'충청','충청북':'충청','충북':'충청','충청남':'충청','충남':'충청','광주':'전라','전라북':'전라','전북':'전라','전라남':'전라','전남':'전라','부산':'경상','대구':'경상','울산':'경상','경상북':'경상','경북':'경상','경상남':'경상','경남':'경상','제주':'제주'};
+const REG_ALIAS={'서울경기':'서울·경기','수도권':'서울·경기','서울/경기':'서울·경기','충청권':'충청','전라권':'전라','경상권':'경상','제주권':'제주','강원권':'강원'};
+function appRegion(s){
+  const raw=String(s.region||'').trim();
+  if(KFDF_REGIONS.indexOf(raw)>=0)return raw;
+  const norm=REG_ALIAS[raw.replace(/\s/g,'')];
+  if(norm)return norm;
+  const src=String(s.city||'')||String(s.school||'');
+  for(const k in SIDO2REG){if(src.indexOf(k)===0)return SIDO2REG[k]}
+  // 학교명에 시도가 섞인 경우 (예: 부산신남초)
+  for(const k in SIDO2REG){if(String(s.school||'').indexOf(k)===0)return SIDO2REG[k]}
+  return raw||'';
+}
+
+// ── 유형 보정: 극초반 신청의 옛 값(school/after 등) 표준화 ──
+function appTypeOf(s){
+  const t=String((s.type||'')+' '+(s.typeKey||'')).toLowerCase();
+  if(t.indexOf('after')>=0||t.indexOf('방과후')>=0||t.indexOf('늘봄')>=0||t.indexOf('돌봄')>=0)return '방과후·늘봄·돌봄';
+  if(t.indexOf('school')>=0||t.indexOf('학교')>=0)return '학교체육 강습';
+  return String(s.type||'');
+}
+function renderInstLink(){
+  const box=document.getElementById('instLinkList');if(!box)return;
+  const q=((document.getElementById('appSearch')||{}).value||'').trim().toLowerCase();
+  const list=(USERS||[]).filter(d=>{
+    const v=d.data();if(v.status!=='approved')return false;
+    const f=v.instructorFor||{};
+    const want=AFL==='학교체육'?f.school:(AFL==='방과후'?f.after:(f.school||f.after));
+    if(!want)return false;
+    if(q&&[v.name,v.baseCity,v.region,(v.activityRegions||[]).join(' '),v.workSchool].map(x=>String(x||'').toLowerCase()).join(' ').indexOf(q)<0)return false;
+    return true;
+  });
+  document.getElementById('instLinkCount').textContent=list.length+'명';
+  box.innerHTML=list.length?list.map(d=>{
+    const v=d.data();const f=v.instructorFor||{};
+    return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid #e3ece7;border-radius:9px;padding:7px 12px;font-size:13px">'
+      +'<b>'+esc(v.name)+'</b>'
+      +(f.school?'<span style="font-size:10.5px;font-weight:900;color:#fff;background:#1F4E9C;padding:2px 8px;border-radius:999px">학교체육</span>':'')
+      +(f.after?'<span style="font-size:10.5px;font-weight:900;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">방과후</span>':'')
+      +'<span style="color:var(--gray)">'+esc(v.region||'')+(v.baseCity?' · 📍'+esc(v.baseCity):' · <b style="color:#C41E2F">거점 미입력</b>')
+      +(v.workSchool?' · 🏫'+esc(v.workSchool):'')+(v.phone?' · ☎'+esc(v.phone):'')+'</span>'
+      +'<button class="btn-sub" style="background:#0f766e;padding:4px 12px;min-height:0;margin-left:auto" onclick="setBase(\''+d.id+'\')">📍지정</button>'
+      +'</div>';
+  }).join(''):'<div style="font-size:13px;color:var(--gray);padding:6px">해당 조건의 지원 강사가 없습니다.</div>';
+}
+function renderApps(){
+  renderInstLink();
+  const dupKey={};APPS.forEach(d=>{const x=d.data();const k=(x.school||'').replace(/\s/g,'')+'|'+(x.type||'');dupKey[k]=(dupKey[k]||0)+1});
+  const sido=(document.getElementById('appSido')||{}).value||'';
+  const q=((document.getElementById('appSearch')||{}).value||'').trim().toLowerCase();
+  const docs=APPS.filter(d=>{
+    const _rf=(document.getElementById('appRegF')||{}).value||'';
+    if(_rf&&appRegion(d.data())!==_rf)return false;
+    const s=d.data();
+    if(AFL!=='전체'&&appTypeOf(s).indexOf(AFL)<0)return false;
+    if(sido){
+      const c=String(s.city||'');
+      if(!(SIDO_ALIAS[sido]||[sido]).some(a=>c.indexOf(a)===0))return false;
+    }
+    if(q){
+      const hay=[s.school,s.city,s.teacher,s.code,s.region,s.assignedName].map(x=>String(x||'').toLowerCase()).join(' ');
+      if(hay.indexOf(q)<0)return false;
+    }
+    return true;
+  });
+  const cnt=document.getElementById('appCount');
+  if(cnt)cnt.textContent=docs.length+'건'+((sido||q)?' (전체 '+APPS.length+'건 중)':'');
+  const el=document.getElementById('appList');
+  el.innerHTML=docs.length?docs.map(d=>{
+    const s=d.data();
+    const st=s.status||'접수';
+    const gc=(window.GOODS||{})[d.id];
+    const stc={'접수':'#8a919d','대기':'#e6b422','선정':'#1F4E9C','배정완료':'#0f766e','미선정':'#C41E2F','취소':'#555555'}[st]||'#8a919d';
+    return '<div class="urow"><div class="grow"><b>'+esc(s.school)+'</b> '
+      +'<span style="font-size:12px;font-weight:800;color:#fff;background:'+stc+';padding:2px 10px;border-radius:999px">'+st+(st==='대기'&&s.waitNo?' '+s.waitNo+'번':'')+'</span>'
+      +(s.eduName?' <span style="font-size:11px;font-weight:800;color:#C41E2F">★이수자교('+esc(s.eduName)+')</span>':'')
+      +(s.selfTeach?' <span style="font-size:11px;font-weight:800;color:#0f766e">◉본인지도 희망'+(s.selfName?'('+esc(s.selfName)+')':'')+'</span>':'')
+      +((dupKey[(s.school||'').replace(/\s/g,'')+'|'+(s.type||'')]>1)?' <span style="font-size:11px;font-weight:800;color:#fff;background:#e6b422;padding:2px 8px;border-radius:999px">⚠ 중복의심</span>':'')
+      +(s.support==='용품만'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">🎁 용품만</span>':'')
+      +' <span style="font-size:11px;font-weight:800;color:#fff;background:'+(appTypeOf(s).indexOf('방과후')>=0?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+'</span>'
+      +(gc&&gc.teacherConfirm?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px" title="'+esc(gc.teacherConfirm.name)+'">📦 용품수령확인</span>':'')
+      +'<div class="sub3">'+(s.code?'<b>'+esc(s.code)+'</b> · ':'')+esc(s.region)+(s.city?' · <b style="color:#1F4E9C">📍'+esc(s.city)+'</b>':' · <b style="color:#C41E2F">시군구 미입력</b>')+' · '+esc(s.students)+(s.start&&s.start.indexOf('8월')>=0?' · <b style="color:#C41E2F">⚡8월 방학 개강 희망</b>':'')+' · 희망 '+esc(s.d1)
+      +'<br>담당 '+esc(s.teacher)+' '+esc(s.phone)+(s.assignedName?' · <b style="color:#0f766e">배정: '+esc(s.assignedName)+'</b>':'')+'</div></div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +(st==='접수'?'<button class="btn-sub" onclick="setStatus(\''+d.id+'\',\'선정\')">선정</button><button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'미선정\')">미선정</button><button class="btn-sub" style="background:#e6b422" onclick="toWait(\''+d.id+'\')">대기 전환</button>':'')
+      +(st==='대기'?'<button class="btn-sub" style="background:#0f766e" onclick="setStatus(\''+d.id+'\',\'접수\')">접수 전환</button>':'')
+      +((st==='취소'||st==='미선정')?'<button class="btn-sub" style="background:#0f766e" onclick="setStatus(\''+d.id+'\',\'접수\')">접수로 복원</button>':'')
+      +(st==='선정'&&!s.assignedName?'<button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'접수\')">선정취소</button>':'')
+      +(st==='배정완료'?'<button class="btn-sub" style="background:#7c3aed" onclick="toggleLogs(\''+d.id+'\')">📒 일지</button>':'')
+      +(st==='배정완료'?'<button class="btn-sub" style="background:#e6b422" onclick="unassign(\''+d.id+'\')">👤 배정해제</button>':'')
+      +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:#fff;color:#8a919d;border:1.5px solid #8a919d" onclick="cancelSchool(\''+d.id+'\')">학교취소</button>':'')
+      +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:#1F4E9C" onclick="copyNotice(\''+d.id+'\')">📋 통보문</button>':'')
+      +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:'+(gc&&gc.teacherConfirm?'#0f766e':'#b8860b')+'" onclick="reqGoods(\''+d.id+'\')">📦 '+(gc&&gc.teacherConfirm?'수령확인✓':'용품수령 확인요청')+'</button>':'')
+      +'<button class="btn-sub" style="background:'+(s.start&&s.start.indexOf('8월')>=0?'#C41E2F':'#8a919d')+'" onclick="setStart(\''+d.id+'\')">'+(s.start&&s.start.indexOf('8월')>=0?'⚡긴급(방학)':s.start?'일반(9월)':'개강시기?')+'</button>'
+      +'<button class="btn-sub" style="background:'+(s.city?'#8a919d':'#C41E2F')+'" onclick="setCity(\''+d.id+'\')">📍시군구</button>'
+      +'<button class="btn-sub" style="background:#fff;color:#7c3aed;border:1.5px solid #7c3aed" title="학교체육 ↔ 방과후 유형 전환" onclick="chgType(\''+d.id+'\')">🔁 유형</button>'
+      +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delApp(\''+d.id+'\')">🗑</button>'
+      +'</div></div>'
+      +'<div id="logs_'+d.id+'" style="display:none;background:var(--bg-soft);border-radius:12px;padding:14px 18px;margin:-6px 0 10px"></div>';
+  }).join(''):'<div class="bempty">해당 유형의 신청이 없습니다.</div>';
+}
+// ── 문자 발송용 명단 복사 (이름[탭]전화) — 실제 발송은 별도 문자 서비스 ──
+function copyPhoneList(kind){
+  let list=[];
+  if(kind==='users'){
+    USERS.filter(d=>uMatch(d.data())).forEach(d=>{const v=d.data();if(v.phone)list.push((v.name||'')+'\t'+v.phone)});
+  }else{
+    const sido=(document.getElementById('appSido')||{}).value||'';
+    const q=((document.getElementById('appSearch')||{}).value||'').trim().toLowerCase();
+    APPS.forEach(d=>{const s=d.data();
+      if(AFL!=='전체'&&appTypeOf(s).indexOf(AFL)<0)return;
+      if(sido){const c=String(s.city||'');if(!(SIDO_ALIAS[sido]||[sido]).some(a=>c.indexOf(a)===0))return;}
+      if(q){const hay=[s.school,s.city,s.teacher,s.code,s.region,s.assignedName].map(x=>String(x||'').toLowerCase()).join(' ');if(hay.indexOf(q)<0)return;}
+      if(s.phone)list.push((s.teacher||'')+'\t'+s.phone+'\t'+(s.school||''));
+    });
+  }
+  const uniq=[...new Set(list)];
+  if(!uniq.length){alert('전화번호가 있는 대상이 없습니다.');return}
+  const text=uniq.join('\n');
+  function done(){alert('✓ '+uniq.length+'명 명단이 복사되었습니다. (이름[탭]전화)\n문자 발송 서비스나 엑셀에 붙여넣으세요.\n\n※ 홈페이지에서는 문자를 직접 발송하지 않습니다 — 별도 문자 서비스가 필요합니다.')}
+  if(navigator.clipboard){navigator.clipboard.writeText(text).then(done).catch(fb)}else fb();
+  function fb(){const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done()}catch(e){alert('복사 실패')}document.body.removeChild(ta)}
+}
+// ── 권역별 강사 수급 대조 (서울/경기 등 배분 판단 근거) ──
+function showSupply(){
+  const box=document.getElementById('supplyBox');
+  if(box.style.display==='block'){box.style.display='none';return}
+  box.style.display='block';
+  const REG=['서울·경기','강원','충청','전라','경상','제주'];
+  const stat={};REG.forEach(r=>stat[r]={apply:0,sel:0,assigned:0,inst:0});
+  APPS.forEach(d=>{const s=d.data();const r=appRegion(s);if(!stat[r])return;
+    const st=s.status||'접수';
+    if(['접수','대기','선정','배정완료'].indexOf(st)>=0)stat[r].apply++;
+    if(st==='선정'||st==='배정완료')stat[r].sel++;
+    if(st==='배정완료')stat[r].assigned++;
+  });
+  USERS.forEach(d=>{const v=d.data();if(v.status!=='approved')return;const f=v.instructorFor||{};if(!(f.school||f.after))return;
+    const regs=(v.activityRegions&&v.activityRegions.length)?v.activityRegions:(v.region?[v.region]:[]);
+    REG.forEach(r=>{if(regs.indexOf(r)>=0)stat[r].inst++});
+  });
+  let html='<b style="font-size:15px">🧭 권역별 강사 수급 현황</b> <span style="font-size:12px;color:var(--gray)">— 신청교(유효 접수) · 선정 · 배정완료 · 미배정 · 강사 지원자(활동가능 권역 기준, 권역 중복 포함)</span>'
+    +'<div style="overflow-x:auto;margin-top:10px"><table class="rtbl"><thead><tr><th>권역</th><th>신청교</th><th>선정</th><th>배정완료</th><th>미배정</th><th>강사 지원자</th><th>수급</th></tr></thead><tbody>';
+  REG.forEach(r=>{const s=stat[r];const un=s.sel-s.assigned;
+    html+='<tr><td class="nm">'+r+'</td><td>'+s.apply+'</td><td>'+s.sel+'</td><td>'+s.assigned+'</td>'
+      +'<td><b style="color:'+(un>0?'#C41E2F':'#0f766e')+'">'+un+'</b></td><td>'+s.inst+'</td>'
+      +'<td>'+(s.inst>=un?'<span style="color:#0f766e;font-weight:800">여유</span>':'<span style="color:#C41E2F;font-weight:800">부족 '+(un-s.inst)+'</span>')+'</td></tr>';
+  });
+  box.innerHTML=html+'</tbody></table></div>';
+}
+
+// ── NEIS 소재지 기반 시군구 일괄 매칭 (2026-07-21 기준 신청교) ──
+const SCHOOL_CITY={"강동초등학교": "부산광역시 해운대구", "광주계림초등학교": "광주광역시 동구", "광주서초등학교": "광주광역시 서구", "광주효동초등학교": "광주광역시 북구", "괴정초등학교": "부산광역시 사하구", "기성초등학교": "대전광역시 서구", "녹명초등학교": "부산광역시 강서구", "능주중학교": "전라남도 화순군", "능주초등학교": "전라남도 화순군", "교문초등학교": "경기도 구리시", "대전관평초등학교": "대전광역시 유성구", "대전글꽃초등학교": "대전광역시 중구", "대전둔원초등학교": "대전광역시 서구", "대전새여울초등학교": "대전광역시 대덕구", "대전송촌초등학교": "대전광역시 대덕구", "대전원신흥초등학교": "대전광역시 유성구", "대전중리초등학교": "대전광역시 대덕구", "대전중원초등학교": "대전광역시 대덕구", "대전지족초등학교": "대전광역시 유성구", "두호남부초등학교": "경상북도 포항시 북구", "동호초등학교": "강원특별자치도 동해시", "동화초등학교": "강원특별자치도 원주시", "마장중학교": null, "망미초등학교": "부산광역시 수영구", "명원초등학교": "부산광역시 강서구", "범일초등학교": "부산광역시 동구", "보림초등학교": "부산광역시 사하구", "봉학초등학교": "부산광역시 영도구", "부암초등학교": "부산광역시 부산진구", "분진중학교": "경기도 김포시", "불곡초등학교": "경기도 성남시 분당구", "새별초등학교": "광주광역시 광산구", "서대구초등학교": "대구광역시 서구", "서울가양초등학교": "서울특별시 강서구", "서울개현초등학교": "서울특별시 강남구", "서울금산초등학교": "서울특별시 금천구", "서울도림초등학교": "서울특별시 영등포구", "서울문창초등학교": "서울특별시 동작구", "서울보라매초등학교": "서울특별시 동작구", "서울송화초등학교": "서울특별시 강서구", "서울신서초등학교": "서울특별시 양천구", "서울은로초등학교": "서울특별시 동작구", "서울창도초등학교": "서울특별시 도봉구", "서울청덕초등학교": "서울특별시 성북구", "서울태랑초등학교": "서울특별시 노원구", "서울평화초등학교": "서울특별시 송파구", "서정리초등학교": "경기도 평택시", "성서초등학교": null, "세곡초등학교": null, "신남초등학교": "부산광역시 사하구", "신창초등학교": "광주광역시 광산구", "신호초등학교": "부산광역시 강서구", "안산중앙초등학교": "경기도 안산시 단원구", "영본초등학교": "서울특별시 동작구", "영통초등학교": "경기도 수원시 영통구", "운남초등학교": null, "운정해오름초등학교": "경기도 파주시", "운흥초등학교": "경기도 시흥시", "유안초등학교": "광주광역시 남구", "인지초등학교": "부산광역시 해운대구", "인천 부일중학교": "인천광역시 부평구", "인천구월초등학교": "인천광역시 남동구", "인천도담초등학교": "인천광역시 서해구", "인천별빛초등학교": "인천광역시 중구", "인천석남서초등학교": "인천광역시 서해구", "인천석암초": "인천광역시 미추홀구", "인천연송초등학교": "인천광역시 연수구", "인천이음초등학교": "인천광역시 검단구", "일동초등학교": "광주광역시 북구", "전남기술과학고등학교": "전라남도 화순군", "전주진북초등학교": "전북특별자치도 전주시 덕진구", "지한초등학교": "광주광역시 동구", "진제초등학교": "광주광역시 남구", "창현초등학교": "경기도 남양주시", "천곡초등학교": "강원특별자치도 동해시", "청동초등학교": "부산광역시 영도구", "청양초등학교": "강원특별자치도 철원군", "초읍초등학교": "부산광역시 부산진구", "태봉초": null, "평택안일초등학교": "경기도 평택시", "한울초등학교": "광주광역시 북구", "한재초등학교": "전라남도 담양군", "한홀초등학교": "경기도 하남시", "화곡초등학교": "충청북도 충주시", "화순제일중학고": "전라남도 화순군"};
+async function matchCityAll(){
+  let fill=0,skip=[],amb=[];
+  for(const d of APPS){
+    const s=d.data();
+    const cur=String(s.city||'').trim();
+    // 이미 "시도 시군구" 형태로 온전하면 유지
+    const m=SCHOOL_CITY[String(s.school||'').trim()];
+    if(m===null){amb.push(s.school);continue}
+    if(m===undefined){if(!cur)skip.push(s.school);continue}
+    // 비었거나, 시군구 없이 시도만 있거나, NEIS와 다르면 교체 여부: 비어있을 때만 자동, 다르면 유지(신청자 입력 존중)
+    if(!cur){
+      await DB.collection('schoolApplications').doc(d.id).update({city:m});fill++;
+    }else if(cur.replace(/\s/g,'').length<4){
+      await DB.collection('schoolApplications').doc(d.id).update({city:m});fill++;
+    }
+  }
+  await loadApps();
+  alert('시군구 일괄 매칭 완료\n· 자동 기입: '+fill+'건'
+    +(amb.length?'\n· 동명교(수동 확인 필요): '+[...new Set(amb)].join(', ')+' — 📍시군구 버튼으로 확정하세요':'')
+    +(skip.length?'\n· 매핑표에 없음: '+[...new Set(skip)].join(', '):''));
+}
+
+// 업무별 위임 표시용 태그 — duties 필드 없으면 하위호환(전 업무), 있으면 위임된 업무만 표기
+function dutyTag(v){
+  if(!Array.isArray(v.duties))return '';
+  const t=[];if(v.duties.indexOf('assign')>=0)t.push('강습');if(v.duties.indexOf('license')>=0)t.push('자격');
+  return t.length?' ('+t.join('·')+')':'';
+}
+// ── 전체 관리자(admin) 지정 (오너 전용) — 모든 회원 조회·관리 권한 부여 ──
+async function setFullAdmin(uid){
+  const doc=USERS.find(d=>d.id===uid);if(!doc)return;
+  const v=doc.data();
+  if(v.owner){alert('오너 계정은 이 버튼으로 변경할 수 없습니다.');return}
+  if(v.role==='admin'){
+    if(!confirm('['+v.name+'] 님의 전체 관리자 권한을 해제하고 일반 회원으로 되돌릴까요?'))return;
+    try{await DB.collection('users').doc(uid).update({role:'member'});alert('해제되었습니다.');loadUsers();}
+    catch(e){alert('실패: '+e.message+'\n(권한 변경은 오너 계정만 가능합니다)')}
+    return;
+  }
+  if(!confirm('⚠️ ['+v.name+'] 님에게 전체 관리자(admin) 권한을 부여합니다.\n\n· 관리자 페이지 전체 사용 가능 — 모든 회원 조회·승인·포인트·삭제, 강습·자격 관리 등\n· 단, 다른 사람에게 권한 부여(권역/전체 관리자 지정)와 오너 설정은 불가 (오너 전용)\n\n부여할까요?'))return;
+  try{
+    await DB.collection('users').doc(uid).update({role:'admin',status:'approved'});
+    alert('전체 관리자로 지정되었습니다.\n이제 이분도 관리자 페이지(admin)에서 모든 회원을 조회·관리할 수 있습니다.');loadUsers();
+  }catch(e){alert('실패: '+e.message+'\n(권한 부여는 오너 계정만 가능합니다 — 규칙 파일의 owner 설정 안내 참고)')}
+}
+// ── 권역 관리자 지정 (오너 전용 — 규칙에서 owner:true 계정만 허용) ──
+async function setRegionAdmin(uid){
+  const doc=USERS.find(d=>d.id===uid);if(!doc)return;
+  const v=doc.data();
+  if(v.role==='regionAdmin'){
+    if(!confirm(v.name+' 님의 권역 관리자 권한('+(v.managedRegion||'')+')을 해제할까요?'))return;
+    try{
+      await DB.collection('users').doc(uid).update({role:'member',managedRegion:firebase.firestore.FieldValue.delete(),managedSido:firebase.firestore.FieldValue.delete(),duties:firebase.firestore.FieldValue.delete()});
+      alert('해제되었습니다.');loadUsers();
+    }catch(e){alert('실패: '+e.message+'\n(권한 부여·해제는 오너 계정만 가능합니다)')}
+    return;
+  }
+  // 업무별 위임: 강습배정 / 자격관리를 각각 선택 부여 (겸무 인원은 둘 다, 특정 업무만 맡는 인원은 하나만)
+  const an=prompt(v.name+' 님에게 "강습 배정" 업무(전 권역 학교 신청 열람·강사배정)를 위임할까요?\ny=예  n=아니오 (자격 업무만 위임)','y');
+  if(an===null)return;
+  const wantAssign=an.trim().toLowerCase()!=='n';
+  const n=prompt(v.name+' 님의 소속(표시용) 권역 번호를 입력하세요:\n1=서울·경기 2=강원 3=충청 4=전라 5=경상 6=제주');
+  if(n===null)return;
+  const R={'1':'서울·경기','2':'강원','3':'충청','4':'전라','5':'경상','6':'제주'}[n.trim()];
+  if(!R){alert('1~6 중에서 입력해주세요.');return}
+  const sn=prompt('자격증 업무 관할 연맹 번호를 입력하세요 (시도연맹 관계자·자격관리 겸무자):\n1=경기 2=강원 3=부산 4=경남 5=경북 6=전남광주\n※ 복수 관할은 쉼표로: 예) 3,4 (부산+경남)\n(자격 업무 권한이 필요 없으면 0)','0');
+  if(sn===null)return;
+  const SIDOS={'1':'경기','2':'강원','3':'부산','4':'경남','5':'경북','6':'전남광주'};
+  // 산하 시도 확장 (기존 대장 데이터 커버)
+  const EXP={'경기':['경기','서울','인천'],'강원':['강원'],'부산':['부산','울산'],'경남':['경남'],'경북':['경북','대구'],'전남광주':['전남광주','광주전남','광주','전북','전남']};
+  const picked=[...new Set(sn.split(',').map(x=>SIDOS[x.trim()]).filter(Boolean))];
+  const S=picked.length?[...new Set(picked.flatMap(f=>EXP[f]))]:null;
+  const SLABEL=picked.join('·');
+  const duties=[];if(wantAssign)duties.push('assign');if(S)duties.push('license');
+  if(!duties.length){alert('강습배정·자격 업무 중 최소 하나는 위임해야 합니다.');return}
+  // 참고: 자격 업무를 위임해도 공고 승인·결과보고 승인은 항상 중앙(오너/admin) 전용이며, 이 위임과 무관하게 자동 제외됩니다.
+  if(!confirm(v.name+' 님에게 권역 관리자 권한을 부여할까요?\n\n· 강습 배정: '+(wantAssign?'전 권역 열람·배정 가능 (region.html)':'권한 없음')+'\n· 자격증 업무: '+(S?('['+SLABEL+'] 관할 신청처리·발급 가능 (산하 시도 포함: '+S.join('·')+') — 공고 승인·결과보고 승인은 항상 중앙 전용'):'권한 없음')+'\n· 회원 삭제·포인트 부여·권한 부여는 불가'))return;
+  try{
+    const upd={role:'regionAdmin',managedRegion:R,duties:duties};
+    if(S)upd.managedSido=S;else upd.managedSido=firebase.firestore.FieldValue.delete();
+    await DB.collection('users').doc(uid).update(upd);
+    alert('지정 완료. '+v.name+' 님에게 '+[wantAssign?'region.html':'',S?'license.html':''].filter(Boolean).join(' · ')+' 주소를 안내하세요.');loadUsers();
+  }catch(e){alert('실패: '+e.message+'\n(권한 부여는 오너 계정만 가능합니다 — 규칙 파일의 owner 설정 안내 참고)')}
+}
+async function approveDegree(uid){
+  const u=USERS.find(x=>x.id===uid);if(!u)return;
+  if(!confirm(u.data().name+' 님의 학위('+(u.data().degree||'')+') 증빙을 확인·승인할까요?'))return;
+  await DB.collection('users').doc(uid).update({degreeApproved:true});
+  loadUsers();
+}
+async function setCity(id){
+  const doc=APPS.find(d=>d.id===id);if(!doc)return;
+  const s=doc.data();
+  const val=prompt('시도 + 시군구를 입력하세요 (예: 경기도 김포시 / 부산광역시 수영구)',s.city||'');
+  if(val===null)return;
+  const upd={city:val.trim()};
+  // 권역도 함께 확인 (잘못 접수된 권역 정정 — 예: 부산 학교가 서울·경기로 접수)
+  const rn=prompt('권역 확인 — 현재 ['+(s.region||'미지정')+']\n맞으면 그냥 [확인], 바꾸려면 번호 입력:\n1=서울·경기 2=강원 3=충청 4=전라 5=경상 6=제주',' ');
+  if(rn!==null){
+    const R={'1':'서울·경기','2':'강원','3':'충청','4':'전라','5':'경상','6':'제주'}[rn.trim()];
+    if(R&&R!==s.region){
+      upd.region=R;
+      // 지명 게시판에 올라가 있으면 권역도 갱신
+      const slot=await DB.collection('openSlots').doc(id).get();
+      if(slot.exists)await DB.collection('openSlots').doc(id).set(Object.assign(slot.data(),{region:R}));
+    }
+  }
+  await DB.collection('schoolApplications').doc(id).update(upd);
+  await loadApps();await updateLeaderboard().catch(()=>{});
+}
+function exportApps(){
+  const rows=[['접수번호','학교명','시도/시군구','권역','유형','지원방식','상태','대기번호','담당교사','전화','이메일','이수자','본인지도','개강희망','배정강사','진행회차']];
+  APPS.forEach(d=>{const s=d.data();
+    rows.push([s.code||'',s.school||'',s.city||'',s.region||'',s.type||'',s.support||'',s.status||'',s.waitNo||'',s.teacher||'',s.phone||'',s.email||'',s.eduName||'',s.selfTeach?(s.selfName||'O'):'',s.start||'',s.assignedName||'',s.doneSessions||0]);
+  });
+  const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='신청학교_목록_시군구포함.csv';a.click();
+}
+async function syncStatus(app,st,extra){
+  extra=extra||{};
+  if(app&&app.code)await DB.collection('appStatus').doc(app.code).set({
+    school:app.school,type:app.type,status:st,waitNo:app.waitNo||0,
+    assignedName:(extra.assignedName!==undefined?extra.assignedName:(app.assignedName||'')),
+    doneSessions:(extra.doneSessions!==undefined?extra.doneSessions:(app.doneSessions||0)),
+    support:app.support||'강사파견+용품',
+    updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+}
+async function syncStatusById(id){
+  const d=await DB.collection('schoolApplications').doc(id).get();
+  if(d.exists)await syncStatus(d.data(),d.data().status);
+}
+async function loadDash(){
+  try{
+    const [us,ap,sl]=await Promise.all([
+      DB.collection('users').get(),
+      DB.collection('schoolApplications').get(),
+      DB.collection('openSlots').get()]);
+    const u=us.docs.map(d=>d.data()),a=ap.docs.map(d=>d.data());
+    const box=(n,l,c)=>'<div style="background:#fff;border:1.5px solid var(--line);border-left:4px solid '+c+';border-radius:12px;padding:14px 16px"><b style="font-size:22px">'+n+'</b><div style="font-size:12px;color:var(--gray);font-weight:700">'+l+'</div></div>';
+    document.getElementById('dash').innerHTML=
+      box(u.filter(x=>x.status==='pending').length,'승인 대기 회원','#e6b422')
+      +box(u.filter(x=>x.status==='approved').length,'승인 회원','#0f766e')
+      +box(a.filter(x=>String(x.type||'').indexOf('방과후')<0).length,'🏫 학교체육 신청','#8c1622')
+      +box(a.filter(x=>String(x.type||'').indexOf('방과후')>=0).length,'🌱 방과후·늘봄 신청','#0f766e')
+      +box(a.filter(x=>x.status==='대기').length,'⏳ 정원초과 대기','#e6b422')
+      +box(a.filter(x=>x.status==='선정').length,'선정 (배정 대기)','#1F4E9C')
+      +box(a.filter(x=>x.status==='배정완료').length,'배정 완료','#0f766e')
+      +box(sl.docs.filter(d=>d.data().claimedBy).length,'지명 확정 대기 ⚡','#C41E2F');
+    try{const rp=await DB.collection('reports').get();if(rp.size)document.getElementById('dash').innerHTML+=box(rp.size,'🚩 커뮤니티 신고','#C41E2F');}catch(e){}
+  }catch(e){}
+}
+async function syncLogPoints(){
+  if(!confirm('제출된 회차 보고(일지) 수와 기록된 회차를 대조하여,\n차이만큼 강사 포인트(회차당 10P)를 일괄 지급합니다.'))return;
+  const logs=await DB.collection('sessionLogs').get();
+  const cnt={};
+  logs.docs.forEach(d=>{const l=d.data();cnt[l.appId]=(cnt[l.appId]||0)+1});
+  const apps=await DB.collection('schoolApplications').where('status','==','배정완료').get();
+  let done=0,pts=0;
+  for(const d of apps.docs){
+    const s=d.data();
+    const logged=cnt[d.id]||0, recorded=s.doneSessions||0;
+    const diff=logged-recorded;
+    if(diff<=0||!s.assignedUid)continue;
+    await DB.collection('users').doc(s.assignedUid).update({points:firebase.firestore.FieldValue.increment(diff*10)});
+    await DB.collection('users').doc(s.assignedUid).collection('activities').add({
+      label:s.school+' 강습 '+diff+'회차 (일지 확인)',date:new Date().toISOString().slice(0,10).replace(/-/g,'.'),
+      points:diff*10,addedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await d.ref.update({doneSessions:logged});
+    await syncStatus(Object.assign({},s,{doneSessions:logged}),'배정완료',{doneSessions:logged});
+    done++;pts+=diff*10;
+  }
+  if(done)await updateLeaderboard();
+  alert(done?('반영 완료 — '+done+'개교, 총 '+pts+'P 지급'):'반영할 신규 일지가 없습니다.');
+  loadApps();
+}
+async function payrollCSV(){
+  const ym=prompt('지급 계산할 월을 입력하세요 (YYYY-MM)',new Date().toISOString().slice(0,7));
+  if(!ym||!/^\d{4}-\d{2}$/.test(ym)){if(ym!==null)alert('형식: 2026-09');return}
+  const logs=await DB.collection('sessionLogs').get();
+  const by={};
+  logs.docs.forEach(d=>{
+    const l=d.data();
+    if(!String(l.date||'').startsWith(ym))return;
+    const k=l.uid;
+    by[k]=by[k]||{name:l.name,schools:{},n:0};
+    by[k].n++;by[k].schools[l.school]=(by[k].schools[l.school]||0)+1;
+  });
+  const keys=Object.keys(by);
+  if(!keys.length){alert(ym+' 월에 제출된 일지가 없습니다.');return}
+  const rows=[['성명','학교(회차)','총 회차','지급총액(회당 5만원)','소득세(8%)','지방소득세(0.8%)','공제계','실지급액']];
+  keys.forEach(k=>{
+    const v=by[k];
+    const amt=v.n*50000;
+    const tax1=Math.floor(amt*0.08/10)*10, tax2=Math.floor(amt*0.008/10)*10;
+    rows.push([v.name,Object.entries(v.schools).map(x=>x[0]+'('+x[1]+')').join(' / '),v.n,amt,tax1,tax2,tax1+tax2,amt-tax1-tax2]);
+  });
+  rows.push([]);rows.push(['※ 예산 기준: 지도자 수당 회당(1시간 수업) 50,000원 — 사업계획서 유형③·⑤. 기타소득 8.8% 원천징수, 소액부징수는 신고 시 확인. 주민번호·계좌는 보안 대장에서 결합.']);
+  const csv='\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='강사지급계산_'+ym+'.csv';a.click();
+}
+async function copyNotice(id){
+  const s=APPS.find(d=>d.id===id).data();
+  let iPhone='(연락처: 직접 기입)';
+  if(s.assignedUid){
+    try{const u=await DB.collection('users').doc(s.assignedUid).get();
+    if(u.exists&&u.data().phone)iPhone=u.data().phone;}catch(e){}
+  }
+  const isAug=s.start&&s.start.indexOf('8월')>=0;
+  const period=isAug?'8월 여름방학 중':'9월';
+  let txt='';
+  if(s.status==='선정'){
+    if(s.support==='용품만'){
+      txt='[학교용 — 담당교사 '+s.teacher+' '+s.phone+']\n'
+        +'[플라잉디스크연맹] '+s.school+' '+s.type+' 신청이 선정되었습니다(용품 지원). 접수번호 '+(s.code||'')+'. '
+        +'50만원 상당 용품 세트를 개강 전 학교로 배송해 드립니다. 강사 파견 없이 학교 자체 운영이며, 운영일지 등 간단한 증빙에 협조 부탁드립니다. 문의 031-984-3248';
+    }else{
+    txt='[학교용 — 담당교사 '+s.teacher+' '+s.phone+']\n'
+      +'[플라잉디스크연맹] '+s.school+' '+s.type+' 신청이 선정되었습니다. 접수번호 '+(s.code||'')+'. '
+      +'개강은 '+period+' 예정이며, 담당 강사 배정 후 성명·연락처를 전달드리니 귀교 외부강사 절차에 따른 경력조회 협조를 부탁드립니다. '
+      +'선정 통보 공문은 학교 메일로 발송됩니다. 문의 031-984-3248';
+    }
+  }else{
+    txt='[학교용 — 담당교사 '+s.teacher+' '+s.phone+']\n'
+      +'[플라잉디스크연맹] '+s.school+' '+s.type+' 담당 강사가 배정되었습니다. 강사: '+s.assignedName+' (연락처: 직접 기입). '
+      +'귀교 외부강사 관리 절차에 따른 경력조회 협조 부탁드리며, 강사가 일정 협의차 연락드릴 예정입니다. 문의 031-984-3248'
+      +'\n\n[강사용 — '+s.assignedName+']\n'
+      +'[플라잉디스크연맹] '+s.school+' ('+s.type+', '+period+' 개강, 24회차) 강사로 배정되었습니다. '
+      +'홈페이지 마이페이지에서 ①위촉 전자동의 ②위촉계약 전자동의를 완료해주세요. '
+      +'담당교사: '+s.teacher+' '+s.phone+' — 위촉 완료 후 일정 협의 연락 바랍니다. '
+      +'수당 지급용 주민등록번호·계좌번호는 이 번호로 회신해주세요. 문의 031-984-3248';
+  }
+  navigator.clipboard.writeText(txt).then(()=>alert('✓ 통보문 전체가 복사되었습니다. 문자·메일에 붙여넣으세요.\n\n'+txt))
+    .catch(()=>prompt('아래 내용을 복사하세요',txt));
+}
+async function toggleLogs(id){
+  const el=document.getElementById('logs_'+id);
+  if(el.style.display==='block'){el.style.display='none';return}
+  el.style.display='block';el.innerHTML='<span style="font-size:13px;color:var(--gray)">불러오는 중…</span>';
+  try{
+    const snap=await DB.collection('sessionLogs').where('appId','==',id).get();
+    const logs=snap.docs.map(d=>d.data()).sort((a,b)=>(a.session||0)-(b.session||0));
+    if(!logs.length){el.innerHTML='<span style="font-size:13px;color:var(--gray)">제출된 일지가 없습니다.</span>';return}
+    const cfmN=logs.filter(l=>l.teacherConfirm).length;
+    el.innerHTML='<b style="font-size:13.5px">운영일지 '+logs.length+'건 (강사: '+esc(logs[0].name)+')</b> <span style="font-size:12px;font-weight:800;color:'+(cfmN===logs.length?'#0f766e':'#C41E2F')+'">· 교사확인 '+cfmN+'/'+logs.length+'</span>'
+      +logs.map(l=>'<div style="border-top:1px dashed #d5d9e0;padding:8px 0;font-size:13px">'
+        +'<b>'+l.session+'회차</b> · '+esc(l.date)+(l.count?' · 👥 '+l.count+'명':'')+' — '+esc(l.content)
+        +(l.note?' · <span style="color:#C41E2F">'+esc(l.note)+'</span>':'')
+        +'<div style="margin-top:4px">'+(l.teacherConfirm
+            ?'<span style="font-weight:800;color:#0f766e">✓ 교사확인: '+esc(l.teacherConfirm.name)+'</span>'+(l.teacherConfirm.at?' <span style="color:#8a919d;font-size:11.5px">('+esc(String(l.teacherConfirm.at).replace("T"," ").slice(0,16))+')</span>':'')+(l.teacherConfirm.sign?' <a href="'+l.teacherConfirm.sign+'" target="_blank"><img src="'+l.teacherConfirm.sign+'" style="height:26px;vertical-align:middle;border:1px solid #eee;border-radius:4px;margin-left:4px"></a>':'')
+            :'<span style="font-weight:800;color:#C41E2F">⚠ 교사 미확인</span>')+'</div>'
+        +(l.photos&&l.photos.length?'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">'+l.photos.map(p=>'<a href="'+p+'" target="_blank"><img src="'+p+'" style="width:90px;height:66px;object-fit:cover;border-radius:8px"></a>').join('')+'</div>':'')
+        +'</div>').join('');
+  }catch(e){el.innerHTML='<span style="font-size:13px;color:var(--red)">불러오기 실패: '+esc(e.message)+'</span>'}
+}
+async function unassign(id){
+  const s=APPS.find(d=>d.id===id).data();
+  if(!confirm('['+s.school+'] 배정 강사 '+(s.assignedName||'')+'의 배정을 해제합니다.\n\n· 학교는 다시 「선정(배정 대기)」 상태로 돌아갑니다\n· 지명 슬롯이 다시 열려 재배정할 수 있습니다\n· 이미 지급된 회차 포인트는 회수되지 않습니다(별도 처리)\n계속할까요?'))return;
+  await DB.collection('schoolApplications').doc(id).update({status:'선정',assignedUid:'',assignedName:''});
+  await syncStatus(Object.assign({},s,{waitNo:s.waitNo||0}),'선정');
+  // 지명 슬롯 재오픈 (용품만이 아닌 경우)
+  if(s.support!=='용품만'){
+    await DB.collection('openSlots').doc(id).set({
+      school:s.school,region:appRegion(s),type:appTypeOf(s),d1:s.d1||'',
+      claimedBy:null,claimedName:'',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  }
+  alert('배정이 해제되었습니다. 자동배정 또는 지명으로 재배정할 수 있습니다.');
+  loadApps();loadDash();
+}
+async function cancelSchool(id){
+  const s=APPS.find(d=>d.id===id).data();
+  const reason=prompt('['+s.school+'] 참여를 취소(반려) 처리합니다.\n사유를 입력하세요 (학교 포기·중복·요건 미충족 등). 취소 사유는 기록으로 남습니다.','학교 사정으로 참여 취소');
+  if(reason===null)return;
+  await DB.collection('schoolApplications').doc(id).update({status:'취소',cancelReason:reason,assignedUid:'',assignedName:''});
+  await syncStatus(s,'취소');
+  await DB.collection('openSlots').doc(id).delete().catch(()=>{});
+  kfdfMail(s.email,'[플라잉디스크연맹] 강습 참여 취소 안내 — '+s.school, s.school+' '+s.type+' 강습 참여가 취소 처리되었습니다.\n사유: '+reason+'\n문의: 031-984-3248');
+  alert('취소 처리되었습니다. (대기자가 있으면 승격을 검토하세요)');
+  loadApps();loadDash();
+}
+async function setStart(id){
+  const s=APPS.find(d=>d.id===id).data();
+  const cur=s.start||'(미지정)';
+  const p=prompt('['+s.school+'] 개강 시기 분류 — 현재: '+cur+'\n\n1 = ⚡긴급 (8월 여름방학 개강)\n2 = 일반 (9월 개강)','');
+  if(p!=='1'&&p!=='2')return;
+  await DB.collection('schoolApplications').doc(id).update({start:p==='1'?'8월 여름방학 중 (7/29까지 신청 시)':'9월 (2학기 개강)'});
+  loadApps();
+}
+async function chgType(id){
+  const doc=APPS.find(d=>d.id===id);if(!doc)return;
+  const v=doc.data();
+  const cur=appTypeOf(v);
+  const nxt=cur==='학교체육 강습'?'방과후·늘봄·돌봄':'학교체육 강습';
+  if(!confirm('['+v.school+']\n'+cur+' → '+nxt+' 으로 유형을 변경합니다.\n(접수번호·배정·상태는 그대로 유지됩니다)'))return;
+  await DB.collection('schoolApplications').doc(id).update({type:nxt});
+  loadApps();loadDash();
+}
+async function delApp(id){
+  const s=APPS.find(d=>d.id===id).data();
+  if(!confirm('['+s.school+' / '+s.type+'] 신청을 휴지통으로 이동합니다.\n7일 후 자동으로 완전 삭제되며, 그 전에는 [🗑 휴지통]에서 복구할 수 있습니다.'))return;
+  await DB.collection('schoolApplications').doc(id).update({deleted:true,deletedAt:firebase.firestore.FieldValue.serverTimestamp(),delBy:(firebase.auth().currentUser||{}).email||''});
+  await DB.collection('openSlots').doc(id).delete().catch(()=>{});
+  if(s.code)await DB.collection('appStatus').doc(s.code).delete().catch(()=>{});
+  loadApps();loadDash();
+}
+async function purgeUserDoc(uid){
+  const acts=await DB.collection('users').doc(uid).collection('activities').get();
+  for(const a of acts.docs)await a.ref.delete();
+  await DB.collection('certs').doc('KFDF-2026-EDU-'+uid.slice(0,6).toUpperCase()).delete().catch(()=>{});
+  try{const ud=await DB.collection('users').doc(uid).get();const ph=String((ud.data()||{}).phone||'').replace(/[^0-9]/g,'');
+    if(ph)await DB.collection('phoneIndex').doc(ph).delete().catch(()=>{});}catch(e){}
+  await DB.collection('users').doc(uid).delete();
+}
+async function purgeOldTrash(){
+  try{
+    const cut=Date.now()/1000-7*86400;
+    for(const col of ['schoolApplications','licenseApps','users']){
+      const sn=await DB.collection(col).where('deleted','==',true).get().catch(()=>null);
+      if(!sn)continue;
+      for(const d of sn.docs){
+        const t=d.data().deletedAt;
+        if(t&&t.seconds<cut){ if(col==='users')await purgeUserDoc(d.id).catch(()=>{}); else await d.ref.delete().catch(()=>{}); }
+      }
+    }
+  }catch(e){}
+}
+async function showTrash(){
+  const box=document.getElementById('trashBox');
+  if(box.style.display==='block'){box.style.display='none';return}
+  box.style.display='block';box.innerHTML='<span style="font-size:13px;color:var(--gray)">불러오는 중...</span>';
+  let lap=[];try{const sn=await DB.collection('licenseApps').where('deleted','==',true).get();lap=sn.docs;}catch(e){}
+  const rows=[];
+  const mk=(d,col,label)=>{
+    const v=d.data();const t=v.deletedAt?v.deletedAt.seconds*1000:Date.now();
+    const left=Math.max(0,7-Math.floor((Date.now()-t)/86400000));
+    rows.push('<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid #e5e0d8;border-radius:9px;padding:8px 12px;font-size:13px">'
+     +'<span style="font-size:10.5px;font-weight:900;color:#fff;background:#8a919d;padding:2px 8px;border-radius:999px">'+label+'</span><b>'+esc(v.school||v.name||'')+'</b>'
+     +'<span style="color:var(--gray)">'+esc(v.type||v.target||'')+(v.teacher?' · '+esc(v.teacher):'')+' · 삭제 '+new Date(t).toLocaleDateString('ko-KR')+(v.delBy?' · '+esc(v.delBy):'')+' · <b style="color:#C41E2F">'+left+'일 후 영구삭제</b></span>'
+     +'<span style="margin-left:auto;display:flex;gap:6px">'
+     +'<button class="btn-sub" style="background:#0f766e;padding:4px 12px;min-height:0" onclick="restoreTrash(\''+col+'\',\''+d.id+'\')">↩ 복구</button>'
+     +'<button class="btn-sub" style="background:#C41E2F;padding:4px 12px;min-height:0" onclick="purgeNow(\''+col+'\',\''+d.id+'\')">✖ 즉시 영구삭제</button></span></div>');
+  };
+  (TRASH.apps||[]).forEach(d=>mk(d,'schoolApplications','강습신청'));
+  lap.forEach(d=>mk(d,'licenseApps','자격신청'));
+  (TRASH.users||[]).forEach(d=>mk(d,'users','회원'));
+  box.innerHTML='<b style="font-size:14.5px">🗑 휴지통</b> <span style="font-size:12px;color:var(--gray)">삭제 항목은 7일간 보관 후 자동 영구삭제됩니다 (관리자 접속 시 정리 실행)</span><div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">'+(rows.join('')||'<div style="font-size:13px;color:var(--gray)">비어 있습니다.</div>')+'</div>';
+}
+async function restoreTrash(col,id){
+  const FV=firebase.firestore.FieldValue;
+  await DB.collection(col).doc(id).update({deleted:FV.delete(),deletedAt:FV.delete(),delBy:FV.delete()});
+  alert('복구되었습니다.'+(col==='schoolApplications'?'\n※ 접수번호 조회·지명 슬롯은 필요 시 다시 생성하세요.':''));
+  await loadApps();await loadUsers();
+  document.getElementById('trashBox').style.display='none';showTrash();
+}
+async function purgeNow(col,id){
+  if(!confirm('지금 즉시 완전히 삭제합니다. 복구할 수 없습니다.'))return;
+  if(col==='users')await purgeUserDoc(id).catch(()=>{});else await DB.collection(col).doc(id).delete().catch(()=>{});
+  await loadApps();await loadUsers();
+  document.getElementById('trashBox').style.display='none';showTrash();
+}
+async function closeWaitlist(){
+  const waits=APPS.filter(d=>d.data().status==='대기');
+  if(!waits.length){alert('대기 상태인 신청이 없습니다.');return}
+  if(!confirm('대기 '+waits.length+'건을 모두 「미선정」으로 종료 처리합니다.\n(결원 승격이 모두 끝난 뒤, 사업 마감 시에만 실행하세요)\n각 학교에 안내 메일이 자동 발송됩니다.'))return;
+  for(const d of waits){
+    const s=d.data();
+    await d.ref.update({status:'미선정'});
+    await syncStatus(s,'미선정');
+    kfdfMail(s.email,'[플라잉디스크연맹] 강습 심사 결과 안내 — '+s.school,
+      s.school+' '+s.type+' 신청이 대기자 정리에 따라 최종 미선정 처리되었습니다. 관심에 감사드리며, 차년도 사업 시 우선 안내드리겠습니다.\n접수번호: '+(s.code||''));
+  }
+  alert(waits.length+'건 종료 처리 완료.');
+  loadApps();loadDash();
+}
+async function fixCounters(){
+  if(!confirm('접수 카운터를 실제 신청 수와 동기화합니다.\n(테스트 삭제 후·기존 신청 반영 시 실행)\n카운터 = 유효 접수(접수·선정·배정완료) + 대기 건수'))return;
+  const snap=await DB.collection('schoolApplications').get();
+  const cnt={school:0,after:0};
+  snap.docs.forEach(d=>{
+    const s=d.data();
+    if(['접수','선정','배정완료','대기'].indexOf(s.status)<0)return;
+    const k=(s.typeKey==='after'||appTypeOf(s).indexOf('방과후')>=0)?'after':'school';
+    cnt[k]++;
+  });
+  await DB.collection('counters').doc('school').set({count:cnt.school});
+  await DB.collection('counters').doc('after').set({count:cnt.after});
+  alert('보정 완료 — 학교체육 '+cnt.school+'건 / 방과후·늘봄 '+cnt.after+'건 반영\n다음 접수는 각각 '+(cnt.school+1)+', '+(cnt.after+1)+'번째부터 계산됩니다.');
+  loadDash();
+}
+async function toWait(id){
+  const s=APPS.find(d=>d.id===id).data();
+  const sameType=APPS.filter(d=>d.data().type===s.type&&d.data().status==='대기');
+  const maxNo=sameType.reduce((m,d)=>Math.max(m,d.data().waitNo||0),0);
+  const no=parseInt(prompt('['+s.school+'] 대기번호를 입력하세요 (현재 '+s.type+' 대기 최대 '+maxNo+'번)',maxNo+1));
+  if(!no)return;
+  await DB.collection('schoolApplications').doc(id).update({status:'대기',waitNo:no});
+  if(s.code)await DB.collection('appStatus').doc(s.code).set({school:s.school,type:s.type,status:'대기',waitNo:no,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+  loadApps();loadDash();
+}
+
+// ── 이력 승인 · 포인트 전환 (권역관리자가 기록한 0P 이력을 중앙이 검토) ──
+async function reviewHist(){
+  const box=document.getElementById('auditBox');
+  box.style.display='block';
+  box.innerHTML='<b style="font-size:15px">📋 이력 승인 · 포인트 전환</b><div style="font-size:12.5px;color:var(--gray);margin:4px 0 12px">권역관리자·시도연맹이 기록한 이력(0P) 중 미검토 건입니다. 포인트를 부여하거나 이력만 승인(0P 유지)하세요.</div><div id="histList">불러오는 중…</div>';
+  try{
+    const snap=await DB.collectionGroup('activities').where('points','==',0).get();
+    const pend=snap.docs.filter(d=>!d.data().reviewed);
+    if(!pend.length){document.getElementById('histList').innerHTML='<span style="font-size:13.5px;color:#0f766e;font-weight:700">✓ 검토 대기 중인 이력이 없습니다.</span>';return}
+    const nameOf=uid=>{const u=USERS.find(x=>x.id===uid);return u?u.data().name:'(회원 미확인)'};
+    window._HISTDOCS={};
+    document.getElementById('histList').innerHTML=pend.map((d,i)=>{
+      const v=d.data();const uid=d.ref.parent.parent.id;
+      window._HISTDOCS[i]={path:d.ref.path,uid:uid};
+      return '<div class="urow"><div class="grow"><b>'+esc(nameOf(uid))+'</b> <span class="sub3">'+esc(v.date)+'</span>'
+        +'<div class="sub3">'+esc(v.label)+'</div></div>'
+        +'<button class="btn-sub" style="background:#C41E2F" onclick="grantHist('+i+')">P 부여</button>'
+        +'<button class="btn-sub" style="background:#8a919d" onclick="keepHist('+i+')">이력만 승인 (0P)</button>'
+        +'</div>';
+    }).join('');
+  }catch(e){document.getElementById('histList').innerHTML='<span style="color:var(--red);font-size:13px">불러오기 실패: '+esc(e.message)+'<br><b>첫 실행이라면:</b> ① 규칙 재게시 확인 ② 위 오류 메시지 안에 색인(index) 생성 링크(https://console.firebase.google.com/...)가 있으면 그 주소를 복사해 접속 → [색인 만들기] 클릭 → 1~2분 후 다시 시도하세요.</span>'}
+}
+async function grantHist(i){
+  const h=window._HISTDOCS[i];if(!h)return;
+  const n=parseInt(prompt('부여할 포인트를 입력하세요 (예: 10)',''));
+  if(!n||n<1)return;
+  await DB.doc(h.path).update({points:n,reviewed:true,reviewedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  await DB.collection('users').doc(h.uid).update({points:firebase.firestore.FieldValue.increment(n)});
+  await updateLeaderboard().catch(()=>{});
+  reviewHist();
+}
+async function keepHist(i){
+  const h=window._HISTDOCS[i];if(!h)return;
+  await DB.doc(h.path).update({reviewed:true,reviewedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  reviewHist();
+}
+// 회원 공식 이력 기록 (경력 데이터 축적)
+async function adHist(uid,label){
+  if(!uid)return;
+  try{await DB.collection('users').doc(uid).collection('activities').add({
+    date:new Date().toISOString().slice(0,10),label:label,points:0,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()});}catch(e){}
+}
+async function setStatus(id,st){
+  const s=APPS.find(d=>d.id===id).data();
+  if(st==='선정'&&!confirm(s.school+' 을(를) 선정할까요?\n\n📧 담당교사에게 선정 안내 이메일이 즉시 발송되고, 강사 지명 게시판에 공개됩니다.'))return;
+  if(st==='미선정'&&!confirm(s.school+' 을(를) 미선정 처리할까요?\n\n📧 담당교사에게 결과 안내 이메일이 즉시 발송됩니다.'))return;
+  if(st==='선정'&&s.selfTeach&&s.selfUid){
+    // 본인 직접 지도: 선정과 동시에 자동 배정 (지명 게시판 미공개)
+    await DB.collection('schoolApplications').doc(id).update({status:'배정완료',assignedUid:s.selfUid,assignedName:s.selfName});
+    await adHist(s.selfUid,'[위촉] '+s.school+' 강사 배정 (본인지도 · '+(s.region||'')+')');
+    await syncStatus(s,'배정완료',{assignedName:s.selfName});
+    kfdfMail(s.email,'[플라잉디스크연맹] 강습 선정 안내 — '+s.school,s.school+' ('+s.type+') 신청이 선정되었으며, 신청하신 본인지도로 강사 배정까지 완료되었습니다.\n접수번호: '+(s.code||'')+'\n일정 협의를 위해 곧 연락드리겠습니다.');
+    loadApps();loadDash();return;
+  }
+  await DB.collection('schoolApplications').doc(id).update({status:st});
+  await syncStatus(s,st);
+  if(st==='선정')kfdfMail(s.email,'[플라잉디스크연맹] 강습 선정 안내 — '+s.school,s.school+' ('+s.type+') 신청이 선정되었습니다!\n접수번호: '+(s.code||'')+'\n강사 배정 후 확정 연락을 드립니다.');
+  if(st==='미선정')kfdfMail(s.email,'[플라잉디스크연맹] 강습 심사 결과 안내 — '+s.school,'아쉽게도 이번에는 선정되지 못했습니다. 추가 모집 시 우선 안내드리겠습니다.\n접수번호: '+(s.code||''));
+  if(st==='선정'){
+    await DB.collection('openSlots').doc(id).set({
+      school:s.school,region:s.region,type:s.type,d1:s.d1||'',
+      claimedBy:null,claimedName:'',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  }else{
+    await DB.collection('openSlots').doc(id).delete().catch(()=>{});
+  }
+  loadApps();loadDash();
+}
+async function autoAssign(){
+  if(!confirm('선정 상태이면서 미배정인 학교를 같은 권역 승인 회원에게 자동배정합니다. (지명신청 완료분은 지명자 우선 확정)'))return;
+  const apps=await DB.collection('schoolApplications').where('status','==','선정').get();
+  const users=await DB.collection('users').where('status','==','approved').get();
+  const pool={};
+  users.docs.forEach(u=>{
+    const d=u.data(),f=d.instructorFor||{};
+    (pool[d.region]=pool[d.region]||[]).push({uid:u.id,name:d.name,cnt:0,school:!!f.school,after:!!f.after});
+  });
+  let done=0,skip=0;
+  for(const d of apps.docs){
+    const s=d.data();
+    if(s.assignedName){skip++;continue}
+    if(s.support==='용품만'){skip++;continue}
+    // 지명신청 우선
+    const slot=await DB.collection('openSlots').doc(d.id).get();
+    if(slot.exists&&slot.data().claimedBy){
+      await d.ref.update({assignedUid:slot.data().claimedBy,assignedName:slot.data().claimedName,status:'배정완료'});
+      await adHist(slot.data().claimedBy,'[위촉] '+s.school+' 강사 배정 ('+(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' · '+(s.region||'')+')');
+      await syncStatus(s,'배정완료',{assignedName:slot.data().claimedName});
+      done++;continue;
+    }
+    const wantAfter=(s.type||'').indexOf('방과후')>=0;
+    const cands=(pool[s.region]||[]).filter(c=>wantAfter?c.after:c.school);
+    if(!cands.length){skip++;continue}
+    cands.sort((a,b)=>a.cnt-b.cnt);
+    const pick=cands[0];pick.cnt++;
+    await d.ref.update({assignedUid:pick.uid,assignedName:pick.name,status:'배정완료'});
+    await adHist(pick.uid,'[위촉] '+s.school+' 강사 배정 ('+(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' · '+(s.region||'')+')');
+    await syncStatus(s,'배정완료',{assignedName:pick.name});
+    await DB.collection('openSlots').doc(d.id).delete().catch(()=>{});
+    done++;
+  }
+  alert('자동배정 완료: '+done+'건 / 건너뜀: '+skip+'건');
+  loadApps();loadDash();
+}
+async function recordSessions(id){
+  const s=APPS.find(d=>d.id===id).data();
+  if(!s.assignedUid){alert('배정된 강사가 없습니다.');return}
+  const cur=s.doneSessions||0;
+  const tgt=parseInt(prompt(s.school+' — '+s.assignedName+' 강사\n\n지금까지 완료된 누적 회차 수(총 몇 회차까지 마쳤는지)를 입력하세요.\n현재 기록: '+cur+' / 24회차\n(차이만큼만 회차당 10P가 지급되어 중복 지급되지 않습니다)', String(Math.min(cur+1,24))));
+  if(tgt===null)return;
+  if(isNaN(tgt)||tgt<0||tgt>24){alert('0~24 사이 숫자를 입력하세요.');return}
+  const diff=tgt-cur;
+  if(diff===0){alert('변동이 없습니다. (이미 '+cur+'회차로 기록됨)');return}
+  const today=new Date().toISOString().slice(0,10);
+  await DB.collection('schoolApplications').doc(id).update({doneSessions:tgt});
+  if(diff>0){
+    await DB.collection('users').doc(s.assignedUid).update({points:firebase.firestore.FieldValue.increment(diff*10)});
+    await DB.collection('users').doc(s.assignedUid).collection('activities').add({
+      label:s.school+' 학교강습 '+diff+'회차 완료 (누적 '+tgt+'/24)',date:today,points:diff*10,
+      addedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    alert(s.assignedName+' 리더에게 +'+(diff*10)+'P 지급 (누적 '+tgt+'/24회차)');
+  }else{
+    await DB.collection('users').doc(s.assignedUid).update({points:firebase.firestore.FieldValue.increment(diff*10)});
+    await DB.collection('users').doc(s.assignedUid).collection('activities').add({
+      label:s.school+' 회차 정정 ('+cur+'→'+tgt+')',date:today,points:diff*10,
+      addedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    alert('회차를 '+tgt+'/24로 정정하고 '+(diff*10)+'P 조정했습니다.');
+  }
+  await syncStatusById(id);
+  loadApps();updateLeaderboard();
+}
+function exportCSV(){
+  const rows=[['학교','권역','유형','지원방식','인원','희망1','희망2','담당교사','연락처','이메일','이수자','상태','배정강사','신청사유']];
+  APPS.forEach(d=>{const s=d.data();rows.push([s.school,s.region,s.type,s.support||'강사파견+용품',s.students,s.d1,s.d2,s.teacher,s.phone,s.email,s.eduName,s.status,s.assignedName,(s.reason||'').replace(/\n/g,' ')])});
+  const csv='\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='강습신청_전체.csv';a.click();
+}
+let UFL='전체';
+function userFilter(f,btn){UFL=f;document.querySelectorAll('.ufl').forEach(b=>{b.style.background=b.dataset.f===f?'':'#8a919d'});renderUsers();}
+let VIEWMODE='table';
+function setView(m,btn){VIEWMODE=m;document.querySelectorAll('.vwl').forEach(b=>b.style.background=b.dataset.v===m?'':'#8a919d');renderUsers();}
+// 명단(표) 뷰 — 한눈에 스캔·검색용 (상세·승인은 카드 뷰)
+function renderRoster(docs){
+  const rows=docs.map(d=>{
+    const v=d.data(),lv=lvOf(v.points||0),f=v.instructorFor||{},q=v.quals||{};
+    const fld=[];
+    if(f.school)fld.push('<span class="bdg" style="background:#1F4E9C">학교</span>');
+    if(f.after)fld.push('<span class="bdg" style="background:#0f766e">방과후</span>');
+    if(f.referee)fld.push('<span class="bdg" style="background:#7c3aed">심판</span>');
+    if(f.staff)fld.push('<span class="bdg" style="background:#b8860b">운영</span>');
+    const quals=[q.leader,q.referee,q.youth?'유소년':''].filter(Boolean).join('·');
+    const hire=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc);
+    return '<tr>'
+      +'<td class="nm">'+esc(v.name)+(v.withdrawReq?' <span title="탈퇴요청">🚪</span>':'')+'</td>'
+      +'<td>'+esc(v.gender||'-')+'</td>'
+      +'<td>'+(v.baseCity?esc(v.baseCity):'<span style="color:#C41E2F">미입력</span>')+'</td>'
+      +'<td>'+(v.phone?esc(v.phone):'<span class="mut">-</span>')+'</td>'
+      +'<td>'+(fld.length?fld.join(''):'<span class="mut">-</span>')+'</td>'
+      +'<td>'+(quals?esc(quals):'<span class="mut">-</span>')+'</td>'
+      +'<td>'+(v.edu2026?'<b style="color:#0f766e">✓</b>':'<span class="mut">-</span>')+'</td>'
+      +'<td>'+(v.safetyEdu?'<b style="color:#0f766e">✓</b>':'<span class="mut">-</span>')+'</td>'
+      +'<td>Lv.'+lv+' · '+(v.points||0)+'P</td>'
+      +'<td>'+(hire?'<span class="bdg" style="background:#0f766e">위촉가능</span>':'<span class="mut">-</span>')+'</td>'
+      +'<td>'+(v.status==='approved'?'<b style="color:#0f766e">승인</b>':'<button class="btn-sub" style="padding:3px 10px;font-size:11px" onclick="approve(\''+d.id+'\')">승인</button>')+'</td>'
+      +'</tr>';
+  }).join('');
+  return '<div style="overflow-x:auto"><table class="rtbl"><thead><tr>'
+    +'<th>성명</th><th>성별</th><th>시군구</th><th>휴대전화</th><th>지원분야</th><th>보유자격</th><th>연수</th><th>안전</th><th>Lv·P</th><th>위촉</th><th>상태</th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function uMatch(v){
+  if(UFL==='pending'){if(v.status==='approved')return false}
+  else if(UFL==='any'){const f=v.instructorFor||{};if(v.status!=='approved')return false;if(!(f.school||f.after||f.referee||f.staff))return false}
+  else if(UFL!=='전체'){if(!(v.instructorFor&&v.instructorFor[UFL]))return false}
+  const sido=(document.getElementById('userSido')||{}).value||'';
+  if(sido==='__none'){
+    if(String(v.baseCity||'').trim()!=='')return false;
+  }else if(sido){
+    const c=String(v.baseCity||'');
+    const hit=(SIDO_ALIAS[sido]||[sido]).some(a=>c.indexOf(a)===0);
+    if(!hit){
+      // 시군구 미입력 회원은 권역이 시도와 1:1인 경우(강원·제주)만 보정 매칭 — 그 외는 [📍 시군구 미입력] 필터에서 확인
+      const SINGLE={'강원':'강원','제주':'제주'};
+      const reg=SINGLE[sido];
+      const regHit=(c==='')&&reg&&(v.region===reg||((v.activityRegions||[]).indexOf(reg)>=0));
+      if(!regHit)return false;
+    }
+  }
+  const q=((document.getElementById('userSearch')||{}).value||'').trim().toLowerCase();
+  if(q){
+    const hay=[v.name,v.baseCity,v.email,v.phone,v.region,(v.activityRegions||[]).join(' ')].map(x=>String(x||'').toLowerCase()).join(' ');
+    if(hay.indexOf(q)<0)return false;
+  }
+  return true;
+}
+async function loadUsers(){
+  const snap=await DB.collection('users').orderBy('createdAt','desc').get();
+  TRASH.users=snap.docs.filter(d=>d.data().deleted);
+  USERS=snap.docs.filter(d=>!d.data().deleted);
+  renderUsers();
+}
+function renderInstTable(docs){
+  const list=docs.filter(d=>{const v=d.data();const f=v.instructorFor||{};return v.status==='approved'&&(f.school||f.after||f.referee||f.staff)});
+  if(!list.length)return '<div class="bempty">해당 조건의 사업 지원 강사·요원이 없습니다.</div>';
+  const bg={school:'#1F4E9C',after:'#0f766e',referee:'#7c3aed',staff:'#b8860b'};
+  const lb={school:'학교체육',after:'방과후',referee:'심판',staff:'운영'};
+  const rows=list.map(d=>{const v=d.data();const f=v.instructorFor||{};
+    const sup=['school','after','referee','staff'].filter(k=>f[k]).map(k=>'<span style="font-size:10px;font-weight:900;color:#fff;background:'+bg[k]+';padding:2px 7px;border-radius:999px;margin-right:2px">'+lb[k]+'</span>').join('');
+    const area=(v.activityAreas&&v.activityAreas.length)?v.activityAreas.map(a=>String(a).replace(/(특별자치도|특별자치시|광역시|특별시)/,'')).join(', '):(v.baseCity?String(v.baseCity).replace(/(특별자치도|특별자치시|광역시|특별시)/,''):((v.activityRegions||[]).join('·')||'-'));
+    return '<tr><td><b>'+esc(v.name)+'</b></td><td>'+esc(v.region||'')+'</td><td style="max-width:260px">'+esc(area)+'</td><td>'+sup+'</td>'
+      +'<td>'+(v.edu2026?(inRoster(v.name)?'<b style="color:#0f766e">✓</b>':'<b style="color:#C41E2F">⚠</b>'):'-')+'</td>'
+      +'<td>'+(v.phone?esc(v.phone):'-')+'</td>'
+      +'<td>'+(v.bank?esc(v.bank)+' '+esc(v.accountNum||''):'-')+'</td>'
+      +'<td><button class="btn-sub" style="background:#0f766e;padding:4px 10px;min-height:0" onclick="setBase(\''+d.id+'\')">📍지정</button></td></tr>';
+  }).join('');
+  return '<div style="font-size:12.5px;color:var(--gray);margin-bottom:6px">사업 지원(학교체육·방과후·심판·운영) 강사·요원만 표시 · '+list.length+'명 · 위 검색·시도 필터와 연동</div>'
+    +'<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th>성명</th><th>권역</th><th>활동 가능 범위</th><th>지원</th><th>연수</th><th>휴대전화</th><th>계좌</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+// ── 강사비 지급 인적사항·위촉계약 서명 관리 (e나라도움 이체·증빙용) ──
+let PAYROWS=[];
+function maskRrn(r){r=String(r||'');if(r.length<8)return '<b style="color:#C41E2F">미등록</b>';return esc(r.slice(0,7))+'●●●●●●'}
+async function loadPayBox(){
+  const listEl=document.getElementById('payList');
+  listEl.innerHTML='불러오는 중…';
+  const assigned=APPS.filter(d=>{const s=d.data();return s.status==='배정완료'&&s.assignedUid});
+  const byUid={};
+  assigned.forEach(d=>{const s=d.data();(byUid[s.assignedUid]=byUid[s.assignedUid]||[]).push({id:d.id,s:s})});
+  const uids=Object.keys(byUid);
+  document.getElementById('payCount').textContent=uids.length+'명 · '+assigned.length+'건 배정';
+  const rows=[];
+  for(const uid of uids){
+    const ud=USERS.find(d=>d.id===uid);
+    const v=ud?ud.data():{};
+    let rrn='';
+    try{const pi=await DB.collection('privateInfo').doc(uid).get();if(pi.exists)rrn=pi.data().rrn||''}catch(e){}
+    const contracts=v.contracts||{};
+    const apps=byUid[uid].map(x=>Object.assign({appId:x.id},x.s,{
+      agreed:!!(contracts[x.id]&&contracts[x.id].agreedAt),
+      signed:!!(contracts[x.id]&&contracts[x.id].sign)
+    }));
+    rows.push({uid:uid,name:v.name||'(이름없음)',region:v.region||'',phone:v.phone||'',bank:v.bank||'',accountNum:v.accountNum||'',accountHolder:v.accountHolder||'',rrn:rrn,apps:apps,contracts:contracts});
+  }
+  rows.sort((a,b)=>String(a.region||'').localeCompare(b.region||'')||a.name.localeCompare(b.name));
+  PAYROWS=rows;
+  renderPayBox();
+}
+function renderPayBox(){
+  const el=document.getElementById('payList');
+  if(!PAYROWS.length){el.innerHTML='<div class="bempty">배정완료된 강사가 없습니다. ↻ 불러오기를 다시 눌러주세요.</div>';return}
+  const rows=PAYROWS.map(r=>{
+    const schools=r.apps.map(a=>esc(a.school)+' '+(a.signed?'<b style="color:#0f766e">✓서명</b>':a.agreed?'<b style="color:#b8860b">동의(미서명)</b>':'<b style="color:#C41E2F">✗미동의</b>')
+      +' <button class="btn-sub" style="background:#153A77;padding:2px 8px;min-height:0;font-size:11px" onclick="viewContractAdmin(\''+r.uid+'\',\''+a.appId+'\')">계약서</button>').join('<br>');
+    return '<tr><td><b>'+esc(r.name)+'</b></td><td>'+esc(r.region)+'</td><td>'+(r.phone?esc(r.phone):'-')+'</td>'
+      +'<td>'+(r.bank?esc(r.bank)+' '+esc(r.accountNum||'')+'<br><span style="color:var(--gray);font-size:11.5px">예금주 '+esc(r.accountHolder||'')+'</span>':'<b style="color:#C41E2F">미등록</b>')+'</td>'
+      +'<td>'+maskRrn(r.rrn)+'</td>'
+      +'<td style="font-size:12.5px">'+schools+'</td></tr>';
+  }).join('');
+  el.innerHTML='<table class="rtbl"><thead><tr><th>이름</th><th>권역</th><th>휴대전화</th><th>계좌</th><th>주민번호</th><th>배정학교 · 계약상태</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<div style="font-size:11.5px;color:var(--gray);margin-top:6px">주민번호는 화면에 마스킹 표시됩니다. 전체 번호는 ⬇ CSV로만 확인할 수 있습니다.</div>';
+}
+function exportPayCSV(){
+  if(!PAYROWS.length){alert('먼저 ↻ 불러오기를 눌러주세요.');return}
+  const rows=[['이름','권역','휴대전화','은행','계좌번호','예금주','주민등록번호','배정학교(계약상태)']];
+  PAYROWS.forEach(r=>{
+    rows.push([r.name,r.region,r.phone,r.bank,r.accountNum,r.accountHolder,r.rrn,r.apps.map(a=>a.school+'('+(a.signed?'서명완료':a.agreed?'동의만':'미동의')+')').join('; ')]);
+  });
+  const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='강사비지급_인적사항_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+function exportUnsignedCSV(){
+  if(!PAYROWS.length){alert('먼저 ↻ 불러오기를 눌러주세요.');return}
+  const rows=[['이름','권역','휴대전화','미서명 학교']];
+  PAYROWS.forEach(r=>{
+    const un=r.apps.filter(a=>!a.signed);
+    if(un.length)rows.push([r.name,r.region,r.phone,un.map(a=>a.school+(a.agreed?'(동의만)':'(미동의)')).join('; ')]);
+  });
+  if(rows.length<2){alert('미서명자가 없습니다. 🎉');return}
+  const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='위촉계약_미서명자_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+function viewContractAdmin(uid,appId){
+  const r=PAYROWS.find(x=>x.uid===uid);if(!r)return;
+  const a=r.apps.find(x=>x.appId===appId);if(!a)return;
+  const ag=r.contracts[appId];
+  const period=(a.start&&a.start.indexOf('8월')>=0)?'2026. 8. ~ 2026. 12.':'2026. 9. ~ 2026. 12.';
+  const logo=new URL('kfdf_logo.png',location.href).href;
+  const seal=new URL('직인.png',location.href).href;
+  const w=window.open('','_blank');
+  if(!w){alert('팝업이 차단되어 있습니다. 팝업 허용 후 다시 시도해주세요.');return}
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>위촉계약서</title>'
+  +'<style>@page{size:A4;margin:0}body{margin:0;font-family:"Malgun Gothic",sans-serif;display:flex;justify-content:center;background:#f2f2f2}'
+  +'.doc{width:210mm;min-height:297mm;background:#fff;box-sizing:border-box;padding:22mm 20mm;font-size:13.5px;line-height:1.85;color:#222;word-break:keep-all}'
+  +'h1{text-align:center;font-size:24px;margin:4mm 0 8mm}'
+  +'.sub0{text-align:center;color:#666;font-size:13px;margin-bottom:2mm}'
+  +'h2{font-size:14.5px;color:#1F4E9C;margin:6mm 0 1mm}'
+  +'table{width:100%;border-collapse:collapse;margin-top:8mm}td{border:1px solid #999;padding:2.4mm 3mm;font-size:13px}'
+  +'.k{background:#f2f5fa;font-weight:700;width:26mm;text-align:center}'
+  +'.org{display:flex;align-items:center;gap:10px;justify-content:center;font-size:20px;font-weight:800;letter-spacing:3px;margin-top:8mm;position:relative}'
+  +'.org img.lg{width:44px;height:44px;object-fit:contain}'
+  +'.orgwrap{position:relative;display:inline-flex;align-items:center;gap:10px;white-space:nowrap}'
+  +'.seal{position:absolute;right:-34px;top:50%;transform:translateY(-52%);width:64px;height:64px;object-fit:contain;mix-blend-mode:multiply;opacity:.92}'
+  +'.admtag{position:fixed;top:6mm;right:8mm;font-size:10.5px;color:#aaa}'
+  +'@media print{.admtag{display:none}body{background:#fff}}</style></head><body>'
+  +'<div class="admtag">관리자 열람용 — '+new Date().toLocaleString('ko-KR')+'</div>'
+  +'<div class="doc">'
+  +'<div class="sub0">2026년 유소년 스포츠 기반구축사업</div>'
+  +'<h1>강습 강사 위촉계약서</h1>'
+  +'<p>사단법인 대한민국플라잉디스크연맹(이하 "갑")과 강사 <b>'+esc(r.name)+'</b>(이하 "을")은 다음과 같이 계약을 체결한다.</p>'
+  +'<h2>제1조 (위촉 업무)</h2><p>갑은 을을 아래 학교의 플라잉디스크 강습 강사로 위촉하고, 을은 해당 프로그램(24회차)을 성실히 지도한다.<br>• 배정 학교: <b>'+esc(a.school)+'</b> ('+esc(a.type||'')+')<br>• 운영 기간: '+period+' (세부 일정은 학교와 협의)</p>'
+  +'<h2>제2조 (강사료)</h2><p>강사료는 시간당 50,000원으로 하며, 갑은 관련 법령에 따른 제세공과금을 원천징수한 후 을이 지정하는 계좌로 월별 지급한다. (운영일지 제출 확인 후)</p>'
+  +'<h2>제3조 (성실·안전 의무)</h2><p>을은 유소년 안전을 최우선으로 하며, 운영일지 작성 등 갑이 요청하는 증빙에 협조한다. 아동학대·성범죄 결격사유가 확인될 경우 위촉은 즉시 해지된다.</p>'
+  +'<h2>제4조 (개인정보)</h2><p>갑은 강사료 지급·원천징수 신고에 필요한 최소한의 개인정보를 수집·이용하며, 보존기간 경과 후 파기한다.</p>'
+  +'<h2>제5조 (전자서명)</h2><p>본 계약은 을이 연맹 홈페이지에서 본인 인증 후 전자적으로 서명한 시점에 성립하며, 기록된 서명·동의 일시는 서면 서명을 갈음한다.</p>'
+  +'<table><tr><td class="k">갑</td><td>사단법인 대한민국플라잉디스크연맹 회장 &nbsp;(직인)</td></tr>'
+  +'<tr><td class="k">을</td><td>'+esc(r.name)+(ag&&ag.sign?' <img src="'+ag.sign+'" style="height:34px;vertical-align:middle;margin:0 6px">':'')+' &nbsp;—&nbsp; '+(ag?'<b style="color:#0f766e">전자 서명 완료: '+fmtDate(ag.agreedAt)+'</b>':'<b style="color:#C41E2F">(서명 전 — 강사 본인 마이페이지에서 서명 필요)</b>')+'</td></tr></table>'
+  +'<div class="org"><span class="orgwrap"><img class="lg" src="'+logo+'">대한민국플라잉디스크연맹<img class="seal" src="'+seal+'" onerror="this.style.display=\'none\'"></span></div>'
+  +'</div></body></html>');
+  w.document.close();
+}
+function renderUsers(){
+  const el=document.getElementById('userList');
+  const docs=USERS.filter(d=>uMatch(d.data()));
+  const uc=document.getElementById('userCount');
+  if(uc)uc.textContent=docs.length+'명'+(docs.length!==USERS.length?' (전체 '+USERS.length+'명 중)':'');
+  if(!docs.length){el.innerHTML='<div class="bempty">해당 조건의 회원이 없습니다.</div>';axFilter();return}
+  if(VIEWMODE==='inst'){el.innerHTML=renderInstTable(docs);axFilter();return}
+  if(VIEWMODE==='table'){el.innerHTML=renderRoster(docs);axFilter();return}
+  el.innerHTML=docs.map(d=>{
+    const v=d.data(),lv=lvOf(v.points||0);
+    return '<div class="urow"><div class="grow"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span>'+(v.withdrawReq?' <span style="font-size:11px;font-weight:900;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px">🚪 탈퇴 요청</span>':'')
+      +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+(v.gender?' · '+esc(v.gender):'')+(v.birth?' · '+esc(v.birth):'')+(v.baseCity?' · <b style="color:#1F4E9C">📍'+esc(v.baseCity)+'</b>':' · <span style="font-size:11px;color:#C41E2F;font-weight:800">시군구 미입력</span>')+((v.activityRegions&&v.activityRegions.length)?' <span style="font-size:11px;font-weight:800;color:#0f766e">🗺활동가능: '+esc(v.activityRegions.join('·'))+'</span>':'')+(v.phone?' · '+esc(v.phone):'')+(v.bank?' · <b style="color:#b8860b">💳'+esc(v.bank)+' '+esc(v.accountNum||'')+' ('+esc(v.accountHolder||'')+')</b>':'')+' · '+(v.edu2026?('연수이수 '+(inRoster(v.name)?'<b style="color:#0f766e">✓명단확인</b>':'<b style="color:#C41E2F">⚠명단에없음</b>')):'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+((v.instructorFor&&v.instructorFor.referee)?' · <b style="color:#7c3aed">심판요원 지원</b>':'')+((v.instructorFor&&v.instructorFor.staff)?' · <b style="color:#b8860b">운영요원 지원</b>':'')+'</div>'
+      +((v.affiliation&&v.affiliation.length)||(v.quals&&(v.quals.leader||v.quals.referee||v.quals.youth))||(v.qualDocs&&v.qualDocs.length)||v.degree
+        ?'<div class="sub3" style="margin-top:3px">프로필: '
+          +((v.affiliation&&v.affiliation.length)?'🏷 '+esc(v.affiliation.join('·')):'')
+          +((v.quals&&(v.quals.leader||v.quals.referee||v.quals.youth))?' · 🎖 '+esc([v.quals.leader,v.quals.referee,v.quals.youth?'유소년지도사':''].filter(Boolean).join('·')):'')
+          +(v.degree?' · 🎓 '+esc(v.degree)+(v.degreeDoc?' <a href="'+v.degreeDoc+'" target="_blank" style="color:#153A77;font-weight:800">📎증빙</a> '+(v.degreeApproved?'<b style="color:#0f766e">✓승인</b>':'<button class="btn-sub" style="background:#b8860b;padding:2px 8px;font-size:11px" onclick="approveDegree(\''+d.id+'\')">학위 승인</button>'):' <b style="color:#C41E2F">(증빙 없음)</b>'):'')
+          +((v.qualDocs&&v.qualDocs.length)?' · '+v.qualDocs.map((u,i)=>'<a href="'+u+'" target="_blank" style="color:#153A77;font-weight:800">📎자격증'+(i+1)+'</a>').join(' '):'')
+        +'</div>':'')
+      +'<div class="sub3" style="margin-top:3px">위촉검증: '
+      +((v.consents&&v.consents.agreedAt)?'<b style="color:#0f766e">✓전자동의 '+fmtDate(v.consents.agreedAt)+'</b>':'<b style="color:#C41E2F">✗전자동의 전</b>')
+      +' · '
+      +(v.crimDoc?'<b style="color:#0f766e">✓경력확인</b>':'<b style="color:#C41E2F">✗경력확인 전</b>')+(v.contracts&&Object.keys(v.contracts).length?' · <b style="color:#0f766e">✓위촉계약 '+Object.keys(v.contracts).length+'건 동의</b>':'')
+      +(v.certDoc?' · <b style="color:#0f766e">✓자격확인</b>':' · <b style="color:#C41E2F">✗자격 미확인</b>')+((v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc)?' <span style="background:#0f766e;color:#fff;font-weight:900;font-size:11px;padding:2px 10px;border-radius:999px">위촉 가능</span>':'')
+      +'</div></div>'
+      +(v.status==='approved'
+        ?'<span style="font-size:13px;font-weight:800;color:#0f766e">승인됨</span>'
+        :'<button class="btn-sub" onclick="approve(\''+d.id+'\')">승인하기</button>')
+      +'<button class="btn-sub" style="background:#1F4E9C" onclick="setOrg(\''+d.id+'\')">직책</button>'
+      +'<button class="btn-sub" style="background:#0f766e" onclick="setBase(\''+d.id+'\')">📍 거점·권역</button>'
+      +(IS_OWNER?'<button class="btn-sub" style="background:'+(v.role==='regionAdmin'?'#7c3aed':'#8a919d')+'" onclick="setRegionAdmin(\''+d.id+'\')">'+(v.role==='regionAdmin'?'🛡 '+esc(v.managedRegion||'권역?')+dutyTag(v)+' 관리자':'🛡 권역관리자 지정')+'</button>'
+        :(v.role==='regionAdmin'?'<span style="font-size:11px;font-weight:900;color:#fff;background:#7c3aed;padding:4px 10px;border-radius:999px;align-self:center">🛡 권역관리자'+dutyTag(v)+'</span>':''))
+      +((IS_OWNER&&!v.owner)?'<button class="btn-sub" style="background:'+(v.role==='admin'?'#C41E2F':'#8a919d')+'" onclick="setFullAdmin(\''+d.id+'\')">'+(v.role==='admin'?'👑 전체관리자 ✓':'👑 전체관리자 지정')+'</button>'
+        :(v.owner?'<span style="font-size:11px;font-weight:900;color:#fff;background:#111;padding:4px 10px;border-radius:999px;align-self:center">👑 오너</span>':(v.role==='admin'?'<span style="font-size:11px;font-weight:900;color:#fff;background:#C41E2F;padding:4px 10px;border-radius:999px;align-self:center">👑 관리자</span>':'')))
+      +'<button class="btn-sub" style="background:'+(v.crimDoc?'#0f766e':'#8a919d')+'" onclick="toggleCrim(\''+d.id+'\')">'+(v.crimDoc?'경력확인 ✓':'경력확인 체크')+'</button>'
+      +'<button class="btn-sub" style="background:'+(v.certDoc?'#0f766e':'#8a919d')+'" onclick="toggleCert(\''+d.id+'\')">'+(v.certDoc?'자격확인 ✓':'자격확인 체크')+'</button>'
+      +'<button class="btn-sub" style="background:'+(v.safetyEdu?'#0f766e':'#8a919d')+'" onclick="toggleSafety(\''+d.id+'\')">'+(v.safetyEdu?'안전교육 ✓':'안전교육 처리')+'</button>'
+      +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delUser(\''+d.id+'\',\''+esc(v.name)+'\')">🗑</button>'
+      +'</div>';
+  }).join('');
+  axFilter();
+}
+function axFilter(){
+  const sel=document.getElementById('axUser');if(!sel)return;
+  const q=((document.getElementById('axSearch')||{}).value||'').trim().toLowerCase();
+  sel.innerHTML=USERS.filter(d=>{
+    const v=d.data();
+    if(v.status!=='approved')return false;
+    if(q&&String(v.name||'').toLowerCase().indexOf(q)<0)return false;
+    return true;
+  }).map(d=>'<option value="'+d.id+'">'+esc(d.data().name)+' ('+esc(d.data().region)+', '+(d.data().points||0)+'P)</option>').join('');
+}
+function exportInstructors(){
+  const rows=[['성명','성별','생년월일','권역','거점 시군구','활동가능권역','소속','지도자자격','심판자격','유소년지도사','학위','학위승인','의류사이즈','경력사항','자격증사본','휴대전화','이메일','상태','포인트','학교체육','방과후늘봄','심판','운영','연수이수','명단확인','자격확인','경력확인','전자동의']];
+  USERS.forEach(d=>{const v=d.data();const f=v.instructorFor||{};
+    if(!(f.school||f.after||f.referee||f.staff))return;
+    const q=v.quals||{};
+    rows.push([v.name,v.gender||'',v.birth||'',v.region||'',v.baseCity||'',(v.activityRegions||[]).join('·')||v.region||'',
+      (v.affiliation||[]).join('·'),q.leader||'',q.referee||'',q.youth?'O':'',v.degree||'',(v.degree&&v.degreeApproved)?'승인':'',v.clothingSize||'',v.career||'',(v.qualDocs||[]).length?(v.qualDocs.length+'장'):'',
+      v.phone||'',v.email||'',v.status||'',v.points||0,
+      f.school?'O':'',f.after?'O':'',f.referee?'O':'',f.staff?'O':'',
+      v.edu2026?'O':'',(v.edu2026&&inRoster(v.name))?'O':'',v.certDoc?'O':'',v.crimDoc?'O':'',(v.consents&&v.consents.agreedAt)?'O':'']);
+  });
+  if(rows.length<2){alert('강사·요원 지원자가 아직 없습니다.');return}
+  const csv='\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='강사요원_지원자명단.csv';a.click();
+}
+function maskName(n){n=String(n||'');return n.length<2?n:n[0]+'*'.repeat(Math.max(1,n.length-2))+(n.length>2?n[n.length-1]:'')}
+async function makeCert(uid,name){
+  await DB.collection('certs').doc('KFDF-2026-EDU-'+uid.slice(0,6).toUpperCase()).set({
+    name:maskName(name),course:'2026 교원·지도자 자율연수 (10시간)',issued:true,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+}
+async function updateLeaderboard(){
+  try{
+    const snap=await DB.collection('users').where('status','==','approved').get();
+    const rows=snap.docs.filter(d=>!d.data().deleted).map(d=>{const v=d.data();return {
+      n:maskName(v.name||''),r:v.region||'',p:v.points||0,
+      edu:!!v.edu2026,org:v.org||'',t:v.orgTitle||''};})
+      .sort((a,b)=>b.p-a.p).slice(0,50);
+    await DB.collection('public').doc('leaderboard').set({
+      rows:rows,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    // ── 공개 사업현황 (학교명·숫자만, 개인정보 없음) ──
+    const apps=await DB.collection('schoolApplications').get();
+    const regions={};let schoolSel=0,afterSel=0,schoolRecv=0,afterRecv=0,sessions=0;const schools=[];
+    apps.docs.forEach(d=>{
+      const v=d.data();
+      const isAfter0=String(v.type||'').indexOf('방과후')>=0;
+      if(['접수','대기','선정','배정완료'].indexOf(v.status)>=0){if(isAfter0)afterRecv++;else schoolRecv++;}
+      if(['선정','배정완료'].indexOf(v.status)<0)return;
+      const isAfter=String(v.type||'').indexOf('방과후')>=0;
+      if(isAfter)afterSel++;else schoolSel++;
+      sessions+=v.doneSessions||0;
+      regions[v.region]=regions[v.region]||{sel:0,inst:0};regions[v.region].sel++;
+      if(schools.length<150)schools.push({n:v.school,r:v.region,t:isAfter?'after':'school',a:v.status==='배정완료'});
+    });
+    let instructors=0;
+    snap.docs.forEach(u=>{
+      const f=u.data().instructorFor||{};
+      if(f.school||f.after||f.referee||f.staff){
+        instructors++;
+        const r=u.data().region||'';
+        regions[r]=regions[r]||{sel:0,inst:0};regions[r].inst++;
+        // 활동가능 권역(타권역 이동 가능 강사) 집계
+        (u.data().activityRegions||[]).forEach(function(x){
+          if(x===r)return;
+          regions[x]=regions[x]||{sel:0,inst:0};
+          regions[x].avail=(regions[x].avail||0)+1;
+        });
+      }
+    });
+    await DB.collection('public').doc('stats').set({
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+      schoolSel:schoolSel,schoolQuota:70,afterSel:afterSel,afterQuota:30,
+      schoolRecv:schoolRecv,afterRecv:afterRecv,
+      members:snap.size,instructors:instructors,sessions:sessions,
+      schools:schools,regions:regions});
+  }catch(e){console.warn('리더보드 갱신 실패',e)}
+}
+async function auditEdu(){
+  const box=document.getElementById('auditBox');
+  box.style.display='block';box.innerHTML='<span style="color:var(--gray)">점검 중…</span>';
+  const snap=await DB.collection('users').where('status','==','approved').get();
+  const rows=[];
+  for(const d of snap.docs){
+    const v=d.data();
+    if(!v.edu2026)continue;
+    const inList=inRoster(v.name);
+    let hasCert=false;
+    try{const c=await DB.collection('certs').doc('KFDF-2026-EDU-'+d.id.slice(0,6).toUpperCase()).get();hasCert=c.exists&&c.data().issued;}catch(e){}
+    rows.push({uid:d.id,name:v.name,region:v.region||'',inList:inList,hasCert:hasCert,pts:v.points||0});
+  }
+  if(!rows.length){box.innerHTML='<b>이수 표시된 승인 회원이 없습니다.</b>';return}
+  const bad=rows.filter(r=>!r.inList);
+  const okNoCert=rows.filter(r=>r.inList&&!r.hasCert);
+  box.innerHTML='<b style="font-size:15px">🔍 이수자 명단 대조 결과</b> <span style="font-size:13px;color:var(--gray)">(이수 표시 '+rows.length+'명 / 내장 명단 '+EDU_ROSTER.length+'명)</span>'
+    +'<div style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap;font-size:13.5px">'
+    +'<span>✅ 명단 일치: <b style="color:#0f766e">'+(rows.length-bad.length)+'명</b></span>'
+    +'<span>⚠ 명단에 없음: <b style="color:#C41E2F">'+bad.length+'명</b></span>'
+    +'<span>🎓 이수증 발급 가능: <b>'+rows.filter(r=>r.hasCert).length+'명</b></span></div>'
+    +(bad.length?'<div style="margin-top:14px;padding:12px 14px;background:#fdf3f4;border:1.5px solid #f3c2c7;border-radius:10px"><b style="color:#C41E2F">⚠ 명단에 없는데 이수로 표시된 회원 — 확인 필요</b>'
+      +bad.map(r=>'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px dashed #f3c2c7;font-size:13.5px"><b style="min-width:70px">'+esc(r.name)+'</b><span style="color:var(--gray)">'+esc(r.region)+' · '+r.pts+'P · '+(r.hasCert?'<b style="color:#C41E2F">이수증 발급됨</b>':'이수증 미발급')+'</span>'
+        +'<button class="btn-sub" style="background:#C41E2F;font-size:12px;padding:6px 12px" onclick="revokeEdu(\''+r.uid+'\',\''+esc(r.name)+'\')">이수 취소</button></div>').join('')
+      +'</div>':'<div style="margin-top:12px;color:#0f766e;font-weight:700">✅ 이상 없음 — 이수 표시된 회원 전원이 명단과 일치합니다.</div>')
+    +(okNoCert.length?'<div style="margin-top:12px;font-size:13px;color:#b8860b">🎓 명단엔 있으나 이수증 코드 미생성 '+okNoCert.length+'명 — 위 "이수자 일괄 정리" 버튼을 누르면 생성됩니다.</div>':'');
+}
+async function revokeEdu(uid,name){
+  if(!confirm('['+name+'] 회원의 이수 자격을 취소합니다.\n- 이수 표시(edu2026) 해제\n- 이수증 검증코드 무효화\n- 지급된 연수 50P 회수\n계속할까요?'))return;
+  try{
+    await DB.collection('users').doc(uid).update({edu2026:false,points:firebase.firestore.FieldValue.increment(-50)});
+    await DB.collection('certs').doc('KFDF-2026-EDU-'+uid.slice(0,6).toUpperCase()).delete().catch(()=>{});
+    await DB.collection('users').doc(uid).collection('activities').add({
+      label:'연수 이수 취소 (명단 대조)',date:new Date().toISOString().slice(0,10).replace(/-/g,'.'),points:-50,
+      addedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await updateLeaderboard();
+    alert('['+name+'] 이수 자격이 취소되었습니다.');
+    auditEdu();loadUsers();
+  }catch(e){alert('실패: '+e.message)}
+}
+async function backfillCerts(){
+  if(!confirm('이미 승인된 연수 이수자 전원에 대해:\n① 이수증 검증코드 생성/갱신\n② 연수 50P 미지급자에게 소급 지급 (+활동이력 기록)\n을 실행합니다. 이미 받은 사람은 자동으로 건너뜁니다.'))return;
+  const snap=await DB.collection('users').where('status','==','approved').get();
+  let cert=0,pt=0;
+  for(const d of snap.docs){
+    const v=d.data();
+    if(!v.edu2026)continue;
+    await makeCert(d.id,v.name);cert++;
+    const done=await d.ref.collection('activities').where('label','==','2026 교원·지도자 자율연수 이수 인증').get();
+    const doneOld=await d.ref.collection('activities').where('label','==','2026 지도자 ' + '직무' + '연수 이수 인증').get();
+    if(done.empty&&doneOld.empty){
+      await d.ref.update({points:firebase.firestore.FieldValue.increment(50)});
+      await d.ref.collection('activities').add({
+        label:'2026 교원·지도자 자율연수 이수 인증',date:'2026.07.05',points:50,
+        addedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      pt++;
+    }
+  }
+  await updateLeaderboard();
+  alert('완료 — 검증코드 '+cert+'건 / 50P 소급 지급 '+pt+'명');
+  loadDash();loadUsers();
+}
+async function bulkMail(){
+  const m=document.getElementById('bmMsg'),btn=document.getElementById('bmBtn');
+  const subj=document.getElementById('bmSubject').value.trim();
+  const body=document.getElementById('bmBody').value;
+  const raw=document.getElementById('bmTo').value;
+  const list=[...new Set(raw.split(/[\n,;]+/).map(x=>x.trim()).filter(x=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)))];
+  if(!list.length){m.textContent='유효한 이메일 주소가 없습니다';m.className='msg err';return}
+  if(!subj||!body.trim()){m.textContent='제목과 내용을 입력하세요';m.className='msg err';return}
+  if(!window.KFDF_CONFIG.emailjs.publicKey){m.textContent='site_config.js에 EmailJS 설정이 없습니다';m.className='msg err';return}
+  if(!confirm(list.length+'명에게 개별 발송합니다. 진행할까요?'))return;
+  btn.disabled=true;
+  let ok=0;const fail=[];
+  for(let i=0;i<list.length;i++){
+    m.textContent='발송 중… '+(i+1)+'/'+list.length;m.className='msg';
+    try{
+      const c=window.KFDF_CONFIG.emailjs;
+      if(!window.emailjs){await new Promise((r,j)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';sc.onload=r;sc.onerror=j;document.head.appendChild(sc)});window.emailjs.init({publicKey:c.publicKey});}
+      await window.emailjs.send(c.serviceId,c.templateId,{to_email:list[i],subject:subj,message:body});
+      ok++;
+    }catch(e){fail.push(list[i])}
+    await new Promise(r=>setTimeout(r,400));
+  }
+  btn.disabled=false;
+  m.textContent='완료 — 성공 '+ok+'건'+(fail.length?' / 실패 '+fail.length+'건: '+fail.join(', '):'');
+  m.className=fail.length?'msg err':'msg ok';
+}
+async function addComp(){
+  const m=document.getElementById('cpMsg');
+  const t=document.getElementById('cpTitle').value.trim(),dt=document.getElementById('cpDate').value;
+  const q=parseInt(document.getElementById('cpQuota').value);
+  if(!t||!dt||!q){m.textContent='대회명·일자·정원을 입력하세요';m.className='msg err';return}
+  await DB.collection('compSlots').add({
+    title:t,region:document.getElementById('cpRegion').value,date:dt,
+    role:document.getElementById('cpRole').value,quota:q,claimed:[],
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  m.textContent='등록 완료 — 메인 참여신청(선정학교 강사지원)에 즉시 게시됩니다';m.className='msg ok';
+  document.getElementById('cpTitle').value='';
+  loadCompsAdmin();
+}
+let CADM=[];
+async function loadCompsAdmin(){
+  const snap=await DB.collection('compSlots').orderBy('date').limit(100).get();
+  CADM=snap.docs;
+  renderCompsAdmin();
+}
+function renderCompsAdmin(){
+  const el=document.getElementById('compAdminList');
+  const q=((document.getElementById('cpSearch')||{}).value||'').trim().toLowerCase();
+  const docs=CADM.filter(d=>{
+    if(!q)return true;
+    const s=d.data();const claimed=s.claimed||[];
+    const hay=[s.title,s.region,s.role,s.date,claimed.map(c=>c.name).join(' ')].map(x=>String(x||'').toLowerCase()).join(' ');
+    return hay.indexOf(q)>=0;
+  });
+  el.innerHTML=!docs.length?'<div class="bempty">'+(q?'검색 결과가 없습니다.':'등록된 대회 모집이 없습니다.')+'</div>':docs.map(d=>{
+    const s=d.data();const claimed=s.claimed||[];
+    const confirmed=s.confirmed||[];
+    return '<div class="urow"><div class="grow"><b>'+esc(s.title)+'</b> <span style="font-size:11px;font-weight:800;color:#fff;background:'+(s.role==='심판'?'#7c3aed':'#b8860b')+';padding:2px 8px;border-radius:999px">'+esc(s.role)+'</span>'
+      +(confirmed.length>=s.quota?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">확정 완료</span>':'')
+      +'<div class="sub3">'+esc(s.region)+' · '+esc(s.date)+' · 지명 '+claimed.length+'/'+s.quota+'명 · 확정 '+confirmed.length+'명'
+      +(claimed.length?'<br>지명자: '+claimed.map(c=>(confirmed.indexOf(c.uid)>=0?'<b style="color:#0f766e">✓'+esc(c.name)+'</b>':esc(c.name))).join(', '):'')+'</div></div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +(claimed.length?'<button class="btn-sub" style="background:#0f766e" onclick="confirmComp(\''+d.id+'\')">✓ 확정 처리</button>':'')
+      +(claimed.length?'<button class="btn-sub" style="background:#1F4E9C" onclick="copyCompNotice(\''+d.id+'\')">📋 통보문</button>':'')
+      +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delComp(\''+d.id+'\')">🗑</button></div></div>';
+  }).join('');
+}
+async function confirmComp(id){
+  const doc=await DB.collection('compSlots').doc(id).get();const s=doc.data();
+  const claimed=s.claimed||[];const confirmed=s.confirmed||[];
+  const names=claimed.map((c,i)=>(i+1)+'. '+c.name+(confirmed.indexOf(c.uid)>=0?' (확정됨)':'')).join('\n');
+  const pick=prompt('['+s.title+' / '+s.role+'] 확정할 지명자 번호를 쉼표로 입력하세요.\n(자격 확인 완료자만 — 전원이면 "전체" 입력)\n\n'+names,'전체');
+  if(pick===null)return;
+  let sel;
+  if(pick.trim()==='전체')sel=claimed.map(c=>c.uid);
+  else sel=pick.split(',').map(x=>claimed[parseInt(x.trim())-1]).filter(Boolean).map(c=>c.uid);
+  if(!sel.length){alert('선택된 지명자가 없습니다.');return}
+  await DB.collection('compSlots').doc(id).update({confirmed:[...new Set([...confirmed,...sel])]});
+  // 회원 공식 이력 기록
+  for(const u of sel){
+    if(confirmed.indexOf(u)>=0)continue; // 기확정자 중복 방지
+    await DB.collection('users').doc(u).collection('activities').add({
+      date:new Date().toISOString().slice(0,10),
+      label:'[대회] '+s.title+' '+s.role+'요원 확정 ('+(s.region||'')+' · '+(s.date||'')+')',
+      points:0,createdAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+  }
+  alert(sel.length+'명 확정 처리되었습니다. 통보문 버튼으로 안내 문자를 복사하세요.\n대회 종료 후에는 [포인트 부여]에서 심판 20P/일·운영 15P/일을 지급하면 됩니다.');
+  loadCompsAdmin();
+}
+async function copyCompNotice(id){
+  const doc=await DB.collection('compSlots').doc(id).get();const s=doc.data();
+  const confirmed=s.confirmed||[];const claimed=s.claimed||[];
+  const names=claimed.filter(c=>confirmed.indexOf(c.uid)>=0).map(c=>c.name);
+  const txt='[플라잉디스크연맹] '+s.title+' '+s.role+'요원으로 확정되었습니다.\n일자: '+s.date+' / 권역: '+s.region+'\n자격증 사본을 지참해 주시고, 세부 집결 시간·장소는 추후 안내드립니다.\n수당: '+(s.role==='심판'?'1일 7만원 이내(4시간 이내 4만원)':'운영요원 수당 기준')+' · 활동 포인트 자동 지급\n문의 031-984-3248'
+    +(names.length?'\n\n[확정자] '+names.join(', '):'');
+  navigator.clipboard.writeText(txt).then(()=>alert('✓ 통보문이 복사되었습니다.\n\n'+txt)).catch(()=>prompt('아래 내용을 복사하세요',txt));
+}
+async function delComp(id){
+  if(!confirm('이 대회 모집을 삭제할까요? (지명 기록도 함께 삭제)'))return;
+  await DB.collection('compSlots').doc(id).delete();loadCompsAdmin();
+}
+async function toggleCert(uid){
+  const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
+  const now=!d.certDoc;
+  if(!confirm(now?('['+d.name+'] 체육지도자 또는 연맹 지도자 자격증을 확인했습니까? (수령·대조 완료)'):('['+d.name+'] 자격확인을 취소 처리할까요?')))return;
+  await DB.collection('users').doc(uid).update({certDoc:now,certDocAt:firebase.firestore.FieldValue.serverTimestamp()});
+  loadUsers();
+}
+async function toggleSafety(uid){
+  const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
+  const now=!d.safetyEdu;
+  if(!confirm(now?('['+d.name+'] 안전교육 이수 완료로 처리할까요?\n(워크샵·집합교육 참석 등 오프라인 이수자를 수동 처리)'):('['+d.name+'] 안전교육 이수를 취소 처리할까요?')))return;
+  const upd=now?{safetyEdu:true,safetyEduAt:firebase.firestore.FieldValue.serverTimestamp()}:{safetyEdu:false,safetyEduAt:firebase.firestore.FieldValue.delete()};
+  await DB.collection('users').doc(uid).update(upd);
+  loadUsers();
+}
+async function toggleCrim(uid){
+  const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
+  const now=!d.crimDoc;
+  if(!confirm(now?('['+d.name+'] 경력 확인이 완료되었습니까? (학교 조회 협조 확인 또는 회보서 수령)\n(완료 처리)'):('['+d.name+'] 경력확인 완료를 취소 처리할까요?')))return;
+  await DB.collection('users').doc(uid).update({crimDoc:now,crimDocAt:firebase.firestore.FieldValue.serverTimestamp()});
+  loadUsers();
+}
+async function delUser(uid,name){
+  const typed=prompt('['+name+'] 회원을 휴지통으로 이동합니다.\n- 7일 후 회원 정보·활동 이력·이수증 검증코드가 자동으로 완전 삭제됩니다\n- 그 전에는 [강습 신청 관리 > 🗑 휴지통]에서 복구할 수 있습니다\n\n이동하려면 회원 이름을 똑같이 입력하세요:','');
+  if(typed===null)return;
+  if(typed.trim()!==name){alert('이름이 일치하지 않아 취소되었습니다.');return}
+  try{
+    await DB.collection('users').doc(uid).update({deleted:true,deletedAt:firebase.firestore.FieldValue.serverTimestamp(),delBy:(firebase.auth().currentUser||{}).email||''});
+    await updateLeaderboard();
+    alert('['+name+'] 휴지통 이동 완료. 7일 내 복구 가능합니다.\n※ 로그인 계정(이메일)은 Firebase 콘솔 > Authentication에서 별도 관리됩니다.');
+    loadDash();loadUsers();
+  }catch(e){alert('실패: '+e.message)}
+}
+
+// ── 버튼 선택 팝업 (prompt 대체) ──
+function pickDialog(title,options){
+  return new Promise(function(res){
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    var box=document.createElement('div');
+    box.style.cssText='background:#fff;border-radius:16px;padding:22px 20px;max-width:430px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.25)';
+    var h=document.createElement('b');
+    h.style.cssText='font-size:16px;display:block;margin-bottom:14px;line-height:1.5;word-break:keep-all';
+    h.textContent=title;box.appendChild(h);
+    options.forEach(function(o){
+      var b=document.createElement('button');
+      b.textContent=o;
+      b.style.cssText='display:block;width:100%;padding:14px 16px;margin:8px 0;border:1.5px solid #dfe5ee;border-radius:10px;background:#f8fafc;font-size:15px;font-weight:700;cursor:pointer;text-align:left;transition:.12s';
+      b.onmouseover=function(){b.style.background='#eef4ff';b.style.borderColor='#1F4E9C'};
+      b.onmouseout=function(){b.style.background='#f8fafc';b.style.borderColor='#dfe5ee'};
+      b.onclick=function(){document.body.removeChild(ov);res(o)};
+      box.appendChild(b);
+    });
+    var c=document.createElement('button');
+    c.textContent='취소';
+    c.style.cssText='display:block;width:100%;padding:11px;margin-top:10px;border:none;background:none;color:#C41E2F;font-size:14px;font-weight:800;cursor:pointer';
+    c.onclick=function(){document.body.removeChild(ov);res(null)};
+    box.appendChild(c);
+    ov.appendChild(box);
+    ov.addEventListener('click',function(e){if(e.target===ov){document.body.removeChild(ov);res(null)}});
+    document.body.appendChild(ov);
+  });
+}
+async function setBase(uid){
+  const doc=await DB.collection('users').doc(uid).get();const v=doc.data();
+  const REG=['서울·경기','강원','충청','전라','경상','제주'];
+  const cur=(v.activityRegions&&v.activityRegions.length)?v.activityRegions:(v.region?[v.region]:[]);
+  const rp=prompt('['+v.name+'] 활동 가능 권역 — 번호 입력 (복수는 쉼표: 예 1,5)\n현재: '+(cur.join(', ')||'없음')+'\n\n1=서울·경기  2=강원  3=충청\n4=전라  5=경상  6=제주',
+    cur.map(r=>REG.indexOf(r)+1).filter(n=>n>0).join(','));
+  if(rp===null)return;
+  const regs=[...new Set(rp.split(',').map(x=>REG[parseInt(x.trim(),10)-1]).filter(Boolean))];
+  if(!regs.length){alert('권역 번호를 1개 이상 입력하세요.');return}
+  const bc=prompt('['+v.name+'] 거점 시군구 — "시도 시군구" 형태로 입력\n(예: 부산광역시 수영구 / 서울특별시 강서구)\n비워두면 기존값 유지',v.baseCity||'');
+  if(bc===null)return;
+  const upd={activityRegions:regs};
+  if(String(bc).trim())upd.baseCity=String(bc).trim();
+  if(!v.region||REG.indexOf(v.region)<0)upd.region=regs[0];
+  await DB.collection('users').doc(uid).update(upd);
+  alert('✓ 저장되었습니다.\n활동 권역: '+regs.join(', ')+(upd.baseCity?'\n거점: '+upd.baseCity:''));
+  loadUsers();
+}
+async function setOrg(uid){
+  const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
+  const cur=d.org==='central'?'중앙연맹':d.org==='regional'?'시도연맹':'일반';
+  const psel=await pickDialog('['+d.name+'] 직책 지정 — 현재: '+cur+(d.orgTitle?' ('+d.orgTitle+')':''),['일반 회원 (뱃지 없음)','시도연맹 임원','중앙연맹']);
+  if(psel===null)return;
+  let org='',title='';
+  if(psel==='시도연맹 임원')org='regional';
+  if(psel==='중앙연맹')org='central';
+  if(org){title=prompt('직함 입력 (선택 — 예: 회장, 사무국장, 이사)\n비워두면 직함 없이 뱃지만 표시됩니다','')||''}
+  let fedName=d.fedName||'';
+  if(org==='regional'){
+    const FEDS=['경기연맹','강원연맹','대전연맹','부산연맹','대구연맹','울산연맹','경남연맹','경북연맹','전남광주연맹','제주연맹'];
+    const fp=await pickDialog('소속 시도연맹 선택 — 현재: '+(fedName||'미지정')+' (뱃지는 이 연맹명으로 표기됩니다)',FEDS);
+    if(fp)fedName=fp;
+    if(!fedName){alert('시도연맹을 선택해야 임원 뱃지를 지정할 수 있습니다');return}
+  }
+  await DB.collection('users').doc(uid).update({org:org,orgTitle:title,fedName:fedName});
+  loadUsers();
+}
+async function approve(uid){
+  const doc=await DB.collection('users').doc(uid).get();
+  const d=doc.data();
+  if(d.edu2026){
+    if(inRoster(d.name)){
+      if(!confirm('📋 명단 일치 — ['+d.name+'] 연수 이수자 명단에 있습니다.\n이수 인증(🎓뱃지 + 50P + 이수증 발급)과 함께 승인할까요?'))return;
+    }else{
+      if(confirm('⚠ ['+d.name+'] 연수 이수자 명단에 없습니다!\n\n[확인] = 그래도 이수 인증으로 승인 (명단 누락 등 직접 확인한 경우만)\n[취소] = 다음 단계로')){
+        // 예외 승인 진행
+      }else{
+        if(confirm('['+d.name+'] 을(를) 일반 회원으로 승인할까요?\n(이수 체크 해제, 🎓·50P·이수증 혜택 없음)')){
+          await DB.collection('users').doc(uid).update({status:'approved',edu2026:false});
+          kfdfMail(d.email,'[플라잉디스크연맹] 리더 회원 승인 완료','안녕하세요 '+d.name+' 님, 리더 회원 승인이 완료되었습니다.\n홈페이지에 로그인하여 활동을 시작해보세요.\n※ 연수 이수 확인이 필요하면 사무국(031-984-3248)으로 문의해주세요.');
+          loadDash();loadUsers();return;
+        }
+        return;
+      }
+    }
+  }
+  if(d.edu2026&&!(d.points>0)){
+    await DB.collection('users').doc(uid).update({status:'approved',points:50});
+    await DB.collection('users').doc(uid).collection('activities').add({
+      label:'2026 교원·지도자 자율연수 이수 인증',date:'2026.07.05',points:50,
+      addedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await makeCert(uid,d.name);
+  }else{
+    await DB.collection('users').doc(uid).update({status:'approved'});
+  }
+  updateLeaderboard();
+  kfdfMail(d.email,'[플라잉디스크연맹] 리더 회원 승인 완료','안녕하세요 '+d.name+' 님, 리더 회원 승인이 완료되었습니다.'+(d.edu2026?'\n자율연수 이수 인증(뱃지+50P)이 반영되었고, 마이페이지에서 이수증을 발급할 수 있습니다.':'')+'\n홈페이지에 로그인하여 강사 활동 지원과 커뮤니티를 이용해보세요.');
+  loadDash();loadUsers();
+}
+async function givePt(){
+  const uid=document.getElementById('axUser').value;
+  const label=document.getElementById('axLabel').value.trim();
+  const date=document.getElementById('axDate').value;
+  const pt=parseInt(document.getElementById('axPt').value)||0;
+  const m=document.getElementById('axMsg');
+  if(!uid||!label||!date||pt<=0){m.textContent='모든 항목을 입력하세요';m.className='msg err';return}
+  await DB.collection('users').doc(uid).collection('activities').add({label:label,date:date,points:pt,addedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  await DB.collection('users').doc(uid).update({points:firebase.firestore.FieldValue.increment(pt)});
+  m.textContent='부여 완료! (+'+pt+'P)';m.className='msg ok';
+  document.getElementById('axLabel').value='';loadUsers();
+  updateLeaderboard();
+}
+</script>
+
+<footer><div class="wrap">
+  <div class="top">
+    <div class="f-brand"><img src="kfdf_logo.png" alt="로고">
+      <div><b>대한민국플라잉디스크연맹</b><span>KOREA FLYING DISC FEDERATION</span></div></div>
+    <div class="links">
+      <a href="about.html">연맹소개</a><a href="business.html">사업안내</a>
+      <a href="notice.html">알림마당</a><a href="archive.html">자료실</a>
+      <a href="apply.html">학교 강습 신청</a>
+    </div>
+  </div>
+  <div class="bottom">
+    <span style="display:inline-block;margin-bottom:8px;padding:4px 14px;background:rgba(255,255,255,.08);border-radius:999px;font-size:12px;font-weight:700;color:#c3c9d4">유소년 스포츠 기반구축사업은 문화체육관광부 · 국민체육진흥공단 · 대한체육회가 후원하며 국민체육진흥기금을 지원받아 운영됩니다</span><br>
+    <b>사단법인 대한민국플라잉디스크연맹</b> &nbsp;|&nbsp; 경기도 김포시 홍도평로 72-22 가동 2층<br>
+    TEL 031-984-3248 &nbsp;|&nbsp; EMAIL kfdf60@hanmail.net<br>
+    © 2026 KOREA FLYING DISC FEDERATION. All rights reserved. &nbsp;|&nbsp; <a href="privacy.html" style="color:#9aa1ad">개인정보처리방침</a>
+  </div>
+</div></footer>
+<!-- 용품 수령 확인 요청 QR 모달 -->
+<div id="agqModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:18px;max-width:360px;width:100%;padding:26px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.25)">
+    <h3 style="margin:0 0 4px;font-size:18px;font-weight:900">📦 용품 수령 확인 요청</h3>
+    <div id="agqSub" style="font-size:13px;font-weight:800;color:#153A77;margin-bottom:6px"></div>
+    <p style="font-size:13px;color:#6b7280;margin:0 0 16px;line-height:1.6">학교 담당교사에게 아래 <b>QR을 보여주거나 링크를 전달</b>하세요. 교사가 수령 품목 확인 후 서명하면 자동 반영됩니다.</p>
+    <div id="agqQr" style="display:flex;justify-content:center;margin-bottom:14px;min-height:190px;align-items:center"></div>
+    <input id="agqLink" readonly onclick="this.select()" style="width:100%;padding:10px;border:1.5px solid #e3e6ea;border-radius:9px;font-size:12px;text-align:center;color:#153A77">
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn-sub" style="flex:1;background:#153A77" onclick="copyAgq()">🔗 링크 복사</button>
+      <button class="btn-sub" style="flex:1;background:#8a919d" onclick="document.getElementById('agqModal').style.display='none'">닫기</button>
+    </div>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+async function reqGoods(appId){
+  const doc=APPS.find(x=>x.id===appId);if(!doc)return;
+  const s=doc.data();
+  const items=(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' 강습 용품 세트 (50만원 상당)';
+  try{
+    await DB.collection('goodsConfirms').doc(appId).set({
+      school:s.school,region:s.region||'',type:s.type||'',items:items,
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    if(!window.GOODS)window.GOODS={};
+    window.GOODS[appId]=Object.assign({},window.GOODS[appId]||{},{school:s.school,region:s.region,type:s.type,items:items});
+  }catch(e){alert('생성 실패: '+e.message);return}
+  const url=new URL('confirm.html?goods='+appId,location.href).href;
+  document.getElementById('agqLink').value=url;
+  document.getElementById('agqSub').textContent=s.school+' · 용품 수령 확인';
+  const qr=document.getElementById('agqQr');qr.innerHTML='';
+  if(window.QRCode){try{new QRCode(qr,{text:url,width:190,height:190,correctLevel:QRCode.CorrectLevel.M})}catch(e){qr.textContent='링크를 이용해주세요'}}
+  else qr.innerHTML='<span style="font-size:12px;color:#999">QR 로딩 중 — 링크를 복사해 전달하세요</span>';
+  document.getElementById('agqModal').style.display='flex';
+}
+function copyAgq(){var t=document.getElementById('agqLink').value;
+  if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){alert('✓ 링크가 복사되었습니다.')}).catch(fb)}else fb();
+  function fb(){var i=document.getElementById('agqLink');i.select();try{document.execCommand('copy');alert('✓ 복사되었습니다.')}catch(e){alert('링크를 길게 눌러 복사해주세요.')}}
+}
+document.getElementById('agqModal').addEventListener('click',function(e){if(e.target===this)this.style.display='none'});
+</script>
+<script src="auth_ui.js?v=20260726d"></script>
+</body>
+</html>
