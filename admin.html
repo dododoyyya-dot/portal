@@ -815,8 +815,14 @@ async function chgType(id){
   const cur=appTypeOf(v);
   const nxt=cur==='학교체육 강습'?'방과후·늘봄·돌봄':'학교체육 강습';
   if(!confirm('['+v.school+']\n'+cur+' → '+nxt+' 으로 유형을 변경합니다.\n(접수번호·배정·상태는 그대로 유지됩니다)'))return;
-  await DB.collection('schoolApplications').doc(id).update({type:nxt});
-  loadApps();loadDash();
+  try{
+    await DB.collection('schoolApplications').doc(id).update({type:nxt,typeKey:(nxt==='방과후·늘봄·돌봄'?'after':'school')});
+    alert('변경되었습니다: '+cur+' → '+nxt);
+    loadApps();loadDash();
+  }catch(e){
+    alert('변경 실패: '+(e&&e.message?e.message:e)+'\n\n권한(Firestore 규칙)에 막혔을 수 있습니다 — 이 계정이 관리자(admin) 권한인지 확인해주세요.');
+    console.error('chgType failed',e);
+  }
 }
 async function delApp(id){
   const s=APPS.find(d=>d.id===id).data();
