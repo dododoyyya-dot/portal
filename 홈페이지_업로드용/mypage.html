@@ -299,9 +299,9 @@ function orgChip(o,region,title,fed){
         </div>
       </div>
     </div>
-    <div style="margin-top:14px;background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:12px;padding:14px 16px">
+    <div id="payInfoBox" style="display:none;margin-top:14px;background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:12px;padding:14px 16px">
       <b style="font-size:13.5px;color:#0f766e">💳 수당 지급 계좌</b>
-      <p style="font-size:12px;color:var(--gray);margin:4px 0 10px">강사·심판·운영요원 수당 및 환급금 지급에 사용됩니다. 본인 명의 계좌만 입력해 주세요.</p>
+      <p style="font-size:12px;color:var(--gray);margin:4px 0 10px">학교강습·방과후·늘봄 등 사업에 배정(위촉)된 분만 입력합니다. 강사·심판·운영요원 수당 및 환급금 지급에 사용되며, 본인 명의 계좌만 입력해 주세요.</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div>
           <label style="font-size:12px;font-weight:800">은행</label>
@@ -394,12 +394,13 @@ function orgChip(o,region,title,fed){
     <h4 style="font-weight:800;margin:22px 0 10px;font-size:15px">내가 제출한 보고</h4>
     <div class="board" id="lgList"><div class="bempty">불러오는 중…</div></div>
   </div>
+  <div id="consentWrap" style="display:none">
   <h3 class="sub" style="margin-top:44px">위촉 전자동의</h3>
   <div class="authbox" style="max-width:none" id="consentBox">
     <div id="consentDone" style="display:none;color:#0f766e;font-weight:800;font-size:15px"></div>
     <div id="consentForm">
       <p style="font-size:14px;color:var(--gray);line-height:1.8;margin-bottom:14px">
-        강사·심판 등 수당이 지급되는 활동의 위촉을 위해 아래 내용에 동의합니다. 동의 일시가 전자적으로 기록되며 서면 동의서를 대체합니다.</p>
+        학교강습·방과후·늘봄 등 사업에 배정(위촉)되어 수당이 지급되는 분만 해당됩니다. 아래 내용에 동의합니다. 동의 일시가 전자적으로 기록되며 서면 동의서를 대체합니다.</p>
       <label style="display:flex;gap:8px;align-items:flex-start;font-size:13.5px;font-weight:600;margin:8px 0"><input type="checkbox" id="c1" style="width:auto;margin-top:3px">
         (필수) 개인정보(성명·연락처·주소·계좌) 수집·이용 동의 — 위촉, 활동 배정, 수당 지급, 사업 정산 목적. 사업 종료 후 5년 보존 후 파기</label>
       <label style="display:flex;gap:8px;align-items:flex-start;font-size:13.5px;font-weight:600;margin:8px 0"><input type="checkbox" id="c2" style="width:auto;margin-top:3px">
@@ -409,6 +410,7 @@ function orgChip(o,region,title,fed){
       <button class="btn-main" style="margin-top:14px" onclick="doConsent()">전자 동의하기</button>
       <div class="msg" id="cMsg"></div>
     </div>
+  </div>
   </div>
   <h3 class="sub" style="margin-top:44px">활동 이력</h3>
   <div class="board" id="actList"><div class="bempty">불러오는 중…</div></div>
@@ -851,6 +853,16 @@ AUTH.onAuthStateChanged(async u=>{
       renderCompContracts();
     }
   }catch(e){}
+  // 학교강습·방과후·늘봄 또는 대회요원으로 배정(위촉)된 경우에만 계좌·주민번호·전자동의 노출
+  (function(){
+    const assigned=(MYASG.length>0)||(MYCOMP.length>0);
+    const alreadyHasPayInfo=!!(d.bank||d.accountNum);
+    const alreadyConsented=!!(d.consents&&d.consents.agreedAt);
+    const payBox=document.getElementById('payInfoBox');
+    if(payBox)payBox.style.display=(assigned||alreadyHasPayInfo)?'block':'none';
+    const cw=document.getElementById('consentWrap');
+    if(cw)cw.style.display=(assigned||alreadyConsented)?'block':'none';
+  })();
   const lv=lvOf(d.points||0);
   const chip=document.getElementById('myLv');
   chip.textContent='Lv.'+lv+' '+lvName(d.points||0); chip.style.background=LVC[lv];
