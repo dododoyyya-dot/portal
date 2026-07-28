@@ -1870,33 +1870,33 @@ async function setOrg(uid){
 async function approve(uid){
   const doc=await DB.collection('users').doc(uid).get();
   const d=doc.data();
-  if(d.edu2026){
-    if(inRoster(d.name)){
-      if(!confirm('📋 명단 일치 — ['+d.name+'] 연수 이수자 명단에 있습니다.\n이수 인증(🎓뱃지 + 50P + 이수증 발급)과 함께 승인할까요?'))return;
-    }else{
-      if(confirm('⚠ ['+d.name+'] 연수 이수자 명단에 없습니다!\n\n[확인] = 그래도 이수 인증으로 승인 (명단 누락 등 직접 확인한 경우만)\n[취소] = 다음 단계로')){
-        // 예외 승인 진행
-      }else{
-        if(confirm('['+d.name+'] 을(를) 일반 회원으로 승인할까요?\n(이수 체크 해제, 🎓·50P·이수증 혜택 없음)')){
-          await DB.collection('users').doc(uid).update({status:'approved',edu2026:false});
-          kfdfMail(d.email,'[플라잉디스크연맹] 리더 회원 승인 완료','안녕하세요 '+d.name+' 님, 리더 회원 승인이 완료되었습니다.\n홈페이지에 로그인하여 활동을 시작해보세요.\n※ 연수 이수 확인이 필요하면 사무국(031-984-3248)으로 문의해주세요.');
-          loadDash();loadUsers();return;
-        }
-        return;
-      }
-    }
-  }
-  if(d.edu2026&&!(d.points>0)){
-    await DB.collection('users').doc(uid).update({status:'approved',points:50});
+  // 회원가입 화면에서 자율연수 자기신고 항목을 없앴으므로(혼란 유발), 이제는 내장 명단(EDU_ROSTER) 일치 여부로
+  // 시스템이 자동 판단하는 것이 원칙. d.edu2026는 과거(자기신고 방식) 가입자와의 하위호환용으로만 남겨둠.
+  const onRoster=inRoster(d.name);
+  if(onRoster){
+    if(!confirm('📋 명단 일치 — ['+d.name+'] 연수 이수자 명단에 있습니다.\n이수 인증(🎓뱃지 + 50P + 이수증 발급)과 함께 승인할까요?'))return;
+    await DB.collection('users').doc(uid).update({status:'approved',edu2026:true,points:50});
     await DB.collection('users').doc(uid).collection('activities').add({
       label:'2026 교원·지도자 자율연수 이수 인증',date:'2026.07.05',points:50,
       addedAt:firebase.firestore.FieldValue.serverTimestamp()});
     await makeCert(uid,d.name);
+  }else if(d.edu2026){
+    // 과거 자기신고 데이터가 남아있는데 명단엔 없는 경우 — 사무국 확인 후 예외 처리
+    if(confirm('⚠ ['+d.name+'] 연수 이수로 표시되어 있으나 명단엔 없습니다!\n\n[확인] = 그래도 이수 인증으로 승인 (명단 누락 등 직접 확인한 경우만)\n[취소] = 이수 인증 없이 일반 승인')){
+      await DB.collection('users').doc(uid).update({status:'approved',points:50});
+      await DB.collection('users').doc(uid).collection('activities').add({
+        label:'2026 교원·지도자 자율연수 이수 인증',date:'2026.07.05',points:50,
+        addedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      await makeCert(uid,d.name);
+    }else{
+      await DB.collection('users').doc(uid).update({status:'approved',edu2026:false});
+    }
   }else{
     await DB.collection('users').doc(uid).update({status:'approved'});
   }
+  const d2=(await DB.collection('users').doc(uid).get()).data();
   updateLeaderboard();
-  kfdfMail(d.email,'[플라잉디스크연맹] 리더 회원 승인 완료','안녕하세요 '+d.name+' 님, 리더 회원 승인이 완료되었습니다.'+(d.edu2026?'\n자율연수 이수 인증(뱃지+50P)이 반영되었고, 마이페이지에서 이수증을 발급할 수 있습니다.':'')+'\n홈페이지에 로그인하여 강사 활동 지원과 커뮤니티를 이용해보세요.');
+  kfdfMail(d2.email,'[플라잉디스크연맹] 리더 회원 승인 완료','안녕하세요 '+d2.name+' 님, 리더 회원 승인이 완료되었습니다.'+(d2.edu2026?'\n자율연수 이수 인증(뱃지+50P)이 반영되었고, 마이페이지에서 이수증을 발급할 수 있습니다.':'')+'\n홈페이지에 로그인하여 강사 활동 지원과 커뮤니티를 이용해보세요.');
   loadDash();loadUsers();
 }
 async function givePt(){
