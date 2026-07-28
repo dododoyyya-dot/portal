@@ -186,10 +186,11 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
         <select id="userSido" onchange="renderUsers()" style="width:auto;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px;font-weight:700">
           <option value="">시도 전체</option>
-          <option value="__none">📍 시군구 미입력</option>
+          <option value="__none">📍 시군구 미입력 (권역 확인됨)</option>
+          <option value="__unclass">❓ 미분류 (권역도 미확인)</option>
           <option>서울</option><option>인천</option><option>경기</option><option>강원</option>
           <option>대전</option><option>세종</option><option>충북</option><option>충남</option>
-          <option value="전남광주">전남광주 (통합)</option><option>광주</option><option>전북</option><option>전남</option>
+          <option value="전남광주">전남광주 (통합)</option><option>전북</option>
           <option>부산</option><option>대구</option><option>울산</option><option>경북</option><option>경남</option>
           <option>제주</option>
         </select>
@@ -1104,8 +1105,15 @@ function uMatch(v){
   else if(UFL==='any'){const f=v.instructorFor||{};if(v.status!=='approved')return false;if(!(f.school||f.after||f.referee||f.staff))return false}
   else if(UFL!=='전체'){if(!(v.instructorFor&&v.instructorFor[UFL]))return false}
   const sido=(document.getElementById('userSido')||{}).value||'';
+  const hasReg=!!(v.region||(v.activityRegions&&v.activityRegions.length));
   if(sido==='__none'){
+    // 시군구(baseCity)는 없지만 권역(region/activityRegions)은 확인된 회원 — 시도 필터엔 안 걸리지만 미분류는 아님
     if(String(v.baseCity||'').trim()!=='')return false;
+    if(!hasReg)return false;
+  }else if(sido==='__unclass'){
+    // 시군구도 권역도 전혀 확인 안 된, 진짜 미분류 회원
+    if(String(v.baseCity||'').trim()!=='')return false;
+    if(hasReg)return false;
   }else if(sido){
     const c=String(v.baseCity||'');
     const hit=(SIDO_ALIAS[sido]||[sido]).some(a=>c.indexOf(a)===0);
