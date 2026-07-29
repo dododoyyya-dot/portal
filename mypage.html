@@ -1335,10 +1335,15 @@ function printLicense(no){
   w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>자격증 '+no+'</title>'
   +'<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">'
   +'<style>@page{size:A4 portrait;margin:0}html,body{margin:0;padding:0;background:#eee}'
-  +'.paper{width:210mm;height:296.5mm;margin:0 auto;position:relative;background:#fff url("'+bg+'") no-repeat center/210mm 296.5mm;font-family:Pretendard,"Noto Sans KR",sans-serif}'
-  +'.f{position:absolute;font-weight:600;color:#111;white-space:nowrap}'
+  +'*{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
+  // 배경을 CSS background(브라우저 기본 인쇄 설정에서 "배경 그래픽"이 꺼져 있으면 인쇄에서 통째로 빠짐)가 아니라
+  // 실제 <img> 요소로 깔아서 항상 인쇄·PDF에 포함되도록 함 (백지 문제의 실제 원인)
+  +'.paper{width:210mm;height:296.5mm;margin:0 auto;position:relative;background:#fff;font-family:Pretendard,"Noto Sans KR",sans-serif;overflow:hidden}'
+  +'.bgimg{position:absolute;left:0;top:0;width:210mm;height:296.5mm;object-fit:cover;z-index:0}'
+  +'.f{position:absolute;font-weight:600;color:#111;white-space:nowrap;z-index:1}'
   +'@media print{body{background:#fff}.paper{margin:0}}'
   +'</style></head><body><div class="paper">'
+  +'<img class="bgimg" id="bgimg" src="'+bg+'">'
   +'<div class="f" style="left:39.7%;top:33.6%;font-size:8.6mm">'+l.grade+'</div>'
   +'<div class="f" style="left:31.8%;top:40.5%;font-size:9.2mm;border-bottom:0.6mm solid #111;padding:0 3mm 1mm 1mm">'+MYD.name+'</div>'
   +'<div class="f" style="left:68.2%;top:33.75%;font-size:4.9mm">'+no+'</div>'
@@ -1348,12 +1353,11 @@ function printLicense(no){
   +'<div class="f" style="left:36.6%;top:70.65%;font-size:6.2mm">'+dot(l.issuedAt)+'</div>'
   +'</div><scr'+'ipt>'
   +'window.onload=function(){'
-  +'var img=new Image();'
+  +'var img=document.getElementById("bgimg");'
   +'var done=false;'
   +'function go(){if(done)return;done=true;window.print()}'
   +'img.onload=go;'
   +'img.onerror=go;'
-  +'img.src='+JSON.stringify(bg)+';'
   +'if(img.complete)go();' // 이미 캐시되어 있으면 즉시 진행
   +'setTimeout(go,3000);' // 안전장치: 3초 넘게 안 걸리면 그래도 진행
   +'}'
