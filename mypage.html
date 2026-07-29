@@ -1346,7 +1346,18 @@ function printLicense(no){
   +'<div class="f" style="left:68.2%;top:37.95%;font-size:4.9mm">'+dot(MYD.birth||'')+'</div>'
   +'<div class="f" style="left:68.2%;top:40.05%;font-size:4.9mm">'+(l.region||'')+'</div>'
   +'<div class="f" style="left:36.6%;top:70.65%;font-size:6.2mm">'+dot(l.issuedAt)+'</div>'
-  +'</div><scr'+'ipt>window.onload=()=>setTimeout(()=>window.print(),600)</scr'+'ipt></body></html>');
+  +'</div><scr'+'ipt>'
+  +'window.onload=function(){'
+  +'var img=new Image();'
+  +'var done=false;'
+  +'function go(){if(done)return;done=true;window.print()}'
+  +'img.onload=go;'
+  +'img.onerror=go;'
+  +'img.src='+JSON.stringify(bg)+';'
+  +'if(img.complete)go();' // 이미 캐시되어 있으면 즉시 진행
+  +'setTimeout(go,3000);' // 안전장치: 3초 넘게 안 걸리면 그래도 진행
+  +'}'
+  +'</scr'+'ipt></body></html>');
   w.document.close();
 }
 async function printCert(){
