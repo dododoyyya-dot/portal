@@ -1521,6 +1521,7 @@ function renderUsers(){
       +'<button class="btn-sub" style="background:'+(v.crimDoc?'#0f766e':'#8a919d')+'" onclick="toggleCrim(\''+d.id+'\')">'+(v.crimDoc?'경력확인 ✓':'경력확인 체크')+'</button>'
       +'<button class="btn-sub" style="background:'+(v.certDoc?'#0f766e':'#8a919d')+'" onclick="toggleCert(\''+d.id+'\')">'+(v.certDoc?'자격확인 ✓':'자격확인 체크')+'</button>'
       +'<button class="btn-sub" style="background:'+(v.safetyEdu?'#0f766e':'#8a919d')+'" onclick="toggleSafety(\''+d.id+'\')">'+(v.safetyEdu?'안전교육 ✓':'안전교육 처리')+'</button>'
+      +'<button class="btn-sub" style="background:#7c3aed" onclick="resetMemberPw(\''+esc(v.email)+'\',\''+esc(v.name)+'\')">🔑 비밀번호 재설정메일</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delUser(\''+d.id+'\',\''+esc(v.name)+'\')">🗑</button>'
       +'</div>';
   }).join('');
@@ -1788,6 +1789,14 @@ async function toggleCrim(uid){
   if(!confirm(now?('['+d.name+'] 경력 확인이 완료되었습니까? (학교 조회 협조 확인 또는 회보서 수령)\n(완료 처리)'):('['+d.name+'] 경력확인 완료를 취소 처리할까요?')))return;
   await DB.collection('users').doc(uid).update({crimDoc:now,crimDocAt:firebase.firestore.FieldValue.serverTimestamp()});
   loadUsers();
+}
+async function resetMemberPw(email,name){
+  if(!email){alert('['+name+'] 님은 등록된 이메일이 없어 재설정 메일을 보낼 수 없습니다.');return}
+  if(!confirm('['+name+'] 님('+email+') 에게 비밀번호 재설정 메일을 보낼까요?\n\n메일의 링크를 클릭하면 본인이 직접 새 비밀번호를 설정하게 됩니다. (관리자가 임의로 비밀번호를 알거나 지정하지는 않습니다)'))return;
+  try{
+    await AUTH.sendPasswordResetEmail(email);
+    alert('['+email+'] 로 재설정 메일을 보냈습니다.\n회원에게 메일함(스팸함 포함)을 확인하도록 안내해주세요.');
+  }catch(e){alert('실패: '+e.message)}
 }
 async function delUser(uid,name){
   const typed=prompt('['+name+'] 회원을 휴지통으로 이동합니다.\n- 7일 후 회원 정보·활동 이력·이수증 검증코드가 자동으로 완전 삭제됩니다\n- 그 전에는 [강습 신청 관리 > 🗑 휴지통]에서 복구할 수 있습니다\n\n이동하려면 회원 이름을 똑같이 입력하세요:','');
