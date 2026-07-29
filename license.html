@@ -748,13 +748,14 @@ async function loadClaims(){
       const c=d.data();
       const stc={'대기':'#b8860b','승인':'#0f766e','거절':'#C41E2F'}[c.status]||'#8a919d';
       return '<div class="lccard" style="padding:12px 16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div>'
-        +'<b>'+esc(c.name)+'</b> → <b>'+esc(c.licenseNo)+'</b> ('+esc(c.licType)+' '+esc(c.licGrade)+(c.licRegion?' · '+esc(c.licRegion):'')+')'
+        +'<b>'+esc(c.name)+'</b> → <b>'+esc(c.licenseNo)+'</b>'+(c.correctedLicenseNo?' <span style="color:#0f766e">(정정: '+esc(c.correctedLicenseNo)+')</span>':'')+' ('+esc(c.licType)+' '+esc(c.licGrade)+(c.licRegion?' · '+esc(c.licRegion):'')+')'
         +' <span class="lctag" style="background:'+(c.nameMatch?'#0f766e':'#C41E2F')+'">'+(c.nameMatch?'✓ 성명 일치':'✗ 성명 불일치')+'</span>'
         +' <span class="lctag" style="background:'+stc+'">'+esc(c.status)+'</span>'
         +'<div style="font-size:12px;color:var(--gray)">대장 성명: '+esc(c.licName||c.licMask)+(c.phone?' · ☎ '+esc(c.phone):'')+'</div></div>'
         +(c.status==='대기'?'<div style="display:flex;gap:6px;flex-wrap:wrap">'
           +'<button class="lcbtn s" onclick="approveClaim(\''+d.id+'\')">연결 승인</button>'
           +(c.nameMatch?'':'<button class="lcbtn b" onclick="fixAndApproveClaim(\''+d.id+'\')">🔧 대장 성명 정정 후 연결</button>')
+          +'<button class="lcbtn w" onclick="correctClaimNumber(\''+d.id+'\')">🔢 올바른 번호 입력 후 승인</button>'
           +'<button class="lcbtn d" onclick="rejectClaim(\''+d.id+'\')">거절</button></div>'
           :(c.status==='승인'?'<div style="display:flex;gap:6px;flex-wrap:wrap">'
             +'<button class="lcbtn ghost" onclick="undoApproveClaim(\''+d.id+'\')">↩ 되돌리기</button></div>':''))
@@ -778,6 +779,35 @@ async function approveClaim(id){
 }
 // ── 엑셀 일괄등록 오기 등으로 대장 성명이 실제 소지자와 달라 불일치가 뜨는 경우 —
 // 입금·증빙 확인 후 대장 성명을 신청자 성명으로 정정하면서 바로 연결까지 처리 ──
+// 신청자가 자격번호를 잘못 입력한 경우(타인 번호를 오입력 등) — 관리자가 실제 올바른 번호를 직접 입력해 그 번호로 승인
+async function correctClaimNumber(id){
+  const doc=CLAIMS.find(d=>d.id===id);if(!doc)return;
+  const c=doc.data();
+  const no=prompt('['+c.name+'] 님이 실제로 보유한 올바른 자격번호를 입력하세요.\n(신청 시 입력한 번호 '+c.licenseNo+'가 잘못된 경우)','');
+  if(no===null)return;
+  const correctNo=no.trim();
+  if(!correctNo){alert('번호를 입력해주세요.');return}
+  const licDoc=await DB.collection('licenses').doc(correctNo).get();
+  if(!licDoc.exists){alert('['+correctNo+'] 자격번호가 대장에 없습니다. 번호를 다시 확인해주세요.');return}
+  const l=licDoc.data();
+  if(l.uid&&l.uid!==c.uid){
+    alert('['+correctNo+'] 은(는) 이미 다른 회원 계정('+(l.name||l.maskName)+')에 연결되어 있습니다.\n타인 명의 자격을 가로챌 수 없으므로 이 번호로는 연결할 수 없습니다.\n번호를 다시 확인하거나 "발급 대장"에서 직접 확인해주세요.');
+    return;
+  }
+  if(!confirm('['+correctNo+'] 자격 정보\n대장 성명: '+(l.name||l.maskName)+'\n종류: '+l.type+' '+l.grade+' · '+(l.region||'')+'\n\n이 번호가 ['+c.name+'] 님 본인 자격이 맞습니까? 맞으면 이 번호로 연결·승인합니다.'))return;
+  try{
+    await DB.collection('licenses').doc(correctNo).update({uid:c.uid});
+    await DB.collection('licenseClaims').doc(id).update({
+      status:'승인',
+      correctedLicenseNo:correctNo,
+      processedAt:firebase.firestore.FieldValue.serverTimestamp(),
+      adminNote:'신청 시 입력한 번호('+c.licenseNo+')가 실제 본인 것이 아니어서, 관리자가 확인한 올바른 번호('+correctNo+')로 정정하여 승인'
+    });
+    await addHist(c.uid,'[자격] 번호 정정 후 연결 승인 — 입력번호 '+c.licenseNo+' → 실제번호 '+correctNo);
+    alert('['+correctNo+'] 번호로 정정하여 연결·승인 완료했습니다.');
+    loadClaims();
+  }catch(e){alert('실패: '+e.message)}
+}
 async function fixAndApproveClaim(id){
   const doc=CLAIMS.find(d=>d.id===id);if(!doc)return;
   const c=doc.data();
