@@ -1063,6 +1063,42 @@ async function loadLics(){
   LICS=docs.sort((a,b)=>(b.data().issuedAt||'').localeCompare(a.data().issuedAt||''));
   renderLics();
 }
+// ── 대장 성명 정정 (개명·오기) ──
+async function renameLic(id){
+  const doc=LICS.find(d=>d.id===id);if(!doc)return;
+  const l=doc.data();
+  const cur=l.name||l.maskName||'';
+  const nv=prompt('['+id+'] 자격 대장의 성명을 수정합니다.\n\n※ 자격증 출력물에 표시되는 이름입니다. 개명·오기 정정 시에만 사용하세요.\n(타인 명의로 바꾸는 것은 금지)',cur);
+  if(nv===null)return;
+  const nm=nv.trim();
+  if(!nm)return alert('성명을 입력해주세요.');
+  if(nm===cur)return;
+  if(!confirm('성명을 「'+cur+'」 → 「'+nm+'」 으로 변경합니다.\n계속할까요?'))return;
+  try{
+    await DB.collection('licenses').doc(id).update({
+      name:nm, maskName:nm,
+      nameFixedFrom:cur,
+      nameFixedAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    if(l.uid){try{await addHist(l.uid,'[자격] 대장 성명 정정 — '+cur+' → '+nm+' ('+id+')')}catch(e){}}
+    alert('성명이 수정되었습니다.');
+    loadLics();
+  }catch(e){alert('실패: '+e.message)}
+}
+// ── 회원 연결 해제 (잘못 승인한 경우 되돌리기) ──
+async function unlinkLic(id){
+  const doc=LICS.find(d=>d.id===id);if(!doc)return;
+  const l=doc.data();
+  if(!l.uid)return alert('연결된 회원이 없습니다.');
+  if(!confirm('['+id+' / '+(l.name||l.maskName||'')+'] 의 회원 계정 연결을 해제할까요?\n\n해당 회원의 마이페이지에서 이 자격증이 사라집니다.\n(대장 정보는 그대로 유지됩니다)'))return;
+  try{
+    const prev=l.uid;
+    await DB.collection('licenses').doc(id).update({uid:firebase.firestore.FieldValue.delete()});
+    try{await addHist(prev,'[자격] 계정 연결 해제 — '+(l.type||'')+' '+(l.grade||'')+' ('+id+')')}catch(e){}
+    alert('연결이 해제되었습니다.');
+    loadLics();
+  }catch(e){alert('실패: '+e.message)}
+}
 function renderLics(){
   const el=document.getElementById('licList');if(!el)return;
   const q=(document.getElementById('lsSearch').value||'').trim().toLowerCase();
@@ -1097,6 +1133,8 @@ function renderLics(){
       +'<div style="font-size:12px;color:var(--gray)">발급 '+esc(l.issuedAt)+' · 유효 ~'+esc(l.expireAt)+' · '+esc(l.issuer||'')+(l.uid?' · 회원연결됨':'')
       +(l.regionMovedFrom?' · 이관: '+esc(l.regionMovedFrom)+'→'+esc(l.region):'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +'<button class="lcbtn b" onclick="renameLic(\''+d.id+'\')">✏️ 성명 수정</button>'
+      +(l.uid?'<button class="lcbtn d" onclick="unlinkLic(\''+d.id+'\')">🔗 연결 해제</button>':'')
       +'<button class="lcbtn g" onclick="moveLic(\''+d.id+'\')">↪ 소속 이관</button>'
       +(CENTRAL?'<button class="lcbtn ghost" onclick="delLic(\''+d.id+'\')">🗑 삭제</button>':'')
       +'</div></div>';
