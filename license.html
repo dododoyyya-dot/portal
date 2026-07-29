@@ -752,8 +752,9 @@ async function loadClaims(){
         +' <span class="lctag" style="background:'+(c.nameMatch?'#0f766e':'#C41E2F')+'">'+(c.nameMatch?'✓ 성명 일치':'✗ 성명 불일치')+'</span>'
         +' <span class="lctag" style="background:'+stc+'">'+esc(c.status)+'</span>'
         +'<div style="font-size:12px;color:var(--gray)">대장 성명: '+esc(c.licName||c.licMask)+(c.phone?' · ☎ '+esc(c.phone):'')+'</div></div>'
-        +(c.status==='대기'?'<div style="display:flex;gap:6px">'
+        +(c.status==='대기'?'<div style="display:flex;gap:6px;flex-wrap:wrap">'
           +'<button class="lcbtn s" onclick="approveClaim(\''+d.id+'\')">연결 승인</button>'
+          +(c.nameMatch?'':'<button class="lcbtn b" onclick="fixAndApproveClaim(\''+d.id+'\')">🔧 대장 성명 정정 후 연결</button>')
           +'<button class="lcbtn d" onclick="rejectClaim(\''+d.id+'\')">거절</button></div>':'')
         +'</div>';
     };
@@ -772,6 +773,27 @@ async function approveClaim(id){
     alert('연결 완료 — 해당 회원 마이페이지에 자격증이 표시됩니다.');
     loadClaims();
   }catch(e){alert('실패: '+e.message+'\n(관할 외 지역 자격이면 중앙에 요청하세요)')}
+}
+// ── 엑셀 일괄등록 오기 등으로 대장 성명이 실제 소지자와 달라 불일치가 뜨는 경우 —
+// 입금·증빙 확인 후 대장 성명을 신청자 성명으로 정정하면서 바로 연결까지 처리 ──
+async function fixAndApproveClaim(id){
+  const doc=CLAIMS.find(d=>d.id===id);if(!doc)return;
+  const c=doc.data();
+  const licDoc=await DB.collection('licenses').doc(c.licenseNo).get();
+  const curName=(licDoc.exists&&(licDoc.data().name||licDoc.data().maskName))||c.licName||c.licMask||'(빈 값)';
+  if(!confirm('['+c.licenseNo+'] 자격 대장의 성명이 「'+curName+'」(으)로 등록돼 있어 신청자 「'+c.name+'」 님과 불일치합니다.\n\n엑셀 일괄등록 오기 등으로 실제로는 '+c.name+' 님 소유가 맞고, 입금·증빙을 확인하셨다면 대장 성명을 「'+c.name+'」(으)로 정정하면서 바로 연결합니다.\n\n타인 명의를 가로채는 것이 아님을 확인한 경우에만 진행하세요. 계속할까요?'))return;
+  try{
+    await DB.collection('licenses').doc(c.licenseNo).update({
+      name:c.name, maskName:c.name,
+      nameFixedFrom:curName,
+      nameFixedAt:firebase.firestore.FieldValue.serverTimestamp(),
+      uid:c.uid
+    });
+    await DB.collection('licenseClaims').doc(id).update({status:'승인',nameFixed:true,processedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await addHist(c.uid,'[자격] 대장 성명 정정 후 연결 — 「'+curName+'」→「'+c.name+'」 ('+c.licenseNo+')');
+    alert('대장 성명을 「'+c.name+'」(으)로 정정하고 연결까지 완료했습니다.');
+    loadClaims();
+  }catch(e){alert('실패: '+e.message)}
 }
 async function rejectClaim(id){
   if(!confirm('이 연결 요청을 거절할까요?'))return;
