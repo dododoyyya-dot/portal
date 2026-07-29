@@ -758,7 +758,9 @@ async function loadClaims(){
           +'<button class="lcbtn w" onclick="correctClaimNumber(\''+d.id+'\')">🔢 올바른 번호 입력 후 승인</button>'
           +'<button class="lcbtn d" onclick="rejectClaim(\''+d.id+'\')">거절</button></div>'
           :(c.status==='승인'?'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-            +'<button class="lcbtn ghost" onclick="undoApproveClaim(\''+d.id+'\')">↩ 되돌리기</button></div>':''))
+            +'<button class="lcbtn ghost" onclick="undoApproveClaim(\''+d.id+'\')">↩ 되돌리기</button></div>'
+            :(c.status==='거절'?'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+              +'<button class="lcbtn ghost" onclick="reopenClaim(\''+d.id+'\')">↩ 재처리(대기로)</button></div>':'')))
         +'</div>';
     };
     el.innerHTML=(pend.length?'<b style="font-size:13.5px">처리 대기 '+pend.length+'건</b>':'')+pend.map(row).join('')
@@ -857,6 +859,22 @@ async function rejectClaim(id){
   if(!confirm('이 연결 요청을 거절할까요?'))return;
   await DB.collection('licenseClaims').doc(id).update({status:'거절',processedAt:firebase.firestore.FieldValue.serverTimestamp()});
   loadClaims();
+}
+// 거절된 건을 다시 "대기"로 되돌려 재처리(예: 처음엔 거절했지만 올바른 번호를 입력해 승인 처리하고 싶은 경우)
+async function reopenClaim(id){
+  const doc=CLAIMS.find(d=>d.id===id);if(!doc)return;
+  const c=doc.data();
+  if(c.status!=='거절')return alert('거절된 건만 재처리할 수 있습니다.');
+  if(!confirm('['+c.name+'] 님의 거절된 요청을 다시 "처리 대기" 상태로 되돌릴까요?\n(거절 사유는 이력에 남고, 이후 정상 승인/정정 처리할 수 있습니다)'))return;
+  try{
+    await DB.collection('licenseClaims').doc(id).update({
+      status:'대기',
+      reopenedAt:firebase.firestore.FieldValue.serverTimestamp(),
+      processedAt:firebase.firestore.FieldValue.delete()
+    });
+    alert('"처리 대기" 상태로 되돌렸습니다.');
+    loadClaims();
+  }catch(e){alert('실패: '+e.message)}
 }
 function gotoApps(nid){
   const chip=document.querySelector('.lcchip[data-t="apps"]');
