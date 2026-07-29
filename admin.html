@@ -66,6 +66,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",
@@ -78,6 +79,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const AUTH = firebase.auth();
 const DB = firebase.firestore();
+const FUNCS = firebase.app().functions('asia-northeast3');
 const LVS = [[0,'어쏘 리더'],[100,'필드 리더'],[300,'치프 리더'],[600,'엘리트 리더'],[1000,'마스터 리더']];
 const LVC = {1:'#8a919d',2:'#1F4E9C',3:'#7c3aed',4:'#C41E2F',5:'#b8860b'};
 function lvOf(p){let l=0;LVS.forEach((v,i)=>{if(p>=v[0])l=i});return l+1}
@@ -1522,6 +1524,7 @@ function renderUsers(){
       +'<button class="btn-sub" style="background:'+(v.certDoc?'#0f766e':'#8a919d')+'" onclick="toggleCert(\''+d.id+'\')">'+(v.certDoc?'자격확인 ✓':'자격확인 체크')+'</button>'
       +'<button class="btn-sub" style="background:'+(v.safetyEdu?'#0f766e':'#8a919d')+'" onclick="toggleSafety(\''+d.id+'\')">'+(v.safetyEdu?'안전교육 ✓':'안전교육 처리')+'</button>'
       +'<button class="btn-sub" style="background:#7c3aed" onclick="resetMemberPw(\''+esc(v.email)+'\',\''+esc(v.name)+'\')">🔑 비밀번호 재설정메일</button>'
+      +'<button class="btn-sub" style="background:#b8860b" onclick="resetMemberPwManual(\''+d.id+'\',\''+esc(v.name)+'\')">🔧 임시 비밀번호 직접 설정</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delUser(\''+d.id+'\',\''+esc(v.name)+'\')">🗑</button>'
       +'</div>';
   }).join('');
@@ -1796,6 +1799,17 @@ async function resetMemberPw(email,name){
   try{
     await AUTH.sendPasswordResetEmail(email);
     alert('['+email+'] 로 재설정 메일을 보냈습니다.\n회원에게 메일함(스팸함 포함)을 확인하도록 안내해주세요.');
+  }catch(e){alert('실패: '+e.message)}
+}
+async function resetMemberPwManual(uid,name){
+  const pw=prompt('['+name+'] 님에게 발급할 임시 비밀번호를 입력하세요 (6자 이상).\n\n설정 후 회원에게 전화로 알려주시고, 로그인하면 마이페이지에서 새 비밀번호로 바꾸도록 안내해주세요.','');
+  if(pw===null)return;
+  if(pw.trim().length<6){alert('6자 이상 입력해주세요.');return}
+  if(!confirm('['+name+'] 님의 비밀번호를 「'+pw+'」(으)로 즉시 변경할까요?\n기존 비밀번호는 더 이상 사용할 수 없게 됩니다.'))return;
+  try{
+    const fn=FUNCS.httpsCallable('adminResetPassword');
+    await fn({targetUid:uid,newPassword:pw.trim()});
+    alert('['+name+'] 님 비밀번호가 「'+pw+'」(으)로 변경되었습니다.\n회원에게 전화로 알려주세요.');
   }catch(e){alert('실패: '+e.message)}
 }
 async function delUser(uid,name){
