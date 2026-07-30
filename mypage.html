@@ -207,7 +207,7 @@ function orgChip(o,region,title,fed){
 
     <!-- ② 소속 -->
     <div style="margin-top:14px">
-      <label style="font-size:13px;font-weight:800">소속 (중복 선택 가능)</label>
+      <label style="font-size:13px;font-weight:800">소속 (중복 선택 가능) <span style="font-weight:700;color:#8c1622;font-size:11.5px">*필수 — 해당 없으면 "소속 없음"</span></label>
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:13.5px;align-items:center">
         <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="pfAf1" style="width:auto">시도연맹 (KFDF)</label>
         <select id="pfAfFed" style="display:none;padding:7px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px">
@@ -281,7 +281,7 @@ function orgChip(o,region,title,fed){
 
     <!-- ⑦ 사이즈 (맨 끝) -->
     <div style="margin-top:16px;padding:14px 16px;background:#fbf7f0;border:1.5px solid #e8dcc8;border-radius:12px">
-      <label style="font-size:13.5px;font-weight:800;color:#8a6d1f">👕 피복 사이즈 <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 활동복·조끼·모자 등 지급용</span></label>
+      <label style="font-size:13.5px;font-weight:800;color:#8a6d1f">👕 피복 사이즈 <span style="font-weight:700;color:#8c1622;font-size:11.5px">*필수</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 활동복·조끼·모자 등 지급용</span></label>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:8px">
         <div>
           <label style="font-size:12px;font-weight:800">상의</label>
@@ -772,6 +772,7 @@ function pfMissing(d){
   if(!d.address||!d.addrDetail)miss.push('집 주소(상세주소 포함)');
   if(!(d.activityRegions&&d.activityRegions.length))miss.push('활동 가능 범위');
   if(!(d.affiliation&&d.affiliation.length))miss.push('소속');
+  if(!d.clothingSize||!d.sizePants||!d.sizeShoe||!d.sizeCap)miss.push('피복 사이즈');
   return miss;
 }
 window.pfMissing=pfMissing;
@@ -811,6 +812,21 @@ async function saveProfile(){
     if(box){box.scrollIntoView({behavior:'smooth',block:'center'});box.style.outline='2px solid #C41E2F';setTimeout(()=>{box.style.outline=''},4000);}
     PFBUSY=false;return;
   }
+  {
+    const hasAf=document.getElementById('pfAf1').checked||document.getElementById('pfAf2').checked||document.getElementById('pfAf3').checked||document.getElementById('pfAf0').checked||document.getElementById('pfAfEtc').value.trim()!=='';
+    if(!hasAf){
+      m.textContent='⚠ 「소속」을 최소 1개 선택해주세요 (해당 없으면 "소속 없음"을 선택)';m.style.color='#8c1622';
+      const box=document.getElementById('pfAf1').closest('div');
+      if(box){box.scrollIntoView({behavior:'smooth',block:'center'});box.style.outline='2px solid #C41E2F';setTimeout(()=>{box.style.outline=''},4000);}
+      PFBUSY=false;return;
+    }
+  }
+  if(document.getElementById('pfAf2').checked&&req('pfTeachLv','학교급 (교원)'))return;
+  if((document.getElementById('pfAf2').checked||document.getElementById('pfAf3').checked)&&req('pfWork','근무지 (학교·기관명)'))return;
+  if(req('pfSize','피복 사이즈(상의)'))return;
+  if(req('pfSizePants','피복 사이즈(하의)'))return;
+  if(req('pfSizeShoe','피복 사이즈(신발)'))return;
+  if(req('pfSizeCap','피복 사이즈(모자)'))return;
   try{
     const af=[];
     if(document.getElementById('pfAf1').checked)af.push('시도연맹');

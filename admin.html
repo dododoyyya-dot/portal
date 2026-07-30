@@ -452,6 +452,7 @@ function renderApps(){
       +'<span style="font-size:12px;font-weight:800;color:#fff;background:'+stc+';padding:2px 10px;border-radius:999px">'+st+(st==='대기'&&s.waitNo?' '+s.waitNo+'번':'')+'</span>'
       +(s.eduName?' <span style="font-size:11px;font-weight:800;color:#C41E2F">★이수자교('+esc(s.eduName)+')</span>':'')
       +(s.selfTeach?' <span style="font-size:11px;font-weight:800;color:#0f766e">◉본인지도 희망'+(s.selfName?'('+esc(s.selfName)+')':'')+'</span>':'')
+      +(s.selfTeach&&!s.selfUid&&!s.assignedName&&(st==='선정'||st==='접수'||st==='대기')?' <span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px" title="신청자가 비로그인 상태로 제출해 자동 배정이 안 됐습니다. 아래 🎯 강사 직접 배정으로 성명 대조 후 지정해주세요.">⚠ 본인지도 매칭필요</span>':'')
       +((dupKey[(s.school||'').replace(/\s/g,'')+'|'+(s.type||'')]>1)?' <span style="font-size:11px;font-weight:800;color:#fff;background:#e6b422;padding:2px 8px;border-radius:999px">⚠ 중복의심</span>':'')
       +(s.support==='용품만'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">🎁 용품만</span>':'')
       +' <span style="font-size:11px;font-weight:800;color:#fff;background:'+(appTypeOf(s).indexOf('방과후')>=0?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+'</span>'
@@ -463,8 +464,9 @@ function renderApps(){
       +(st==='대기'?'<button class="btn-sub" style="background:#0f766e" onclick="setStatus(\''+d.id+'\',\'접수\')">접수 전환</button>':'')
       +((st==='취소'||st==='미선정')?'<button class="btn-sub" style="background:#0f766e" onclick="setStatus(\''+d.id+'\',\'접수\')">접수로 복원</button>':'')
       +(st==='선정'&&!s.assignedName?'<button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'접수\')">선정취소</button>':'')
-      +(st==='배정완료'&&s.support!=='용품만'?'<button class="btn-sub" style="background:#7c3aed" onclick="toggleLogs(\''+d.id+'\')">📒 일지</button>':'')
+      +(st==='배정완료'?'<button class="btn-sub" style="background:#7c3aed" onclick="toggleLogs(\''+d.id+'\')">📒 일지</button>':'')
       +(st==='배정완료'?'<button class="btn-sub" style="background:#e6b422" onclick="unassign(\''+d.id+'\')">👤 배정해제</button>':'')
+      +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:#0f766e;color:#fff" title="회원을 검색해 이 학교의 강사로 직접 배정 (본인지도 신청자가 비로그인으로 제출한 경우 등)" onclick="assignInstructor(\''+d.id+'\')">🎯 강사 직접 배정</button>':'')
       +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:#fff;color:#8a919d;border:1.5px solid #8a919d" onclick="cancelSchool(\''+d.id+'\')">학교취소</button>':'')
       +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:#1F4E9C" onclick="copyNotice(\''+d.id+'\')">📋 통보문</button>':'')
       +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:'+(gc&&gc.teacherConfirm?'#0f766e':'#b8860b')+'" onclick="reqGoods(\''+d.id+'\')">📦 '+(gc&&gc.teacherConfirm?'수령확인✓':'용품수령 확인요청')+'</button>':'')
@@ -806,6 +808,43 @@ async function unassign(id){
   alert('배정이 해제되었습니다. 자동배정 또는 지명으로 재배정할 수 있습니다.');
   loadApps();loadDash();
 }
+// ── 강사 직접 배정(성명·전화 검색) — 본인지도 희망자가 비로그인으로 신청해 selfUid가 비어있는 경우,
+//    또는 지명게시판을 거치지 않고 관리자가 곧바로 배정해야 하는 경우에 사용 ──
+async function assignInstructor(id){
+  const doc=APPS.find(d=>d.id===id);if(!doc)return;
+  const s=doc.data();
+  const hint=s.selfTeach?(s.selfName||s.teacher||''):(s.teacher||'');
+  const kw=prompt('['+s.school+']\n배정할 강사(회원)를 검색합니다 — 이름 또는 전화번호 일부를 입력하세요'+(s.selfTeach?'\n(본인지도 희망 담당교사: '+(s.teacher||'')+', 연락처: '+(s.phone||'')+')':''), hint);
+  if(kw===null)return;
+  const q=kw.trim();
+  if(!q){alert('검색어를 입력해주세요.');return}
+  const matches=USERS.filter(u=>{
+    const v=u.data();
+    return v.status==='approved'&&!v.deleted&&((v.name||'').indexOf(q)>=0||(v.phone||'').replace(/-/g,'').indexOf(q.replace(/-/g,''))>=0);
+  });
+  if(!matches.length){alert('일치하는 승인회원이 없습니다. 이름·전화번호를 다시 확인하거나, 아직 가입 전이면 먼저 회원가입 후 다시 시도해주세요.');return}
+  const opts=matches.slice(0,20).map(u=>{
+    const v=u.data();
+    return v.name+' · '+(v.phone||'전화없음')+' · '+(v.baseCity||v.region||'권역미상')+(v.instructorFor&&v.instructorFor.school?' · 학교강습 강사등록':'');
+  });
+  const picked=await pickDialog('['+s.school+']에 배정할 강사를 선택하세요 ('+matches.length+'명 검색됨)',opts);
+  if(picked===null)return;
+  const idx=opts.indexOf(picked);
+  const u=matches[idx],v=u.data();
+  if(!confirm('['+s.school+']\n→ '+v.name+' ('+(v.phone||'')+')\n\n이 회원을 강사로 직접 배정합니다.\n상태가 [배정완료]로 바뀌며, 지명 슬롯이 있었다면 함께 정리됩니다.\n계속할까요?'))return;
+  try{
+    await DB.collection('schoolApplications').doc(id).update({assignedUid:u.id,assignedName:v.name,status:'배정완료'});
+    await adHist(u.id,'[위촉] '+s.school+' 강사 배정 ('+(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' · '+(s.region||'')+(s.selfTeach?' · 본인지도(수동매칭)':'')+')');
+    await syncStatus(s,'배정완료',{assignedName:v.name});
+    await DB.collection('openSlots').doc(id).delete().catch(()=>{});
+    kfdfMail(s.email,'[플라잉디스크연맹] 강사 배정 안내 — '+s.school,s.school+' ('+s.type+') 신청의 강사가 '+v.name+' 님으로 배정되었습니다.\n접수번호: '+(s.code||'')+'\n일정 협의를 위해 곧 연락드리겠습니다.');
+    alert('배정 완료: '+v.name);
+    loadApps();loadDash();
+  }catch(e){
+    alert('배정 실패: '+(e&&e.message?e.message:e)+'\n\n권한(Firestore 규칙)에 막혔을 수 있습니다 — 이 계정이 관리자(admin) 권한인지 확인해주세요.');
+    console.error('assignInstructor failed',e);
+  }
+}
 async function cancelSchool(id){
   const s=APPS.find(d=>d.id===id).data();
   const reason=prompt('['+s.school+'] 참여를 취소(반려) 처리합니다.\n사유를 입력하세요 (학교 포기·중복·요건 미충족 등). 취소 사유는 기록으로 남습니다.','학교 사정으로 참여 취소');
@@ -846,7 +885,7 @@ async function chgSupport(id){
   const v=doc.data();
   const cur=v.support==='용품만'?'용품만':'강사파견+용품';
   const nxt=cur==='용품만'?'강사파견+용품':'용품만';
-  const warn=nxt==='용품만'?'\n\n⚠ 용품만으로 바꾸면 이후 "📒 일지" 버튼이 사라집니다(용품만 학교는 운영일지 불필요).':'\n\n⚠ 강사파견+용품으로 바꾸면 실제 강사 배정이 필요합니다.';
+  const warn=nxt==='용품만'?'':'\n\n⚠ 강사파견+용품으로 바꾸면 실제 강사 배정이 필요합니다.';
   if(!confirm('['+v.school+']\n지원방식을 [ '+cur+' ] → [ '+nxt+' ] (으)로 변경합니다.'+warn))return;
   try{
     await DB.collection('schoolApplications').doc(id).update({support:nxt});
