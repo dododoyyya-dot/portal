@@ -130,7 +130,7 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
     </div>
     <div id="fS" style="display:none">
       <div style="background:#eef3fa;border:1.5px solid #d4e0f2;border-radius:10px;padding:11px 14px;font-size:12.5px;font-weight:700;color:#153A77;margin-bottom:4px">
-        아래 항목은 마이페이지 프로필과 동일한 <b>필수 정보</b>입니다 (강습 배정·위촉·정산·물품 발송에 사용). 자격증·학위·경력·계좌 등은 가입 후 마이페이지에서 등록하시면 됩니다.
+        아래 항목은 마이페이지 프로필과 동일한 <b>필수 정보</b>입니다 (강습 배정·위촉·정산·물품 발송에 사용). 계좌는 선택 입력이며, 자격증·학위 증빙·경력 등은 가입 후 마이페이지에서 등록하시면 됩니다.
       </div>
       <label>이름 (실명) <span style="color:#C41E2F">*</span></label><input id="sName" placeholder="홍길동">
       <label>휴대전화 (배정·위촉 연락용) <span style="color:#C41E2F">*</span></label><input id="sPhone" placeholder="010-0000-0000">
@@ -192,6 +192,27 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
           <select id="sSizePants"><option value="">하의(허리)</option><option>26</option><option>28</option><option>30</option><option>32</option><option>34</option><option>36</option><option>38</option><option>40</option></select>
           <select id="sSizeShoe"><option value="">신발(mm)</option><option>220</option><option>230</option><option>240</option><option>250</option><option>260</option><option>270</option><option>280</option><option>290</option></select>
           <select id="sSizeCap"><option value="">모자</option><option>성인</option><option>아동</option></select>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;padding:14px 16px;background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:12px">
+        <label style="margin:0;font-size:13.5px;font-weight:800;color:#0f766e">💳 수당 지급 계좌 <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 선택, 나중에 마이페이지에서 입력·수정 가능합니다</span></label>
+        <p style="font-size:12px;color:var(--gray);margin:4px 0 10px">강습·강사·심판·운영요원 등에 배정(위촉)되면 수당·환급금 지급에 사용됩니다. 본인 명의 계좌만 입력해 주세요.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label style="font-size:12px;font-weight:800">은행</label>
+            <select id="sBank" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
+              <option value="">선택</option><option>국민</option><option>신한</option><option>우리</option><option>하나</option><option>농협</option><option>기업</option><option>SC제일</option><option>부산</option><option>경남</option><option>대구</option><option>광주</option><option>전북</option><option>제주</option><option>우체국</option><option>새마을금고</option><option>신협</option><option>카카오뱅크</option><option>토스뱅크</option><option>케이뱅크</option><option>기타</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:800">예금주</label>
+            <input id="sAccHolder" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px" placeholder="본인 성명">
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <label style="font-size:12px;font-weight:800">계좌번호</label>
+          <input id="sAccNum" inputmode="numeric" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px" placeholder="- 없이 숫자만 입력">
         </div>
       </div>
 
@@ -451,6 +472,9 @@ async function go(){
         sizePants:document.getElementById('sSizePants').value,
         sizeShoe:document.getElementById('sSizeShoe').value,
         sizeCap:document.getElementById('sSizeCap').value,
+        bank:document.getElementById('sBank').value,
+        accountHolder:document.getElementById('sAccHolder').value.trim(),
+        accountNum:document.getElementById('sAccNum').value.replace(/[^0-9]/g,''),
         edu2026:false, // 자율연수 이수 여부는 자기신고 대신 사무국 승인 시 내장 명단과 자동 대조합니다
         role:'member', status:'pending', points:0,
         createdAt:firebase.firestore.FieldValue.serverTimestamp()
