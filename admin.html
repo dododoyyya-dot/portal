@@ -471,6 +471,7 @@ function renderApps(){
       +'<button class="btn-sub" style="background:'+(s.start&&s.start.indexOf('8월')>=0?'#C41E2F':'#8a919d')+'" onclick="setStart(\''+d.id+'\')">'+(s.start&&s.start.indexOf('8월')>=0?'⚡긴급(방학)':s.start?'일반(9월)':'개강시기?')+'</button>'
       +'<button class="btn-sub" style="background:'+(s.city?'#8a919d':'#C41E2F')+'" onclick="setCity(\''+d.id+'\')">📍시군구</button>'
       +'<button class="btn-sub" style="background:#fff;color:#7c3aed;border:1.5px solid #7c3aed" title="학교체육 ↔ 방과후 유형 전환" onclick="chgType(\''+d.id+'\')">🔁 유형</button>'
+      +'<button class="btn-sub" style="background:#fff;color:#0f766e;border:1.5px solid #0f766e" title="강사파견+용품 ↔ 용품만 전환 (강사 섭외 불가 시)" onclick="chgSupport(\''+d.id+'\')">🎁 지원방식</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delApp(\''+d.id+'\')">🗑</button>'
       +'</div></div>'
       +'<div id="logs_'+d.id+'" style="display:none;background:var(--bg-soft);border-radius:12px;padding:14px 18px;margin:-6px 0 10px"></div>';
@@ -837,6 +838,23 @@ async function chgType(id){
   }catch(e){
     alert('변경 실패: '+(e&&e.message?e.message:e)+'\n\n권한(Firestore 규칙)에 막혔을 수 있습니다 — 이 계정이 관리자(admin) 권한인지 확인해주세요.');
     console.error('chgType failed',e);
+  }
+}
+// ── 지원방식(강사파견+용품 ↔ 용품만) 사후 변경 — 강사 섭외가 안 되는 학교를 용품만으로 전환할 때 사용 ──
+async function chgSupport(id){
+  const doc=APPS.find(d=>d.id===id);if(!doc)return;
+  const v=doc.data();
+  const cur=v.support==='용품만'?'용품만':'강사파견+용품';
+  const nxt=cur==='용품만'?'강사파견+용품':'용품만';
+  const warn=nxt==='용품만'?'\n\n⚠ 용품만으로 바꾸면 이후 "📒 일지" 버튼이 사라집니다(용품만 학교는 운영일지 불필요).':'\n\n⚠ 강사파견+용품으로 바꾸면 실제 강사 배정이 필요합니다.';
+  if(!confirm('['+v.school+']\n지원방식을 [ '+cur+' ] → [ '+nxt+' ] (으)로 변경합니다.'+warn))return;
+  try{
+    await DB.collection('schoolApplications').doc(id).update({support:nxt});
+    alert('변경되었습니다: '+cur+' → '+nxt);
+    loadApps();loadDash();
+  }catch(e){
+    alert('변경 실패: '+(e&&e.message?e.message:e)+'\n\n권한(Firestore 규칙)에 막혔을 수 있습니다 — 이 계정이 관리자(admin) 권한인지 확인해주세요.');
+    console.error('chgSupport failed',e);
   }
 }
 async function delApp(id){
