@@ -1106,13 +1106,13 @@ async function loadMyLogs(){
 function renderContracts(){
   const done=(MYD.contracts||{});
   document.getElementById('contractList').innerHTML=MYASG.map(x=>{
-    const a=x.data();const ag=done[x.id];
+    const a=x.data();const ag=done[x.id];const signed=!!(ag&&ag.sign);
     const period=(a.start&&a.start.indexOf('8월')>=0)?'2026. 8. ~ 12. (여름방학 개강)':'2026. 9. ~ 12.';
     return '<div class="urow"><div class="grow"><b>'+esc(a.school)+'</b> <span style="font-size:11.5px;color:var(--gray)">'+esc(a.type)+' · 24회차 · '+period+'</span>'
-      +'<div class="sub3">'+(ag?('<b style="color:#0f766e">✓ 서명 완료 ('+fmtDate(ag.agreedAt)+')</b>'+(ag.sign?'<img src="'+ag.sign+'" alt="서명" style="height:24px;vertical-align:middle;margin-left:8px;border:1px solid #eee;border-radius:5px;background:#fff">':'')):'<b style="color:#C41E2F">서명 전 — 계약서 확인 후 서명해주세요</b>')+'</div></div>'
+      +'<div class="sub3">'+(signed?('<b style="color:#0f766e">✓ 서명 완료 ('+fmtDate(ag.agreedAt)+')</b><img src="'+ag.sign+'" alt="서명" style="height:24px;vertical-align:middle;margin-left:8px;border:1px solid #eee;border-radius:5px;background:#fff">'):(ag?'<b style="color:#b8860b">⚠ 예전 방식으로 동의만 기록되고 실제 서명은 저장되지 않았습니다 — 아래에서 다시 서명해주세요</b>':'<b style="color:#C41E2F">서명 전 — 계약서 확인 후 서명해주세요</b>'))+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +'<button class="btn-sub" onclick="printContract(\''+x.id+'\')">'+(ag?'계약서 인쇄·PDF':'계약서 보기')+'</button>'
-      +(ag?'':'<button class="btn-sub" style="background:#0f766e" onclick="openSigModal(\''+x.id+'\')">✍ 서명하고 동의</button>')
+      +'<button class="btn-sub" onclick="printContract(\''+x.id+'\')">'+(signed?'계약서 인쇄·PDF':'계약서 보기')+'</button>'
+      +(signed?'':'<button class="btn-sub" style="background:#0f766e" onclick="openSigModal(\''+x.id+'\')">✍ '+(ag?'다시 ':'')+'서명하고 동의</button>')
       +'</div></div>';
   }).join('');
 }
@@ -1186,12 +1186,12 @@ async function submitSign(){
 function renderCompContracts(){
   const done=(MYD.contracts||{});
   document.getElementById('compContractList').innerHTML=MYCOMP.map(x=>{
-    const c=x.data();const ag=done['comp_'+x.id];
+    const c=x.data();const ag=done['comp_'+x.id];const signed=!!(ag&&ag.sign);
     return '<div class="urow"><div class="grow"><b>'+esc(c.title)+'</b> <span style="font-size:11.5px;color:var(--gray)">'+esc(c.role)+' · '+esc(c.date)+' · '+esc(c.region)+'</span>'
-      +'<div class="sub3">'+(ag?('<b style="color:#0f766e">✓ 서명 완료 ('+fmtDate(ag.agreedAt)+')</b>'+(ag.sign?'<img src="'+ag.sign+'" alt="서명" style="height:24px;vertical-align:middle;margin-left:8px;border:1px solid #eee;border-radius:5px;background:#fff">':'')):'<b style="color:#C41E2F">서명 전 — 계약서 확인 후 서명해주세요</b>')+'</div></div>'
+      +'<div class="sub3">'+(signed?('<b style="color:#0f766e">✓ 서명 완료 ('+fmtDate(ag.agreedAt)+')</b><img src="'+ag.sign+'" alt="서명" style="height:24px;vertical-align:middle;margin-left:8px;border:1px solid #eee;border-radius:5px;background:#fff">'):(ag?'<b style="color:#b8860b">⚠ 예전 방식으로 동의만 기록되고 실제 서명은 저장되지 않았습니다 — 아래에서 다시 서명해주세요</b>':'<b style="color:#C41E2F">서명 전 — 계약서 확인 후 서명해주세요</b>'))+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +'<button class="btn-sub" onclick="printCompContract(\''+x.id+'\')">'+(ag?'계약서 인쇄·PDF':'계약서 보기')+'</button>'
-      +(ag?'':'<button class="btn-sub" style="background:#0f766e" onclick="openCompSigModal(\''+x.id+'\')">✍ 서명하고 동의</button>')
+      +'<button class="btn-sub" onclick="printCompContract(\''+x.id+'\')">'+(signed?'계약서 인쇄·PDF':'계약서 보기')+'</button>'
+      +(signed?'':'<button class="btn-sub" style="background:#0f766e" onclick="openCompSigModal(\''+x.id+'\')">✍ '+(ag?'다시 ':'')+'서명하고 동의</button>')
       +'</div></div>';
   }).join('');
 }
@@ -1231,7 +1231,7 @@ function printCompContract(id){
   +'<tr><td class="k">일자 · 권역</td><td>'+esc(c.date)+' · '+esc(c.region)+'</td></tr>'
   +'<tr><td class="k">입금 계좌</td><td>'+(MYD.bank?esc(MYD.bank)+' '+esc(MYD.accountNum||'')+' (예금주: '+esc(MYD.accountHolder||'')+')':'<span style="color:#C41E2F">미등록 — 프로필에서 등록 필요</span>')+'</td></tr></table>'
   +'<table><tr><td class="k">갑</td><td>사단법인 대한민국플라잉디스크연맹 회장 &nbsp;(직인)</td></tr>'
-  +'<tr><td class="k">을</td><td>'+esc(MYD.name)+(ag&&ag.sign?' <img src="'+ag.sign+'" style="height:34px;vertical-align:middle;margin:0 6px">':'')+' &nbsp;—&nbsp; '+(ag?'<b style="color:#0f766e">전자 서명 완료: '+fmtDate(ag.agreedAt)+'</b>':'(서명 전)')+'</td></tr></table>'
+  +'<tr><td class="k">을</td><td>'+esc(MYD.name)+(ag&&ag.sign?' <img src="'+ag.sign+'" style="height:34px;vertical-align:middle;margin:0 6px">':'')+' &nbsp;—&nbsp; '+((ag&&ag.sign)?'<b style="color:#0f766e">전자 서명 완료: '+fmtDate(ag.agreedAt)+'</b>':(ag?'<b style="color:#b8860b">(이전 방식으로 동의만 기록됨 — 다시 서명 필요)</b>':'(서명 전)'))+'</td></tr></table>'
   +'<div class="org"><span class="orgwrap"><img class="lg" src="'+logo+'">대한민국플라잉디스크연맹<img class="seal" src="'+seal+'" onerror="this.style.display=\'none\'"></span></div>'
   +'</div><script>window.onload=function(){window.print()}<'+'/script></body></html>');
   w.document.close();
@@ -1275,7 +1275,7 @@ function printContract(id){
   +'<tr><td class="k">\ub2f4\ub2f9 \ud68c\ucc28</td><td>\ud559\uad50\ub2f9 24\ud68c\ucc28</td></tr>'
   +'<tr><td class="k">\uc785\uae08 \uacc4\uc88c</td><td>'+(MYD.bank?esc(MYD.bank)+' '+esc(MYD.accountNum||'')+' (\uc608\uae08\uc8fc: '+esc(MYD.accountHolder||'')+')':'<span style="color:#C41E2F">\ubbf8\ub4f1\ub85d \u2014 \ud504\ub85c\ud544\uc5d0\uc11c \ub4f1\ub85d \ud544\uc694</span>')+'</td></tr></table>'
   +'<table><tr><td class="k">\uac11</td><td>\uc0ac\ub2e8\ubc95\uc778 \ub300\ud55c\ubbfc\uad6d\ud50c\ub77c\uc789\ub514\uc2a4\ud06c\uc5f0\ub9f9 \ud68c\uc7a5 &nbsp;(\uc9c1\uc778)</td></tr>'
-  +'<tr><td class="k">\uc744</td><td>'+esc(MYD.name)+(ag&&ag.sign?' <img src="'+ag.sign+'" style="height:34px;vertical-align:middle;margin:0 6px">':'')+' &nbsp;\u2014&nbsp; '+(ag?'<b style="color:#0f766e">\uc804\uc790 \uc11c\uba85 \uc644\ub8cc: '+fmtDate(ag.agreedAt)+'</b>':'(\uc11c\uba85 \uc804)')+'</td></tr></table>'
+  +'<tr><td class="k">\uc744</td><td>'+esc(MYD.name)+(ag&&ag.sign?' <img src="'+ag.sign+'" style="height:34px;vertical-align:middle;margin:0 6px">':'')+' &nbsp;\u2014&nbsp; '+((ag&&ag.sign)?'<b style="color:#0f766e">\uc804\uc790 \uc11c\uba85 \uc644\ub8cc: '+fmtDate(ag.agreedAt)+'</b>':(ag?'<b style="color:#b8860b">(\uc774\uc804 \ubc29\uc2dd\uc73c\ub85c \ub3d9\uc758\ub9cc \uae30\ub85d\ub428 \u2014 \ub2e4\uc2dc \uc11c\uba85 \ud544\uc694)</b>':'(\uc11c\uba85 \uc804)'))+'</td></tr></table>'
   +'<div class="org"><span class="orgwrap"><img class="lg" src="'+logo+'">\ub300\ud55c\ubbfc\uad6d\ud50c\ub77c\uc789\ub514\uc2a4\ud06c\uc5f0\ub9f9<img class="seal" src="'+seal+'" onerror="this.style.display=\'none\'"></span></div>'
   +'</div><script>window.onload=function(){window.print()}<'+'/script></body></html>');
   w.document.close();
