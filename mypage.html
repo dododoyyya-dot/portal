@@ -769,7 +769,7 @@ function pfMissing(d){
   if(!d.gender)miss.push('성별');
   if(!d.birth)miss.push('생년월일');
   if(!d.baseCity)miss.push('거점 시·군·구');
-  if(!d.address||!d.addrDetail)miss.push('집 주소(상세주소 포함)');
+  if(!d.address)miss.push('집 주소(상세주소 포함)');
   if(!(d.activityRegions&&d.activityRegions.length))miss.push('활동 가능 범위');
   if(!(d.affiliation&&d.affiliation.length))miss.push('소속');
   if(!d.clothingSize||!d.sizePants||!d.sizeShoe||!d.sizeCap)miss.push('피복 사이즈');
@@ -875,9 +875,6 @@ async function saveProfile(){
       career:document.getElementById('pfCareer').value.trim(),
       clothingSize:document.getElementById('pfSize').value,
       address:((document.getElementById('pfZip').value.trim())?('['+document.getElementById('pfZip').value.trim()+'] '):'')+document.getElementById('pfAddr').value.trim()+' '+document.getElementById('pfAddr2').value.trim(),
-      addrBase:document.getElementById('pfAddr').value.trim(),
-      addrDetail:document.getElementById('pfAddr2').value.trim(),
-      zipcode:document.getElementById('pfZip').value.trim(),
       sizePants:document.getElementById('pfSizePants').value,
       sizeShoe:document.getElementById('pfSizeShoe').value,
       sizeCap:document.getElementById('pfSizeCap').value,
@@ -909,7 +906,14 @@ async function saveProfile(){
     renderDocList(docs);fillProfile(MYD);
     m.textContent='✓ 저장되었습니다';m.style.color='#0f766e';
     pfCollapse(MYD);window.scrollTo({top:0,behavior:'smooth'});alert('프로필이 저장되었습니다.');
-  }catch(e){m.textContent='저장 실패: '+e.message;m.style.color='#C41E2F'}
+  }catch(e){
+    let msg=e&&e.message||String(e);
+    if(/permission|insufficient/i.test(msg))msg='저장 권한 오류가 발생했습니다. 새로고침 후 다시 시도해 주시고, 계속되면 사무국(031-984-3248)으로 알려주세요.';
+    m.textContent='⚠ 저장 실패: '+msg;m.style.color='#C41E2F';
+    m.scrollIntoView({behavior:'smooth',block:'center'});
+    alert('프로필 저장에 실패했습니다.\n\n'+msg);
+    console.error('saveProfile',e);
+  }
   PFBUSY=false;
 }
 async function savePhone(){
