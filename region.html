@@ -281,6 +281,7 @@ function renderSchools(){
       +'<span class="ktag" style="background:'+(isAfter?'#0f766e':'#8c1622')+'">'+(isAfter?'방과후·늘봄':'학교체육')+'</span>'
       +'<span class="ktag line">'+esc(s.region||'')+'</span>'
       +(s.support==='용품만'?'<span class="ktag" style="background:#b8860b">🎁 용품만</span>':'')
+      +(s.support==='본인지도+용품'?'<span class="ktag" style="background:#7c3aed">🧑‍🏫 본인지도+용품</span>':(s.selfTeach?'<span class="ktag" style="background:#7c3aed">🧑‍🏫 본인지도</span>':''))
       +'</div>'
       +'<div class="kmeta">'+(s.code?'<b>'+esc(s.code)+'</b> &nbsp;':'')
       +(s.city?'📍 '+esc(s.city):'<span style="color:#C41E2F;font-weight:800">📍 시군구 미입력</span>')
@@ -293,6 +294,8 @@ function renderSchools(){
       +(st==='선정'?'<button class="kbtn ghost" onclick="setSt(\''+d.id+'\',\'접수\')">선정취소</button>':'')
       +(st==='배정완료'?'<button class="kbtn" style="background:#e6b422" onclick="unassign(\''+d.id+'\')">배정해제</button>':'')
       +'<button class="kbtn ghost" onclick="editCity(\''+d.id+'\')">📍 시군구</button>'
+      +'<button class="kbtn ghost" onclick="chgSupportR(\''+d.id+'\')">🎁 지원방식</button>'
+      +'<button class="kbtn ghost" onclick="chgTypeR(\''+d.id+'\')">🔁 유형</button>'
       +'</div></div>';
   }).join('');
 }
@@ -451,6 +454,38 @@ async function editCity(id){
     await DB.collection('schoolApplications').doc(id).update(upd);
     await loadSchools();
   }catch(e){alert('실패: '+e.message)}
+}
+// ── 지원방식 변경 (강사파견+용품 / 본인지도+용품 / 용품만) ──
+async function chgSupportR(id){
+  const doc=RAPPS.find(d=>d.id===id);if(!doc)return;
+  const s=doc.data();
+  const cur=s.support||'강사파견+용품';
+  const n=prompt('['+s.school+'] 지원방식 변경 — 현재: '+cur+'\n번호를 입력하세요:\n1=강사파견+용품\n2=본인지도+용품 (이수자 본인이 직접 지도)\n3=용품만');
+  if(n===null)return;
+  const nxt={'1':'강사파견+용품','2':'본인지도+용품','3':'용품만'}[n.trim()];
+  if(!nxt){alert('1~3 중에서 입력해주세요.');return}
+  if(nxt===cur){alert('현재와 동일한 지원방식입니다.');return}
+  const upd={support:nxt};
+  if(nxt==='본인지도+용품')upd.selfTeach=true;
+  if(!confirm('['+s.school+']\n지원방식을 [ '+cur+' ] → [ '+nxt+' ] (으)로 변경합니다.'+(nxt==='본인지도+용품'?'\n\n🧑‍🏫 본인지도로 표시됩니다. 강사(본인) 배정은 👤 강사 배정으로 지정해주세요.':'')))return;
+  try{
+    await DB.collection('schoolApplications').doc(id).update(upd);
+    alert('변경되었습니다: '+cur+' → '+nxt);
+    await loadSchools();
+  }catch(e){alert('변경 실패: '+e.message+'\n\n권한 규칙이 아직 갱신 전이면 사무국에 요청해주세요.')}
+}
+// ── 유형 변경 (학교체육 ↔ 방과후·늘봄) ──
+async function chgTypeR(id){
+  const doc=RAPPS.find(d=>d.id===id);if(!doc)return;
+  const s=doc.data();
+  const cur=appTypeOf(s);
+  const nxt=cur.indexOf('방과후')>=0?'학교체육 강습':'방과후·늘봄·돌봄';
+  if(!confirm('['+s.school+']\n'+cur+' → '+nxt+' 으로 유형을 변경합니다.\n(접수번호·배정·상태는 그대로 유지됩니다)'))return;
+  try{
+    await DB.collection('schoolApplications').doc(id).update({type:nxt,typeKey:(nxt==='방과후·늘봄·돌봄'?'after':'school')});
+    alert('변경되었습니다: '+cur+' → '+nxt);
+    await loadSchools();
+  }catch(e){alert('변경 실패: '+e.message+'\n\n권한 규칙이 아직 갱신 전이면 사무국에 요청해주세요.')}
 }
 function exportSchools(){
   const rows=[['접수번호','학교명','시군구','유형','지원방식','상태','담당교사','전화','배정강사']];
