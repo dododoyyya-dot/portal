@@ -883,12 +883,15 @@ async function chgType(id){
 async function chgSupport(id){
   const doc=APPS.find(d=>d.id===id);if(!doc)return;
   const v=doc.data();
-  const cur=v.support==='용품만'?'용품만':'강사파견+용품';
-  const nxt=cur==='용품만'?'강사파견+용품':'용품만';
-  const warn=nxt==='용품만'?'':'\n\n⚠ 강사파견+용품으로 바꾸면 실제 강사 배정이 필요합니다.';
-  if(!confirm('['+v.school+']\n지원방식을 [ '+cur+' ] → [ '+nxt+' ] (으)로 변경합니다.'+warn))return;
+  const cur=v.support||'강사파견+용품';
+  const opts=['강사파견+용품','본인지도+용품','용품만'].filter(o=>o!==cur);
+  const nxt=await pickDialog('['+v.school+'] 지원방식 변경\n현재: '+cur, opts);
+  if(!nxt)return;
+  const upd={support:nxt};
+  if(nxt==='본인지도+용품')upd.selfTeach=true;
+  if(!confirm('['+v.school+']\n지원방식을 [ '+cur+' ] → [ '+nxt+' ] (으)로 변경합니다.'+(nxt==='본인지도+용품'?'\n\n🧑‍🏫 본인지도로 표시됩니다. 강사(본인) 배정은 🎯 강사 직접 배정 버튼으로 지정해주세요.':'')))return;
   try{
-    await DB.collection('schoolApplications').doc(id).update({support:nxt});
+    await DB.collection('schoolApplications').doc(id).update(upd);
     alert('변경되었습니다: '+cur+' → '+nxt);
     loadApps();loadDash();
   }catch(e){
