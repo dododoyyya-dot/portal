@@ -991,12 +991,12 @@ AUTH.onAuthStateChanged(async u=>{
       renderCompContracts();
     }
   }catch(e){}
-  // 계좌 입력은 누구나 상시 가능(상단 bankInfoBox, 배정 여부 무관). 주민번호(payInfoBox)·전자동의는 배정(위촉)된 경우에만 노출 — 이미 등록된 값이 있으면 배정 여부와 무관하게 계속 노출(값이 안 보여 사라진 것처럼 보이지 않도록)
+  // 계좌·주민번호 입력은 누구나 상시 가능(배정 여부 무관 — 2026-07-31 사용자 요청으로 재상시화). 전자동의는 배정(위촉)된 경우에만 노출.
   (function(){
     const assigned=(MYASG.length>0)||(MYCOMP.length>0);
     const alreadyConsented=!!(d.consents&&d.consents.agreedAt);
     const payBox=document.getElementById('payInfoBox');
-    if(payBox)payBox.style.display=assigned?'block':'none'; // 주민번호 등록 여부는 위 privateInfo 조회 콜백에서 추가로 노출 처리됨
+    if(payBox)payBox.style.display='block';
     const cw=document.getElementById('consentWrap');
     if(cw)cw.style.display=(assigned||alreadyConsented)?'block':'none';
   })();
