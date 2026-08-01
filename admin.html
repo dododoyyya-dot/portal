@@ -460,7 +460,8 @@ function renderApps(){
       +'<div class="sub3">'+(s.code?'<b>'+esc(s.code)+'</b> · ':'')+esc(s.region)+(s.city?' · <b style="color:#1F4E9C">📍'+esc(s.city)+'</b>':' · <b style="color:#C41E2F">시군구 미입력</b>')+' · '+esc(s.students)+(s.start&&s.start.indexOf('8월')>=0?' · <b style="color:#C41E2F">⚡8월 방학 개강 희망</b>':'')+' · 희망 '+esc(s.d1)
       +'<br>담당 '+esc(s.teacher)+' '+esc(s.phone)+(s.assignedName?' · <b style="color:#0f766e">배정: '+esc(s.assignedName)+'</b>':'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +(st==='접수'?'<button class="btn-sub" onclick="setStatus(\''+d.id+'\',\'선정\')">선정</button><button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'미선정\')">미선정</button><button class="btn-sub" style="background:#e6b422" onclick="toWait(\''+d.id+'\')">대기 전환</button>':'')
+      +((st==='접수'||st==='대기')?'<button class="btn-sub" onclick="setStatus(\''+d.id+'\',\'선정\')">선정</button><button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'미선정\')">미선정</button>':'')
+      +(st==='접수'?'<button class="btn-sub" style="background:#e6b422" onclick="toWait(\''+d.id+'\')">대기 전환</button>':'')
       +(st==='대기'?'<button class="btn-sub" style="background:#0f766e" onclick="setStatus(\''+d.id+'\',\'접수\')">접수 전환</button>':'')
       +((st==='취소'||st==='미선정')?'<button class="btn-sub" style="background:#0f766e" onclick="setStatus(\''+d.id+'\',\'접수\')">접수로 복원</button>':'')
       +(st==='선정'&&!s.assignedName?'<button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'접수\')">선정취소</button>':'')
