@@ -174,6 +174,7 @@ const DB = firebase.firestore();
     <p class="sec-desc" style="margin-bottom:12px;font-size:13px" id="rgInstHint">좌측 학교의 [👤 강사 배정]을 누르면 이곳에서 강사를 골라 바로 확정할 수 있습니다.</p>
     <div class="kbar">
       <input id="rgISearch" class="ksearch" oninput="renderInst()" placeholder="이름·시군구 검색">
+      <button class="kdl" id="rgShowAll" onclick="toggleShowAll()" title="강사 지원을 아직 안 한 승인회원까지 목록에 표시합니다. 배정 전 본인 의사 확인 필수!">미지원 회원 포함</button>
       <button class="kdl" onclick="exportInst()">⬇ CSV</button>
       <span id="rgICount" class="kcount"></span>
     </div>
@@ -398,6 +399,9 @@ function clearSel(rerender){
   if(rerender!==false){renderSchools();renderInst();}
 }
 async function confirmAssign(uid){
+  {const cu=RUSERS.find(d=>d.id===uid);if(cu){const cf=cu.data().instructorFor||{};
+    if(!(cf.school||cf.after)&&!confirm('⚠ '+(cu.data().name||'')+' 님은 아직 강사 지원을 하지 않은 회원입니다.\n본인 의사를 확인하셨나요? 배정 후에는 본인이 마이페이지에서 위촉계약 서명을 해야 강사비가 지급됩니다.\n\n그래도 배정할까요?'))return;}}
+
   if(!SEL)return;
   const appDoc=RAPPS.find(d=>d.id===SEL);if(!appDoc)return;
   const s=appDoc.data();
@@ -497,12 +501,11 @@ function exportSchools(){
 
 async function loadInst(){
   const snap=await DB.collection('users').where('status','==','approved').get();
-  RUSERS=snap.docs.filter(d=>{
-    const v=d.data();const f=v.instructorFor||{};
-    return f.school||f.after;
-  });
+  RUSERS=snap.docs.filter(d=>!d.data().deleted);
   renderInst();
 }
+let SHOW_ALL=false;
+function toggleShowAll(){SHOW_ALL=!SHOW_ALL;document.getElementById('rgShowAll').textContent=SHOW_ALL?'✔ 미지원 회원 포함':'미지원 회원 포함';renderInst();}
 function renderInst(){
   const el=document.getElementById('rgInst');
   const q=(document.getElementById('rgISearch').value||'').trim().toLowerCase();
@@ -511,7 +514,9 @@ function renderInst(){
   const isAfter=s?appTypeOf(s).indexOf('방과후')>=0:false;
   let docs=RUSERS.filter(d=>{
     const v=d.data();const f=v.instructorFor||{};
-    if(s&&!(isAfter?f.after:f.school))return false; // 선택된 학교의 유형에 맞는 강사만
+    const applied=!!(f.school||f.after);
+    if(!SHOW_ALL&&!applied)return false; // 기본: 강사 지원자만
+    if(s&&applied&&!(isAfter?f.after:f.school))return false; // 지원자는 선택 학교 유형에 맞는 사람만 (미지원자는 SHOW_ALL일 때 전부 노출)
     if(q&&[v.name,v.baseCity,v.region].map(x=>String(x||'').toLowerCase()).join(' ').indexOf(q)<0)return false;
     return true;
   });
@@ -538,6 +543,7 @@ function renderInst(){
       +'<div class="iav" style="background:'+av+'">'+esc(String(v.name||'?').charAt(0))+'</div>'
       +'<div class="ibody">'
       +'<div class="ihead"><span class="iname">'+esc(v.name)+'</span>'+badge
+      +((f.school||f.after)?'':'<span class="itag" style="background:#8c1622">강사 미지원 — 의사 확인 후 배정</span>')
       +(ok?'<span class="itag" style="background:#1F4E9C">위촉 가능</span>':'<span class="itag" style="background:#e6b422">검증 미완</span>')
       +(ld.n?'<span class="itag" style="background:#7c3aed">담당 '+ld.n+'개교</span>':'')
       +'</div>'
