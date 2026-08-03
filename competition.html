@@ -168,30 +168,75 @@ async function loadSlots(){
   }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+cesc(e.message)+'</div>'}
 }
 let APPLY_ID=null,APPLY_SEL=[];
-function openApply(id){
+let RRN_OK=false;
+async function openApply(id){
   const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
   const s=doc.data();
   APPLY_ID=id;APPLY_SEL=[];
   const roles=(s.roles&&s.roles.length)?s.roles:(DEFAULT_ROLES[s.role]||[]);
+  // 마이페이지 정보 자동 연동
+  const aff=(CMY.affiliation&&CMY.affiliation.length)?CMY.affiliation.join('·'):(CMY.workSchool||CMY.fedName||'-');
+  const acct=(CMY.bank&&CMY.accountNum)?(CMY.bank+' '+CMY.accountNum+(CMY.accountHolder?' ('+CMY.accountHolder+')':'')):'';
+  if(!window.__rrnChecked){
+    try{const pd=await DB.collection('privateInfo').doc(CME.uid).get();RRN_OK=!!(pd.exists&&pd.data().rrn);}catch(e){RRN_OK=false;}
+    window.__rrnChecked=true;
+  }
+  const infoRow=(k,v,ok)=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed #e4e8ef;font-size:13px"><span style="color:#666;font-weight:700;white-space:nowrap">'+k+'</span><span style="text-align:right;font-weight:'+(ok?'700':'800')+';color:'+(ok?'#111':'#C41E2F')+'">'+v+'</span></div>';
   const old=document.getElementById('cApplyModal');if(old)old.remove();
   const div=document.createElement('div');
   div.id='cApplyModal';
   div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
-  div.innerHTML='<div style="background:#fff;border-radius:18px;max-width:480px;width:100%;padding:28px;max-height:90vh;overflow:auto">'
+  div.innerHTML='<div style="background:#fff;border-radius:18px;max-width:520px;width:100%;padding:28px;max-height:92vh;overflow:auto">'
     +'<b style="font-size:18px">'+cesc(s.title)+' — '+cesc(s.role)+'요원 신청</b>'
     +'<div style="font-size:13px;color:#666;margin:6px 0 14px">'+cesc(s.region)+' · '+cesc(s.date)+'</div>'
+    +'<div style="background:#f6f8fb;border-radius:12px;padding:12px 16px;margin-bottom:14px">'
+    +'<div style="font-size:12px;font-weight:900;color:#153A77;margin-bottom:4px">신청 정보 — 마이페이지에서 자동 연동됩니다 <a href="mypage.html#profileBox" style="font-size:11.5px;color:var(--red);font-weight:800">수정 →</a></div>'
+    +infoRow('성명',cesc(CMY.name||'-'),true)
+    +infoRow('소속',cesc(aff),true)
+    +infoRow('연락처',cesc(CMY.phone||'미입력 — 마이페이지에서 입력 필요'),!!CMY.phone)
+    +infoRow('수당 입금계좌',acct?cesc(acct):'미등록 — 수당 지급에 필요 (마이페이지)',!!acct)
+    +infoRow('주민등록번호',RRN_OK?'등록 완료 (보안 저장)':'미등록 — 원천징수 처리에 필요 (마이페이지)',RRN_OK)
+    +'</div>'
     +'<div style="font-size:13.5px;font-weight:800;margin-bottom:8px">희망 임무를 순서대로 선택하세요 (선택한 순서 = 1→2→3순위, 최대 3개)</div>'
     +'<div id="cRoleBtns" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
     +roles.map(r=>'<button type="button" class="btn-sub" style="background:#fff;color:#153A77;border:1.5px solid #b9cdec" data-role="'+cesc(r)+'" onclick="togRole(this)">'+cesc(r)+'</button>').join('')
     +'</div><div id="cSelTxt" style="font-size:12.5px;color:#0f766e;font-weight:800;min-height:18px;margin-bottom:12px"></div>'
-    +'<label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:#444;background:#f6f8fb;border-radius:10px;padding:10px 12px;margin-bottom:14px">'
+    +'<label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:#444;background:#f6f8fb;border-radius:10px;padding:10px 12px;margin-bottom:10px">'
     +'<input type="checkbox" id="cConsent" style="width:auto;margin-top:2px">'
-    +'<span>(필수) 개인정보 수집·이용 및 국세청 제3자 제공(원천징수)에 동의합니다. 소속·성명·연락처·계좌번호를 대회 수당 지급 목적으로 수집·이용하며 보유기간은 2026. 12. 31.까지입니다.</span></label>'
-    +'<div style="display:flex;gap:8px;justify-content:flex-end">'
+    +'<span>(필수) 개인정보 수집·이용 및 국세청 제3자 제공(원천징수)에 동의합니다. 소속·성명·연락처·계좌번호를 대회 수당(심판·운영·안전요원) 지급 목적으로 수집·이용하며 보유기간은 2026. 12. 31.까지입니다. 원천징수 세액 납부를 위해 성명·지급총액·결정세액·주민등록번호가 국세청에 제공됩니다.</span></label>'
+    +'<div style="font-size:13px;font-weight:800;margin:10px 0 6px">본인 서명 <span style="font-weight:600;color:#888;font-size:11.5px">(마우스·손가락으로 서명)</span> <button type="button" class="btn-sub" style="background:#8a919d;padding:4px 12px;font-size:11.5px" onclick="clearSig()">지우기</button></div>'
+    +'<canvas id="cSigPad" width="440" height="120" style="width:100%;height:120px;border:1.5px dashed #b9cdec;border-radius:10px;touch-action:none;background:#fff"></canvas>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
     +'<button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'cApplyModal\').remove()">닫기</button>'
-    +'<button class="btn-main" style="width:auto;padding:11px 26px" onclick="submitClaim()">신청 제출</button></div>'
+    +'<button class="btn-main" style="width:auto;padding:11px 26px" onclick="submitClaim()">동의·서명하고 신청</button></div>'
     +'</div>';
   document.body.appendChild(div);
+  initSig();
+}
+// ── 서명 패드 ──
+let SIG_DRAWN=false;
+function initSig(){
+  const cv=document.getElementById('cSigPad');const ctx=cv.getContext('2d');
+  ctx.lineWidth=2.4;ctx.lineCap='round';ctx.strokeStyle='#111';
+  let down=false,px=0,py=0;
+  const pos=e=>{const r=cv.getBoundingClientRect();const t=e.touches?e.touches[0]:e;
+    return [(t.clientX-r.left)*(cv.width/r.width),(t.clientY-r.top)*(cv.height/r.height)];};
+  const start=e=>{down=true;[px,py]=pos(e);e.preventDefault();};
+  const move=e=>{if(!down)return;const [x,y]=pos(e);ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(x,y);ctx.stroke();px=x;py=y;SIG_DRAWN=true;e.preventDefault();};
+  const end=()=>{down=false;};
+  cv.addEventListener('mousedown',start);cv.addEventListener('mousemove',move);window.addEventListener('mouseup',end);
+  cv.addEventListener('touchstart',start,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',end);
+  SIG_DRAWN=false;
+}
+function clearSig(){
+  const cv=document.getElementById('cSigPad');
+  cv.getContext('2d').clearRect(0,0,cv.width,cv.height);SIG_DRAWN=false;
+}
+function exportSig(){
+  const cv=document.getElementById('cSigPad');
+  let out=cv.toDataURL('image/png');
+  if(out.length>150000)out=cv.toDataURL('image/jpeg',0.7);
+  return out;
 }
 function togRole(btn){
   const r=btn.dataset.role;
@@ -206,6 +251,10 @@ function togRole(btn){
 async function submitClaim(){
   if(!APPLY_SEL.length){alert('희망 임무를 1개 이상 선택해주세요.');return}
   if(!document.getElementById('cConsent').checked){alert('개인정보 수집·이용 동의가 필요합니다.');return}
+  if(!SIG_DRAWN){alert('본인 서명이 필요합니다. 서명란에 서명해주세요.');return}
+  const doc0=CSLOTS.find(d=>d.id===APPLY_ID);
+  const title=doc0?doc0.data().title:'';
+  const sign=exportSig();
   const ref=DB.collection('compSlots').doc(APPLY_ID);
   try{
     await DB.runTransaction(async tx=>{
@@ -214,11 +263,16 @@ async function submitClaim(){
       if(activeOf(s,CME.uid))throw new Error('이미 신청한 대회입니다');
       if(activeCount(s)>=s.quota)throw new Error('정원이 마감되었습니다');
       const claimed=(s.claimed||[]).slice();
-      claimed.push({uid:CME.uid,name:CMY.name||'',prefs:APPLY_SEL.slice(),consent:true,at:new Date().toISOString()});
+      claimed.push({uid:CME.uid,name:CMY.name||'',prefs:APPLY_SEL.slice(),consent:true,signed:true,at:new Date().toISOString()});
       tx.update(ref,{claimed:claimed});
     });
+    // 서명 이미지 + 동의 기록은 본인 users.contracts에 저장 (수당지급조서·동의서 출력용)
+    const c=Object.assign({},CMY.contracts||{});
+    c['compapply_'+APPLY_ID]={title:title,agreedAt:new Date().toISOString(),sign:sign,prefs:APPLY_SEL.slice()};
+    await DB.collection('users').doc(CME.uid).update({contracts:c}).catch(e=>console.warn('sign save',e));
+    CMY.contracts=c;
     document.getElementById('cApplyModal').remove();
-    alert('신청 완료! 사무국 확정 후 개별 연락드립니다.\n확정 시 마이페이지에서 위촉 동의·서명 절차가 안내됩니다.');
+    alert('신청 완료! 개인정보 동의·서명이 함께 저장되었습니다.\n사무국 확정 후 개별 연락드립니다.');
   }catch(e){alert(e.message)}
   loadSlots();
 }

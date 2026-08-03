@@ -1883,6 +1883,7 @@ function renderCompsAdmin(){
       +(act.length?'<button class="btn-sub" style="background:#0f766e" onclick="confirmComp(\''+d.id+'\')">✓ 확정 처리</button>':'')
       +(act.length?'<button class="btn-sub" style="background:#1F4E9C" onclick="copyCompNotice(\''+d.id+'\')">📋 통보문</button>':'')
       +(act.length?'<button class="btn-sub" style="background:#153A77" onclick="compCSV(\''+d.id+'\')">⬇ 명단 CSV</button>':'')
+      +(act.length?'<button class="btn-sub" style="background:#7c3aed" onclick="compConsentDocs(\''+d.id+'\')">📄 동의서 출력</button>':'')
       +'<button class="btn-sub" style="background:#b8860b" onclick="extendComp(\''+d.id+'\')">⏰ 마감 연장</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delComp(\''+d.id+'\')">🗑</button></div></div>';
   }).join('');
@@ -1929,19 +1930,60 @@ async function extendComp(id){
 async function compCSV(id){
   const doc=await DB.collection('compSlots').doc(id).get();const s=doc.data();
   const act=compActiveClaims(s);const confirmed=s.confirmed||[];
-  const rows=[['성명','구분','1지망','2지망','3지망','동의','확정','휴대전화','신청일시']];
+  const rows=[['성명','구분','1지망','2지망','3지망','동의','서명','확정','휴대전화','은행','계좌번호','예금주','신청일시']];
   for(const c of act){
-    let phone='';
+    let ud=null;
     const u=USERS.find(x=>x.id===c.uid);
-    if(u)phone=u.data().phone||'';
-    else{try{const ud=await DB.collection('users').doc(c.uid).get();if(ud.exists)phone=ud.data().phone||'';}catch(e){}}
+    if(u)ud=u.data();
+    else{try{const snap=await DB.collection('users').doc(c.uid).get();if(snap.exists)ud=snap.data();}catch(e){}}
+    ud=ud||{};
+    const signed=!!(ud.contracts&&ud.contracts['compapply_'+id]&&ud.contracts['compapply_'+id].sign);
     const p=c.prefs||[];
-    rows.push([c.name,s.role,p[0]||'',p[1]||'',p[2]||'',c.consent?'O':'',confirmed.indexOf(c.uid)>=0?'확정':'',phone,(c.at||'').slice(0,16).replace('T',' ')]);
+    rows.push([c.name,s.role,p[0]||'',p[1]||'',p[2]||'',c.consent?'O':'',signed?'O':'',confirmed.indexOf(c.uid)>=0?'확정':'',ud.phone||'',ud.bank||'',ud.accountNum||'',ud.accountHolder||'',(c.at||'').slice(0,16).replace('T',' ')]);
   }
   const csv='\uFEFF'+rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   a.download=s.title+'_'+s.role+'요원_신청명단.csv';a.click();
+}
+// ── 대회요원 개인정보 동의서 일괄 출력 (수당지급 증빙 — 참고서식 기반, 서명 포함) ──
+async function compConsentDocs(id){
+  const doc=await DB.collection('compSlots').doc(id).get();const s=doc.data();
+  const act=compActiveClaims(s);
+  if(!act.length){alert('유효 신청자가 없습니다.');return}
+  let pages=[];
+  for(const c of act){
+    let ud={},rrn='';
+    try{const snap=await DB.collection('users').doc(c.uid).get();if(snap.exists)ud=snap.data();}catch(e){}
+    try{const pd=await DB.collection('privateInfo').doc(c.uid).get();if(pd.exists)rrn=pd.data().rrn||'';}catch(e){}
+    const ct=(ud.contracts||{})['compapply_'+id]||{};
+    const aff=(ud.affiliation&&ud.affiliation.length)?ud.affiliation.join('·'):(ud.workSchool||ud.fedName||'');
+    pages.push('<div style="page-break-after:always;font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:30px 10px">'
+      +'<h2 style="text-align:center;border:2px solid #333;padding:12px">'+esc(s.title)+' 관련 수당 지급<br><span style="font-size:15px">개인정보 수집·이용·제공 동의서</span></h2>'
+      +'<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:13.5px">'
+      +'<tr><th style="border:1px solid #666;background:#f2f2f2;padding:7px;width:110px">성명</th><td style="border:1px solid #666;padding:7px">'+esc(c.name)+'</td>'
+      +'<th style="border:1px solid #666;background:#f2f2f2;padding:7px;width:110px">소속</th><td style="border:1px solid #666;padding:7px">'+esc(aff||'-')+'</td></tr>'
+      +'<tr><th style="border:1px solid #666;background:#f2f2f2;padding:7px">연락처</th><td style="border:1px solid #666;padding:7px">'+esc(ud.phone||'')+'</td>'
+      +'<th style="border:1px solid #666;background:#f2f2f2;padding:7px">담당 임무</th><td style="border:1px solid #666;padding:7px">'+esc(s.role)+((c.prefs&&c.prefs.length)?' ('+esc(c.prefs.join('→'))+')':'')+'</td></tr>'
+      +'<tr><th style="border:1px solid #666;background:#f2f2f2;padding:7px">은행명</th><td style="border:1px solid #666;padding:7px">'+esc(ud.bank||'')+'</td>'
+      +'<th style="border:1px solid #666;background:#f2f2f2;padding:7px">계좌번호</th><td style="border:1px solid #666;padding:7px">'+esc(ud.accountNum||'')+'</td></tr>'
+      +'<tr><th style="border:1px solid #666;background:#f2f2f2;padding:7px">주민등록번호</th><td colspan="3" style="border:1px solid #666;padding:7px">'+esc(rrn||'(미등록)')+'</td></tr>'
+      +'</table>'
+      +'<div style="font-size:13px;line-height:1.8;border:1px solid #999;padding:12px 16px;margin-bottom:10px">'
+      +'<b>□ 개인정보 수집·이용 동의</b><br>· 항목: 소속, 성명, 계좌번호, 연락처 &nbsp;· 수집목적: 대회 관련 수당(심판·운영 및 안전요원) 지급 &nbsp;· 보유기간: 2026. 12. 31.까지<br>'
+      +'※ 동의를 거부할 권리가 있으며, 거부 시 수당 지급 등에 제한을 받을 수 있습니다. <b>동의함 ☑</b><br><br>'
+      +'<b>□ 개인정보 제3자 제공 내역 고지</b><br>· 제공받는 자: 국세청 &nbsp;· 목적: 참석수당 원천징수 세액 납부 &nbsp;· 항목: 성명, 지급총액, 결정세액 &nbsp;· 근거: 「소득세법」 제21조·제37조·제129조<br><br>'
+      +'<b>□ 고유식별정보(주민등록번호) 처리 고지</b><br>· 개인정보보호법 제24조의2제1항제1호 및 「국세기본법 시행령」 제68조에 따라 수당 원천징수 세액 납부 목적으로 처리됩니다.'
+      +'</div>'
+      +'<div style="text-align:right;margin-top:22px;font-size:14px">'+(ct.agreedAt?esc(String(ct.agreedAt).slice(0,10).replace(/-/g,'. '))+'.':'2026.&nbsp;&nbsp;&nbsp;.&nbsp;&nbsp;&nbsp;.')+'</div>'
+      +'<div style="text-align:right;margin-top:8px;font-size:15px">본인&nbsp;&nbsp;성명&nbsp;&nbsp;<b>'+esc(c.name)+'</b>&nbsp;&nbsp;'
+      +(ct.sign?'<img src="'+ct.sign+'" style="height:44px;vertical-align:middle">':'(서명)')+'</div>'
+      +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">'+esc(s.title)+' 조직위원회 (사단법인 대한민국플라잉디스크연맹) 귀하</div>'
+      +'</div>');
+  }
+  const w=window.open('','_blank');
+  w.document.write('<html><head><title>'+esc(s.title)+' 동의서</title></head><body>'+pages.join('')+'<script>setTimeout(function(){window.print()},600)<\/script></body></html>');
+  w.document.close();
 }
 async function delComp(id){
   if(!confirm('이 대회 모집을 삭제할까요? (지명 기록도 함께 삭제)'))return;
