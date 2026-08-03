@@ -162,7 +162,8 @@ async function loadSlots(){
       else action='<button class="btn-sub" onclick="openApply(\''+d.id+'\')">신청하기</button>';
       return '<div class="urow"><div class="grow"><b>'+cesc(s.title)+'</b> <span style="font-size:11.5px;font-weight:900;color:#fff;background:'+rc+';padding:2px 10px;border-radius:999px">'+cesc(s.role)+'</span>'
         +'<div class="sub3">'+cesc(s.region)+' · '+cesc(s.date)+' · 신청 '+act+'/'+s.quota+'명'+(s.deadline?' · 마감 '+cesc(s.deadline):'')+'</div>'
-        +'<div class="sub3" style="color:#666">임무: '+roles.map(cesc).join(' · ')+'</div></div>'
+        +'<div class="sub3" style="color:#666">임무: '+roles.map(cesc).join(' · ')+'</div>'
+        +(s.note?'<div class="sub3" style="color:#153A77;font-weight:700">📌 '+cesc(s.note)+'</div>':'')+'</div>'
         +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'+action+'</div></div>';
     }).join('');
   }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+cesc(e.message)+'</div>'}
@@ -188,7 +189,7 @@ async function openApply(id){
   div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
   div.innerHTML='<div style="background:#fff;border-radius:18px;max-width:520px;width:100%;padding:28px;max-height:92vh;overflow:auto">'
     +'<b style="font-size:18px">'+cesc(s.title)+' — '+cesc(s.role)+'요원 신청</b>'
-    +'<div style="font-size:13px;color:#666;margin:6px 0 14px">'+cesc(s.region)+' · '+cesc(s.date)+'</div>'
+    +'<div style="font-size:13px;color:#666;margin:6px 0 14px">'+cesc(s.region)+' · '+cesc(s.date)+(s.note?'<br><span style="color:#153A77;font-weight:700">📌 '+cesc(s.note)+'</span>':'')+'</div>'
     +'<div style="background:#f6f8fb;border-radius:12px;padding:12px 16px;margin-bottom:14px">'
     +'<div style="font-size:12px;font-weight:900;color:#153A77;margin-bottom:4px">신청 정보 — 마이페이지에서 자동 연동됩니다 <a href="mypage.html#profileBox" style="font-size:11.5px;color:var(--red);font-weight:800">수정 →</a></div>'
     +infoRow('성명',cesc(CMY.name||'-'),true)

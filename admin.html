@@ -235,6 +235,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <label>정원 (명)</label><input id="cpQuota" type="number" value="4" min="1">
         <label>신청 마감일</label><input id="cpDeadline" type="date">
         <label>임무 목록 (쉼표 구분 — 비우면 기본값)</label><input id="cpRoles" placeholder="심판: 주심,부심,기록 / 운영: 경기운영,안전요원,의전·접수,기록·홍보(사진·영상),주차·수송,보조요원">
+        <label>안내문 (선택 — 신청 화면에 표시)</label><textarea id="cpNote" rows="3" placeholder="예: 집결 08:30 / 중식 제공 / 자격증 사본 지참"></textarea>
         <button class="btn-main" onclick="addComp()">모집 등록</button>
         <div class="msg" id="cpMsg"></div>
       </div>
@@ -1836,11 +1837,14 @@ async function addComp(){
     title:t,region:document.getElementById('cpRegion').value,date:dt,
     role:document.getElementById('cpRole').value,quota:q,claimed:[],cancels:[],
     deadline:document.getElementById('cpDeadline').value||'',roles:roles,
+    note:document.getElementById('cpNote').value.trim(),
     createdAt:firebase.firestore.FieldValue.serverTimestamp()});
   m.textContent='등록 완료 — 메인 참여신청(선정학교 강사지원)에 즉시 게시됩니다';m.className='msg ok';
-  document.getElementById('cpTitle').value='';
+  document.getElementById('cpTitle').value='';document.getElementById('cpNote').value='';
   loadCompsAdmin();
 }
+const COMP_DEFAULT_ROLES={'심판':['주심','부심','기록'],'운영':['경기운영','안전요원','의전·접수','기록·홍보(사진·영상)','주차·수송','보조요원']};
+function compEffRoles(s){return (s.roles&&s.roles.length)?s.roles:(COMP_DEFAULT_ROLES[s.role]||[]);}
 let CADM=[];
 function compActiveClaims(s){
   const seen={};const out=[];
@@ -1878,8 +1882,14 @@ function renderCompsAdmin(){
       +(closed?' <span style="font-size:11px;font-weight:800;color:#fff;background:#8a919d;padding:2px 8px;border-radius:999px">마감</span>':'')
       +(confirmed.length>=s.quota?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">확정 완료</span>':'')
       +'<div class="sub3">'+esc(s.region)+' · '+esc(s.date)+(s.deadline?' · 마감 '+esc(s.deadline):'')+' · 유효신청 '+act.length+'/'+s.quota+'명 · 확정 '+confirmed.length+'명 · 취소 '+((s.cancels||[]).length)+'건'
-      +(act.length?'<br>신청자: '+act.map(c=>(confirmed.indexOf(c.uid)>=0?'<b style="color:#0f766e">✓'+esc(c.name)+'</b>':esc(c.name))+(c.prefs&&c.prefs.length?'<span style="color:#7c3aed">('+esc(c.prefs.join('→'))+')</span>':'')).join(', '):'')+'</div></div>'
+      +(s.note?'<br><span style="color:#555">📌 '+esc(s.note)+'</span>':'')
+      +(act.length?'<br>신청자: '+act.map(c=>{
+          const eff=compEffRoles(s);
+          const prefTxt=(c.prefs&&c.prefs.length)?'('+c.prefs.map(p=>eff.indexOf(p)>=0?esc(p):'<s style="color:#C41E2F" title="현재 모집 임무에서 제외된 지망">'+esc(p)+'</s>').join('→')+')':'';
+          return (confirmed.indexOf(c.uid)>=0?'<b style="color:#0f766e">✓'+esc(c.name)+'</b>':esc(c.name))+(prefTxt?'<span style="color:#7c3aed">'+prefTxt+'</span>':'');
+        }).join(', '):'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +'<button class="btn-sub" style="background:#153A77" onclick="editComp(\''+d.id+'\')">✏️ 수정</button>'
       +(act.length?'<button class="btn-sub" style="background:#0f766e" onclick="confirmComp(\''+d.id+'\')">✓ 확정 처리</button>':'')
       +(act.length?'<button class="btn-sub" style="background:#1F4E9C" onclick="copyCompNotice(\''+d.id+'\')">📋 통보문</button>':'')
       +(act.length?'<button class="btn-sub" style="background:#153A77" onclick="compCSV(\''+d.id+'\')">⬇ 명단 CSV</button>':'')
@@ -1925,6 +1935,65 @@ async function extendComp(id){
   if(nd&&!/^\d{4}-\d{2}-\d{2}$/.test(nd.trim())){alert('YYYY-MM-DD 형식으로 입력해주세요.');return}
   await DB.collection('compSlots').doc(id).update({deadline:nd.trim()});
   alert(nd.trim()?('마감일이 '+nd.trim()+'로 변경되었습니다. (마감 전이면 자동 재오픈)'):'마감일이 해제되었습니다.');
+  loadCompsAdmin();
+}
+// ── 모집 공고 전체 수정 (기존값 프리필 폼) ──
+let EC_SNAP=null;
+function editComp(id){
+  const d=CADM.find(x=>x.id===id);if(!d)return;
+  const s=d.data();EC_SNAP={id:id,s:s};
+  const act=compActiveClaims(s);
+  const regions=['서울·경기','강원','충청','전라','경상','제주'];
+  const old=document.getElementById('ecModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='ecModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+  div.innerHTML='<div class="authbox" style="max-width:520px;width:100%;padding:26px;max-height:92vh;overflow:auto;margin:0">'
+    +'<b style="font-size:17px">✏️ 모집 공고 수정</b>'
+    +'<div style="font-size:12.5px;color:#666;margin:4px 0 12px">유효신청 '+act.length+'명 · 확정 '+((s.confirmed||[]).length)+'명'
+    +(act.length?' — <b style="color:#C41E2F">신청자가 있어 역할(심판/운영)은 변경할 수 없습니다</b>':'')+'</div>'
+    +'<label>대회명</label><input id="ecTitle" value="'+esc(s.title||'')+'">'
+    +'<label>권역</label><select id="ecRegion">'+regions.map(r=>'<option'+(r===s.region?' selected':'')+'>'+r+'</option>').join('')+'</select>'
+    +'<label>일자</label><input id="ecDate" type="date" value="'+esc(s.date||'')+'">'
+    +'<label>역할</label>'+(act.length
+      ?'<input value="'+esc(s.role)+'" disabled style="background:#f2f2f2">'
+      :'<select id="ecRole"><option'+(s.role==='심판'?' selected':'')+'>심판</option><option'+(s.role==='운영'?' selected':'')+'>운영</option></select>')
+    +'<label>정원 (명)'+(act.length?' — 최소 '+act.length+' (현재 유효신청 수 미만 불가)':'')+'</label><input id="ecQuota" type="number" min="'+Math.max(1,act.length)+'" value="'+s.quota+'">'
+    +'<label>신청 마감일</label><input id="ecDeadline" type="date" value="'+esc(s.deadline||'')+'">'
+    +'<label>임무 목록 (쉼표 구분 — 비우면 기본값: '+esc((COMP_DEFAULT_ROLES[s.role]||[]).join(','))+')</label><input id="ecRoles" value="'+esc((s.roles||[]).join(','))+'">'
+    +'<label>안내문 (신청 화면에 표시)</label><textarea id="ecNote" rows="3">'+esc(s.note||'')+'</textarea>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
+    +'<button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'ecModal\').remove()">닫기</button>'
+    +'<button class="btn-main" style="width:auto;padding:11px 26px" onclick="saveEditComp()">저장</button></div>'
+    +'</div>';
+  document.body.appendChild(div);
+}
+async function saveEditComp(){
+  if(!EC_SNAP)return;
+  const id=EC_SNAP.id,s=EC_SNAP.s;
+  const act=compActiveClaims(s);
+  const t=document.getElementById('ecTitle').value.trim(),dt=document.getElementById('ecDate').value;
+  const q=parseInt(document.getElementById('ecQuota').value);
+  if(!t||!dt||!q){alert('대회명·일자·정원을 입력하세요.');return}
+  if(q<act.length){alert('정원('+q+'명)을 현재 유효신청 수('+act.length+'명)보다 적게 줄일 수 없습니다.\n먼저 사무국에서 해당 신청자에게 안내 후 조정하세요.');return}
+  const rolesTxt=document.getElementById('ecRoles').value.trim();
+  const roles=rolesTxt?rolesTxt.split(',').map(x=>x.trim()).filter(Boolean):[];
+  const roleSel=document.getElementById('ecRole');
+  const newRole=roleSel?roleSel.value:s.role;
+  const eff=roles.length?roles:(COMP_DEFAULT_ROLES[newRole]||[]);
+  // 삭제된 임무를 지망한 신청자 확인
+  const hit=act.filter(c=>(c.prefs||[]).some(p=>eff.indexOf(p)<0));
+  if(hit.length){
+    const detail=hit.map(c=>'· '+c.name+' ('+(c.prefs||[]).filter(p=>eff.indexOf(p)<0).join(', ')+')').join('\n');
+    if(!confirm('⚠ 변경된 임무 목록에서 제외되는 임무를 지망한 신청자가 '+hit.length+'명 있습니다:\n\n'+detail
+      +'\n\n신청 기록은 그대로 보존되며, 목록에는 빨간 취소선으로 표시됩니다.\n해당 인원에게는 임무 재선택 또는 개별 안내가 필요합니다.\n\n그래도 저장할까요?'))return;
+  }
+  const upd={title:t,region:document.getElementById('ecRegion').value,date:dt,quota:q,
+    deadline:document.getElementById('ecDeadline').value||'',roles:roles,
+    note:document.getElementById('ecNote').value.trim()};
+  if(!act.length)upd.role=newRole;
+  await DB.collection('compSlots').doc(id).update(upd);
+  document.getElementById('ecModal').remove();EC_SNAP=null;
+  alert('공고가 수정되었습니다. 신청 화면에 즉시 반영됩니다.'+(hit.length?'\n⚠ 제외 임무 지망자 '+hit.length+'명 — 개별 안내를 잊지 마세요.':''));
   loadCompsAdmin();
 }
 async function compCSV(id){
