@@ -1973,8 +1973,8 @@ async function saveEditComp(){
   const act=compActiveClaims(s);
   const t=document.getElementById('ecTitle').value.trim(),dt=document.getElementById('ecDate').value;
   const q=parseInt(document.getElementById('ecQuota').value);
-  if(!t||!dt||!q){alert('대회명·일자·정원을 입력하세요.');return}
-  if(q<act.length){alert('정원('+q+'명)을 현재 유효신청 수('+act.length+'명)보다 적게 줄일 수 없습니다.\n먼저 사무국에서 해당 신청자에게 안내 후 조정하세요.');return}
+  if(!t||!dt||isNaN(q)){alert('대회명·일자·정원을 입력하세요.');return}
+  if(q<Math.max(1,act.length)){alert('정원('+q+'명)은 최소 '+Math.max(1,act.length)+'명 이상이어야 합니다.'+(act.length?'\n(현재 유효신청 '+act.length+'명 — 신청자보다 적게 줄일 수 없습니다. 먼저 해당 신청자에게 안내 후 조정하세요.)':''));return}
   const rolesTxt=document.getElementById('ecRoles').value.trim();
   const roles=rolesTxt?rolesTxt.split(',').map(x=>x.trim()).filter(Boolean):[];
   const roleSel=document.getElementById('ecRole');
