@@ -283,7 +283,7 @@ function renderSchools(){
       +'<span class="ktag" style="background:'+(isAfter?'#0f766e':'#8c1622')+'">'+(isAfter?'방과후·늘봄':'학교체육')+'</span>'
       +'<span class="ktag line">'+esc(s.region||'')+'</span>'
       +(s.support==='용품만'?'<span class="ktag" style="background:#b8860b">🎁 용품만</span>':'')
-      +(s.support==='본인지도+용품'?'<span class="ktag" style="background:#7c3aed">🧑‍🏫 본인지도+용품</span>':(s.selfTeach?'<span class="ktag" style="background:#7c3aed">🧑‍🏫 본인지도</span>':''))
+      +(s.support==='본인지도+용품'?'<span class="ktag" style="background:#7c3aed">🧑‍🏫 본인지도+용품</span>':((s.selfTeach&&s.support!=='용품만')?'<span class="ktag" style="background:#7c3aed">🧑‍🏫 본인지도</span>':''))
       +'</div>'
       +'<div class="kmeta">'+(s.code?'<b>'+esc(s.code)+'</b> &nbsp;':'')
       +(s.city?'📍 '+esc(s.city):'<span style="color:#C41E2F;font-weight:800">📍 시군구 미입력</span>')
@@ -316,7 +316,7 @@ async function setSt(id,st){
   if(st==='선정'&&!confirm(s.school+' 을(를) 선정할까요?\n\n📧 담당교사에게 선정 안내 이메일이 발송되고, 강사 지명 게시판에 공개됩니다.'))return;
   try{
     // 본인지도 신청교는 선정과 동시에 자동 배정 (admin과 동일)
-    if(st==='선정'&&s.selfTeach&&s.selfUid){
+    if(st==='선정'&&s.selfTeach&&s.selfUid&&s.support!=='용품만'){
       await DB.collection('schoolApplications').doc(id).update({status:'배정완료',assignedUid:s.selfUid,assignedName:s.selfName});
       await syncStatus(s,'배정완료',{assignedName:s.selfName});
       if(window.kfdfMail)kfdfMail(s.email,'[플라잉디스크연맹] 강습 선정 안내 — '+s.school,s.school+' ('+s.type+') 신청이 선정되었으며, 신청하신 본인지도로 강사 배정까지 완료되었습니다.\n접수번호: '+(s.code||'')+'\n일정 협의를 위해 곧 연락드리겠습니다.');

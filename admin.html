@@ -452,8 +452,8 @@ function renderApps(){
     return '<div class="urow"><div class="grow"><b>'+esc(s.school)+'</b> '
       +'<span style="font-size:12px;font-weight:800;color:#fff;background:'+stc+';padding:2px 10px;border-radius:999px">'+st+(st==='대기'&&s.waitNo?' '+s.waitNo+'번':'')+'</span>'
       +(s.eduName?' <span style="font-size:11px;font-weight:800;color:#C41E2F">★이수자교('+esc(s.eduName)+')</span>':'')
-      +(s.selfTeach?' <span style="font-size:11px;font-weight:800;color:#0f766e">◉본인지도 희망'+(s.selfName?'('+esc(s.selfName)+')':'')+'</span>':'')
-      +(s.selfTeach&&!s.selfUid&&!s.assignedName&&(st==='선정'||st==='접수'||st==='대기')?' <span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px" title="신청자가 비로그인 상태로 제출해 자동 배정이 안 됐습니다. 아래 🎯 강사 직접 배정으로 성명 대조 후 지정해주세요.">⚠ 본인지도 매칭필요</span>':'')
+      +((s.selfTeach&&s.support!=='용품만')?' <span style="font-size:11px;font-weight:800;color:#0f766e">◉본인지도 희망'+(s.selfName?'('+esc(s.selfName)+')':'')+'</span>':'')
+      +(s.selfTeach&&s.support!=='용품만'&&!s.selfUid&&!s.assignedName&&(st==='선정'||st==='접수'||st==='대기')?' <span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px" title="신청자가 비로그인 상태로 제출해 자동 배정이 안 됐습니다. 아래 🎯 강사 직접 배정으로 성명 대조 후 지정해주세요.">⚠ 본인지도 매칭필요</span>':'')
       +((dupKey[(s.school||'').replace(/\s/g,'')+'|'+(s.type||'')]>1)?' <span style="font-size:11px;font-weight:800;color:#fff;background:#e6b422;padding:2px 8px;border-radius:999px">⚠ 중복의심</span>':'')
       +(s.support==='용품만'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">🎁 용품만</span>':'')
       +' <span style="font-size:11px;font-weight:800;color:#fff;background:'+(appTypeOf(s).indexOf('방과후')>=0?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+'</span>'
@@ -1051,7 +1051,7 @@ async function setStatus(id,st){
   const s=APPS.find(d=>d.id===id).data();
   if(st==='선정'&&!confirm(s.school+' 을(를) 선정할까요?\n\n📧 담당교사에게 선정 안내 이메일이 즉시 발송되고, 강사 지명 게시판에 공개됩니다.'))return;
   if(st==='미선정'&&!confirm(s.school+' 을(를) 미선정 처리할까요?\n\n📧 담당교사에게 결과 안내 이메일이 즉시 발송됩니다.'))return;
-  if(st==='선정'&&s.selfTeach&&s.selfUid){
+  if(st==='선정'&&s.selfTeach&&s.selfUid&&s.support!=='용품만'){
     // 본인 직접 지도: 선정과 동시에 자동 배정 (지명 게시판 미공개)
     await DB.collection('schoolApplications').doc(id).update({status:'배정완료',assignedUid:s.selfUid,assignedName:s.selfName});
     await adHist(s.selfUid,'[위촉] '+s.school+' 강사 배정 (본인지도 · '+(s.region||'')+')');
