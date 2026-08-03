@@ -59,6 +59,11 @@
         <a href="archive.html">자료실 (서식 다운로드)</a>
         <a href="faq.html">자주 묻는 질문</a>
       </div></div>
+    <div><a href="competition.html" class="top">대회</a>
+      <div class="drop">
+        <a href="competition.html">대회 일정 · 안내</a>
+        <a href="competition.html#staff">심판·운영요원 신청</a>
+      </div></div>
     <a href="apply.html" class="cta">강습 신청</a>
     <a href="jobs.html" class="cta" style="background:#1F4E9C;margin-left:8px">강사신청</a>
   </nav>
@@ -228,6 +233,8 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <label>역할</label>
         <select id="cpRole"><option>심판</option><option>운영</option></select>
         <label>정원 (명)</label><input id="cpQuota" type="number" value="4" min="1">
+        <label>신청 마감일</label><input id="cpDeadline" type="date">
+        <label>임무 목록 (쉼표 구분 — 비우면 기본값)</label><input id="cpRoles" placeholder="심판: 주심,부심,기록 / 운영: 경기운영,안전요원,의전·접수,기록·홍보(사진·영상),주차·수송,보조요원">
         <button class="btn-main" onclick="addComp()">모집 등록</button>
         <div class="msg" id="cpMsg"></div>
       </div>
@@ -1823,15 +1830,31 @@ async function addComp(){
   const t=document.getElementById('cpTitle').value.trim(),dt=document.getElementById('cpDate').value;
   const q=parseInt(document.getElementById('cpQuota').value);
   if(!t||!dt||!q){m.textContent='대회명·일자·정원을 입력하세요';m.className='msg err';return}
+  const rolesTxt=document.getElementById('cpRoles').value.trim();
+  const roles=rolesTxt?rolesTxt.split(',').map(x=>x.trim()).filter(Boolean):[];
   await DB.collection('compSlots').add({
     title:t,region:document.getElementById('cpRegion').value,date:dt,
-    role:document.getElementById('cpRole').value,quota:q,claimed:[],
+    role:document.getElementById('cpRole').value,quota:q,claimed:[],cancels:[],
+    deadline:document.getElementById('cpDeadline').value||'',roles:roles,
     createdAt:firebase.firestore.FieldValue.serverTimestamp()});
   m.textContent='등록 완료 — 메인 참여신청(선정학교 강사지원)에 즉시 게시됩니다';m.className='msg ok';
   document.getElementById('cpTitle').value='';
   loadCompsAdmin();
 }
 let CADM=[];
+function compActiveClaims(s){
+  const seen={};const out=[];
+  const cancelsBy={};(s.cancels||[]).forEach(k=>{cancelsBy[k.uid]=(cancelsBy[k.uid]||0)+1});
+  const claimsBy={};(s.claimed||[]).forEach(c=>{claimsBy[c.uid]=(claimsBy[c.uid]||0)+1});
+  (s.claimed||[]).forEach(c=>{
+    if(seen[c.uid])return;seen[c.uid]=1;
+    if((claimsBy[c.uid]||0)>(cancelsBy[c.uid]||0)){
+      const arr=(s.claimed||[]).filter(x=>x.uid===c.uid);
+      out.push(arr[arr.length-1]);
+    }
+  });
+  return out;
+}
 async function loadCompsAdmin(){
   const snap=await DB.collection('compSlots').orderBy('date').limit(100).get();
   CADM=snap.docs;
@@ -1846,22 +1869,27 @@ function renderCompsAdmin(){
     const hay=[s.title,s.region,s.role,s.date,claimed.map(c=>c.name).join(' ')].map(x=>String(x||'').toLowerCase()).join(' ');
     return hay.indexOf(q)>=0;
   });
+  const today=new Date().toISOString().slice(0,10);
   el.innerHTML=!docs.length?'<div class="bempty">'+(q?'검색 결과가 없습니다.':'등록된 대회 모집이 없습니다.')+'</div>':docs.map(d=>{
-    const s=d.data();const claimed=s.claimed||[];
+    const s=d.data();const act=compActiveClaims(s);
     const confirmed=s.confirmed||[];
+    const closed=s.deadline&&today>s.deadline;
     return '<div class="urow"><div class="grow"><b>'+esc(s.title)+'</b> <span style="font-size:11px;font-weight:800;color:#fff;background:'+(s.role==='심판'?'#7c3aed':'#b8860b')+';padding:2px 8px;border-radius:999px">'+esc(s.role)+'</span>'
+      +(closed?' <span style="font-size:11px;font-weight:800;color:#fff;background:#8a919d;padding:2px 8px;border-radius:999px">마감</span>':'')
       +(confirmed.length>=s.quota?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">확정 완료</span>':'')
-      +'<div class="sub3">'+esc(s.region)+' · '+esc(s.date)+' · 지명 '+claimed.length+'/'+s.quota+'명 · 확정 '+confirmed.length+'명'
-      +(claimed.length?'<br>지명자: '+claimed.map(c=>(confirmed.indexOf(c.uid)>=0?'<b style="color:#0f766e">✓'+esc(c.name)+'</b>':esc(c.name))).join(', '):'')+'</div></div>'
+      +'<div class="sub3">'+esc(s.region)+' · '+esc(s.date)+(s.deadline?' · 마감 '+esc(s.deadline):'')+' · 유효신청 '+act.length+'/'+s.quota+'명 · 확정 '+confirmed.length+'명 · 취소 '+((s.cancels||[]).length)+'건'
+      +(act.length?'<br>신청자: '+act.map(c=>(confirmed.indexOf(c.uid)>=0?'<b style="color:#0f766e">✓'+esc(c.name)+'</b>':esc(c.name))+(c.prefs&&c.prefs.length?'<span style="color:#7c3aed">('+esc(c.prefs.join('→'))+')</span>':'')).join(', '):'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +(claimed.length?'<button class="btn-sub" style="background:#0f766e" onclick="confirmComp(\''+d.id+'\')">✓ 확정 처리</button>':'')
-      +(claimed.length?'<button class="btn-sub" style="background:#1F4E9C" onclick="copyCompNotice(\''+d.id+'\')">📋 통보문</button>':'')
+      +(act.length?'<button class="btn-sub" style="background:#0f766e" onclick="confirmComp(\''+d.id+'\')">✓ 확정 처리</button>':'')
+      +(act.length?'<button class="btn-sub" style="background:#1F4E9C" onclick="copyCompNotice(\''+d.id+'\')">📋 통보문</button>':'')
+      +(act.length?'<button class="btn-sub" style="background:#153A77" onclick="compCSV(\''+d.id+'\')">⬇ 명단 CSV</button>':'')
+      +'<button class="btn-sub" style="background:#b8860b" onclick="extendComp(\''+d.id+'\')">⏰ 마감 연장</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delComp(\''+d.id+'\')">🗑</button></div></div>';
   }).join('');
 }
 async function confirmComp(id){
   const doc=await DB.collection('compSlots').doc(id).get();const s=doc.data();
-  const claimed=s.claimed||[];const confirmed=s.confirmed||[];
+  const claimed=compActiveClaims(s);const confirmed=s.confirmed||[];
   const names=claimed.map((c,i)=>(i+1)+'. '+c.name+(confirmed.indexOf(c.uid)>=0?' (확정됨)':'')).join('\n');
   const pick=prompt('['+s.title+' / '+s.role+'] 확정할 지명자 번호를 쉼표로 입력하세요.\n(자격 확인 완료자만 — 전원이면 "전체" 입력)\n\n'+names,'전체');
   if(pick===null)return;
@@ -1888,6 +1916,32 @@ async function copyCompNotice(id){
   const txt='[플라잉디스크연맹] '+s.title+' '+s.role+'요원으로 확정되었습니다.\n일자: '+s.date+' / 권역: '+s.region+'\n자격증 사본을 지참해 주시고, 세부 집결 시간·장소는 추후 안내드립니다.\n수당: '+(s.role==='심판'?'1일 7만원 이내(4시간 이내 4만원)':'운영요원 수당 기준')+' · 활동 포인트 자동 지급\n문의 031-984-3248'
     +(names.length?'\n\n[확정자] '+names.join(', '):'');
   navigator.clipboard.writeText(txt).then(()=>alert('✓ 통보문이 복사되었습니다.\n\n'+txt)).catch(()=>prompt('아래 내용을 복사하세요',txt));
+}
+async function extendComp(id){
+  const doc=await DB.collection('compSlots').doc(id).get();const s=doc.data();
+  const nd=prompt('['+s.title+']\n신청 마감일을 입력하세요 (YYYY-MM-DD)\n현재: '+(s.deadline||'미설정'), s.deadline||'');
+  if(nd===null)return;
+  if(nd&&!/^\d{4}-\d{2}-\d{2}$/.test(nd.trim())){alert('YYYY-MM-DD 형식으로 입력해주세요.');return}
+  await DB.collection('compSlots').doc(id).update({deadline:nd.trim()});
+  alert(nd.trim()?('마감일이 '+nd.trim()+'로 변경되었습니다. (마감 전이면 자동 재오픈)'):'마감일이 해제되었습니다.');
+  loadCompsAdmin();
+}
+async function compCSV(id){
+  const doc=await DB.collection('compSlots').doc(id).get();const s=doc.data();
+  const act=compActiveClaims(s);const confirmed=s.confirmed||[];
+  const rows=[['성명','구분','1지망','2지망','3지망','동의','확정','휴대전화','신청일시']];
+  for(const c of act){
+    let phone='';
+    const u=USERS.find(x=>x.id===c.uid);
+    if(u)phone=u.data().phone||'';
+    else{try{const ud=await DB.collection('users').doc(c.uid).get();if(ud.exists)phone=ud.data().phone||'';}catch(e){}}
+    const p=c.prefs||[];
+    rows.push([c.name,s.role,p[0]||'',p[1]||'',p[2]||'',c.consent?'O':'',confirmed.indexOf(c.uid)>=0?'확정':'',phone,(c.at||'').slice(0,16).replace('T',' ')]);
+  }
+  const csv='\uFEFF'+rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=s.title+'_'+s.role+'요원_신청명단.csv';a.click();
 }
 async function delComp(id){
   if(!confirm('이 대회 모집을 삭제할까요? (지명 기록도 함께 삭제)'))return;

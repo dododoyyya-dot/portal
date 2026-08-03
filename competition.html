@@ -58,6 +58,11 @@
         <a href="archive.html">자료실 (서식 다운로드)</a>
         <a href="faq.html">자주 묻는 질문</a>
       </div></div>
+    <div><a href="competition.html" class="top">대회</a>
+      <div class="drop">
+        <a href="competition.html">대회 일정 · 안내</a>
+        <a href="competition.html#staff">심판·운영요원 신청</a>
+      </div></div>
     <a href="apply.html" class="cta">강습 신청</a>
     <a href="jobs.html" class="cta" style="background:#1F4E9C;margin-left:8px">강사신청</a>
   </nav>
@@ -76,13 +81,165 @@
     <tr><td>2026. 하반기</td><td class="l">전국 얼티미트 · 거츠 대회</td><td>일반 · 동호인</td><td>추후 공고</td></tr>
     <tr><td>연중</td><td class="l">연맹 주관 교류전 · 이벤트 대회</td><td>전 연령</td><td>추후 공고</td></tr>
   </table>
-  <h3 class="sub">심판 · 운영요원</h3>
+  <h3 class="sub" id="staff">심판 · 운영요원</h3>
   <div class="gbox">
     연맹 주관 대회의 심판·기록원·운영요원은 공개 모집하며, <b>연맹 리더(연수 이수자)는 우선 선발</b>됩니다.<br>
-    · 심판 수당: 1인 1일 70,000원 이내 (4시간 이내 40,000원) &nbsp;· 아동학대·성범죄 경력조회 결격사유가 없어야 합니다.<br>
-    · 모집 공고는 알림마당과 유소년사업 포털에 게시됩니다.
+    · 심판 수당: 1일 70,000원 이내 (4시간 이내 40,000원) · 운영요원 수당: 예산 기준 &nbsp;· 아동학대·성범죄 경력조회 결격사유가 없어야 합니다.<br>
+    · 수당은 활동 종료 후 기재 계좌로 이체되며, 원천징수 관계 법령에 따라 처리됩니다.
+  </div>
+
+  <div class="sec-label" style="margin-top:46px">RECRUIT</div>
+  <h2 class="sec-title">심판·운영요원 모집 · 신청</h2>
+  <p class="sec-desc">승인 회원 중 강사 페이지에서 심판·운영 분야를 지원한 분만 신청할 수 있습니다. 희망 임무를 1~3순위로 선택해 신청하며, 마감 전에는 본인이 직접 취소할 수 있습니다.</p>
+  <div class="gbox" id="cGate" style="display:none"></div>
+  <div id="cBody" style="display:none">
+    <div class="board" id="cSlotList"><div class="bempty">불러오는 중…</div></div>
+    <div style="margin-top:14px;font-size:12.5px;color:var(--gray);line-height:1.7;background:var(--bg-soft);border-radius:10px;padding:12px 16px">
+      <b>개인정보 수집·이용 안내</b> — 신청 시 소속·성명·연락처·계좌번호를 대회 수당(심판·운영·안전요원) 지급 목적으로 수집·이용하며(보유기간 2026. 12. 31.까지), 수당 원천징수 세액 납부를 위해 성명·지급총액·결정세액·주민등록번호가 국세청에 제공됩니다(「소득세법」 제21조·제37조·제129조, 「국세기본법 시행령」 제68조). 동의를 거부할 권리가 있으나, 거부 시 수당 지급에 제한이 있을 수 있습니다. 계좌·주민등록번호는 마이페이지에서 별도 보안 저장됩니다.
+    </div>
   </div>
 </div></section>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="site_config.js"></script>
+<script>
+if(!firebase.apps.length)firebase.initializeApp({
+  apiKey:"AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",authDomain:"koreaflyingdiscfederation.firebaseapp.com",
+  projectId:"koreaflyingdiscfederation",storageBucket:"koreaflyingdiscfederation.firebasestorage.app",
+  messagingSenderId:"1081847355343",appId:"1:1081847355343:web:ca40ed9a52e13f607f64ba"});
+const AUTH=firebase.auth(),DB=firebase.firestore();
+function cesc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+let CME=null,CMY=null,CSLOTS=[];
+const DEFAULT_ROLES={'심판':['주심','부심','기록'],'운영':['경기운영','안전요원','의전·접수','기록·홍보(사진·영상)','주차·수송','보조요원']};
+// 유효 신청 판정: 신청 횟수 - 취소 횟수 (재신청 허용)
+function activeOf(s,uid){
+  const c=(s.claimed||[]).filter(x=>x.uid===uid).length;
+  const x=(s.cancels||[]).filter(k=>k.uid===uid).length;
+  return c>x;
+}
+function activeCount(s){
+  const uids=[...new Set((s.claimed||[]).map(c=>c.uid))];
+  return uids.filter(u=>activeOf(s,u)).length;
+}
+function latestClaim(s,uid){
+  const arr=(s.claimed||[]).filter(x=>x.uid===uid);
+  return arr.length?arr[arr.length-1]:null;
+}
+AUTH.onAuthStateChanged(async u=>{
+  const g=document.getElementById('cGate');
+  if(!u){g.style.display='block';g.innerHTML='🔒 승인 회원 전용입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a> 후 신청할 수 있습니다.';return}
+  CME=u;
+  const d=await DB.collection('users').doc(u.uid).get();CMY=d.data();
+  if(!CMY||CMY.status!=='approved'){g.style.display='block';g.innerHTML='⏳ 사무국 승인 후 신청할 수 있습니다.';return}
+  document.getElementById('cBody').style.display='block';
+  loadSlots();
+});
+async function loadSlots(){
+  const el=document.getElementById('cSlotList');
+  try{
+    const snap=await DB.collection('compSlots').orderBy('date').limit(50).get();
+    CSLOTS=snap.docs;
+    if(snap.empty){el.innerHTML='<div class="bempty">현재 모집 중인 대회가 없습니다. 확정 시 이곳에 게시됩니다.</div>';return}
+    const today=new Date().toISOString().slice(0,10);
+    el.innerHTML=snap.docs.map(d=>{
+      const s=d.data();
+      const roles=(s.roles&&s.roles.length)?s.roles:(DEFAULT_ROLES[s.role]||[]);
+      const mine=activeOf(s,CME.uid);
+      const mineConfirmed=(s.confirmed||[]).indexOf(CME.uid)>=0;
+      const act=activeCount(s);
+      const closed=(s.deadline&&today>s.deadline)||act>=s.quota;
+      const f=CMY.instructorFor||{};
+      const eligible=s.role==='심판'?!!f.referee:!!f.staff;
+      const myClaim=mine?latestClaim(s,CME.uid):null;
+      const rc=s.role==='심판'?'#7c3aed':'#b8860b';
+      let action;
+      if(mineConfirmed)action='<span style="background:#b8860b;color:#fff;font-weight:900;font-size:12.5px;padding:6px 14px;border-radius:999px">🏅 확정 — 개별 안내 예정</span>';
+      else if(mine)action='<span style="background:#0f766e;color:#fff;font-weight:900;font-size:12.5px;padding:6px 14px;border-radius:999px">✓ 신청 완료'+(myClaim&&myClaim.prefs?' ('+cesc(myClaim.prefs.join('→'))+')':'')+'</span> <button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="cancelClaim(\''+d.id+'\')">신청 취소</button>';
+      else if(closed)action='<span style="background:#8a919d;color:#fff;font-weight:900;font-size:12.5px;padding:6px 14px;border-radius:999px">마감</span>';
+      else if(!eligible)action='<span style="color:#8a919d;font-size:12.5px;font-weight:700">'+(s.role==='심판'?'심판':'운영')+'요원 분야 지원 후 신청 가능 — <a href="jobs.html" style="color:var(--blue);font-weight:800">강사 활동 지원 →</a></span>';
+      else action='<button class="btn-sub" onclick="openApply(\''+d.id+'\')">신청하기</button>';
+      return '<div class="urow"><div class="grow"><b>'+cesc(s.title)+'</b> <span style="font-size:11.5px;font-weight:900;color:#fff;background:'+rc+';padding:2px 10px;border-radius:999px">'+cesc(s.role)+'</span>'
+        +'<div class="sub3">'+cesc(s.region)+' · '+cesc(s.date)+' · 신청 '+act+'/'+s.quota+'명'+(s.deadline?' · 마감 '+cesc(s.deadline):'')+'</div>'
+        +'<div class="sub3" style="color:#666">임무: '+roles.map(cesc).join(' · ')+'</div></div>'
+        +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'+action+'</div></div>';
+    }).join('');
+  }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+cesc(e.message)+'</div>'}
+}
+let APPLY_ID=null,APPLY_SEL=[];
+function openApply(id){
+  const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
+  const s=doc.data();
+  APPLY_ID=id;APPLY_SEL=[];
+  const roles=(s.roles&&s.roles.length)?s.roles:(DEFAULT_ROLES[s.role]||[]);
+  const old=document.getElementById('cApplyModal');if(old)old.remove();
+  const div=document.createElement('div');
+  div.id='cApplyModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+  div.innerHTML='<div style="background:#fff;border-radius:18px;max-width:480px;width:100%;padding:28px;max-height:90vh;overflow:auto">'
+    +'<b style="font-size:18px">'+cesc(s.title)+' — '+cesc(s.role)+'요원 신청</b>'
+    +'<div style="font-size:13px;color:#666;margin:6px 0 14px">'+cesc(s.region)+' · '+cesc(s.date)+'</div>'
+    +'<div style="font-size:13.5px;font-weight:800;margin-bottom:8px">희망 임무를 순서대로 선택하세요 (선택한 순서 = 1→2→3순위, 최대 3개)</div>'
+    +'<div id="cRoleBtns" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
+    +roles.map(r=>'<button type="button" class="btn-sub" style="background:#fff;color:#153A77;border:1.5px solid #b9cdec" data-role="'+cesc(r)+'" onclick="togRole(this)">'+cesc(r)+'</button>').join('')
+    +'</div><div id="cSelTxt" style="font-size:12.5px;color:#0f766e;font-weight:800;min-height:18px;margin-bottom:12px"></div>'
+    +'<label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:#444;background:#f6f8fb;border-radius:10px;padding:10px 12px;margin-bottom:14px">'
+    +'<input type="checkbox" id="cConsent" style="width:auto;margin-top:2px">'
+    +'<span>(필수) 개인정보 수집·이용 및 국세청 제3자 제공(원천징수)에 동의합니다. 소속·성명·연락처·계좌번호를 대회 수당 지급 목적으로 수집·이용하며 보유기간은 2026. 12. 31.까지입니다.</span></label>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end">'
+    +'<button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'cApplyModal\').remove()">닫기</button>'
+    +'<button class="btn-main" style="width:auto;padding:11px 26px" onclick="submitClaim()">신청 제출</button></div>'
+    +'</div>';
+  document.body.appendChild(div);
+}
+function togRole(btn){
+  const r=btn.dataset.role;
+  const i=APPLY_SEL.indexOf(r);
+  if(i>=0){APPLY_SEL.splice(i,1);btn.style.background='#fff';btn.style.color='#153A77';}
+  else{
+    if(APPLY_SEL.length>=3){alert('최대 3개까지 선택할 수 있습니다.');return}
+    APPLY_SEL.push(r);btn.style.background='#153A77';btn.style.color='#fff';
+  }
+  document.getElementById('cSelTxt').textContent=APPLY_SEL.length?('선택: '+APPLY_SEL.map((x,i)=>(i+1)+'순위 '+x).join(' · ')):'';
+}
+async function submitClaim(){
+  if(!APPLY_SEL.length){alert('희망 임무를 1개 이상 선택해주세요.');return}
+  if(!document.getElementById('cConsent').checked){alert('개인정보 수집·이용 동의가 필요합니다.');return}
+  const ref=DB.collection('compSlots').doc(APPLY_ID);
+  try{
+    await DB.runTransaction(async tx=>{
+      const doc=await tx.get(ref);
+      const s=doc.data();
+      if(activeOf(s,CME.uid))throw new Error('이미 신청한 대회입니다');
+      if(activeCount(s)>=s.quota)throw new Error('정원이 마감되었습니다');
+      const claimed=(s.claimed||[]).slice();
+      claimed.push({uid:CME.uid,name:CMY.name||'',prefs:APPLY_SEL.slice(),consent:true,at:new Date().toISOString()});
+      tx.update(ref,{claimed:claimed});
+    });
+    document.getElementById('cApplyModal').remove();
+    alert('신청 완료! 사무국 확정 후 개별 연락드립니다.\n확정 시 마이페이지에서 위촉 동의·서명 절차가 안내됩니다.');
+  }catch(e){alert(e.message)}
+  loadSlots();
+}
+async function cancelClaim(id){
+  if(!confirm('이 대회 신청을 취소할까요?\n(마감 전이라면 다시 신청할 수 있습니다)'))return;
+  const ref=DB.collection('compSlots').doc(id);
+  try{
+    await DB.runTransaction(async tx=>{
+      const doc=await tx.get(ref);
+      const s=doc.data();
+      if(!activeOf(s,CME.uid))throw new Error('신청 내역이 없습니다');
+      if((s.confirmed||[]).indexOf(CME.uid)>=0)throw new Error('이미 확정된 신청은 사무국(031-984-3248)을 통해 취소해주세요');
+      const cancels=(s.cancels||[]).slice();
+      cancels.push({uid:CME.uid,at:new Date().toISOString()});
+      tx.update(ref,{cancels:cancels});
+    });
+    alert('신청이 취소되었습니다.');
+  }catch(e){alert(e.message)}
+  loadSlots();
+}
+</script>
 
 <footer><div class="wrap">
   <div class="top">
