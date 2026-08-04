@@ -238,9 +238,12 @@ async function loadSlots(){
 }
 let APPLY_ID=null,APPLY_SEL=[],APPLY_PID=null,APPLY_MAX=3,APPLY_PARTS=[],MY_CLUBS=null;
 let RRN_OK=false;
-// 공고별 동의서: 스캔 이미지 > 직접 입력 문안 > 기본 문안 순으로 표시
+// 공고별 동의서: 스캔 이미지(여러 장) > 직접 입력 문안 > 기본 문안 순으로 표시
+function consentImgsOf(s){return (s.consentImgs&&s.consentImgs.length)?s.consentImgs:(s.consentImg?[s.consentImg]:[])}
 function consentBlockHtml(s,defHtml){
-  if(s.consentImg)return '<img src="'+s.consentImg+'" alt="개인정보 동의서" style="width:100%;border:1px solid #e2e7f0;border-radius:8px;margin-bottom:10px">';
+  const imgs=consentImgsOf(s);
+  if(imgs.length)return imgs.map((x,i)=>'<img src="'+x+'" alt="개인정보 동의서 '+(i+1)+'페이지" style="width:100%;border:1px solid #e2e7f0;border-radius:8px;margin-bottom:8px">').join('')
+    +(imgs.length>1?'<div style="font-size:11.5px;color:#8a919d;font-weight:700;margin-bottom:8px">총 '+imgs.length+'페이지 — 전체 내용을 확인 후 동의해주세요</div>':'');
   if(s.consentText)return '<div style="font-size:12px;color:#4b5563;line-height:1.8;margin-bottom:10px;white-space:pre-wrap">'+cesc(s.consentText)+'</div>';
   return defHtml;
 }
@@ -506,8 +509,8 @@ function printMyDocs(id){
     +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">사단법인 대한민국플라잉디스크연맹 귀하</div></div>';
   const page2='<div style="font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:30px 10px">'
     +'<h2 style="text-align:center;border:2px solid #333;padding:12px;font-size:19px">개인정보 수집·이용 및 제3자 제공 동의서</h2>'
-    +(s.consentImg
-      ?'<div style="margin-top:14px"><img src="'+s.consentImg+'" style="width:100%;border:1px solid #999"></div><div style="font-size:13px;margin-top:8px">위 동의서 내용을 확인하였으며 이에 동의합니다. <b>동의함 ☑</b></div>'
+    +(consentImgsOf(s).length
+      ?consentImgsOf(s).map(x=>'<div style="margin-top:14px"><img src="'+x+'" style="width:100%;border:1px solid #999"></div>').join('')+'<div style="font-size:13px;margin-top:8px">위 동의서 내용을 확인하였으며 이에 동의합니다. <b>동의함 ☑</b></div>'
       :(s.consentText
         ?'<div style="font-size:13px;line-height:1.9;border:1px solid #999;padding:14px 18px;margin-top:14px;white-space:pre-wrap">'+cesc(s.consentText)+'\n\n동의함 ☑</div>'
         :'<div style="font-size:13px;line-height:1.9;border:1px solid #999;padding:14px 18px;margin-top:14px">'
@@ -547,8 +550,8 @@ function printMyEntryDocs(id,s){
       +'① 참가자는 대회 규정과 안전 수칙을 준수하며, 주최 측의 경기 운영에 따릅니다.<br>'
       +'② 대회 중 촬영된 기록·사진·영상은 연맹 홍보 자료로 활용될 수 있음에 동의합니다.<br>'
       +(m.kid?'③ 본 신청은 법정대리인(보호자)의 동의·서명으로 효력을 가집니다.':'③ 본인은 위 내용을 확인하고 참가를 신청합니다.')+'</div>'
-      +(s.consentImg
-        ?'<div style="margin-top:10px"><img src="'+s.consentImg+'" style="width:100%;border:1px solid #999"></div><div style="font-size:12.5px;margin-top:6px">위 동의서 내용을 확인하였으며 이에 동의합니다. <b>동의함 ☑</b></div>'
+      +(consentImgsOf(s).length
+        ?consentImgsOf(s).map(x=>'<div style="margin-top:10px"><img src="'+x+'" style="width:100%;border:1px solid #999"></div>').join('')+'<div style="font-size:12.5px;margin-top:6px">위 동의서 내용을 확인하였으며 이에 동의합니다. <b>동의함 ☑</b></div>'
         :(s.consentText
           ?'<div style="font-size:12.5px;line-height:1.9;border:1px solid #999;padding:12px 16px;margin-top:10px;white-space:pre-wrap">'+cesc(s.consentText)+'\n\n동의함 ☑</div>'
           :'<div style="font-size:12.5px;line-height:1.9;border:1px solid #999;padding:12px 16px;margin-top:10px">'
