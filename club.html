@@ -41,7 +41,14 @@
         <a href="about.html#org">조직도</a>
         <a href="about.html#rule">정관 · 규정</a>
         <a href="about.html#region">시도연맹 구성</a>
+        <a href="sponsor.html">후원안내</a>
         <a href="about.html#way">오시는 길</a>
+      </div></div>
+    <div><a href="sports.html" class="top">종목소개</a>
+      <div class="drop">
+        <a href="sports.html">얼티미트</a>
+        <a href="sports.html">디스크골프</a>
+        <a href="sports.html">원반윷놀이 · 기타 종목</a>
       </div></div>
     <div><a href="business.html" class="top">사업안내</a>
       <div class="drop">
@@ -102,7 +109,7 @@
     <h3 class="sub">🏠 내 클럽</h3>
     <div id="myClubList" class="board"><div class="bempty">불러오는 중…</div></div>
 
-    <h3 class="sub" style="margin-top:40px">🔍 클럽 찾기</h3>
+    <h3 class="sub" style="margin-top:40px">🔍 클럽 찾기 <span id="clubStat" style="font-size:12.5px;font-weight:700;color:#8a919d;margin-left:8px"></span></h3>
     <div id="sidoChips" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px"></div>
     <div id="clubList" class="board"><div class="bempty">불러오는 중…</div></div>
 
@@ -175,6 +182,10 @@ async function loadClubs(){
   try{
     const snap=await DB.collection('clubs').where('status','==','승인').limit(300).get();
     ALLCLUBS=snap.docs;
+    // 전국 집계 (숨김 클럽 포함, 승인 기준)
+    const tot=snap.docs.reduce((a,d)=>{a.c++;a.m+=(d.data().memberUids||[]).length;return a},{c:0,m:0});
+    const st=document.getElementById('clubStat');
+    if(st)st.textContent='— 전국 '+tot.c+'개 클럽 · '+tot.m+'명 등록';
     renderClubs();
   }catch(e){document.getElementById('clubList').innerHTML='<div class="bempty">불러오기 실패: '+kesc(e.message)+'</div>'}
 }
@@ -268,11 +279,20 @@ async function loadMyClubs(){
           +(active.length?active.map(p=>'<span style="font-size:12.5px;margin-left:8px">'+kesc(p.name)+(p.code?' <span style="color:#b8860b">(코드)</span>':'')
             +' <button class="cbtn cbtn-teal" style="padding:3px 10px;font-size:11.5px" onclick="approveJoin(\''+d.id+'\',\''+p.uid+'\')">승인</button>'
             +' <button class="cbtn" style="padding:3px 10px;font-size:11.5px;background:#eceff4;color:#666" onclick="rejectJoin(\''+d.id+'\',\''+p.uid+'\')">거절</button></span>').join(''):' <span style="font-size:12px;color:#8a919d">없음</span>')
-          +'</div>';
+          +'</div>'
+          +'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">회원 관리 ('+((c.members||[]).length)+'명)</summary>'
+          +'<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'
+          +(c.members||[]).map(mm=>'<span style="font-size:12.5px;background:#f6f8fb;border-radius:8px;padding:5px 10px">'+kesc(mm.name||'')
+            +(mm.uid===c.ownerUid?' <b style="color:#C41E2F;font-size:11px">클럽장</b>'
+              :' <button class="cbtn" style="padding:2px 8px;font-size:11px;background:#fff;color:#C41E2F;border:1px solid #f1c7cc" onclick="removeMember(\''+d.id+'\',\''+mm.uid+'\',\''+kesc(mm.name||'')+'\')">제외</button>')
+            +'</span>').join('')
+          +'</div></details>';
       }
+      const leaveBtn=(isMember&&!isOwner)?'<button class="cbtn" style="padding:4px 12px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="leaveClub(\''+d.id+'\',\''+kesc(c.name)+'\')">클럽 탈퇴</button>':'';
       return '<div class="clubcard"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="cname">'+kesc(c.name)+'</span>'
         +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'+badge
-        +'<span style="font-size:12px;color:#8a919d;font-weight:700">회원 '+((c.memberUids||[]).length)+'명</span></div>'
+        +'<span style="font-size:12px;color:#8a919d;font-weight:700">회원 '+((c.memberUids||[]).length)+'명</span>'
+        +'<span style="flex:1"></span>'+leaveBtn+'</div>'
         +(c.intro?'<div class="cmeta2">'+kesc(c.intro)+'</div>':'')
         +ownerUI+'</div>';
     }).join('');
@@ -293,6 +313,32 @@ async function approveJoin(id,uid){
     });
     loadMyClubs();loadClubs();
   }catch(e){alert('승인 실패: '+e.message)}
+}
+// 회원 자진 탈퇴 (본인만 — 규칙에서 본인 1명 제거만 허용)
+async function leaveClub(id,name){
+  if(!confirm('['+name+'] 클럽에서 탈퇴할까요?\n(다른 클럽 가입·재가입은 자유롭게 가능합니다)'))return;
+  try{
+    await DB.runTransaction(async tx=>{
+      const ref=DB.collection('clubs').doc(id);
+      const doc=await tx.get(ref);const c=doc.data();
+      tx.update(ref,{members:(c.members||[]).filter(x=>x.uid!==KME.uid),
+        memberUids:(c.memberUids||[]).filter(x=>x!==KME.uid)});
+    });
+    alert('탈퇴되었습니다.');loadMyClubs();loadClubs();
+  }catch(e){alert('탈퇴 실패: '+e.message)}
+}
+// 클럽장 — 회원 제외
+async function removeMember(id,uid,name){
+  if(!confirm('['+name+'] 회원을 클럽에서 제외할까요?'))return;
+  try{
+    await DB.runTransaction(async tx=>{
+      const ref=DB.collection('clubs').doc(id);
+      const doc=await tx.get(ref);const c=doc.data();
+      tx.update(ref,{members:(c.members||[]).filter(x=>x.uid!==uid),
+        memberUids:(c.memberUids||[]).filter(x=>x!==uid)});
+    });
+    loadMyClubs();loadClubs();
+  }catch(e){alert('제외 실패: '+e.message)}
 }
 async function rejectJoin(id,uid){
   if(!confirm('이 가입 신청을 거절할까요?'))return;
@@ -334,7 +380,7 @@ async function createClub(){
     <div class="links">
       <a href="about.html">연맹소개</a><a href="business.html">사업안내</a>
       <a href="notice.html">알림마당</a><a href="archive.html">자료실</a>
-      <a href="apply.html">학교 강습 신청</a>
+      <a href="apply.html">학교 강습 신청</a><a href="sponsor.html">후원안내</a>
     </div>
   </div>
   <div class="bottom">

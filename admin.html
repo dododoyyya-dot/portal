@@ -28,7 +28,14 @@
         <a href="about.html#org">조직도</a>
         <a href="about.html#rule">정관 · 규정</a>
         <a href="about.html#region">시도연맹 구성</a>
+        <a href="sponsor.html">후원안내</a>
         <a href="about.html#way">오시는 길</a>
+      </div></div>
+    <div><a href="sports.html" class="top">종목소개</a>
+      <div class="drop">
+        <a href="sports.html">얼티미트</a>
+        <a href="sports.html">디스크골프</a>
+        <a href="sports.html">원반윷놀이 · 기타 종목</a>
       </div></div>
     <div><a href="business.html" class="top">사업안내</a>
       <div class="drop">
@@ -242,7 +249,8 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <div style="font-size:11.5px;color:#8a919d;margin-top:3px">참가 = 선수 모집 (임무 목록 칸에 부문 입력: 오픈부,여자부,혼성부 등 — 자녀 참가는 보호자 계정에서 신청)</div>
         <label>정원 (명)</label><input id="cpQuota" type="number" value="4" min="1">
         <label>신청 마감일</label><input id="cpDeadline" type="date">
-        <label>임무 목록 (쉼표 구분 — 비우면 기본값)</label><input id="cpRoles" placeholder="심판: 심판장,주심,부심,점수심,기록심,선심 / 운영: 경기운영,안전,미화,홍보,시상,의전·접수,주차·수송,보조">
+        <label>임무 목록 (쉼표 구분 — 비우면 기본값 · 참가는 "부문:정원" 형식으로 부문별 정원 지정 가능)</label><input id="cpRoles" placeholder="심판: 심판장,주심,부심,… / 참가: 오픈부:16,여자부:8,혼성부">
+        <label>참가비 (선택 — 참가 모집 시 표시. 예: 무료 / 1인 10,000원)</label><input id="cpFee" placeholder="예: 무료 (기념품 증정) / 팀당 30,000원">
         <label>안내문 (선택 — 신청 화면에 표시)</label><textarea id="cpNote" rows="3" placeholder="예: 집결 08:30 / 중식 제공 / 자격증 사본 지참"></textarea>
         <label>개인정보 동의서 문안 (선택 — 비우면 연맹 기본 문안 사용)</label>
         <textarea id="cpConsentText" rows="4" placeholder="행사별 수집·이용·제3자 제공 동의 문안을 직접 입력하면 기본 문안 대신 표시됩니다"></textarea>
@@ -259,6 +267,17 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <div style="font-size:12.5px;color:var(--gray);margin-bottom:10px">클럽 생성은 승인 후 club.html 목록에 게시됩니다. 숨김 = 목록 비노출(가입 코드로만 가입, 외부 단체용). 코드 발급 후 해당 단체에 전달하세요.</div>
       <button class="btn-sub" style="background:#8a919d;margin-bottom:10px" onclick="loadClubsAdmin()">↻ 새로고침</button>
       <div class="board" id="clubAdminList"><div class="bempty">불러오는 중…</div></div>
+      <h3 style="margin-top:34px">📝 페이지 콘텐츠 편집</h3>
+      <div style="font-size:12.5px;color:var(--gray);margin-bottom:10px">종목소개·후원안내 페이지의 내용을 코드 수정 없이 여기서 바로 고칩니다. 저장 즉시 홈페이지에 반영됩니다.</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <select id="pgSel" style="padding:9px 13px;border:1.5px solid #dfe5ee;border-radius:10px;font-family:inherit;font-size:14px">
+          <option value="sports">종목소개 (sports.html)</option>
+          <option value="sponsor">후원안내 (sponsor.html)</option>
+        </select>
+        <button class="btn-sub" style="background:#153A77" onclick="pgLoad()">불러오기</button>
+        <span id="pgMsg" style="font-size:13px;font-weight:700"></span>
+      </div>
+      <div id="pgEditor"></div>
     </div>
     <div id="v3" style="display:none">
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
@@ -1856,6 +1875,7 @@ async function addComp(){
     role:document.getElementById('cpRole').value,quota:q,claimed:[],cancels:[],
     deadline:document.getElementById('cpDeadline').value||'',roles:roles,
     note:document.getElementById('cpNote').value.trim(),
+    fee:document.getElementById('cpFee').value.trim(),
     consentText:document.getElementById('cpConsentText').value.trim(),
     consentImgs:CONSENT_IMGS.cp.slice(),consentImg:'',
     createdAt:firebase.firestore.FieldValue.serverTimestamp()});
@@ -1950,7 +1970,15 @@ async function loadClubsAdmin(){
     if((x.status==='대기')!==(y.status==='대기'))return x.status==='대기'?-1:1;
     return String(x.sido||'').localeCompare(String(y.sido||''));
   });
-  el.innerHTML=!docs.length?'<div class="bempty">등록된 클럽이 없습니다.</div>':docs.map(d=>{
+  // 집계: 전국 → 시도별 (승인 클럽 기준)
+  const agg={};let totC=0,totM=0;
+  docs.forEach(d=>{const c=d.data();if(c.status!=='승인')return;totC++;const m=(c.memberUids||[]).length;totM+=m;
+    if(!agg[c.sido])agg[c.sido]={c:0,m:0};agg[c.sido].c++;agg[c.sido].m+=m;});
+  const aggHtml='<div style="background:#f6f8fb;border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:13px">'
+    +'<b>📊 전국 '+totC+'개 클럽 · '+totM+'명</b>'
+    +(Object.keys(agg).length?' &nbsp;—&nbsp; '+Object.keys(agg).sort().map(s2=>s2+' '+agg[s2].c+'개('+agg[s2].m+'명)').join(' · '):'')
+    +'</div>';
+  el.innerHTML=aggHtml+(!docs.length?'<div class="bempty">등록된 클럽이 없습니다.</div>':docs.map(d=>{
     const c=d.data();
     return '<div class="urow"><div class="grow"><b>'+esc(c.name)+'</b> '
       +'<span style="font-size:11px;font-weight:800;color:#fff;background:#153A77;padding:2px 8px;border-radius:999px">'+esc(c.sido)+' '+esc(c.gugun||'')+'</span> '
@@ -1963,10 +1991,76 @@ async function loadClubsAdmin(){
       +'<button class="btn-sub" style="background:#8a919d" onclick="toggleClubHidden(\''+d.id+'\','+(!c.hidden)+')">'+(c.hidden?'👁 노출':'🙈 숨김')+'</button>'
       +'<button class="btn-sub" style="background:#b8860b" onclick="setClubCode(\''+d.id+'\')">🔑 코드</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delClub(\''+d.id+'\')">🗑</button></div></div>';
-  }).join('');
+  }).join(''));
 }
 async function approveClub(id){
   await DB.collection('clubs').doc(id).update({status:'승인'});loadClubsAdmin();
+}
+// ── 페이지 콘텐츠 편집기 (siteContent/{page} — 종목소개·후원안내) ──
+const PAGE_DEFAULTS={
+ sports:[
+  {h:'🥏 플라잉디스크란?',body:'플라잉디스크(Flying Disc)는 원반 하나로 즐기는 생활·전문 스포츠입니다. 장비가 간단하고 규칙이 직관적이라 유소년부터 성인까지 누구나 쉽게 시작할 수 있으며, 신체 접촉이 적어 안전합니다.\n특히 얼티미트는 심판 없이 선수 스스로 판정하는 "스피릿 오브 더 게임(Spirit of the Game)" 정신으로 배려·소통·정직을 배우는 인성 스포츠로 주목받고 있습니다.'},
+  {h:'🏃 얼티미트 (Ultimate)',body:'7인제(유소년 5인제) 팀 스포츠로, 원반을 패스해 상대 엔드존에서 캐치하면 득점합니다.\n· 경기장: 100×37m (유소년 축소 운영 가능)\n· 특징: 심판 없이 선수 간 자율 판정 — 스피릿 오브 더 게임\n· 신체 접촉 금지, 원반을 들면 이동 불가(피벗만 허용)\n· 세계선수권·월드게임즈 정식 종목'},
+  {h:'⛳ 디스크골프 (Disc Golf)',body:'골프와 동일한 방식으로, 원반을 던져 체인 바스켓(홀)에 최소 타수로 넣는 개인 종목입니다.\n· 드라이버·미드레인지·퍼터 등 용도별 원반 사용\n· 공원·학교 운동장 등 어디서나 코스 구성 가능\n· 남녀노소 함께 즐기는 대표적 생활체육 종목'},
+  {h:'🎯 원반윷놀이',body:'전통 윷놀이와 플라잉디스크를 결합한 한국형 뉴스포츠입니다.\n· 원반을 던져 윷판 구역에 안착시켜 말을 이동\n· 세대 통합형 종목으로 학교·가족 행사에 적합\n· 좁은 공간(강당·교실)에서도 운영 가능'},
+  {h:'🤾 기타 종목 (거츠 · 어큐러시 · 디스턴스)',body:'· 거츠(Guts): 5인 팀이 마주 서서 강속 원반을 주고받는 스피드 종목\n· 어큐러시(Accuracy): 표적 통과 정확도를 겨루는 종목 — 학교 수업 도입에 최적\n· 디스턴스(Distance): 원반 멀리 던지기 기록 종목\n· 프리스타일(Freestyle): 음악에 맞춘 원반 퍼포먼스'}],
+ sponsor:[
+  {h:'🤝 후원 안내',body:'사단법인 대한민국플라잉디스크연맹은 유소년 스포츠 기반구축, 학교 강습, 지도자 양성, 전국·권역별 대회를 운영하는 비영리 체육단체입니다.\n여러분의 후원은 더 많은 아이들이 운동장에서 원반을 던지는 데 쓰입니다.'},
+  {h:'💙 후원금은 이렇게 쓰입니다',body:'· 유소년 강습 용품(원반·조끼·교구) 지원\n· 소외지역 학교 방문 강습 확대\n· 유소년 대회 개최 및 참가 지원\n· 지도자·심판 양성 교육'},
+  {h:'🏦 후원 방법',body:'· 계좌 후원: (후원 계좌는 사무국으로 문의해 주세요)\n· 물품 후원: 스포츠 용품·차량·인쇄 등 현물 후원 환영\n· 재능 후원: 사진·영상·디자인·통역 등 전문 재능 기부\n· 문의: 031-984-3248 / kfdf60@hanmail.net'},
+  {h:'🎖 후원자 예우',body:'· 연맹 홈페이지·대회 현수막 후원사 로고 게시\n· 연맹 주관 대회 초청 및 시상 참여\n· 후원 증서 발급\n· 기부금 영수증 관련 사항은 사무국으로 문의해 주세요'}]
+};
+let PG_SECS=[];
+async function pgLoad(){
+  const page=document.getElementById('pgSel').value;
+  const m=document.getElementById('pgMsg');
+  try{
+    const doc=await DB.collection('siteContent').doc(page).get();
+    if(doc.exists&&doc.data().sections&&doc.data().sections.length){
+      PG_SECS=doc.data().sections.slice();
+      m.textContent='저장된 콘텐츠 불러옴 (수정본 사용 중)';m.style.color='#0f766e';
+    }else{
+      PG_SECS=(PAGE_DEFAULTS[page]||[]).map(x=>Object.assign({},x));
+      m.textContent='기본 문안 사용 중 — 저장하면 수정본으로 교체됩니다';m.style.color='#b8860b';
+    }
+    renderPgEditor();
+  }catch(e){m.textContent='불러오기 실패: '+e.message;m.style.color='#C41E2F'}
+}
+function renderPgEditor(){
+  const el=document.getElementById('pgEditor');
+  el.innerHTML=PG_SECS.map((s,i)=>'<div style="background:#fff;border:1.5px solid #dfe5ee;border-radius:12px;padding:14px 16px;margin-bottom:10px">'
+    +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">'
+    +'<b style="font-size:12px;color:#8a919d">'+(i+1)+'</b>'
+    +'<input value="'+esc(s.h)+'" oninput="PG_SECS['+i+'].h=this.value" placeholder="섹션 제목" style="flex:1;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:8px;font-weight:800;font-family:inherit;font-size:14px">'
+    +'<button class="btn-sub" style="background:#8a919d;padding:6px 10px;font-size:12px"'+(i===0?' disabled':'')+' onclick="pgMove('+i+',-1)">↑</button>'
+    +'<button class="btn-sub" style="background:#8a919d;padding:6px 10px;font-size:12px"'+(i===PG_SECS.length-1?' disabled':'')+' onclick="pgMove('+i+',1)">↓</button>'
+    +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F;padding:6px 10px;font-size:12px" onclick="pgDel('+i+')">삭제</button></div>'
+    +'<textarea rows="4" oninput="PG_SECS['+i+'].body=this.value" placeholder="내용 (줄바꿈 그대로 표시됩니다)" style="width:100%;padding:10px 12px;border:1.5px solid #dfe5ee;border-radius:8px;font-family:inherit;font-size:13.5px;line-height:1.6">'+esc(s.body)+'</textarea>'
+    +'</div>').join('')
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'
+    +'<button class="btn-sub" style="background:#8a919d" onclick="pgAdd()">+ 섹션 추가</button>'
+    +'<span style="flex:1"></span>'
+    +'<button class="btn-sub" style="background:#b8860b" onclick="pgReset()">기본 문안으로 복원</button>'
+    +'<button class="btn-sub" style="background:#0f766e" onclick="pgSave()">💾 저장 (즉시 반영)</button></div>';
+}
+function pgAdd(){PG_SECS.push({h:'',body:''});renderPgEditor()}
+function pgDel(i){if(!confirm('이 섹션을 삭제할까요?'))return;PG_SECS.splice(i,1);renderPgEditor()}
+function pgMove(i,d){const t=PG_SECS[i];PG_SECS[i]=PG_SECS[i+d];PG_SECS[i+d]=t;renderPgEditor()}
+async function pgSave(){
+  const page=document.getElementById('pgSel').value;
+  const m=document.getElementById('pgMsg');
+  const secs=PG_SECS.filter(s=>(s.h||'').trim()||(s.body||'').trim());
+  if(!secs.length){m.textContent='섹션이 없습니다';m.style.color='#C41E2F';return}
+  try{
+    await DB.collection('siteContent').doc(page).set({sections:secs,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:(firebase.auth().currentUser||{}).email||''});
+    m.textContent='✓ 저장 완료 — 홈페이지에 즉시 반영되었습니다';m.style.color='#0f766e';
+  }catch(e){m.textContent='저장 실패: '+e.message;m.style.color='#C41E2F'}
+}
+async function pgReset(){
+  const page=document.getElementById('pgSel').value;
+  if(!confirm('저장된 수정본을 삭제하고 기본 문안으로 되돌릴까요?'))return;
+  await DB.collection('siteContent').doc(page).delete().catch(()=>{});
+  pgLoad();
 }
 async function toggleClubHidden(id,h){
   await DB.collection('clubs').doc(id).update({hidden:h});loadClubsAdmin();
@@ -2078,7 +2172,8 @@ function editComp(id){
       :'<select id="ecRole"><option'+(s.role==='심판'?' selected':'')+'>심판</option><option'+(s.role==='운영'?' selected':'')+'>운영</option></select>')
     +'<label>정원 (명)'+(act.length?' — 최소 '+act.length+' (현재 유효신청 수 미만 불가)':'')+'</label><input id="ecQuota" type="number" min="'+Math.max(1,act.length)+'" value="'+s.quota+'">'
     +'<label>신청 마감일</label><input id="ecDeadline" type="date" value="'+esc(s.deadline||'')+'">'
-    +'<label>임무 목록 (쉼표 구분 — 비우면 기본값: '+esc((COMP_DEFAULT_ROLES[s.role]||[]).join(','))+')</label><input id="ecRoles" value="'+esc((s.roles||[]).join(','))+'">'
+    +'<label>임무 목록 (쉼표 구분 — 비우면 기본값: '+esc((COMP_DEFAULT_ROLES[s.role]||[]).join(','))+' · 참가는 "부문:정원" 가능)</label><input id="ecRoles" value="'+esc((s.roles||[]).join(','))+'">'
+    +'<label>참가비 (참가 모집 시 표시)</label><input id="ecFee" value="'+esc(s.fee||'')+'" placeholder="예: 무료 / 1인 10,000원">'
     +'<label>안내문 (신청 화면에 표시)</label><textarea id="ecNote" rows="3">'+esc(s.note||'')+'</textarea>'
     +'<label>개인정보 동의서 문안 (비우면 연맹 기본 문안)</label>'
     +'<textarea id="ecConsentText" rows="4" placeholder="행사별 동의 문안 직접 입력">'+esc(s.consentText||'')+'</textarea>'
@@ -2117,6 +2212,7 @@ async function saveEditComp(){
   const upd={title:t,region:document.getElementById('ecRegion').value,date:dt,quota:q,
     deadline:document.getElementById('ecDeadline').value||'',roles:roles,
     note:document.getElementById('ecNote').value.trim(),
+    fee:document.getElementById('ecFee').value.trim(),
     consentText:document.getElementById('ecConsentText').value.trim(),
     consentImgs:CONSENT_IMGS.ec.slice(),consentImg:''};
   if(!act.length)upd.role=newRole;
@@ -2485,7 +2581,7 @@ async function givePt(){
     <div class="links">
       <a href="about.html">연맹소개</a><a href="business.html">사업안내</a>
       <a href="notice.html">알림마당</a><a href="archive.html">자료실</a>
-      <a href="apply.html">학교 강습 신청</a>
+      <a href="apply.html">학교 강습 신청</a><a href="sponsor.html">후원안내</a>
     </div>
   </div>
   <div class="bottom">
