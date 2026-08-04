@@ -112,7 +112,7 @@ if(!firebase.apps.length)firebase.initializeApp({
 const AUTH=firebase.auth(),DB=firebase.firestore();
 function cesc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 let CME=null,CMY=null,CSLOTS=[];
-const DEFAULT_ROLES={'심판':['주심','부심','기록'],'운영':['경기운영','안전요원','의전·접수','기록·홍보(사진·영상)','주차·수송','보조요원']};
+const DEFAULT_ROLES={'심판':['심판장','주심','부심','점수심','기록심','선심'],'운영':['경기운영','안전요원','미화요원','홍보요원','시상요원','의전·접수','주차·수송','보조요원']};
 // 유효 신청 판정: 신청 횟수 - 취소 횟수 (재신청 허용)
 function activeOf(s,uid){
   const c=(s.claimed||[]).filter(x=>x.uid===uid).length;
@@ -156,7 +156,7 @@ async function loadSlots(){
       const rc=s.role==='심판'?'#7c3aed':'#b8860b';
       let action;
       if(mineConfirmed)action='<span style="background:#b8860b;color:#fff;font-weight:900;font-size:12.5px;padding:6px 14px;border-radius:999px">🏅 확정 — 개별 안내 예정</span>';
-      else if(mine)action='<span style="background:#0f766e;color:#fff;font-weight:900;font-size:12.5px;padding:6px 14px;border-radius:999px">✓ 신청 완료'+(myClaim&&myClaim.prefs?' ('+cesc(myClaim.prefs.join('→'))+')':'')+'</span> <button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="cancelClaim(\''+d.id+'\')">신청 취소</button>';
+      else if(mine)action='<span style="background:#0f766e;color:#fff;font-weight:900;font-size:12.5px;padding:6px 14px;border-radius:999px">✓ 신청 완료'+(myClaim&&myClaim.prefs?' ('+cesc(myClaim.prefs.join('→'))+')':'')+'</span> <button class="btn-sub" style="background:#153A77" onclick="printMyDocs(\''+d.id+'\')">📄 내 신청서</button> <button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="cancelClaim(\''+d.id+'\')">신청 취소</button>';
       else if(closed)action='<span style="background:#8a919d;color:#fff;font-weight:900;font-size:12.5px;padding:6px 14px;border-radius:999px">마감</span>';
       else if(!eligible)action='<span style="color:#8a919d;font-size:12.5px;font-weight:700">'+(s.role==='심판'?'심판':'운영')+'요원 분야 지원 후 신청 가능 — <a href="jobs.html" style="color:var(--blue);font-weight:800">강사 활동 지원 →</a></span>';
       else action='<button class="btn-sub" onclick="openApply(\''+d.id+'\')">신청하기</button>';
@@ -187,29 +187,47 @@ async function openApply(id){
   const div=document.createElement('div');
   div.id='cApplyModal';
   div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
-  div.innerHTML='<div style="background:#fff;border-radius:18px;max-width:520px;width:100%;padding:28px;max-height:92vh;overflow:auto">'
-    +'<b style="font-size:18px">'+cesc(s.title)+' — '+cesc(s.role)+'요원 신청</b>'
-    +'<div style="font-size:13px;color:#666;margin:6px 0 14px">'+cesc(s.region)+' · '+cesc(s.date)+(s.note?'<br><span style="color:#153A77;font-weight:700">📌 '+cesc(s.note)+'</span>':'')+'</div>'
-    +'<div style="background:#f6f8fb;border-radius:12px;padding:12px 16px;margin-bottom:14px">'
-    +'<div style="font-size:12px;font-weight:900;color:#153A77;margin-bottom:4px">신청 정보 — 마이페이지에서 자동 연동됩니다 <a href="mypage.html#profileBox" style="font-size:11.5px;color:var(--red);font-weight:800">수정 →</a></div>'
-    +infoRow('성명',cesc(CMY.name||'-'),true)
-    +infoRow('소속',cesc(aff),true)
-    +infoRow('연락처',cesc(CMY.phone||'미입력 — 마이페이지에서 입력 필요'),!!CMY.phone)
-    +infoRow('수당 입금계좌',acct?cesc(acct):'미등록 — 수당 지급에 필요 (마이페이지)',!!acct)
-    +infoRow('주민등록번호',RRN_OK?'등록 완료 (보안 저장)':'미등록 — 원천징수 처리에 필요 (마이페이지)',RRN_OK)
-    +'</div>'
-    +'<div style="font-size:13.5px;font-weight:800;margin-bottom:8px">희망 임무를 순서대로 선택하세요 (선택한 순서 = 1→2→3순위, 최대 3개)</div>'
-    +'<div id="cRoleBtns" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
+  const today=new Date().toISOString().slice(0,10);
+  const th='style="border:1px solid #8a94a6;background:#eef1f6;padding:7px 9px;font-size:12.5px;white-space:nowrap;width:96px"';
+  const td='style="border:1px solid #8a94a6;padding:7px 9px;font-size:13px"';
+  const tdW=(ok)=>'style="border:1px solid #8a94a6;padding:7px 9px;font-size:13px;font-weight:'+(ok?'700':'800')+';color:'+(ok?'#111':'#C41E2F')+'"';
+  div.innerHTML='<div style="background:#fff;border-radius:18px;max-width:560px;width:100%;padding:24px;max-height:92vh;overflow:auto">'
+    +'<div style="font-size:11.5px;color:#888;text-align:right;margin-bottom:6px">작성일: '+today+' · 마이페이지 정보 자동 기입 <a href="mypage.html#profileBox" style="color:var(--red);font-weight:800">수정 →</a></div>'
+    // ── 문서 1 : 위촉 신청서(계약서) ──
+    +'<div style="border:2px solid #153A77;border-radius:6px;padding:18px 16px">'
+    +'<div style="text-align:center;font-weight:900;font-size:18px;letter-spacing:5px;color:#153A77">대회 '+cesc(s.role)+'요원 위촉 신청서</div>'
+    +'<div style="text-align:center;font-size:12.5px;color:#666;margin:6px 0 12px">'+cesc(s.title)+' · '+cesc(s.region)+' · '+cesc(s.date)+(s.note?'<br><span style="color:#153A77;font-weight:700">📌 '+cesc(s.note)+'</span>':'')+'</div>'
+    +'<table style="width:100%;border-collapse:collapse;margin-bottom:12px">'
+    +'<tr><th '+th+'>성 명</th><td '+td+'>'+cesc(CMY.name||'-')+'</td><th '+th+'>생년월일</th><td '+td+'>'+cesc(CMY.birth||'-')+'</td></tr>'
+    +'<tr><th '+th+'>소 속</th><td '+td+'>'+cesc(aff)+'</td><th '+th+'>연락처</th><td '+tdW(!!CMY.phone)+'>'+cesc(CMY.phone||'미입력')+'</td></tr>'
+    +'<tr><th '+th+'>입금계좌</th><td '+tdW(!!acct)+'>'+(acct?cesc(acct):'미등록 — 수당 지급에 필요')+'</td><th '+th+'>주민번호</th><td '+tdW(RRN_OK)+'>'+(RRN_OK?'등록 완료 (보안 저장)':'미등록 — 원천징수에 필요')+'</td></tr>'
+    +'</table>'
+    +'<div style="font-size:13px;font-weight:800;margin-bottom:6px">희망 임무 <span style="font-weight:600;color:#888;font-size:11.5px">(누르는 순서 = 1→2→3지망, 최대 3개)</span></div>'
+    +'<div id="cRoleBtns" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">'
     +roles.map(r=>'<button type="button" class="btn-sub" style="background:#fff;color:#153A77;border:1.5px solid #b9cdec" data-role="'+cesc(r)+'" onclick="togRole(this)">'+cesc(r)+'</button>').join('')
-    +'</div><div id="cSelTxt" style="font-size:12.5px;color:#0f766e;font-weight:800;min-height:18px;margin-bottom:12px"></div>'
-    +'<label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:#444;background:#f6f8fb;border-radius:10px;padding:10px 12px;margin-bottom:10px">'
-    +'<input type="checkbox" id="cConsent" style="width:auto;margin-top:2px">'
-    +'<span>(필수) 개인정보 수집·이용 및 국세청 제3자 제공(원천징수)에 동의합니다. 소속·성명·연락처·계좌번호를 대회 수당(심판·운영·안전요원) 지급 목적으로 수집·이용하며 보유기간은 2026. 12. 31.까지입니다. 원천징수 세액 납부를 위해 성명·지급총액·결정세액·주민등록번호가 국세청에 제공됩니다.</span></label>'
-    +'<div style="font-size:13px;font-weight:800;margin:10px 0 6px">본인 서명 <span style="font-weight:600;color:#888;font-size:11.5px">(마우스·손가락으로 서명)</span> <button type="button" class="btn-sub" style="background:#8a919d;padding:4px 12px;font-size:11.5px" onclick="clearSig()">지우기</button></div>'
-    +'<canvas id="cSigPad" width="440" height="120" style="width:100%;height:120px;border:1.5px dashed #b9cdec;border-radius:10px;touch-action:none;background:#fff"></canvas>'
+    +'</div><div id="cSelTxt" style="font-size:12.5px;color:#0f766e;font-weight:800;min-height:18px;margin-bottom:10px"></div>'
+    +'<div style="font-size:12px;color:#444;line-height:1.75;border-top:1px solid #d7dce6;padding-top:9px">'
+    +'① 본인은 위 대회 '+cesc(s.role)+'요원 위촉을 신청하며, 사무국 확정 통보 시 위촉 효력이 발생합니다.<br>'
+    +'② 수당은 연맹 지급 기준에 따라 대회 종료 후 위 계좌로 일괄 지급됩니다(원천징수 세액 공제 후).<br>'
+    +'③ 본인은 대회 운영 규정·안전 수칙 및 조직위의 임무 배정에 따를 것을 확약합니다.</div>'
+    +'</div>'
+    // ── 문서 2 : 개인정보 동의서 ──
+    +'<div style="border:1.5px solid #555;border-radius:6px;padding:16px;margin-top:12px">'
+    +'<div style="text-align:center;font-weight:900;font-size:15px;letter-spacing:2px">개인정보 수집·이용 및 제3자 제공 동의서</div>'
+    +'<div style="font-size:12px;color:#444;line-height:1.75;margin:10px 0">'
+    +'<b>□ 수집·이용</b> — 항목: 소속·성명·연락처·계좌번호 / 목적: 대회 수당(심판·운영·안전요원) 지급 / 보유기간: 2026. 12. 31.까지<br>'
+    +'<b>□ 제3자 제공</b> — 제공받는 자: 국세청 / 목적: 수당 원천징수 세액 납부 / 항목: 성명·지급총액·결정세액·주민등록번호 (소득세법 제21조·제129조)<br>'
+    +'<b>□ 고유식별정보</b> — 개인정보보호법 제24조의2 및 국세기본법 시행령 제68조에 따라 처리<br>'
+    +'※ 동의를 거부할 권리가 있으며, 거부 시 수당 지급에 제한이 있을 수 있습니다.</div>'
+    +'<label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:800;color:#153A77">'
+    +'<input type="checkbox" id="cConsent" style="width:auto">위 내용을 확인하였으며 동의합니다.</label>'
+    +'</div>'
+    // ── 서명 (두 문서 공통 날인) ──
+    +'<div style="font-size:13px;font-weight:800;margin:14px 0 6px">본인 서명 <span style="font-weight:600;color:#888;font-size:11.5px">(마우스·손가락 — 위 신청서와 동의서에 함께 날인됩니다)</span> <button type="button" class="btn-sub" style="background:#8a919d;padding:4px 12px;font-size:11.5px" onclick="clearSig()">지우기</button></div>'
+    +'<canvas id="cSigPad" width="480" height="120" style="width:100%;height:120px;border:1.5px dashed #b9cdec;border-radius:10px;touch-action:none;background:#fff"></canvas>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
     +'<button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'cApplyModal\').remove()">닫기</button>'
-    +'<button class="btn-main" style="width:auto;padding:11px 26px" onclick="submitClaim()">동의·서명하고 신청</button></div>'
+    +'<button class="btn-main" style="width:auto;padding:11px 26px" onclick="submitClaim()">서명하고 제출</button></div>'
     +'</div>';
   document.body.appendChild(div);
   initSig();
@@ -267,15 +285,59 @@ async function submitClaim(){
       claimed.push({uid:CME.uid,name:CMY.name||'',prefs:APPLY_SEL.slice(),consent:true,signed:true,at:new Date().toISOString()});
       tx.update(ref,{claimed:claimed});
     });
-    // 서명 이미지 + 동의 기록은 본인 users.contracts에 저장 (수당지급조서·동의서 출력용)
+    // 신청서·동의서 2건을 본인 users.contracts에 저장 (수당지급조서·동의서 출력용)
+    const now=new Date().toISOString();
     const c=Object.assign({},CMY.contracts||{});
-    c['compapply_'+APPLY_ID]={title:title,agreedAt:new Date().toISOString(),sign:sign,prefs:APPLY_SEL.slice()};
+    c['compapply_'+APPLY_ID]={title:title,doc:'위촉 신청서',agreedAt:now,sign:sign,prefs:APPLY_SEL.slice()};
+    c['compconsent_'+APPLY_ID]={title:title,doc:'개인정보 수집·이용 및 제3자 제공 동의서',agreedAt:now,sign:sign};
     await DB.collection('users').doc(CME.uid).update({contracts:c}).catch(e=>console.warn('sign save',e));
     CMY.contracts=c;
     document.getElementById('cApplyModal').remove();
-    alert('신청 완료! 개인정보 동의·서명이 함께 저장되었습니다.\n사무국 확정 후 개별 연락드립니다.');
+    alert('제출 완료! 위촉 신청서와 개인정보 동의서가 전자서명과 함께 저장되었습니다.\n목록의 [📄 내 신청서] 버튼으로 언제든 확인·인쇄할 수 있습니다.\n사무국 확정 후 개별 연락드립니다.');
   }catch(e){alert(e.message)}
   loadSlots();
+}
+// ── 제출한 신청서·동의서 보기·인쇄 ──
+function printMyDocs(id){
+  const doc0=CSLOTS.find(d=>d.id===id);if(!doc0)return;
+  const s=doc0.data();
+  const ap=(CMY.contracts||{})['compapply_'+id]||{};
+  const myClaim=latestClaim(s,CME.uid)||{};
+  const prefs=(ap.prefs||myClaim.prefs||[]);
+  const aff=(CMY.affiliation&&CMY.affiliation.length)?CMY.affiliation.join('·'):(CMY.workSchool||CMY.fedName||'-');
+  const acct=(CMY.bank&&CMY.accountNum)?(CMY.bank+' '+CMY.accountNum+(CMY.accountHolder?' ('+CMY.accountHolder+')':'')):'-';
+  const dt=(ap.agreedAt||myClaim.at||'').slice(0,10);
+  const sig=ap.sign?'<img src="'+ap.sign+'" style="height:44px;vertical-align:middle">':'(전자서명)';
+  const th='style="border:1px solid #666;background:#f2f2f2;padding:7px;width:100px;font-size:13px"';
+  const td='style="border:1px solid #666;padding:7px;font-size:13px"';
+  const page1='<div style="page-break-after:always;font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:30px 10px">'
+    +'<h2 style="text-align:center;letter-spacing:6px;border:2px solid #333;padding:12px">대회 '+cesc(s.role)+'요원 위촉 신청서</h2>'
+    +'<div style="text-align:center;color:#555;font-size:13.5px;margin:8px 0 14px">'+cesc(s.title)+' · '+cesc(s.region)+' · '+cesc(s.date)+'</div>'
+    +'<table style="width:100%;border-collapse:collapse">'
+    +'<tr><th '+th+'>성 명</th><td '+td+'>'+cesc(CMY.name||'-')+'</td><th '+th+'>생년월일</th><td '+td+'>'+cesc(CMY.birth||'-')+'</td></tr>'
+    +'<tr><th '+th+'>소 속</th><td '+td+'>'+cesc(aff)+'</td><th '+th+'>연락처</th><td '+td+'>'+cesc(CMY.phone||'-')+'</td></tr>'
+    +'<tr><th '+th+'>입금계좌</th><td '+td+'>'+cesc(acct)+'</td><th '+th+'>희망 임무</th><td '+td+'>'+cesc(prefs.length?prefs.map((p,i)=>(i+1)+'지망 '+p).join(' · '):'-')+'</td></tr>'
+    +'</table>'
+    +'<div style="font-size:12.5px;line-height:1.9;border:1px solid #999;padding:12px 16px;margin-top:14px">'
+    +'① 본인은 위 대회 '+cesc(s.role)+'요원 위촉을 신청하며, 사무국 확정 통보 시 위촉 효력이 발생합니다.<br>'
+    +'② 수당은 연맹 지급 기준에 따라 대회 종료 후 위 계좌로 일괄 지급됩니다(원천징수 세액 공제 후).<br>'
+    +'③ 본인은 대회 운영 규정·안전 수칙 및 조직위의 임무 배정에 따를 것을 확약합니다.</div>'
+    +'<div style="text-align:right;margin-top:26px;font-size:14px">'+cesc(dt.replace(/-/g,'. '))+'.</div>'
+    +'<div style="text-align:right;margin-top:8px;font-size:15px">신청인&nbsp;&nbsp;<b>'+cesc(CMY.name||'')+'</b>&nbsp;&nbsp;'+sig+'</div>'
+    +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">사단법인 대한민국플라잉디스크연맹 귀하</div></div>';
+  const page2='<div style="font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:30px 10px">'
+    +'<h2 style="text-align:center;border:2px solid #333;padding:12px;font-size:19px">개인정보 수집·이용 및 제3자 제공 동의서</h2>'
+    +'<div style="font-size:13px;line-height:1.9;border:1px solid #999;padding:14px 18px;margin-top:14px">'
+    +'<b>□ 개인정보 수집·이용 동의</b><br>· 항목: 소속, 성명, 연락처, 계좌번호 · 목적: 대회 수당(심판·운영·안전요원) 지급 · 보유기간: 2026. 12. 31.까지<br><br>'
+    +'<b>□ 개인정보 제3자 제공 동의</b><br>· 제공받는 자: 국세청 · 목적: 수당 원천징수 세액 납부 · 항목: 성명, 지급총액, 결정세액, 주민등록번호 · 근거: 소득세법 제21조·제129조<br><br>'
+    +'<b>□ 고유식별정보 처리 고지</b><br>· 개인정보보호법 제24조의2 및 국세기본법 시행령 제68조에 따라 처리됩니다.<br><br>'
+    +'※ 동의를 거부할 권리가 있으며, 거부 시 수당 지급에 제한이 있을 수 있습니다. <b>동의함 ☑</b></div>'
+    +'<div style="text-align:right;margin-top:26px;font-size:14px">'+cesc(dt.replace(/-/g,'. '))+'.</div>'
+    +'<div style="text-align:right;margin-top:8px;font-size:15px">본인&nbsp;&nbsp;<b>'+cesc(CMY.name||'')+'</b>&nbsp;&nbsp;'+sig+'</div>'
+    +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">'+cesc(s.title)+' 조직위원회 (사단법인 대한민국플라잉디스크연맹) 귀하</div></div>';
+  const w=window.open('','_blank');
+  w.document.write('<html><head><title>'+cesc(s.title)+' 신청서·동의서</title></head><body>'+page1+page2+'<script>setTimeout(function(){window.print()},600)<\/script></body></html>');
+  w.document.close();
 }
 async function cancelClaim(id){
   if(!confirm('이 대회 신청을 취소할까요?\n(마감 전이라면 다시 신청할 수 있습니다)'))return;

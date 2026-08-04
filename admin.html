@@ -234,7 +234,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <select id="cpRole"><option>심판</option><option>운영</option></select>
         <label>정원 (명)</label><input id="cpQuota" type="number" value="4" min="1">
         <label>신청 마감일</label><input id="cpDeadline" type="date">
-        <label>임무 목록 (쉼표 구분 — 비우면 기본값)</label><input id="cpRoles" placeholder="심판: 주심,부심,기록 / 운영: 경기운영,안전요원,의전·접수,기록·홍보(사진·영상),주차·수송,보조요원">
+        <label>임무 목록 (쉼표 구분 — 비우면 기본값)</label><input id="cpRoles" placeholder="심판: 심판장,주심,부심,점수심,기록심,선심 / 운영: 경기운영,안전,미화,홍보,시상,의전·접수,주차·수송,보조">
         <label>안내문 (선택 — 신청 화면에 표시)</label><textarea id="cpNote" rows="3" placeholder="예: 집결 08:30 / 중식 제공 / 자격증 사본 지참"></textarea>
         <button class="btn-main" onclick="addComp()">모집 등록</button>
         <div class="msg" id="cpMsg"></div>
@@ -1843,7 +1843,7 @@ async function addComp(){
   document.getElementById('cpTitle').value='';document.getElementById('cpNote').value='';
   loadCompsAdmin();
 }
-const COMP_DEFAULT_ROLES={'심판':['주심','부심','기록'],'운영':['경기운영','안전요원','의전·접수','기록·홍보(사진·영상)','주차·수송','보조요원']};
+const COMP_DEFAULT_ROLES={'심판':['심판장','주심','부심','점수심','기록심','선심'],'운영':['경기운영','안전요원','미화요원','홍보요원','시상요원','의전·접수','주차·수송','보조요원']};
 function compEffRoles(s){return (s.roles&&s.roles.length)?s.roles:(COMP_DEFAULT_ROLES[s.role]||[]);}
 let CADM=[];
 function compActiveClaims(s){
@@ -1894,6 +1894,7 @@ function renderCompsAdmin(){
       +(act.length?'<button class="btn-sub" style="background:#1F4E9C" onclick="copyCompNotice(\''+d.id+'\')">📋 통보문</button>':'')
       +(act.length?'<button class="btn-sub" style="background:#153A77" onclick="compCSV(\''+d.id+'\')">⬇ 명단 CSV</button>':'')
       +(act.length?'<button class="btn-sub" style="background:#7c3aed" onclick="compConsentDocs(\''+d.id+'\')">📄 동의서 출력</button>':'')
+      +(confirmed.length?'<button class="btn-sub" style="background:#b8860b" onclick="compPayroll(\''+d.id+'\')">💰 수당지급내역서</button>':'')
       +'<button class="btn-sub" style="background:#b8860b" onclick="extendComp(\''+d.id+'\')">⏰ 마감 연장</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delComp(\''+d.id+'\')">🗑</button></div></div>';
   }).join('');
@@ -2057,6 +2058,116 @@ async function compConsentDocs(id){
 async function delComp(id){
   if(!confirm('이 대회 모집을 삭제할까요? (지명 기록도 함께 삭제)'))return;
   await DB.collection('compSlots').doc(id).delete();loadCompsAdmin();
+}
+// ── 수당지급내역서 (확정자 대상 — 금액 입력 → 원천징수 자동 → 저장·CSV·인쇄) ──
+let PAY_CTX=null;
+function payTax(amt){
+  // 기타소득: 필요경비 60% → 소득금액 = 지급액×40%. 소득금액 5만원(지급액 125,000원) 이하 과세최저한 → 비과세
+  if(!amt||amt<=125000)return {tax:0,local:0};
+  const income=amt*0.4;
+  const tax=Math.floor(income*0.2/10)*10;       // 소득세 20%
+  const local=Math.floor(tax*0.1/10)*10;        // 지방소득세 10%
+  return {tax:tax,local:local};
+}
+async function compPayroll(id){
+  const doc=await DB.collection('compSlots').doc(id).get();const s=doc.data();
+  const confirmed=s.confirmed||[];
+  if(!confirmed.length){alert('확정자가 없습니다. 먼저 ✓ 확정 처리하세요.');return}
+  const act=compActiveClaims(s).filter(c=>confirmed.indexOf(c.uid)>=0);
+  const saved=s.payroll||{};
+  const rows=[];
+  for(const c of act){
+    let ud={},rrn='';
+    try{const u=await DB.collection('users').doc(c.uid).get();if(u.exists)ud=u.data();}catch(e){}
+    try{const p=await DB.collection('privateInfo').doc(c.uid).get();if(p.exists)rrn=p.data().rrn||'';}catch(e){}
+    rows.push({uid:c.uid,name:c.name,prefs:c.prefs||[],phone:ud.phone||'',bank:ud.bank||'',accountNum:ud.accountNum||'',accountHolder:ud.accountHolder||'',rrn:rrn,
+      signed:!!(ud.contracts&&ud.contracts['compapply_'+id]&&ud.contracts['compapply_'+id].sign),
+      amt:(saved[c.uid]&&saved[c.uid].amt)||''});
+  }
+  PAY_CTX={id:id,s:s,rows:rows};
+  const old=document.getElementById('payModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='payModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+  div.innerHTML='<div class="authbox" style="max-width:760px;width:100%;padding:26px;max-height:92vh;overflow:auto;margin:0">'
+    +'<b style="font-size:17px">💰 수당지급내역서 — '+esc(s.title)+' ('+esc(s.role)+')</b>'
+    +'<div style="font-size:12px;color:#666;margin:4px 0 12px">지급액 입력 시 원천징수(기타소득 8.8%, 12.5만원 이하 비과세)와 실지급액이 자동 계산됩니다. 저장 후 CSV·인쇄 가능.</div>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+    +'<tr style="background:#eef1f6">'+['성명','임무','계좌','지급액(원)','원천징수','실지급액','서명'].map(h=>'<th style="border:1px solid #c6cedd;padding:6px 7px;white-space:nowrap">'+h+'</th>').join('')+'</tr>'
+    +rows.map((r,i)=>'<tr>'
+      +'<td style="border:1px solid #c6cedd;padding:6px 7px;font-weight:700">'+esc(r.name)+'</td>'
+      +'<td style="border:1px solid #c6cedd;padding:6px 7px">'+esc(r.prefs[0]||s.role)+'</td>'
+      +'<td style="border:1px solid #c6cedd;padding:6px 7px;font-size:11.5px">'+esc(r.bank+' '+r.accountNum)+'</td>'
+      +'<td style="border:1px solid #c6cedd;padding:3px"><input type="number" id="payAmt'+i+'" value="'+r.amt+'" oninput="payCalc('+i+')" style="width:100px;padding:6px;border:1px solid #c6cedd;border-radius:6px"></td>'
+      +'<td style="border:1px solid #c6cedd;padding:6px 7px;text-align:right" id="payTax'+i+'">-</td>'
+      +'<td style="border:1px solid #c6cedd;padding:6px 7px;text-align:right;font-weight:800" id="payNet'+i+'">-</td>'
+      +'<td style="border:1px solid #c6cedd;padding:6px 7px;text-align:center">'+(r.signed?'✓':'<span style="color:#C41E2F">×</span>')+'</td>'
+      +'</tr>').join('')
+    +'</table>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">'
+    +'<input type="number" id="payAll" placeholder="일괄 금액" style="width:110px;padding:8px;border:1px solid #c6cedd;border-radius:8px">'
+    +'<button class="btn-sub" style="background:#8a919d;padding:8px 14px" onclick="payFillAll()">전체 적용</button>'
+    +'<span style="flex:1"></span>'
+    +'<button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'payModal\').remove()">닫기</button>'
+    +'<button class="btn-sub" style="background:#0f766e" onclick="savePayroll()">💾 저장</button>'
+    +'<button class="btn-sub" style="background:#153A77" onclick="payrollCompCSV()">⬇ CSV</button>'
+    +'<button class="btn-sub" style="background:#7c3aed" onclick="payrollPrint()">🖨 인쇄</button></div>'
+    +'</div>';
+  document.body.appendChild(div);
+  rows.forEach((r,i)=>payCalc(i));
+}
+function payCalc(i){
+  const amt=parseInt(document.getElementById('payAmt'+i).value)||0;
+  const t=payTax(amt);const tot=t.tax+t.local;
+  document.getElementById('payTax'+i).textContent=amt?tot.toLocaleString():'-';
+  document.getElementById('payNet'+i).textContent=amt?(amt-tot).toLocaleString():'-';
+}
+function payFillAll(){
+  const v=document.getElementById('payAll').value;if(!v)return;
+  PAY_CTX.rows.forEach((r,i)=>{document.getElementById('payAmt'+i).value=v;payCalc(i);});
+}
+function payGather(){
+  return PAY_CTX.rows.map((r,i)=>{
+    const amt=parseInt(document.getElementById('payAmt'+i).value)||0;
+    const t=payTax(amt);
+    return Object.assign({},r,{amt:amt,tax:t.tax,local:t.local,net:amt-t.tax-t.local});
+  });
+}
+async function savePayroll(){
+  const data=payGather();
+  const payroll={};
+  data.forEach(r=>{if(r.amt)payroll[r.uid]={amt:r.amt,tax:r.tax,local:r.local,net:r.net,at:new Date().toISOString()}});
+  await DB.collection('compSlots').doc(PAY_CTX.id).update({payroll:payroll});
+  alert('수당지급내역이 저장되었습니다. (입력 '+Object.keys(payroll).length+'명)');
+  loadCompsAdmin();
+}
+function payrollCompCSV(){
+  const s=PAY_CTX.s;const data=payGather();
+  const rows=[['성명','주민등록번호','휴대전화','은행','계좌번호','예금주','임무','지급액','소득세','지방소득세','원천징수계','실지급액','전자서명','비고']];
+  data.forEach(r=>rows.push([r.name,r.rrn,r.phone,r.bank,r.accountNum,r.accountHolder,(r.prefs[0]||s.role),r.amt||'',r.tax||0,r.local||0,(r.tax+r.local)||0,r.net||'',r.signed?'O':'X','']));
+  const tot=data.reduce((a,r)=>({amt:a.amt+(r.amt||0),tax:a.tax+r.tax+r.local,net:a.net+(r.net||0)}),{amt:0,tax:0,net:0});
+  rows.push(['합계','','','','','','',tot.amt,'','',tot.tax,tot.net,'','']);
+  const csv='﻿'+rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=s.title+'_'+s.role+'요원_수당지급내역서.csv';a.click();
+}
+function payrollPrint(){
+  const s=PAY_CTX.s;const data=payGather();
+  const tot=data.reduce((a,r)=>({amt:a.amt+(r.amt||0),tax:a.tax+r.tax+r.local,net:a.net+(r.net||0)}),{amt:0,tax:0,net:0});
+  const td='style="border:1px solid #666;padding:6px 8px;font-size:12.5px"';
+  const html='<div style="font-family:Malgun Gothic,sans-serif;max-width:760px;margin:0 auto;padding:30px 10px">'
+    +'<h2 style="text-align:center;border:2px solid #333;padding:12px">'+esc(s.title)+' '+esc(s.role)+'요원 수당지급내역서</h2>'
+    +'<div style="text-align:right;font-size:12.5px;color:#555;margin:6px 0">대회일: '+esc(s.date)+' · 작성일: '+new Date().toISOString().slice(0,10)+'</div>'
+    +'<table style="width:100%;border-collapse:collapse"><tr style="background:#f2f2f2">'
+    +['연번','성명','임무','은행','계좌번호','지급액','원천징수','실지급액','서명'].map(h=>'<th '+td+'>'+h+'</th>').join('')+'</tr>'
+    +data.map((r,i)=>'<tr><td '+td+'>'+(i+1)+'</td><td '+td+'>'+esc(r.name)+'</td><td '+td+'>'+esc(r.prefs[0]||s.role)+'</td><td '+td+'>'+esc(r.bank)+'</td><td '+td+'>'+esc(r.accountNum)+'</td>'
+      +'<td '+td+' align="right">'+(r.amt?r.amt.toLocaleString():'')+'</td><td '+td+' align="right">'+((r.tax+r.local)?(r.tax+r.local).toLocaleString():'')+'</td><td '+td+' align="right"><b>'+(r.net?r.net.toLocaleString():'')+'</b></td><td '+td+'></td></tr>').join('')
+    +'<tr style="background:#f7f7f7;font-weight:800"><td '+td+' colspan="5">합계</td><td '+td+' align="right">'+tot.amt.toLocaleString()+'</td><td '+td+' align="right">'+tot.tax.toLocaleString()+'</td><td '+td+' align="right">'+tot.net.toLocaleString()+'</td><td '+td+'></td></tr></table>'
+    +'<div style="font-size:11.5px;color:#555;margin-top:10px">· 원천징수: 기타소득 필요경비 60% 적용, 소득금액 5만원(지급액 125,000원) 이하 과세최저한 비과세 · 개인정보 수집·제공 동의서 별첨</div>'
+    +'<div style="text-align:right;margin-top:30px;font-size:14px">사단법인 대한민국플라잉디스크연맹&nbsp;&nbsp;담당자&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</div></div>';
+  const w=window.open('','_blank');
+  w.document.write('<html><head><title>수당지급내역서</title></head><body>'+html+'<script>setTimeout(function(){window.print()},600)<\/script></body></html>');
+  w.document.close();
 }
 async function toggleCert(uid){
   const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
