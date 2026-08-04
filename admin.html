@@ -244,6 +244,11 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <label>신청 마감일</label><input id="cpDeadline" type="date">
         <label>임무 목록 (쉼표 구분 — 비우면 기본값)</label><input id="cpRoles" placeholder="심판: 심판장,주심,부심,점수심,기록심,선심 / 운영: 경기운영,안전,미화,홍보,시상,의전·접수,주차·수송,보조">
         <label>안내문 (선택 — 신청 화면에 표시)</label><textarea id="cpNote" rows="3" placeholder="예: 집결 08:30 / 중식 제공 / 자격증 사본 지참"></textarea>
+        <label>개인정보 동의서 문안 (선택 — 비우면 연맹 기본 문안 사용)</label>
+        <textarea id="cpConsentText" rows="4" placeholder="행사별 수집·이용·제3자 제공 동의 문안을 직접 입력하면 기본 문안 대신 표시됩니다"></textarea>
+        <label>동의서 스캔 이미지 (선택 — 업로드 시 문안 대신 이미지가 표시됩니다)</label>
+        <input type="file" id="cpConsentImg" accept="image/*" onchange="pickConsentImg(this,'cp')">
+        <div id="cpImgState" style="font-size:12px;font-weight:700;margin-top:4px;color:#8a919d">이미지 없음</div>
         <button class="btn-main" onclick="addComp()">모집 등록</button>
         <div class="msg" id="cpMsg"></div>
       </div>
@@ -1850,13 +1855,41 @@ async function addComp(){
     role:document.getElementById('cpRole').value,quota:q,claimed:[],cancels:[],
     deadline:document.getElementById('cpDeadline').value||'',roles:roles,
     note:document.getElementById('cpNote').value.trim(),
+    consentText:document.getElementById('cpConsentText').value.trim(),
+    consentImg:CONSENT_IMG.cp||'',
     createdAt:firebase.firestore.FieldValue.serverTimestamp()});
   m.textContent='등록 완료 — 메인 참여신청(선정학교 강사지원)에 즉시 게시됩니다';m.className='msg ok';
   document.getElementById('cpTitle').value='';document.getElementById('cpNote').value='';
+  document.getElementById('cpConsentText').value='';document.getElementById('cpConsentImg').value='';
+  CONSENT_IMG.cp='';document.getElementById('cpImgState').textContent='이미지 없음';
   loadCompsAdmin();
 }
 const COMP_DEFAULT_ROLES={'심판':['심판장','주심','부심','점수심','기록심','선심'],'운영':['경기운영','안전요원','미화요원','홍보요원','시상요원','의전·접수','주차·수송','보조요원'],'참가':['오픈부','여자부','혼성부']};
 function compKey(c){return c.pid||c.uid}
+// 동의서 스캔 이미지 — 캔버스 축소·압축 후 dataURL (Firestore 1MB 문서 한도 내 ≤500KB)
+const CONSENT_IMG={cp:'',ec:''};
+function pickConsentImg(input,which){
+  const f=input.files&&input.files[0];
+  const st=document.getElementById(which+'ImgState');
+  if(!f){CONSENT_IMG[which]='';if(st)st.textContent='이미지 없음';return}
+  const fr=new FileReader();
+  fr.onload=()=>{
+    const img=new Image();
+    img.onload=()=>{
+      const w=Math.min(1100,img.width);const h=Math.round(img.height*w/img.width);
+      const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      let out=cv.toDataURL('image/jpeg',0.8);
+      if(out.length>500000)out=cv.toDataURL('image/jpeg',0.55);
+      if(out.length>500000)out=cv.toDataURL('image/jpeg',0.35);
+      if(out.length>700000){alert('이미지가 너무 큽니다. 해상도를 줄여 다시 업로드해주세요.');input.value='';return}
+      CONSENT_IMG[which]=out;
+      if(st)st.innerHTML='✓ <b style="color:#0f766e">이미지 준비됨</b> ('+Math.round(out.length/1024)+'KB) — 저장 시 문안 대신 이 이미지가 표시됩니다';
+    };
+    img.src=fr.result;
+  };
+  fr.readAsDataURL(f);
+}
 function compEffRoles(s){return (s.roles&&s.roles.length)?s.roles:(COMP_DEFAULT_ROLES[s.role]||[]);}
 let CADM=[];
 function compActiveClaims(s){
@@ -2018,10 +2051,17 @@ function editComp(id){
     +'<label>신청 마감일</label><input id="ecDeadline" type="date" value="'+esc(s.deadline||'')+'">'
     +'<label>임무 목록 (쉼표 구분 — 비우면 기본값: '+esc((COMP_DEFAULT_ROLES[s.role]||[]).join(','))+')</label><input id="ecRoles" value="'+esc((s.roles||[]).join(','))+'">'
     +'<label>안내문 (신청 화면에 표시)</label><textarea id="ecNote" rows="3">'+esc(s.note||'')+'</textarea>'
+    +'<label>개인정보 동의서 문안 (비우면 연맹 기본 문안)</label>'
+    +'<textarea id="ecConsentText" rows="4" placeholder="행사별 동의 문안 직접 입력">'+esc(s.consentText||'')+'</textarea>'
+    +'<label>동의서 스캔 이미지 (업로드 시 문안 대신 표시)</label>'
+    +(s.consentImg?'<div style="margin:6px 0"><img src="'+s.consentImg+'" style="max-width:100%;max-height:160px;border:1px solid #dfe5ee;border-radius:8px"><label style="display:flex;gap:6px;align-items:center;font-size:12.5px;font-weight:700;color:#C41E2F;margin-top:4px"><input type="checkbox" id="ecImgDel" style="width:auto">현재 이미지 삭제 (기본/직접 문안으로 복귀)</label></div>':'')
+    +'<input type="file" id="ecConsentImg" accept="image/*" onchange="pickConsentImg(this,\'ec\')">'
+    +'<div id="ecImgState" style="font-size:12px;font-weight:700;margin-top:4px;color:#8a919d">'+(s.consentImg?'현재 등록된 이미지 사용 중 — 새 파일 선택 시 교체':'이미지 없음')+'</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
     +'<button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'ecModal\').remove()">닫기</button>'
     +'<button class="btn-main" style="width:auto;padding:11px 26px" onclick="saveEditComp()">저장</button></div>'
     +'</div>';
+  CONSENT_IMG.ec='';
   document.body.appendChild(div);
 }
 async function saveEditComp(){
@@ -2046,7 +2086,10 @@ async function saveEditComp(){
   }
   const upd={title:t,region:document.getElementById('ecRegion').value,date:dt,quota:q,
     deadline:document.getElementById('ecDeadline').value||'',roles:roles,
-    note:document.getElementById('ecNote').value.trim()};
+    note:document.getElementById('ecNote').value.trim(),
+    consentText:document.getElementById('ecConsentText').value.trim()};
+  const imgDel=document.getElementById('ecImgDel');
+  upd.consentImg=CONSENT_IMG.ec||((imgDel&&imgDel.checked)?'':(s.consentImg||''));
   if(!act.length)upd.role=newRole;
   await DB.collection('compSlots').doc(id).update(upd);
   document.getElementById('ecModal').remove();EC_SNAP=null;
@@ -2106,12 +2149,16 @@ async function compConsentDocs(id){
       +'<th style="border:1px solid #666;background:#f2f2f2;padding:7px">계좌번호</th><td style="border:1px solid #666;padding:7px">'+esc(ud.accountNum||'')+'</td></tr>'
       +'<tr><th style="border:1px solid #666;background:#f2f2f2;padding:7px">주민등록번호</th><td colspan="3" style="border:1px solid #666;padding:7px">'+esc(rrn||'(미등록)')+'</td></tr>'
       +'</table>'
-      +'<div style="font-size:13px;line-height:1.8;border:1px solid #999;padding:12px 16px;margin-bottom:10px">'
-      +'<b>□ 개인정보 수집·이용 동의</b><br>· 항목: 소속, 성명, 계좌번호, 연락처 &nbsp;· 수집목적: 대회 관련 수당(심판·운영 및 안전요원) 지급 &nbsp;· 보유기간: 2026. 12. 31.까지<br>'
-      +'※ 동의를 거부할 권리가 있으며, 거부 시 수당 지급 등에 제한을 받을 수 있습니다. <b>동의함 ☑</b><br><br>'
-      +'<b>□ 개인정보 제3자 제공 내역 고지</b><br>· 제공받는 자: 국세청 &nbsp;· 목적: 참석수당 원천징수 세액 납부 &nbsp;· 항목: 성명, 지급총액, 결정세액 &nbsp;· 근거: 「소득세법」 제21조·제37조·제129조<br><br>'
-      +'<b>□ 고유식별정보(주민등록번호) 처리 고지</b><br>· 개인정보보호법 제24조의2제1항제1호 및 「국세기본법 시행령」 제68조에 따라 수당 원천징수 세액 납부 목적으로 처리됩니다.'
-      +'</div>'
+      +(s.consentImg
+        ?'<div style="margin-bottom:10px"><img src="'+s.consentImg+'" style="width:100%;border:1px solid #999"></div><div style="font-size:12px;margin-bottom:10px">위 동의서 내용을 확인하였으며 이에 동의합니다. <b>동의함 ☑</b></div>'
+        :(s.consentText
+          ?'<div style="font-size:13px;line-height:1.8;border:1px solid #999;padding:12px 16px;margin-bottom:10px;white-space:pre-wrap">'+esc(s.consentText)+'\n\n동의함 ☑</div>'
+          :'<div style="font-size:13px;line-height:1.8;border:1px solid #999;padding:12px 16px;margin-bottom:10px">'
+          +'<b>□ 개인정보 수집·이용 동의</b><br>· 항목: 소속, 성명, 계좌번호, 연락처 &nbsp;· 수집목적: 대회 관련 수당(심판·운영 및 안전요원) 지급 &nbsp;· 보유기간: 2026. 12. 31.까지<br>'
+          +'※ 동의를 거부할 권리가 있으며, 거부 시 수당 지급 등에 제한을 받을 수 있습니다. <b>동의함 ☑</b><br><br>'
+          +'<b>□ 개인정보 제3자 제공 내역 고지</b><br>· 제공받는 자: 국세청 &nbsp;· 목적: 참석수당 원천징수 세액 납부 &nbsp;· 항목: 성명, 지급총액, 결정세액 &nbsp;· 근거: 「소득세법」 제21조·제37조·제129조<br><br>'
+          +'<b>□ 고유식별정보(주민등록번호) 처리 고지</b><br>· 개인정보보호법 제24조의2제1항제1호 및 「국세기본법 시행령」 제68조에 따라 수당 원천징수 세액 납부 목적으로 처리됩니다.'
+          +'</div>'))
       +'<div style="text-align:right;margin-top:22px;font-size:14px">'+(ct.agreedAt?esc(String(ct.agreedAt).slice(0,10).replace(/-/g,'. '))+'.':'2026.&nbsp;&nbsp;&nbsp;.&nbsp;&nbsp;&nbsp;.')+'</div>'
       +'<div style="text-align:right;margin-top:8px;font-size:15px">본인&nbsp;&nbsp;성명&nbsp;&nbsp;<b>'+esc(c.name)+'</b>&nbsp;&nbsp;'
       +(ct.sign?'<img src="'+ct.sign+'" style="height:44px;vertical-align:middle">':'(서명)')+'</div>'

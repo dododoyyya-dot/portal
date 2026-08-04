@@ -238,6 +238,12 @@ async function loadSlots(){
 }
 let APPLY_ID=null,APPLY_SEL=[],APPLY_PID=null,APPLY_MAX=3,APPLY_PARTS=[],MY_CLUBS=null;
 let RRN_OK=false;
+// 공고별 동의서: 스캔 이미지 > 직접 입력 문안 > 기본 문안 순으로 표시
+function consentBlockHtml(s,defHtml){
+  if(s.consentImg)return '<img src="'+s.consentImg+'" alt="개인정보 동의서" style="width:100%;border:1px solid #e2e7f0;border-radius:8px;margin-bottom:10px">';
+  if(s.consentText)return '<div style="font-size:12px;color:#4b5563;line-height:1.8;margin-bottom:10px;white-space:pre-wrap">'+cesc(s.consentText)+'</div>';
+  return defHtml;
+}
 async function openApply(id){
   const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
   const s=doc.data();
@@ -290,10 +296,10 @@ async function openApply(id){
       +'③ 미성년 참가자의 경우 아래 서명은 <b>법정대리인(보호자)의 참가 동의</b>로서 효력을 가집니다.</div>'
       +'</div>'
       +'<div class="docsec"><div class="dtitle">개인정보 수집·이용 동의서</div>'
-      +'<div style="font-size:12px;color:#4b5563;line-height:1.8;margin-bottom:10px">'
+      +consentBlockHtml(s,'<div style="font-size:12px;color:#4b5563;line-height:1.8;margin-bottom:10px">'
       +'<b>□ 수집·이용</b> — 항목: 참가자 성명·생년월일·성별·소속(학교·클럽)·보호자 성명·연락처 / 목적: 대회 참가 관리, 행사 단체보험 가입, 기록 관리 / 보유기간: 2026. 12. 31.까지<br>'
       +'<b>□ 미성년자 처리 고지</b> — 만 14세 미만 아동의 개인정보는 개인정보보호법 제22조의2에 따라 법정대리인의 동의 하에 처리됩니다.<br>'
-      +'※ 동의를 거부할 권리가 있으며, 거부 시 대회 참가에 제한이 있을 수 있습니다.</div>'
+      +'※ 동의를 거부할 권리가 있으며, 거부 시 대회 참가에 제한이 있을 수 있습니다.</div>')
       +'<label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:800;color:#153A77">'
       +'<input type="checkbox" id="cConsent" style="width:auto">위 내용을 확인하였으며 동의합니다.</label>'
       +'</div>'
@@ -323,11 +329,11 @@ async function openApply(id){
       +'③ 본인은 대회 운영 규정·안전 수칙 및 조직위의 임무 배정에 따를 것을 확약합니다.</div>'
       +'</div>'
       +'<div class="docsec"><div class="dtitle">개인정보 수집·이용 및 제3자 제공 동의서</div>'
-      +'<div style="font-size:12px;color:#4b5563;line-height:1.8;margin-bottom:10px">'
+      +consentBlockHtml(s,'<div style="font-size:12px;color:#4b5563;line-height:1.8;margin-bottom:10px">'
       +'<b>□ 수집·이용</b> — 항목: 소속·성명·연락처·계좌번호 / 목적: 대회 수당(심판·운영·안전요원) 지급 / 보유기간: 2026. 12. 31.까지<br>'
       +'<b>□ 제3자 제공</b> — 제공받는 자: 국세청 / 목적: 수당 원천징수 세액 납부 / 항목: 성명·지급총액·결정세액·주민등록번호 (소득세법 제21조·제129조)<br>'
       +'<b>□ 고유식별정보</b> — 개인정보보호법 제24조의2 및 국세기본법 시행령 제68조에 따라 처리<br>'
-      +'※ 동의를 거부할 권리가 있으며, 거부 시 수당 지급에 제한이 있을 수 있습니다.</div>'
+      +'※ 동의를 거부할 권리가 있으며, 거부 시 수당 지급에 제한이 있을 수 있습니다.</div>')
       +'<label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:800;color:#153A77">'
       +'<input type="checkbox" id="cConsent" style="width:auto">위 내용을 확인하였으며 동의합니다.</label>'
       +'</div>'
@@ -500,11 +506,15 @@ function printMyDocs(id){
     +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">사단법인 대한민국플라잉디스크연맹 귀하</div></div>';
   const page2='<div style="font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:30px 10px">'
     +'<h2 style="text-align:center;border:2px solid #333;padding:12px;font-size:19px">개인정보 수집·이용 및 제3자 제공 동의서</h2>'
-    +'<div style="font-size:13px;line-height:1.9;border:1px solid #999;padding:14px 18px;margin-top:14px">'
-    +'<b>□ 개인정보 수집·이용 동의</b><br>· 항목: 소속, 성명, 연락처, 계좌번호 · 목적: 대회 수당(심판·운영·안전요원) 지급 · 보유기간: 2026. 12. 31.까지<br><br>'
-    +'<b>□ 개인정보 제3자 제공 동의</b><br>· 제공받는 자: 국세청 · 목적: 수당 원천징수 세액 납부 · 항목: 성명, 지급총액, 결정세액, 주민등록번호 · 근거: 소득세법 제21조·제129조<br><br>'
-    +'<b>□ 고유식별정보 처리 고지</b><br>· 개인정보보호법 제24조의2 및 국세기본법 시행령 제68조에 따라 처리됩니다.<br><br>'
-    +'※ 동의를 거부할 권리가 있으며, 거부 시 수당 지급에 제한이 있을 수 있습니다. <b>동의함 ☑</b></div>'
+    +(s.consentImg
+      ?'<div style="margin-top:14px"><img src="'+s.consentImg+'" style="width:100%;border:1px solid #999"></div><div style="font-size:13px;margin-top:8px">위 동의서 내용을 확인하였으며 이에 동의합니다. <b>동의함 ☑</b></div>'
+      :(s.consentText
+        ?'<div style="font-size:13px;line-height:1.9;border:1px solid #999;padding:14px 18px;margin-top:14px;white-space:pre-wrap">'+cesc(s.consentText)+'\n\n동의함 ☑</div>'
+        :'<div style="font-size:13px;line-height:1.9;border:1px solid #999;padding:14px 18px;margin-top:14px">'
+        +'<b>□ 개인정보 수집·이용 동의</b><br>· 항목: 소속, 성명, 연락처, 계좌번호 · 목적: 대회 수당(심판·운영·안전요원) 지급 · 보유기간: 2026. 12. 31.까지<br><br>'
+        +'<b>□ 개인정보 제3자 제공 동의</b><br>· 제공받는 자: 국세청 · 목적: 수당 원천징수 세액 납부 · 항목: 성명, 지급총액, 결정세액, 주민등록번호 · 근거: 소득세법 제21조·제129조<br><br>'
+        +'<b>□ 고유식별정보 처리 고지</b><br>· 개인정보보호법 제24조의2 및 국세기본법 시행령 제68조에 따라 처리됩니다.<br><br>'
+        +'※ 동의를 거부할 권리가 있으며, 거부 시 수당 지급에 제한이 있을 수 있습니다. <b>동의함 ☑</b></div>'))
     +'<div style="text-align:right;margin-top:26px;font-size:14px">'+cesc(dt.replace(/-/g,'. '))+'.</div>'
     +'<div style="text-align:right;margin-top:8px;font-size:15px">본인&nbsp;&nbsp;<b>'+cesc(CMY.name||'')+'</b>&nbsp;&nbsp;'+sig+'</div>'
     +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">'+cesc(s.title)+' 조직위원회 (사단법인 대한민국플라잉디스크연맹) 귀하</div></div>';
@@ -537,8 +547,12 @@ function printMyEntryDocs(id,s){
       +'① 참가자는 대회 규정과 안전 수칙을 준수하며, 주최 측의 경기 운영에 따릅니다.<br>'
       +'② 대회 중 촬영된 기록·사진·영상은 연맹 홍보 자료로 활용될 수 있음에 동의합니다.<br>'
       +(m.kid?'③ 본 신청은 법정대리인(보호자)의 동의·서명으로 효력을 가집니다.':'③ 본인은 위 내용을 확인하고 참가를 신청합니다.')+'</div>'
-      +'<div style="font-size:12.5px;line-height:1.9;border:1px solid #999;padding:12px 16px;margin-top:10px">'
-      +'<b>□ 개인정보 수집·이용 동의</b> — 항목: 참가자 성명·생년월일·성별·소속·보호자 성명·연락처 / 목적: 대회 참가 관리·단체보험·기록 관리 / 보유기간: 2026. 12. 31.까지 <b>동의함 ☑</b></div>'
+      +(s.consentImg
+        ?'<div style="margin-top:10px"><img src="'+s.consentImg+'" style="width:100%;border:1px solid #999"></div><div style="font-size:12.5px;margin-top:6px">위 동의서 내용을 확인하였으며 이에 동의합니다. <b>동의함 ☑</b></div>'
+        :(s.consentText
+          ?'<div style="font-size:12.5px;line-height:1.9;border:1px solid #999;padding:12px 16px;margin-top:10px;white-space:pre-wrap">'+cesc(s.consentText)+'\n\n동의함 ☑</div>'
+          :'<div style="font-size:12.5px;line-height:1.9;border:1px solid #999;padding:12px 16px;margin-top:10px">'
+          +'<b>□ 개인정보 수집·이용 동의</b> — 항목: 참가자 성명·생년월일·성별·소속·보호자 성명·연락처 / 목적: 대회 참가 관리·단체보험·기록 관리 / 보유기간: 2026. 12. 31.까지 <b>동의함 ☑</b></div>'))
       +'<div style="text-align:right;margin-top:24px;font-size:14px">'+cesc(dt.replace(/-/g,'. '))+'.</div>'
       +'<div style="text-align:right;margin-top:8px;font-size:15px">'+(m.kid?'법정대리인&nbsp;&nbsp;<b>'+cesc(m.guardian||CMY.name||'')+'</b>':'신청인&nbsp;&nbsp;<b>'+cesc(m.name)+'</b>')+'&nbsp;&nbsp;'+sig+'</div>'
       +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">'+cesc(s.title)+' 조직위원회 (사단법인 대한민국플라잉디스크연맹) 귀하</div></div>');
