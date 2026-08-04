@@ -38,13 +38,13 @@
         <a href="competition.html">└ 권역별 유소년 대회</a>
         <a href="business.html#train">└ 교원연수 · 교재개발</a>
       </div></div>
-    <div><a href="certification.html" class="top">자격검정</a>
+    <div><a href="certification.html" class="top">자격증</a>
       <div class="drop">
         <a href="certification.html">체육지도자 실기 · 구술 (국가자격)</a>
         <a href="license.html">연맹 자격증 (지도자 · 심판)</a>
         <a href="verify.html">이수증 · 자격증 진위확인</a>
       </div></div>
-    <div><a href="leader.html" class="top">리더 시스템</a>
+    <div><a href="leader.html" class="top">지도자·심판</a>
       <div class="drop">
         <a href="leader.html">레벨업 (포인트) 시스템</a>
         <a href="jobs.html">강사 활동 지원 · 지명</a>
@@ -62,7 +62,14 @@
     <div><a href="competition.html" class="top">대회</a>
       <div class="drop">
         <a href="competition.html">대회 일정 · 안내</a>
+        <a href="competition.html#staff">대회 참가 신청 (선수)</a>
         <a href="competition.html#staff">심판·운영요원 신청</a>
+      </div></div>
+    <div><a href="club.html" class="top">클럽</a>
+      <div class="drop">
+        <a href="club.html">클럽 찾기 · 가입</a>
+        <a href="club.html">클럽 만들기 (클럽장)</a>
+        <a href="club.html">내 클럽 · 가입 승인</a>
       </div></div>
     <a href="apply.html" class="cta">강습 신청</a>
     <a href="jobs.html" class="cta" style="background:#1F4E9C;margin-left:8px">강사신청</a>
@@ -231,7 +238,8 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <select id="cpRegion"><option>서울·경기</option><option>강원</option><option>충청</option><option>전라</option><option>경상</option><option>제주</option></select>
         <label>일자</label><input id="cpDate" type="date">
         <label>역할</label>
-        <select id="cpRole"><option>심판</option><option>운영</option></select>
+        <select id="cpRole"><option>심판</option><option>운영</option><option>참가</option></select>
+        <div style="font-size:11.5px;color:#8a919d;margin-top:3px">참가 = 선수 모집 (임무 목록 칸에 부문 입력: 오픈부,여자부,혼성부 등 — 자녀 참가는 보호자 계정에서 신청)</div>
         <label>정원 (명)</label><input id="cpQuota" type="number" value="4" min="1">
         <label>신청 마감일</label><input id="cpDeadline" type="date">
         <label>임무 목록 (쉼표 구분 — 비우면 기본값)</label><input id="cpRoles" placeholder="심판: 심판장,주심,부심,점수심,기록심,선심 / 운영: 경기운영,안전,미화,홍보,시상,의전·접수,주차·수송,보조">
@@ -241,6 +249,10 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       </div>
       <input id="cpSearch" oninput="renderCompsAdmin()" placeholder="🔍 대회명·권역·역할·지명자(강사)·확정자 이름 검색" style="width:100%;max-width:420px;padding:9px 13px;border:1.5px solid #dfe5ee;border-radius:10px;margin-bottom:12px">
       <div class="board" id="compAdminList"><div class="bempty">불러오는 중…</div></div>
+      <h3 style="margin-top:34px">🏠 클럽 승인 관리</h3>
+      <div style="font-size:12.5px;color:var(--gray);margin-bottom:10px">클럽 생성은 승인 후 club.html 목록에 게시됩니다. 숨김 = 목록 비노출(가입 코드로만 가입, 외부 단체용). 코드 발급 후 해당 단체에 전달하세요.</div>
+      <button class="btn-sub" style="background:#8a919d;margin-bottom:10px" onclick="loadClubsAdmin()">↻ 새로고침</button>
+      <div class="board" id="clubAdminList"><div class="bempty">불러오는 중…</div></div>
     </div>
     <div id="v3" style="display:none">
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
@@ -1843,17 +1855,19 @@ async function addComp(){
   document.getElementById('cpTitle').value='';document.getElementById('cpNote').value='';
   loadCompsAdmin();
 }
-const COMP_DEFAULT_ROLES={'심판':['심판장','주심','부심','점수심','기록심','선심'],'운영':['경기운영','안전요원','미화요원','홍보요원','시상요원','의전·접수','주차·수송','보조요원']};
+const COMP_DEFAULT_ROLES={'심판':['심판장','주심','부심','점수심','기록심','선심'],'운영':['경기운영','안전요원','미화요원','홍보요원','시상요원','의전·접수','주차·수송','보조요원'],'참가':['오픈부','여자부','혼성부']};
+function compKey(c){return c.pid||c.uid}
 function compEffRoles(s){return (s.roles&&s.roles.length)?s.roles:(COMP_DEFAULT_ROLES[s.role]||[]);}
 let CADM=[];
 function compActiveClaims(s){
   const seen={};const out=[];
-  const cancelsBy={};(s.cancels||[]).forEach(k=>{cancelsBy[k.uid]=(cancelsBy[k.uid]||0)+1});
-  const claimsBy={};(s.claimed||[]).forEach(c=>{claimsBy[c.uid]=(claimsBy[c.uid]||0)+1});
+  const cancelsBy={};(s.cancels||[]).forEach(k=>{const key=compKey(k);cancelsBy[key]=(cancelsBy[key]||0)+1});
+  const claimsBy={};(s.claimed||[]).forEach(c=>{const key=compKey(c);claimsBy[key]=(claimsBy[key]||0)+1});
   (s.claimed||[]).forEach(c=>{
-    if(seen[c.uid])return;seen[c.uid]=1;
-    if((claimsBy[c.uid]||0)>(cancelsBy[c.uid]||0)){
-      const arr=(s.claimed||[]).filter(x=>x.uid===c.uid);
+    const key=compKey(c);
+    if(seen[key])return;seen[key]=1;
+    if((claimsBy[key]||0)>(cancelsBy[key]||0)){
+      const arr=(s.claimed||[]).filter(x=>compKey(x)===key);
       out.push(arr[arr.length-1]);
     }
   });
@@ -1863,6 +1877,48 @@ async function loadCompsAdmin(){
   const snap=await DB.collection('compSlots').orderBy('date').limit(100).get();
   CADM=snap.docs;
   renderCompsAdmin();
+  loadClubsAdmin().catch(()=>{});
+}
+// ── 클럽 승인·관리 ──
+async function loadClubsAdmin(){
+  const el=document.getElementById('clubAdminList');if(!el)return;
+  const snap=await DB.collection('clubs').limit(300).get();
+  const docs=snap.docs.slice().sort((a,b)=>{
+    const x=a.data(),y=b.data();
+    if((x.status==='대기')!==(y.status==='대기'))return x.status==='대기'?-1:1;
+    return String(x.sido||'').localeCompare(String(y.sido||''));
+  });
+  el.innerHTML=!docs.length?'<div class="bempty">등록된 클럽이 없습니다.</div>':docs.map(d=>{
+    const c=d.data();
+    return '<div class="urow"><div class="grow"><b>'+esc(c.name)+'</b> '
+      +'<span style="font-size:11px;font-weight:800;color:#fff;background:#153A77;padding:2px 8px;border-radius:999px">'+esc(c.sido)+' '+esc(c.gugun||'')+'</span> '
+      +(c.status==='승인'?'<span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">승인</span>':'<span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px">대기</span>')
+      +(c.hidden?' <span style="font-size:11px;font-weight:800;color:#fff;background:#8a919d;padding:2px 8px;border-radius:999px">숨김(코드전용)</span>':'')
+      +(c.code?' <span style="font-size:11px;font-weight:800;color:#b8860b">코드: '+esc(c.code)+'</span>':'')
+      +'<div class="sub3">클럽장 '+esc(c.ownerName||'')+' · 회원 '+((c.memberUids||[]).length)+'명 · 가입대기 '+((c.pendingUids||[]).length)+'명'+(c.intro?'<br>'+esc(c.intro):'')+'</div></div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +(c.status!=='승인'?'<button class="btn-sub" style="background:#0f766e" onclick="approveClub(\''+d.id+'\')">✓ 승인</button>':'')
+      +'<button class="btn-sub" style="background:#8a919d" onclick="toggleClubHidden(\''+d.id+'\','+(!c.hidden)+')">'+(c.hidden?'👁 노출':'🙈 숨김')+'</button>'
+      +'<button class="btn-sub" style="background:#b8860b" onclick="setClubCode(\''+d.id+'\')">🔑 코드</button>'
+      +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delClub(\''+d.id+'\')">🗑</button></div></div>';
+  }).join('');
+}
+async function approveClub(id){
+  await DB.collection('clubs').doc(id).update({status:'승인'});loadClubsAdmin();
+}
+async function toggleClubHidden(id,h){
+  await DB.collection('clubs').doc(id).update({hidden:h});loadClubsAdmin();
+}
+async function setClubCode(id){
+  const doc=await DB.collection('clubs').doc(id).get();const c=doc.data();
+  const auto='KFDF'+Math.random().toString(36).slice(2,7).toUpperCase();
+  const code=prompt('['+c.name+'] 가입 코드를 입력하세요 (비우면 코드 가입 비활성)\n제안: '+auto,c.code||auto);
+  if(code===null)return;
+  await DB.collection('clubs').doc(id).update({code:code.trim().toUpperCase()});loadClubsAdmin();
+}
+async function delClub(id){
+  if(!confirm('이 클럽을 삭제할까요? (회원 명단 포함 삭제)'))return;
+  await DB.collection('clubs').doc(id).delete();loadClubsAdmin();
 }
 function renderCompsAdmin(){
   const el=document.getElementById('compAdminList');
@@ -1878,7 +1934,7 @@ function renderCompsAdmin(){
     const s=d.data();const act=compActiveClaims(s);
     const confirmed=s.confirmed||[];
     const closed=s.deadline&&today>s.deadline;
-    return '<div class="urow"><div class="grow"><b>'+esc(s.title)+'</b> <span style="font-size:11px;font-weight:800;color:#fff;background:'+(s.role==='심판'?'#7c3aed':'#b8860b')+';padding:2px 8px;border-radius:999px">'+esc(s.role)+'</span>'
+    return '<div class="urow"><div class="grow"><b>'+esc(s.title)+'</b> <span style="font-size:11px;font-weight:800;color:#fff;background:'+({'심판':'#7c3aed','운영':'#b8860b','참가':'#0f766e'}[s.role]||'#153A77')+';padding:2px 8px;border-radius:999px">'+esc(s.role)+(s.role==='참가'?'(선수)':'')+'</span>'
       +(closed?' <span style="font-size:11px;font-weight:800;color:#fff;background:#8a919d;padding:2px 8px;border-radius:999px">마감</span>':'')
       +(confirmed.length>=s.quota?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">확정 완료</span>':'')
       +'<div class="sub3">'+esc(s.region)+' · '+esc(s.date)+(s.deadline?' · 마감 '+esc(s.deadline):'')+' · 유효신청 '+act.length+'/'+s.quota+'명 · 확정 '+confirmed.length+'명 · 취소 '+((s.cancels||[]).length)+'건'
@@ -2000,6 +2056,17 @@ async function saveEditComp(){
 async function compCSV(id){
   const doc=await DB.collection('compSlots').doc(id).get();const s=doc.data();
   const act=compActiveClaims(s);const confirmed=s.confirmed||[];
+  if(s.role==='참가'){
+    const rows2=[['참가자','생년월일','성별','소속(학교)','클럽','부문','미성년','보호자','보호자연락처','동의','신청일시']];
+    for(const c of act){
+      rows2.push([c.name,c.birth||'',c.gender||'',c.school||'',c.club||'',(c.prefs||[]).join('·'),c.kid?'O':'',c.guardian||'',c.guardianPhone||'',c.consent?'O':'',(c.at||'').slice(0,16).replace('T',' ')]);
+    }
+    const csv2='﻿'+rows2.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\n');
+    const a2=document.createElement('a');
+    a2.href=URL.createObjectURL(new Blob([csv2],{type:'text/csv'}));
+    a2.download=s.title+'_참가자명단.csv';a2.click();
+    return;
+  }
   const rows=[['성명','구분','1지망','2지망','3지망','동의','서명','확정','휴대전화','은행','계좌번호','예금주','신청일시']];
   for(const c of act){
     let ud=null;
