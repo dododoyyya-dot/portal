@@ -115,13 +115,19 @@
     <div id="clubList" class="board"><div class="bempty">불러오는 중…</div></div>
 
     <div style="margin-top:26px;background:#f6f8fb;border:1.5px solid #dfe5ee;border-radius:14px;padding:18px 20px">
-      <b style="font-size:14.5px">🔑 가입 코드로 가입</b>
-      <div style="font-size:12.5px;color:#6b7280;margin:4px 0 10px">연맹에서 발급한 가입 코드가 있는 단체(외부 단체 포함)는 코드를 입력해 가입을 신청합니다.</div>
+      <b style="font-size:14.5px">🔑 클럽 코드로 찾기 · 가입</b>
+      <div style="font-size:12.5px;color:#6b7280;margin:4px 0 10px;line-height:1.7">모든 클럽에는 생성 시 연맹이 발급하는 <b>클럽 코드</b>(예: 2026-0001)가 부여됩니다. 코드를 알고 있다면 목록을 찾지 않고 바로 가입 신청할 수 있습니다.<br>KFDF 소속이 아닌 <b>타 단체(사단체) 클럽의 선수</b>도 연맹에서 발급받은 단체 코드를 입력해 회원으로 가입 신청할 수 있습니다.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <input id="codeInput" placeholder="가입 코드 입력" class="cfield" style="max-width:220px;margin-top:0;text-transform:uppercase">
+        <input id="codeInput" placeholder="클럽 코드 입력 (예: 2026-0001)" class="cfield" style="max-width:240px;margin-top:0;text-transform:uppercase">
         <button class="cbtn cbtn-teal" onclick="joinByCode()">코드로 가입 신청</button>
       </div>
       <div id="codeMsg" style="font-size:13px;font-weight:700;margin-top:8px"></div>
+    </div>
+
+    <div id="sidoApproveBox" style="display:none;margin-top:26px;background:#fff8ed;border:1.5px solid #ecd9b0;border-radius:14px;padding:18px 20px">
+      <b style="font-size:14.5px">🛡 관할 클럽 승인 <span id="saSido" style="color:#b8860b"></span></b>
+      <div style="font-size:12.5px;color:#6b7280;margin:4px 0 10px">시도연맹 임원 권한으로 관할 시도의 클럽 생성 신청을 승인합니다.</div>
+      <div id="sidoApproveList"></div>
     </div>
 
     <h3 class="sub" style="margin-top:40px">➕ 클럽 만들기</h3>
@@ -129,11 +135,13 @@
       <label class="clabel" style="margin-top:0">클럽명 <span style="color:#C41E2F">*</span></label>
       <input id="ncName" class="cfield" placeholder="예: 김포 프리버드 얼티미트 클럽">
       <div style="display:flex;gap:10px">
-        <div style="flex:1"><label class="clabel">시도 <span style="color:#C41E2F">*</span></label>
-          <select id="ncSido" class="cfield"></select></div>
-        <div style="flex:1"><label class="clabel">시군구 <span style="color:#C41E2F">*</span></label>
-          <input id="ncGugun" class="cfield" placeholder="예: 김포시"></div>
+        <div style="flex:1"><label class="clabel">소속 시도연맹 <span style="color:#C41E2F">*</span></label>
+          <select id="ncSido" class="cfield" onchange="fillGugun()"></select></div>
+        <div style="flex:1"><label class="clabel">거점 시·군·구 <span style="color:#C41E2F">*</span></label>
+          <select id="ncGugun" class="cfield"><option value="">시도를 먼저 선택</option></select></div>
       </div>
+      <div style="font-size:12px;color:#8a5a00;background:#fff8ed;border-radius:8px;padding:8px 12px;margin-top:8px">📍 거점은 <b>실제 활동하며 서류(체육회 등록 등)를 제출할 수 있는 시·군·구 한 곳</b>을 선택합니다. "전지역"으로는 등록할 수 없습니다.</div>
+      <div id="ncOrgLine" style="font-size:12.5px;font-weight:800;color:#153A77;margin-top:8px"></div>
       <label class="clabel">클럽 소개</label>
       <input id="ncIntro" class="cfield" placeholder="한 줄 소개 (활동 종목·연령대 등)">
       <label class="clabel">클럽 내규 (회비 · 운동 시간 · 규칙)</label>
@@ -160,7 +168,38 @@ if(!firebase.apps.length)firebase.initializeApp({
 const AUTH=firebase.auth(),DB=firebase.firestore();
 function kesc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 const SIDOS=['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
-let KME=null,KMY=null,ALLCLUBS=[],SIDO_F='';
+// 시·군·구 행정구역 (거점 선택용 — "전지역" 불가)
+const GUGUN={
+ '서울':['강남구','강동구','강북구','강서구','관악구','광진구','구로구','금천구','노원구','도봉구','동대문구','동작구','마포구','서대문구','서초구','성동구','성북구','송파구','양천구','영등포구','용산구','은평구','종로구','중구','중랑구'],
+ '부산':['강서구','금정구','기장군','남구','동구','동래구','부산진구','북구','사상구','사하구','서구','수영구','연제구','영도구','중구','해운대구'],
+ '대구':['군위군','남구','달서구','달성군','동구','북구','서구','수성구','중구'],
+ '인천':['강화군','계양구','남동구','동구','미추홀구','부평구','서구','연수구','옹진군','중구'],
+ '광주':['광산구','남구','동구','북구','서구'],
+ '대전':['대덕구','동구','서구','유성구','중구'],
+ '울산':['남구','동구','북구','울주군','중구'],
+ '세종':['세종시'],
+ '경기':['가평군','고양시','과천시','광명시','광주시','구리시','군포시','김포시','남양주시','동두천시','부천시','성남시','수원시','시흥시','안산시','안성시','안양시','양주시','양평군','여주시','연천군','오산시','용인시','의왕시','의정부시','이천시','파주시','평택시','포천시','하남시','화성시'],
+ '강원':['강릉시','고성군','동해시','삼척시','속초시','양구군','양양군','영월군','원주시','인제군','정선군','철원군','춘천시','태백시','평창군','홍천군','화천군','횡성군'],
+ '충북':['괴산군','단양군','보은군','영동군','옥천군','음성군','제천시','증평군','진천군','청주시','충주시'],
+ '충남':['계룡시','공주시','금산군','논산시','당진시','보령시','부여군','서산시','서천군','아산시','예산군','천안시','청양군','태안군','홍성군'],
+ '전북':['고창군','군산시','김제시','남원시','무주군','부안군','순창군','완주군','익산시','임실군','장수군','전주시','정읍시','진안군'],
+ '전남':['강진군','고흥군','곡성군','광양시','구례군','나주시','담양군','목포시','무안군','보성군','순천시','신안군','여수시','영광군','영암군','완도군','장성군','장흥군','진도군','함평군','해남군','화순군'],
+ '경북':['경산시','경주시','고령군','구미시','김천시','문경시','봉화군','상주시','성주군','안동시','영덕군','영양군','영주시','영천시','예천군','울릉군','울진군','의성군','청도군','청송군','칠곡군','포항시'],
+ '경남':['거제시','거창군','고성군','김해시','남해군','밀양시','사천시','산청군','양산시','의령군','진주시','창녕군','창원시','통영시','하동군','함안군','함양군','합천군'],
+ '제주':['서귀포시','제주시']
+};
+function fillGugun(){
+  const sido=document.getElementById('ncSido').value;
+  const g=document.getElementById('ncGugun');
+  g.innerHTML=sido?'<option value="">선택</option>'+(GUGUN[sido]||[]).map(x=>'<option>'+x+'</option>').join(''):'<option value="">시도를 먼저 선택</option>';
+  updOrgLine();
+  g.onchange=updOrgLine;
+}
+function updOrgLine(){
+  const s=document.getElementById('ncSido').value,g=document.getElementById('ncGugun').value;
+  document.getElementById('ncOrgLine').textContent=s?('소속: 대한민국플라잉디스크연맹(KFDF) › '+s+' 연맹'+(g?' › '+g:'')):'';
+}
+let KME=null,KMY=null,ALLCLUBS=[],SIDO_F='',MYCLUB_CACHE=[];
 AUTH.onAuthStateChanged(async u=>{
   const g=document.getElementById('clGate');
   if(!u){g.style.display='block';g.innerHTML='🔒 승인 회원 전용입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a> 후 이용할 수 있습니다.';return}
@@ -172,6 +211,7 @@ AUTH.onAuthStateChanged(async u=>{
   renderSido();
   loadClubs();
   loadMyClubs();
+  loadSidoApprovals().catch(()=>{});
 });
 function renderSido(){
   document.getElementById('sidoChips').innerHTML=['전체'].concat(SIDOS).map(s=>{
@@ -262,6 +302,7 @@ async function loadMyClubs(){
     ]);
     const seen={};const items=[];
     own.docs.concat(mem.docs).concat(pend.docs).forEach(d=>{if(seen[d.id])return;seen[d.id]=1;items.push(d)});
+    MYCLUB_CACHE=items;
     if(!items.length){el.innerHTML='<div class="bempty">소속된 클럽이 없습니다. 아래에서 클럽을 찾거나 직접 만들어 보세요.</div>';return}
     el.innerHTML=items.map(d=>{
       const c=d.data();
@@ -290,11 +331,16 @@ async function loadMyClubs(){
           +'</div></details>';
       }
       const leaveBtn=(isMember&&!isOwner)?'<button class="cbtn" style="padding:4px 12px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="leaveClub(\''+d.id+'\',\''+kesc(c.name)+'\')">클럽 탈퇴</button>':'';
+      const ownerBtns=isOwner?'<button class="cbtn cbtn-soft" style="padding:4px 12px;font-size:12px" onclick="editMyClub(\''+d.id+'\')">✏️ 수정</button>'
+        +'<button class="cbtn" style="padding:4px 12px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="delMyClub(\''+d.id+'\',\''+kesc(c.name)+'\')">🗑 삭제</button>':'';
       return '<div class="clubcard"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="cname">'+kesc(c.name)+'</span>'
         +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'+badge
+        +(c.code&&(isOwner||isMember)?'<span class="cpill2" style="background:#b8860b" title="이 코드로 회원을 초대할 수 있습니다">🔑 '+kesc(c.code)+'</span>':'')
         +'<span style="font-size:12px;color:#8a919d;font-weight:700">회원 '+((c.memberUids||[]).length)+'명</span>'
-        +'<span style="flex:1"></span>'+leaveBtn+'</div>'
+        +'<span style="flex:1"></span>'+ownerBtns+leaveBtn+'</div>'
         +(c.intro?'<div class="cmeta2">'+kesc(c.intro)+'</div>':'')
+        +'<div class="cmeta2" style="color:#8a94a6">소속: KFDF › '+kesc(c.sido)+' 연맹 › '+kesc(c.gugun||'')+'</div>'
+        +(c.rulesText?'<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">클럽 내규 보기</summary><div style="font-size:12.5px;color:#4b5563;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:10px 13px;margin-top:6px">'+kesc(c.rulesText)+'</div></details>':'')
         +ownerUI+'</div>';
     }).join('');
   }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+kesc(e.message)+'</div>'}
@@ -351,26 +397,105 @@ async function rejectJoin(id,uid){
     loadMyClubs();
   }catch(e){alert('거절 실패: '+e.message)}
 }
+// 클럽 코드 자동 발급: 연도-일련번호 (counters/clubCode +1)
+async function issueClubCode(){
+  const ref=DB.collection('counters').doc('clubCode');
+  let n=1;
+  await DB.runTransaction(async tx=>{
+    const doc=await tx.get(ref);
+    if(!doc.exists){n=1;tx.set(ref,{count:1});}
+    else{n=(doc.data().count||0)+1;tx.update(ref,{count:n});}
+  });
+  return new Date().getFullYear()+'-'+String(n).padStart(4,'0');
+}
 async function createClub(){
   const m=document.getElementById('ncMsg');
   const name=document.getElementById('ncName').value.trim();
   const sido=document.getElementById('ncSido').value;
-  const gugun=document.getElementById('ncGugun').value.trim();
-  if(!name||!sido||!gugun){m.textContent='클럽명·시도·시군구를 입력하세요';m.style.color='#C41E2F';return}
+  const gugun=document.getElementById('ncGugun').value;
+  if(!name||!sido||!gugun){m.textContent='클럽명·시도·거점 시군구를 선택하세요';m.style.color='#C41E2F';return}
   try{
+    let code='';
+    try{code=await issueClubCode();}catch(e){code='';}
     await DB.collection('clubs').add({
       name:name,sido:sido,gugun:gugun,
       intro:document.getElementById('ncIntro').value.trim(),
       rulesText:document.getElementById('ncRules').value.trim(),
       ownerUid:KME.uid,ownerName:KMY.name||'',
-      status:'대기',hidden:false,code:'',
+      status:'대기',hidden:false,code:code,
       members:[{uid:KME.uid,name:KMY.name||'',at:new Date().toISOString()}],
       memberUids:[KME.uid],pendingJoins:[],pendingUids:[],
       createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-    m.textContent='✓ 생성 신청 완료 — 사무국 승인 후 목록에 게시됩니다';m.style.color='#0f766e';
+    m.textContent='✓ 생성 신청 완료'+(code?' — 클럽 코드 ['+code+'] 발급':'')+' · 승인 후 목록에 게시됩니다';m.style.color='#0f766e';
     document.getElementById('ncName').value='';
     loadMyClubs();
   }catch(e){m.textContent='실패: '+(e.code==='permission-denied'?'권한 오류 — 로그인·승인 상태를 확인해주세요':e.message);m.style.color='#C41E2F'}
+}
+// ── 클럽장: 클럽 정보 수정 · 삭제 ──
+function editMyClub(id){
+  const item=MYCLUB_CACHE.find(d=>d.id===id);if(!item)return;
+  const c=item.data();
+  const old=document.getElementById('mcModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='mcModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+  div.innerHTML='<div style="background:#fff;border-radius:20px;max-width:560px;width:100%;max-height:92vh;overflow:auto;padding:26px;box-shadow:0 24px 60px rgba(0,0,0,.25)">'
+    +'<h3 style="margin:0;font-size:18px;font-weight:900">✏️ 클럽 정보 수정</h3>'
+    +'<div style="font-size:12px;color:#8a919d;margin-top:4px">거점(시도·시군구)·코드 변경은 사무국으로 문의해주세요.</div>'
+    +'<label class="clabel">클럽명</label><input id="mcName" class="cfield" value="'+kesc(c.name||'')+'">'
+    +'<label class="clabel">클럽 소개</label><input id="mcIntro" class="cfield" value="'+kesc(c.intro||'')+'">'
+    +'<label class="clabel">클럽 내규</label><textarea id="mcRules" class="cfield" rows="6">'+kesc(c.rulesText||'')+'</textarea>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
+    +'<button class="cbtn" style="background:#eceff4;color:#555" onclick="document.getElementById(\'mcModal\').remove()">닫기</button>'
+    +'<button class="cbtn cbtn-main" onclick="saveMyClub(\''+id+'\')">저장</button></div></div>';
+  document.body.appendChild(div);
+}
+async function saveMyClub(id){
+  const name=document.getElementById('mcName').value.trim();
+  if(!name){alert('클럽명을 입력하세요.');return}
+  try{
+    await DB.collection('clubs').doc(id).update({name:name,
+      intro:document.getElementById('mcIntro').value.trim(),
+      rulesText:document.getElementById('mcRules').value.trim()});
+    document.getElementById('mcModal').remove();
+    loadMyClubs();loadClubs();
+  }catch(e){alert('저장 실패: '+e.message)}
+}
+async function delMyClub(id,name){
+  if(!confirm('['+name+'] 클럽을 삭제할까요?\n회원 명단이 함께 삭제되며 복구할 수 없습니다.'))return;
+  try{await DB.collection('clubs').doc(id).delete();loadMyClubs();loadClubs();}
+  catch(e){alert('삭제 실패: '+e.message)}
+}
+// ── 시도연맹 임원: 관할 클럽 승인 ──
+async function loadSidoApprovals(){
+  const sido=KMY&&KMY.clubAdminSido;
+  const isAdm=KMY&&KMY.role==='admin';
+  if(!sido&&!isAdm)return;
+  const box=document.getElementById('sidoApproveBox');
+  try{
+    let q=DB.collection('clubs').where('status','==','대기');
+    if(sido&&!isAdm)q=q.where('sido','==',sido);
+    const snap=await q.limit(50).get();
+    box.style.display='block';
+    document.getElementById('saSido').textContent=sido?'— '+sido+' 관할':'— 전체(중앙)';
+    document.getElementById('sidoApproveList').innerHTML=snap.empty
+      ?'<div style="font-size:12.5px;color:#8a919d">승인 대기 중인 클럽이 없습니다.</div>'
+      :snap.docs.map(d=>{const c=d.data();
+        return '<div class="clubcard" style="margin-bottom:8px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+          +'<span class="cname">'+kesc(c.name)+'</span>'
+          +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'
+          +'<span style="font-size:12px;color:#8a919d">클럽장 '+kesc(c.ownerName||'')+(c.code?' · 코드 '+kesc(c.code):'')+'</span>'
+          +'<span style="flex:1"></span>'
+          +'<button class="cbtn cbtn-teal" onclick="sidoApprove(\''+d.id+'\')">✓ 승인</button></div>'
+          +(c.intro?'<div class="cmeta2">'+kesc(c.intro)+'</div>':'')+'</div>';
+      }).join('');
+  }catch(e){box.style.display='block';document.getElementById('sidoApproveList').innerHTML='<div style="font-size:12.5px;color:#C41E2F">불러오기 실패: '+kesc(e.message)+'</div>';}
+}
+async function sidoApprove(id){
+  try{
+    await DB.collection('clubs').doc(id).update({status:'승인'});
+    alert('승인되었습니다. 클럽 목록에 게시됩니다.');
+    loadSidoApprovals();loadClubs();
+  }catch(e){alert('승인 실패: '+(e.code==='permission-denied'?'관할 권한이 없습니다':e.message))}
 }
 </script>
 
