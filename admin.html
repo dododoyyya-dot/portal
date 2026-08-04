@@ -62,6 +62,7 @@
     
     <div><a href="notice.html" class="top">알림마당</a>
       <div class="drop">
+        <a href="calendar.html">연맹 일정 캘린더</a>
         <a href="notice.html">공지사항 · 공고</a>
         <a href="archive.html">자료실 (서식 다운로드)</a>
         <a href="faq.html">자주 묻는 질문</a>
@@ -278,6 +279,14 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <span id="pgMsg" style="font-size:13px;font-weight:700"></span>
       </div>
       <div id="pgEditor"></div>
+      <h3 style="margin-top:34px">📅 캘린더 편집 권한</h3>
+      <div style="font-size:12.5px;color:var(--gray);margin-bottom:10px">권한을 받은 회원(시도연맹 임원 등)은 <b>일정 캘린더</b>에서 연맹 행사를 직접 등록·수정할 수 있습니다. 본인이 등록한 일정만 수정 가능하며, 사무국은 전체 관리합니다.</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+        <input id="calSearch" placeholder="회원 이름으로 검색" style="padding:9px 13px;border:1.5px solid #dfe5ee;border-radius:10px;font-family:inherit;font-size:14px;width:200px" onkeydown="if(event.key==='Enter')calFind()">
+        <button class="btn-sub" style="background:#153A77" onclick="calFind()">검색</button>
+        <button class="btn-sub" style="background:#8a919d" onclick="calListEditors()">현재 권한자 보기</button>
+      </div>
+      <div id="calPermList"></div>
     </div>
     <div id="v3" style="display:none">
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
@@ -2061,6 +2070,33 @@ async function pgReset(){
   if(!confirm('저장된 수정본을 삭제하고 기본 문안으로 되돌릴까요?'))return;
   await DB.collection('siteContent').doc(page).delete().catch(()=>{});
   pgLoad();
+}
+// ── 캘린더 편집 권한 부여 ──
+function calPermRow(d){
+  const v=d.data();
+  return '<div class="urow"><div class="grow"><b>'+esc(v.name||'')+'</b> <span style="font-size:12px;color:var(--gray)">'+esc(v.email||'')+(v.fedName?' · '+esc(v.fedName):'')+'</span>'
+    +(v.calendarEditor?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">캘린더 권한</span>':'')
+    +(v.role==='admin'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px">관리자</span>':'')+'</div>'
+    +(v.role==='admin'?'<span style="font-size:12px;color:var(--gray)">관리자는 항상 가능</span>'
+      :'<button class="btn-sub" style="background:'+(v.calendarEditor?'#8a919d':'#0f766e')+'" onclick="calToggle(\''+d.id+'\','+(!v.calendarEditor)+')">'+(v.calendarEditor?'권한 해제':'권한 부여')+'</button>')
+    +'</div>';
+}
+async function calFind(){
+  const q=document.getElementById('calSearch').value.trim();
+  const el=document.getElementById('calPermList');
+  if(!q){el.innerHTML='<div class="bempty">이름을 입력하세요.</div>';return}
+  const snap=await DB.collection('users').where('name','==',q).limit(10).get();
+  el.innerHTML=snap.empty?'<div class="bempty">해당 이름의 회원이 없습니다.</div>':snap.docs.map(calPermRow).join('');
+}
+async function calListEditors(){
+  const el=document.getElementById('calPermList');
+  const snap=await DB.collection('users').where('calendarEditor','==',true).limit(50).get();
+  el.innerHTML=snap.empty?'<div class="bempty">권한을 받은 회원이 없습니다. 이름 검색 후 [권한 부여]를 누르세요.</div>':snap.docs.map(calPermRow).join('');
+}
+async function calToggle(uid,on){
+  await DB.collection('users').doc(uid).update({calendarEditor:on});
+  alert(on?'캘린더 편집 권한을 부여했습니다.':'권한을 해제했습니다.');
+  calFind().catch(()=>{});calListEditors().catch(()=>{});
 }
 async function toggleClubHidden(id,h){
   await DB.collection('clubs').doc(id).update({hidden:h});loadClubsAdmin();

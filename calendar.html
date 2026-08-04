@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>일정 캘린더 | 대한민국플라잉디스크연맹</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="style.css?v=20260726e">
+<style>
+.calbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.calbar .mon{font-size:22px;font-weight:900;letter-spacing:-.3px;min-width:150px;text-align:center}
+.navbtn{border:1.5px solid #dfe5ee;background:#fff;border-radius:10px;padding:8px 14px;font-weight:900;cursor:pointer;font-family:inherit;font-size:14px}
+.navbtn:hover{border-color:#153A77;color:#153A77}
+.fchip{border:1.5px solid #dfe5ee;background:#fff;border-radius:999px;padding:6px 13px;font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit;color:#4b5563;display:flex;align-items:center;gap:5px}
+.fchip .dot{width:9px;height:9px;border-radius:50%}
+.fchip.on{border-color:#153A77;background:#153A77;color:#fff}
+.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#e5e9f0;border:1px solid #e5e9f0;border-radius:14px;overflow:hidden}
+.dow{background:#f4f7fc;padding:9px 0;text-align:center;font-size:12.5px;font-weight:900;color:#5b6472}
+.dow.sun{color:#C41E2F}.dow.sat{color:#1F4E9C}
+.dcell{background:#fff;min-height:96px;padding:6px 7px;position:relative}
+.dcell.other{background:#fafbfd}
+.dcell .dn{font-size:12.5px;font-weight:800;color:#374151}
+.dcell.other .dn{color:#c3c9d4}
+.dcell .dn.sun{color:#C41E2F}.dcell .dn.sat{color:#1F4E9C}
+.dcell.today{background:#f0f5ff;box-shadow:inset 0 0 0 2px #1F4E9C}
+.evt{display:block;margin-top:3px;font-size:11px;font-weight:800;color:#fff;padding:2.5px 7px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border:none;width:100%;text-align:left;font-family:inherit}
+.evt:hover{filter:brightness(1.12)}
+.calbtn{border:none;cursor:pointer;font-family:inherit;font-weight:800;font-size:13px;padding:10px 20px;border-radius:10px}
+.calbtn-main{background:linear-gradient(135deg,#1F4E9C,#153A77);color:#fff;box-shadow:0 3px 10px rgba(21,58,119,.25)}
+.evlist{margin-top:26px}
+.evrow{display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid #e8ecf3;border-radius:14px;padding:14px 18px;margin-bottom:9px}
+.evrow .ed{min-width:86px;text-align:center;font-weight:900;font-size:13px;color:#153A77;background:#f0f5ff;border-radius:10px;padding:8px 6px}
+.evrow .et{font-size:14.5px;font-weight:900}
+.evrow .em{font-size:12.5px;color:#6b7280;margin-top:3px}
+.tbadge{font-size:10.5px;font-weight:900;color:#fff;padding:2px 9px;border-radius:999px;margin-left:6px;vertical-align:1px}
+#evModal .cmodal,#evView .cmodal{background:#fff;border-radius:20px;max-width:520px;width:100%;max-height:92vh;overflow:auto;box-shadow:0 24px 60px rgba(0,0,0,.25);padding:26px}
+.cfield{width:100%;padding:11px 13px;border:1.5px solid #dfe5ee;border-radius:10px;font-size:14px;font-family:inherit;margin-top:5px}
+.clabel{display:block;font-size:13px;font-weight:800;color:#374151;margin-top:13px}
+@media(max-width:640px){.dcell{min-height:64px}.evt{font-size:9.5px;padding:2px 4px}}
+</style>
+</head>
+<body>
+<div class="util"><div class="wrap">
+  <div><b>대한민국플라잉디스크연맹</b> · 대한체육회 인정단체</div>
+  <div><a href="mailto:kfdf60@hanmail.net">kfdf60@hanmail.net</a> &nbsp;|&nbsp; 031-984-3248 &nbsp;|&nbsp; <a href="login.html" id="utilAuth" style="color:#fff;font-weight:700">로그인</a> · <a href="mypage.html" style="color:#fff;font-weight:700">마이페이지</a></div>
+</div></div>
+<header><div class="wrap nav">
+  <a href="index.html" class="brand">
+    <img src="kfdf_logo.png" alt="대한민국플라잉디스크연맹 로고">
+    <div><div class="t1">대한민국플라잉디스크연맹</div><div class="t2">KOREA FLYING DISC FEDERATION</div></div>
+  </a>
+  <button class="hamb" onclick="document.querySelector('.menu').classList.toggle('open')">☰</button>
+  <nav class="menu">
+    <div><a href="about.html" class="top">연맹소개</a>
+      <div class="drop">
+        <a href="about.html#greet">인사말 · 미션</a>
+        <a href="about.html#org">조직도</a>
+        <a href="about.html#rule">정관 · 규정</a>
+        <a href="about.html#region">시도연맹 구성</a>
+        <a href="sponsor.html">후원안내</a>
+        <a href="about.html#way">오시는 길</a>
+      </div></div>
+    <div><a href="sports.html" class="top">종목소개</a>
+      <div class="drop">
+        <a href="sports.html">얼티미트</a>
+        <a href="sports.html">디스크골프</a>
+        <a href="sports.html">원반윷놀이 · 기타 종목</a>
+      </div></div>
+    <div><a href="business.html" class="top">사업안내</a>
+      <div class="drop">
+        <a href="business.html#youth">2026 유소년 스포츠 기반구축사업</a>
+        <a href="business.html#school">└ 학교체육 강습</a>
+        <a href="business.html#after">└ 방과후 · 늘봄</a>
+        <a href="competition.html">└ 권역별 유소년 대회</a>
+        <a href="business.html#train">└ 교원연수 · 교재개발</a>
+      </div></div>
+    <div><a href="certification.html" class="top">자격증</a>
+      <div class="drop">
+        <a href="certification.html">체육지도자 실기 · 구술 (국가자격)</a>
+        <a href="license.html">연맹 자격증 (지도자 · 심판)</a>
+        <a href="verify.html">이수증 · 자격증 진위확인</a>
+      </div></div>
+    <div><a href="leader.html" class="top">지도자·심판</a>
+      <div class="drop">
+        <a href="leader.html">레벨업 (포인트) 시스템</a>
+        <a href="jobs.html">강사 활동 지원 · 지명</a>
+        <a href="guide.html">강사 가이드 (일지·운영·유의사항)</a>
+        <a href="safety.html">안전교육 이수</a>
+        <a href="mypage.html">마이페이지</a>
+      </div></div>
+
+    <div><a href="notice.html" class="top">알림마당</a>
+      <div class="drop">
+        <a href="calendar.html">연맹 일정 캘린더</a>
+        <a href="notice.html">공지사항 · 공고</a>
+        <a href="archive.html">자료실 (서식 다운로드)</a>
+        <a href="faq.html">자주 묻는 질문</a>
+      </div></div>
+    <div><a href="competition.html" class="top">대회</a>
+      <div class="drop">
+        <a href="competition.html">대회 일정 · 안내</a>
+        <a href="competition.html#staff">대회 참가 신청 (선수)</a>
+        <a href="competition.html#staff">심판·운영요원 신청</a>
+      </div></div>
+    <div><a href="club.html" class="top">클럽</a>
+      <div class="drop">
+        <a href="club.html">클럽 찾기 · 가입</a>
+        <a href="club.html">클럽 만들기 (클럽장)</a>
+        <a href="club.html">내 클럽 · 가입 승인</a>
+      </div></div>
+    <a href="apply.html" class="cta">강습 신청</a>
+    <a href="jobs.html" class="cta" style="background:#1F4E9C;margin-left:8px">강사신청</a>
+  </nav>
+</div></header>
+<div class="phero"><div class="wrap">
+  <div class="crumb">HOME &nbsp;›&nbsp; <b>일정 캘린더</b></div>
+  <h1>연맹 일정 캘린더</h1><p>대회 · 자격검정 · 연수 · 행사 — 연맹의 모든 일정을 한눈에 확인하세요.</p>
+</div></div>
+<section><div class="wrap">
+  <div class="calbar">
+    <button class="navbtn" onclick="moveMon(-1)">‹</button>
+    <div class="mon" id="monTitle"></div>
+    <button class="navbtn" onclick="moveMon(1)">›</button>
+    <button class="navbtn" style="font-size:12.5px" onclick="goToday()">오늘</button>
+    <span style="flex:1"></span>
+    <div id="typeChips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+    <button class="calbtn calbtn-main" id="addBtn" style="display:none" onclick="openEv()">+ 일정 등록</button>
+  </div>
+  <div class="calgrid" id="calGrid"></div>
+  <div class="evlist">
+    <h3 class="sub" style="margin-top:30px">이번 달 일정</h3>
+    <div id="monList"><div class="bempty" style="padding:20px;color:#8a919d">불러오는 중…</div></div>
+  </div>
+</div></section>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="site_config.js"></script>
+<script>
+if(!firebase.apps.length)firebase.initializeApp({
+  apiKey:"AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",authDomain:"koreaflyingdiscfederation.firebaseapp.com",
+  projectId:"koreaflyingdiscfederation",storageBucket:"koreaflyingdiscfederation.firebasestorage.app",
+  messagingSenderId:"1081847355343",appId:"1:1081847355343:web:ca40ed9a52e13f607f64ba"});
+const AUTH=firebase.auth(),DB=firebase.firestore();
+function xesc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+const TYPES={'대회':'#0f766e','자격검정':'#7c3aed','연수':'#b8860b','행사':'#1F4E9C','회의':'#8a919d'};
+let YM=new Date();YM=new Date(YM.getFullYear(),YM.getMonth(),1);
+let EVENTS=[];let COMP_EVENTS=[];let FILTER='';let ME=null,MYU=null,CAN_EDIT=false,EDIT_ID=null;
+AUTH.onAuthStateChanged(async u=>{
+  ME=u;
+  if(u){
+    try{const d=await DB.collection('users').doc(u.uid).get();MYU=d.data();
+      CAN_EDIT=!!(MYU&&(MYU.role==='admin'||MYU.calendarEditor===true));}catch(e){}
+    // 로그인 시 대회 모집(compSlots)도 자동 표시
+    try{const cs=await DB.collection('compSlots').orderBy('date').limit(100).get();
+      COMP_EVENTS=cs.docs.map(d=>{const s=d.data();return {auto:true,title:s.title+(s.role==='참가'?'':' ('+s.role+'요원 모집)'),type:'대회',start:s.date,end:s.date,sido:s.region||'',place:'',desc:'대회 페이지에서 신청 가능',link:'competition.html'}});}catch(e){}
+  }
+  document.getElementById('addBtn').style.display=CAN_EDIT?'':'none';
+  render();
+});
+async function loadEvents(){
+  try{
+    const snap=await DB.collection('events').orderBy('start').limit(500).get();
+    EVENTS=snap.docs.map(d=>Object.assign({id:d.id},d.data()));
+  }catch(e){EVENTS=[]}
+  render();
+}
+loadEvents();
+function allEvents(){return EVENTS.concat(COMP_EVENTS).filter(e=>!FILTER||e.type===FILTER)}
+function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function inRange(e,ds){const s=e.start||'';const en=e.end||e.start||'';return ds>=s&&ds<=en}
+function moveMon(d){YM=new Date(YM.getFullYear(),YM.getMonth()+d,1);render()}
+function goToday(){const n=new Date();YM=new Date(n.getFullYear(),n.getMonth(),1);render()}
+function render(){
+  document.getElementById('monTitle').textContent=YM.getFullYear()+'년 '+(YM.getMonth()+1)+'월';
+  document.getElementById('typeChips').innerHTML=['전체'].concat(Object.keys(TYPES)).map(t=>{
+    const v=t==='전체'?'':t;
+    return '<button class="fchip'+(FILTER===v?' on':'')+'" onclick="FILTER=\''+v+'\';render()">'
+      +(v?'<span class="dot" style="background:'+TYPES[v]+'"></span>':'')+t+'</button>';
+  }).join('');
+  const first=new Date(YM), startDow=first.getDay();
+  const gridStart=new Date(first);gridStart.setDate(1-startDow);
+  const today=ymd(new Date());
+  let cells='';
+  ['일','월','화','수','목','금','토'].forEach((d,i)=>cells+='<div class="dow'+(i===0?' sun':i===6?' sat':'')+'">'+d+'</div>');
+  const evs=allEvents();
+  for(let i=0;i<42;i++){
+    const d=new Date(gridStart);d.setDate(gridStart.getDate()+i);
+    const ds=ymd(d);const other=d.getMonth()!==YM.getMonth();
+    const dayEvs=evs.filter(e=>inRange(e,ds));
+    cells+='<div class="dcell'+(other?' other':'')+(ds===today?' today':'')+'">'
+      +'<span class="dn'+(d.getDay()===0?' sun':d.getDay()===6?' sat':'')+'">'+d.getDate()+'</span>'
+      +dayEvs.slice(0,3).map(e=>'<button class="evt" style="background:'+(TYPES[e.type]||'#153A77')+'" onclick="viewEv(\''+xesc(e.id||'')+'\',\''+xesc(e.title).replace(/'/g,'&#39;')+'\')" title="'+xesc(e.title)+'">'+xesc(e.title)+'</button>').join('')
+      +(dayEvs.length>3?'<span style="font-size:10px;color:#8a919d;font-weight:800">+'+(dayEvs.length-3)+'건</span>':'')
+      +'</div>';
+  }
+  document.getElementById('calGrid').innerHTML=cells;
+  // 이번 달 리스트
+  const ms=ymd(new Date(YM.getFullYear(),YM.getMonth(),1));
+  const me2=ymd(new Date(YM.getFullYear(),YM.getMonth()+1,0));
+  const monEvs=evs.filter(e=>(e.start||'')<=me2&&(e.end||e.start||'')>=ms).sort((a,b)=>String(a.start).localeCompare(String(b.start)));
+  document.getElementById('monList').innerHTML=!monEvs.length
+    ?'<div class="bempty" style="padding:20px;color:#8a919d">이번 달 등록된 일정이 없습니다.</div>'
+    :monEvs.map(e=>{
+      const mine=CAN_EDIT&&e.id&&(MYU&&MYU.role==='admin'||e.byUid===(ME&&ME.uid));
+      return '<div class="evrow"><div class="ed">'+xesc((e.start||'').slice(5).replace('-','.'))+(e.end&&e.end!==e.start?'<br>~'+xesc(e.end.slice(5).replace('-','.')):'')+'</div>'
+      +'<div style="flex:1"><span class="et">'+xesc(e.title)+'</span><span class="tbadge" style="background:'+(TYPES[e.type]||'#153A77')+'">'+xesc(e.type)+'</span>'+(e.auto?'<span class="tbadge" style="background:#c3c9d4">자동</span>':'')
+      +'<div class="em">'+(e.sido?xesc(e.sido)+' · ':'')+(e.place?xesc(e.place)+' · ':'')+xesc(e.desc||'')
+      +(e.link?' <a href="'+xesc(e.link)+'" style="color:var(--red);font-weight:800">바로가기 →</a>':'')+'</div></div>'
+      +(mine?'<div style="display:flex;gap:6px"><button class="navbtn" style="font-size:12px;padding:6px 12px" onclick="openEv(\''+e.id+'\')">수정</button>'
+        +'<button class="navbtn" style="font-size:12px;padding:6px 12px;color:#C41E2F" onclick="delEv(\''+e.id+'\')">삭제</button></div>':'')
+      +'</div>';
+    }).join('');
+}
+function viewEv(id,title){
+  const e=allEvents().find(x=>(x.id&&x.id===id)||x.title===title);if(!e)return;
+  const old=document.getElementById('evView');if(old)old.remove();
+  const div=document.createElement('div');div.id='evView';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+  div.onclick=ev=>{if(ev.target===div)div.remove()};
+  div.innerHTML='<div class="cmodal">'
+    +'<span class="tbadge" style="background:'+(TYPES[e.type]||'#153A77')+';font-size:12px;margin-left:0">'+xesc(e.type)+'</span>'
+    +'<h3 style="margin:10px 0 6px;font-size:19px;font-weight:900">'+xesc(e.title)+'</h3>'
+    +'<div style="font-size:13.5px;color:#4b5563;line-height:2">📅 '+xesc(e.start||'')+(e.end&&e.end!==e.start?' ~ '+xesc(e.end):'')
+    +(e.sido?'<br>📍 '+xesc(e.sido)+(e.place?' · '+xesc(e.place):''):(e.place?'<br>📍 '+xesc(e.place):''))
+    +(e.desc?'<br><span style="white-space:pre-wrap">📝 '+xesc(e.desc)+'</span>':'')
+    +(e.byName?'<br><span style="font-size:12px;color:#8a919d">등록: '+xesc(e.byName)+'</span>':'')+'</div>'
+    +(e.link?'<a href="'+xesc(e.link)+'" class="calbtn calbtn-main" style="display:inline-block;text-decoration:none;margin-top:12px">바로가기 →</a>':'')
+    +'<div style="text-align:right;margin-top:14px"><button class="navbtn" onclick="document.getElementById(\'evView\').remove()">닫기</button></div>'
+    +'</div>';
+  document.body.appendChild(div);
+}
+// ── 일정 등록·수정 (권한자) ──
+function openEv(id){
+  EDIT_ID=id||null;
+  const e=id?EVENTS.find(x=>x.id===id):null;
+  const old=document.getElementById('evModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='evModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+  div.innerHTML='<div class="cmodal">'
+    +'<h3 style="margin:0;font-size:18px;font-weight:900">'+(id?'✏️ 일정 수정':'📅 일정 등록')+'</h3>'
+    +'<label class="clabel">일정명 <span style="color:#C41E2F">*</span></label><input id="evTitle" class="cfield" value="'+xesc(e?e.title:'')+'" placeholder="예: 2026 전국 얼티미트 대회">'
+    +'<div style="display:flex;gap:10px"><div style="flex:1"><label class="clabel">유형</label><select id="evType" class="cfield">'+Object.keys(TYPES).map(t=>'<option'+(e&&e.type===t?' selected':'')+'>'+t+'</option>').join('')+'</select></div>'
+    +'<div style="flex:1"><label class="clabel">지역 (선택)</label><select id="evSido" class="cfield"><option value="">전국·중앙</option>'+['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'].map(s=>'<option'+(e&&e.sido===s?' selected':'')+'>'+s+'</option>').join('')+'</select></div></div>'
+    +'<div style="display:flex;gap:10px"><div style="flex:1"><label class="clabel">시작일 <span style="color:#C41E2F">*</span></label><input id="evStart" type="date" class="cfield" value="'+xesc(e?e.start:'')+'"></div>'
+    +'<div style="flex:1"><label class="clabel">종료일 (하루면 비움)</label><input id="evEnd" type="date" class="cfield" value="'+xesc(e&&e.end&&e.end!==e.start?e.end:'')+'"></div></div>'
+    +'<label class="clabel">장소</label><input id="evPlace" class="cfield" value="'+xesc(e?e.place:'')+'" placeholder="예: 김포 솔터축구장">'
+    +'<label class="clabel">설명</label><textarea id="evDesc" class="cfield" rows="3" placeholder="참가 대상·준비물·문의처 등">'+xesc(e?e.desc:'')+'</textarea>'
+    +'<label class="clabel">링크 (선택 — 신청·공고 페이지)</label><input id="evLink" class="cfield" value="'+xesc(e?e.link:'')+'" placeholder="예: competition.html 또는 https://…">'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
+    +'<button class="navbtn" onclick="document.getElementById(\'evModal\').remove()">닫기</button>'
+    +'<button class="calbtn calbtn-main" onclick="saveEv()">'+(id?'저장':'등록')+'</button></div>'
+    +'</div>';
+  document.body.appendChild(div);
+}
+async function saveEv(){
+  const title=document.getElementById('evTitle').value.trim();
+  const start=document.getElementById('evStart').value;
+  if(!title||!start){alert('일정명과 시작일을 입력해주세요.');return}
+  const end=document.getElementById('evEnd').value||start;
+  if(end<start){alert('종료일이 시작일보다 빠릅니다.');return}
+  const data={title:title,type:document.getElementById('evType').value,
+    start:start,end:end,
+    sido:document.getElementById('evSido').value,
+    place:document.getElementById('evPlace').value.trim(),
+    desc:document.getElementById('evDesc').value.trim(),
+    link:document.getElementById('evLink').value.trim()};
+  try{
+    if(EDIT_ID){await DB.collection('events').doc(EDIT_ID).update(data);}
+    else{data.byUid=ME.uid;data.byName=(MYU&&MYU.name)||'';data.createdAt=firebase.firestore.FieldValue.serverTimestamp();
+      await DB.collection('events').add(data);}
+    document.getElementById('evModal').remove();
+    loadEvents();
+  }catch(e2){alert('저장 실패: '+(e2.code==='permission-denied'?'권한이 없습니다. 사무국에 캘린더 편집 권한을 요청해주세요.':e2.message))}
+}
+async function delEv(id){
+  if(!confirm('이 일정을 삭제할까요?'))return;
+  try{await DB.collection('events').doc(id).delete();loadEvents();}
+  catch(e){alert('삭제 실패: '+e.message)}
+}
+</script>
+
+<footer><div class="wrap">
+  <div class="top">
+    <div class="f-brand"><img src="kfdf_logo.png" alt="로고">
+      <div><b>대한민국플라잉디스크연맹</b><span>KOREA FLYING DISC FEDERATION</span></div></div>
+    <div class="links">
+      <a href="about.html">연맹소개</a><a href="business.html">사업안내</a>
+      <a href="notice.html">알림마당</a><a href="archive.html">자료실</a>
+      <a href="apply.html">학교 강습 신청</a><a href="sponsor.html">후원안내</a>
+    </div>
+  </div>
+  <div class="bottom">
+    <span style="display:inline-block;margin-bottom:8px;padding:4px 14px;background:rgba(255,255,255,.08);border-radius:999px;font-size:12px;font-weight:700;color:#c3c9d4">유소년 스포츠 기반구축사업은 문화체육관광부 · 국민체육진흥공단 · 대한체육회가 후원하며 국민체육진흥기금을 지원받아 운영됩니다</span><br>
+    <b>사단법인 대한민국플라잉디스크연맹</b> &nbsp;|&nbsp; 경기도 김포시 홍도평로 72-22 가동 2층<br>
+    TEL 031-984-3248 &nbsp;|&nbsp; EMAIL kfdf60@hanmail.net<br>
+    © 2026 KOREA FLYING DISC FEDERATION. All rights reserved. &nbsp;|&nbsp; <a href="privacy.html" style="color:#9aa1ad">개인정보처리방침</a>
+  </div>
+</div></footer>
+<script src="auth_ui.js?v=20260726d"></script>
+</body>
+</html>
