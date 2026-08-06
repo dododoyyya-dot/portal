@@ -92,6 +92,7 @@ function appTypeOf(s){
   return 'school';
 }
 
+let SCOPE_R=null; // 권역장 관할 권역 (admin은 null=전권역)
 AUTH.onAuthStateChanged(async u=>{
   const g=document.getElementById('gate');
   if(!u){g.style.display='block';g.innerHTML='🔒 관리자 전용 페이지입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a>';return}
@@ -100,12 +101,16 @@ AUTH.onAuthStateChanged(async u=>{
   if(!v||(v.role!=='admin'&&v.role!=='regionAdmin')){
     g.style.display='block';g.innerHTML='⛔ 관리자·권역장 권한이 없습니다.';return;
   }
+  if(v.role==='regionAdmin'&&v.managedRegion&&KFDF_REGIONS.indexOf(v.managedRegion)>=0)SCOPE_R=v.managedRegion;
   document.getElementById('body').style.display='block';
   load();
 });
 
 async function load(){
-  const snap=await DB.collection('schoolApplications').get();
+  // 권역장은 규칙상 관할 권역 건만 읽을 수 있으므로 where 조건 필수 (admin은 전체)
+  const snap=SCOPE_R
+    ?await DB.collection('schoolApplications').where('region','==',SCOPE_R).get()
+    :await DB.collection('schoolApplications').get();
   const R={};KFDF_REGIONS.forEach(r=>R[r]={school:0,after:0,goods:0,self:0,dispatch:0,applied:0,wait:0});
   R['미상']={school:0,after:0,goods:0,self:0,dispatch:0,applied:0,wait:0};
   let selSchool=0,selAfter=0,goods=0,selfN=0,dispatch=0,totalApps=0,waitN=0;
@@ -135,6 +140,7 @@ async function load(){
   let rt='<tr><th>권역</th><th>🏫 학교체육</th><th>🌱 방과후·늘봄</th><th>선정 계</th><th>유효 신청</th><th>대기</th></tr>';
   let ts=0,ta=0,tapp=0,tw=0;
   KFDF_REGIONS.forEach(r=>{
+    if(SCOPE_R&&r!==SCOPE_R)return; // 권역장: 관할 권역 행만 표시
     const c=R[r];const sum=c.school+c.after;
     ts+=c.school;ta+=c.after;tapp+=c.applied;tw+=c.wait;
     rt+='<tr><td>'+r+'</td><td>'+c.school+'</td><td>'+c.after+'</td><td class="big">'+sum+'</td><td>'+c.applied+'</td><td>'+c.wait+'</td></tr>';
@@ -146,12 +152,13 @@ async function load(){
   let st2='<tr><th>권역</th><th>강사파견+용품</th><th>본인지도+용품</th><th>🎁 용품만</th></tr>';
   let td2=0,tf2=0,tg2=0;
   KFDF_REGIONS.forEach(r=>{
+    if(SCOPE_R&&r!==SCOPE_R)return; // 권역장: 관할 권역 행만 표시
     const c=R[r];td2+=c.dispatch;tf2+=c.self;tg2+=c.goods;
     st2+='<tr><td>'+r+'</td><td>'+c.dispatch+'</td><td>'+c.self+'</td><td>'+c.goods+'</td></tr>';
   });
   st2+='<tr class="sum"><td>합계</td><td>'+td2+'</td><td>'+tf2+'</td><td>'+tg2+'</td></tr>';
   document.getElementById('supTable').innerHTML=st2;
-  document.getElementById('updated').textContent='집계 시각: '+new Date().toLocaleString('ko-KR');
+  document.getElementById('updated').textContent='집계 시각: '+new Date().toLocaleString('ko-KR')+(SCOPE_R?' · 관할 권역('+SCOPE_R+') 집계만 표시됩니다':'');
 }
 </script>
 </body>
