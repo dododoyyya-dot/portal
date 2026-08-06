@@ -326,6 +326,7 @@ function renderSchools(){
       +(st==='선정'&&s.support!=='용품만'?'<button class="kbtn" style="background:'+(SEL===d.id?'#153A77':'#0f766e')+'" onclick="selectApp(\''+d.id+'\')">'+(SEL===d.id?'✔ 선택됨':'👤 강사 배정')+'</button>':'')
       +(st==='선정'?'<button class="kbtn ghost" onclick="setSt(\''+d.id+'\',\'접수\')">선정취소</button>':'')
       +(st==='배정완료'?'<button class="kbtn" style="background:#e6b422" onclick="unassign(\''+d.id+'\')">배정해제</button>':'')
+      +(st==='배정완료'?'<button class="kbtn" style="background:#334155" onclick="printInspect(\''+d.id+'\')">🖨 점검일지</button>':'')
       +'<button class="kbtn ghost" onclick="editCity(\''+d.id+'\')">📍 시군구</button>'
       +'<button class="kbtn ghost" onclick="chgSupportR(\''+d.id+'\')">🎁 지원방식</button>'
       +'<button class="kbtn ghost" onclick="chgTypeR(\''+d.id+'\')">🔁 유형</button>'
@@ -531,6 +532,45 @@ async function chgTypeR(id){
     alert('변경되었습니다: '+cur+' → '+nxt);
     await loadSchools();
   }catch(e){alert('변경 실패: '+e.message+'\n\n권한 규칙이 아직 갱신 전이면 사무국에 요청해주세요.')}
+}
+// ── 학교 현장점검일지 — 학교·강사·점검자 자동 기입 후 인쇄해 현장 지참 ──
+function printInspect(id){
+  const doc=RAPPS.find(d=>d.id===id);if(!doc)return;
+  const s=doc.data();
+  const insp=(RMY&&RMY.name)?RMY.name:'';
+  const th='style="border:1px solid #555;background:#f2f2f2;padding:7px 6px;font-size:12.5px;font-weight:800;width:92px;text-align:center;vertical-align:middle"';
+  const td='style="border:1px solid #555;padding:7px 9px;font-size:12.5px;vertical-align:middle"';
+  const chk='style="border:1px solid #555;padding:6px;font-size:12px;text-align:center;width:52px;vertical-align:middle"';
+  const items=['강습이 실제 실시되고 있는가? (계획 시간·장소 준수)','배정 강사 본인이 지도하고 있는가?','지원 용품을 수업에 활용하고 있는가?','참여 학생 출결 관리가 되고 있는가? (출석&nbsp;&nbsp;&nbsp;&nbsp;명)','운영일지(홈페이지 회차보고)를 작성하고 있는가?','안전 관리(보험·시설·응급 대비)는 적절한가?'];
+  const rows=items.map(t=>'<tr><td '+td+'>'+t+'</td><td '+chk+'>□ 적정</td><td '+chk+'>□ 개선<br>필요</td></tr>').join('');
+  const html='<div style="font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:26px 8px">'
+    +'<div style="text-align:center;font-size:12px;color:#666">2026 유소년 스포츠 기반구축사업</div>'
+    +'<h2 style="text-align:center;letter-spacing:8px;margin:6px 0 16px;font-size:22px">학교 현장점검일지</h2>'
+    +'<table style="width:100%;border-collapse:collapse;margin-bottom:12px">'
+    +'<tr><th '+th+'>학교명</th><td '+td+'><b>'+esc(s.school||'')+'</b></td><th '+th+'>유형</th><td '+td+'>'+esc(String(s.type||'').indexOf('방과후')>=0?'방과후·늘봄·돌봄':'학교체육 강습')+'</td></tr>'
+    +'<tr><th '+th+'>소재지</th><td '+td+'>'+esc(s.city||'')+' ('+esc(s.region||'')+' 권역)</td><th '+th+'>지원방식</th><td '+td+'>'+esc(s.support||'강사파견+용품')+'</td></tr>'
+    +'<tr><th '+th+'>배정 강사</th><td '+td+'>'+esc(s.assignedName||'')+'</td><th '+th+'>담당 교사</th><td '+td+'>'+esc(s.teacher||'')+' '+esc(s.phone||'')+'</td></tr>'
+    +'<tr><th '+th+'>점검자</th><td '+td+'>'+esc(insp)+' (권역장/점검위원)</td><th '+th+'>점검일자</th><td '+td+'>2026년&nbsp;&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;&nbsp;일&nbsp;&nbsp;(&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;~&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;)</td></tr>'
+    +'</table>'
+    +'<table style="width:100%;border-collapse:collapse;margin-bottom:12px">'
+    +'<tr><th '+th.replace('width:92px','')+'>점검 내용</th><th '+chk+'>적정</th><th '+chk+'>개선필요</th></tr>'+rows
+    +'</table>'
+    +'<table style="width:100%;border-collapse:collapse;margin-bottom:12px">'
+    +'<tr><th '+th+'>문제점 및<br>개선 사항</th><td '+td+' colspan="3"><div style="height:56px"></div></td></tr>'
+    +'<tr><th '+th+'>기타 특이사항</th><td '+td+' colspan="3"><div style="height:36px"></div></td></tr>'
+    +'</table>'
+    +'<div style="font-size:12px;margin-bottom:14px">· 이동거리(편도):&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;km &nbsp;→&nbsp; 점검수당 구간: □ 5만원&nbsp; □ 8만원&nbsp; □ 12만원</div>'
+    +'<div style="font-size:12.5px;text-align:center;margin-bottom:10px">위 내용이 사실과 다름없음을 확인합니다.</div>'
+    +'<table style="width:100%;border-collapse:collapse">'
+    +'<tr><td style="border:1px solid #555;padding:10px;font-size:12.5px;text-align:center">강사(지도자) :&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(서명)</td>'
+    +'<td style="border:1px solid #555;padding:10px;font-size:12.5px;text-align:center">점검자 :&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(서명)</td>'
+    +'<td style="border:1px solid #555;padding:10px;font-size:12.5px;text-align:center">확인(담당교사) :&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(서명)</td></tr>'
+    +'</table>'
+    +'<div style="font-size:10.5px;color:#777;text-align:center;margin-top:12px">제출: 사단법인 대한민국플라잉디스크연맹 사무국 (kfdf60@hanmail.net · 031-984-3248) ※ 본인이 배정에 관여한 학교의 자기점검은 효력이 없습니다 (교차 점검 원칙)</div>'
+    +'</div>';
+  const w=window.open('','_blank');
+  w.document.write('<html><head><title>'+esc(s.school||'')+' 현장점검일지</title></head><body>'+html+'<script>setTimeout(function(){window.print()},500)<\/script></body></html>');
+  w.document.close();
 }
 function exportSchools(){
   const rows=[['접수번호','학교명','시군구','유형','지원방식','상태','담당교사','전화','배정강사']];
