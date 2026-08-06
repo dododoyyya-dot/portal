@@ -162,7 +162,7 @@ const DB = firebase.firestore();
   <div>
 
     <div class="sec-label">SCHOOLS</div>
-    <h2 class="sec-title" style="font-size:24px">신청 학교 (전 권역)</h2>
+    <h2 class="sec-title" style="font-size:24px" id="rgSchTitle">신청 학교 (전 권역)</h2>
     <div class="kbar" id="rgRegChips">
       <button class="kchip rreg on" data-r="전체" onclick="rgRegion('전체',this)">전 권역</button>
       <button class="kchip rreg" data-r="서울·경기" onclick="rgRegion('서울·경기',this)">서울·경기</button>
@@ -209,6 +209,7 @@ const DB = firebase.firestore();
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 let RME=null,RMY=null,RAPPS=[],RUSERS=[],RFL='전체',RREG='전체',SEL=null;
+let RSCOPE=null; // 권역장 관할 권역 (admin은 null=전권역)
 
 AUTH.onAuthStateChanged(async u=>{
   const g=document.getElementById('rgGate');
@@ -222,7 +223,13 @@ AUTH.onAuthStateChanged(async u=>{
   if(RMY.role==='regionAdmin'&&Array.isArray(RMY.duties)&&RMY.duties.indexOf('assign')<0){
     g.style.display='block';g.innerHTML='⛔ 강습배정 권한이 없습니다 — 자격 업무만 위임되어 있습니다. <a href="license.html" style="font-weight:800;color:var(--red)">자격증 관리 페이지로 →</a>';return;
   }
-  document.getElementById('rgBadge').textContent='— '+esc(RMY.name||'')+' 님 (전 권역)';
+  // ── 관할 권역 제한: 권역장은 부여받은 권역(managedRegion)만 열람·배정 (admin은 전권역) ──
+  if(RMY.role==='regionAdmin'&&RMY.managedRegion&&KFDF_REGIONS.indexOf(RMY.managedRegion)>=0){
+    RSCOPE=RMY.managedRegion;RREG=RSCOPE;
+    document.getElementById('rgRegChips').style.display='none'; // 권역 선택 칩 숨김
+    const t=document.getElementById('rgSchTitle');if(t)t.textContent='신청 학교 ('+RSCOPE+' 권역)';
+  }
+  document.getElementById('rgBadge').textContent='— '+esc(RMY.name||'')+' 님 ('+(RSCOPE?RSCOPE+' 권역':'전 권역')+')';
   document.getElementById('rgBody').style.display='block';
   await Promise.all([loadSchools(),loadInst()]);
 });
@@ -281,6 +288,7 @@ function renderSchools(){
   const q=(document.getElementById('rgSearch').value||'').trim().toLowerCase();
   const docs=RAPPS.filter(d=>{
     const s=d.data();
+    if(RSCOPE&&appRegion(s)!==RSCOPE)return false; // 권역장: 관할 권역만
     if(RREG!=='전체'&&appRegion(s)!==RREG)return false;
     if(RFL!=='전체'&&appTypeOf(s).indexOf(RFL)<0)return false;
     if(q){
@@ -370,6 +378,14 @@ function eligibleInst(app){
 function instRegs(v){
   return (v.activityRegions&&v.activityRegions.length)?v.activityRegions:[v.region];
 }
+// 권역장 관할 내 강사 여부: 활동가능 권역에 관할 포함, 또는 거점·거주가 관할 권역
+function instInScope(v){
+  if(!RSCOPE)return true;
+  if(instRegs(v).indexOf(RSCOPE)>=0)return true;
+  const sd=sidoOf(v.baseCity);
+  if(sd&&SIDO2REG[sd]===RSCOPE)return true;
+  return String(v.region||'')===RSCOPE;
+}
 // ── 인접 권역 정의 ──
 const ADJ={'서울·경기':['강원','충청'],'강원':['서울·경기','충청','경상'],'충청':['서울·경기','강원','전라','경상'],'전라':['충청','경상','제주'],'경상':['강원','충청','전라'],'제주':['전라']};
 // 시도·시군구 추출 (표기 흔들림 흡수)
@@ -426,6 +442,7 @@ async function confirmAssign(uid){
   if(!SEL)return;
   const appDoc=RAPPS.find(d=>d.id===SEL);if(!appDoc)return;
   const s=appDoc.data();
+  if(RSCOPE&&appRegion(s)!==RSCOPE){alert('⛔ 관할 권역('+RSCOPE+') 외 학교는 배정할 수 없습니다.');return}
   const pick=RUSERS.find(d=>d.id===uid);if(!pick)return;
   const v=pick.data();
   const ok=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc);
@@ -515,9 +532,10 @@ async function chgTypeR(id){
 function exportSchools(){
   const rows=[['접수번호','학교명','시군구','유형','지원방식','상태','담당교사','전화','배정강사']];
   RAPPS.forEach(d=>{const s=d.data();
+    if(RSCOPE&&appRegion(s)!==RSCOPE)return; // 권역장: 관할 권역만
     rows.push([s.code||'',s.school||'',s.city||'',s.type||'',s.support||'',s.status||'',s.teacher||'',s.phone||'',s.assignedName||'']);
   });
-  dlCSV(rows,'전체_신청학교.csv');
+  dlCSV(rows,(RSCOPE?RSCOPE.replace(/·/g,''):'전체')+'_신청학교.csv');
 }
 
 async function loadInst(){
@@ -536,6 +554,7 @@ function renderInst(){
   let docs=RUSERS.filter(d=>{
     const v=d.data();const f=v.instructorFor||{};
     const applied=!!(f.school||f.after);
+    if(!instInScope(v))return false; // 권역장: 관할 권역 강사만 (활동가능권역·거점 기준)
     if(!SHOW_ALL&&!applied)return false; // 기본: 강사 지원자만
     if(s&&applied&&!(isAfter?f.after:f.school))return false; // 지원자는 선택 학교 유형에 맞는 사람만 (미지원자는 SHOW_ALL일 때 전부 노출)
     if(q&&[v.name,v.baseCity,v.region].map(x=>String(x||'').toLowerCase()).join(' ').indexOf(q)<0)return false;
@@ -584,11 +603,12 @@ function renderInst(){
 function exportInst(){
   const rows=[['성명','거점 시군구','거주 권역','활동가능 권역','휴대전화','학교체육','방과후','위촉검증']];
   RUSERS.forEach(d=>{const v=d.data();const f=v.instructorFor||{};
+    if(!instInScope(v))return; // 권역장: 관할 권역 강사만
     rows.push([v.name,v.baseCity||'',v.region||'',(v.activityRegions||[]).join('·'),v.phone||'',
       f.school?'O':'',f.after?'O':'',
       (v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc)?'완료':'미완']);
   });
-  dlCSV(rows,'전체_배정가능강사.csv');
+  dlCSV(rows,(RSCOPE?RSCOPE.replace(/·/g,''):'전체')+'_배정가능강사.csv');
 }
 function dlCSV(rows,name){
   const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
