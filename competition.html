@@ -504,10 +504,13 @@ async function submitClaim(){
   loadSlots();
 }
 // ── 제출한 신청서·동의서 보기·인쇄 ──
-function printMyDocs(id){
+async function printMyDocs(id){
   const doc0=CSLOTS.find(d=>d.id===id);if(!doc0)return;
   const s=doc0.data();
   if(s.role==='참가'){printMyEntryDocs(id,s);return}
+  // 주민등록번호(본인만 열람 가능) — 동의서 인적사항 기입용
+  let myRrn='';
+  try{const pd=await DB.collection('privateInfo').doc(CME.uid).get();if(pd.exists)myRrn=pd.data().rrn||'';}catch(e){}
   const ap=(CMY.contracts||{})['compapply_'+id]||{};
   const myClaim=latestClaim(s,CME.uid)||{};
   const prefs=(ap.prefs||myClaim.prefs||[]);
@@ -532,10 +535,22 @@ function printMyDocs(id){
     +'<div style="text-align:right;margin-top:26px;font-size:14px">'+cesc(dt.replace(/-/g,'. '))+'.</div>'
     +'<div style="text-align:right;margin-top:8px;font-size:15px">신청인&nbsp;&nbsp;<b>'+cesc(CMY.name||'')+'</b>&nbsp;&nbsp;'+sig+'</div>'
     +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">사단법인 대한민국플라잉디스크연맹 귀하</div></div>';
+  // 오버레이(필드배치): 관리자가 지정한 좌표에 신청자 정보 자동 기입
+  const ovlVals={name:CMY.name||'',rrn:myRrn||'',phone:CMY.phone||'',bank:CMY.bank||'',acct:CMY.accountNum||'',holder:CMY.accountHolder||CMY.name||'',date:dt.replace(/-/g,'. ')+'.',sign:''};
+  const hasOvl=!!(s.consentOverlays&&Object.keys(s.consentOverlays).some(k=>(s.consentOverlays[k]||[]).length));
+  function ovlSpans(i){
+    const flds=(s.consentOverlays&&s.consentOverlays[String(i)])||[];
+    return flds.map(f=>{
+      const inner=f.f==='sign'
+        ?(ap.sign?'<img src="'+ap.sign+'" style="height:'+(f.fs||30)+'px;display:block">':'(서명)')
+        :cesc(ovlVals[f.f]||'');
+      return '<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:'+(f.fs||14)+'px;font-weight:700;color:#111;white-space:nowrap;line-height:1.3">'+inner+'</span>';
+    }).join('');
+  }
   const page2='<div style="font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:30px 10px">'
     +'<h2 style="text-align:center;border:2px solid #333;padding:12px;font-size:19px">개인정보 수집·이용 및 제3자 제공 동의서</h2>'
     +(consentImgsOf(s).length
-      ?consentImgsOf(s).map(x=>'<div style="margin-top:14px"><img src="'+x+'" style="width:100%;border:1px solid #999"></div>').join('')+'<div style="font-size:13px;margin-top:8px">위 동의서 내용을 확인하였으며 이에 동의합니다. <b>동의함 ☑</b></div>'
+      ?consentImgsOf(s).map((x,i)=>'<div style="margin-top:14px;position:relative"><img src="'+x+'" style="width:100%;display:block;border:1px solid #999">'+ovlSpans(i)+'</div>').join('')+'<div style="font-size:13px;margin-top:8px">위 동의서 내용을 확인하였으며 이에 동의합니다. <b>동의함 ☑</b></div>'
       :(s.consentText
         ?'<div style="font-size:13px;line-height:1.9;border:1px solid #999;padding:14px 18px;margin-top:14px;white-space:pre-wrap">'+cesc(s.consentText)+'\n\n동의함 ☑</div>'
         :'<div style="font-size:13px;line-height:1.9;border:1px solid #999;padding:14px 18px;margin-top:14px">'
@@ -543,6 +558,10 @@ function printMyDocs(id){
         +'<b>□ 개인정보 제3자 제공 동의</b><br>· 제공받는 자: 국세청 · 목적: 수당 원천징수 세액 납부 · 항목: 성명, 지급총액, 결정세액, 주민등록번호 · 근거: 소득세법 제21조·제129조<br><br>'
         +'<b>□ 고유식별정보 처리 고지</b><br>· 개인정보보호법 제24조의2 및 국세기본법 시행령 제68조에 따라 처리됩니다.<br><br>'
         +'※ 동의를 거부할 권리가 있으며, 거부 시 수당 지급에 제한이 있을 수 있습니다. <b>동의함 ☑</b></div>'))
+    +(hasOvl?'':'<table style="width:100%;border-collapse:collapse;margin-top:14px">'
+    +'<tr><th '+th+'>성 명</th><td '+td+'>'+cesc(CMY.name||'-')+'</td><th '+th+'>주민등록번호</th><td '+td+'>'+cesc(myRrn||'(마이페이지 미등록)')+'</td></tr>'
+    +'<tr><th '+th+'>연락처</th><td '+td+'>'+cesc(CMY.phone||'-')+'</td><th '+th+'>은행 / 계좌번호</th><td '+td+'>'+cesc(CMY.bank?((CMY.bank||'')+' '+(CMY.accountNum||'')+(CMY.accountHolder?' (예금주 '+CMY.accountHolder+')':'')):'-')+'</td></tr>'
+    +'</table>')
     +'<div style="text-align:right;margin-top:26px;font-size:14px">'+cesc(dt.replace(/-/g,'. '))+'.</div>'
     +'<div style="text-align:right;margin-top:8px;font-size:15px">본인&nbsp;&nbsp;<b>'+cesc(CMY.name||'')+'</b>&nbsp;&nbsp;'+sig+'</div>'
     +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">'+cesc(s.title)+' 조직위원회 (사단법인 대한민국플라잉디스크연맹) 귀하</div></div>';
