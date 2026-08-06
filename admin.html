@@ -259,6 +259,13 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <input type="file" id="cpConsentImg" accept="image/*" multiple onchange="pickConsentImg(this,'cp')">
         <div id="cpImgStrip" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>
         <div id="cpImgState" style="font-size:12px;font-weight:700;margin-top:4px;color:#8a919d">이미지 없음</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;padding:10px;background:#f4f7fc;border-radius:10px">
+          <select id="cpTplSel" onfocus="fillTplSel()" style="padding:8px 11px;border:1.5px solid #dfe5ee;border-radius:8px;font-family:inherit;font-size:13px;flex:1;min-width:160px"><option value="">📂 동의서 보관함…</option></select>
+          <button type="button" class="btn-sub" style="background:#153A77" onclick="loadConsentTpl('cp')">불러오기</button>
+          <button type="button" class="btn-sub" style="background:#0f766e" onclick="saveConsentTpl('cp')">현재 동의서 저장</button>
+          <button type="button" class="btn-sub" style="background:#8a919d" onclick="delConsentTpl('cp')">삭제</button>
+          <div style="flex-basis:100%;font-size:11.5px;color:#8a919d">교육청·구청 등 기관별 동의서를 이름 붙여 저장해두고, 공고 올릴 때 골라 쓰세요 (이미지·필드배치·문안 함께 저장됨)</div>
+        </div>
         <button class="btn-main" onclick="addComp()">모집 등록</button>
         <div class="msg" id="cpMsg"></div>
       </div>
@@ -1894,12 +1901,12 @@ async function addComp(){
     note:document.getElementById('cpNote').value.trim(),
     fee:document.getElementById('cpFee').value.trim(),
     consentText:document.getElementById('cpConsentText').value.trim(),
-    consentImgs:CONSENT_IMGS.cp.slice(),consentImg:'',
+    consentImgs:CONSENT_IMGS.cp.slice(),consentImg:'',consentOverlays:ovlPack('cp'),
     createdAt:firebase.firestore.FieldValue.serverTimestamp()});
   m.textContent='등록 완료 — 메인 참여신청(선정학교 강사지원)에 즉시 게시됩니다';m.className='msg ok';
   document.getElementById('cpTitle').value='';document.getElementById('cpNote').value='';
   document.getElementById('cpConsentText').value='';document.getElementById('cpConsentImg').value='';
-  CONSENT_IMGS.cp=[];renderImgStrip('cp');
+  CONSENT_IMGS.cp=[];CONSENT_OVL.cp=[];renderImgStrip('cp');
   loadCompsAdmin();
 }
 // 구버전 단일 이미지(consentImg) 호환 게터
@@ -1942,19 +1949,136 @@ async function pickConsentImg(input,which){
   input.value='';
   renderImgStrip(which);
 }
-function rmConsentImg(which,i){CONSENT_IMGS[which].splice(i,1);renderImgStrip(which)}
+function rmConsentImg(which,i){CONSENT_IMGS[which].splice(i,1);CONSENT_OVL[which].splice(i,1);renderImgStrip(which)}
 function renderImgStrip(which){
   const strip=document.getElementById(which+'ImgStrip');
   const st=document.getElementById(which+'ImgState');
   const arr=CONSENT_IMGS[which];
-  if(strip)strip.innerHTML=arr.map((x,i)=>'<div style="position:relative;display:inline-block">'
+  if(strip)strip.innerHTML=arr.map((x,i)=>{
+    const n=(CONSENT_OVL[which][i]||[]).length;
+    return '<div style="position:relative;display:inline-block;text-align:center">'
     +'<img src="'+x+'" style="height:84px;border:1px solid #dfe5ee;border-radius:8px;display:block">'
     +'<span style="position:absolute;top:-6px;left:-6px;background:#153A77;color:#fff;font-size:10.5px;font-weight:900;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center">'+(i+1)+'</span>'
     +'<button type="button" onclick="rmConsentImg(\''+which+'\','+i+')" style="position:absolute;top:-7px;right:-7px;background:#C41E2F;color:#fff;border:none;width:19px;height:19px;border-radius:50%;font-size:11px;font-weight:900;cursor:pointer;line-height:1">×</button>'
-    +'</div>').join('');
+    +'<button type="button" onclick="openOvlEditor(\''+which+'\','+i+')" style="display:block;margin-top:3px;width:100%;background:'+(n?'#0f766e':'#7c3aed')+';color:#fff;border:none;border-radius:6px;font-size:10.5px;font-weight:900;padding:3px 6px;cursor:pointer">'+(n?'🎯 필드 '+n+'개':'🎯 필드배치')+'</button>'
+    +'</div>'}).join('');
   if(st)st.innerHTML=arr.length
-    ?'✓ <b style="color:#0f766e">'+arr.length+'장 준비됨</b> (총 '+Math.round(consentTotal(which)/1024)+'KB) — 저장 시 문안 대신 순서대로 표시됩니다'
+    ?'✓ <b style="color:#0f766e">'+arr.length+'장 준비됨</b> (총 '+Math.round(consentTotal(which)/1024)+'KB) — 저장 시 문안 대신 순서대로 표시됩니다.<br>🎯 <b>필드배치</b>를 누르면 이미지 위에 성명·주민번호·계좌·서명이 찍힐 위치를 지정할 수 있습니다 (지정 시 신청자 정보가 그 자리에 자동 인쇄).'
     :'이미지 없음';
+}
+// ── 동의서 필드배치(오버레이): 스캔 양식 위 좌표에 신청자 정보 자동 기입 ──
+// 저장 형식: consentOverlays = {"이미지번호":[{f:필드,x:0~1,y:0~1,fs:px(680px 폭 기준)}...]}  ※ Firestore 중첩배열 불가 → 객체 맵
+const CONSENT_OVL={cp:[],ec:[]};
+const OVL_FIELDS={name:'성명',rrn:'주민등록번호',phone:'연락처',bank:'은행',acct:'계좌번호',holder:'예금주',date:'날짜',sign:'서명'};
+function ovlPack(which){const o={};CONSENT_OVL[which].forEach((a,i)=>{if(a&&a.length)o[String(i)]=a});return o}
+function ovlUnpack(s){
+  const n=consentImgsOf(s).length;const arr=[];
+  for(let i=0;i<n;i++)arr.push((s.consentOverlays&&s.consentOverlays[String(i)])?s.consentOverlays[String(i)].map(f=>Object.assign({},f)):[]);
+  return arr;
+}
+let OVL_W=null,OVL_I=0,OVL_SEL=-1,OVL_DRAG=null;
+function openOvlEditor(which,i){
+  OVL_W=which;OVL_I=i;OVL_SEL=-1;
+  const old=document.getElementById('ovlModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='ovlModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.6);z-index:1200;display:flex;align-items:center;justify-content:center;padding:14px';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:740px;width:100%;max-height:94vh;overflow:auto;padding:20px">'
+    +'<b style="font-size:16px">🎯 동의서 필드배치 — '+(i+1)+'번 이미지</b>'
+    +'<div style="font-size:12.5px;color:#555;margin:6px 0 10px">① 아래에서 필드를 고르고 ② 이미지의 원하는 위치를 클릭하면 배치됩니다. 칩을 <b>드래그</b>해 이동, <b>더블클릭</b>하면 삭제. 신청자가 서명을 마치면 인쇄본의 해당 위치에 실제 값이 찍힙니다.</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">'
+    +'<select id="ovlField" style="padding:7px 10px;border:1.5px solid #dfe5ee;border-radius:8px;font-family:inherit;font-size:13px">'
+    +Object.keys(OVL_FIELDS).map(k=>'<option value="'+k+'">'+OVL_FIELDS[k]+'</option>').join('')+'</select>'
+    +'<button type="button" class="btn-sub" style="background:#8a919d;padding:7px 12px" onclick="ovlFont(-2)">글자 −</button>'
+    +'<button type="button" class="btn-sub" style="background:#8a919d;padding:7px 12px" onclick="ovlFont(2)">글자 ＋</button>'
+    +'<span style="font-size:12px;color:#888">(선택한 칩에 적용)</span>'
+    +'<button type="button" class="btn-main" style="width:auto;padding:8px 22px;margin-left:auto" onclick="document.getElementById(\'ovlModal\').remove();renderImgStrip(OVL_W)">완료</button>'
+    +'</div>'
+    +'<div id="ovlBox" style="position:relative;width:680px;max-width:100%;margin:0 auto;cursor:crosshair">'
+    +'<img id="ovlImg" src="'+CONSENT_IMGS[which][i]+'" style="width:100%;display:block;border:1px solid #ccc" draggable="false">'
+    +'</div></div>';
+  document.body.appendChild(div);
+  const box=div.querySelector('#ovlBox');
+  box.addEventListener('mousedown',ovlDown);
+  box.addEventListener('mousemove',ovlMove);
+  window.addEventListener('mouseup',ovlUp);
+  renderOvlChips();
+}
+function renderOvlChips(){
+  const box=document.getElementById('ovlBox');if(!box)return;
+  box.querySelectorAll('.ovlchip').forEach(c=>c.remove());
+  ovlArr().forEach((f,idx)=>{
+    const c=document.createElement('div');
+    c.className='ovlchip';c.dataset.idx=idx;
+    c.style.cssText='position:absolute;left:'+(f.x*100)+'%;top:'+(f.y*100)+'%;font-size:'+f.fs+'px;font-weight:800;color:#1230c4;background:rgba(80,110,255,.14);border:1.5px dashed '+(idx===OVL_SEL?'#C41E2F':'#4c6ef5')+';border-radius:5px;padding:1px 6px;cursor:move;user-select:none;white-space:nowrap;line-height:1.35';
+    c.textContent=OVL_FIELDS[f.f]||f.f;
+    c.addEventListener('dblclick',e=>{e.stopPropagation();ovlArr().splice(idx,1);OVL_SEL=-1;renderOvlChips()});
+    box.appendChild(c);
+  });
+}
+function ovlArr(){CONSENT_OVL[OVL_W][OVL_I]=CONSENT_OVL[OVL_W][OVL_I]||[];return CONSENT_OVL[OVL_W][OVL_I]}
+function ovlDown(e){
+  const box=document.getElementById('ovlBox');const r=box.getBoundingClientRect();
+  const chip=e.target.closest('.ovlchip');
+  if(chip){OVL_SEL=parseInt(chip.dataset.idx);OVL_DRAG={dx:e.clientX-chip.getBoundingClientRect().left,dy:e.clientY-chip.getBoundingClientRect().top};renderOvlChips();e.preventDefault();return}
+  const f=document.getElementById('ovlField').value;
+  ovlArr().push({f:f,x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height,fs:f==='sign'?30:14});
+  OVL_SEL=ovlArr().length-1;renderOvlChips();
+}
+function ovlMove(e){
+  if(!OVL_DRAG||OVL_SEL<0)return;
+  const box=document.getElementById('ovlBox');const r=box.getBoundingClientRect();
+  const f=ovlArr()[OVL_SEL];if(!f)return;
+  f.x=Math.min(.98,Math.max(0,(e.clientX-r.left-OVL_DRAG.dx)/r.width));
+  f.y=Math.min(.98,Math.max(0,(e.clientY-r.top-OVL_DRAG.dy)/r.height));
+  renderOvlChips();
+}
+function ovlUp(){OVL_DRAG=null}
+function ovlFont(d){
+  const f=ovlArr()[OVL_SEL];if(!f){alert('먼저 칩을 클릭해 선택하세요.');return}
+  f.fs=Math.min(60,Math.max(8,f.fs+d));renderOvlChips();
+}
+// ── 동의서 보관함 (자주 쓰는 양식 저장·재사용) ──
+async function fillTplSel(force){
+  const sels=[document.getElementById('cpTplSel'),document.getElementById('ecTplSel')].filter(Boolean);
+  if(!sels.length)return;
+  if(force||!window.__TPLS){
+    const snap=await DB.collection('consentTemplates').orderBy('name').get().catch(()=>null);
+    window.__TPLS=snap?snap.docs.map(d=>({id:d.id,name:d.data().name})):[];
+  }
+  sels.forEach(sel=>{
+    const cur=sel.value;
+    sel.innerHTML='<option value="">📂 동의서 보관함…</option>'+window.__TPLS.map(t=>'<option value="'+t.id+'"'+(t.id===cur?' selected':'')+'>'+esc(t.name)+'</option>').join('');
+  });
+}
+async function saveConsentTpl(which){
+  const text=document.getElementById(which+'ConsentText').value.trim();
+  const imgs=CONSENT_IMGS[which];
+  if(!text&&!imgs.length){alert('저장할 동의서(문안 또는 이미지)가 없습니다.');return}
+  const name=prompt('보관함에 저장할 이름을 입력하세요 (예: 부산교육청 동의서, 연맹 기본):');
+  if(!name||!name.trim())return;
+  await DB.collection('consentTemplates').add({name:name.trim(),consentText:text,consentImgs:imgs.slice(),consentOverlays:ovlPack(which),createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  alert('✓ 보관함에 저장되었습니다: '+name.trim());
+  fillTplSel(true);
+}
+async function loadConsentTpl(which){
+  const sel=document.getElementById(which+'TplSel');
+  if(!sel||!sel.value){alert('보관함에서 불러올 동의서를 먼저 선택하세요.');return}
+  const doc=await DB.collection('consentTemplates').doc(sel.value).get();
+  if(!doc.exists){alert('삭제된 항목입니다.');fillTplSel(true);return}
+  const t=doc.data();
+  document.getElementById(which+'ConsentText').value=t.consentText||'';
+  CONSENT_IMGS[which]=(t.consentImgs||[]).slice();
+  CONSENT_OVL[which]=ovlUnpack({consentImgs:t.consentImgs||[],consentOverlays:t.consentOverlays||{}});
+  renderImgStrip(which);
+  alert('✓ 불러왔습니다: '+t.name+'\n(이미지·필드배치·문안이 현재 공고에 적용됩니다)');
+}
+async function delConsentTpl(which){
+  const sel=document.getElementById(which+'TplSel');
+  if(!sel||!sel.value){alert('삭제할 항목을 선택하세요.');return}
+  const nm=sel.options[sel.selectedIndex].textContent;
+  if(!confirm('보관함에서 ['+nm+'] 을(를) 삭제할까요? (기존 공고에는 영향 없음)'))return;
+  await DB.collection('consentTemplates').doc(sel.value).delete();
+  fillTplSel(true);
 }
 function compEffRoles(s){return (s.roles&&s.roles.length)?s.roles:(COMP_DEFAULT_ROLES[s.role]||[]);}
 let CADM=[];
@@ -2268,11 +2392,17 @@ function editComp(id){
     +'<input type="file" id="ecConsentImg" accept="image/*" multiple onchange="pickConsentImg(this,\'ec\')">'
     +'<div id="ecImgStrip" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>'
     +'<div id="ecImgState" style="font-size:12px;font-weight:700;margin-top:4px;color:#8a919d">이미지 없음</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;padding:10px;background:#f4f7fc;border-radius:10px">'
+    +'<select id="ecTplSel" onfocus="fillTplSel()" style="padding:8px 11px;border:1.5px solid #dfe5ee;border-radius:8px;font-family:inherit;font-size:13px;flex:1;min-width:150px"><option value="">📂 동의서 보관함…</option></select>'
+    +'<button type="button" class="btn-sub" style="background:#153A77" onclick="loadConsentTpl(\'ec\')">불러오기</button>'
+    +'<button type="button" class="btn-sub" style="background:#0f766e" onclick="saveConsentTpl(\'ec\')">현재 동의서 저장</button>'
+    +'</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
     +'<button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'ecModal\').remove()">닫기</button>'
     +'<button class="btn-main" style="width:auto;padding:11px 26px" onclick="saveEditComp()">저장</button></div>'
     +'</div>';
   CONSENT_IMGS.ec=consentImgsOf(s).slice();
+  CONSENT_OVL.ec=ovlUnpack(s);
   document.body.appendChild(div);
   renderImgStrip('ec');
 }
@@ -2301,7 +2431,7 @@ async function saveEditComp(){
     note:document.getElementById('ecNote').value.trim(),
     fee:document.getElementById('ecFee').value.trim(),
     consentText:document.getElementById('ecConsentText').value.trim(),
-    consentImgs:CONSENT_IMGS.ec.slice(),consentImg:''};
+    consentImgs:CONSENT_IMGS.ec.slice(),consentImg:'',consentOverlays:ovlPack('ec')};
   if(!act.length)upd.role=newRole;
   await DB.collection('compSlots').doc(id).update(upd);
   document.getElementById('ecModal').remove();EC_SNAP=null;
