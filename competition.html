@@ -260,9 +260,18 @@ function divActiveCount(s,name){
 }
 // 공고별 동의서: 스캔 이미지(여러 장) > 직접 입력 문안 > 기본 문안 순으로 표시
 function consentImgsOf(s){return (s.consentImgs&&s.consentImgs.length)?s.consentImgs:(s.consentImg?[s.consentImg]:[])}
+// 필드배치(오버레이) 미리보기 — 신청 화면에서 내 정보가 찍힐 위치를 파란 표시로 보여줌
+function consentPreviewSpans(s,i){
+  const flds=(s.consentOverlays&&s.consentOverlays[String(i)])||[];
+  if(!flds.length)return '';
+  const vals={name:CMY.name||'성명',rrn:'주민등록번호(자동)',phone:CMY.phone||'연락처',bank:CMY.bank||'은행',acct:CMY.accountNum||'계좌번호',holder:CMY.accountHolder||CMY.name||'예금주',date:'제출일(자동)',sign:'✍ 서명 위치'};
+  return flds.map(f=>'<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:'+Math.min(f.fs||14,16)+'px;font-weight:800;color:#1230c4;background:rgba(80,110,255,.13);border:1px dashed #4c6ef5;border-radius:4px;padding:0 5px;white-space:nowrap;line-height:1.4">'+cesc(vals[f.f]||'')+'</span>').join('');
+}
 function consentBlockHtml(s,defHtml){
   const imgs=consentImgsOf(s);
-  if(imgs.length)return imgs.map((x,i)=>'<img src="'+x+'" alt="개인정보 동의서 '+(i+1)+'페이지" style="width:100%;border:1px solid #e2e7f0;border-radius:8px;margin-bottom:8px">').join('')
+  const hasOvl=!!(s.consentOverlays&&Object.keys(s.consentOverlays).some(k=>(s.consentOverlays[k]||[]).length));
+  if(imgs.length)return imgs.map((x,i)=>'<div style="position:relative;margin-bottom:8px"><img src="'+x+'" alt="개인정보 동의서 '+(i+1)+'페이지" style="width:100%;display:block;border:1px solid #e2e7f0;border-radius:8px">'+consentPreviewSpans(s,i)+'</div>').join('')
+    +(hasOvl?'<div style="font-size:11.5px;color:#1F4E9C;font-weight:700;margin-bottom:8px">💡 파란 표시 위치에 내 정보와 서명이 자동으로 기입되어 출력됩니다 (수기 작성 불필요)</div>':'')
     +(imgs.length>1?'<div style="font-size:11.5px;color:#8a919d;font-weight:700;margin-bottom:8px">총 '+imgs.length+'페이지 — 전체 내용을 확인 후 동의해주세요</div>':'');
   if(s.consentText)return '<div style="font-size:12px;color:#4b5563;line-height:1.8;margin-bottom:10px;white-space:pre-wrap">'+cesc(s.consentText)+'</div>';
   return defHtml;
@@ -581,6 +590,12 @@ function printMyEntryDocs(id,s){
     const ap=(CMY.contracts||{})['compapply_'+id+'_'+sfx]||{};
     const dt=(ap.agreedAt||m.at||'').slice(0,10);
     const sig=ap.sign?'<img src="'+ap.sign+'" style="height:44px;vertical-align:middle">':'(전자서명)';
+    // 필드배치(오버레이) — 참가자·보호자 기준 값
+    const eVals={name:m.name||'',rrn:'',phone:CMY.phone||'',bank:'',acct:'',holder:m.kid?(m.guardian||CMY.name||''):(m.name||''),date:dt.replace(/-/g,'. ')+'.',sign:''};
+    const eOvl=i=>((s.consentOverlays&&s.consentOverlays[String(i)])||[]).map(f=>{
+      const inner=f.f==='sign'?(ap.sign?'<img src="'+ap.sign+'" style="height:'+(f.fs||30)+'px;display:block">':'(서명)'):cesc(eVals[f.f]||'');
+      return '<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:'+(f.fs||14)+'px;font-weight:700;color:#111;white-space:nowrap;line-height:1.3">'+inner+'</span>';
+    }).join('');
     pages.push('<div style="page-break-after:always;font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:30px 10px">'
       +'<h2 style="text-align:center;letter-spacing:6px;border:2px solid #333;padding:12px">대 회 참 가 신 청 서</h2>'
       +'<div style="text-align:center;color:#555;font-size:13.5px;margin:8px 0 14px">'+cesc(s.title)+' · '+cesc(s.region)+' · '+cesc(s.date)+'</div>'
@@ -595,7 +610,7 @@ function printMyEntryDocs(id,s){
       +'② 대회 중 촬영된 기록·사진·영상은 연맹 홍보 자료로 활용될 수 있음에 동의합니다.<br>'
       +(m.kid?'③ 본 신청은 법정대리인(보호자)의 동의·서명으로 효력을 가집니다.':'③ 본인은 위 내용을 확인하고 참가를 신청합니다.')+'</div>'
       +(consentImgsOf(s).length
-        ?consentImgsOf(s).map(x=>'<div style="margin-top:10px"><img src="'+x+'" style="width:100%;border:1px solid #999"></div>').join('')+'<div style="font-size:12.5px;margin-top:6px">위 동의서 내용을 확인하였으며 이에 동의합니다. <b>동의함 ☑</b></div>'
+        ?consentImgsOf(s).map((x,i)=>'<div style="margin-top:10px;position:relative"><img src="'+x+'" style="width:100%;display:block;border:1px solid #999">'+eOvl(i)+'</div>').join('')+'<div style="font-size:12.5px;margin-top:6px">위 동의서 내용을 확인하였으며 이에 동의합니다. <b>동의함 ☑</b></div>'
         :(s.consentText
           ?'<div style="font-size:12.5px;line-height:1.9;border:1px solid #999;padding:12px 16px;margin-top:10px;white-space:pre-wrap">'+cesc(s.consentText)+'\n\n동의함 ☑</div>'
           :'<div style="font-size:12.5px;line-height:1.9;border:1px solid #999;padding:12px 16px;margin-top:10px">'
