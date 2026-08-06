@@ -652,10 +652,10 @@ async function setRegionAdmin(uid){
     return;
   }
   // 업무별 위임: 강습배정 / 자격관리를 각각 선택 부여 (겸무 인원은 둘 다, 특정 업무만 맡는 인원은 하나만)
-  const an=prompt(v.name+' 님에게 "강습 배정" 업무(전 권역 학교 신청 열람·강사배정)를 위임할까요?\ny=예  n=아니오 (자격 업무만 위임)','y');
+  const an=prompt(v.name+' 님에게 "강습 배정" 업무(관할 권역 학교 신청 열람·강사배정)를 위임할까요?\ny=예  n=아니오 (자격 업무만 위임)','y');
   if(an===null)return;
   const wantAssign=an.trim().toLowerCase()!=='n';
-  const n=prompt(v.name+' 님의 소속(표시용) 권역 번호를 입력하세요:\n1=서울·경기 2=강원 3=충청 4=전라 5=경상 6=제주');
+  const n=prompt(v.name+' 님의 관할 권역 번호를 입력하세요 (권역장은 이 권역만 열람·배정):\n1=서울·경기 2=강원 3=충청 4=전라 5=경상 6=제주');
   if(n===null)return;
   const R={'1':'서울·경기','2':'강원','3':'충청','4':'전라','5':'경상','6':'제주'}[n.trim()];
   if(!R){alert('1~6 중에서 입력해주세요.');return}
@@ -670,7 +670,7 @@ async function setRegionAdmin(uid){
   const duties=[];if(wantAssign)duties.push('assign');if(S)duties.push('license');
   if(!duties.length){alert('강습배정·자격 업무 중 최소 하나는 위임해야 합니다.');return}
   // 참고: 자격 업무를 위임해도 공고 승인·결과보고 승인은 항상 중앙(오너/admin) 전용이며, 이 위임과 무관하게 자동 제외됩니다.
-  if(!confirm(v.name+' 님에게 권역 관리자 권한을 부여할까요?\n\n· 강습 배정: '+(wantAssign?'전 권역 열람·배정 가능 (region.html)':'권한 없음')+'\n· 자격증 업무: '+(S?('['+SLABEL+'] 관할 신청처리·발급 가능 (산하 시도 포함: '+S.join('·')+') — 공고 승인·결과보고 승인은 항상 중앙 전용'):'권한 없음')+'\n· 회원 삭제·포인트 부여·권한 부여는 불가'))return;
+  if(!confirm(v.name+' 님에게 권역 관리자 권한을 부여할까요?\n\n· 강습 배정: '+(wantAssign?'관할 권역 ['+R+'] 만 열람·배정 (region.html)':'권한 없음')+'\n· 자격증 업무: '+(S?('['+SLABEL+'] 관할 신청처리·발급 가능 (산하 시도 포함: '+S.join('·')+') — 공고 승인·결과보고 승인은 항상 중앙 전용'):'권한 없음')+'\n· 회원 삭제·포인트 부여·권한 부여는 불가'))return;
   try{
     const upd={role:'regionAdmin',managedRegion:R,duties:duties};
     if(S)upd.managedSido=S;else upd.managedSido=firebase.firestore.FieldValue.delete();
