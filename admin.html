@@ -313,11 +313,13 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#b8860b" onclick="payrollCSV()">💰 월 지급 계산 CSV</button>
         <button class="btn-sub" style="background:#555" onclick="closeWaitlist()">⏳ 대기자 일괄 종료</button>
         <button class="btn-sub" style="background:#0f766e" onclick="showSupply()">🧭 권역별 수급 현황</button>
+        <button class="btn-sub" style="background:#0e7490" onclick="showInspections()">📋 현장점검 제출현황</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="copyPhoneList('apps')">📱 문자명단 복사 (교사·현재 필터)</button>
           </div>
         </details>
       </div>
       <div id="supplyBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px"></div>
+      <div id="inspBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px"></div>
       <div id="trashBox" style="display:none;background:#faf8f4;border:1.5px solid #e5e0d8;border-radius:14px;padding:14px 18px;margin-bottom:14px"></div>
       <div id="instLinkBox" style="background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:14px;padding:14px 18px;margin-bottom:14px">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -592,6 +594,58 @@ function showSupply(){
   box.innerHTML=html+'</tbody></table></div>';
 }
 
+// ── 현장점검일지 제출현황 (권역장 온라인 제출분 열람 + CSV 전체/권역별) ──
+let INSPS=[];
+async function showInspections(){
+  const box=document.getElementById('inspBox');
+  if(box.style.display==='block'){box.style.display='none';return}
+  box.style.display='block';
+  box.innerHTML='불러오는 중…';
+  const snap=await DB.collection('inspections').orderBy('createdAt','desc').limit(500).get().catch(e=>{box.innerHTML='조회 실패: '+esc(e.message);return null});
+  if(!snap)return;
+  INSPS=snap.docs.map(d=>d.data());
+  renderInsps();
+}
+function renderInsps(){
+  const box=document.getElementById('inspBox');
+  const sel=document.getElementById('inspReg');
+  const reg=sel?sel.value:'전체';
+  const list=INSPS.filter(v=>reg==='전체'||v.region===reg);
+  const badge=v=>Object.values(v.checks||{}).some(x=>x==='개선필요')?'<span style="color:#C41E2F;font-weight:900">개선필요 있음</span>':'<span style="color:#0f766e;font-weight:800">전항목 적정</span>';
+  let html='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">'
+    +'<b style="font-size:15px">📋 현장점검 제출현황</b>'
+    +'<select id="inspReg" onchange="renderInsps()" style="padding:7px 11px;border:1.5px solid #dfe5ee;border-radius:9px;font-family:inherit;font-size:13px">'
+    +['전체','서울·경기','강원','충청','전라','경상','제주'].map(r=>'<option'+(r===reg?' selected':'')+'>'+r+'</option>').join('')+'</select>'
+    +'<button class="btn-sub" style="background:#153A77" onclick="inspCSV()">⬇ CSV ('+(reg==='전체'?'전체':reg)+')</button>'
+    +'<span style="font-size:12.5px;color:var(--gray)">'+list.length+'건'+(reg==='전체'?' (전권역)':'')+'</span></div>';
+  if(!list.length){box.innerHTML=html+'<div style="color:#8a919d;font-size:13px">제출된 점검일지가 없습니다.</div>';return}
+  html+='<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th>점검일</th><th>권역</th><th>학교</th><th>유형</th><th>강사</th><th>점검자</th><th>결과</th><th>참석</th><th>이동(km)</th><th>수당</th><th>문제점·특이사항</th></tr></thead><tbody>';
+  list.forEach(v=>{
+    html+='<tr><td>'+esc(v.date||'')+'</td><td>'+esc(v.region||'')+'</td><td class="nm">'+esc(v.school||'')+'</td>'
+      +'<td>'+(String(v.type||'').indexOf('방과후')>=0?'방과후':'학교체육')+'</td><td>'+esc(v.assignedName||'')+'</td><td>'+esc(v.inspector||'')+'</td>'
+      +'<td>'+badge(v)+'</td><td>'+(v.attend||'')+'</td><td>'+(v.distanceKm||'')+'</td><td>'+esc(v.band||'')+'</td>'
+      +'<td style="font-size:12px;max-width:260px">'+esc([v.problems,v.notes].filter(Boolean).join(' / '))+'</td></tr>';
+  });
+  box.innerHTML=html+'</tbody></table></div>';
+}
+function inspCSV(){
+  const sel=document.getElementById('inspReg');
+  const reg=sel?sel.value:'전체';
+  const list=INSPS.filter(v=>reg==='전체'||v.region===reg);
+  if(!list.length){alert('다운로드할 제출분이 없습니다.');return}
+  const rows=[['점검일','권역','시군구','학교','유형','지원방식','배정강사','담당교사','점검자','시간준수','안전지도','수준적합','장소적합','기금인지안내','참석인원','이동거리(km)','수당구간','문제점·개선사항','특이사항','제출일시']];
+  list.forEach(v=>{
+    const c=v.checks||{};
+    rows.push([v.date||'',v.region||'',v.city||'',v.school||'',v.type||'',v.support||'',v.assignedName||'',v.teacher||'',v.inspector||'',
+      c.c1||'',c.c2||'',c.c3||'',c.c4||'',c.c5||'',v.attend||0,v.distanceKm||0,v.band||'',v.problems||'',v.notes||'',
+      v.createdAt&&v.createdAt.seconds?new Date(v.createdAt.seconds*1000).toISOString().slice(0,16).replace('T',' '):'']);
+  });
+  const csv='﻿'+rows.map(r=>r.map(x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='현장점검일지_'+(reg==='전체'?'전체':reg.replace(/·/g,''))+'_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+}
 // ── NEIS 소재지 기반 시군구 일괄 매칭 (2026-07-21 기준 신청교) ──
 const SCHOOL_CITY={"강동초등학교": "부산광역시 해운대구", "광주계림초등학교": "광주광역시 동구", "광주서초등학교": "광주광역시 서구", "광주효동초등학교": "광주광역시 북구", "괴정초등학교": "부산광역시 사하구", "기성초등학교": "대전광역시 서구", "녹명초등학교": "부산광역시 강서구", "능주중학교": "전라남도 화순군", "능주초등학교": "전라남도 화순군", "교문초등학교": "경기도 구리시", "대전관평초등학교": "대전광역시 유성구", "대전글꽃초등학교": "대전광역시 중구", "대전둔원초등학교": "대전광역시 서구", "대전새여울초등학교": "대전광역시 대덕구", "대전송촌초등학교": "대전광역시 대덕구", "대전원신흥초등학교": "대전광역시 유성구", "대전중리초등학교": "대전광역시 대덕구", "대전중원초등학교": "대전광역시 대덕구", "대전지족초등학교": "대전광역시 유성구", "두호남부초등학교": "경상북도 포항시 북구", "동호초등학교": "강원특별자치도 동해시", "동화초등학교": "강원특별자치도 원주시", "마장중학교": null, "망미초등학교": "부산광역시 수영구", "명원초등학교": "부산광역시 강서구", "범일초등학교": "부산광역시 동구", "보림초등학교": "부산광역시 사하구", "봉학초등학교": "부산광역시 영도구", "부암초등학교": "부산광역시 부산진구", "분진중학교": "경기도 김포시", "불곡초등학교": "경기도 성남시 분당구", "새별초등학교": "광주광역시 광산구", "서대구초등학교": "대구광역시 서구", "서울가양초등학교": "서울특별시 강서구", "서울개현초등학교": "서울특별시 강남구", "서울금산초등학교": "서울특별시 금천구", "서울도림초등학교": "서울특별시 영등포구", "서울문창초등학교": "서울특별시 동작구", "서울보라매초등학교": "서울특별시 동작구", "서울송화초등학교": "서울특별시 강서구", "서울신서초등학교": "서울특별시 양천구", "서울은로초등학교": "서울특별시 동작구", "서울창도초등학교": "서울특별시 도봉구", "서울청덕초등학교": "서울특별시 성북구", "서울태랑초등학교": "서울특별시 노원구", "서울평화초등학교": "서울특별시 송파구", "서정리초등학교": "경기도 평택시", "성서초등학교": null, "세곡초등학교": null, "신남초등학교": "부산광역시 사하구", "신창초등학교": "광주광역시 광산구", "신호초등학교": "부산광역시 강서구", "안산중앙초등학교": "경기도 안산시 단원구", "영본초등학교": "서울특별시 동작구", "영통초등학교": "경기도 수원시 영통구", "운남초등학교": null, "운정해오름초등학교": "경기도 파주시", "운흥초등학교": "경기도 시흥시", "유안초등학교": "광주광역시 남구", "인지초등학교": "부산광역시 해운대구", "인천 부일중학교": "인천광역시 부평구", "인천구월초등학교": "인천광역시 남동구", "인천도담초등학교": "인천광역시 서해구", "인천별빛초등학교": "인천광역시 중구", "인천석남서초등학교": "인천광역시 서해구", "인천석암초": "인천광역시 미추홀구", "인천연송초등학교": "인천광역시 연수구", "인천이음초등학교": "인천광역시 검단구", "일동초등학교": "광주광역시 북구", "전남기술과학고등학교": "전라남도 화순군", "전주진북초등학교": "전북특별자치도 전주시 덕진구", "지한초등학교": "광주광역시 동구", "진제초등학교": "광주광역시 남구", "창현초등학교": "경기도 남양주시", "천곡초등학교": "강원특별자치도 동해시", "청동초등학교": "부산광역시 영도구", "청양초등학교": "강원특별자치도 철원군", "초읍초등학교": "부산광역시 부산진구", "태봉초": null, "평택안일초등학교": "경기도 평택시", "한울초등학교": "광주광역시 북구", "한재초등학교": "전라남도 담양군", "한홀초등학교": "경기도 하남시", "화곡초등학교": "충청북도 충주시", "화순제일중학고": "전라남도 화순군"};
 async function matchCityAll(){
