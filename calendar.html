@@ -136,12 +136,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="kfdf.js?v=20260808"></script>
 <script src="site_config.js"></script>
 <script>
-if(!firebase.apps.length)firebase.initializeApp({
-  apiKey:"AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",authDomain:"koreaflyingdiscfederation.firebaseapp.com",
-  projectId:"koreaflyingdiscfederation",storageBucket:"koreaflyingdiscfederation.firebasestorage.app",
-  messagingSenderId:"1081847355343",appId:"1:1081847355343:web:ca40ed9a52e13f607f64ba"});
+KFDF.initApp();
 const AUTH=firebase.auth(),DB=firebase.firestore();
 function xesc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 const TYPES={'대회':'#0f766e','자격검정':'#7c3aed','연수':'#b8860b','행사':'#1F4E9C','회의':'#8a919d'};
@@ -151,7 +149,7 @@ AUTH.onAuthStateChanged(async u=>{
   ME=u;
   if(u){
     try{const d=await DB.collection('users').doc(u.uid).get();MYU=d.data();
-      CAN_EDIT=!!(MYU&&(MYU.role==='admin'||MYU.calendarEditor===true));}catch(e){}
+      CAN_EDIT=!!(MYU&&(MYU.role==='admin'||MYU.role==='sidoOfficer'||MYU.calendarEditor===true));}catch(e){}
     // 로그인 시 대회 모집(compSlots)도 자동 표시
     try{const cs=await DB.collection('compSlots').orderBy('date').limit(100).get();
       COMP_EVENTS=cs.docs.map(d=>{const s=d.data();return {auto:true,title:s.title+(s.role==='참가'?'':' ('+s.role+'요원 모집)'),type:'대회',start:s.date,end:s.date,sido:s.region||'',place:'',desc:'대회 페이지에서 신청 가능',link:'competition.html'}});}catch(e){}

@@ -159,12 +159,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="kfdf.js?v=20260808"></script>
 <script src="site_config.js"></script>
 <script>
-if(!firebase.apps.length)firebase.initializeApp({
-  apiKey:"AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",authDomain:"koreaflyingdiscfederation.firebaseapp.com",
-  projectId:"koreaflyingdiscfederation",storageBucket:"koreaflyingdiscfederation.firebasestorage.app",
-  messagingSenderId:"1081847355343",appId:"1:1081847355343:web:ca40ed9a52e13f607f64ba"});
+KFDF.initApp();
 const AUTH=firebase.auth(),DB=firebase.firestore();
 function kesc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 const SIDOS=['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
@@ -467,7 +465,7 @@ async function delMyClub(id,name){
 }
 // ── 시도연맹 임원: 관할 클럽 승인 ──
 async function loadSidoApprovals(){
-  const sido=KMY&&KMY.clubAdminSido;
+  const sido=KMY&&(KMY.role==='sidoOfficer'?KMY.sido:KMY.clubAdminSido);
   const isAdm=KMY&&KMY.role==='admin';
   if(!sido&&!isAdm)return;
   const box=document.getElementById('sidoApproveBox');

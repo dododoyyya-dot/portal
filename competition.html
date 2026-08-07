@@ -157,12 +157,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="kfdf.js?v=20260808"></script>
 <script src="site_config.js"></script>
 <script>
-if(!firebase.apps.length)firebase.initializeApp({
-  apiKey:"AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",authDomain:"koreaflyingdiscfederation.firebaseapp.com",
-  projectId:"koreaflyingdiscfederation",storageBucket:"koreaflyingdiscfederation.firebasestorage.app",
-  messagingSenderId:"1081847355343",appId:"1:1081847355343:web:ca40ed9a52e13f607f64ba"});
+KFDF.initApp();
 const AUTH=firebase.auth(),DB=firebase.firestore();
 function cesc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 let CME=null,CMY=null,CSLOTS=[];
@@ -475,7 +473,8 @@ async function submitEntry(){
     const c=Object.assign({},CMY.contracts||{});
     c['compapply_'+APPLY_ID+'_'+sfx]={title:title,doc:'대회 참가 신청서',who:p.name,agreedAt:now,sign:sign,prefs:APPLY_SEL.slice(),kid:!!p.kid};
     c['compconsent_'+APPLY_ID+'_'+sfx]={title:title,doc:'개인정보 수집·이용 동의서(참가)',who:p.name,agreedAt:now,sign:sign};
-    await DB.collection('users').doc(CME.uid).update({contracts:c}).catch(e=>console.warn('sign save',e));
+    // 대회 참가 신청 → 선수(athlete) 자동 등록
+    await DB.collection('users').doc(CME.uid).update({contracts:c,'caps.athlete':true}).catch(e=>console.warn('sign save',e));
     CMY.contracts=c;
     document.getElementById('cApplyModal').remove();
     alert('🏃 '+p.name+' 참가 신청 완료!'+(p.kid?'\n보호자(법정대리인) 동의·서명이 함께 저장되었습니다.':'')+'\n[📄 내 신청서] 버튼으로 언제든 확인·인쇄할 수 있습니다.');
@@ -567,6 +566,7 @@ async function printMyDocs(id){
         +'<b>□ 개인정보 제3자 제공 동의</b><br>· 제공받는 자: 국세청 · 목적: 수당 원천징수 세액 납부 · 항목: 성명, 지급총액, 결정세액, 주민등록번호 · 근거: 소득세법 제21조·제129조<br><br>'
         +'<b>□ 고유식별정보 처리 고지</b><br>· 개인정보보호법 제24조의2 및 국세기본법 시행령 제68조에 따라 처리됩니다.<br><br>'
         +'※ 동의를 거부할 권리가 있으며, 거부 시 수당 지급에 제한이 있을 수 있습니다. <b>동의함 ☑</b></div>'))
+    // 인적사항 기입란 — 성명·주민번호·연락처·계좌 자동 기입 (필드배치가 지정된 공고는 이미지 위에 직접 찍히므로 생략)
     +(hasOvl?'':'<table style="width:100%;border-collapse:collapse;margin-top:14px">'
     +'<tr><th '+th+'>성 명</th><td '+td+'>'+cesc(CMY.name||'-')+'</td><th '+th+'>주민등록번호</th><td '+td+'>'+cesc(myRrn||'(마이페이지 미등록)')+'</td></tr>'
     +'<tr><th '+th+'>연락처</th><td '+td+'>'+cesc(CMY.phone||'-')+'</td><th '+th+'>은행 / 계좌번호</th><td '+td+'>'+cesc(CMY.bank?((CMY.bank||'')+' '+(CMY.accountNum||'')+(CMY.accountHolder?' (예금주 '+CMY.accountHolder+')':'')):'-')+'</td></tr>'

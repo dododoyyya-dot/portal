@@ -85,17 +85,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="kfdf.js?v=20260808"></script>
 <script src="region_map.js?v=20260726d"></script>
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",
-  authDomain: "koreaflyingdiscfederation.firebaseapp.com",
-  projectId: "koreaflyingdiscfederation",
-  storageBucket: "koreaflyingdiscfederation.firebasestorage.app",
-  messagingSenderId: "1081847355343",
-  appId: "1:1081847355343:web:ca40ed9a52e13f607f64ba"
-};
-firebase.initializeApp(firebaseConfig);
+KFDF.initApp();
 const AUTH = firebase.auth();
 const DB = firebase.firestore();
 const LVS = [[0,'어쏘 리더'],[100,'필드 리더'],[300,'치프 리더'],[600,'엘리트 리더'],[1000,'마스터 리더']];
@@ -238,6 +231,13 @@ function renderApply(){
     b.textContent=f[x[1]]?'✓ 지원 완료 (취소하기)':'지원하기';
     b.style.background=f[x[1]]?'#0f766e':'';
   });
+  // 강사(학교/방과후) 지원자의 사무국 검증 상태 표시
+  const vb=document.getElementById('jVerify');if(vb)vb.remove();
+  if(f.school||f.after){
+    const ok=!!JMY.instructorVerified;
+    document.querySelector('#jBody .sec-label').insertAdjacentHTML('beforebegin',
+      '<div id="jVerify" style="background:'+(ok?'#eafaf3':'#fff8e6')+';border:1px solid '+(ok?'#0f766e':'#e6b422')+';border-radius:12px;padding:12px 16px;margin-bottom:18px;font-size:13.5px;color:'+(ok?'#0f766e':'#8a6d1a')+'">'+(ok?'✔ <b>사무국 검증 강사</b> — 강습 배정 대상으로 인정됩니다.':'🕓 <b>사무국 검증 대기</b> — 지원이 접수되었습니다. 사무국이 자격·서류 확인 후 검증 강사로 인정합니다.')+'</div>');
+  }
 }
 function jMissing(d){
   d=d||{};const miss=[];

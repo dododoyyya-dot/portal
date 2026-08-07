@@ -86,17 +86,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+<script src="kfdf.js?v=20260808"></script>
 <script src="region_map.js?v=20260726d"></script>
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",
-  authDomain: "koreaflyingdiscfederation.firebaseapp.com",
-  projectId: "koreaflyingdiscfederation",
-  storageBucket: "koreaflyingdiscfederation.firebasestorage.app",
-  messagingSenderId: "1081847355343",
-  appId: "1:1081847355343:web:ca40ed9a52e13f607f64ba"
-};
-firebase.initializeApp(firebaseConfig);
+KFDF.initApp();
 const AUTH = firebase.auth();
 const DB = firebase.firestore();
 const LVS = [[0,'어쏘 리더'],[100,'필드 리더'],[300,'치프 리더'],[600,'엘리트 리더'],[1000,'마스터 리더']];
@@ -1001,7 +994,7 @@ async function savePhone(){
       if(dup.exists&&dup.data().uid!==AUTH.currentUser.uid){el.textContent='이미 다른 회원이 사용 중인 번호입니다';el.style.color='#C41E2F';return}
     }catch(e){}
     await DB.collection('users').doc(AUTH.currentUser.uid).update({phone:p});
-    await DB.collection('phoneIndex').doc(pn).set({uid:AUTH.currentUser.uid,name:MYD.name||''}).catch(()=>{});
+    await DB.collection('phoneIndex').doc(pn).set({uid:AUTH.currentUser.uid}).catch(()=>{}); // 개인정보 최소화: 이름 미저장
     MYD.phone=p;el.textContent='✓ 저장되었습니다';el.style.color='#0f766e';
   }catch(e){el.textContent='저장 실패: '+e.message;el.style.color='#C41E2F'}
 }
@@ -1013,6 +1006,36 @@ async function doConsent(){
   await DB.collection('users').doc(u.uid).update({consents:{privacy:true,rrn:true,crimCheck:true,agreedAt:firebase.firestore.FieldValue.serverTimestamp()}});
   location.reload();
 }
+// ── 내 신분·자격 뱃지 + 선수(athlete) 자가신고 ──
+function renderIdentity(d){
+  const role=d.owner?'오너':(d.role==='admin'?'중앙관리자':(d.role==='sidoOfficer'?('시도연맹 임원'+(d.sido?' ('+esc(d.sido)+')':'')):(d.role==='regionAdmin'?'권역장':'일반회원')));
+  const inst=d.instructorFor||{};const caps=[];
+  if((inst.school||inst.after)&&d.instructorVerified)caps.push('✔ 검증강사');
+  else if(inst.school||inst.after)caps.push('강사(신청)');
+  if(inst.referee)caps.push('심판');
+  if(inst.staff)caps.push('운영요원');
+  const isAth=!!(d.caps&&d.caps.athlete)||!!(d.children&&d.children.length);
+  if(isAth)caps.push('선수');
+  if(d.edu2026)caps.push('🎓 연수이수');
+  const pill=c=>'<span style="display:inline-block;background:#eef2f7;color:#1F4E9C;font-size:11.5px;font-weight:800;padding:3px 10px;border-radius:999px;margin:2px 4px 2px 0">'+c+'</span>';
+  const capHtml=caps.length?caps.map(pill).join(''):'<span style="font-size:12px;color:#8a919d">등록된 자격이 없습니다</span>';
+  const athOn=!!(d.caps&&d.caps.athlete);
+  return '<div id="identBox" style="margin-top:12px;background:#f8fafc;border:1px solid #e5eaf0;border-radius:12px;padding:12px 14px">'
+    +'<div style="font-size:12.5px;color:#5b6472">대표 신분 &nbsp;<b style="color:#111;font-size:13.5px">'+role+'</b></div>'
+    +'<div style="margin-top:7px">'+capHtml+'</div>'
+    +'<button onclick="toggleAthlete()" class="btn-sub" style="margin-top:8px;background:'+(athOn?'#8a919d':'#0f766e')+';color:#fff;border:none;font-size:12px;padding:6px 12px;border-radius:8px;cursor:pointer;font-weight:800">'+(athOn?'선수 등록 해제':'🏅 선수로 등록')+'</button>'
+    +'<span style="font-size:11.5px;color:#8a919d;margin-left:8px">대회 참가 시 자동 등록됩니다</span>'
+    +'</div>';
+}
+async function toggleAthlete(){
+  if(!AUTH.currentUser)return;
+  const on=!(MYD.caps&&MYD.caps.athlete);
+  try{
+    await DB.collection('users').doc(AUTH.currentUser.uid).update({'caps.athlete':on});
+    MYD.caps=Object.assign({},MYD.caps,{athlete:on});
+    const box=document.getElementById('identBox');if(box)box.outerHTML=renderIdentity(MYD);
+  }catch(e){alert('변경 실패: '+e.message)}
+}
 AUTH.onAuthStateChanged(async u=>{
   if(!u){location.href='login.html';return}
   const doc=await DB.collection('users').doc(u.uid).get();
@@ -1022,6 +1045,7 @@ AUTH.onAuthStateChanged(async u=>{
   document.getElementById('myName').textContent=d.name;
   document.getElementById('mySub').textContent=d.region+' 권역 · '+(d.edu2026?'2026 자율연수 이수':'연수 미이수')+' · '+d.email;
   document.getElementById('orgBadge').innerHTML=orgChip(d.org,d.region,d.orgTitle,d.fedName);
+  document.getElementById('orgBadge').insertAdjacentHTML('afterend',renderIdentity(d));
   document.getElementById('myPhone').value=d.phone||'';
   if(!d.phone){document.getElementById('phMsg').textContent='배정·위촉 연락을 위해 등록해주세요';document.getElementById('phMsg').style.color='#C41E2F'}
   fillProfile(d);

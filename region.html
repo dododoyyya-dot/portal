@@ -84,17 +84,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="kfdf.js?v=20260808"></script>
 <script src="site_config.js"></script>
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",
-  authDomain: "koreaflyingdiscfederation.firebaseapp.com",
-  projectId: "koreaflyingdiscfederation",
-  storageBucket: "koreaflyingdiscfederation.firebasestorage.app",
-  messagingSenderId: "1081847355343",
-  appId: "1:1081847355343:web:ca40ed9a52e13f607f64ba"
-};
-firebase.initializeApp(firebaseConfig);
+KFDF.initApp();
 const AUTH = firebase.auth();
 const DB = firebase.firestore();
 </script>
@@ -218,6 +211,11 @@ AUTH.onAuthStateChanged(async u=>{
   const d=await DB.collection('users').doc(u.uid).get();RMY=d.data();
   if(!RMY||(RMY.role!=='regionAdmin'&&RMY.role!=='admin')){
     g.style.display='block';g.innerHTML='⛔ 권역 관리자 권한이 없습니다. 사무국(오너)의 지정이 필요합니다.';return;
+  }
+  // 권역장 만료 확인: 사업 종료일이 지나면 자동 회수 (보안규칙도 동일하게 차단)
+  if(RMY.role==='regionAdmin'&&RMY.regionAdminExpiresAt){
+    let exp=false;try{const t=RMY.regionAdminExpiresAt.toDate?RMY.regionAdminExpiresAt.toDate():new Date(RMY.regionAdminExpiresAt);exp=new Date()>t;}catch(_){}
+    if(exp){g.style.display='block';g.innerHTML='⛔ 권역장 권한이 만료되었습니다 (만료일 경과). 재지정이 필요하면 사무국에 문의하세요.';return;}
   }
   // 업무별 위임: duties 필드가 있고 'assign'이 빠져있으면 강습배정 권한 없음(자격관리만 위임된 경우)
   if(RMY.role==='regionAdmin'&&Array.isArray(RMY.duties)&&RMY.duties.indexOf('assign')<0){

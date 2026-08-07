@@ -87,16 +87,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+<script src="kfdf.js?v=20260808"></script>
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",
-  authDomain: "koreaflyingdiscfederation.firebaseapp.com",
-  projectId: "koreaflyingdiscfederation",
-  storageBucket: "koreaflyingdiscfederation.firebasestorage.app",
-  messagingSenderId: "1081847355343",
-  appId: "1:1081847355343:web:ca40ed9a52e13f607f64ba"
-};
-firebase.initializeApp(firebaseConfig);
+KFDF.initApp();
 const AUTH = firebase.auth();
 const DB = firebase.firestore();
 const FUNCS = firebase.app().functions('asia-northeast3');
@@ -653,7 +646,7 @@ async function setRegionAdmin(uid){
   if(v.role==='regionAdmin'){
     if(!confirm(v.name+' 님의 권역 관리자 권한('+(v.managedRegion||'')+')을 해제할까요?'))return;
     try{
-      await DB.collection('users').doc(uid).update({role:'member',managedRegion:firebase.firestore.FieldValue.delete(),managedSido:firebase.firestore.FieldValue.delete(),duties:firebase.firestore.FieldValue.delete()});
+      await DB.collection('users').doc(uid).update({role:'member',managedRegion:firebase.firestore.FieldValue.delete(),managedSido:firebase.firestore.FieldValue.delete(),duties:firebase.firestore.FieldValue.delete(),regionAdminExpiresAt:firebase.firestore.FieldValue.delete()});
       alert('해제되었습니다.');loadUsers();
     }catch(e){alert('실패: '+e.message+'\n(권한 부여·해제는 오너 계정만 가능합니다)')}
     return;
@@ -676,14 +669,49 @@ async function setRegionAdmin(uid){
   const SLABEL=picked.join('·');
   const duties=[];if(wantAssign)duties.push('assign');if(S)duties.push('license');
   if(!duties.length){alert('강습배정·자격 업무 중 최소 하나는 위임해야 합니다.');return}
+  // 만료일: 사업 기간용 권한이므로 만료일을 지정하면 그 이후 자동 회수(규칙에서 무효화)
+  const ex=prompt('권역장 권한 만료일을 입력하세요 (YYYY-MM-DD, 사업 종료일 권장).\n이 날짜가 지나면 권역장 권한이 자동 회수됩니다.\n(만료 없이 상시 유지하려면 빈칸)','2026-12-31');
+  if(ex===null)return;
+  const exDate=ex.trim()?new Date(ex.trim()+'T23:59:59+09:00'):null;
+  if(ex.trim()&&isNaN(exDate)){alert('날짜 형식이 올바르지 않습니다 (예: 2026-12-31)');return}
   // 참고: 자격 업무를 위임해도 공고 승인·결과보고 승인은 항상 중앙(오너/admin) 전용이며, 이 위임과 무관하게 자동 제외됩니다.
-  if(!confirm(v.name+' 님에게 권역 관리자 권한을 부여할까요?\n\n· 강습 배정: '+(wantAssign?'관할 권역 ['+R+'] 만 열람·배정 (region.html)':'권한 없음')+'\n· 자격증 업무: '+(S?('['+SLABEL+'] 관할 신청처리·발급 가능 (산하 시도 포함: '+S.join('·')+') — 공고 승인·결과보고 승인은 항상 중앙 전용'):'권한 없음')+'\n· 회원 삭제·포인트 부여·권한 부여는 불가'))return;
+  if(!confirm(v.name+' 님에게 권역 관리자 권한을 부여할까요?\n\n· 강습 배정: '+(wantAssign?'관할 권역 ['+R+'] 만 열람·배정 (region.html)':'권한 없음')+'\n· 자격증 업무: '+(S?('['+SLABEL+'] 관할 신청처리·발급 가능 (산하 시도 포함: '+S.join('·')+') — 공고 승인·결과보고 승인은 항상 중앙 전용'):'권한 없음')+'\n· 만료: '+(exDate?exDate.toLocaleDateString('ko-KR')+' 이후 자동 회수':'상시(만료 없음)')+'\n· 회원 삭제·포인트 부여·권한 부여는 불가'))return;
   try{
-    const upd={role:'regionAdmin',managedRegion:R,duties:duties};
+    const upd={role:'regionAdmin',managedRegion:R,duties:duties,sido:firebase.firestore.FieldValue.delete()};
     if(S)upd.managedSido=S;else upd.managedSido=firebase.firestore.FieldValue.delete();
+    upd.regionAdminExpiresAt=exDate?firebase.firestore.Timestamp.fromDate(exDate):firebase.firestore.FieldValue.delete();
     await DB.collection('users').doc(uid).update(upd);
     alert('지정 완료. '+v.name+' 님에게 '+[wantAssign?'region.html':'',S?'license.html':''].filter(Boolean).join(' · ')+' 주소를 안내하세요.');loadUsers();
   }catch(e){alert('실패: '+e.message+'\n(권한 부여는 오너 계정만 가능합니다 — 규칙 파일의 owner 설정 안내 참고)')}
+}
+// ── 시도연맹 임원(sidoOfficer) 지정 (오너 전용) — 상설 임원. 자기 시도 캘린더·클럽승인 자동 ──
+async function setSidoOfficer(uid){
+  const doc=USERS.find(d=>d.id===uid);if(!doc)return;
+  const v=doc.data();
+  if(v.owner){alert('오너 계정은 이 버튼으로 변경할 수 없습니다.');return}
+  if(v.role==='sidoOfficer'){
+    if(!confirm(v.name+' 님의 시도연맹 임원 권한('+(v.sido||'')+')을 해제하고 일반 회원으로 되돌릴까요?'))return;
+    try{await DB.collection('users').doc(uid).update({role:'member',sido:firebase.firestore.FieldValue.delete()});alert('해제되었습니다.');loadUsers();}
+    catch(e){alert('실패: '+e.message+'\n(권한 변경은 오너 계정만 가능합니다)')}
+    return;
+  }
+  const sido=prompt(v.name+' 님을 시도연맹 임원으로 지정합니다.\n관할 시도명을 입력하세요 (예: 서울, 경기, 부산, 강원 …).\n이 시도의 일정 캘린더 편집·클럽 승인 권한이 자동으로 부여됩니다.',v.region||'');
+  if(sido===null)return;
+  if(!sido.trim()){alert('관할 시도명을 입력해주세요.');return}
+  if(!confirm(v.name+' 님을 ['+sido.trim()+'] 시도연맹 임원(상설)으로 지정할까요?\n\n· '+sido.trim()+' 시도 일정 캘린더 직접 등록·수정\n· '+sido.trim()+' 시도 클럽 생성 신청 승인\n· 회원 삭제·포인트·강습배정 등은 불가 (그것은 권역장/관리자 권한)'))return;
+  try{
+    await DB.collection('users').doc(uid).update({role:'sidoOfficer',sido:sido.trim(),status:'approved',
+      managedRegion:firebase.firestore.FieldValue.delete(),duties:firebase.firestore.FieldValue.delete(),regionAdminExpiresAt:firebase.firestore.FieldValue.delete()});
+    alert('시도연맹 임원으로 지정되었습니다.');loadUsers();
+  }catch(e){alert('실패: '+e.message+'\n(권한 부여는 오너 계정만 가능합니다 — 규칙 파일의 owner 설정 안내 참고)')}
+}
+// ── 강사 검증(instructorVerified) 토글 (관리자) — 사무국이 확인한 "정식 강사" 표시 ──
+async function toggleInstVerify(uid){
+  const doc=USERS.find(d=>d.id===uid);if(!doc)return;
+  const v=doc.data();const on=!v.instructorVerified;
+  if(on&&!confirm(v.name+' 님을 사무국 검증 강사로 표시할까요?\n(자격·서류를 확인한 뒤에만 체크하세요. 검증 강사는 강습 배정 대상으로 인정됩니다.)'))return;
+  try{await DB.collection('users').doc(uid).update({instructorVerified:on});loadUsers();}
+  catch(e){alert('실패: '+e.message)}
 }
 async function approveDegree(uid,on){
   const u=USERS.find(x=>x.id===uid);if(!u)return;
@@ -1707,13 +1735,16 @@ function renderUsers(){
         :'<button class="btn-sub" onclick="approve(\''+d.id+'\')">승인하기</button>')
       +'<button class="btn-sub" style="background:#1F4E9C" onclick="setOrg(\''+d.id+'\')">직책</button>'
       +'<button class="btn-sub" style="background:#0f766e" onclick="setBase(\''+d.id+'\')">📍 거점·권역</button>'
-      +(IS_OWNER?'<button class="btn-sub" style="background:'+(v.role==='regionAdmin'?'#7c3aed':'#8a919d')+'" onclick="setRegionAdmin(\''+d.id+'\')">'+(v.role==='regionAdmin'?'🛡 '+esc(v.managedRegion||'권역?')+dutyTag(v)+' 관리자':'🛡 권역관리자 지정')+'</button>'
-        :(v.role==='regionAdmin'?'<span style="font-size:11px;font-weight:900;color:#fff;background:#7c3aed;padding:4px 10px;border-radius:999px;align-self:center">🛡 권역관리자'+dutyTag(v)+'</span>':''))
+      +(IS_OWNER?'<button class="btn-sub" style="background:'+(v.role==='regionAdmin'?'#7c3aed':'#8a919d')+'" onclick="setRegionAdmin(\''+d.id+'\')">'+(v.role==='regionAdmin'?'🛡 '+esc(v.managedRegion||'권역?')+dutyTag(v)+' 권역장'+(v.regionAdminExpiresAt?' ~'+fmtDate(v.regionAdminExpiresAt):''):'🛡 권역장 지정')+'</button>'
+        :(v.role==='regionAdmin'?'<span style="font-size:11px;font-weight:900;color:#fff;background:#7c3aed;padding:4px 10px;border-radius:999px;align-self:center">🛡 권역장'+dutyTag(v)+(v.regionAdminExpiresAt?' ~'+fmtDate(v.regionAdminExpiresAt):'')+'</span>':''))
+      +(IS_OWNER?'<button class="btn-sub" style="background:'+(v.role==='sidoOfficer'?'#0f766e':'#8a919d')+'" onclick="setSidoOfficer(\''+d.id+'\')">'+(v.role==='sidoOfficer'?'🏛 '+esc(v.sido||'시도?')+' 임원 ✓':'🏛 시도임원 지정')+'</button>'
+        :(v.role==='sidoOfficer'?'<span style="font-size:11px;font-weight:900;color:#fff;background:#0f766e;padding:4px 10px;border-radius:999px;align-self:center">🏛 '+esc(v.sido||'')+' 시도임원</span>':''))
       +((IS_OWNER&&!v.owner)?'<button class="btn-sub" style="background:'+(v.role==='admin'?'#C41E2F':'#8a919d')+'" onclick="setFullAdmin(\''+d.id+'\')">'+(v.role==='admin'?'👑 전체관리자 ✓':'👑 전체관리자 지정')+'</button>'
         :(v.owner?'<span style="font-size:11px;font-weight:900;color:#fff;background:#111;padding:4px 10px;border-radius:999px;align-self:center">👑 오너</span>':(v.role==='admin'?'<span style="font-size:11px;font-weight:900;color:#fff;background:#C41E2F;padding:4px 10px;border-radius:999px;align-self:center">👑 관리자</span>':'')))
       +'<button class="btn-sub" style="background:'+(v.crimDoc?'#0f766e':'#8a919d')+'" onclick="toggleCrim(\''+d.id+'\')">'+(v.crimDoc?'경력확인 ✓':'경력확인 체크')+'</button>'
       +'<button class="btn-sub" style="background:'+(v.certDoc?'#0f766e':'#8a919d')+'" onclick="toggleCert(\''+d.id+'\')">'+(v.certDoc?'자격확인 ✓':'자격확인 체크')+'</button>'
       +'<button class="btn-sub" style="background:'+(v.safetyEdu?'#0f766e':'#8a919d')+'" onclick="toggleSafety(\''+d.id+'\')">'+(v.safetyEdu?'안전교육 ✓':'안전교육 처리')+'</button>'
+      +((v.instructorFor&&(v.instructorFor.school||v.instructorFor.after))?'<button class="btn-sub" style="background:'+(v.instructorVerified?'#1F4E9C':'#8a919d')+'" onclick="toggleInstVerify(\''+d.id+'\')">'+(v.instructorVerified?'✔ 검증강사':'강사 검증하기')+'</button>':'')
       +'<button class="btn-sub" style="background:#7c3aed" onclick="resetMemberPw(\''+esc(v.email)+'\',\''+esc(v.name)+'\')">🔑 비밀번호 재설정메일</button>'
       +'<button class="btn-sub" style="background:#b8860b" onclick="resetMemberPwManual(\''+d.id+'\',\''+esc(v.name)+'\')">🔧 임시 비밀번호 직접 설정</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delUser(\''+d.id+'\',\''+esc(v.name)+'\')">🗑</button>'
@@ -2020,6 +2051,7 @@ function ovlDown(e){
   const box=document.getElementById('ovlBox');const r=box.getBoundingClientRect();
   const chip=e.target.closest('.ovlchip');
   if(chip){OVL_SEL=parseInt(chip.dataset.idx);OVL_DRAG={dx:e.clientX-chip.getBoundingClientRect().left,dy:e.clientY-chip.getBoundingClientRect().top};renderOvlChips();e.preventDefault();return}
+  // 빈 곳 클릭 → 새 필드 추가
   const f=document.getElementById('ovlField').value;
   ovlArr().push({f:f,x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height,fs:f==='sign'?30:14});
   OVL_SEL=ovlArr().length-1;renderOvlChips();
