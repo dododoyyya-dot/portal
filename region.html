@@ -325,6 +325,7 @@ function renderSchools(){
       +(st==='선정'?'<button class="kbtn ghost" onclick="setSt(\''+d.id+'\',\'접수\')">선정취소</button>':'')
       +(st==='배정완료'?'<button class="kbtn" style="background:#e6b422" onclick="unassign(\''+d.id+'\')">배정해제</button>':'')
       +(st==='배정완료'?'<button class="kbtn" style="background:#334155" onclick="printInspect(\''+d.id+'\')">🖨 점검일지</button>':'')
+      +(st==='배정완료'?'<button class="kbtn" style="background:#0e7490" onclick="openInspForm(\''+d.id+'\')">📝 점검 제출</button>':'')
       +'<button class="kbtn ghost" onclick="editCity(\''+d.id+'\')">📍 시군구</button>'
       +'<button class="kbtn ghost" onclick="chgSupportR(\''+d.id+'\')">🎁 지원방식</button>'
       +'<button class="kbtn ghost" onclick="chgTypeR(\''+d.id+'\')">🔁 유형</button>'
@@ -532,6 +533,57 @@ async function chgTypeR(id){
   }catch(e){alert('변경 실패: '+e.message+'\n\n권한 규칙이 아직 갱신 전이면 사무국에 요청해주세요.')}
 }
 // ── 학교 현장점검일지 — 학교·강사·점검자 자동 기입 후 인쇄해 현장 지참 ──
+const INSP_ITEMS=['계획된 시간을 준수하여 진행하는가? (지각·결강 없음)','안전하게 지도하고 있는가? (안전사항 안내·응급 대비)','수업 내용이 학생 수준에 적합한가?','수업 장소는 적합하고 안전한가?','국민체육진흥기금(공단) 지원 사업임을 참여자에게 안내하였는가?'];
+// ── 점검일지 온라인 제출 (현장에서 모바일로 바로 작성 가능) ──
+let INSP_ID=null,INSP_S=null;
+function openInspForm(id){
+  const doc=RAPPS.find(d=>d.id===id);if(!doc)return;
+  INSP_ID=id;INSP_S=doc.data();const s=INSP_S;
+  const old=document.getElementById('inspModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='inspModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto';
+  const rows=INSP_ITEMS.map((t,i)=>'<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #eef1f6;font-size:13px"><span style="flex:1">'+esc(t)+'</span>'
+    +'<label style="font-weight:800;font-size:12.5px;white-space:nowrap"><input type="radio" name="ic'+i+'" value="적정" checked> 적정</label>'
+    +'<label style="font-weight:800;font-size:12.5px;color:#C41E2F;white-space:nowrap"><input type="radio" name="ic'+i+'" value="개선필요"> 개선필요</label></div>').join('');
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:92vh;overflow:auto;padding:22px">'
+    +'<b style="font-size:16px">📝 현장점검일지 제출 — '+esc(s.school||'')+'</b>'
+    +'<div style="font-size:12px;color:#666;margin:4px 0 12px">'+esc(s.city||'')+' · '+esc(String(s.type||'').indexOf('방과후')>=0?'방과후·늘봄·돌봄':'학교체육 강습')+' · 강사 '+esc(s.assignedName||'')+' · 점검자 '+esc((RMY&&RMY.name)||'')+'</div>'
+    +'<label style="font-size:12.5px;font-weight:800">점검일자</label><input id="iDate" type="date" value="'+new Date().toISOString().slice(0,10)+'" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin:4px 0 10px">'
+    +'<div style="font-size:12.5px;font-weight:800;margin-bottom:2px">점검 내용</div>'+rows
+    +'<div style="display:flex;gap:10px;margin-top:10px"><div style="flex:1"><label style="font-size:12.5px;font-weight:800">당일 참석 인원</label><input id="iAttend" type="number" min="0" placeholder="명" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></div>'
+    +'<div style="flex:1"><label style="font-size:12.5px;font-weight:800">이동거리 편도(km)</label><input id="iDist" type="number" min="0" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></div>'
+    +'<div style="flex:1"><label style="font-size:12.5px;font-weight:800">수당 구간</label><select id="iBand" style="width:100%;padding:9px 8px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"><option value="">선택</option><option>5만원</option><option>8만원</option><option>12만원</option></select></div></div>'
+    +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">문제점 및 개선 사항</label><textarea id="iProb" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></textarea>'
+    +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:8px">기타 특이사항 (일정 변경 사유 등)</label><textarea id="iNote" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></textarea>'
+    +'<div style="font-size:11.5px;color:#8a919d;margin-top:8px">제출자(점검자)는 로그인 계정으로 기록되며, 별도 서명 없이 전자제출로 갈음됩니다.</div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
+    +'<button class="kbtn ghost" style="padding:10px 18px" onclick="document.getElementById(\'inspModal\').remove()">닫기</button>'
+    +'<button class="kbtn" style="background:#0e7490;padding:10px 22px" onclick="submitInsp()">제출</button></div>'
+    +'</div>';
+  document.body.appendChild(div);
+}
+async function submitInsp(){
+  const s=INSP_S;if(!s)return;
+  const date=document.getElementById('iDate').value;
+  if(!date){alert('점검일자를 선택하세요.');return}
+  const checks={};
+  for(let i=0;i<INSP_ITEMS.length;i++){const v=document.querySelector('input[name="ic'+i+'"]:checked');checks['c'+(i+1)]=v?v.value:'적정'}
+  const data={appId:INSP_ID,school:s.school||'',region:appRegion(s)||s.region||'',city:s.city||'',
+    type:appTypeOf(s),support:s.support||'강사파견+용품',assignedName:s.assignedName||'',teacher:s.teacher||'',
+    inspector:(RMY&&RMY.name)||'',inspectorUid:RME.uid,date:date,
+    attend:parseInt(document.getElementById('iAttend').value)||0,
+    checks:checks,
+    problems:document.getElementById('iProb').value.trim(),
+    notes:document.getElementById('iNote').value.trim(),
+    distanceKm:parseFloat(document.getElementById('iDist').value)||0,
+    band:document.getElementById('iBand').value,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+  try{
+    await DB.collection('inspections').add(data);
+    document.getElementById('inspModal').remove();
+    alert('✓ 점검일지가 제출되었습니다.\n'+(s.school||'')+' · '+date+'\n사무국 확인 후 점검수당 지급에 반영됩니다.');
+  }catch(e){alert('제출 실패: '+e.message+'\n(규칙 게시 전이면 사무국에 알려주세요)')}
+}
 function printInspect(id){
   const doc=RAPPS.find(d=>d.id===id);if(!doc)return;
   const s=doc.data();
@@ -539,7 +591,7 @@ function printInspect(id){
   const th='style="border:1px solid #555;background:#f2f2f2;padding:7px 6px;font-size:12.5px;font-weight:800;width:92px;text-align:center;vertical-align:middle"';
   const td='style="border:1px solid #555;padding:7px 9px;font-size:12.5px;vertical-align:middle"';
   const chk='style="border:1px solid #555;padding:6px;font-size:12px;text-align:center;width:52px;vertical-align:middle"';
-  const items=['계획된 시간을 준수하여 진행하는가? (지각·결강 없음)','안전하게 지도하고 있는가? (안전사항 안내·응급 대비)','수업 내용이 학생 수준에 적합한가?','수업 장소는 적합하고 안전한가?','국민체육진흥기금(공단) 지원 사업임을 참여자에게 안내하였는가?'];
+  const items=INSP_ITEMS;
   const rows=items.map(t=>'<tr><td '+td+'>'+t+'</td><td '+chk+'>□ 적정</td><td '+chk+'>□ 개선<br>필요</td></tr>').join('');
   const html='<div style="font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:26px 8px">'
     +'<div style="text-align:center;font-size:12px;color:#666">2026 유소년 스포츠 기반구축사업</div>'
