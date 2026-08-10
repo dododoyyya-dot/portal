@@ -254,7 +254,13 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
 </div></section>
 <script>
 let M='L';
-function mode(m){M=m;
+function mode(m){
+  // 가입 탭을 떠날 때: 진행 중이던 전화 인증 세션 정리 (고아 전화계정·헤더 로그아웃 표시 방지)
+  if(M==='S'&&m==='L'&&(typeof PHONE_CONFIRM!=='undefined')&&(PHONE_CONFIRM||PHONE_VERIFIED_NUM)){
+    try{resetPhoneVerify()}catch(_){}
+    if(AUTH.currentUser&&!(AUTH.currentUser.providerData||[]).some(p=>p.providerId==='password'))AUTH.signOut().catch(()=>{});
+  }
+  M=m;
   document.getElementById('tabL').classList.toggle('on',m==='L');
   document.getElementById('tabS').classList.toggle('on',m==='S');
   document.getElementById('fS').style.display=m==='S'?'block':'none';

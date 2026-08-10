@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>권한 관리 센터 | 대한민국플라잉디스크연맹</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="style.css?v=20260726e">
+<style>
+body{background:#f4f6fa}
+.ptop{background:linear-gradient(120deg,#0f1013,#1a1c22 55%,#153A77);color:#fff;padding:26px 0}
+.ptop .wrap{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.ptop img{width:46px;height:46px;object-fit:contain}
+.ptop h1{font-size:21px;font-weight:900;margin:0}
+.ptop .sub{font-size:12.5px;color:#c3c9d4;margin-top:2px}
+.pback{margin-left:auto;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);padding:9px 18px;border-radius:10px;text-decoration:none;font-weight:800;font-size:13px}
+.pback:hover{background:rgba(255,255,255,.2)}
+.pwrap{max-width:1180px;margin:0 auto;padding:26px 20px 60px}
+.statrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
+.stat2{background:#fff;border:1px solid #e6eaf2;border-radius:14px;padding:15px 17px;box-shadow:0 1px 4px rgba(15,25,60,.04)}
+.stat2 b{display:block;font-size:24px;font-weight:900;color:#153A77}
+.stat2 span{font-size:12px;font-weight:700;color:#6b7280}
+.psec{background:#fff;border:1px solid #e6eaf2;border-radius:16px;padding:20px 22px;box-shadow:0 1px 4px rgba(15,25,60,.04);margin-bottom:18px}
+.psec h2{font-size:15px;font-weight:900;color:#153A77;margin:0 0 12px}
+.pgrid{display:grid;grid-template-columns:380px 1fr;gap:18px;align-items:start}
+@media(max-width:900px){.pgrid{grid-template-columns:1fr}}
+.psearch{width:100%;padding:11px 15px;border:1.5px solid #dfe5ee;border-radius:11px;font-size:14px;font-family:inherit}
+.psearch:focus{outline:none;border-color:#1F4E9C}
+.mrow{display:flex;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid #f0f2f6;cursor:pointer;border-radius:8px;transition:background .12s}
+.mrow:hover{background:#f6f9ff}
+.mrow.sel{background:#eef4ff;outline:1.5px solid #b9cdec}
+.mav{flex:0 0 34px;width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#153A77,#1F4E9C);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px}
+.mrow b{font-size:14px}
+.mrow .mi{font-size:11.5px;color:#8a919d}
+.rpill{font-size:10.5px;font-weight:900;color:#fff;padding:2.5px 9px;border-radius:999px;white-space:nowrap}
+.fldrow{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.fldrow>span{font-size:12.5px;font-weight:700;color:#4b5563;min-width:88px}
+.fld{padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;font-size:13.5px;font-family:inherit}
+.subbox{border:1px solid #e6eaf2;border-radius:12px;padding:14px 16px;margin-top:12px}
+.subbox .st{font-size:12.5px;font-weight:900;color:#153A77;margin-bottom:4px}
+.pbtn{border:none;cursor:pointer;font-family:inherit;font-weight:800;font-size:13px;padding:10px 20px;border-radius:10px;color:#fff;transition:filter .15s}
+.pbtn:hover{filter:brightness(1.1)}
+.chkl{display:flex;gap:8px;align-items:center;font-size:13.5px;font-weight:700;margin-top:8px;cursor:pointer}
+.chkl input{width:auto}
+.reqrow{display:flex;align-items:center;gap:10px;padding:11px 13px;background:#fbfcfe;border:1px solid #e9edf4;border-radius:11px;margin-bottom:8px;flex-wrap:wrap}
+.empty2{font-size:13px;color:#8a919d;padding:8px 2px}
+</style>
+</head>
+<body>
+<div class="ptop"><div class="wrap">
+  <img src="kfdf_logo.png" alt="로고">
+  <div><h1>🛡 권한 관리 센터</h1><div class="sub">대한민국플라잉디스크연맹 · 임원 및 권한 통합 관리</div></div>
+  <a class="pback" href="admin.html">← 관리자 홈</a>
+</div></div>
+
+<div class="pwrap">
+  <div class="gbox" id="pmGate" style="display:none;background:#fff;border:1.5px solid #f3c2c7;border-radius:14px;padding:22px;text-align:center;font-weight:800"></div>
+  <div id="pmBody" style="display:none">
+
+    <!-- 임원진 현황 -->
+    <div class="statrow" id="statRow"></div>
+
+    <!-- 임원 등록 신청 대기 -->
+    <div class="psec" id="reqSec" style="display:none">
+      <h2>📥 임원 등록 신청 대기 <span id="reqCnt" style="color:#C41E2F"></span></h2>
+      <div id="reqList"></div>
+    </div>
+
+    <div class="pgrid">
+      <!-- 좌: 회원 검색 -->
+      <div class="psec" style="margin-bottom:0">
+        <h2>👥 회원 검색</h2>
+        <input class="psearch" id="q" placeholder="🔍 이름·이메일·시도 검색" oninput="renderList()">
+        <div style="display:flex;gap:6px;margin:10px 0 4px;flex-wrap:wrap" id="fltRow"></div>
+        <div id="mlist" style="max-height:560px;overflow:auto;margin-top:6px"></div>
+      </div>
+      <!-- 우: 선택 회원 권한 패널 -->
+      <div class="psec" style="margin-bottom:0" id="detail">
+        <h2>⚙ 권한 설정</h2>
+        <div class="empty2">왼쪽에서 회원을 선택하면 이곳에서 등급·관할·부가권한을 설정합니다.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="kfdf.js?v=20260808"></script>
+<script>
+KFDF.initApp();
+const AUTH=firebase.auth();
+const DB=firebase.firestore();
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);return isNaN(d)?'':d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')}
+
+const PM_REGIONS=['서울·경기','강원','충청','전라','경상','제주'];
+const PM_SIDOS=['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
+const PM_FEDS=['경기','강원','부산','경남','경북','전남광주'];
+const PM_EXP={'경기':['경기','서울','인천'],'강원':['강원'],'부산':['부산','울산'],'경남':['경남'],'경북':['경북','대구'],'전남광주':['전남광주','광주전남','광주','전북','전남']};
+const PM_GUGUN={
+ '서울':['강남구','강동구','강북구','강서구','관악구','광진구','구로구','금천구','노원구','도봉구','동대문구','동작구','마포구','서대문구','서초구','성동구','성북구','송파구','양천구','영등포구','용산구','은평구','종로구','중구','중랑구'],
+ '부산':['강서구','금정구','기장군','남구','동구','동래구','부산진구','북구','사상구','사하구','서구','수영구','연제구','영도구','중구','해운대구'],
+ '대구':['군위군','남구','달서구','달성군','동구','북구','서구','수성구','중구'],
+ '인천':['강화군','계양구','남동구','동구','미추홀구','부평구','서구','연수구','옹진군','중구'],
+ '광주':['광산구','남구','동구','북구','서구'],
+ '대전':['대덕구','동구','서구','유성구','중구'],
+ '울산':['남구','동구','북구','울주군','중구'],
+ '세종':['세종시'],
+ '경기':['가평군','고양시','과천시','광명시','광주시','구리시','군포시','김포시','남양주시','동두천시','부천시','성남시','수원시','시흥시','안산시','안성시','안양시','양주시','양평군','여주시','연천군','오산시','용인시','의왕시','의정부시','이천시','파주시','평택시','포천시','하남시','화성시'],
+ '강원':['강릉시','고성군','동해시','삼척시','속초시','양구군','양양군','영월군','원주시','인제군','정선군','철원군','춘천시','태백시','평창군','홍천군','화천군','횡성군'],
+ '충북':['괴산군','단양군','보은군','영동군','옥천군','음성군','제천시','증평군','진천군','청주시','충주시'],
+ '충남':['계룡시','공주시','금산군','논산시','당진시','보령시','부여군','서산시','서천군','아산시','예산군','천안시','청양군','태안군','홍성군'],
+ '전북':['고창군','군산시','김제시','남원시','무주군','부안군','순창군','완주군','익산시','임실군','장수군','전주시','정읍시','진안군'],
+ '전남':['강진군','고흥군','곡성군','광양시','구례군','나주시','담양군','목포시','무안군','보성군','순천시','신안군','여수시','영광군','영암군','완도군','장성군','장흥군','진도군','함평군','해남군','화순군'],
+ '경북':['경산시','경주시','고령군','구미시','김천시','문경시','봉화군','상주시','성주군','안동시','영덕군','영양군','영주시','영천시','예천군','울릉군','울진군','의성군','청도군','청송군','칠곡군','포항시'],
+ '경남':['거제시','거창군','고성군','김해시','남해군','밀양시','사천시','산청군','양산시','의령군','진주시','창녕군','창원시','통영시','하동군','함안군','함양군','합천군'],
+ '제주':['서귀포시','제주시']};
+
+let ME=null,MY=null,IS_OWNER=false,USERS=[],SEL=null,FLT='';
+AUTH.onAuthStateChanged(async u=>{
+  const g=document.getElementById('pmGate');
+  if(!u){g.style.display='block';g.innerHTML='🔒 관리자 전용 페이지입니다. <a href="login.html" style="color:#C41E2F">로그인 →</a>';return}
+  ME=u;
+  const d=await DB.collection('users').doc(u.uid).get();MY=d.data()||{};
+  if(MY.role!=='admin'&&!MY.owner){g.style.display='block';g.innerHTML='⛔ 관리자 권한이 필요합니다.';return}
+  IS_OWNER=MY.owner===true;
+  document.getElementById('pmBody').style.display='block';
+  await loadAll();
+});
+async function loadAll(){
+  const snap=await DB.collection('users').orderBy('createdAt','desc').get();
+  USERS=snap.docs.filter(d=>!d.data().deleted);
+  renderStats();renderFilters();renderList();loadReqs();
+  if(SEL)renderDetail(SEL);
+}
+function roleKo(v){
+  if(v.owner)return['오너','#111'];
+  if(v.role==='admin')return['중앙관리자','#C41E2F'];
+  if(v.role==='sidoOfficer')return[(v.sido||'')+' 시도임원','#0f766e'];
+  if(v.role==='gugunOfficer')return[(v.sido||'')+' '+(v.gugun||'')+' 구군임원','#0e7490'];
+  if(v.role==='regionAdmin')return[(v.managedRegion||'')+' 권역장'+(v.regionAdminExpiresAt?' ~'+fmtDate(v.regionAdminExpiresAt):''),'#7c3aed'];
+  return null;
+}
+function renderStats(){
+  const c={admin:0,sido:0,gugun:0,region:0,cal:0,club:0,verify:0};
+  USERS.forEach(d=>{const v=d.data();
+    if(v.role==='admin'||v.owner)c.admin++;
+    if(v.role==='sidoOfficer')c.sido++;
+    if(v.role==='gugunOfficer')c.gugun++;
+    if(v.role==='regionAdmin')c.region++;
+    if(v.calendarEditor)c.cal++;
+    if(v.clubAdminSido)c.club++;
+    if(v.instructorVerified)c.verify++;});
+  document.getElementById('statRow').innerHTML=[
+    ['👑 중앙관리자',c.admin],['🏛 시도임원',c.sido],['🏛 구군임원',c.gugun],['🛡 권역장',c.region],
+    ['📅 캘린더 권한',c.cal],['🛡 클럽승인(구)',c.club],['✔ 검증강사',c.verify]
+  ].map(x=>'<div class="stat2"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>').join('');
+}
+function renderFilters(){
+  const flts=[['','전체'],['officer','임원·관리자만'],['member','일반회원만']];
+  document.getElementById('fltRow').innerHTML=flts.map(f=>'<button class="pbtn" style="padding:6px 14px;font-size:12px;background:'+(FLT===f[0]?'#153A77':'#c6cfdd')+'" onclick="FLT=\''+f[0]+'\';renderList()">'+f[1]+'</button>').join('');
+}
+function renderList(){
+  const q=(document.getElementById('q').value||'').trim().toLowerCase();
+  const el=document.getElementById('mlist');
+  const rows=USERS.filter(d=>{
+    const v=d.data();
+    const hasRole=!!(v.owner||['admin','sidoOfficer','gugunOfficer','regionAdmin'].indexOf(v.role)>=0||v.calendarEditor||v.clubAdminSido||v.instructorVerified);
+    if(FLT==='officer'&&!hasRole)return false;
+    if(FLT==='member'&&hasRole)return false;
+    if(q){const hay=[v.name,v.email,v.sido,v.region,v.gugun].map(x=>String(x||'').toLowerCase()).join(' ');if(hay.indexOf(q)<0)return false;}
+    return true;
+  });
+  renderFilters();
+  el.innerHTML=rows.length?rows.map(d=>{
+    const v=d.data();const r=roleKo(v);
+    return '<div class="mrow'+(SEL===d.id?' sel':'')+'" onclick="pick(\''+d.id+'\')">'
+      +'<span class="mav">'+esc((v.name||'?').charAt(0))+'</span>'
+      +'<div style="flex:1;min-width:0"><b>'+esc(v.name||'(이름없음)')+'</b>'
+      +(r?' <span class="rpill" style="background:'+r[1]+'">'+esc(r[0])+'</span>':'')
+      +'<div class="mi">'+esc(v.email||'')+' · '+esc(v.region||'')+(v.status==='approved'?'':' · <b style="color:#b8860b">승인대기</b>')+'</div></div></div>';
+  }).join(''):'<div class="empty2">검색 결과가 없습니다.</div>';
+}
+function pick(id){SEL=id;renderList();renderDetail(id);}
+function renderDetail(id){
+  const doc=USERS.find(d=>d.id===id);if(!doc)return;
+  const v=doc.data();
+  const role=v.owner?'owner':(v.role||'member');
+  const lockRole=!IS_OWNER||v.owner;
+  const feds=Array.isArray(v.managedSido)?v.managedSido:(v.managedSido?[v.managedSido]:[]);
+  const fedChecked=f=>PM_EXP[f].some(x=>feds.indexOf(x)>=0)?' checked':'';
+  const exDate=v.regionAdminExpiresAt?(v.regionAdminExpiresAt.toDate?v.regionAdminExpiresAt.toDate():new Date(v.regionAdminExpiresAt)):null;
+  const exStr=exDate&&!isNaN(exDate)?exDate.toISOString().slice(0,10):'';
+  const r=roleKo(v);
+  document.getElementById('detail').innerHTML='<h2>⚙ 권한 설정 — '+esc(v.name||'')+(r?' <span class="rpill" style="background:'+r[1]+'">'+esc(r[0])+'</span>':'')+'</h2>'
+    +'<div style="font-size:12px;color:#8a919d">'+esc(v.email||'')+' · '+esc(v.region||'')+' · 가입 '+fmtDate(v.createdAt)+'</div>'
+    +'<div class="subbox"><div class="st">① 관리 등급 '+(lockRole?'<span style="color:#C41E2F;font-weight:700">'+(v.owner?'(오너 계정은 변경 불가)':'(등급 변경은 오너 전용 — 열람만)')+'</span>':'')+'</div>'
+      +'<div class="fldrow"><span>등급</span><select id="pmRole" class="fld"'+(lockRole?' disabled':'')+' onchange="pmRoleUI()">'
+        +'<option value="member"'+(role==='member'?' selected':'')+'>일반회원</option>'
+        +'<option value="gugunOfficer"'+(role==='gugunOfficer'?' selected':'')+'>구·군연맹 임원 (상설)</option>'
+        +'<option value="sidoOfficer"'+(role==='sidoOfficer'?' selected':'')+'>시도연맹 임원 (상설)</option>'
+        +'<option value="regionAdmin"'+(role==='regionAdmin'?' selected':'')+'>권역장 (사업 기간)</option>'
+        +'<option value="admin"'+(role==='admin'?' selected':'')+'>중앙관리자</option>'
+        +(v.owner?'<option value="owner" selected>오너</option>':'')+'</select></div>'
+      +'<div id="pmSidoRow" style="display:none" class="fldrow"><span>관할 시도</span><select id="pmSido" class="fld" onchange="pmFillGugun()"><option value="">선택</option>'+PM_SIDOS.map(s=>'<option'+(v.sido===s?' selected':'')+'>'+s+'</option>').join('')+'</select></div>'
+      +'<div id="pmGugunRow" style="display:none" class="fldrow"><span>관할 시군구</span><select id="pmGugun" class="fld"><option value="">시도를 먼저 선택</option></select></div>'
+      +'<div id="pmRegionRows" style="display:none">'
+        +'<div class="fldrow"><span>관할 권역</span><select id="pmRegion" class="fld">'+PM_REGIONS.map(x=>'<option'+(v.managedRegion===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div>'
+        +'<div class="fldrow"><span>만료일</span><input id="pmExpire" type="date" class="fld" value="'+exStr+'"> <span style="font-size:11.5px;color:#8a919d;min-width:0">지나면 자동 회수 · 빈칸=상시</span></div>'
+        +'<div class="fldrow"><span>위임 업무</span><label class="chkl" style="margin:0"><input type="checkbox" id="pmDutyAssign"'+((!Array.isArray(v.duties)||v.duties.indexOf('assign')>=0)?' checked':'')+'> 강습 배정</label><label class="chkl" style="margin:0"><input type="checkbox" id="pmDutyLic"'+(Array.isArray(v.duties)&&v.duties.indexOf('license')>=0?' checked':'')+'> 자격증 업무</label></div>'
+        +'<div class="fldrow"><span>자격 관할</span><span style="min-width:0">'+PM_FEDS.map(f=>'<label style="font-size:12.5px;font-weight:700;margin-right:8px"><input type="checkbox" class="pmFed" value="'+f+'"'+fedChecked(f)+'> '+f+'</label>').join('')+'</span></div>'
+      +'</div></div>'
+    +'<div class="subbox"><div class="st">② 부가 권한 <span style="font-weight:600;color:#8a919d">(관리자도 부여 가능)</span></div>'
+      +'<label class="chkl"><input type="checkbox" id="pmCal"'+(v.calendarEditor?' checked':'')+'> 📅 캘린더 편집 (연맹 일정 등록·수정)</label>'
+      +'<label class="chkl"><input type="checkbox" id="pmVerify"'+(v.instructorVerified?' checked':'')+((v.instructorFor&&(v.instructorFor.school||v.instructorFor.after))?'':' disabled')+'> ✔ 검증 강사'+((v.instructorFor&&(v.instructorFor.school||v.instructorFor.after))?'':' <span style="font-size:11.5px;color:#8a919d">— 강사 지원자만</span>')+'</label>'
+      +'<div class="fldrow"><span>클럽승인 시도</span><select id="pmClubSido" class="fld"><option value="">권한 없음</option>'+PM_SIDOS.map(s=>'<option'+(v.clubAdminSido===s?' selected':'')+'>'+s+'</option>').join('')+'</select><span style="font-size:11.5px;color:#8a919d;min-width:0">구버전 방식 — 시도임원 등급이면 불필요</span></div></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
+    +'<button class="pbtn" style="background:#153A77" onclick="savePerm(\''+id+'\')">💾 저장</button></div>';
+  PM_CUR_GUGUN=v.gugun||'';
+  pmRoleUI();pmFillGugun();
+}
+let PM_CUR_GUGUN='';
+function pmFillGugun(){
+  const s=document.getElementById('pmSido');const g=document.getElementById('pmGugun');
+  if(!s||!g)return;
+  const list=PM_GUGUN[s.value]||[];
+  g.innerHTML=s.value?('<option value="">선택</option>'+list.map(x=>'<option'+(PM_CUR_GUGUN===x?' selected':'')+'>'+x+'</option>').join('')):'<option value="">시도를 먼저 선택</option>';
+}
+function pmRoleUI(){
+  const r=document.getElementById('pmRole').value;
+  document.getElementById('pmSidoRow').style.display=(r==='sidoOfficer'||r==='gugunOfficer')?'flex':'none';
+  document.getElementById('pmGugunRow').style.display=(r==='gugunOfficer')?'flex':'none';
+  document.getElementById('pmRegionRows').style.display=(r==='regionAdmin')?'block':'none';
+}
+async function savePerm(uid){
+  const doc=USERS.find(d=>d.id===uid);if(!doc)return;
+  const v=doc.data();
+  const del=firebase.firestore.FieldValue.delete;
+  const upd={};
+  if(IS_OWNER&&!v.owner){
+    const r=document.getElementById('pmRole').value;
+    if(r!==(v.role||'member')||r==='sidoOfficer'||r==='gugunOfficer'||r==='regionAdmin'){
+      upd.role=r;
+      if(r==='sidoOfficer'||r==='gugunOfficer'){
+        const sido=document.getElementById('pmSido').value;
+        if(!sido){alert('관할 시도를 선택해주세요.');return}
+        upd.sido=sido;
+        if(r==='gugunOfficer'){const g=document.getElementById('pmGugun').value;if(!g){alert('관할 시군구를 선택해주세요.');return}upd.gugun=g;}
+        else upd.gugun=del();
+        upd.managedRegion=del();upd.duties=del();upd.managedSido=del();upd.regionAdminExpiresAt=del();
+        upd.status='approved';
+      }else if(r==='regionAdmin'){
+        const duties=[];
+        if(document.getElementById('pmDutyAssign').checked)duties.push('assign');
+        if(document.getElementById('pmDutyLic').checked)duties.push('license');
+        if(!duties.length){alert('강습 배정·자격증 업무 중 최소 하나는 위임해야 합니다.');return}
+        upd.managedRegion=document.getElementById('pmRegion').value;upd.duties=duties;
+        const picked=[...document.querySelectorAll('.pmFed:checked')].map(x=>x.value);
+        upd.managedSido=(duties.indexOf('license')>=0&&picked.length)?[...new Set(picked.flatMap(f=>PM_EXP[f]))]:del();
+        const ex=document.getElementById('pmExpire').value;
+        upd.regionAdminExpiresAt=ex?firebase.firestore.Timestamp.fromDate(new Date(ex+'T23:59:59+09:00')):del();
+        upd.sido=del();upd.gugun=del();upd.status='approved';
+      }else if(r==='admin'){
+        upd.status='approved';
+        upd.managedRegion=del();upd.duties=del();upd.regionAdminExpiresAt=del();upd.sido=del();upd.gugun=del();
+      }else{
+        upd.managedRegion=del();upd.duties=del();upd.managedSido=del();upd.regionAdminExpiresAt=del();upd.sido=del();upd.gugun=del();
+      }
+    }
+  }
+  const cal=document.getElementById('pmCal').checked;
+  if(cal!==!!v.calendarEditor)upd.calendarEditor=cal;
+  const vfEl=document.getElementById('pmVerify');
+  if(!vfEl.disabled&&vfEl.checked!==!!v.instructorVerified)upd.instructorVerified=vfEl.checked;
+  const cs=document.getElementById('pmClubSido').value;
+  if(cs!==(v.clubAdminSido||''))upd.clubAdminSido=cs||del();
+  if(!Object.keys(upd).length){alert('변경된 내용이 없습니다.');return}
+  try{
+    await DB.collection('users').doc(uid).update(upd);
+    alert('✓ 권한이 저장되었습니다.');
+    await loadAll();
+  }catch(e){alert('저장 실패: '+e.message+(String(e.message).indexOf('permission')>=0?'\n(등급·관할 변경은 오너 계정만 가능합니다)':''))}
+}
+// ── 임원 등록 신청 대기 (오너: 시도·구군 모두 / 관리자: 열람) ──
+let REQS=[];
+async function loadReqs(){
+  try{
+    const snap=await DB.collection('officerRequests').where('status','==','대기').limit(80).get();
+    REQS=snap.docs.map(d=>({id:d.id,data:d.data()}));
+    const sec=document.getElementById('reqSec');
+    sec.style.display='block';
+    document.getElementById('reqCnt').textContent=REQS.length?('('+REQS.length+'건)'):'';
+    document.getElementById('reqList').innerHTML=REQS.length?REQS.map(r=>{
+      const d=r.data;
+      return '<div class="reqrow"><b>'+esc(d.name||'')+'</b>'
+        +'<span class="rpill" style="background:#153A77">'+(d.kind==='sido'?'시도연맹 임원':'구·군연맹 임원')+'</span>'
+        +'<span style="font-size:12.5px;color:#6b7280">'+esc(d.sido||'')+(d.gugun?' '+esc(d.gugun):'')+(d.title?' · '+esc(d.title):'')+'</span>'
+        +'<span style="flex:1"></span>'
+        +(IS_OWNER
+          ?'<button class="pbtn" style="background:#0f766e;padding:7px 16px" onclick="approveReq(\''+r.id+'\')">승인</button>'
+           +'<button class="pbtn" style="background:#8a919d;padding:7px 16px" onclick="rejectReq(\''+r.id+'\')">반려</button>'
+          :'<span style="font-size:11.5px;color:#8a919d">승인은 오너 또는 해당 시도임원(클럽 페이지)</span>')
+        +'</div>';
+    }).join(''):'<div class="empty2">대기 중인 임원 등록 신청이 없습니다.</div>';
+  }catch(e){document.getElementById('reqList').innerHTML='<div class="empty2">불러오기 실패: '+esc(e.message)+'</div>';}
+}
+async function approveReq(id){
+  const r=REQS.find(x=>x.id===id);if(!r)return;const d=r.data;
+  const upd=d.kind==='gugun'?{role:'gugunOfficer',sido:d.sido,gugun:d.gugun,status:'approved'}:{role:'sidoOfficer',sido:d.sido,status:'approved'};
+  if(!confirm(d.name+' 님을 ['+d.sido+(d.gugun?' '+d.gugun:'')+'] '+(d.kind==='sido'?'시도연맹 임원':'구·군연맹 임원')+'(으)로 승인할까요?'))return;
+  try{
+    await DB.collection('users').doc(d.uid).update(upd);
+    await DB.collection('officerRequests').doc(id).update({status:'승인',processedAt:firebase.firestore.FieldValue.serverTimestamp(),processedBy:ME.uid});
+    await loadAll();
+  }catch(e){alert('승인 실패: '+e.message)}
+}
+async function rejectReq(id){
+  if(!confirm('이 임원 등록 신청을 반려할까요?'))return;
+  try{
+    await DB.collection('officerRequests').doc(id).update({status:'반려',processedAt:firebase.firestore.FieldValue.serverTimestamp(),processedBy:ME.uid});
+    await loadReqs();
+  }catch(e){alert('반려 실패: '+e.message)}
+}
+</script>
+<script src="auth_ui.js?v=20260726d"></script>
+</body>
+</html>

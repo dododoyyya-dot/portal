@@ -7,20 +7,26 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <link rel="stylesheet" href="style.css?v=20260726e">
 <style>
-.clubcard{background:#fff;border:1px solid #e8ecf3;border-radius:16px;padding:18px 20px;margin-bottom:12px;box-shadow:0 2px 10px rgba(21,58,119,.05);transition:box-shadow .2s}
-.clubcard:hover{box-shadow:0 8px 22px rgba(21,58,119,.10)}
-.clubcard .cname{font-size:15.5px;font-weight:900}
-.clubcard .cmeta2{font-size:12.5px;color:#6b7280;margin-top:5px}
-.cbtn{border:none;cursor:pointer;font-family:inherit;font-weight:800;font-size:13px;padding:9px 18px;border-radius:10px;transition:filter .15s}
+.clubcard{background:#fff;border:1px solid #e6eaf2;border-radius:18px;padding:18px 20px;margin-bottom:12px;box-shadow:0 1px 4px rgba(15,25,60,.04);transition:transform .18s,box-shadow .18s,border-color .18s}
+.clubcard:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(21,58,119,.12);border-color:#c9d8ef}
+.clubcard .cname{font-size:16px;font-weight:900;letter-spacing:-.2px}
+.clubcard .cmeta2{font-size:12.5px;color:#6b7280;margin-top:6px;line-height:1.65}
+.cav{flex:0 0 46px;width:46px;height:46px;border-radius:14px;object-fit:cover;background:linear-gradient(135deg,#153A77,#1F4E9C);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:19px;overflow:hidden;box-shadow:0 3px 8px rgba(21,58,119,.18)}
+.cav img{width:100%;height:100%;object-fit:cover;display:block}
+.cbtn{border:none;cursor:pointer;font-family:inherit;font-weight:800;font-size:13px;padding:9px 18px;border-radius:11px;transition:filter .15s,transform .1s}
 .cbtn:hover{filter:brightness(1.08)}
-.cbtn-main{background:linear-gradient(135deg,#1F4E9C,#153A77);color:#fff}
+.cbtn:active{transform:scale(.97)}
+.cbtn-main{background:linear-gradient(135deg,#1F4E9C,#153A77);color:#fff;box-shadow:0 3px 10px rgba(21,58,119,.25)}
 .cbtn-soft{background:#eef2f9;color:#153A77}
 .cbtn-teal{background:#0f766e;color:#fff}
-.cpill2{font-size:11.5px;font-weight:900;padding:3px 11px;border-radius:999px;color:#fff}
-.sidochip{border:1.5px solid #c9d6ec;background:#fff;color:#153A77;font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:999px;cursor:pointer;font-family:inherit}
-.sidochip.on{background:#153A77;color:#fff;border-color:#153A77}
-.cfield{width:100%;padding:11px 13px;border:1.5px solid #dfe5ee;border-radius:10px;font-size:14px;font-family:inherit;margin-top:5px}
+.cpill2{font-size:11.5px;font-weight:800;padding:3.5px 12px;border-radius:999px;color:#fff;letter-spacing:.1px}
+.sidochip{border:1.5px solid #d7e1f0;background:#fff;color:#3b5a86;font-weight:800;font-size:12.5px;padding:7px 15px;border-radius:999px;cursor:pointer;font-family:inherit;transition:.15s}
+.sidochip:hover{border-color:#153A77;color:#153A77}
+.sidochip.on{background:#153A77;color:#fff;border-color:#153A77;box-shadow:0 3px 8px rgba(21,58,119,.25)}
+.cfield{width:100%;padding:11px 14px;border:1.5px solid #dfe5ee;border-radius:11px;font-size:14px;font-family:inherit;margin-top:5px;transition:border-color .15s}
+.cfield:focus{outline:none;border-color:#1F4E9C}
 .clabel{display:block;font-size:13px;font-weight:800;color:#374151;margin-top:14px}
+.csec{background:#fff;border:1px solid #e6eaf2;border-radius:18px;padding:22px 24px;box-shadow:0 1px 4px rgba(15,25,60,.04)}
 </style>
 </head>
 <body>
@@ -150,6 +156,14 @@
       </div>
       <div style="font-size:12px;color:#8a5a00;background:#fff8ed;border-radius:8px;padding:8px 12px;margin-top:8px">📍 거점은 <b>실제 활동하며 서류(체육회 등록 등)를 제출할 수 있는 시·군·구 한 곳</b>을 선택합니다. "전지역"으로는 등록할 수 없습니다.</div>
       <div id="ncOrgLine" style="font-size:12.5px;font-weight:800;color:#153A77;margin-top:8px"></div>
+      <label class="clabel">클럽 심볼 (엠블럼 · 선택)</label>
+      <div style="display:flex;gap:12px;align-items:center;margin-top:5px">
+        <div id="ncSymPrev" class="cav" style="flex:0 0 56px;width:56px;height:56px;font-size:22px">🥏</div>
+        <div style="flex:1">
+          <input type="file" id="ncSymbol" accept="image/*" onchange="previewSymbol(this,'ncSymPrev')" style="font-size:13px">
+          <div style="font-size:11.5px;color:#8a919d;margin-top:3px">정사각형 이미지 권장 · 자동 압축 업로드 (2MB 이하)</div>
+        </div>
+      </div>
       <label class="clabel">클럽 소개</label>
       <input id="ncIntro" class="cfield" placeholder="한 줄 소개 (활동 종목·연령대 등)">
       <label class="clabel">클럽 내규 (회비 · 운동 시간 · 규칙)</label>
@@ -167,6 +181,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260808"></script>
 <script src="site_config.js"></script>
 <script>
@@ -253,7 +268,7 @@ function renderClubs(){
       else if(st==='pending')act='<span class="cpill2" style="background:#b8860b">승인 대기</span>';
       else act='<button class="cbtn cbtn-main" onclick="joinClub(\''+d.id+'\')">본인 가입</button>';
       const cnt=(c.memberUids||[]).length+((c.childMembers||[]).length);
-      return '<div class="clubcard"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="cname">'+kesc(c.name)+'</span>'
+      return '<div class="clubcard"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+cavHtml(c)+'<span class="cname">'+kesc(c.name)+'</span>'
         +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'
         +'<span style="font-size:12px;color:#8a919d;font-weight:700">회원 '+cnt+'명</span>'
         +'<span style="flex:1"></span>'+childJoinBtn(c,d.id)+act+'</div>'
@@ -430,7 +445,7 @@ async function loadMyClubs(){
       const leaveBtn=(isMember&&!isOwner)?'<button class="cbtn" style="padding:4px 12px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="leaveClub(\''+d.id+'\',\''+kesc(c.name)+'\')">클럽 탈퇴</button>':'';
       const ownerBtns=isOwner?'<button class="cbtn cbtn-soft" style="padding:4px 12px;font-size:12px" onclick="editMyClub(\''+d.id+'\')">✏️ 수정</button>'
         +'<button class="cbtn" style="padding:4px 12px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="delMyClub(\''+d.id+'\',\''+kesc(c.name)+'\')">🗑 삭제</button>':'';
-      return '<div class="clubcard"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="cname">'+kesc(c.name)+'</span>'
+      return '<div class="clubcard"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+cavHtml(c)+'<span class="cname">'+kesc(c.name)+'</span>'
         +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'+badge
         +(c.code&&(isOwner||isMember)?'<span class="cpill2" style="background:#b8860b" title="이 코드로 회원을 초대할 수 있습니다">🔑 '+kesc(c.code)+'</span>':'')
         +'<span style="font-size:12px;color:#8a919d;font-weight:700">회원 '+((c.memberUids||[]).length)+'명</span>'
@@ -494,6 +509,23 @@ async function rejectJoin(id,uid){
     loadMyClubs();
   }catch(e){alert('거절 실패: '+e.message)}
 }
+// ── 클럽 심볼(엠블럼) 업로드 ──
+function cavHtml(c){return '<span class="cav">'+(c.symbol?'<img src="'+kesc(c.symbol)+'" alt="심볼">':kesc((c.name||'?').charAt(0)))+'</span>';}
+function previewSymbol(inp,pid){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=function(e){document.getElementById(pid).innerHTML='<img src="'+e.target.result+'">';};r.readAsDataURL(f);}
+function shrinkImg(file,max){return new Promise(function(res,rej){
+  const img=new Image();
+  img.onload=function(){const s=Math.min(1,max/Math.max(img.width,img.height));
+    const c=document.createElement('canvas');c.width=Math.round(img.width*s)||1;c.height=Math.round(img.height*s)||1;
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    c.toBlob(function(b){b?res(b):rej(new Error('이미지 압축 실패'))},'image/jpeg',0.85);};
+  img.onerror=function(){rej(new Error('이미지를 읽을 수 없습니다'))};
+  img.src=URL.createObjectURL(file);});}
+async function uploadClubSymbol(clubId,file){
+  const blob=await shrinkImg(file,512);
+  const ref=firebase.storage().ref('clubs/'+clubId+'/symbol_'+Date.now()+'.jpg');
+  await ref.put(blob,{contentType:'image/jpeg'});
+  return await ref.getDownloadURL();
+}
 // 클럽 코드 자동 발급: 특수문자 없는 4자리 일련번호 (counters/clubCode +1) — 예: 0001
 async function issueClubCode(){
   const ref=DB.collection('counters').doc('clubCode');
@@ -514,7 +546,8 @@ async function createClub(){
   try{
     let code='';
     try{code=await issueClubCode();}catch(e){code='';}
-    await DB.collection('clubs').add({
+    const ref=DB.collection('clubs').doc();
+    await ref.set({
       name:name,sido:sido,gugun:gugun,
       intro:document.getElementById('ncIntro').value.trim(),
       rulesText:document.getElementById('ncRules').value.trim(),
@@ -523,8 +556,15 @@ async function createClub(){
       members:[{uid:KME.uid,name:KMY.name||'',at:new Date().toISOString()}],
       memberUids:[KME.uid],pendingJoins:[],pendingUids:[],
       createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-    m.textContent='✓ 생성 신청 완료'+(code?' — 클럽 코드 ['+code+'] 발급':'')+' · 승인 후 목록에 게시됩니다';m.style.color='#0f766e';
-    document.getElementById('ncName').value='';
+    // 심볼 업로드 (선택 — 실패해도 클럽 생성은 유지)
+    const sf=document.getElementById('ncSymbol').files[0];
+    if(sf){m.textContent='심볼 업로드 중…';m.style.color='#8a919d';
+      try{const url=await uploadClubSymbol(ref.id,sf);await ref.update({symbol:url});}
+      catch(e){console.warn('symbol',e);}}
+    alert('✓ 클럽 생성 신청 완료!'+(code?'\n\n귀 클럽의 고유 코드는 [ '+code+' ] 입니다.\n회원들에게 이 코드를 알려주면 코드로 바로 가입 신청할 수 있습니다.':'')+'\n\n승인 후 클럽 목록에 게시됩니다.');
+    m.textContent='✓ 생성 신청 완료'+(code?' — 클럽 코드 ['+code+']':'');m.style.color='#0f766e';
+    document.getElementById('ncName').value='';document.getElementById('ncSymbol').value='';
+    document.getElementById('ncSymPrev').innerHTML='🥏';
     loadMyClubs();
   }catch(e){m.textContent='실패: '+(e.code==='permission-denied'?'권한 오류 — 로그인·승인 상태를 확인해주세요':e.message);m.style.color='#C41E2F'}
 }
@@ -537,7 +577,12 @@ function editMyClub(id){
   div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
   div.innerHTML='<div style="background:#fff;border-radius:20px;max-width:560px;width:100%;max-height:92vh;overflow:auto;padding:26px;box-shadow:0 24px 60px rgba(0,0,0,.25)">'
     +'<h3 style="margin:0;font-size:18px;font-weight:900">✏️ 클럽 정보 수정</h3>'
-    +'<div style="font-size:12px;color:#8a919d;margin-top:4px">거점(시도·시군구)·코드 변경은 사무국으로 문의해주세요.</div>'
+    +'<div style="font-size:12px;color:#8a919d;margin-top:4px">거점(시도·시군구)·코드 변경은 사무국으로 문의해주세요.'+(c.code?' · 클럽 코드 <b style="color:#b8860b">'+kesc(c.code)+'</b>':'')+'</div>'
+    +'<label class="clabel">클럽 심볼</label>'
+    +'<div style="display:flex;gap:12px;align-items:center;margin-top:5px">'
+    +'<div id="mcSymPrev" class="cav" style="flex:0 0 56px;width:56px;height:56px;font-size:22px">'+(c.symbol?'<img src="'+kesc(c.symbol)+'">':kesc((c.name||'?').charAt(0)))+'</div>'
+    +'<div style="flex:1"><input type="file" id="mcSymbol" accept="image/*" onchange="previewSymbol(this,\'mcSymPrev\')" style="font-size:13px">'
+    +'<div style="font-size:11.5px;color:#8a919d;margin-top:3px">정사각형 이미지 권장 · 자동 압축 (2MB 이하)</div></div></div>'
     +'<label class="clabel">클럽명</label><input id="mcName" class="cfield" value="'+kesc(c.name||'')+'">'
     +'<label class="clabel">클럽 소개</label><input id="mcIntro" class="cfield" value="'+kesc(c.intro||'')+'">'
     +'<label class="clabel">클럽 내규</label><textarea id="mcRules" class="cfield" rows="6">'+kesc(c.rulesText||'')+'</textarea>'
@@ -550,9 +595,12 @@ async function saveMyClub(id){
   const name=document.getElementById('mcName').value.trim();
   if(!name){alert('클럽명을 입력하세요.');return}
   try{
-    await DB.collection('clubs').doc(id).update({name:name,
+    const upd={name:name,
       intro:document.getElementById('mcIntro').value.trim(),
-      rulesText:document.getElementById('mcRules').value.trim()});
+      rulesText:document.getElementById('mcRules').value.trim()};
+    const sf=document.getElementById('mcSymbol')&&document.getElementById('mcSymbol').files[0];
+    if(sf)upd.symbol=await uploadClubSymbol(id,sf);
+    await DB.collection('clubs').doc(id).update(upd);
     document.getElementById('mcModal').remove();
     loadMyClubs();loadClubs();
   }catch(e){alert('저장 실패: '+e.message)}
@@ -598,8 +646,8 @@ async function loadOfficer(){
       ofFillGugun();
     }
   }
-  // 시도임원/사무국: 임원 등록 신청 승인
-  if(role==='sidoOfficer'||role==='admin'||KMY.owner){
+  // 임원 등록 신청 승인 — 시도임원(자기 시도 구군임원) · 오너(전체). ※등급 변경 규칙상 일반 admin은 승인 불가하므로 버튼 미노출
+  if(role==='sidoOfficer'||KMY.owner){
     try{
       // 복합 인덱스 회피: 단일 필드 조회 후 클라이언트 필터
       const q=(role==='sidoOfficer')

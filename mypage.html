@@ -1003,11 +1003,15 @@ async function savePhone(){
   if(!/^01[016789][-. ]?\d{3,4}[-. ]?\d{4}$/.test(p)){el.textContent='번호 형식을 확인해주세요';el.style.color='#C41E2F';return}
   try{
     const pn=p.replace(/[^0-9]/g,'');
+    let dupExists=false;
     try{const dup=await DB.collection('phoneIndex').doc(pn).get();
       if(dup.exists&&dup.data().uid!==AUTH.currentUser.uid){el.textContent='이미 다른 회원이 사용 중인 번호입니다';el.style.color='#C41E2F';return}
+      dupExists=dup.exists;
     }catch(e){}
+    const oldPn=String(MYD.phone||'').replace(/[^0-9]/g,'');
     await DB.collection('users').doc(AUTH.currentUser.uid).update({phone:p});
-    await DB.collection('phoneIndex').doc(pn).set({uid:AUTH.currentUser.uid}).catch(()=>{}); // 개인정보 최소화: 이름 미저장
+    if(!dupExists)await DB.collection('phoneIndex').doc(pn).set({uid:AUTH.currentUser.uid}).catch(e=>console.warn('phoneIndex',e)); // 개인정보 최소화: 이름 미저장
+    if(oldPn&&oldPn!==pn)await DB.collection('phoneIndex').doc(oldPn).delete().catch(()=>{}); // 옛 번호 반납(본인 소유만 규칙 허용)
     MYD.phone=p;el.textContent='✓ 저장되었습니다';el.style.color='#0f766e';
   }catch(e){el.textContent='저장 실패: '+e.message;el.style.color='#C41E2F'}
 }
@@ -1054,7 +1058,8 @@ async function toggleAthlete(){
 AUTH.onAuthStateChanged(async u=>{
   if(!u){location.href='login.html';return}
   const doc=await DB.collection('users').doc(u.uid).get();
-  if(!doc.exists){location.href='login.html';return}
+  // 회원 문서가 없는 계정(가입 중단 등) — 로그아웃 후 이동해 무한 리다이렉트 방지
+  if(!doc.exists){await AUTH.signOut().catch(()=>{});location.href='login.html';return}
   const d=doc.data();MYD=d;
   document.getElementById('myCard').style.display='block';
   document.getElementById('myName').textContent=d.name;
