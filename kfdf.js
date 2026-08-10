@@ -38,6 +38,7 @@
   function isOwner(d) { return !!(d && d.owner === true); }
   function isAdmin(d) { return roleOf(d) === 'admin' || isOwner(d); }
   function isSidoOfficer(d) { return roleOf(d) === 'sidoOfficer'; }
+  function isGugunOfficer(d) { return roleOf(d) === 'gugunOfficer'; }   // 구·군연맹 임원
   // 권역장: 만료일(regionAdminExpiresAt)이 지나면 자동 무효
   function regionActive(d) {
     if (roleOf(d) !== 'regionAdmin') return false;
@@ -49,8 +50,11 @@
   function isApproved(d) { return !!(d && d.status === 'approved'); }
   // 시도 단위 임원 권한 (시도임원 role 또는 하위호환 플래그)
   function canCalendar(d) { return isAdmin(d) || isSidoOfficer(d) || !!(d && d.calendarEditor === true); }
-  function canApproveClub(d, sido) {
-    return isAdmin(d) || (isSidoOfficer(d) && d && d.sido === sido) || !!(d && d.clubAdminSido === sido);
+  function canApproveClub(d, sido, gugun) {
+    return isAdmin(d)
+      || (isSidoOfficer(d) && d && d.sido === sido)
+      || (isGugunOfficer(d) && d && d.sido === sido && d.gugun === gugun)
+      || !!(d && d.clubAdminSido === sido);
   }
 
   /* ─── ② 자격·활동 꼬리표 (caps, 여러 개 가능) ─── */
@@ -66,6 +70,7 @@
     if (isOwner(d)) return '오너';
     if (roleOf(d) === 'admin') return '중앙관리자';
     if (isSidoOfficer(d)) return '시도연맹 임원';
+    if (isGugunOfficer(d)) return '구·군연맹 임원';
     if (roleOf(d) === 'regionAdmin') return regionActive(d) ? '권역장' : '권역장(만료)';
     return '일반회원';
   }
@@ -116,7 +121,7 @@
   var API = {
     CFG: CFG, initApp: initApp, ready: ready,
     // 등급
-    roleOf: roleOf, isOwner: isOwner, isAdmin: isAdmin, isSidoOfficer: isSidoOfficer,
+    roleOf: roleOf, isOwner: isOwner, isAdmin: isAdmin, isSidoOfficer: isSidoOfficer, isGugunOfficer: isGugunOfficer,
     isRegionAdmin: isRegionAdmin, regionActive: regionActive, isApproved: isApproved,
     canCalendar: canCalendar, canApproveClub: canApproveClub,
     // 자격

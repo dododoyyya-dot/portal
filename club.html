@@ -116,17 +116,25 @@
 
     <div style="margin-top:26px;background:#f6f8fb;border:1.5px solid #dfe5ee;border-radius:14px;padding:18px 20px">
       <b style="font-size:14.5px">🔑 클럽 코드로 찾기 · 가입</b>
-      <div style="font-size:12.5px;color:#6b7280;margin:4px 0 10px;line-height:1.7">모든 클럽에는 생성 시 연맹이 발급하는 <b>클럽 코드</b>(예: 2026-0001)가 부여됩니다. 코드를 알고 있다면 목록을 찾지 않고 바로 가입 신청할 수 있습니다.<br>KFDF 소속이 아닌 <b>타 단체(사단체) 클럽의 선수</b>도 연맹에서 발급받은 단체 코드를 입력해 회원으로 가입 신청할 수 있습니다.</div>
+      <div style="font-size:12.5px;color:#6b7280;margin:4px 0 10px;line-height:1.7">모든 클럽에는 생성 시 연맹이 발급하는 <b>클럽 코드</b>(예: 0001)가 부여됩니다. 코드를 알고 있다면 목록을 찾지 않고 바로 가입 신청할 수 있습니다.<br>KFDF 소속이 아닌 <b>타 단체(사단체) 클럽의 선수</b>도 연맹에서 발급받은 단체 코드를 입력해 회원으로 가입 신청할 수 있습니다.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <input id="codeInput" placeholder="클럽 코드 입력 (예: 2026-0001)" class="cfield" style="max-width:240px;margin-top:0;text-transform:uppercase">
+        <input id="codeInput" placeholder="클럽 코드 입력 (예: 0001)" class="cfield" style="max-width:240px;margin-top:0;text-transform:uppercase">
         <button class="cbtn cbtn-teal" onclick="joinByCode()">코드로 가입 신청</button>
       </div>
       <div id="codeMsg" style="font-size:13px;font-weight:700;margin-top:8px"></div>
     </div>
 
-    <div id="sidoApproveBox" style="display:none;margin-top:26px;background:#fff8ed;border:1.5px solid #ecd9b0;border-radius:14px;padding:18px 20px">
+    <div id="officerBox" style="display:none;margin-top:26px;background:#f3f6fb;border:1.5px solid #d3e0f2;border-radius:14px;padding:18px 22px">
+      <b style="font-size:14.5px;color:#153A77">🏛 연맹 임원 등록</b>
+      <div style="font-size:12.5px;color:#6b7280;margin:5px 0 12px;line-height:1.7">시도연맹·구군연맹 임원으로 등록하면 관할 지역의 클럽을 승인·관리할 수 있습니다. 신청 후 <b>상위 연맹(시도연맹 임원)</b> 또는 <b>사무국</b> 승인으로 확정됩니다.</div>
+      <div id="officerStatus"></div>
+      <div id="officerApply" style="margin-top:10px"></div>
+      <div id="officerApprovals" style="margin-top:12px"></div>
+    </div>
+
+    <div id="sidoApproveBox" style="display:none;margin-top:20px;background:#fff8ed;border:1.5px solid #ecd9b0;border-radius:14px;padding:18px 22px">
       <b style="font-size:14.5px">🛡 관할 클럽 승인 <span id="saSido" style="color:#b8860b"></span></b>
-      <div style="font-size:12.5px;color:#6b7280;margin:4px 0 10px">시도연맹 임원 권한으로 관할 시도의 클럽 생성 신청을 승인합니다.</div>
+      <div style="font-size:12.5px;color:#6b7280;margin:4px 0 10px">관할 지역의 클럽 생성 신청을 검토해 승인·반려합니다.</div>
       <div id="sidoApproveList"></div>
     </div>
 
@@ -210,6 +218,7 @@ AUTH.onAuthStateChanged(async u=>{
   loadClubs();
   loadMyClubs();
   loadSidoApprovals().catch(()=>{});
+  loadOfficer().catch(()=>{});
 });
 function renderSido(){
   document.getElementById('sidoChips').innerHTML=['전체'].concat(SIDOS).map(s=>{
@@ -272,8 +281,14 @@ async function joinByCode(){
   const m=document.getElementById('codeMsg');
   const code=document.getElementById('codeInput').value.trim().toUpperCase();
   if(!code){m.textContent='코드를 입력하세요';m.style.color='#C41E2F';return}
+  // '-'·공백 유무, 자릿수(앞자리 0)와 무관하게 인식 — 후보 코드를 모두 조회
+  const norm=code.replace(/[\s-]/g,'');
+  const cands=[...new Set([code,norm,
+    (/^\d{8}$/.test(norm)?norm.slice(0,4)+'-'+norm.slice(4):null),   // 20260001 → 2026-0001 (구 형식)
+    (/^\d{1,4}$/.test(norm)?norm.padStart(4,'0'):null)              // 1 → 0001 (신 형식)
+  ].filter(Boolean))].slice(0,10);
   try{
-    const snap=await DB.collection('clubs').where('code','==',code).limit(1).get();
+    const snap=await DB.collection('clubs').where('code','in',cands).limit(1).get();
     if(snap.empty){m.textContent='유효하지 않은 코드입니다';m.style.color='#C41E2F';return}
     const d=snap.docs[0];const c=d.data();
     if((c.memberUids||[]).indexOf(KME.uid)>=0){m.textContent='이미 소속된 클럽입니다 ('+c.name+')';m.style.color='#b8860b';return}
@@ -282,7 +297,7 @@ async function joinByCode(){
     await DB.runTransaction(async tx=>{
       const ref=DB.collection('clubs').doc(d.id);
       const doc=await tx.get(ref);const cc=doc.data();
-      const pj=(cc.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',code:code,at:new Date().toISOString()});
+      const pj=(cc.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',code:c.code||norm,at:new Date().toISOString()});
       const pu=(cc.pendingUids||[]).slice();pu.push(KME.uid);
       tx.update(ref,{pendingJoins:pj,pendingUids:pu});
     });
@@ -395,7 +410,7 @@ async function rejectJoin(id,uid){
     loadMyClubs();
   }catch(e){alert('거절 실패: '+e.message)}
 }
-// 클럽 코드 자동 발급: 연도-일련번호 (counters/clubCode +1)
+// 클럽 코드 자동 발급: 특수문자 없는 4자리 일련번호 (counters/clubCode +1) — 예: 0001
 async function issueClubCode(){
   const ref=DB.collection('counters').doc('clubCode');
   let n=1;
@@ -404,7 +419,7 @@ async function issueClubCode(){
     if(!doc.exists){n=1;tx.set(ref,{count:1});}
     else{n=(doc.data().count||0)+1;tx.update(ref,{count:n});}
   });
-  return new Date().getFullYear()+'-'+String(n).padStart(4,'0');
+  return String(n).padStart(4,'0');
 }
 async function createClub(){
   const m=document.getElementById('ncMsg');
@@ -463,27 +478,126 @@ async function delMyClub(id,name){
   try{await DB.collection('clubs').doc(id).delete();loadMyClubs();loadClubs();}
   catch(e){alert('삭제 실패: '+e.message)}
 }
-// ── 시도연맹 임원: 관할 클럽 승인 ──
+// ── 연맹 임원 등록(신청→승인) ──
+let OFFICER_REQS=[];
+function ofTitleKo(k){return k==='sido'?'시도연맹 임원':'구·군연맹 임원';}
+function ofChip(t,c){return '<span class="cpill2" style="background:'+c+'">'+kesc(t)+'</span>';}
+async function loadOfficer(){
+  const box=document.getElementById('officerBox');if(!box)return;box.style.display='block';
+  const stat=document.getElementById('officerStatus'),applyEl=document.getElementById('officerApply'),apprEl=document.getElementById('officerApprovals');
+  stat.innerHTML='';applyEl.innerHTML='';apprEl.innerHTML='';
+  const role=KMY.role||'member';
+  if(role==='sidoOfficer')stat.innerHTML=ofChip('현재 신분 · '+(KMY.sido||'')+' 시도연맹 임원','#0f766e');
+  else if(role==='gugunOfficer')stat.innerHTML=ofChip('현재 신분 · '+(KMY.sido||'')+' '+(KMY.gugun||'')+' 구·군연맹 임원','#0f766e');
+  else if(role==='admin'||KMY.owner)stat.innerHTML=ofChip('사무국(중앙관리자)','#153A77');
+  // 일반회원: 신청 폼 또는 대기 상태
+  if(role==='member'){
+    let mine=null;
+    try{const my=await DB.collection('officerRequests').where('uid','==',KME.uid).limit(10).get();
+      const md=my.docs.find(x=>x.data().status==='대기');if(md)mine={id:md.id,d:md.data()};}catch(e){}
+    if(mine){
+      applyEl.innerHTML=ofChip('임원 등록 신청 접수됨 · 승인 대기 ('+ofTitleKo(mine.d.kind)+' · '+kesc(mine.d.sido)+(mine.d.gugun?' '+kesc(mine.d.gugun):'')+')','#b8860b')
+        +' <button class="cbtn" style="padding:3px 11px;font-size:11.5px;background:#eceff4;color:#666" onclick="cancelOfficerReq(\''+mine.id+'\')">신청 취소</button>';
+    }else{
+      applyEl.innerHTML='<div style="background:#fff;border:1px solid #e2e8f2;border-radius:11px;padding:14px 16px">'
+        +'<div style="font-size:12.5px;font-weight:800;margin-bottom:9px">임원 등록 신청</div>'
+        +'<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:11px;font-size:13px">'
+        +'<label style="cursor:pointer"><input type="radio" name="ofKind" value="gugun" checked onchange="ofKindChange()"> 구·군연맹 임원</label>'
+        +'<label style="cursor:pointer"><input type="radio" name="ofKind" value="sido" onchange="ofKindChange()"> 시도연맹 임원</label></div>'
+        +'<div style="display:flex;gap:10px;flex-wrap:wrap">'
+        +'<select id="ofSido" class="cfield" style="max-width:180px;margin-top:0" onchange="ofFillGugun()"></select>'
+        +'<select id="ofGugun" class="cfield" style="max-width:200px;margin-top:0"></select></div>'
+        +'<input id="ofTitle" class="cfield" placeholder="직책(선택) — 예: 회장, 사무국장" style="margin-top:9px;max-width:300px">'
+        +'<button class="cbtn cbtn-main" style="margin-top:11px" onclick="submitOfficerReq()">임원 등록 신청</button>'
+        +'<div id="ofMsg" style="font-size:12.5px;font-weight:700;margin-top:7px"></div></div>';
+      document.getElementById('ofSido').innerHTML='<option value="">시도 선택</option>'+SIDOS.map(s=>'<option>'+s+'</option>').join('');
+      ofFillGugun();
+    }
+  }
+  // 시도임원/사무국: 임원 등록 신청 승인
+  if(role==='sidoOfficer'||role==='admin'||KMY.owner){
+    try{
+      // 복합 인덱스 회피: 단일 필드 조회 후 클라이언트 필터
+      const q=(role==='sidoOfficer')
+        ? DB.collection('officerRequests').where('sido','==',KMY.sido||'__')
+        : DB.collection('officerRequests').where('status','==','대기');
+      const snap=await q.limit(80).get();
+      OFFICER_REQS=snap.docs.map(d=>({id:d.id,data:d.data()}))
+        .filter(r=>r.data.status==='대기')
+        .filter(r=>role==='sidoOfficer'?r.data.kind==='gugun':true); // 시도임원은 구군 신청만
+      apprEl.innerHTML='<div style="font-size:12.5px;font-weight:800;color:#153A77;margin-bottom:6px">임원 등록 신청 승인 '+(OFFICER_REQS.length?'('+OFFICER_REQS.length+'건)':'')+'</div>'
+        +(OFFICER_REQS.length?OFFICER_REQS.map(r=>'<div style="background:#fff;border:1px solid #e2e8f2;border-radius:10px;padding:10px 13px;margin-bottom:7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+          +'<b>'+kesc(r.data.name||'')+'</b>'+ofChip(ofTitleKo(r.data.kind),'#153A77')
+          +'<span style="font-size:12px;color:#6b7280">'+kesc(r.data.sido||'')+(r.data.gugun?' '+kesc(r.data.gugun):'')+(r.data.title?' · '+kesc(r.data.title):'')+'</span>'
+          +'<span style="flex:1"></span>'
+          +'<button class="cbtn cbtn-teal" style="padding:4px 12px;font-size:12px" onclick="approveOfficer(\''+r.id+'\')">승인</button>'
+          +'<button class="cbtn" style="padding:4px 12px;font-size:12px;background:#eceff4;color:#666" onclick="rejectOfficer(\''+r.id+'\')">반려</button></div>').join('')
+          :'<div style="font-size:12.5px;color:#8a919d">대기 중인 임원 신청이 없습니다.</div>');
+    }catch(e){apprEl.innerHTML='<div style="font-size:12px;color:#C41E2F">신청 목록 불러오기 실패: '+kesc(e.message)+'</div>';}
+  }
+}
+function ofKindChange(){const k=[...document.getElementsByName('ofKind')].find(r=>r.checked).value;document.getElementById('ofGugun').style.display=(k==='sido')?'none':'';}
+function ofFillGugun(){const s=document.getElementById('ofSido').value,g=document.getElementById('ofGugun');if(!g)return;g.innerHTML=s?'<option value="">시군구 선택</option>'+(GUGUN[s]||[]).map(x=>'<option>'+x+'</option>').join(''):'<option value="">시도를 먼저 선택</option>';}
+async function submitOfficerReq(){
+  const m=document.getElementById('ofMsg');
+  const kind=[...document.getElementsByName('ofKind')].find(r=>r.checked).value;
+  const sido=document.getElementById('ofSido').value;
+  const gugun=kind==='gugun'?document.getElementById('ofGugun').value:'';
+  const title=document.getElementById('ofTitle').value.trim();
+  if(!sido){m.textContent='관할 시도를 선택해주세요';m.style.color='#C41E2F';return}
+  if(kind==='gugun'&&!gugun){m.textContent='관할 시·군·구를 선택해주세요';m.style.color='#C41E2F';return}
+  try{
+    await DB.collection('officerRequests').add({uid:KME.uid,name:KMY.name||'',kind:kind,sido:sido,gugun:gugun,title:title,status:'대기',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    m.textContent='✓ 임원 등록 신청이 접수되었습니다. 승인 후 확정됩니다.';m.style.color='#0f766e';
+    setTimeout(loadOfficer,700);
+  }catch(e){m.textContent='신청 실패: '+e.message;m.style.color='#C41E2F';}
+}
+async function cancelOfficerReq(id){
+  if(!confirm('임원 등록 신청을 취소할까요?'))return;
+  try{await DB.collection('officerRequests').doc(id).delete();loadOfficer();}catch(e){alert('취소 실패: '+e.message)}
+}
+async function approveOfficer(id){
+  const r=OFFICER_REQS.find(x=>x.id===id);if(!r)return;const d=r.data;
+  const upd=d.kind==='gugun'?{role:'gugunOfficer',sido:d.sido,gugun:d.gugun}:{role:'sidoOfficer',sido:d.sido};
+  if(!confirm(d.name+' 님을 ['+d.sido+(d.gugun?' '+d.gugun:'')+'] '+ofTitleKo(d.kind)+'(으)로 승인할까요?'))return;
+  try{
+    await DB.collection('users').doc(d.uid).update(upd);
+    await DB.collection('officerRequests').doc(id).update({status:'승인',processedAt:firebase.firestore.FieldValue.serverTimestamp(),processedBy:KME.uid});
+    alert('승인되었습니다. '+d.name+' 님이 '+ofTitleKo(d.kind)+'으로 등록되었습니다.');loadOfficer();
+  }catch(e){alert('승인 실패: '+(e.code==='permission-denied'?'권한이 없습니다.\n· 시도임원은 자기 시도의 「구·군연맹 임원」만 승인할 수 있습니다.\n· 「시도연맹 임원」 승인은 사무국(오너)만 가능합니다.':e.message));}
+}
+async function rejectOfficer(id){
+  if(!confirm('이 임원 등록 신청을 반려할까요?'))return;
+  try{await DB.collection('officerRequests').doc(id).update({status:'반려',processedAt:firebase.firestore.FieldValue.serverTimestamp(),processedBy:KME.uid});loadOfficer();}
+  catch(e){alert('반려 실패: '+e.message)}
+}
+// ── 시도/구군 임원: 관할 클럽 승인·반려 ──
 async function loadSidoApprovals(){
-  const sido=KMY&&(KMY.role==='sidoOfficer'?KMY.sido:KMY.clubAdminSido);
-  const isAdm=KMY&&KMY.role==='admin';
+  const role=KMY&&KMY.role;
+  const isAdm=role==='admin'||(KMY&&KMY.owner);
+  const isGugun=role==='gugunOfficer';
+  const sido=role==='sidoOfficer'?KMY.sido:(isGugun?KMY.sido:(KMY&&KMY.clubAdminSido));
+  const gugun=isGugun?KMY.gugun:null;
   if(!sido&&!isAdm)return;
   const box=document.getElementById('sidoApproveBox');
   try{
     let q=DB.collection('clubs').where('status','==','대기');
     if(sido&&!isAdm)q=q.where('sido','==',sido);
-    const snap=await q.limit(50).get();
+    const snap=await q.limit(80).get();
+    let docs=snap.docs;
+    if(gugun)docs=docs.filter(d=>(d.data().gugun||'')===gugun); // 구군임원은 자기 시군구만
     box.style.display='block';
-    document.getElementById('saSido').textContent=sido?'— '+sido+' 관할':'— 전체(중앙)';
-    document.getElementById('sidoApproveList').innerHTML=snap.empty
+    document.getElementById('saSido').textContent=isAdm?'— 전체(중앙)':('— '+sido+(gugun?' '+gugun:'')+' 관할');
+    document.getElementById('sidoApproveList').innerHTML=!docs.length
       ?'<div style="font-size:12.5px;color:#8a919d">승인 대기 중인 클럽이 없습니다.</div>'
-      :snap.docs.map(d=>{const c=d.data();
+      :docs.map(d=>{const c=d.data();
         return '<div class="clubcard" style="margin-bottom:8px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
           +'<span class="cname">'+kesc(c.name)+'</span>'
           +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'
           +'<span style="font-size:12px;color:#8a919d">클럽장 '+kesc(c.ownerName||'')+(c.code?' · 코드 '+kesc(c.code):'')+'</span>'
           +'<span style="flex:1"></span>'
-          +'<button class="cbtn cbtn-teal" onclick="sidoApprove(\''+d.id+'\')">✓ 승인</button></div>'
+          +'<button class="cbtn cbtn-teal" style="padding:5px 14px" onclick="sidoApprove(\''+d.id+'\')">✓ 승인</button>'
+          +'<button class="cbtn" style="padding:5px 14px;background:#eceff4;color:#666" onclick="sidoReject(\''+d.id+'\')">반려</button></div>'
           +(c.intro?'<div class="cmeta2">'+kesc(c.intro)+'</div>':'')+'</div>';
       }).join('');
   }catch(e){box.style.display='block';document.getElementById('sidoApproveList').innerHTML='<div style="font-size:12.5px;color:#C41E2F">불러오기 실패: '+kesc(e.message)+'</div>';}
@@ -494,6 +608,11 @@ async function sidoApprove(id){
     alert('승인되었습니다. 클럽 목록에 게시됩니다.');
     loadSidoApprovals();loadClubs();
   }catch(e){alert('승인 실패: '+(e.code==='permission-denied'?'관할 권한이 없습니다':e.message))}
+}
+async function sidoReject(id){
+  if(!confirm('이 클럽 생성 신청을 반려할까요?'))return;
+  try{await DB.collection('clubs').doc(id).update({status:'반려'});loadSidoApprovals();}
+  catch(e){alert('반려 실패: '+(e.code==='permission-denied'?'관할 권한이 없습니다':e.message))}
 }
 </script>
 

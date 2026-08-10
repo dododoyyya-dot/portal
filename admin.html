@@ -218,6 +218,8 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <span style="font-weight:600;color:#8a6d1b">— 켜면 같은 권역의 모든 시도에 중복 표시됩니다 (예: 경상 → 부산·대구·울산·경북·경남)</span>
       </label>
       <div id="auditBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:16px"></div>
+      <div style="margin-bottom:10px"><button class="btn-sub" style="background:#0f766e" onclick="toggleSchoolGroups()">🏫 학교별 회원 보기 (동호회 분류)</button></div>
+      <div id="schoolGroupBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:16px"></div>
       <div class="board" id="userList"><div class="bempty">불러오는 중…</div></div></div>
     <div id="v5" style="display:none">
       <div class="authbox" style="max-width:720px;margin:0">
@@ -245,6 +247,8 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <label>신청 마감일</label><input id="cpDeadline" type="date">
         <label>임무 목록 (쉼표 구분 — 비우면 기본값 · 참가는 "부문:정원" 형식으로 부문별 정원 지정 가능)</label><input id="cpRoles" placeholder="심판: 심판장,주심,부심,… / 참가: 오픈부:16,여자부:8,혼성부">
         <label>참가비 (선택 — 참가 모집 시 표시. 예: 무료 / 1인 10,000원)</label><input id="cpFee" placeholder="예: 무료 (기념품 증정) / 팀당 30,000원">
+        <label>참가 제한 지역 (선택 — 참가 모집 시. 예: 부산 → 부산 지역만 · 비우면 전체 개방)</label><input id="cpEligRegion" placeholder="예: 부산 (시·도명. 시민대회·구청장기 등 지역 제한 시)">
+        <label>참가 자격 안내 (선택 — 신청 화면 상단에 표시)</label><input id="cpEligNote" placeholder="예: 부산시 소재 학교·클럽 소속 선수만 참가 가능">
         <label>안내문 (선택 — 신청 화면에 표시)</label><textarea id="cpNote" rows="3" placeholder="예: 집결 08:30 / 중식 제공 / 자격증 사본 지참"></textarea>
         <label>개인정보 동의서 문안 (선택 — 비우면 연맹 기본 문안 사용)</label>
         <textarea id="cpConsentText" rows="4" placeholder="행사별 수집·이용·제3자 제공 동의 문안을 직접 입력하면 기본 문안 대신 표시됩니다"></textarea>
@@ -1750,6 +1754,23 @@ function viewCompContractAdmin(uid,compId){
   +'</div></body></html>');
   w.document.close();
 }
+// ── 🏫 학교별 회원 (동호회 자동분류) ──
+function normSchool(s){return String(s||'').trim().replace(/\s+/g,'').replace(/(초등학교|초교)$/,'초').replace(/(중학교)$/,'중').replace(/(고등학교|고교)$/,'고');}
+function schoolAge(b){const by=new Date(b);if(isNaN(by))return'';const age=Math.floor((Date.now()-by.getTime())/(365.25*86400000));return age>=18?'성인':age+'세';}
+function toggleSchoolGroups(){const b=document.getElementById('schoolGroupBox');if(b.style.display==='none'){renderSchoolGroups();b.style.display='block';}else b.style.display='none';}
+function renderSchoolGroups(){
+  const groups={};
+  USERS.forEach(d=>{const v=d.data();const sc=(v.school||'').trim();if(!sc)return;const k=normSchool(sc);(groups[k]=groups[k]||{label:sc,members:[]}).members.push(v);});
+  const keys=Object.keys(groups).sort((a,b)=>groups[b].members.length-groups[a].members.length);
+  const el=document.getElementById('schoolGroupBox');
+  if(!keys.length){el.innerHTML='<div class="bempty">재학 학교를 입력한 회원이 없습니다. (회원이 마이페이지 › 재학 학교를 입력하면 자동 집계됩니다)</div>';return;}
+  const tot=keys.reduce((a,k)=>a+groups[k].members.length,0);
+  el.innerHTML='<div style="font-size:13px;font-weight:800;color:#0f766e;margin-bottom:10px">🏫 학교별 회원 — '+keys.length+'개 학교 · '+tot+'명</div>'
+    +keys.map(k=>{const g=groups[k];
+      return '<div style="border-bottom:1px solid var(--line);padding:9px 2px"><b>'+esc(g.label)+'</b> <span style="color:#8a919d;font-size:12.5px;font-weight:700">'+g.members.length+'명</span>'
+        +'<div style="font-size:12.5px;color:#5b6472;margin-top:4px;line-height:1.7">'+g.members.map(m=>esc(m.name||'')+(m.birth?' <span style="color:#8a919d">('+schoolAge(m.birth)+')</span>':'')).join(' · ')+'</div></div>';
+    }).join('');
+}
 function renderUsers(){
   const el=document.getElementById('userList');
   // 시도 필터 선택 시에만 '권역 보정 포함' 옵션 노출
@@ -1983,6 +2004,8 @@ async function addComp(){
     title:t,region:document.getElementById('cpRegion').value,date:dt,
     role:document.getElementById('cpRole').value,quota:q,claimed:[],cancels:[],
     deadline:document.getElementById('cpDeadline').value||'',roles:roles,
+    eligRegion:(document.getElementById('cpEligRegion')?document.getElementById('cpEligRegion').value.trim():''),
+    eligNote:(document.getElementById('cpEligNote')?document.getElementById('cpEligNote').value.trim():''),
     note:document.getElementById('cpNote').value.trim(),
     fee:document.getElementById('cpFee').value.trim(),
     consentText:document.getElementById('cpConsentText').value.trim(),
