@@ -149,7 +149,17 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
         👨‍👧 만 18세 미만(미성년자)은 본인 명의로 가입하지 않습니다. <b>보호자(법정대리인)가 가입한 뒤 마이페이지 → 자녀 프로필 등록</b>으로 연동해 주세요. 자녀의 대회·행사 참가는 보호자 계정에서 동의·신청합니다.
       </div>
       <label>이름 (실명) <span style="color:#C41E2F">*</span></label><input id="sName" placeholder="홍길동">
-      <label>휴대전화 (배정·위촉 연락용) <span style="color:#C41E2F">*</span></label><input id="sPhone" placeholder="010-0000-0000">
+      <label>휴대전화 (배정·위촉 연락용) <span style="color:#C41E2F">*</span> <span style="font-weight:700;color:#0f766e;font-size:12px">— 본인 휴대폰 인증 필수</span></label>
+      <input id="sPhone" placeholder="010-0000-0000" oninput="resetPhoneVerify()">
+      <div style="margin-top:6px;background:#f4f7fc;border:1.5px solid #d3e0f2;border-radius:10px;padding:11px 13px">
+        <button type="button" id="sendCodeBtn" onclick="sendPhoneCode()" style="background:#153A77;color:#fff;border:none;padding:9px 16px;border-radius:8px;font-weight:800;cursor:pointer;font-family:inherit;font-size:13.5px">📱 인증번호 받기</button>
+        <div id="codeRow" style="display:none;margin-top:9px;gap:8px;align-items:center">
+          <input id="sCode" inputmode="numeric" maxlength="6" placeholder="문자로 받은 6자리" style="width:150px;padding:9px 12px;border:1.5px solid var(--line);border-radius:8px;font-size:15px;letter-spacing:2px">
+          <button type="button" onclick="verifyPhoneCode()" style="background:#0f766e;color:#fff;border:none;padding:9px 16px;border-radius:8px;font-weight:800;cursor:pointer;font-family:inherit;font-size:13.5px;margin-left:6px">확인</button>
+        </div>
+        <div id="phoneVerifyMsg" style="font-size:12.5px;font-weight:700;margin-top:7px;color:var(--gray)">가입하려면 본인 휴대폰 번호로 인증해야 합니다.</div>
+      </div>
+      <div id="recaptcha-container"></div>
       <div style="display:flex;gap:10px">
         <div style="flex:1"><label>성별 <span style="color:#C41E2F">*</span></label>
           <select id="sGender"><option value="">선택</option><option>남</option><option>여</option></select></div>
@@ -431,6 +441,62 @@ function aaRm(i){AA.splice(i,1);aaRender();}
 function aaSave(){return AA.map(a=>AA_FULL[a.s]+' '+a.g)}
 function aaRegions(){return [...new Set(AA.map(a=>AA_REG[a.s]))]}
 function aaBase(){if(!AA.length)return '';const a=AA[0];return AA_FULL[a.s]+(a.g==='전지역'?'':' '+a.g)}
+// ── 휴대폰 본인인증 (SMS) — 가입 필수. 인증된 전화계정에 이메일/비번을 연결하는 방식 ──
+let PHONE_CONFIRM=null, PHONE_VERIFIED_NUM=null, recaptchaVerifier=null;
+function e164KR(phone){const n=String(phone||'').replace(/[^0-9]/g,'');return n.charAt(0)==='0'?('+82'+n.slice(1)):('+82'+n);}
+function resetPhoneVerify(){
+  PHONE_VERIFIED_NUM=null;PHONE_CONFIRM=null;
+  const cr=document.getElementById('codeRow');if(cr)cr.style.display='none';
+  const sc=document.getElementById('sCode');if(sc){sc.value='';sc.disabled=false;}
+  const b=document.getElementById('sendCodeBtn');if(b){b.disabled=false;b.textContent='📱 인증번호 받기';}
+  const m=document.getElementById('phoneVerifyMsg');if(m){m.innerHTML='가입하려면 본인 휴대폰 번호로 인증해야 합니다.';m.style.color='var(--gray)';}
+}
+async function sendPhoneCode(){
+  const msg=document.getElementById('phoneVerifyMsg');
+  const phone=document.getElementById('sPhone').value.trim();
+  if(!/^01[016789][-. ]?\d{3,4}[-. ]?\d{4}$/.test(phone)){msg.innerHTML='휴대전화 번호를 정확히 입력해주세요 (예: 010-1234-5678)';msg.style.color='#C41E2F';return;}
+  const pnorm=phone.replace(/[^0-9]/g,'');
+  try{const dup=await DB.collection('phoneIndex').doc(pnorm).get();if(dup.exists){msg.innerHTML='이미 이 번호로 가입된 회원이 있습니다. 로그인하시거나 사무국(031-984-3248)으로 문의해주세요.';msg.style.color='#C41E2F';return;}}catch(e){}
+  msg.innerHTML='인증번호 전송 중…';msg.style.color='var(--gray)';
+  try{
+    if(!recaptchaVerifier){recaptchaVerifier=new firebase.auth.RecaptchaVerifier('recaptcha-container',{size:'invisible'});}
+    PHONE_CONFIRM=await AUTH.signInWithPhoneNumber(e164KR(phone),recaptchaVerifier);
+    document.getElementById('codeRow').style.display='flex';
+    document.getElementById('sendCodeBtn').textContent='인증번호 재전송';
+    msg.innerHTML='✉️ 문자로 인증번호를 보냈습니다. 6자리를 입력하고 [확인]을 눌러주세요.';msg.style.color='#0f766e';
+  }catch(e){
+    let t=e.message;
+    if(e.code==='auth/too-many-requests')t='요청이 많습니다. 잠시 후 다시 시도해주세요.';
+    else if(e.code==='auth/invalid-phone-number')t='번호 형식이 올바르지 않습니다.';
+    else if(e.code==='auth/captcha-check-failed'||e.code==='auth/argument-error')t='보안 확인에 실패했습니다. 새로고침 후 다시 시도해주세요.';
+    msg.innerHTML='전송 실패: '+t;msg.style.color='#C41E2F';
+    if(recaptchaVerifier){try{recaptchaVerifier.clear()}catch(_){}recaptchaVerifier=null;}
+  }
+}
+async function verifyPhoneCode(){
+  const msg=document.getElementById('phoneVerifyMsg');
+  const code=document.getElementById('sCode').value.trim();
+  if(!PHONE_CONFIRM){msg.innerHTML='먼저 [인증번호 받기]를 눌러주세요';msg.style.color='#C41E2F';return;}
+  if(!/^\d{6}$/.test(code)){msg.innerHTML='문자로 받은 6자리 숫자를 입력해주세요';msg.style.color='#C41E2F';return;}
+  msg.innerHTML='확인 중…';msg.style.color='var(--gray)';
+  try{
+    const result=await PHONE_CONFIRM.confirm(code);
+    const u=result.user;
+    if((u.providerData||[]).some(p=>p.providerId==='password')){
+      await AUTH.signOut().catch(()=>{});PHONE_CONFIRM=null;
+      msg.innerHTML='이미 가입된 번호입니다. 로그인 화면에서 로그인해주세요.';msg.style.color='#C41E2F';return;
+    }
+    PHONE_VERIFIED_NUM=document.getElementById('sPhone').value.replace(/[^0-9]/g,'');
+    msg.innerHTML='✅ <b style="color:#0f766e">휴대폰 본인인증 완료</b> — 아래 정보를 마저 입력하고 가입하기를 눌러주세요.';
+    document.getElementById('sendCodeBtn').disabled=true;
+    document.getElementById('sCode').disabled=true;
+  }catch(e){
+    let t=e.message;
+    if(e.code==='auth/invalid-verification-code')t='인증번호가 올바르지 않습니다. 다시 확인해주세요.';
+    else if(e.code==='auth/code-expired')t='인증번호가 만료되었습니다. 재전송해주세요.';
+    msg.innerHTML='인증 실패: '+t;msg.style.color='#C41E2F';
+  }
+}
 async function go(){
   const email=document.getElementById('aEmail').value.trim(), pw=document.getElementById('aPw').value;
   if(!email||!pw)return say('이메일과 비밀번호를 입력하세요');
@@ -465,11 +531,14 @@ async function go(){
       if((document.getElementById('sAf2').checked||document.getElementById('sAf3').checked)&&!work)return say('근무지(학교·기관명)를 입력해주세요');
       const pnorm=phone.replace(/[^0-9]/g,'');
       if(pnorm.length<10){say('휴대전화 번호를 정확히 입력해주세요');return}
+      // 휴대폰 본인인증 필수 — 인증 완료된 번호와 입력 번호가 일치해야 가입 진행 (미인증이면 계정 생성 안 됨)
+      if(PHONE_VERIFIED_NUM!==pnorm){say('휴대폰 본인인증을 완료해주세요.\n[📱 인증번호 받기] → 문자 6자리 입력 → [확인] 순서로 인증하면 가입할 수 있습니다.');return}
       try{
         const dup=await DB.collection('phoneIndex').doc(pnorm).get();
         if(dup.exists){say('이미 이 전화번호로 가입된 회원이 있습니다.\n기존 계정으로 로그인하시거나, 계정을 잊으셨으면 사무국(031-984-3248)으로 문의해주세요.');return}
       }catch(e){}
-      const cred=await AUTH.createUserWithEmailAndPassword(email,pw);
+      // 인증된 전화계정에 이메일/비밀번호 연결 = 계정 생성. (본인인증을 통과해야만 여기 도달)
+      const cred=await AUTH.currentUser.linkWithCredential(firebase.auth.EmailAuthProvider.credential(email,pw));
       const zipVal=document.getElementById('sZip').value.trim();
       await DB.collection('users').doc(cred.user.uid).set({
         name:name, email:email,
@@ -499,7 +568,7 @@ async function go(){
       setTimeout(()=>location.href='mypage.html',1500);
     }
   }catch(e){
-    const m={'auth/email-already-in-use':'이미 가입된 이메일입니다','auth/invalid-email':'이메일 형식이 올바르지 않습니다','auth/weak-password':'비밀번호는 6자 이상이어야 합니다','auth/invalid-credential':'이메일 또는 비밀번호가 올바르지 않습니다','auth/user-not-found':'가입되지 않은 이메일입니다','auth/wrong-password':'비밀번호가 올바르지 않습니다'};
+    const m={'auth/email-already-in-use':'이미 가입된 이메일입니다','auth/credential-already-in-use':'이미 가입된 이메일입니다','auth/provider-already-linked':'이미 이 번호에 계정이 있습니다. 로그인해주세요.','auth/invalid-email':'이메일 형식이 올바르지 않습니다','auth/weak-password':'비밀번호는 6자 이상이어야 합니다','auth/invalid-credential':'이메일 또는 비밀번호가 올바르지 않습니다','auth/user-not-found':'가입되지 않은 이메일입니다','auth/wrong-password':'비밀번호가 올바르지 않습니다','auth/requires-recent-login':'인증이 만료되었습니다. 휴대폰 인증부터 다시 진행해주세요.'};
     say(m[e.code]||('오류: '+e.message));
   }
 }
