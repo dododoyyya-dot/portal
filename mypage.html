@@ -690,8 +690,8 @@ function fillProfile(d){
   document.getElementById('pfCareer').value=d.career||'';
   // 활동 가능 범위
   try{aaLoad(d)}catch(e){console.warn('aa',e)}
-  // 자녀(미성년) 프로필
-  try{renderKids()}catch(e){console.warn('kids',e)}
+  // 자녀(미성년) 프로필 — cid 마이그레이션 후 렌더
+  migrateKids().then(renderKids).catch(e=>console.warn('kids',e));
   // 주민번호 등록 여부 (별도 보안 컬렉션)
   try{
     DB.collection('privateInfo').doc(AUTH.currentUser.uid).get().then(pd=>{
@@ -826,7 +826,16 @@ function pfGate(d){
     +'</div>');
   return true;
 }
-// ── 자녀(미성년) 프로필 — 보호자 계정 연동, 등록 시 법정대리인 동의 기록 ──
+// ── 자녀(미성년) 프로필 — 보호자 계정 연동(복수 자녀), 안정 식별자(cid)로 클럽·대회 이력 연결 ──
+function newCid(){return (AUTH.currentUser.uid.slice(0,6)+'-'+Date.now().toString(36)+Math.floor(Math.random()*900+100)).toLowerCase();}
+async function migrateKids(){
+  // 기존 자녀(cid 없음)에 안정 식별자 부여 (1회)
+  const kids=(MYD&&MYD.children)||[];
+  if(!kids.length)return;
+  let changed=false;
+  kids.forEach(k=>{if(!k.cid){k.cid=newCid();changed=true;}});
+  if(changed){try{await DB.collection('users').doc(AUTH.currentUser.uid).update({children:kids});MYD.children=kids;}catch(e){}}
+}
 function renderKids(){
   const el=document.getElementById('kidList');if(!el)return;
   const kids=(MYD&&MYD.children)||[];
@@ -849,7 +858,7 @@ async function addKid(){
   if(age>=19){m.textContent='만 19세 이상은 본인 계정으로 가입해주세요';m.style.color='#C41E2F';return}
   if(!document.getElementById('kidConsent').checked){m.textContent='법정대리인 동의에 체크해주세요';m.style.color='#C41E2F';return}
   const kids=((MYD&&MYD.children)||[]).slice();
-  kids.push({name:name,birth:birth,gender:gender,school:school,consentAt:new Date().toISOString(),parentName:MYD.name||''});
+  kids.push({cid:newCid(),name:name,birth:birth,gender:gender,school:school,consentAt:new Date().toISOString(),parentName:MYD.name||''});
   try{
     await DB.collection('users').doc(AUTH.currentUser.uid).update({children:kids});
     MYD.children=kids;renderKids();

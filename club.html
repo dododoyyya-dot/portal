@@ -251,11 +251,12 @@ function renderClubs(){
       let act='';
       if(st==='member')act='<span class="cpill2" style="background:#0f766e">✓ 소속</span>';
       else if(st==='pending')act='<span class="cpill2" style="background:#b8860b">승인 대기</span>';
-      else act='<button class="cbtn cbtn-main" onclick="joinClub(\''+d.id+'\')">가입 신청</button>';
+      else act='<button class="cbtn cbtn-main" onclick="joinClub(\''+d.id+'\')">본인 가입</button>';
+      const cnt=(c.memberUids||[]).length+((c.childMembers||[]).length);
       return '<div class="clubcard"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="cname">'+kesc(c.name)+'</span>'
         +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'
-        +'<span style="font-size:12px;color:#8a919d;font-weight:700">회원 '+((c.memberUids||[]).length)+'명</span>'
-        +'<span style="flex:1"></span>'+act+'</div>'
+        +'<span style="font-size:12px;color:#8a919d;font-weight:700">회원 '+cnt+'명</span>'
+        +'<span style="flex:1"></span>'+childJoinBtn(c,d.id)+act+'</div>'
         +(c.intro?'<div class="cmeta2">'+kesc(c.intro)+'</div>':'')
         +(c.rulesText?'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">클럽 내규 보기</summary><div style="font-size:12.5px;color:#4b5563;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:10px 13px;margin-top:6px">'+kesc(c.rulesText)+'</div></details>':'')
         +'</div>';
@@ -276,6 +277,79 @@ async function joinClub(id){
     alert('가입 신청 완료! 클럽장 승인 후 소속으로 표시됩니다.');
     loadClubs();loadMyClubs();
   }catch(e){alert(e.message)}
+}
+// ── 자녀(미성년) 클럽 가입 — 보호자 계정에서 자녀(복수) 선택 ──
+function childJoinBtn(c,id){
+  const kids=(KMY&&KMY.children)||[];if(!kids.length)return '';
+  return '<button class="cbtn cbtn-soft" style="padding:7px 14px" onclick="openChildJoin(\''+id+'\')">👨‍👧 자녀 가입</button>';
+}
+function childStatusInClub(c,cid){
+  if((c.childMembers||[]).some(m=>m.cid===cid))return 'member';
+  if((c.childPending||[]).some(m=>m.cid===cid))return 'pending';
+  return '';
+}
+function showModal(title,html){
+  closeModal();
+  const ov=document.createElement('div');ov.id='kfdfModal';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,20,40,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.onclick=function(e){if(e.target===ov)closeModal();};
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;max-width:480px;width:100%;max-height:85vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 50px rgba(0,0,0,.3)"><div style="display:flex;align-items:center;margin-bottom:12px"><b style="font-size:16px;flex:1">'+title+'</b><button onclick="closeModal()" style="border:none;background:#eceff4;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:16px">✕</button></div>'+html+'</div>';
+  document.body.appendChild(ov);
+}
+function closeModal(){const m=document.getElementById('kfdfModal');if(m)m.remove();}
+function openChildJoin(id){
+  const d=ALLCLUBS.find(x=>x.id===id);if(!d)return;const c=d.data();
+  const kids=(KMY&&KMY.children)||[];
+  const rows=kids.map(k=>{
+    const stt=childStatusInClub(c,k.cid);
+    const btn=stt==='member'?'<span class="cpill2" style="background:#0f766e">✓ 소속</span>'
+      :stt==='pending'?'<span class="cpill2" style="background:#b8860b">신청 중</span>'
+      :'<button class="cbtn cbtn-teal" style="padding:5px 13px" onclick="doChildJoin(\''+id+'\',\''+k.cid+'\')">이 자녀로 신청</button>';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #eef1f6"><b>'+kesc(k.name)+'</b><span style="font-size:12px;color:#8a919d">'+kesc(k.birth||'')+(k.school?' · '+kesc(k.school):'')+'</span><span style="flex:1"></span>'+btn+'</div>';
+  }).join('');
+  showModal('👨‍👧 '+kesc(c.name)+' · 자녀 가입','<div style="font-size:12.5px;color:#6b7280;margin-bottom:4px">가입할 자녀를 선택하세요. 클럽장 승인 후 소속으로 표시됩니다.<br>자녀 추가는 <b>마이페이지 › 자녀 관리</b>에서.</div>'+(rows||'<div style="color:#8a919d;font-size:13px;padding:10px 0">등록된 자녀가 없습니다.</div>'));
+}
+async function doChildJoin(id,cid){
+  const k=((KMY&&KMY.children)||[]).find(x=>x.cid===cid);if(!k)return;
+  try{
+    await DB.runTransaction(async tx=>{
+      const ref=DB.collection('clubs').doc(id);const doc=await tx.get(ref);const c=doc.data();
+      if((c.childMembers||[]).some(m=>m.cid===cid))throw new Error('이미 소속된 자녀입니다');
+      if((c.childPending||[]).some(m=>m.cid===cid))throw new Error('이미 신청 중입니다');
+      const cp=(c.childPending||[]).slice();
+      cp.push({parentUid:KME.uid,parentName:KMY.name||'',cid:cid,name:k.name||'',birth:k.birth||'',school:k.school||'',at:new Date().toISOString()});
+      tx.update(ref,{childPending:cp});
+    });
+    closeModal();alert('✓ '+k.name+' 가입 신청 완료 — 클럽장 승인 후 소속으로 표시됩니다.');
+    loadClubs();loadMyClubs();
+  }catch(e){alert('신청 실패: '+(e.code==='permission-denied'?'권한 오류 — 승인 회원만 신청할 수 있습니다':e.message))}
+}
+async function approveChild(id,cid){
+  try{
+    await DB.runTransaction(async tx=>{
+      const ref=DB.collection('clubs').doc(id);const doc=await tx.get(ref);const c=doc.data();
+      const p=(c.childPending||[]).find(x=>x.cid===cid);if(!p)return;
+      const cm=(c.childMembers||[]).slice();
+      if(!cm.some(x=>x.cid===cid))cm.push({parentUid:p.parentUid,parentName:p.parentName||'',cid:cid,name:p.name||'',birth:p.birth||'',school:p.school||'',at:new Date().toISOString()});
+      tx.update(ref,{childMembers:cm,childPending:(c.childPending||[]).filter(x=>x.cid!==cid)});
+    });
+    loadMyClubs();loadClubs();
+  }catch(e){alert('승인 실패: '+e.message)}
+}
+async function rejectChild(id,cid){
+  try{
+    const ref=DB.collection('clubs').doc(id);const doc=await ref.get();const c=doc.data();
+    await ref.update({childPending:(c.childPending||[]).filter(x=>x.cid!==cid)});
+    loadMyClubs();
+  }catch(e){alert('처리 실패: '+e.message)}
+}
+async function removeChildMember(id,cid,nm){
+  if(!confirm(nm+' 자녀를 클럽에서 제외할까요?'))return;
+  try{
+    const ref=DB.collection('clubs').doc(id);const doc=await ref.get();const c=doc.data();
+    await ref.update({childMembers:(c.childMembers||[]).filter(x=>x.cid!==cid)});
+    loadMyClubs();loadClubs();
+  }catch(e){alert('제외 실패: '+e.message)}
 }
 async function joinByCode(){
   const m=document.getElementById('codeMsg');
@@ -329,18 +403,28 @@ async function loadMyClubs(){
       if(isOwner){
         const pend2=(c.pendingJoins||[]);
         const active=pend2.filter(p=>(c.pendingUids||[]).indexOf(p.uid)>=0);
+        const cPend=(c.childPending||[]);
+        const cMem=(c.childMembers||[]);
         ownerUI='<div style="margin-top:10px;border-top:1px dashed #e5e9f0;padding-top:10px">'
-          +'<b style="font-size:12.5px">가입 신청 '+active.length+'건</b> '
+          +'<b style="font-size:12.5px">본인 가입 신청 '+active.length+'건</b> '
           +(active.length?active.map(p=>'<span style="font-size:12.5px;margin-left:8px">'+kesc(p.name)+(p.code?' <span style="color:#b8860b">(코드)</span>':'')
             +' <button class="cbtn cbtn-teal" style="padding:3px 10px;font-size:11.5px" onclick="approveJoin(\''+d.id+'\',\''+p.uid+'\')">승인</button>'
             +' <button class="cbtn" style="padding:3px 10px;font-size:11.5px;background:#eceff4;color:#666" onclick="rejectJoin(\''+d.id+'\',\''+p.uid+'\')">거절</button></span>').join(''):' <span style="font-size:12px;color:#8a919d">없음</span>')
           +'</div>'
-          +'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">회원 관리 ('+((c.members||[]).length)+'명)</summary>'
+          +'<div style="margin-top:8px;border-top:1px dashed #e5e9f0;padding-top:9px">'
+          +'<b style="font-size:12.5px">👨‍👧 자녀 가입 신청 '+cPend.length+'건</b> '
+          +(cPend.length?cPend.map(p=>'<span style="font-size:12.5px;margin-left:8px">'+kesc(p.name)+' <span style="color:#8a919d;font-size:11px">('+kesc(p.birth||'')+(p.parentName?' · 보호자 '+kesc(p.parentName):'')+')</span>'
+            +' <button class="cbtn cbtn-teal" style="padding:3px 10px;font-size:11.5px" onclick="approveChild(\''+d.id+'\',\''+p.cid+'\')">승인</button>'
+            +' <button class="cbtn" style="padding:3px 10px;font-size:11.5px;background:#eceff4;color:#666" onclick="rejectChild(\''+d.id+'\',\''+p.cid+'\')">거절</button></span>').join(''):' <span style="font-size:12px;color:#8a919d">없음</span>')
+          +'</div>'
+          +'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">회원 관리 (본인 '+((c.members||[]).length)+' · 자녀 '+cMem.length+'명)</summary>'
           +'<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'
           +(c.members||[]).map(mm=>'<span style="font-size:12.5px;background:#f6f8fb;border-radius:8px;padding:5px 10px">'+kesc(mm.name||'')
             +(mm.uid===c.ownerUid?' <b style="color:#C41E2F;font-size:11px">클럽장</b>'
               :' <button class="cbtn" style="padding:2px 8px;font-size:11px;background:#fff;color:#C41E2F;border:1px solid #f1c7cc" onclick="removeMember(\''+d.id+'\',\''+mm.uid+'\',\''+kesc(mm.name||'')+'\')">제외</button>')
             +'</span>').join('')
+          +cMem.map(mm=>'<span style="font-size:12.5px;background:#eef7f2;border-radius:8px;padding:5px 10px">👧 '+kesc(mm.name||'')
+            +' <button class="cbtn" style="padding:2px 8px;font-size:11px;background:#fff;color:#C41E2F;border:1px solid #f1c7cc" onclick="removeChildMember(\''+d.id+'\',\''+mm.cid+'\',\''+kesc(mm.name||'')+'\')">제외</button></span>').join('')
           +'</div></details>';
       }
       const leaveBtn=(isMember&&!isOwner)?'<button class="cbtn" style="padding:4px 12px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="leaveClub(\''+d.id+'\',\''+kesc(c.name)+'\')">클럽 탈퇴</button>':'';
