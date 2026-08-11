@@ -118,6 +118,7 @@
 
     <h3 class="sub" style="margin-top:40px">🔍 클럽 찾기 <span id="clubStat" style="font-size:12.5px;font-weight:700;color:#8a919d;margin-left:8px"></span></h3>
     <div id="sidoChips" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px"></div>
+    <input id="clSearch" oninput="renderClubs()" placeholder="🔍 클럽명 · 시군구 · 소개로 검색" style="width:100%;max-width:420px;padding:10px 14px;border:1.5px solid #dfe5ee;border-radius:10px;margin-bottom:12px;font-family:inherit;font-size:14px">
     <div id="clubList" class="board"><div class="bempty">불러오는 중…</div></div>
 
     <div style="margin-top:26px;background:#f6f8fb;border:1.5px solid #dfe5ee;border-radius:14px;padding:18px 20px">
@@ -259,7 +260,11 @@ function clubStatusOf(c){
 }
 function renderClubs(){
   const el=document.getElementById('clubList');
-  const docs=ALLCLUBS.filter(d=>{const c=d.data();return !c.hidden&&(!SIDO_F||c.sido===SIDO_F)});
+  const q=((document.getElementById('clSearch')||{}).value||'').trim().toLowerCase();
+  const docs=ALLCLUBS.filter(d=>{const c=d.data();
+    if(c.hidden||(SIDO_F&&c.sido!==SIDO_F))return false;
+    if(q&&[c.name,c.sido,c.gugun,c.intro].map(x=>String(x||'').toLowerCase()).join(' ').indexOf(q)<0)return false;
+    return true});
   el.innerHTML=!docs.length?'<div class="bempty">'+(SIDO_F?SIDO_F+' 지역에 ':'')+'등록된 클럽이 없습니다. 첫 클럽을 만들어 보세요!</div>'
     :docs.map(d=>{
       const c=d.data();const st=clubStatusOf(c);
