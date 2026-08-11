@@ -87,6 +87,34 @@
   <div class="crumb">HOME &nbsp;›&nbsp; <b>연맹소개</b></div>
   <h1>연맹소개</h1><p>대한민국 플라잉디스크를 이끄는 사람들과 조직을 소개합니다.</p>
 </div></div>
+<style>
+.subtabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:2px solid var(--line);background:#fff}
+.subtabs .st{border:none;background:none;padding:14px 20px;font-size:14.5px;font-weight:800;color:#8a919d;cursor:pointer;font-family:inherit;border-bottom:3px solid transparent;margin-bottom:-2px}
+.subtabs .st.on{color:var(--black);border-bottom-color:var(--red)}
+.subtabs .st:hover{color:var(--black)}
+</style>
+<div style="background:#fff"><div class="wrap"><div class="subtabs" id="aboutTabs">
+  <button class="st on" data-s="greet" onclick="showAbout('greet')">인사말 · 미션</button>
+  <button class="st" data-s="ci" onclick="showAbout('ci')">CI 소개</button>
+  <button class="st" data-s="org" onclick="showAbout('org')">조직도</button>
+  <button class="st" data-s="rule" onclick="showAbout('rule')">정관 · 규정</button>
+  <button class="st" data-s="region" onclick="showAbout('region')">시도연맹 · 권역</button>
+  <button class="st" data-s="way" onclick="showAbout('way')">오시는 길</button>
+</div></div></div>
+<script>
+const ABOUT_SECS=['greet','ci','org','rule','region','way'];
+function showAbout(k){
+  ABOUT_SECS.forEach(s=>{const el=document.getElementById(s);if(el)el.style.display=(s===k?'':'none')});
+  document.querySelectorAll('#aboutTabs .st').forEach(b=>b.classList.toggle('on',b.dataset.s===k));
+  window.scrollTo({top:0});
+}
+function aboutHash(){
+  const h=(location.hash||'').replace('#','');
+  showAbout(ABOUT_SECS.indexOf(h)>=0?h:'greet');
+}
+window.addEventListener('hashchange',aboutHash);
+document.addEventListener('DOMContentLoaded',aboutHash);
+</script>
 <section id="greet"><div class="wrap">
   <div class="sec-label">GREETING</div>
   <h2 class="sec-title">인사말</h2>
