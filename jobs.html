@@ -141,6 +141,17 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
 <section><div class="wrap" style="max-width:900px">
   <div id="jGate" class="pending-banner" style="display:none"></div>
   <div id="jBody" style="display:none">
+    <style>
+    .subtabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:2px solid var(--line);margin-bottom:26px}
+    .subtabs .st{border:none;background:none;padding:13px 20px;font-size:14.5px;font-weight:800;color:#8a919d;cursor:pointer;font-family:inherit;border-bottom:3px solid transparent;margin-bottom:-2px}
+    .subtabs .st.on{color:var(--black);border-bottom-color:var(--red)}
+    .subtabs .st:hover{color:var(--black)}
+    </style>
+    <div class="subtabs" id="jTabs">
+      <button class="st on" data-s="1" onclick="showJTab('1')">🎓 강사 · 대회요원 활동 지원</button>
+      <button class="st" data-s="2" onclick="showJTab('2')">🔎 단기 강사 구인 게시판</button>
+    </div>
+    <div id="jPane1">
     <div class="sec-label">STEP 1</div>
     <h2 class="sec-title" style="font-size:24px">강사 · 대회요원 활동 지원</h2>
     <p class="sec-desc" style="margin-bottom:20px">활동을 원하는 분야에 지원해두면 권역별 배정 대상이 됩니다. (중복 지원 가능 · 언제든 취소)</p>
@@ -182,7 +193,9 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
     <h2 class="sec-title" style="font-size:24px">대회 심판·운영요원 신청</h2>
     <div class="note" style="margin-bottom:0"><b>대회 메뉴로 이동했습니다</b> — 권역별대회 심판·운영요원 모집 확인과 신청(희망 임무 1~3순위 선택·신청 취소)은 <a href="competition.html#staff" style="color:var(--red);font-weight:900">대회 페이지 →</a>에서 진행합니다. 심판·운영 분야 지원(STEP 1)을 먼저 완료해야 신청할 수 있습니다.</div>
 
-    <div class="sec-label" style="margin-top:48px">단기 구인</div>
+    </div>
+    <div id="jPane2" style="display:none">
+    <div class="sec-label">단기 구인</div>
     <h2 class="sec-title" style="font-size:24px">🔎 단기 강사 구인 게시판</h2>
     <p class="sec-desc" style="margin-bottom:14px">학교·단체의 <b>단기(몇 시간~단발성) 강사 요청</b>을 게시합니다. 강사를 찾는 회원은 공고를 올리고(사무국 승인 후 게시), 활동을 원하는 강사는 <b>[지원하기]</b>로 신청하세요.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
@@ -190,6 +203,7 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
       <span style="font-size:12.5px;color:var(--gray)">※ 사무국 승인 후 목록에 게시됩니다</span>
     </div>
     <div id="gigList" class="board"><div class="bempty">불러오는 중…</div></div>
+    </div>
   </div>
 </div></section>
 
@@ -217,6 +231,15 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
   </div>
 </div>
 <script>
+function showJTab(k){
+  document.getElementById('jPane1').style.display=(k==='1'?'':'none');
+  document.getElementById('jPane2').style.display=(k==='2'?'':'none');
+  document.querySelectorAll('#jTabs .st').forEach(b=>b.classList.toggle('on',b.dataset.s===k));
+  window.scrollTo({top:0});
+}
+function jHash(){if((location.hash||'').indexOf('gig')>=0)showJTab('2');}
+window.addEventListener('hashchange',jHash);
+document.addEventListener('DOMContentLoaded',jHash);
 let JME=null,JMY=null,JR='전체';
 AUTH.onAuthStateChanged(async u=>{
   const g=document.getElementById('jGate');
