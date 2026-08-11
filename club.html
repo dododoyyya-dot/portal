@@ -282,7 +282,12 @@ function renderClubs(){
         +'</div>';
     }).join('');
 }
+function isMinorSelf(){
+  const b=KMY&&KMY.birth;if(!b)return false;
+  return (Date.now()-new Date(b).getTime())/31557600000 < 19;
+}
 async function joinClub(id){
+  if(isMinorSelf()){alert('👨‍👧 만 19세 미만은 본인 계정으로 클럽에 가입할 수 없습니다.\n보호자(법정대리인) 계정에서 자녀 프로필로 신청해 주세요.\n(보호자 계정 → 클럽 찾기 → 자녀 가입)');return;}
   if(!confirm('이 클럽에 가입을 신청할까요?\n클럽 관리자(클럽장) 승인 후 소속으로 표시됩니다.'))return;
   try{
     await DB.runTransaction(async tx=>{
@@ -373,6 +378,7 @@ async function removeChildMember(id,cid,nm){
 }
 async function joinByCode(){
   const m=document.getElementById('codeMsg');
+  if(isMinorSelf()){m.textContent='만 19세 미만은 보호자 계정에서 자녀로 가입해 주세요';m.style.color='#C41E2F';return}
   const code=document.getElementById('codeInput').value.trim().toUpperCase();
   if(!code){m.textContent='코드를 입력하세요';m.style.color='#C41E2F';return}
   // '-'·공백 유무, 자릿수(앞자리 0)와 무관하게 인식 — 후보 코드를 모두 조회
