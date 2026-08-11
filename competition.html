@@ -446,6 +446,10 @@ function togRole(btn){
 async function submitEntry(){
   const p=APPLY_PARTS.find(x=>x.pid===APPLY_PID);
   if(!p){alert('참가자를 선택해주세요.');return}
+  // 성인 전환 검사 — 자녀 프로필이 만 19세 도달 시 본인 계정으로 활동
+  if(p.kid&&p.birth&&(Date.now()-new Date(p.birth).getTime())/31557600000>=19){
+    alert('🎓 '+p.name+' 님은 만 19세 이상으로 성인 전환 대상입니다.\n본인 명의 계정으로 가입한 뒤 직접 신청해주세요.');return;
+  }
   if(!APPLY_SEL.length){alert('참가 부문을 선택해주세요.');return}
   if(!document.getElementById('cConsent').checked){alert('개인정보 수집·이용 동의가 필요합니다.');return}
   if(!SIG_DRAWN){alert((p.kid?'보호자(법정대리인)':'본인')+' 서명이 필요합니다. 서명란에 서명해주세요.');return}
