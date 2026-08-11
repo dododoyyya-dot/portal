@@ -286,8 +286,27 @@ function isMinorSelf(){
   const b=KMY&&KMY.birth;if(!b)return false;
   return (Date.now()-new Date(b).getTime())/31557600000 < 19;
 }
+// 미성년 계정: 클럽 가입은 보호자 승인 요청 → 보호자가 마이페이지에서 승인 시 접수
+async function requestGuardianJoin(id){
+  if(!(KMY&&KMY.guardianUid)){
+    alert('👨‍👧 만 19세 미만은 보호자 승인으로 가입합니다.\n아직 보호자 계정이 연동되지 않았습니다.\n마이페이지 › 보호자 연동에서 연동 코드를 등록하거나, 보호자가 계정을 만들어준 경우 사무국에 문의해 주세요.');
+    return;
+  }
+  if(!confirm('보호자에게 클럽 가입 승인 요청을 보낼까요?\n보호자가 마이페이지에서 승인하면 가입 신청이 접수됩니다.'))return;
+  try{
+    const cd=await DB.collection('clubs').doc(id).get();
+    const cname=cd.exists?(cd.data().name||''):'';
+    const dup=await DB.collection('familyRequests').where('childUid','==',KME.uid).where('targetId','==',id).where('status','==','대기').get();
+    if(!dup.empty)throw new Error('이미 보호자 승인 대기 중입니다');
+    await DB.collection('familyRequests').add({kind:'club',targetId:id,targetName:cname,
+      childUid:KME.uid,childName:KMY.name||'',childBirth:KMY.birth||'',childSchool:KMY.school||'',
+      guardianUid:KMY.guardianUid,status:'대기',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    KFDF.notify(KMY.guardianUid,'👨‍👧 '+(KMY.name||'자녀')+' — ['+cname+'] 클럽 가입 승인 요청','mypage.html#famReqBox');
+    alert('✓ 보호자에게 승인 요청을 보냈습니다.\n보호자가 승인하면 클럽장 승인 절차로 넘어갑니다.');
+  }catch(e){alert('요청 실패: '+e.message)}
+}
 async function joinClub(id){
-  if(isMinorSelf()){alert('👨‍👧 만 19세 미만은 본인 계정으로 클럽에 가입할 수 없습니다.\n보호자(법정대리인) 계정에서 자녀 프로필로 신청해 주세요.\n(보호자 계정 → 클럽 찾기 → 자녀 가입)');return;}
+  if(isMinorSelf()){requestGuardianJoin(id);return;}
   if(!confirm('이 클럽에 가입을 신청할까요?\n클럽 관리자(클럽장) 승인 후 소속으로 표시됩니다.'))return;
   try{
     await DB.runTransaction(async tx=>{
@@ -358,6 +377,10 @@ async function approveChild(id,cid){
       if(!cm.some(x=>x.cid===cid))cm.push({parentUid:p.parentUid,parentName:p.parentName||'',cid:cid,name:p.name||'',birth:p.birth||'',school:p.school||'',at:new Date().toISOString()});
       tx.update(ref,{childMembers:cm,childPending:(c.childPending||[]).filter(x=>x.cid!==cid)});
     });
+    try{const d0=await DB.collection('clubs').doc(id).get();const nm=d0.exists?(d0.data().name||'클럽'):'클럽';
+      const p0=cid.indexOf('#')<0?cid:null; // cid가 자녀 계정 uid면 자녀에게, 프로필형이면 보호자에게
+      KFDF.notify(p0||cid.split('#')[0],'✅ ['+nm+'] 자녀 클럽 가입이 클럽장 승인되었습니다','club.html');
+    }catch(e){}
     loadMyClubs();loadClubs();
   }catch(e){alert('승인 실패: '+e.message)}
 }
@@ -378,7 +401,7 @@ async function removeChildMember(id,cid,nm){
 }
 async function joinByCode(){
   const m=document.getElementById('codeMsg');
-  if(isMinorSelf()){m.textContent='만 19세 미만은 보호자 계정에서 자녀로 가입해 주세요';m.style.color='#C41E2F';return}
+  if(isMinorSelf()){m.textContent='만 19세 미만은 클럽 찾기에서 [가입] 클릭 → 보호자 승인 요청으로 가입해 주세요';m.style.color='#C41E2F';return}
   const code=document.getElementById('codeInput').value.trim().toUpperCase();
   if(!code){m.textContent='코드를 입력하세요';m.style.color='#C41E2F';return}
   // '-'·공백 유무, 자릿수(앞자리 0)와 무관하게 인식 — 후보 코드를 모두 조회
@@ -481,6 +504,7 @@ async function approveJoin(id,uid){
         pendingJoins:(c.pendingJoins||[]).filter(x=>x.uid!==uid),
         pendingUids:(c.pendingUids||[]).filter(x=>x!==uid)});
     });
+    KFDF.notify(uid,'✅ 클럽 가입이 승인되었습니다','club.html');
     loadMyClubs();loadClubs();
   }catch(e){alert('승인 실패: '+e.message)}
 }
