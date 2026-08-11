@@ -308,6 +308,8 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#0e7490" onclick="window.open('sim.html','_blank')">🧪 가선정 시뮬레이션 (새 창)</button>
         <button class="btn-sub" style="background:#153A77" onclick="window.open('tally.html','_blank')">📊 총집계 현황</button>
         <button class="btn-sub" style="background:#0f766e" onclick="exportCSV()">⬇ 전체 CSV</button>
+        <button class="btn-sub" style="background:#7c3aed" onclick="showGigs()">🔎 단기공고 승인<span id="gigCntBadge" style="display:none;background:#C41E2F;border-radius:999px;padding:1px 7px;font-size:11px;margin-left:5px"></span></button>
+        <button class="btn-sub" style="background:#0e7490" onclick="showInspections()">📋 점검 제출현황</button>
         <button class="btn-sub" style="background:#8a919d" onclick="showTrash()">🗑 휴지통</button>
         <details style="display:inline-block">
           <summary style="cursor:pointer;padding:9px 16px;background:#8a919d;color:#fff;border-radius:10px;font-weight:800;font-size:13.5px;list-style:none">🧰 관리 도구 더보기 ▾</summary>
@@ -319,8 +321,6 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#b8860b" onclick="payrollCSV()">💰 월 지급 계산 CSV</button>
         <button class="btn-sub" style="background:#555" onclick="closeWaitlist()">⏳ 대기자 일괄 종료</button>
         <button class="btn-sub" style="background:#0f766e" onclick="showSupply()">🧭 권역별 수급 현황</button>
-        <button class="btn-sub" style="background:#0e7490" onclick="showInspections()">📋 현장점검 제출현황</button>
-        <button class="btn-sub" style="background:#7c3aed" onclick="showGigs()">🔎 단기 구인 공고 승인</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="copyPhoneList('apps')">📱 문자명단 복사 (교사·현재 필터)</button>
           </div>
         </details>
@@ -604,6 +604,15 @@ function showSupply(){
 
 // ── 단기 구인 공고 승인 (gigs) ──
 let GIGS=[];
+// 대기 건수 배지
+AUTH.onAuthStateChanged(async u=>{
+  if(!u)return;
+  try{
+    const s=await DB.collection('gigs').where('status','==','대기').get();
+    const b=document.getElementById('gigCntBadge');
+    if(b&&s.size){b.textContent=s.size;b.style.display='inline-block'}
+  }catch(e){}
+});
 async function showGigs(){
   const box=document.getElementById('gigBox');
   if(box.style.display==='block'){box.style.display='none';return}
