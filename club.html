@@ -112,11 +112,25 @@
   <p class="sec-desc">클럽 생성은 사무국(중앙) 승인 후 목록에 게시됩니다. 가입 신청은 클럽 관리자(클럽장) 승인으로 완료되며, 승인된 소속은 대회 참가 신청 시 자동으로 연동됩니다.</p>
   <div class="gbox" id="clGate" style="display:none"></div>
   <div id="clBody" style="display:none">
+    <style>
+    .subtabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:2px solid var(--line);margin-bottom:26px}
+    .subtabs .st{border:none;background:none;padding:13px 20px;font-size:14.5px;font-weight:800;color:#8a919d;cursor:pointer;font-family:inherit;border-bottom:3px solid transparent;margin-bottom:-2px}
+    .subtabs .st.on{color:var(--black);border-bottom-color:var(--red)}
+    .subtabs .st:hover{color:var(--black)}
+    </style>
+    <div class="subtabs" id="clTabs">
+      <button class="st on" data-s="1" onclick="showClTab('1')">🏠 내 클럽</button>
+      <button class="st" data-s="2" onclick="showClTab('2')">🔍 클럽 찾기 · 가입</button>
+      <button class="st" data-s="3" onclick="showClTab('3')">➕ 클럽 만들기</button>
+    </div>
 
+    <div id="clPane1">
     <h3 class="sub">🏠 내 클럽</h3>
     <div id="myClubList" class="board"><div class="bempty">불러오는 중…</div></div>
 
-    <h3 class="sub" style="margin-top:40px">🔍 클럽 찾기 <span id="clubStat" style="font-size:12.5px;font-weight:700;color:#8a919d;margin-left:8px"></span></h3>
+    </div>
+    <div id="clPane2" style="display:none">
+    <h3 class="sub">🔍 클럽 찾기 <span id="clubStat" style="font-size:12.5px;font-weight:700;color:#8a919d;margin-left:8px"></span></h3>
     <div id="sidoChips" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px"></div>
     <input id="clSearch" oninput="renderClubs()" placeholder="🔍 클럽명 · 시군구 · 소개로 검색" style="width:100%;max-width:420px;padding:10px 14px;border:1.5px solid #dfe5ee;border-radius:10px;margin-bottom:12px;font-family:inherit;font-size:14px">
     <div id="clubList" class="board"><div class="bempty">불러오는 중…</div></div>
@@ -145,7 +159,9 @@
       <div id="sidoApproveList"></div>
     </div>
 
-    <h3 class="sub" style="margin-top:40px">➕ 클럽 만들기</h3>
+    </div>
+    <div id="clPane3" style="display:none">
+    <h3 class="sub">➕ 클럽 만들기</h3>
     <div style="background:#fff;border:1.5px solid #dfe5ee;border-radius:14px;padding:22px 24px;max-width:640px">
       <label class="clabel" style="margin-top:0">클럽명 <span style="color:#C41E2F">*</span></label>
       <input id="ncName" class="cfield" placeholder="예: 김포 프리버드 얼티미트 클럽">
@@ -175,6 +191,7 @@
       <div style="font-size:12px;color:#8a919d;margin-top:8px">· 생성 즉시 본인이 클럽장(선수관리자)이 되며, 사무국 승인 후 목록에 게시됩니다.</div>
       <button class="cbtn cbtn-main" style="margin-top:12px" onclick="createClub()">클럽 생성 신청</button>
       <span id="ncMsg" style="font-size:13px;font-weight:700;margin-left:8px"></span>
+    </div>
     </div>
   </div>
 </div></section>
@@ -220,6 +237,11 @@ function fillGugun(){
 function updOrgLine(){
   const s=document.getElementById('ncSido').value,g=document.getElementById('ncGugun').value;
   document.getElementById('ncOrgLine').textContent=s?('소속: 대한민국플라잉디스크연맹(KFDF) › '+s+' 연맹'+(g?' › '+g:'')):'';
+}
+function showClTab(k){
+  ['1','2','3'].forEach(n=>{const p=document.getElementById('clPane'+n);if(p)p.style.display=(n===k?'':'none')});
+  document.querySelectorAll('#clTabs .st').forEach(b=>b.classList.toggle('on',b.dataset.s===k));
+  window.scrollTo({top:0});
 }
 let KME=null,KMY=null,ALLCLUBS=[],SIDO_F='',MYCLUB_CACHE=[];
 AUTH.onAuthStateChanged(async u=>{
