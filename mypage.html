@@ -376,6 +376,18 @@ function orgChip(o,region,title,fed){
     <span id="kidMsg" style="font-size:13px;font-weight:700;margin-left:8px"></span>
 
     <div style="margin-top:18px;padding-top:16px;border-top:1px dashed #dfe5ee">
+      <div style="font-size:13.5px;font-weight:800;margin-bottom:4px">📱 휴대폰이 없는 자녀 — <b>계정 대리 생성</b> (선택)</div>
+      <p style="font-size:12px;color:var(--gray);margin:0 0 9px;line-height:1.7">자녀가 휴대폰이 없어 본인 인증을 못 하는 경우, 보호자가 자녀용 <b>로그인 아이디·비밀번호</b>를 직접 만들어 줄 수 있습니다. 생성된 계정은 보호자에게 연동되어, 자녀가 이 아이디로 로그인해 활동할 수 있습니다. (미성년 활동은 계속 보호자 동의·관리 아래에 있습니다)</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="kaKid" style="min-width:130px;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px"><option value="">— 등록한 자녀 선택 —</option></select>
+        <input id="kaId" placeholder="자녀 로그인 아이디(영문/숫자)" style="width:180px;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px">
+        <input id="kaPw" type="text" placeholder="임시 비밀번호(6자 이상)" style="width:160px;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px">
+        <button class="btn-sub" style="background:#153A77" onclick="createKidAccount()">계정 생성</button>
+      </div>
+      <div id="kaMsg" style="font-size:12.5px;font-weight:700;margin-top:6px"></div>
+    </div>
+
+    <div style="margin-top:18px;padding-top:16px;border-top:1px dashed #dfe5ee">
       <div style="font-size:13.5px;font-weight:800;margin-bottom:4px">🔗 자녀 <b>본인 계정</b> 연동 (선택)</div>
       <p style="font-size:12px;color:var(--gray);margin:0 0 9px;line-height:1.7">자녀가 이미 휴대폰 인증으로 <b>본인 계정</b>을 만든 경우, 아래 <b>연동 코드</b>를 발급해 자녀에게 알려주세요. 자녀가 마이페이지에서 코드를 입력하면 보호자로 연결됩니다. (자녀 계정이 없으면 위의 자녀 프로필 등록만으로 충분합니다)</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -713,7 +725,7 @@ function fillProfile(d){
   // 활동 가능 범위
   try{aaLoad(d)}catch(e){console.warn('aa',e)}
   // 자녀(미성년) 프로필 — cid 마이그레이션 후 렌더
-  migrateKids().then(renderKids).catch(e=>console.warn('kids',e));
+  migrateKids().then(()=>{renderKids();fillKidAccountSel();}).catch(e=>console.warn('kids',e));
   loadMyGuardian();
   // 주민번호 등록 여부 (별도 보안 컬렉션)
   try{
@@ -922,6 +934,47 @@ function loadMyGuardian(){
   const el=document.getElementById('myGuardianBox');if(!el)return;
   if(MYD&&MYD.guardianUid){el.textContent='🔗 연동된 보호자: '+(MYD.guardianName||'')+' — 연동 해제는 사무국에 문의';}
   else el.textContent='';
+}
+function fillKidAccountSel(){
+  const sel=document.getElementById('kaKid');if(!sel)return;
+  const kids=(MYD&&MYD.children)||[];
+  sel.innerHTML='<option value="">— 등록한 자녀 선택 —</option>'+kids.map((k,i)=>'<option value="'+i+'">'+String(k.name||'').replace(/</g,'&lt;')+(k.childUid?' (계정 있음)':'')+'</option>').join('');
+}
+async function createKidAccount(){
+  const m=document.getElementById('kaMsg');
+  const idx=document.getElementById('kaKid').value;
+  const id=(document.getElementById('kaId').value||'').trim().toLowerCase();
+  const pw=(document.getElementById('kaPw').value||'').trim();
+  if(idx===''){m.textContent='자녀를 선택하세요 (없으면 위에서 먼저 자녀 등록)';m.style.color='#C41E2F';return}
+  if(!/^[a-z0-9._-]{3,20}$/.test(id)){m.textContent='아이디는 영문·숫자 3~20자로 입력하세요';m.style.color='#C41E2F';return}
+  if(pw.length<6){m.textContent='비밀번호는 6자 이상';m.style.color='#C41E2F';return}
+  const kids=((MYD&&MYD.children)||[]).slice();const k=kids[idx];
+  if(k.childUid){m.textContent='이미 계정이 연결된 자녀입니다';m.style.color='#C41E2F';return}
+  const email=id+'@kids.kfdf.local';
+  m.textContent='계정 생성 중…';m.style.color='#666';
+  let sec;
+  try{sec=firebase.app('kidgen');}catch(e){sec=firebase.initializeApp(KFDF.CFG,'kidgen');}
+  try{
+    const cred=await sec.auth().createUserWithEmailAndPassword(email,pw);
+    const uid=cred.user.uid;
+    await sec.firestore().collection('users').doc(uid).set({
+      name:k.name||'',birth:k.birth||'',gender:k.gender||'',school:k.school||'',
+      role:'member',status:'pending',points:0,
+      guardianUid:AUTH.currentUser.uid,guardianName:MYD.name||'',
+      isMinor:true,loginId:id,createdBy:AUTH.currentUser.uid,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await sec.auth().signOut();
+    kids[idx]=Object.assign({},k,{childUid:uid,loginId:id});
+    await DB.collection('users').doc(AUTH.currentUser.uid).update({children:kids});
+    MYD.children=kids;renderKids();fillKidAccountSel();
+    document.getElementById('kaId').value='';document.getElementById('kaPw').value='';
+    m.innerHTML='✓ 자녀 계정이 생성되었습니다 — 로그인 아이디: <b>'+id+'</b> / 비밀번호는 자녀에게 전달하세요. (로그인 화면에서 아이디로 로그인)';m.style.color='#0f766e';
+  }catch(e){
+    let msg=e.message;
+    if(e.code==='auth/email-already-in-use')msg='이미 사용 중인 아이디입니다. 다른 아이디를 입력하세요.';
+    m.textContent='생성 실패: '+msg;m.style.color='#C41E2F';
+    try{await sec.auth().signOut();}catch(x){}
+  }
 }
 async function addKid(){
   const m=document.getElementById('kidMsg');
