@@ -633,8 +633,12 @@ function renderGigs(){
   box.innerHTML=html+'</div>';
 }
 async function setGig(id,st){
-  try{await DB.collection('gigs').doc(id).update({status:st});const g=GIGS.find(x=>x._id===id);if(g)g.status=st;renderGigs();}
-  catch(e){alert('실패: '+e.message)}
+  try{
+    await DB.collection('gigs').doc(id).update({status:st});
+    const g=GIGS.find(x=>x._id===id);if(g)g.status=st;
+    if(st==='승인'&&g&&g.byUid)KFDF.notify(g.byUid,'✅ 단기 구인 공고 ['+(g.title||'')+'] 게시 승인','jobs.html#gigList');
+    renderGigs();
+  }catch(e){alert('실패: '+e.message)}
 }
 async function delGigAdmin(id){
   if(!confirm('이 공고를 삭제할까요?'))return;
