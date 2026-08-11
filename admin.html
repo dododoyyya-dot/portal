@@ -250,6 +250,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <label>참가비 (선택 — 참가 모집 시 표시. 예: 무료 / 1인 10,000원)</label><input id="cpFee" placeholder="예: 무료 (기념품 증정) / 팀당 30,000원">
         <label>참가 제한 지역 (선택 — 참가 모집 시. 예: 부산 → 부산 지역만 · 비우면 전체 개방)</label><input id="cpEligRegion" placeholder="예: 부산 (시·도명. 시민대회·구청장기 등 지역 제한 시)">
         <label>참가 자격 안내 (선택 — 신청 화면 상단에 표시)</label><input id="cpEligNote" placeholder="예: 부산시 소재 학교·클럽 소속 선수만 참가 가능">
+        <label>참가 차단 클럽 (선택 — 쉼표 구분, 해당 클럽 소속은 참가 신청 불가)</label><input id="cpBlockClubs" placeholder="예: 쿠파, ○○클럽">
         <label>안내문 (선택 — 신청 화면에 표시)</label><textarea id="cpNote" rows="3" placeholder="예: 집결 08:30 / 중식 제공 / 자격증 사본 지참"></textarea>
         <label>개인정보 동의서 문안 (선택 — 비우면 연맹 기본 문안 사용)</label>
         <textarea id="cpConsentText" rows="4" placeholder="행사별 수집·이용·제3자 제공 동의 문안을 직접 입력하면 기본 문안 대신 표시됩니다"></textarea>
@@ -2145,6 +2146,7 @@ async function addComp(){
     deadline:document.getElementById('cpDeadline').value||'',roles:roles,
     eligRegion:(document.getElementById('cpEligRegion')?document.getElementById('cpEligRegion').value.trim():''),
     eligNote:(document.getElementById('cpEligNote')?document.getElementById('cpEligNote').value.trim():''),
+    blockClubs:(document.getElementById('cpBlockClubs')?document.getElementById('cpBlockClubs').value.split(',').map(x=>x.trim()).filter(Boolean):[]),
     note:document.getElementById('cpNote').value.trim(),
     fee:document.getElementById('cpFee').value.trim(),
     consentText:document.getElementById('cpConsentText').value.trim(),
@@ -2635,6 +2637,7 @@ function editComp(id){
     +'<label>참가비 (참가 모집 시 표시)</label><input id="ecFee" value="'+esc(s.fee||'')+'" placeholder="예: 무료 / 1인 10,000원">'
     +'<label>참가 제한 지역 (비우면 전체 개방)</label><input id="ecEligRegion" value="'+esc(s.eligRegion||'')+'" placeholder="예: 부산 (시·도명)">'
     +'<label>참가 자격 안내</label><input id="ecEligNote" value="'+esc(s.eligNote||'')+'" placeholder="예: 부산시 소재 학교·클럽 소속 선수만">'
+    +'<label>참가 차단 클럽 (쉼표 구분 — 해당 클럽 소속은 신청 불가)</label><input id="ecBlockClubs" value="'+esc((s.blockClubs||[]).join(', '))+'" placeholder="예: 쿠파, ○○클럽">'
     +'<label>안내문 (신청 화면에 표시)</label><textarea id="ecNote" rows="3">'+esc(s.note||'')+'</textarea>'
     +'<label>개인정보 동의서 문안 (비우면 연맹 기본 문안)</label>'
     +'<textarea id="ecConsentText" rows="4" placeholder="행사별 동의 문안 직접 입력">'+esc(s.consentText||'')+'</textarea>'
@@ -2682,6 +2685,7 @@ async function saveEditComp(){
     fee:document.getElementById('ecFee').value.trim(),
     eligRegion:document.getElementById('ecEligRegion').value.trim(),
     eligNote:document.getElementById('ecEligNote').value.trim(),
+    blockClubs:document.getElementById('ecBlockClubs').value.split(',').map(x=>x.trim()).filter(Boolean),
     consentText:document.getElementById('ecConsentText').value.trim(),
     consentImgs:CONSENT_IMGS.ec.slice(),consentImg:'',consentOverlays:ovlPack('ec')};
   if(!act.length)upd.role=newRole;
