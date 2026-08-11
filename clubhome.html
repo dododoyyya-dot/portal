@@ -252,19 +252,31 @@ function showChTab(k){
 }
 
 // ── 구성원 ──
+// 학교명 정규화(공백·학교급 접미사 차이를 무시하고 매칭) — login.html 가입폼과 동일 로직
+function normSchool(s){
+  return String(s||'').trim().replace(/\s+/g,'').replace(/(초등학교|중학교|고등학교|초교|중교|고교|학교)$/,'');
+}
 function renderMembers(){
   const el=document.getElementById('chMembers');
   const c=CCLUB;
-  const adults=(c.members||[]);
+  const kidCids=new Set((c.childMembers||[]).map(k=>k.cid));
+  // 계정 연동형 미성년 회원은 childMembers·members 양쪽에 등록되어 있음 — "성인 회원"에는 중복 표시하지 않음
+  const adults=(c.members||[]).filter(m=>!kidCids.has(m.uid));
   const kids=(c.childMembers||[]);
   let html='<div style="margin-bottom:6px"><b style="font-size:12.5px;color:#374151">성인 회원 ('+adults.length+'명)</b></div>';
   html+=adults.length?adults.map(m=>'<span class="memchip"><span class="dot">'+kesc((m.name||'?').charAt(0))+'</span>'+kesc(m.name||'')+(m.uid===c.ownerUid?' <b style="color:#C41E2F">· 클럽장</b>':'')+'</span>').join(''):'<span style="font-size:12.5px;color:#8a919d">없음</span>';
   if(kids.length){
-    const groups={};
-    kids.forEach(k=>{const s=k.school||'학교 미기재';(groups[s]=groups[s]||[]).push(k);});
-    Object.keys(groups).sort().forEach(school=>{
-      html+='<div class="schoolgrp"><h4>🏫 '+kesc(school)+' ('+groups[school].length+'명)</h4>'
-        +groups[school].map(k=>'<span class="memchip"><span class="dot">'+kesc((k.name||'?').charAt(0))+'</span>'+kesc(k.name||'')+'</span>').join('')
+    const groups={};   // 정규화 키 → {label, list}
+    kids.forEach(k=>{
+      const raw=k.school||'학교 미기재';
+      const key=normSchool(raw)||raw;
+      if(!groups[key])groups[key]={label:raw,list:[]};
+      groups[key].list.push(k);
+    });
+    Object.keys(groups).sort((a,b)=>groups[a].label.localeCompare(groups[b].label,'ko')).forEach(key=>{
+      const g=groups[key];
+      html+='<div class="schoolgrp"><h4>🏫 '+kesc(g.label)+' ('+g.list.length+'명)</h4>'
+        +g.list.map(k=>'<span class="memchip"><span class="dot">'+kesc((k.name||'?').charAt(0))+'</span>'+kesc(k.name||'')+'</span>').join('')
         +'</div>';
     });
   }
@@ -357,12 +369,6 @@ async function postWall(){
     loadWall();
   }catch(e){m.style.color='#C41E2F';m.textContent='실패: '+(e.code==='permission-denied'?'권한 오류 — 소속 회원만 남길 수 있습니다':e.message)}
 }
-async function deleteWall(id){
-  if(!confirm('이 담벼락 글을 삭제할까요?'))return;
-  try{await DB.collection('clubWalls').doc(id).delete();loadWall();}
-  catch(e){alert('삭제 실패: '+e.message)}
-}
-
 // ── 모달 ──
 function showModal(title,html){
   closeModal();
