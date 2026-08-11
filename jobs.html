@@ -383,6 +383,9 @@ async function applyGig(id){
       const ap=(g.applicants||[]).slice();ap.push({uid:JME.uid,name:JMY.name||'',phone:JMY.phone||'',at:new Date().toISOString()});
       tx.update(ref,{applicants:ap});
     });
+    try{const g0=await DB.collection('gigs').doc(id).get();const gd=g0.data();
+      if(gd&&gd.byUid)KFDF.notify(gd.byUid,'📩 ['+(gd.title||'')+'] 공고에 '+(JMY.name||'회원')+' 님이 지원했습니다','jobs.html#gigList');
+    }catch(e){}
     loadGigs();
   }catch(e){alert('지원 실패: '+e.message)}
 }
