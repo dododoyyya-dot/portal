@@ -181,8 +181,41 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
     <div class="sec-label" style="margin-top:48px">STEP 3</div>
     <h2 class="sec-title" style="font-size:24px">대회 심판·운영요원 신청</h2>
     <div class="note" style="margin-bottom:0"><b>대회 메뉴로 이동했습니다</b> — 권역별대회 심판·운영요원 모집 확인과 신청(희망 임무 1~3순위 선택·신청 취소)은 <a href="competition.html#staff" style="color:var(--red);font-weight:900">대회 페이지 →</a>에서 진행합니다. 심판·운영 분야 지원(STEP 1)을 먼저 완료해야 신청할 수 있습니다.</div>
+
+    <div class="sec-label" style="margin-top:48px">단기 구인</div>
+    <h2 class="sec-title" style="font-size:24px">🔎 단기 강사 구인 게시판</h2>
+    <p class="sec-desc" style="margin-bottom:14px">학교·단체의 <b>단기(몇 시간~단발성) 강사 요청</b>을 게시합니다. 강사를 찾는 회원은 공고를 올리고(사무국 승인 후 게시), 활동을 원하는 강사는 <b>[지원하기]</b>로 신청하세요.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+      <button class="btn-sub" style="background:#153A77" onclick="openGigForm()">+ 구인 공고 올리기</button>
+      <span style="font-size:12.5px;color:var(--gray)">※ 사무국 승인 후 목록에 게시됩니다</span>
+    </div>
+    <div id="gigList" class="board"><div class="bempty">불러오는 중…</div></div>
   </div>
 </div></section>
+
+<div id="gigModal" style="display:none;position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;align-items:center;justify-content:center;padding:14px;overflow:auto">
+  <div style="background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:92vh;overflow:auto;padding:22px">
+    <b style="font-size:16px">📝 단기 강사 구인 공고</b>
+    <div style="font-size:12px;color:#666;margin:4px 0 12px">작성 후 사무국 승인을 거쳐 게시됩니다. 개인정보(연락처)는 지원 강사·사무국에만 표시됩니다.</div>
+    <label style="font-size:12.5px;font-weight:800">공고 제목 *</label><input id="gTitle" placeholder="예: ○○초 학부모 체험행사 플라잉디스크 강사" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin:4px 0 8px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div style="flex:1;min-width:130px"><label style="font-size:12.5px;font-weight:800">기관·단체명 *</label><input id="gOrg" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></div>
+      <div style="flex:1;min-width:130px"><label style="font-size:12.5px;font-weight:800">지역(시군구) *</label><input id="gArea" placeholder="예: 부산 강서구" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <div style="flex:1;min-width:130px"><label style="font-size:12.5px;font-weight:800">일시 *</label><input id="gWhen" placeholder="예: 9/20(토) 10~13시" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></div>
+      <div style="flex:1;min-width:130px"><label style="font-size:12.5px;font-weight:800">보수(수당)</label><input id="gPay" placeholder="예: 시간당 5만원 / 협의" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></div>
+    </div>
+    <label style="font-size:12.5px;font-weight:800;display:block;margin-top:8px">모집 인원</label><input id="gCount" type="number" min="1" value="1" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px">
+    <label style="font-size:12.5px;font-weight:800;display:block;margin-top:8px">상세 내용 *</label><textarea id="gDesc" rows="3" placeholder="대상·인원·준비물·자격요건 등" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></textarea>
+    <label style="font-size:12.5px;font-weight:800;display:block;margin-top:8px">담당자 연락처 *</label><input id="gContact" placeholder="전화 또는 이메일 (지원자·사무국에만 노출)" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn-sub" style="background:#8a919d" onclick="document.getElementById('gigModal').style.display='none'">닫기</button>
+      <button class="btn-sub" style="background:#153A77" onclick="submitGig()">공고 등록 신청</button>
+    </div>
+    <div id="gigMsg" style="font-size:13px;font-weight:700;margin-top:8px"></div>
+  </div>
+</div>
 <script>
 let JME=null,JMY=null,JR='전체';
 AUTH.onAuthStateChanged(async u=>{
@@ -190,7 +223,7 @@ AUTH.onAuthStateChanged(async u=>{
   if(!u){g.style.display='block';g.innerHTML='🔒 승인 회원 전용입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a>';return}
   JME=u;const d=await DB.collection('users').doc(u.uid).get();JMY=d.data();
   if(!JMY||JMY.status!=='approved'){g.style.display='block';g.innerHTML='⏳ 사무국 승인 후 이용 가능합니다.';return}
-  document.getElementById('jBody').style.display='block';renderApply();showMyRegions();loadMyRegion();
+  document.getElementById('jBody').style.display='block';renderApply();showMyRegions();loadMyRegion();loadGigs();
 });
 let JMAP=null;
 function myRegions(){
@@ -296,6 +329,67 @@ async function loadMyRegion(){
   }catch(e){}
 }
 // 대회요원 모집·신청은 competition.html로 이관 (2026-08-03)
+
+// ── 단기 강사 구인 게시판 (gigs) ──
+function openGigForm(){document.getElementById('gigMsg').textContent='';document.getElementById('gigModal').style.display='flex';}
+async function submitGig(){
+  const m=document.getElementById('gigMsg');
+  const g={title:document.getElementById('gTitle').value.trim(),org:document.getElementById('gOrg').value.trim(),
+    area:document.getElementById('gArea').value.trim(),when:document.getElementById('gWhen').value.trim(),
+    pay:document.getElementById('gPay').value.trim(),count:parseInt(document.getElementById('gCount').value)||1,
+    desc:document.getElementById('gDesc').value.trim(),contact:document.getElementById('gContact').value.trim()};
+  if(!g.title||!g.org||!g.area||!g.when||!g.desc||!g.contact){m.textContent='* 필수 항목을 모두 입력하세요';m.style.color='#C41E2F';return}
+  try{
+    await DB.collection('gigs').add(Object.assign(g,{byUid:JME.uid,byName:JMY.name||'',status:'대기',applicants:[],
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()}));
+    m.textContent='✓ 등록 신청 완료 — 사무국 승인 후 게시됩니다';m.style.color='#0f766e';
+    setTimeout(()=>{document.getElementById('gigModal').style.display='none';loadGigs();},1200);
+  }catch(e){m.textContent='등록 실패: '+e.message;m.style.color='#C41E2F'}
+}
+async function loadGigs(){
+  const el=document.getElementById('gigList');
+  try{
+    const snap=await DB.collection('gigs').where('status','==','승인').limit(100).get();
+    let gigs=snap.docs.map(d=>Object.assign({_id:d.id},d.data()));
+    try{const mine=await DB.collection('gigs').where('byUid','==',JME.uid).get();
+      mine.docs.forEach(d=>{if(!gigs.find(x=>x._id===d.id))gigs.push(Object.assign({_id:d.id},d.data()))});}catch(e){}
+    gigs.sort((a,b)=>((b.createdAt&&b.createdAt.seconds)||0)-((a.createdAt&&a.createdAt.seconds)||0));
+    if(!gigs.length){el.innerHTML='<div class="bempty">등록된 단기 구인 공고가 없습니다.</div>';return}
+    el.innerHTML=gigs.map(g=>{
+      const mine=g.byUid===JME.uid;const applied=(g.applicants||[]).some(a=>a.uid===JME.uid);
+      const pending=g.status==='대기';
+      const showContact=mine||applied;
+      return '<div class="brow" style="display:block;padding:14px 16px">'
+        +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+        +'<b style="font-size:15px">'+esc(g.title)+'</b>'
+        +(pending?'<span style="font-size:11px;font-weight:900;color:#fff;background:#e6b422;padding:2px 9px;border-radius:999px">승인 대기</span>':'')
+        +'<span style="flex:1"></span><span style="font-size:12px;color:#8a919d">지원 '+((g.applicants||[]).length)+'명</span></div>'
+        +'<div style="font-size:13px;color:#4b5563;margin-top:5px;line-height:1.7">🏢 '+esc(g.org)+' · 📍 '+esc(g.area)+' · 🗓 '+esc(g.when)+(g.pay?' · 💰 '+esc(g.pay):'')+' · 모집 '+(g.count||1)+'명<br>'+esc(g.desc)+'</div>'
+        +(showContact?'<div style="font-size:12.5px;color:#153A77;font-weight:700;margin-top:5px">☎ '+esc(g.contact)+'</div>':'')
+        +'<div style="margin-top:9px">'
+        +(mine?'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F;padding:5px 14px;font-size:12.5px" onclick="delGig(\''+g._id+'\')">삭제</button>'
+          :(applied?'<span style="font-size:12.5px;font-weight:800;color:#0f766e">✓ 지원 완료 — 담당자 연락처 확인</span>'
+            :(pending?'<span style="font-size:12px;color:#8a919d">게시 대기 중</span>':'<button class="btn-sub" style="background:#0f766e;padding:6px 16px" onclick="applyGig(\''+g._id+'\')">지원하기</button>')))
+        +'</div></div>';
+    }).join('');
+  }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+esc(e.message)+'</div>'}
+}
+async function applyGig(id){
+  if(!confirm('이 공고에 지원할까요?\n지원 시 담당자에게 내 이름·연락처가 전달되고, 나도 담당자 연락처를 볼 수 있습니다.'))return;
+  try{
+    await DB.runTransaction(async tx=>{
+      const ref=DB.collection('gigs').doc(id);const doc=await tx.get(ref);const g=doc.data();
+      if((g.applicants||[]).some(a=>a.uid===JME.uid))throw new Error('이미 지원했습니다');
+      const ap=(g.applicants||[]).slice();ap.push({uid:JME.uid,name:JMY.name||'',phone:JMY.phone||'',at:new Date().toISOString()});
+      tx.update(ref,{applicants:ap});
+    });
+    loadGigs();
+  }catch(e){alert('지원 실패: '+e.message)}
+}
+async function delGig(id){
+  if(!confirm('이 공고를 삭제할까요?'))return;
+  try{await DB.collection('gigs').doc(id).delete();loadGigs();}catch(e){alert('삭제 실패: '+e.message)}
+}
 
 // loadSlots()/claim() 제거 — 지명 기능 폐쇄
 
