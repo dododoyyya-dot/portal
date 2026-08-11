@@ -299,7 +299,9 @@ async function openApply(id){
   let inner='';
   if(entry){
     // ── 참가(선수) 신청 — 본인 또는 자녀 선택, 자녀는 법정대리인(보호자) 서명 동의 ──
-    const parts=[{pid:CME.uid+'#self',name:CMY.name||'',label:(CMY.name||'본인')+' · 본인',birth:CMY.birth||'',gender:CMY.gender||'',school:'',kid:false}]
+    // 본인이 만 19세 미만이면 본인 항목 제외 (미성년은 보호자 계정에서만 참가 신청)
+    const selfMinor=CMY.birth?((Date.now()-new Date(CMY.birth).getTime())/31557600000<19):false;
+    const parts=(selfMinor?[]:[{pid:CME.uid+'#self',name:CMY.name||'',label:(CMY.name||'본인')+' · 본인',birth:CMY.birth||'',gender:CMY.gender||'',school:'',kid:false}])
       .concat((CMY.children||[]).map((k,i)=>({pid:CME.uid+'#k'+i,name:k.name,label:k.name+' · 자녀',birth:k.birth||'',gender:k.gender||'',school:k.school||'',kid:true})));
     APPLY_PARTS=parts.filter(p=>!activeOfKey(s,p.pid));
     const clubOpts=(MY_CLUBS||[]).map(n=>'<option>'+cesc(n)+'</option>').join('');
@@ -309,7 +311,7 @@ async function openApply(id){
       +'<div style="font-size:11.5px;color:#8a919d;text-align:right;margin-bottom:8px">작성일 '+today+' · 자녀는 <a href="mypage.html" style="color:var(--red);font-weight:800">마이페이지 자녀 프로필</a>에서 등록</div>'
       +'<div style="font-size:13px;font-weight:800;margin-bottom:7px">① 참가자 선택</div>'
       +'<div id="cPartBtns" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
-      +(APPLY_PARTS.length?APPLY_PARTS.map((p,i)=>'<button type="button" class="rolechip" data-pid="'+cesc(p.pid)+'" onclick="selPart('+i+')">'+cesc(p.label)+'</button>').join(''):'<span style="font-size:12.5px;color:#C41E2F;font-weight:700">신청 가능한 참가자가 없습니다 (전원 신청 완료)</span>')
+      +(APPLY_PARTS.length?APPLY_PARTS.map((p,i)=>'<button type="button" class="rolechip" data-pid="'+cesc(p.pid)+'" onclick="selPart('+i+')">'+cesc(p.label)+'</button>').join(''):'<span style="font-size:12.5px;color:#C41E2F;font-weight:700">'+(selfMinor?'👨‍👧 만 19세 미만은 본인이 직접 신청할 수 없습니다. 보호자 계정에서 자녀 프로필을 등록해 신청해 주세요.':'신청 가능한 참가자가 없습니다 (전원 신청 완료)')+'</span>')
       +'</div>'
       +'<div class="docsec"><div class="dtitle">대 회 참 가 신 청 서</div>'
       +'<table class="itable">'
