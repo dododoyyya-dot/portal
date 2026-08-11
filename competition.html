@@ -197,8 +197,41 @@ AUTH.onAuthStateChanged(async u=>{
   const d=await DB.collection('users').doc(u.uid).get();CMY=d.data();
   if(!CMY||CMY.status!=='approved'){g.style.display='block';g.innerHTML='⏳ 사무국 승인 후 신청할 수 있습니다.';return}
   document.getElementById('cBody').style.display='block';
-  loadSlots();
+  await loadSlots();
+  checkFamReq();
 });
+// ── 미성년 참가: 자녀 요청 → 보호자 승인(신청서 작성·서명) ──
+let FAMREQ=null;
+async function checkFamReq(){
+  const id=new URLSearchParams(location.search).get('famreq');
+  if(!id)return;
+  try{
+    const d=await DB.collection('familyRequests').doc(id).get();
+    if(!d.exists){alert('승인 요청을 찾을 수 없습니다 (이미 처리됐을 수 있습니다)');return}
+    const r=Object.assign({id:d.id},d.data());
+    if(r.guardianUid!==CME.uid){alert('본인에게 온 승인 요청이 아닙니다');return}
+    if(r.status!=='대기'){alert('이미 처리된 요청입니다 ('+r.status+')');return}
+    FAMREQ=r;
+    alert('👨‍👧 '+(r.childName||'자녀')+' 님의 ['+(r.targetName||'대회')+'] 참가 승인 절차입니다.\n신청서를 확인하고 보호자(법정대리인) 서명을 하면 참가 신청이 완료됩니다.');
+    openApply(r.targetId);
+  }catch(e){alert('요청 확인 실패: '+e.message)}
+}
+async function openMinorReq(id){
+  if(!(CMY&&CMY.guardianUid)){
+    alert('👨‍👧 만 19세 미만은 보호자 승인으로 참가 신청합니다.\n아직 보호자 계정이 연동되지 않았습니다.\n마이페이지 › 보호자 연동(연동 코드)을 먼저 진행해 주세요.');return;
+  }
+  const doc0=CSLOTS.find(d=>d.id===id);const s0=doc0?doc0.data():{};
+  if(!confirm('['+(s0.title||'대회')+']\n보호자에게 참가 승인 요청을 보낼까요?\n보호자가 신청서를 확인·서명하면 참가 신청이 완료됩니다.'))return;
+  try{
+    const dup=await DB.collection('familyRequests').where('childUid','==',CME.uid).where('targetId','==',id).where('status','==','대기').get();
+    if(!dup.empty)throw new Error('이미 보호자 승인 대기 중입니다');
+    const ref=await DB.collection('familyRequests').add({kind:'comp',targetId:id,targetName:s0.title||'',
+      childUid:CME.uid,childName:CMY.name||'',childBirth:CMY.birth||'',childGender:CMY.gender||'',childSchool:CMY.school||'',
+      guardianUid:CMY.guardianUid,status:'대기',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    KFDF.notify(CMY.guardianUid,'👨‍👧 '+(CMY.name||'자녀')+' — ['+(s0.title||'대회')+'] 참가 승인 요청','competition.html?famreq='+ref.id);
+    alert('✓ 보호자에게 승인 요청을 보냈습니다.\n보호자가 승인·서명하면 참가 신청이 완료됩니다.');
+  }catch(e){alert('요청 실패: '+e.message)}
+}
 async function loadSlots(){
   const el=document.getElementById('cSlotList');
   try{
@@ -299,10 +332,12 @@ async function openApply(id){
   let inner='';
   if(entry){
     // ── 참가(선수) 신청 — 본인 또는 자녀 선택, 자녀는 법정대리인(보호자) 서명 동의 ──
-    // 본인이 만 19세 미만이면 본인 항목 제외 (미성년은 보호자 계정에서만 참가 신청)
+    // 본인이 만 19세 미만이면 보호자 승인 요청으로 전환 (미성년은 보호자 승인·서명으로만 참가)
     const selfMinor=CMY.birth?((Date.now()-new Date(CMY.birth).getTime())/31557600000<19):false;
-    const parts=(selfMinor?[]:[{pid:CME.uid+'#self',name:CMY.name||'',label:(CMY.name||'본인')+' · 본인',birth:CMY.birth||'',gender:CMY.gender||'',school:'',kid:false}])
-      .concat((CMY.children||[]).map((k,i)=>({pid:CME.uid+'#k'+i,name:k.name,label:k.name+' · 자녀',birth:k.birth||'',gender:k.gender||'',school:k.school||'',kid:true})));
+    if(selfMinor&&!FAMREQ){openMinorReq(id);return;}
+    const parts=(FAMREQ?[{pid:FAMREQ.childUid,name:FAMREQ.childName||'',label:(FAMREQ.childName||'자녀')+' · 자녀(승인 진행)',birth:FAMREQ.childBirth||'',gender:FAMREQ.childGender||'',school:FAMREQ.childSchool||'',kid:true}]
+      :(selfMinor?[]:[{pid:CME.uid+'#self',name:CMY.name||'',label:(CMY.name||'본인')+' · 본인',birth:CMY.birth||'',gender:CMY.gender||'',school:'',kid:false}]))
+      .concat(FAMREQ?[]:(CMY.children||[]).map((k,i)=>({pid:CME.uid+'#k'+i,name:k.name,label:k.name+' · 자녀',birth:k.birth||'',gender:k.gender||'',school:k.school||'',kid:true})));
     APPLY_PARTS=parts.filter(p=>!activeOfKey(s,p.pid));
     const clubOpts=(MY_CLUBS||[]).map(n=>'<option>'+cesc(n)+'</option>').join('');
     inner='<div class="cmodal">'
@@ -499,6 +534,15 @@ async function submitEntry(){
     // 대회 참가 신청 → 선수(athlete) 자동 등록
     await DB.collection('users').doc(CME.uid).update({contracts:c,'caps.athlete':true}).catch(e=>console.warn('sign save',e));
     CMY.contracts=c;
+    // 보호자 승인 절차였다면 요청 완료 처리 + 자녀에게 알림
+    if(FAMREQ){
+      try{
+        await DB.collection('familyRequests').doc(FAMREQ.id).update({status:'승인',decidedAt:new Date().toISOString()});
+        KFDF.notify(FAMREQ.childUid,'✅ ['+title+'] 대회 참가 신청 완료 — 보호자 승인·서명됨','competition.html');
+      }catch(e){console.warn('famreq',e)}
+      FAMREQ=null;
+      history.replaceState(null,'',location.pathname);
+    }
     document.getElementById('cApplyModal').remove();
     alert('🏃 '+p.name+' 참가 신청 완료!'+(p.kid?'\n보호자(법정대리인) 동의·서명이 함께 저장되었습니다.':'')+'\n[📄 내 신청서] 버튼으로 언제든 확인·인쇄할 수 있습니다.');
   }catch(e){alert(e.message)}
