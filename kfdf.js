@@ -118,8 +118,19 @@
     w.forEach(function (cb) { try { cb(user, me, API); } catch (e) { console.warn(e); } });
   }
 
+  // 알림 생성 (수신자 uid, 제목, 클릭 시 이동 링크) — 실패해도 본 작업엔 영향 없음
+  function notify(toUid, title, link) {
+    try {
+      if (!toUid || !window.firebase || !firebase.firestore) return Promise.resolve();
+      return firebase.firestore().collection('notifications').add({
+        toUid: toUid, title: String(title || ''), link: String(link || ''),
+        read: false, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(function () {});
+    } catch (e) { return Promise.resolve(); }
+  }
+
   var API = {
-    CFG: CFG, initApp: initApp, ready: ready,
+    CFG: CFG, initApp: initApp, ready: ready, notify: notify,
     // 등급
     roleOf: roleOf, isOwner: isOwner, isAdmin: isAdmin, isSidoOfficer: isSidoOfficer, isGugunOfficer: isGugunOfficer,
     isRegionAdmin: isRegionAdmin, regionActive: regionActive, isApproved: isApproved,
