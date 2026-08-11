@@ -17,10 +17,13 @@
       ['심판 · 운영요원 신청','competition.html#staff'],['연맹 일정 캘린더','calendar.html']]},
     {t:'클럽',h:'club.html',d:[
       ['클럽 찾기 · 가입','club.html'],['클럽 만들기 (클럽장)','club.html'],['내 클럽 · 가입 승인','club.html']]},
-    {t:'지도자·심판',h:'jobs.html',d:[
-      ['자격증 안내 · 검정','certification.html'],['연맹 자격 신청 (지도자·심판)','license.html'],['이수증 · 자격 진위확인','verify.html'],
-      ['강사 활동 지원','jobs.html'],['단기 강사 구인 게시판','jobs.html#gigList'],
-      ['강사 가이드','guide.html'],['안전교육 이수','safety.html'],['레벨업 (포인트) 시스템','leader.html']]},
+    {t:'자격증',h:'license.html',d:[
+      ['연맹 자격증 신청 (지도자·심판)','license.html'],
+      ['이수증 · 자격 진위확인','verify.html'],['안전교육 이수','safety.html'],
+      ['체육지도자 실기·구술 검정 (연 1회)','certification.html']]},
+    {t:'강사·활동',h:'jobs.html',d:[
+      ['강사 활동 지원 (분야 등록)','jobs.html'],['단기 강사 구인 게시판','jobs.html#gigList'],
+      ['강사 가이드 (일지·운영·유의사항)','guide.html'],['레벨업 (포인트) 시스템','leader.html']]},
     {t:'알림마당',h:'notice.html',d:[
       ['공지사항 · 공고','notice.html'],['연맹 일정 캘린더','calendar.html'],['자료실 (서식 다운로드)','archive.html'],['자주 묻는 질문','faq.html']]}
   ];
@@ -34,7 +37,7 @@
         +'<div class="drop">'+m.d.map(function(x){return '<a href="'+x[1]+'">'+esc(x[0])+'</a>'}).join('')+'</div></div>';
     }).join('');
     html+='<a href="apply.html" class="cta">강습 신청</a>'
-        +'<a href="mypage.html" class="cta" style="background:#1F4E9C;margin-left:8px">마이페이지</a>';
+        +'<a href="jobs.html" class="cta" style="background:#1F4E9C;margin-left:8px">강사신청</a>';
     nav.innerHTML=html;
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',renderNav);else renderNav();
@@ -42,15 +45,21 @@
   // ── 로그인 전환 + 알림 배지 ──
   function badge(u){
     try{
+      var el=document.getElementById('utilAuth');if(!el||!el.parentNode)return;
+      var b=document.getElementById('kfdfBell');
+      if(!b){
+        b=document.createElement('a');
+        b.id='kfdfBell';
+        b.href='mypage.html#alarmBox';
+        b.title='알림함';
+        b.style.cssText='color:#fff;font-weight:900;margin-right:10px;text-decoration:none';
+        b.innerHTML='🔔';
+        el.parentNode.insertBefore(b,el);
+      }
       if(!firebase.firestore)return;
       firebase.firestore().collection('notifications').where('toUid','==',u.uid).where('read','==',false).limit(30).get().then(function(snap){
         var n=snap.size;if(!n)return;
-        var el=document.getElementById('utilAuth');if(!el||!el.parentNode)return;
-        var b=document.createElement('a');
-        b.href='mypage.html#alarmBox';
-        b.style.cssText='color:#fff;font-weight:900;margin-right:10px;text-decoration:none';
         b.innerHTML='🔔<span style="background:#C41E2F;border-radius:999px;padding:1px 7px;font-size:11px;margin-left:3px">'+(n>=30?'30+':n)+'</span>';
-        el.parentNode.insertBefore(b,el);
       }).catch(function(){});
     }catch(e){}
   }
@@ -62,8 +71,8 @@
       if(u){
         el.textContent='로그아웃';el.href='#';
         el.onclick=function(e){e.preventDefault();if(confirm('로그아웃 할까요?'))firebase.auth().signOut().then(function(){location.href='index.html'})};
-        if(firebase.firestore)badge(u);
-        else{
+        badge(u);
+        if(!firebase.firestore){
           var s3=document.createElement('script');
           s3.src='https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js';
           s3.onload=function(){badge(u)};document.head.appendChild(s3);
