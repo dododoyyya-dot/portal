@@ -184,6 +184,22 @@ function orgChip(o,region,title,fed){
     <span id="phMsg" style="font-size:13px;font-weight:700"></span>
   </div>
 
+  <div id="alarmBox" style="margin-top:26px;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:18px 20px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <b style="font-size:16px">🔔 알림</b>
+      <span id="alarmCnt" style="font-size:12px;font-weight:900;color:#fff;background:#C41E2F;border-radius:999px;padding:1px 8px;display:none"></span>
+      <span style="flex:1"></span>
+      <button class="btn-sub" style="background:#8a919d;padding:5px 12px;font-size:12px" onclick="markAllAlarms()">모두 읽음</button>
+    </div>
+    <div id="alarmList" style="margin-top:10px;font-size:13.5px;color:#8a919d">알림을 불러오는 중…</div>
+  </div>
+
+  <div id="famReqBox" style="display:none;margin-top:14px;background:#fffdf3;border:1.5px solid #e6b422;border-radius:14px;padding:18px 20px">
+    <b style="font-size:16px">👨‍👧 자녀 활동 승인 대기</b>
+    <p style="font-size:12.5px;color:#8a6d1a;margin:4px 0 8px">자녀 계정에서 요청한 클럽 가입·대회 참가입니다. 승인해야 신청이 접수됩니다.</p>
+    <div id="famReqList"></div>
+  </div>
+
   <div id="profileBox" style="margin-top:26px;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:20px 22px">
     <h3 style="margin:0 0 4px;font-size:16px">👤 마이 프로필 <span style="font-weight:600;color:var(--gray);font-size:12.5px">— 배정·위촉·자격 관리에 활용됩니다. 언제든 본인이 수정할 수 있습니다.</span></h3>
     <div id="pfSum" style="display:none;margin-top:12px;align-items:center;gap:12px;flex-wrap:wrap;background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:12px;padding:14px 16px">
@@ -727,6 +743,7 @@ function fillProfile(d){
   // 자녀(미성년) 프로필 — cid 마이그레이션 후 렌더
   migrateKids().then(()=>{renderKids();fillKidAccountSel();}).catch(e=>console.warn('kids',e));
   loadMyGuardian();
+  loadAlarms();loadFamReqs();
   // 주민번호 등록 여부 (별도 보안 컬렉션)
   try{
     DB.collection('privateInfo').doc(AUTH.currentUser.uid).get().then(pd=>{
@@ -934,6 +951,91 @@ function loadMyGuardian(){
   const el=document.getElementById('myGuardianBox');if(!el)return;
   if(MYD&&MYD.guardianUid){el.textContent='🔗 연동된 보호자: '+(MYD.guardianName||'')+' — 연동 해제는 사무국에 문의';}
   else el.textContent='';
+}
+// ── 알림함 ──
+let ALARMS=[];
+function aesc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+async function loadAlarms(){
+  const el=document.getElementById('alarmList');if(!el)return;
+  try{
+    const snap=await DB.collection('notifications').where('toUid','==',AUTH.currentUser.uid).limit(50).get();
+    ALARMS=snap.docs.map(d=>Object.assign({_id:d.id},d.data()));
+    ALARMS.sort((a,b)=>((b.createdAt&&b.createdAt.seconds)||0)-((a.createdAt&&a.createdAt.seconds)||0));
+    const unread=ALARMS.filter(a=>!a.read).length;
+    const cnt=document.getElementById('alarmCnt');
+    if(unread){cnt.textContent=unread+'건';cnt.style.display='inline-block'}else cnt.style.display='none';
+    if(!ALARMS.length){el.innerHTML='<span style="color:#8a919d">새 알림이 없습니다.</span>';return}
+    el.innerHTML=ALARMS.slice(0,20).map(a=>{
+      const d=a.createdAt&&a.createdAt.toDate?a.createdAt.toDate():null;
+      const t=d?(d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'):'';
+      return '<div onclick="openAlarm(\''+a._id+'\')" style="display:flex;gap:8px;align-items:center;padding:9px 4px;border-bottom:1px solid #f0f2f7;cursor:pointer'+(a.read?';opacity:.55':'')+'">'
+        +(a.read?'':'<span style="width:7px;height:7px;border-radius:50%;background:#C41E2F;flex:none"></span>')
+        +'<span style="flex:1;font-weight:'+(a.read?'500':'800')+';color:#222">'+aesc(a.title)+'</span>'
+        +'<span style="font-size:11.5px;color:#9aa1ad;flex:none">'+t+'</span>'
+        +(a.link?'<span style="font-size:12px;color:#1F4E9C;font-weight:800;flex:none">확인 →</span>':'')
+        +'</div>';
+    }).join('');
+  }catch(e){el.innerHTML='<span style="color:#C41E2F">알림 불러오기 실패: '+aesc(e.message)+'</span>'}
+}
+async function openAlarm(id){
+  const a=ALARMS.find(x=>x._id===id);if(!a)return;
+  try{if(!a.read)await DB.collection('notifications').doc(id).update({read:true});}catch(e){}
+  if(a.link)location.href=a.link;else{a.read=true;loadAlarms();}
+}
+async function markAllAlarms(){
+  const un=ALARMS.filter(a=>!a.read);
+  for(const a of un){try{await DB.collection('notifications').doc(a._id).update({read:true});}catch(e){}}
+  loadAlarms();
+}
+// ── 자녀 활동 승인 (보호자) — familyRequests ──
+let FREQS=[];
+async function loadFamReqs(){
+  const box=document.getElementById('famReqBox');if(!box)return;
+  try{
+    const snap=await DB.collection('familyRequests').where('guardianUid','==',AUTH.currentUser.uid).where('status','==','대기').get();
+    FREQS=snap.docs.map(d=>Object.assign({_id:d.id},d.data()));
+    if(!FREQS.length){box.style.display='none';return}
+    box.style.display='block';
+    document.getElementById('famReqList').innerHTML=FREQS.map(r=>
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 0;border-bottom:1px dashed #e8dcae">'
+      +'<b>'+aesc(r.childName||'자녀')+'</b>'
+      +'<span style="font-size:12.5px;color:#6b7280">'+(r.kind==='club'?'클럽 가입':'대회 참가')+' — '+aesc(r.targetName||'')+'</span>'
+      +'<span style="flex:1"></span>'
+      +(r.kind==='club'
+        ?'<button class="btn-sub" style="background:#0f766e;padding:6px 14px;font-size:12.5px" onclick="famApproveClub(\''+r._id+'\')">승인 (가입 신청 접수)</button>'
+        :'<button class="btn-sub" style="background:#153A77;padding:6px 14px;font-size:12.5px" onclick="location.href=\'competition.html?famreq='+r._id+'\'">신청서 확인·서명 →</button>')
+      +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F;padding:6px 14px;font-size:12.5px" onclick="famReject(\''+r._id+'\')">거절</button>'
+      +'</div>').join('');
+  }catch(e){console.warn('famreq',e);box.style.display='none'}
+}
+async function famApproveClub(reqId){
+  const r=FREQS.find(x=>x._id===reqId);if(!r)return;
+  if(!confirm(r.childName+' — ['+r.targetName+'] 클럽 가입을 승인할까요?\n승인 시 클럽장에게 가입 신청이 접수됩니다.'))return;
+  try{
+    await DB.runTransaction(async tx=>{
+      const ref=DB.collection('clubs').doc(r.targetId);
+      const doc=await tx.get(ref);if(!doc.exists)throw new Error('클럽을 찾을 수 없습니다');
+      const c=doc.data();
+      if((c.childMembers||[]).some(m=>m.cid===r.childUid))throw new Error('이미 소속된 자녀입니다');
+      if((c.childPending||[]).some(m=>m.cid===r.childUid))throw new Error('이미 가입 신청 중입니다');
+      const cp=(c.childPending||[]).slice();
+      cp.push({parentUid:AUTH.currentUser.uid,parentName:MYD.name||'',cid:r.childUid,name:r.childName||'',birth:r.childBirth||'',school:r.childSchool||'',at:new Date().toISOString()});
+      tx.update(ref,{childPending:cp});
+    });
+    await DB.collection('familyRequests').doc(reqId).update({status:'승인',decidedAt:new Date().toISOString()});
+    KFDF.notify(r.childUid,'✅ ['+(r.targetName||'클럽')+'] 가입이 보호자 승인되었습니다 — 클럽장 승인 대기','club.html');
+    alert('✓ 승인 완료 — 클럽장 승인 후 소속으로 표시됩니다.');
+    loadFamReqs();
+  }catch(e){alert('승인 실패: '+e.message)}
+}
+async function famReject(reqId){
+  const r=FREQS.find(x=>x._id===reqId);if(!r)return;
+  if(!confirm(r.childName+' — ['+r.targetName+'] 요청을 거절할까요?'))return;
+  try{
+    await DB.collection('familyRequests').doc(reqId).update({status:'거절',decidedAt:new Date().toISOString()});
+    KFDF.notify(r.childUid,'❌ ['+(r.targetName||'')+'] '+(r.kind==='club'?'클럽 가입':'대회 참가')+' 요청이 보호자에 의해 거절되었습니다','');
+    loadFamReqs();
+  }catch(e){alert('거절 실패: '+e.message)}
 }
 function fillKidAccountSel(){
   const sel=document.getElementById('kaKid');if(!sel)return;
