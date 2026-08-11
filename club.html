@@ -295,10 +295,10 @@ function renderClubs(){
       else if(st==='pending')act='<span class="cpill2" style="background:#b8860b">승인 대기</span>';
       else act='<button class="cbtn cbtn-main" onclick="joinClub(\''+d.id+'\')">본인 가입</button>';
       const cnt=(c.memberUids||[]).length+((c.childMembers||[]).length);
-      return '<div class="clubcard"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+cavHtml(c)+'<span class="cname">'+kesc(c.name)+'</span>'
+      return '<div class="clubcard"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+cavHtml(c)+'<a href="clubhome.html?id='+d.id+'" style="text-decoration:none;color:inherit"><span class="cname">'+kesc(c.name)+'</span></a>'
         +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'
         +'<span style="font-size:12px;color:#8a919d;font-weight:700">회원 '+cnt+'명</span>'
-        +'<span style="flex:1"></span>'+childJoinBtn(c,d.id)+act+'</div>'
+        +'<span style="flex:1"></span><a class="cbtn cbtn-soft" style="padding:7px 14px;text-decoration:none;display:inline-block" href="clubhome.html?id='+d.id+'">🏠 클럽 홈</a>'+childJoinBtn(c,d.id)+act+'</div>'
         +(c.intro?'<div class="cmeta2">'+kesc(c.intro)+'</div>':'')
         +(c.rulesText?'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">클럽 내규 보기</summary><div style="font-size:12.5px;color:#4b5563;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:10px 13px;margin-top:6px">'+kesc(c.rulesText)+'</div></details>':'')
         +'</div>';
@@ -391,17 +391,27 @@ async function doChildJoin(id,cid){
   }catch(e){alert('신청 실패: '+(e.code==='permission-denied'?'권한 오류 — 승인 회원만 신청할 수 있습니다':e.message))}
 }
 async function approveChild(id,cid){
+  // cid에 '-'가 있으면 프로필형(계정 없는 자녀, mypage newCid() 형식) · 없으면 자녀 본인 계정의 실제 uid(계정 연동형)
+  const isAcctLinked=cid.indexOf('-')<0;
   try{
     await DB.runTransaction(async tx=>{
       const ref=DB.collection('clubs').doc(id);const doc=await tx.get(ref);const c=doc.data();
       const p=(c.childPending||[]).find(x=>x.cid===cid);if(!p)return;
       const cm=(c.childMembers||[]).slice();
       if(!cm.some(x=>x.cid===cid))cm.push({parentUid:p.parentUid,parentName:p.parentName||'',cid:cid,name:p.name||'',birth:p.birth||'',school:p.school||'',at:new Date().toISOString()});
-      tx.update(ref,{childMembers:cm,childPending:(c.childPending||[]).filter(x=>x.cid!==cid)});
+      const upd={childMembers:cm,childPending:(c.childPending||[]).filter(x=>x.cid!==cid)};
+      // 계정 연동형 미성년 회원은 memberUids/members에도 등록 — 클럽 미니페이지 등 회원 전용 기능 이용 가능하도록
+      if(isAcctLinked && !(c.memberUids||[]).includes(cid)){
+        upd.memberUids=(c.memberUids||[]).concat([cid]);
+        upd.members=(c.members||[]).concat([{uid:cid,name:p.name||'',at:new Date().toISOString()}]);
+      }
+      tx.update(ref,upd);
     });
     try{const d0=await DB.collection('clubs').doc(id).get();const nm=d0.exists?(d0.data().name||'클럽'):'클럽';
-      const p0=cid.indexOf('#')<0?cid:null; // cid가 자녀 계정 uid면 자녀에게, 프로필형이면 보호자에게
-      KFDF.notify(p0||cid.split('#')[0],'✅ ['+nm+'] 자녀 클럽 가입이 클럽장 승인되었습니다','club.html');
+      // 계정 연동형이면 자녀 본인에게, 프로필형(계정 없음)이면 보호자에게 알림
+      const findP=(await DB.collection('clubs').doc(id).get()).data();
+      const pInfo=(findP.childMembers||[]).find(x=>x.cid===cid);
+      KFDF.notify(isAcctLinked?cid:(pInfo?pInfo.parentUid:cid),'✅ ['+nm+'] 자녀 클럽 가입이 클럽장 승인되었습니다','club.html');
     }catch(e){}
     loadMyClubs();loadClubs();
   }catch(e){alert('승인 실패: '+e.message)}
@@ -499,13 +509,14 @@ async function loadMyClubs(){
           +'</div></details>';
       }
       const leaveBtn=(isMember&&!isOwner)?'<button class="cbtn" style="padding:4px 12px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="leaveClub(\''+d.id+'\',\''+kesc(c.name)+'\')">클럽 탈퇴</button>':'';
+      const homeBtn=(isOwner||isMember)?'<a class="cbtn cbtn-teal" style="padding:4px 12px;font-size:12px;text-decoration:none;display:inline-block" href="clubhome.html?id='+d.id+'">🏠 클럽 홈</a>':'';
       const ownerBtns=isOwner?'<button class="cbtn cbtn-soft" style="padding:4px 12px;font-size:12px" onclick="editMyClub(\''+d.id+'\')">✏️ 수정</button>'
         +'<button class="cbtn" style="padding:4px 12px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="delMyClub(\''+d.id+'\',\''+kesc(c.name)+'\')">🗑 삭제</button>':'';
       return '<div class="clubcard"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+cavHtml(c)+'<span class="cname">'+kesc(c.name)+'</span>'
         +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'+badge
         +(c.code&&(isOwner||isMember)?'<span class="cpill2" style="background:#b8860b" title="이 코드로 회원을 초대할 수 있습니다">🔑 '+kesc(c.code)+'</span>':'')
         +'<span style="font-size:12px;color:#8a919d;font-weight:700">회원 '+((c.memberUids||[]).length)+'명</span>'
-        +'<span style="flex:1"></span>'+ownerBtns+leaveBtn+'</div>'
+        +'<span style="flex:1"></span>'+homeBtn+ownerBtns+leaveBtn+'</div>'
         +(c.intro?'<div class="cmeta2">'+kesc(c.intro)+'</div>':'')
         +'<div class="cmeta2" style="color:#8a94a6">소속: KFDF › '+kesc(c.sido)+' 연맹 › '+kesc(c.gugun||'')+'</div>'
         +(c.rulesText?'<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">클럽 내규 보기</summary><div style="font-size:12.5px;color:#4b5563;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:10px 13px;margin-top:6px">'+kesc(c.rulesText)+'</div></details>':'')
@@ -596,6 +607,7 @@ async function issueClubCode(){
 }
 async function createClub(){
   const m=document.getElementById('ncMsg');
+  if(isMinorSelf()){m.textContent='🔞 클럽 개설(클럽장)은 만 19세 이상만 가능합니다. 체육회 등록 규정상 클럽 대표자는 성인이어야 해요 — 보호자나 지도자 성인 회원께 개설을 부탁드려주세요.';m.style.color='#C41E2F';return}
   const name=document.getElementById('ncName').value.trim();
   const sido=document.getElementById('ncSido').value;
   const gugun=document.getElementById('ncGugun').value;
