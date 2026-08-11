@@ -455,6 +455,13 @@ async function submitEntry(){
   const sign=exportSig();
   const clubSel=document.getElementById('epClub');
   const club=clubSel.value==='__etc'?document.getElementById('epClubEtc').value.trim():clubSel.value;
+  // 참가 차단 클럽 확인 (구청장기 등 소속 제한 대회 — 공고의 blockClubs)
+  if(s0.blockClubs&&s0.blockClubs.length&&club){
+    const nc=String(club).replace(/\s/g,'').toLowerCase();
+    if(s0.blockClubs.some(b=>String(b).replace(/\s/g,'').toLowerCase()===nc)){
+      alert('⛔ 이 대회는 ['+club+'] 소속의 참가 신청이 제한되어 있습니다.\n주최 측 참가 자격 안내를 확인해주세요.');return;
+    }
+  }
   // 참가 제한 지역 확인 (부산시장배·구청장기 등 — 소속/거주 지역이 다르면 확인)
   if(s0.eligRegion){
     const key=s0.eligRegion.replace(/\s/g,'');
