@@ -320,12 +320,14 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#555" onclick="closeWaitlist()">⏳ 대기자 일괄 종료</button>
         <button class="btn-sub" style="background:#0f766e" onclick="showSupply()">🧭 권역별 수급 현황</button>
         <button class="btn-sub" style="background:#0e7490" onclick="showInspections()">📋 현장점검 제출현황</button>
+        <button class="btn-sub" style="background:#7c3aed" onclick="showGigs()">🔎 단기 구인 공고 승인</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="copyPhoneList('apps')">📱 문자명단 복사 (교사·현재 필터)</button>
           </div>
         </details>
       </div>
       <div id="supplyBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px"></div>
       <div id="inspBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px"></div>
+      <div id="gigBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px"></div>
       <div id="trashBox" style="display:none;background:#faf8f4;border:1.5px solid #e5e0d8;border-radius:14px;padding:14px 18px;margin-bottom:14px"></div>
       <div id="instLinkBox" style="background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:14px;padding:14px 18px;margin-bottom:14px">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -600,6 +602,45 @@ function showSupply(){
   box.innerHTML=html+'</tbody></table></div>';
 }
 
+// ── 단기 구인 공고 승인 (gigs) ──
+let GIGS=[];
+async function showGigs(){
+  const box=document.getElementById('gigBox');
+  if(box.style.display==='block'){box.style.display='none';return}
+  box.style.display='block';box.innerHTML='불러오는 중…';
+  const snap=await DB.collection('gigs').orderBy('createdAt','desc').limit(200).get().catch(e=>{box.innerHTML='조회 실패: '+esc(e.message);return null});
+  if(!snap)return;
+  GIGS=snap.docs.map(d=>Object.assign({_id:d.id},d.data()));
+  renderGigs();
+}
+function renderGigs(){
+  const box=document.getElementById('gigBox');
+  if(!GIGS.length){box.innerHTML='<b style="font-size:15px">🔎 단기 구인 공고</b><div style="color:#8a919d;font-size:13px;margin-top:8px">등록된 공고가 없습니다.</div>';return}
+  const wait=GIGS.filter(g=>g.status==='대기');
+  let html='<b style="font-size:15px">🔎 단기 구인 공고 승인</b> <span style="font-size:12.5px;color:var(--gray)">— 승인 대기 '+wait.length+'건</span><div style="margin-top:10px">';
+  GIGS.forEach(g=>{
+    html+='<div style="border:1.5px solid '+(g.status==='대기'?'#e6b422':'#e8ecf3')+';border-radius:10px;padding:11px 14px;margin-bottom:8px">'
+      +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>'+esc(g.title)+'</b>'
+      +'<span style="font-size:11px;font-weight:900;color:#fff;background:'+(g.status==='승인'?'#0f766e':'#e6b422')+';padding:2px 9px;border-radius:999px">'+esc(g.status)+'</span>'
+      +'<span style="flex:1"></span><span style="font-size:12px;color:#8a919d">지원 '+((g.applicants||[]).length)+'명</span></div>'
+      +'<div style="font-size:12.5px;color:#4b5563;margin-top:4px;line-height:1.6">'+esc(g.org)+' · '+esc(g.area)+' · '+esc(g.when)+(g.pay?' · '+esc(g.pay):'')+' · 모집 '+(g.count||1)+'명 · 게시자 '+esc(g.byName||'')+'<br>'+esc(g.desc)+'<br>☎ '+esc(g.contact)+'</div>'
+      +((g.applicants||[]).length?'<div style="font-size:12px;color:#153A77;margin-top:4px">지원자: '+g.applicants.map(a=>esc(a.name)+'('+esc(a.phone||'')+')').join(', ')+'</div>':'')
+      +'<div style="margin-top:8px;display:flex;gap:6px">'
+      +(g.status==='대기'?'<button class="btn-sub" style="background:#0f766e;padding:5px 14px;font-size:12.5px" onclick="setGig(\''+g._id+'\',\'승인\')">승인·게시</button>':'<button class="btn-sub" style="background:#8a919d;padding:5px 14px;font-size:12.5px" onclick="setGig(\''+g._id+'\',\'대기\')">게시 취소</button>')
+      +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F;padding:5px 14px;font-size:12.5px" onclick="delGigAdmin(\''+g._id+'\')">삭제</button></div>'
+      +'</div>';
+  });
+  box.innerHTML=html+'</div>';
+}
+async function setGig(id,st){
+  try{await DB.collection('gigs').doc(id).update({status:st});const g=GIGS.find(x=>x._id===id);if(g)g.status=st;renderGigs();}
+  catch(e){alert('실패: '+e.message)}
+}
+async function delGigAdmin(id){
+  if(!confirm('이 공고를 삭제할까요?'))return;
+  try{await DB.collection('gigs').doc(id).delete();GIGS=GIGS.filter(x=>x._id!==id);renderGigs();}
+  catch(e){alert('삭제 실패: '+e.message)}
+}
 // ── 현장점검일지 제출현황 (권역장 온라인 제출분 열람 + CSV 전체/권역별) ──
 let INSPS=[];
 async function showInspections(){
