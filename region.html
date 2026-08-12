@@ -553,6 +553,16 @@ function openInspForm(id){
     +'<div style="display:flex;gap:10px;margin-top:10px"><div style="flex:1"><label style="font-size:12.5px;font-weight:800">당일 참석 인원</label><input id="iAttend" type="number" min="0" placeholder="명" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></div>'
     +'<div style="flex:1"><label style="font-size:12.5px;font-weight:800">이동거리 편도(km)</label><input id="iDist" type="number" min="0" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></div>'
     +'<div style="flex:1"><label style="font-size:12.5px;font-weight:800">수당 구간</label><select id="iBand" style="width:100%;padding:9px 8px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"><option value="">선택</option><option>5만원</option><option>8만원</option><option>12만원</option></select></div></div>'
+    +'<div style="display:flex;gap:10px;margin-top:10px"><div style="flex:1"><label style="font-size:12.5px;font-weight:800">점검 시작 시각</label><input id="iT1" type="time" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></div>'
+    +'<div style="flex:1"><label style="font-size:12.5px;font-weight:800">점검 종료 시각</label><input id="iT2" type="time" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></div></div>'
+    +'<div style="margin-top:10px;padding:10px 12px;background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:10px;font-size:13px">'
+    +'<b style="font-size:12.5px">현장 대면 확인</b>'
+    +'<label style="display:flex;gap:7px;align-items:center;margin-top:6px;font-weight:600"><input type="checkbox" id="iMetInst" style="width:auto"> 배정 강사('+esc(s.assignedName||'')+')를 현장에서 대면 확인했습니다</label>'
+    +'<label style="display:flex;gap:7px;align-items:center;margin-top:4px;font-weight:600"><input type="checkbox" id="iMetTeach" style="width:auto"> 담당교사('+esc(s.teacher||'')+')를 현장에서 대면(또는 유선) 확인했습니다</label></div>'
+    +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">📷 현장 사진 (필수 1장 이상 · 최대 3장 — 수업 전경 등)</label>'
+    +'<input id="iPhotos" type="file" accept="image/*" capture="environment" multiple onchange="inspPhotoPick(this)" style="font-size:13px;margin-top:4px">'
+    +'<div id="iPhotoPrev" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div>'
+    +'<div style="font-size:11.5px;color:#8a919d">얼굴이 크게 나오는 사진은 피해주세요. 자동으로 압축되어 첨부됩니다.</div>'
     +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">문제점 및 개선 사항</label><textarea id="iProb" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></textarea>'
     +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:8px">기타 특이사항 (일정 변경 사유 등)</label><textarea id="iNote" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></textarea>'
     +'<div style="font-size:11.5px;color:#8a919d;margin-top:8px">제출자(점검자)는 로그인 계정으로 기록되며, 별도 서명 없이 전자제출로 갈음됩니다.</div>'
@@ -561,16 +571,57 @@ function openInspForm(id){
     +'<button class="kbtn" style="background:#0e7490;padding:10px 22px" onclick="submitInsp()">제출</button></div>'
     +'</div>';
   document.body.appendChild(div);
+  INSP_PHOTOS=[];
+}
+// 현장 사진 첨부 — 자동 압축(최대 900px·JPEG) 후 문서에 내장 저장 (최대 3장)
+let INSP_PHOTOS=[];
+function inspShrink(file){
+  return new Promise(function(res,rej){
+    const img=new Image();
+    img.onload=function(){
+      const sc=Math.min(1,900/Math.max(img.width,img.height));
+      const cv=document.createElement('canvas');
+      cv.width=Math.round(img.width*sc);cv.height=Math.round(img.height*sc);
+      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+      res(cv.toDataURL('image/jpeg',0.72));
+    };
+    img.onerror=rej;
+    img.src=URL.createObjectURL(file);
+  });
+}
+async function inspPhotoPick(inp){
+  const files=[...(inp.files||[])].slice(0,3-INSP_PHOTOS.length);
+  for(const f of files){
+    try{
+      const url=await inspShrink(f);
+      if(url.length>350000){alert('사진 용량이 너무 큽니다. 다른 사진을 선택해주세요.');continue}
+      INSP_PHOTOS.push(url);
+    }catch(e){console.warn('photo',e);}
+  }
+  inp.value='';
+  renderInspPhotos();
+}
+function renderInspPhotos(){
+  const box=document.getElementById('iPhotoPrev');if(!box)return;
+  box.innerHTML=INSP_PHOTOS.map((p,i)=>'<span style="position:relative;display:inline-block"><img src="'+p+'" style="height:64px;border-radius:8px;border:1px solid #dfe5ee">'
+    +'<button type="button" onclick="INSP_PHOTOS.splice('+i+',1);renderInspPhotos()" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:#C41E2F;color:#fff;font-size:11px;cursor:pointer;line-height:1">×</button></span>').join('');
 }
 async function submitInsp(){
   const s=INSP_S;if(!s)return;
   const date=document.getElementById('iDate').value;
   if(!date){alert('점검일자를 선택하세요.');return}
+  if(!INSP_PHOTOS.length){alert('현장 사진을 1장 이상 첨부해주세요.\n(수업 전경 등 — 점검 증빙에 필요합니다)');return}
+  if(!document.getElementById('iMetInst').checked){alert('배정 강사 현장 대면 확인에 체크해주세요.\n(강사를 만나지 못한 경우 특이사항에 사유를 적고 사무국에 알려주세요)');return}
   const checks={};
   for(let i=0;i<INSP_ITEMS.length;i++){const v=document.querySelector('input[name="ic'+i+'"]:checked');checks['c'+(i+1)]=v?v.value:'적정'}
+  const t1=document.getElementById('iT1').value,t2=document.getElementById('iT2').value;
   const data={appId:INSP_ID,school:s.school||'',region:appRegion(s)||s.region||'',city:s.city||'',
     type:appTypeOf(s),support:s.support||'강사파견+용품',assignedName:s.assignedName||'',teacher:s.teacher||'',
     inspector:(RMY&&RMY.name)||'',inspectorUid:RME.uid,date:date,
+    timeRange:(t1||t2)?(t1+'~'+t2):'',
+    metInstructor:document.getElementById('iMetInst').checked,
+    metTeacher:document.getElementById('iMetTeach').checked,
+    photos:INSP_PHOTOS.slice(0,3),
     attend:parseInt(document.getElementById('iAttend').value)||0,
     checks:checks,
     problems:document.getElementById('iProb').value.trim(),
