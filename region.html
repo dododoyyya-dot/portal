@@ -548,7 +548,9 @@ function openInspForm(id){
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:92vh;overflow:auto;padding:22px">'
     +'<b style="font-size:16px">📝 현장점검일지 제출 — '+esc(s.school||'')+'</b>'
     +'<div style="font-size:12px;color:#666;margin:4px 0 12px">'+esc(s.city||'')+' · '+esc(String(s.type||'').indexOf('방과후')>=0?'방과후·늘봄·돌봄':'학교체육 강습')+' · 강사 '+esc(s.assignedName||'')+' · 점검자 '+esc((RMY&&RMY.name)||'')+'</div>'
-    +'<label style="font-size:12.5px;font-weight:800">점검일자</label><input id="iDate" type="date" value="'+new Date().toISOString().slice(0,10)+'" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin:4px 0 10px">'
+    +'<label style="font-size:12.5px;font-weight:800">점검일자</label><input id="iDate" type="date" value="'+new Date().toISOString().slice(0,10)+'" onchange="inspDayCheck()" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin:4px 0 2px">'
+    +'<div id="iDayWarn" style="font-size:12px;font-weight:700;color:#b8860b;margin-bottom:4px"></div>'
+    +'<div id="iDupWarn" style="font-size:12px;font-weight:700;color:#b8860b;margin-bottom:6px"></div>'
     +'<div style="font-size:12.5px;font-weight:800;margin-bottom:2px">점검 내용</div>'+rows
     +'<div style="display:flex;gap:10px;margin-top:10px"><div style="flex:1"><label style="font-size:12.5px;font-weight:800">당일 참석 인원</label><input id="iAttend" type="number" min="0" placeholder="명" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></div>'
     +'<div style="flex:1"><label style="font-size:12.5px;font-weight:800">이동거리 편도(km)</label><input id="iDist" type="number" min="0" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></div>'
@@ -563,6 +565,7 @@ function openInspForm(id){
     +'<input id="iPhotos" type="file" accept="image/*" capture="environment" multiple onchange="inspPhotoPick(this)" style="font-size:13px;margin-top:4px">'
     +'<div id="iPhotoPrev" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div>'
     +'<div style="font-size:11.5px;color:#8a919d">얼굴이 크게 나오는 사진은 피해주세요. 자동으로 압축되어 첨부됩니다.</div>'
+    +'<input id="iNoPhoto" placeholder="사진 촬영이 불가한 경우 사유 입력 (예: 우천으로 수업 취소 확인)" style="width:100%;padding:8px 12px;border:1.5px solid #eee0c8;border-radius:9px;margin-top:6px;font-size:12.5px">'
     +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">문제점 및 개선 사항</label><textarea id="iProb" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></textarea>'
     +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:8px">기타 특이사항 (일정 변경 사유 등)</label><textarea id="iNote" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></textarea>'
     +'<div style="font-size:11.5px;color:#8a919d;margin-top:8px">제출자(점검자)는 로그인 계정으로 기록되며, 별도 서명 없이 전자제출로 갈음됩니다.</div>'
@@ -572,6 +575,32 @@ function openInspForm(id){
     +'</div>';
   document.body.appendChild(div);
   INSP_PHOTOS=[];
+  inspDayCheck();
+  inspDupCheck();
+}
+// 점검일 요일이 신청서의 수업 요일(희망 요일·시간)과 다르면 경고 (차단 아님 — 보강수업 등 가능)
+function inspDayCheck(){
+  const el=document.getElementById('iDayWarn');if(!el)return;
+  const s=INSP_S;const date=document.getElementById('iDate').value;
+  el.textContent='';
+  if(!date||!s)return;
+  const sched=String(s.d1||'')+' '+String(s.d2||'');
+  const m=sched.match(/[월화수목금토일]/g);
+  if(!m||!m.length)return;
+  const wd='일월화수목금토'[new Date(date+'T00:00:00').getDay()];
+  if(m.indexOf(wd)<0)el.textContent='⚠ 점검일('+wd+'요일)이 이 학교 수업 요일('+[...new Set(m)].join('·')+')과 다릅니다 — 보강·일정변경 점검이면 특이사항에 사유를 적어주세요.';
+}
+// 동일 학교 점검 중복 제출 안내 (차단 아님 — 재점검 가능)
+async function inspDupCheck(){
+  const el=document.getElementById('iDupWarn');if(!el||!INSP_ID)return;
+  try{
+    const reg=(RMY&&RMY.managedRegion)||'';if(!reg)return;
+    const snap=await DB.collection('inspections').where('region','==',reg).where('appId','==',INSP_ID).limit(10).get();
+    if(!snap.empty){
+      const dates=snap.docs.map(d=>d.data().date||'').filter(Boolean).sort().reverse();
+      el.textContent='ℹ 이 학교는 이미 점검일지가 '+snap.size+'건 제출되었습니다'+(dates[0]?' (최근 '+dates[0]+')':'')+' — 추가 점검이면 그대로 진행하세요.';
+    }
+  }catch(e){console.warn('dup',e);}
 }
 // 현장 사진 첨부 — 자동 압축(최대 900px·JPEG) 후 문서에 내장 저장 (최대 3장)
 let INSP_PHOTOS=[];
@@ -610,7 +639,8 @@ async function submitInsp(){
   const s=INSP_S;if(!s)return;
   const date=document.getElementById('iDate').value;
   if(!date){alert('점검일자를 선택하세요.');return}
-  if(!INSP_PHOTOS.length){alert('현장 사진을 1장 이상 첨부해주세요.\n(수업 전경 등 — 점검 증빙에 필요합니다)');return}
+  const noPhoto=document.getElementById('iNoPhoto').value.trim();
+  if(!INSP_PHOTOS.length&&!noPhoto){alert('현장 사진을 1장 이상 첨부해주세요.\n(촬영이 불가한 상황이면 사진 아래 「사진 불가 사유」를 입력하면 제출할 수 있습니다)');return}
   if(!document.getElementById('iMetInst').checked){alert('배정 강사 현장 대면 확인에 체크해주세요.\n(강사를 만나지 못한 경우 특이사항에 사유를 적고 사무국에 알려주세요)');return}
   const checks={};
   for(let i=0;i<INSP_ITEMS.length;i++){const v=document.querySelector('input[name="ic'+i+'"]:checked');checks['c'+(i+1)]=v?v.value:'적정'}
@@ -622,6 +652,7 @@ async function submitInsp(){
     metInstructor:document.getElementById('iMetInst').checked,
     metTeacher:document.getElementById('iMetTeach').checked,
     photos:INSP_PHOTOS.slice(0,3),
+    noPhotoReason:INSP_PHOTOS.length?'':noPhoto,
     attend:parseInt(document.getElementById('iAttend').value)||0,
     checks:checks,
     problems:document.getElementById('iProb').value.trim(),
