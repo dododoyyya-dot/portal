@@ -191,6 +191,21 @@
   </div>
 </div></section>
 
+<section id="clubBattles" style="display:none;background:linear-gradient(120deg,#1a0f13,#0f1013 55%,#132347);padding:64px 0"><div class="wrap">
+  <div class="sec-label" style="color:#e6b422">CLUB MATCH</div>
+  <h2 class="sec-title" style="color:#fff">⚔️ 클럽 교류전 <a href="club.html" style="font-size:13px;font-weight:800;color:#2dd4bf;text-decoration:none;margin-left:10px">우리 클럽도 도전하기 →</a></h2>
+  <p style="color:#9aa1ad;font-size:13.5px;margin:-6px 0 24px">전국 클럽들이 도전장을 주고받으며 전적을 쌓는 중! 승리하면 랭킹이 올라갑니다.</p>
+  <div id="cbUpWrap" style="display:none;margin-bottom:20px">
+    <div style="color:#e6b422;font-size:13px;font-weight:900;margin-bottom:10px">🔜 다가오는 매치</div>
+    <div id="cbUp" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px"></div>
+  </div>
+  <div id="cbDoneWrap" style="display:none">
+    <div style="color:#ff7a5c;font-size:13px;font-weight:900;margin-bottom:10px">🔥 최근 승부</div>
+    <div id="cbDone" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px"></div>
+  </div>
+  <div id="cbRank" style="margin-top:24px"></div>
+</div></section>
+
 <section id="news"><div class="wrap">
   <div class="sec-label">NOTICE</div>
   <h2 class="sec-title">소식 · 공고</h2>
@@ -343,6 +358,40 @@
         KFDF_MAP.render('lsMap',{mode:'display',counts:counts});
       }
     }).catch(()=>{});
+    // ── ⚔️ 클럽 교류전 (공개 열람) ──
+    firebase.firestore().collection('clubMatches').orderBy('createdAt','desc').limit(60).get().then(snap=>{
+      const all=snap.docs.map(d=>d.data());
+      const done=all.filter(m=>m.status==='완료').slice(0,6);
+      const up=all.filter(m=>m.status==='수락').slice(0,3);
+      if(!done.length&&!up.length)return;
+      document.getElementById('clubBattles').style.display='block';
+      function card(m,fin){
+        const cw=fin&&m.scoreCh>m.scoreTg, tw=fin&&m.scoreCh<m.scoreTg;
+        return '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:16px 18px;text-align:center">'
+          +'<div style="display:flex;align-items:center;justify-content:center;gap:10px;font-size:14.5px;color:#fff">'
+          +'<b style="flex:1;text-align:right'+(cw?';color:#e6b422':'')+'">'+(cw?'👑 ':'')+esc(m.chName)+'</b>'
+          +(fin?'<b style="font-size:20px;color:#ff7a5c">'+m.scoreCh+':'+m.scoreTg+'</b>':'<b style="color:#C41E2F;font-size:15px">VS</b>')
+          +'<b style="flex:1;text-align:left'+(tw?';color:#e6b422':'')+'">'+esc(m.tgName)+(tw?' 👑':'')+'</b></div>'
+          +'<div style="font-size:11.5px;color:#9aa1ad;margin-top:6px">'+esc(m.date||'')+(m.place?' · '+esc(m.place):'')+'</div></div>';
+      }
+      if(up.length){document.getElementById('cbUpWrap').style.display='block';document.getElementById('cbUp').innerHTML=up.map(m=>card(m,false)).join('');}
+      if(done.length){document.getElementById('cbDoneWrap').style.display='block';document.getElementById('cbDone').innerHTML=done.map(m=>card(m,true)).join('');}
+      // 랭킹 상위 3
+      const rec={};
+      all.filter(m=>m.status==='완료').forEach(m=>{
+        rec[m.chId]=rec[m.chId]||{n:m.chName,w:0,d:0,l:0};rec[m.tgId]=rec[m.tgId]||{n:m.tgName,w:0,d:0,l:0};
+        if(m.scoreCh>m.scoreTg){rec[m.chId].w++;rec[m.tgId].l++;}
+        else if(m.scoreCh<m.scoreTg){rec[m.tgId].w++;rec[m.chId].l++;}
+        else{rec[m.chId].d++;rec[m.tgId].d++;}
+      });
+      const rows=Object.values(rec).map(r=>Object.assign({pts:r.w*3+r.d},r)).sort((a,b)=>b.pts-a.pts||b.w-a.w).slice(0,3);
+      if(rows.length){
+        const medal=['🥇','🥈','🥉'];
+        document.getElementById('cbRank').innerHTML='<div style="color:#e6b422;font-size:13px;font-weight:900;margin-bottom:10px">🏆 전적 랭킹 TOP 3</div>'
+          +'<div style="display:flex;gap:12px;flex-wrap:wrap">'
+          +rows.map((r,i)=>'<div style="background:rgba(255,255,255,.08);border-radius:12px;padding:12px 20px;color:#fff;font-size:14px"><span style="font-size:18px">'+medal[i]+'</span> <b>'+esc(r.n)+'</b> <span style="color:#2dd4bf;font-weight:800">'+r.w+'승</span> <span style="color:#9aa1ad">'+r.d+'무</span> <span style="color:#ff7a5c">'+r.l+'패</span></div>').join('')+'</div>';
+      }
+    }).catch(e=>console.warn('matches',e));
   }
   function boot(n){
     if(window.firebase&&firebase.apps.length&&firebase.firestore){load();return}
