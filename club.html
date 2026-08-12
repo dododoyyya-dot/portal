@@ -196,8 +196,9 @@
     </div>
     <div id="clPane4" style="display:none">
     <h3 class="sub">⚔️ 클럽 교류전</h3>
-    <p style="font-size:13px;color:#6b7280;margin:0 0 16px;line-height:1.7">클럽장이 다른 클럽에 <b>도전장</b>을 보내고, 상대가 수락하면 교류전이 성사됩니다. 경기 후 결과를 기록하면 <b>클럽 전적(승·무·패)</b>이 쌓이고 랭킹에 반영됩니다.</p>
+    <p style="font-size:13px;color:#6b7280;margin:0 0 16px;line-height:1.7"><b>1:1 도전장</b> — 클럽장이 다른 클럽에 도전장을 보내고, 상대가 수락하면 교류전이 성사됩니다. 결과를 기록하면 <b>클럽 전적(승·무·패)</b>이 쌓이고 랭킹에 반영됩니다.<br><b>🏟️ 합동 교류전</b> — 여러 클럽·여러 인원이 한자리에 모이는 친선 리그입니다. 클럽장이 개최하면 다른 클럽들이 팀 단위로 참가 신청할 수 있어요.</p>
     <div id="cmMine"></div>
+    <div id="cmMeets" style="margin-top:26px"></div>
     <div id="cmRank" style="margin-top:22px"></div>
     <div id="cmRecent" style="margin-top:22px"></div>
     </div>
@@ -960,7 +961,130 @@ async function loadMatches(){
     CM_ALL=ms.docs.map(d=>({id:d.id,d:d.data()}));
     CM_MYOWN=own.docs.filter(d=>d.data().status==='승인');
     renderMatchMine();renderMatchRank();renderMatchRecent();
+    loadMeets();
   }catch(e){mineEl.innerHTML='<div class="bempty">불러오기 실패: '+kesc(e.message)+'</div>'}
+}
+// ── 🏟️ 합동 교류전 (여러 클럽·여러 인원 친선 리그 — 개최 → 팀 참가 → 결과 기록) ──
+let MEET_ALL=[];
+async function loadMeets(){
+  const el=document.getElementById('cmMeets');if(!el)return;
+  try{
+    const snap=await DB.collection('clubMeets').orderBy('createdAt','desc').limit(60).get();
+    MEET_ALL=snap.docs.map(d=>({id:d.id,d:d.data()}));
+    renderMeets();
+  }catch(e){el.innerHTML='<div class="bempty">합동 교류전 불러오기 실패: '+kesc(e.message)+'</div>'}
+}
+function meetTeamsTxt(m){
+  return (m.teams||[]).map(t=>kesc(t.clubName)+'('+(t.members||0)+'명)').join(' · ');
+}
+function renderMeets(){
+  const el=document.getElementById('cmMeets');
+  const myIds=CM_MYOWN.map(d=>d.id);
+  let html='<b style="font-size:14.5px">🏟️ 합동 교류전 <span style="font-size:11.5px;color:#8a919d;font-weight:700">— 여러 클럽이 함께하는 친선 리그</span></b>';
+  if(CM_MYOWN.length){
+    html+='<div style="background:#f3f6fb;border:1.5px solid #d3e0f2;border-radius:14px;padding:16px 18px;margin-top:10px">'
+      +'<b style="font-size:13.5px;color:#153A77">📣 합동 교류전 개최하기</b>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">'
+      +'<input id="mtTitle" class="cfield" placeholder="행사명 (예: 부산권 클럽 친선 리그)" style="max-width:240px;margin-top:0">'
+      +'<select id="mtHost" class="cfield" style="max-width:170px;margin-top:0">'+CM_MYOWN.map(d=>'<option value="'+d.id+'">'+kesc(d.data().name)+'</option>').join('')+'</select>'
+      +'<input id="mtDate" type="date" class="cfield" style="max-width:150px;margin-top:0">'
+      +'<input id="mtPlace" class="cfield" placeholder="장소" style="max-width:180px;margin-top:0">'
+      +'<input id="mtN" type="number" min="1" class="cfield" placeholder="우리 팀 인원" style="max-width:110px;margin-top:0">'
+      +'<button class="cbtn cbtn-main" onclick="createMeet()">🏟️ 개최</button></div>'
+      +'<div id="mtMsg" style="font-size:12.5px;font-weight:700;margin-top:6px"></div></div>';
+  }
+  const open=MEET_ALL.filter(m=>m.d.status==='모집중');
+  const done=MEET_ALL.filter(m=>m.d.status==='완료').slice(0,6);
+  if(open.length){
+    html+='<div style="margin-top:12px">'+open.map(m=>{
+      const isHost=myIds.indexOf(m.d.hostClubId)>=0;
+      const joined=(m.d.teams||[]).some(t=>myIds.indexOf(t.clubId)>=0);
+      const totN=(m.d.teams||[]).reduce((a,t)=>a+(t.members||0),0);
+      let act='';
+      if(isHost)act=' <button class="cbtn cbtn-soft" style="padding:4px 12px;font-size:12px" onclick="finishMeet(\''+m.id+'\')">결과 입력·완료</button> <button class="cbtn" style="padding:4px 12px;font-size:12px;background:#fff;color:#C41E2F;border:1px solid #f1c7cc" onclick="delMeet(\''+m.id+'\')">취소</button>';
+      else if(joined)act=' <span class="cpill2" style="background:#0f766e">✓ 참가 중</span>';
+      else if(CM_MYOWN.length)act=' <button class="cbtn cbtn-teal" style="padding:4px 12px;font-size:12px" onclick="joinMeet(\''+m.id+'\')">팀 참가 신청</button>';
+      return '<div class="clubcard" style="margin-top:8px"><div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">'
+        +'<span class="cpill2" style="background:#b8860b">모집중</span><b style="font-size:14px">'+kesc(m.d.title)+'</b>'
+        +'<span style="font-size:12px;color:#8a919d">'+kesc(m.d.date||'')+(m.d.place?' · '+kesc(m.d.place):'')+' · 주최 '+kesc(m.d.hostClubName)+'</span>'
+        +'<span style="flex:1"></span><b style="font-size:12.5px;color:#153A77">'+(m.d.teams||[]).length+'개 클럽 · '+totN+'명</b>'+act+'</div>'
+        +'<div class="cmeta2" style="margin-top:6px">참가: '+(meetTeamsTxt(m.d)||'아직 없음')+'</div></div>';
+    }).join('')+'</div>';
+  }
+  if(done.length){
+    html+='<div style="margin-top:14px"><b style="font-size:13px">🏁 지난 합동 교류전</b>'
+      +done.map(m=>'<div class="clubcard" style="margin-top:8px"><div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">'
+        +'<span class="cpill2" style="background:#0f766e">완료</span><b>'+kesc(m.d.title)+'</b>'
+        +'<span style="font-size:12px;color:#8a919d">'+kesc(m.d.date||'')+' · '+(m.d.teams||[]).length+'개 클럽 '+(m.d.teams||[]).reduce((a,t)=>a+(t.members||0),0)+'명</span></div>'
+        +(m.d.result?'<div class="cmeta2" style="margin-top:5px;font-weight:700;color:#8a5a00">🏆 '+kesc(m.d.result)+'</div>':'')
+        +'<div class="cmeta2" style="margin-top:4px">'+meetTeamsTxt(m.d)+'</div></div>').join('')+'</div>';
+  }
+  if(!open.length&&!done.length&&!CM_MYOWN.length)html+='<div class="bempty" style="margin-top:8px">아직 열린 합동 교류전이 없습니다.</div>';
+  el.innerHTML=html;
+}
+async function createMeet(){
+  const msg=document.getElementById('mtMsg');
+  const title=document.getElementById('mtTitle').value.trim();
+  const host=document.getElementById('mtHost').value;
+  const date=document.getElementById('mtDate').value;
+  const n=parseInt(document.getElementById('mtN').value)||0;
+  if(!title||!host||!date){msg.textContent='행사명·주최 클럽·일자를 입력하세요';msg.style.color='#C41E2F';return}
+  if(!n){msg.textContent='우리 팀 참가 인원을 입력하세요';msg.style.color='#C41E2F';return}
+  const hd=CM_MYOWN.find(d=>d.id===host).data();
+  try{
+    await DB.collection('clubMeets').add({
+      title:title,date:date,place:document.getElementById('mtPlace').value.trim(),
+      hostClubId:host,hostClubName:hd.name||'',hostUid:KME.uid,status:'모집중',
+      teams:[{clubId:host,clubName:hd.name||'',uid:KME.uid,members:n,at:new Date().toISOString()}],
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    msg.textContent='🏟️ 개최되었습니다! 다른 클럽들이 참가 신청할 수 있어요.';msg.style.color='#0f766e';
+    loadMeets();
+  }catch(e){msg.textContent='개최 실패: '+e.message;msg.style.color='#C41E2F'}
+}
+async function joinMeet(id){
+  const m=MEET_ALL.find(x=>x.id===id);if(!m)return;
+  const myIds=CM_MYOWN.map(d=>d.id);
+  let clubId=myIds[0];
+  if(myIds.length>1){
+    const names=CM_MYOWN.map((d,i)=>(i+1)+'. '+d.data().name).join('\n');
+    const pick=prompt('참가할 클럽 번호를 선택하세요:\n'+names,'1');
+    if(pick===null)return;
+    const idx=parseInt(pick,10)-1;
+    if(!(idx>=0&&idx<myIds.length)){alert('잘못된 번호입니다');return}
+    clubId=myIds[idx];
+  }
+  const n=parseInt(prompt('참가 인원 수를 입력하세요 (선수·학생 포함)','')||'',10);
+  if(!n||n<1){alert('인원 수를 숫자로 입력해주세요');return}
+  const cd=CM_MYOWN.find(d=>d.id===clubId).data();
+  if(!confirm('['+m.d.title+']에 ['+cd.name+'] '+n+'명으로 참가 신청할까요?'))return;
+  try{
+    await DB.runTransaction(async tx=>{
+      const ref=DB.collection('clubMeets').doc(id);
+      const doc=await tx.get(ref);const d=doc.data();
+      if(d.status!=='모집중')throw new Error('모집이 마감된 행사입니다');
+      if((d.teams||[]).some(t=>t.clubId===clubId))throw new Error('이미 참가 신청한 클럽입니다');
+      const teams=(d.teams||[]).slice();
+      teams.push({clubId:clubId,clubName:cd.name||'',uid:KME.uid,members:n,at:new Date().toISOString()});
+      tx.update(ref,{teams:teams});
+    });
+    KFDF.notify(m.d.hostUid,'🏟️ ['+cd.name+'] 클럽이 ['+m.d.title+']에 '+n+'명 참가 신청!','club.html');
+    alert('✓ 참가 신청 완료!');
+    loadMeets();
+  }catch(e){alert('신청 실패: '+e.message)}
+}
+async function finishMeet(id){
+  const m=MEET_ALL.find(x=>x.id===id);if(!m)return;
+  const result=prompt('결과를 입력하세요 (예: 1위 부산유나이티드 · 2위 사하클럽 · 3위 신남FC)\n비워두면 결과 없이 완료 처리됩니다.','');
+  if(result===null)return;
+  try{
+    await DB.collection('clubMeets').doc(id).update({status:'완료',result:(result||'').trim(),doneAt:firebase.firestore.FieldValue.serverTimestamp()});
+    for(const t of (m.d.teams||[]))if(t.uid!==KME.uid)KFDF.notify(t.uid,'🏁 ['+m.d.title+'] 합동 교류전이 완료 처리되었습니다','club.html');
+    loadMeets();
+  }catch(e){alert('완료 처리 실패: '+e.message)}
+}
+async function delMeet(id){
+  if(!confirm('이 합동 교류전을 취소(삭제)할까요? 참가 신청도 함께 삭제됩니다.'))return;
+  try{await DB.collection('clubMeets').doc(id).delete();loadMeets();}catch(e){alert('취소 실패: '+e.message)}
 }
 function cmStatusPill(st){
   const col={'신청':'#b8860b','수락':'#153A77','완료':'#0f766e','거절':'#8a919d','취소':'#8a919d'}[st]||'#8a919d';
