@@ -3222,13 +3222,40 @@ async function withdrawApprove(uid,name){
   if(typed===null)return;
   if(typed.trim()!==name){alert('이름이 일치하지 않아 취소되었습니다.');return}
   try{
+    const ud=await DB.collection('users').doc(uid).get();
+    const v=ud.data()||{};
+    const cleaned=[];
+    // ① 전화번호 인덱스 즉시 해제 — 남아 있으면 같은 번호로 재가입이 차단됨
+    const ph=String(v.phone||'').replace(/[^0-9]/g,'');
+    if(ph){await DB.collection('phoneIndex').doc(ph).delete().catch(()=>{});cleaned.push('전화번호 인덱스 해제(재가입 가능)');}
+    // ② 소속 클럽 명단에서 제거 (클럽장인 클럽은 사무국 확인 필요 — 자동 제거하지 않음)
+    let ownerClubs=[];
+    try{
+      const cs=await DB.collection('clubs').get();
+      for(const c of cs.docs){
+        const cd=c.data();
+        if(cd.ownerUid===uid){ownerClubs.push(cd.name||'');continue}
+        if((cd.memberUids||[]).indexOf(uid)>=0||(cd.pendingUids||[]).indexOf(uid)>=0){
+          await DB.collection('clubs').doc(c.id).update({
+            members:(cd.members||[]).filter(m=>m.uid!==uid),
+            memberUids:(cd.memberUids||[]).filter(x=>x!==uid),
+            pendingJoins:(cd.pendingJoins||[]).filter(m=>m.uid!==uid),
+            pendingUids:(cd.pendingUids||[]).filter(x=>x!==uid),
+            tempUids:(cd.tempUids||[]).filter(x=>x!==uid)}).catch(()=>{});
+          cleaned.push('클럽 [' +(cd.name||'')+ '] 명단에서 제외');
+        }
+      }
+    }catch(e){}
     await DB.collection('users').doc(uid).update({
       deleted:true,deletedAt:firebase.firestore.FieldValue.serverTimestamp(),
       delBy:(firebase.auth().currentUser||{}).email||'',
       withdrawStatus:'탈퇴처리',withdrawDoneAt:firebase.firestore.FieldValue.serverTimestamp()});
     await updateLeaderboard();
     document.getElementById('wdModal').remove();
-    alert('✓ ['+name+'] 탈퇴 처리 완료 (휴지통 이동 · 7일 내 복구 가능)\n※ 로그인 계정은 Firebase 콘솔 > Authentication에서 삭제해주세요.');
+    alert('✓ ['+name+'] 탈퇴 처리 완료 (휴지통 이동 · 7일 내 복구 가능)\n'
+      +(cleaned.length?'\n[자동 정리]\n· '+cleaned.join('\n· ')+'\n':'')
+      +(ownerClubs.length?'\n⚠ 이 회원이 클럽장인 클럽이 있습니다: '+ownerClubs.join(', ')+'\n→ 클럽 회장 인수인계 또는 클럽 삭제를 먼저 처리해주세요.\n':'')
+      +'\n⚠ 반드시 남은 절차: Firebase 콘솔 > Authentication에서 해당 이메일 계정을 삭제해야 합니다.\n(삭제하지 않으면 같은 이메일·전화번호로 재가입이 불가합니다)');
     loadDash();loadUsers();
   }catch(e){alert('실패: '+e.message)}
 }
