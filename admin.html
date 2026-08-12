@@ -715,7 +715,7 @@ function renderInsps(){
   html+='<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th>점검일</th><th>권역</th><th>학교</th><th>유형</th><th>강사</th><th>점검자</th><th>결과</th><th>대면</th><th>사진</th><th>참석</th><th>이동(km)</th><th>수당</th><th>문제점·특이사항</th></tr></thead><tbody>';
   list.forEach((v,vi)=>{
     const met=(v.metInstructor?'강사✓':'<span style="color:#C41E2F">강사×</span>')+' '+(v.metTeacher?'교사✓':'교사–');
-    const ph=(v.photos&&v.photos.length)?'<a href="#" onclick="inspPhotoView('+vi+');return false" style="font-weight:800;color:#153A77">📷 '+v.photos.length+'장</a>':'<span style="color:#C41E2F">없음</span>';
+    const ph=(v.photos&&v.photos.length)?'<a href="#" onclick="inspPhotoView('+vi+');return false" style="font-weight:800;color:#153A77">📷 '+v.photos.length+'장</a>':(v.noPhotoReason?'<span style="color:#b8860b;font-size:11.5px" title="'+esc(v.noPhotoReason)+'">사유: '+esc(v.noPhotoReason.slice(0,10))+'…</span>':'<span style="color:#C41E2F">없음</span>');
     html+='<tr><td>'+esc(v.date||'')+(v.timeRange?'<br><span style="font-size:11px;color:#8a919d">'+esc(v.timeRange)+'</span>':'')+'</td><td>'+esc(v.region||'')+'</td><td class="nm">'+esc(v.school||'')+'</td>'
       +'<td>'+(String(v.type||'').indexOf('방과후')>=0?'방과후':'학교체육')+'</td><td>'+esc(v.assignedName||'')+'</td><td>'+esc(v.inspector||'')+'</td>'
       +'<td>'+badge(v)+'</td><td style="font-size:11.5px;white-space:nowrap">'+met+'</td><td>'+ph+'</td><td>'+(v.attend||'')+'</td><td>'+(v.distanceKm||'')+'</td><td>'+esc(v.band||'')+'</td>'
@@ -738,11 +738,11 @@ function inspCSV(){
   const reg=sel?sel.value:'전체';
   const list=INSPS.filter(v=>reg==='전체'||v.region===reg);
   if(!list.length){alert('다운로드할 제출분이 없습니다.');return}
-  const rows=[['점검일','점검시간','권역','시군구','학교','유형','지원방식','배정강사','담당교사','점검자','강사대면','교사대면','사진(장)','시간준수','안전지도','수준적합','장소적합','기금인지안내','참석인원','이동거리(km)','수당구간','문제점·개선사항','특이사항','제출일시']];
+  const rows=[['점검일','점검시간','권역','시군구','학교','유형','지원방식','배정강사','담당교사','점검자','강사대면','교사대면','사진(장)','사진불가사유','시간준수','안전지도','수준적합','장소적합','기금인지안내','참석인원','이동거리(km)','수당구간','문제점·개선사항','특이사항','제출일시']];
   list.forEach(v=>{
     const c=v.checks||{};
     rows.push([v.date||'',v.timeRange||'',v.region||'',v.city||'',v.school||'',v.type||'',v.support||'',v.assignedName||'',v.teacher||'',v.inspector||'',
-      v.metInstructor?'O':'X',v.metTeacher?'O':'X',(v.photos||[]).length,
+      v.metInstructor?'O':'X',v.metTeacher?'O':'X',(v.photos||[]).length,v.noPhotoReason||'',
       c.c1||'',c.c2||'',c.c3||'',c.c4||'',c.c5||'',v.attend||0,v.distanceKm||0,v.band||'',v.problems||'',v.notes||'',
       v.createdAt&&v.createdAt.seconds?new Date(v.createdAt.seconds*1000).toISOString().slice(0,16).replace('T',' '):'']);
   });
