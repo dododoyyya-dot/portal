@@ -200,6 +200,66 @@ AUTH.onAuthStateChanged(async u=>{
   await loadSlots();
   checkFamReq();
 });
+// ── 👥 신청 현황 공개 (일반회원: 마스킹 명단 / 사무국·임원: 세부정보) ──
+function isCompStaff(){
+  return !!(CMY&&(CMY.owner||['admin','regionAdmin','sidoOfficer','gugunOfficer'].indexOf(CMY.role)>=0));
+}
+function mname(n){
+  n=String(n||'');
+  if(n.length<2)return n;
+  if(n.length===2)return n[0]+'*';
+  return n[0]+'*'.repeat(n.length-2)+n[n.length-1];
+}
+// 유효 신청 목록 (키별 최신 항목)
+function compClaimList(s){
+  const keys=[...new Set((s.claimed||[]).map(ckey))].filter(k=>activeOfKey(s,k));
+  return keys.map(k=>{
+    const arr=(s.claimed||[]).filter(c=>ckey(c)===k);
+    return arr[arr.length-1];
+  }).sort((a,b)=>String(a.at||'').localeCompare(String(b.at||'')));
+}
+function viewRoster(id){
+  const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
+  const s=doc.data();
+  const list=compClaimList(s);
+  const staff=isCompStaff();
+  const entry=s.role==='참가';
+  const confirmed=s.confirmed||[];
+  const old=document.getElementById('rosterModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='rosterModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+  const th='style="border:1px solid #dfe5ee;padding:7px 9px;background:#f6f8fb;font-size:12.5px;white-space:nowrap"';
+  const td='style="border:1px solid #dfe5ee;padding:7px 9px;font-size:12.5px"';
+  // 임무·부문별 집계
+  const cnt={};
+  list.forEach(c=>{const p=(c.prefs||[])[0]||'미지정';cnt[p]=(cnt[p]||0)+1});
+  const sumTxt=Object.keys(cnt).map(k=>cesc(k)+' '+cnt[k]+'명').join(' · ');
+  let rows;
+  if(!list.length)rows='<tr><td '+td+' colspan="9" style="text-align:center;color:#8a919d">아직 신청자가 없습니다</td></tr>';
+  else if(staff){
+    rows=list.map((c,i)=>'<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b></td>'
+      +(entry?'<td '+td+'>'+cesc(c.birth||'-')+'</td><td '+td+'>'+cesc(c.gender||'-')+'</td><td '+td+'>'+cesc(c.school||c.club||'-')+'</td>':'')
+      +'<td '+td+'>'+cesc((c.prefs||[]).map((p,j)=>(j+1)+'지망 '+p).join(' · ')||'-')+'</td>'
+      +'<td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
+      +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td></tr>').join('');
+  }else{
+    rows=list.map((c,i)=>'<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(mname(c.name))+'</b></td>'
+      +'<td '+td+'>'+cesc((c.prefs||[])[0]||'-')+'</td>'
+      +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td></tr>').join('');
+  }
+  const head=staff
+    ?'<tr><th '+th+'>연번</th><th '+th+'>성명</th>'+(entry?'<th '+th+'>생년월일</th><th '+th+'>성별</th><th '+th+'>학교·클럽</th>':'')+'<th '+th+'>희망 '+(entry?'부문':'임무')+'</th><th '+th+'>신청일</th><th '+th+'>상태</th></tr>'
+    :'<tr><th '+th+'>연번</th><th '+th+'>성명</th><th '+th+'>'+(entry?'부문':'임무')+'</th><th '+th+'>상태</th></tr>';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:'+(staff?'720px':'480px')+';width:100%;max-height:90vh;overflow:auto;padding:24px">'
+    +'<b style="font-size:16px">👥 신청 현황 — '+cesc(s.title)+'</b>'
+    +'<div style="font-size:12.5px;color:#666;margin:4px 0 4px">'+cesc(s.date||'')+' · '+cesc(s.role)+(entry?' (선수)':'요원')+' · 신청 '+list.length+'/'+s.quota+'명'+(sumTxt?' — '+sumTxt:'')+'</div>'
+    +(staff?'<div style="font-size:12px;color:#0f766e;font-weight:700;margin-bottom:8px">🔓 권한자 보기 — 세부정보가 표시됩니다. <a href="admin.html" style="color:#153A77;font-weight:800">관리자 페이지에서 수정 →</a></div>'
+           :'<div style="font-size:12px;color:#8a919d;margin-bottom:8px">개인정보 보호를 위해 성명은 일부 가려서 표시됩니다.</div>')
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">'+head+rows+'</table></div>'
+    +'<div style="display:flex;justify-content:flex-end;margin-top:14px">'
+    +'<button class="cbtn cbtn-ghost" onclick="document.getElementById(\'rosterModal\').remove()">닫기</button></div></div>';
+  document.body.appendChild(div);
+}
 // ── 미성년 참가: 자녀 요청 → 보호자 승인(신청서 작성·서명) ──
 let FAMREQ=null;
 async function checkFamReq(){
@@ -276,7 +336,7 @@ async function loadSlots(){
               return '<span class="ctag'+(c>=dv.cap?'" style="color:#C41E2F;background:#fdf0f1':'')+'">'+cesc(dv.name)+' '+c+'/'+dv.cap+(c>=dv.cap?' 마감':'')+'</span>';}
             return '<span class="ctag">'+cesc(dv.name)+'</span>';
           }).join('')+'</div>'
-        +'<div class="cact">'+action+'</div></div>';
+        +'<div class="cact">'+action+'<button class="cbtn cbtn-ghost" onclick="viewRoster(\''+d.id+'\')">👥 신청 현황</button></div></div>';
     }).join('');
   }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+cesc(e.message)+'</div>'}
 }
