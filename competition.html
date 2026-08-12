@@ -365,8 +365,62 @@ function consentBlockHtml(s,defHtml){
   if(imgs.length)return imgs.map((x,i)=>'<div style="position:relative;margin-bottom:8px"><img src="'+x+'" alt="개인정보 동의서 '+(i+1)+'페이지" style="width:100%;display:block;border:1px solid #e2e7f0;border-radius:8px">'+consentPreviewSpans(s,i)+'</div>').join('')
     +(hasOvl?'<div style="font-size:11.5px;color:#1F4E9C;font-weight:700;margin-bottom:8px">💡 파란 표시 위치에 내 정보와 서명이 자동으로 기입되어 출력됩니다 (수기 작성 불필요)</div>':'')
     +(imgs.length>1?'<div style="font-size:11.5px;color:#8a919d;font-weight:700;margin-bottom:8px">총 '+imgs.length+'페이지 — 전체 내용을 확인 후 동의해주세요</div>':'');
-  if(s.consentText)return '<div style="font-size:12px;color:#4b5563;line-height:1.8;margin-bottom:10px;white-space:pre-wrap">'+cesc(s.consentText)+'</div>';
+  if(s.consentText)return consentPaperHtml(s);
   return defHtml;
+}
+// ── 종이 서식형 동의서: 인적사항 자동 기입 + 동의 항목별 예/아니오 직접 체크 (종이 작성과 동일) ──
+let CONSENT_GROUPS=0;
+function consentPaperHtml(s){
+  CONSENT_GROUPS=0;
+  const entry=s.role==='참가';
+  const lines=String(s.consentText||'').split('\n');
+  const th='style="border:1px solid #999;background:#f4f4f4;padding:6px 8px;font-size:12px;width:96px;text-align:center;white-space:nowrap"';
+  const td='style="border:1px solid #999;padding:6px 9px;font-size:12.5px"';
+  let title='';
+  let body='';
+  for(let i=0;i<lines.length;i++){
+    const ln=lines[i];
+    const t=ln.trim();
+    if(!title&&t){title=t;continue}
+    const m=t.match(/^(.{2,40}동의)\s*[☑□]\s*예\s*[☑□]?\s*아니오$/);
+    if(m){
+      const g=CONSENT_GROUPS++;
+      body+='<div style="display:flex;gap:18px;align-items:center;justify-content:center;margin:8px 0;padding:9px 12px;background:#fbfbf6;border:1.2px solid #d8d2bd;border-radius:8px;font-size:13px;font-weight:800;flex-wrap:wrap">'
+        +'<span>'+cesc(m[1])+'</span>'
+        +'<label style="display:flex;gap:5px;align-items:center;cursor:pointer;color:#0f766e"><input type="radio" name="cAns'+g+'" value="예" style="width:auto"> 예</label>'
+        +'<label style="display:flex;gap:5px;align-items:center;cursor:pointer;color:#C41E2F"><input type="radio" name="cAns'+g+'" value="아니오" style="width:auto"> 아니오</label></div>';
+    }else{
+      body+='<div style="min-height:9px;font-size:12.3px;line-height:1.85;color:#333;white-space:pre-wrap">'+cesc(ln)+'</div>';
+    }
+  }
+  return '<div style="border:1.6px solid #555;border-radius:4px;padding:16px 18px;background:#fffdf8">'
+    +'<div style="text-align:center;font-size:15px;font-weight:900;letter-spacing:1px;border-bottom:1.4px solid #777;padding-bottom:9px;margin-bottom:11px">'+cesc(title||'개인정보 수집·이용·제공 동의서')+'</div>'
+    +'<table style="width:100%;border-collapse:collapse;margin-bottom:11px">'
+    +'<tr><th '+th+'>성 명</th><td '+td+'>'+cesc(CMY.name||'')+'</td><th '+th+'>주민등록번호</th><td '+td+'>'+(entry?'해당 없음':(RRN_OK?'등록 완료 — 제출 시 자동 기입':'<span style="color:#C41E2F;font-weight:700">미등록 — 마이페이지에서 등록 필요</span>'))+'</td></tr>'
+    +'<tr><th '+th+'>은 행 명</th><td '+td+'>'+(CMY.bank?cesc(CMY.bank):'<span style="color:#C41E2F">미입력</span>')+'</td><th '+th+'>계좌번호</th><td '+td+'>'+(CMY.accountNum?cesc(CMY.accountNum):'<span style="color:#C41E2F">미입력</span>')+'</td></tr>'
+    +'</table>'
+    +body
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;padding-top:10px;border-top:1.2px dashed #aaa;font-size:13px;font-weight:800;flex-wrap:wrap">'
+    +'<span>'+new Date().toISOString().slice(0,10).replace(/-/g,'. ')+'.</span>'
+    +'<span>성명: '+cesc(CMY.name||'')+' <span style="color:#8a919d;font-weight:600">(아래 서명이 본 동의서에 함께 날인됩니다)</span></span></div>'
+    +'</div>';
+}
+// 동의 항목 응답 확인 — 종이 서식처럼 직접 체크해야 제출 가능
+function consentGate(){
+  for(let g=0;g<CONSENT_GROUPS;g++){
+    const v=document.querySelector('input[name="cAns'+g+'"]:checked');
+    if(!v){alert('동의서의 [예 / 아니오] 항목에 모두 직접 체크해주세요.');return false}
+    if(v.value==='아니오'){alert('「아니오」를 선택하시면 수당 지급·신청 처리가 불가하여 제출할 수 없습니다.\n동의하지 않으시면 창을 닫아주세요.');return false}
+  }
+  return true;
+}
+function consentAnswers(){
+  const out={};
+  for(let g=0;g<CONSENT_GROUPS;g++){
+    const v=document.querySelector('input[name="cAns'+g+'"]:checked');
+    out['q'+(g+1)]=v?v.value:'';
+  }
+  return out;
 }
 async function openApply(id){
   const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
@@ -548,6 +602,7 @@ async function submitEntry(){
     alert('🎓 '+p.name+' 님은 만 19세 이상으로 성인 전환 대상입니다.\n본인 명의 계정으로 가입한 뒤 직접 신청해주세요.');return;
   }
   if(!APPLY_SEL.length){alert('참가 부문을 선택해주세요.');return}
+  if(!consentGate())return;
   if(!document.getElementById('cConsent').checked){alert('개인정보 수집·이용 동의가 필요합니다.');return}
   if(!SIG_DRAWN){alert((p.kid?'보호자(법정대리인)':'본인')+' 서명이 필요합니다. 서명란에 서명해주세요.');return}
   const doc0=CSLOTS.find(d=>d.id===APPLY_ID);
@@ -589,7 +644,7 @@ async function submitEntry(){
     const now=new Date().toISOString();
     const sfx=APPLY_PID.split('#')[1]||'self';
     const c=Object.assign({},CMY.contracts||{});
-    c['compapply_'+APPLY_ID+'_'+sfx]={title:title,doc:'대회 참가 신청서',who:p.name,agreedAt:now,sign:sign,prefs:APPLY_SEL.slice(),kid:!!p.kid};
+    c['compapply_'+APPLY_ID+'_'+sfx]={title:title,doc:'대회 참가 신청서',who:p.name,agreedAt:now,sign:sign,prefs:APPLY_SEL.slice(),kid:!!p.kid,answers:consentAnswers()};
     c['compconsent_'+APPLY_ID+'_'+sfx]={title:title,doc:'개인정보 수집·이용 동의서(참가)',who:p.name,agreedAt:now,sign:sign};
     // 대회 참가 신청 → 선수(athlete) 자동 등록
     await DB.collection('users').doc(CME.uid).update({contracts:c,'caps.athlete':true}).catch(e=>console.warn('sign save',e));
@@ -610,6 +665,7 @@ async function submitEntry(){
 }
 async function submitClaim(){
   if(!APPLY_SEL.length){alert('희망 임무를 1개 이상 선택해주세요.');return}
+  if(!consentGate())return;
   if(!document.getElementById('cConsent').checked){alert('개인정보 수집·이용 동의가 필요합니다.');return}
   if(!SIG_DRAWN){alert('본인 서명이 필요합니다. 서명란에 서명해주세요.');return}
   const doc0=CSLOTS.find(d=>d.id===APPLY_ID);
@@ -630,7 +686,7 @@ async function submitClaim(){
     const now=new Date().toISOString();
     const c=Object.assign({},CMY.contracts||{});
     c['compapply_'+APPLY_ID]={title:title,doc:'위촉 신청서',agreedAt:now,sign:sign,prefs:APPLY_SEL.slice()};
-    c['compconsent_'+APPLY_ID]={title:title,doc:'개인정보 수집·이용 및 제3자 제공 동의서',agreedAt:now,sign:sign};
+    c['compconsent_'+APPLY_ID]={title:title,doc:'개인정보 수집·이용 및 제3자 제공 동의서',agreedAt:now,sign:sign,answers:consentAnswers()};
     await DB.collection('users').doc(CME.uid).update({contracts:c}).catch(e=>console.warn('sign save',e));
     CMY.contracts=c;
     document.getElementById('cApplyModal').remove();
