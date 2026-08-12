@@ -785,12 +785,15 @@ function dutyTag(v){
 // ══ 🛡 통합 권한 패널 — 등급·관할·부가권한을 한 화면에서 관리 ══
 function roleBadge(v){
   const pill=(t,bg)=>'<span style="font-size:11px;font-weight:900;color:#fff;background:'+bg+';padding:4px 10px;border-radius:999px;align-self:center">'+t+'</span>';
-  if(v.owner)return pill('👑 오너','#111');
-  if(v.role==='admin')return pill('👑 중앙관리자','#C41E2F');
-  if(v.role==='sidoOfficer')return pill('🏛 '+esc(v.sido||'')+' 시도임원','#0f766e');
-  if(v.role==='gugunOfficer')return pill('🏛 '+esc(v.sido||'')+' '+esc(v.gugun||'')+' 구군임원','#0e7490');
-  if(v.role==='regionAdmin')return pill('🛡 '+esc(v.managedRegion||'')+dutyTag(v)+' 권역장'+(v.regionAdminExpiresAt?' ~'+fmtDate(v.regionAdminExpiresAt):''),'#7c3aed');
-  return '';
+  // 겸직 지원: 주 등급 + 권역장(managedRegion) 배지를 함께 표시
+  const out=[];
+  if(v.owner)out.push(pill('👑 오너','#111'));
+  else if(v.role==='admin')out.push(pill('👑 중앙관리자','#C41E2F'));
+  else if(v.role==='sidoOfficer')out.push(pill('🏛 '+esc(v.sido||'')+' 시도임원','#0f766e'));
+  else if(v.role==='gugunOfficer')out.push(pill('🏛 '+esc(v.sido||'')+' '+esc(v.gugun||'')+' 구군임원','#0e7490'));
+  if(v.role==='regionAdmin'||v.managedRegion)
+    out.push(pill('🛡 '+esc(v.managedRegion||'')+dutyTag(v)+' 권역장'+(v.role!=='regionAdmin'?'(겸직)':'')+(v.regionAdminExpiresAt?' ~'+fmtDate(v.regionAdminExpiresAt):''),'#7c3aed'));
+  return out.join(' ');
 }
 const PM_REGIONS=['서울·경기','강원','충청','전라','경상','제주'];
 const PM_SIDOS=['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
@@ -843,6 +846,7 @@ function permModal(uid){
         +(v.owner?'<option value="owner" selected>오너</option>':'')+'</select>')
       +'<div id="pmSidoRow" style="display:none">'+row('관할 시도','<select id="pmSido" '+inp+' onchange="pmFillGugun()"><option value="">선택</option>'+PM_SIDOS.map(s=>'<option'+(v.sido===s?' selected':'')+'>'+s+'</option>').join('')+'</select>')+'</div>'
       +'<div id="pmGugunRow" style="display:none">'+row('관할 시군구','<select id="pmGugun" '+inp+'><option value="">시도를 먼저 선택</option></select>')+'</div>'
+      +'<label id="pmDualRow" style="display:none;gap:8px;align-items:center;font-size:13px;font-weight:800;color:#7c3aed;margin-top:10px;padding:9px 12px;background:#f6f3ff;border:1.5px solid #ddd0f7;border-radius:9px"><input type="checkbox" id="pmDual" style="width:auto"'+(v.role!=='regionAdmin'&&v.managedRegion?' checked':'')+' onchange="pmRoleUI()"> 🛡 <b>권역장 겸직</b> — 위 등급을 유지하면서 사업 권역장 업무도 함께 수행</label>'
       +'<div id="pmRegionRows" style="display:none">'
         +row('관할 권역','<select id="pmRegion" '+inp+'>'+PM_REGIONS.map(r=>'<option'+(v.managedRegion===r?' selected':'')+'>'+r+'</option>').join('')+'</select>')
         +row('만료일','<input id="pmExpire" type="date" '+inp+' value="'+exStr+'"> <span style="font-size:11.5px;color:#8a919d">지나면 자동 회수 · 빈칸=상시</span>')
@@ -872,7 +876,12 @@ function pmRoleUI(){
   const r=document.getElementById('pmRole').value;
   document.getElementById('pmSidoRow').style.display=(r==='sidoOfficer'||r==='gugunOfficer')?'block':'none';
   document.getElementById('pmGugunRow').style.display=(r==='gugunOfficer')?'block':'none';
-  document.getElementById('pmRegionRows').style.display=(r==='regionAdmin')?'block':'none';
+  // 겸직 체크박스: 권역장 등급이 아닐 때만 노출 (권역장 등급이면 당연히 권역 설정 표시)
+  const dualRow=document.getElementById('pmDualRow');
+  const dual=document.getElementById('pmDual');
+  const canDual=(r==='member'||r==='sidoOfficer'||r==='gugunOfficer'||r==='admin');
+  dualRow.style.display=canDual?'flex':'none';
+  document.getElementById('pmRegionRows').style.display=(r==='regionAdmin'||(canDual&&dual.checked))?'block':'none';
 }
 async function savePerm(uid){
   const doc=USERS.find(d=>d.id===uid);if(!doc)return;
@@ -890,25 +899,30 @@ async function savePerm(uid){
         upd.sido=sido;
         if(r==='gugunOfficer'){const g=document.getElementById('pmGugun').value.trim();if(!g){alert('관할 시군구를 입력해주세요.');return}upd.gugun=g;}
         else upd.gugun=del();
-        upd.managedRegion=del();upd.duties=del();upd.managedSido=del();upd.regionAdminExpiresAt=del();
         upd.status='approved';
-      }else if(r==='regionAdmin'){
-        const duties=[];
-        if(document.getElementById('pmDutyAssign').checked)duties.push('assign');
-        if(document.getElementById('pmDutyLic').checked)duties.push('license');
-        if(!duties.length){alert('강습 배정·자격증 업무 중 최소 하나는 위임해야 합니다.');return}
-        upd.managedRegion=document.getElementById('pmRegion').value;upd.duties=duties;
-        const picked=[...document.querySelectorAll('.pmFed:checked')].map(x=>x.value);
-        upd.managedSido=(duties.indexOf('license')>=0&&picked.length)?[...new Set(picked.flatMap(f=>PM_EXP[f]))]:del();
-        const ex=document.getElementById('pmExpire').value;
-        upd.regionAdminExpiresAt=ex?firebase.firestore.Timestamp.fromDate(new Date(ex+'T23:59:59+09:00')):del();
-        upd.sido=del();upd.gugun=del();upd.status='approved';
       }else if(r==='admin'){
         upd.status='approved';
-        upd.managedRegion=del();upd.duties=del();upd.regionAdminExpiresAt=del();upd.sido=del();upd.gugun=del();
-      }else{ // member
-        upd.managedRegion=del();upd.duties=del();upd.managedSido=del();upd.regionAdminExpiresAt=del();upd.sido=del();upd.gugun=del();
+        upd.sido=del();upd.gugun=del();
+      }else if(r!=='regionAdmin'){ // member
+        upd.sido=del();upd.gugun=del();
       }
+    }
+    // ①-2 권역장 업무 (등급이 권역장이거나, 다른 등급 + 겸직 체크) — 겸직 시 주 등급은 그대로 유지
+    const dualEl=document.getElementById('pmDual');
+    const asRegion=(r==='regionAdmin')||(dualEl&&dualEl.checked&&r!=='regionAdmin');
+    if(asRegion){
+      const duties=[];
+      if(document.getElementById('pmDutyAssign').checked)duties.push('assign');
+      if(document.getElementById('pmDutyLic').checked)duties.push('license');
+      if(!duties.length){alert('강습 배정·자격증 업무 중 최소 하나는 위임해야 합니다.');return}
+      upd.managedRegion=document.getElementById('pmRegion').value;upd.duties=duties;
+      const picked=[...document.querySelectorAll('.pmFed:checked')].map(x=>x.value);
+      upd.managedSido=(duties.indexOf('license')>=0&&picked.length)?[...new Set(picked.flatMap(f=>PM_EXP[f]))]:del();
+      const ex=document.getElementById('pmExpire').value;
+      upd.regionAdminExpiresAt=ex?firebase.firestore.Timestamp.fromDate(new Date(ex+'T23:59:59+09:00')):del();
+      upd.status='approved';
+    }else{
+      upd.managedRegion=del();upd.duties=del();upd.managedSido=del();upd.regionAdminExpiresAt=del();
     }
   }
   // ② 부가 권한 (admin 가능)
