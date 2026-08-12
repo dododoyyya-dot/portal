@@ -327,6 +327,19 @@ async function requestGuardianJoin(id){
     alert('✓ 보호자에게 승인 요청을 보냈습니다.\n보호자가 승인하면 클럽장 승인 절차로 넘어갑니다.');
   }catch(e){alert('요청 실패: '+e.message)}
 }
+// 가입 신청자 상세정보 저장 — 클럽장·본인·관리자만 열람 가능(clubJoinInfo 규칙)
+function saveJoinInfo(clubId){
+  return DB.collection('clubJoinInfo').doc(clubId+'_'+KME.uid).set({
+    clubId:clubId,uid:KME.uid,name:KMY.name||'',gender:KMY.gender||'',birth:KMY.birth||'',
+    region:KMY.baseCity||KMY.region||'',school:KMY.school||'',phone:KMY.phone||'',
+    at:new Date().toISOString()}).catch(function(e){console.warn('joinInfo',e);});
+}
+function joinInfoText(j){
+  if(!j)return '';
+  var age='';
+  if(j.birth){var a=Math.floor((Date.now()-new Date(j.birth).getTime())/31557600000);if(a>0&&a<120)age='만 '+a+'세';}
+  return [j.gender,age,j.region,j.school,j.phone].filter(Boolean).join(' · ');
+}
 async function joinClub(id){
   if(isMinorSelf()){requestGuardianJoin(id);return;}
   if(!confirm('이 클럽에 가입을 신청할까요?\n클럽 관리자(클럽장) 승인 후 소속으로 표시됩니다.'))return;
@@ -340,6 +353,7 @@ async function joinClub(id){
       const pu=(c.pendingUids||[]).slice();pu.push(KME.uid);
       tx.update(ref,{pendingJoins:pj,pendingUids:pu});
     });
+    await saveJoinInfo(id);
     alert('가입 신청 완료! 클럽장 승인 후 소속으로 표시됩니다.');
     loadClubs();loadMyClubs();
   }catch(e){alert(e.message)}
@@ -440,7 +454,8 @@ async function joinByCode(){
   const norm=code.replace(/[\s-]/g,'');
   const cands=[...new Set([code,norm,
     (/^\d{8}$/.test(norm)?norm.slice(0,4)+'-'+norm.slice(4):null),   // 20260001 → 2026-0001 (구 형식)
-    (/^\d{1,4}$/.test(norm)?norm.padStart(4,'0'):null)              // 1 → 0001 (신 형식)
+    (/^\d{6}$/.test(norm)?norm.slice(0,2)+'-'+norm.slice(2):null),  // 260001 → 26-0001 (연도 형식)
+    (/^\d{1,4}$/.test(norm)?norm.padStart(4,'0'):null)              // 1 → 0001 (구 일련번호 형식)
   ].filter(Boolean))].slice(0,10);
   try{
     const snap=await DB.collection('clubs').where('code','in',cands).limit(1).get();
@@ -456,6 +471,7 @@ async function joinByCode(){
       const pu=(cc.pendingUids||[]).slice();pu.push(KME.uid);
       tx.update(ref,{pendingJoins:pj,pendingUids:pu});
     });
+    await saveJoinInfo(d.id);
     m.textContent='✓ ['+c.name+'] 가입 신청 완료 — 관리자 승인 후 소속으로 표시됩니다';m.style.color='#0f766e';
     loadMyClubs();
   }catch(e){m.textContent='실패: '+e.message;m.style.color='#C41E2F'}
@@ -489,6 +505,7 @@ async function loadMyClubs(){
         ownerUI='<div style="margin-top:10px;border-top:1px dashed #e5e9f0;padding-top:10px">'
           +'<b style="font-size:12.5px">본인 가입 신청 '+active.length+'건</b> '
           +(active.length?active.map(p=>'<span style="font-size:12.5px;margin-left:8px">'+kesc(p.name)+(p.code?' <span style="color:#b8860b">(코드)</span>':'')
+            +' <span id="ji_'+d.id+'_'+p.uid+'" style="font-size:11.5px;color:#6b7280;font-weight:600"></span>'
             +' <button class="cbtn cbtn-teal" style="padding:3px 10px;font-size:11.5px" onclick="approveJoin(\''+d.id+'\',\''+p.uid+'\')">승인</button>'
             +' <button class="cbtn" style="padding:3px 10px;font-size:11.5px;background:#eceff4;color:#666" onclick="rejectJoin(\''+d.id+'\',\''+p.uid+'\')">거절</button></span>').join(''):' <span style="font-size:12px;color:#8a919d">없음</span>')
           +'</div>'
@@ -522,7 +539,23 @@ async function loadMyClubs(){
         +(c.rulesText?'<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">클럽 내규 보기</summary><div style="font-size:12.5px;color:#4b5563;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:10px 13px;margin-top:6px">'+kesc(c.rulesText)+'</div></details>':'')
         +ownerUI+'</div>';
     }).join('');
+    fillJoinInfos(items);
   }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+kesc(e.message)+'</div>'}
+}
+// 클럽장 화면: 가입 신청자 상세정보(성별·나이·지역·전화) 비동기 표시 — 클럽장만 열람 가능
+async function fillJoinInfos(items){
+  for(const d of items){
+    const c=d.data();
+    if(c.ownerUid!==KME.uid||!(c.pendingUids||[]).length)continue;
+    try{
+      const snap=await DB.collection('clubJoinInfo').where('clubId','==',d.id).limit(50).get();
+      snap.docs.forEach(x=>{
+        const j=x.data();
+        const el=document.getElementById('ji_'+d.id+'_'+j.uid);
+        if(el){const t=joinInfoText(j);if(t)el.textContent='('+t+')';}
+      });
+    }catch(e){console.warn('joinInfos',e);}
+  }
 }
 async function approveJoin(id,uid){
   try{
@@ -538,6 +571,7 @@ async function approveJoin(id,uid){
         pendingUids:(c.pendingUids||[]).filter(x=>x!==uid)});
     });
     KFDF.notify(uid,'✅ 클럽 가입이 승인되었습니다','club.html');
+    DB.collection('clubJoinInfo').doc(id+'_'+uid).delete().catch(()=>{});
     loadMyClubs();loadClubs();
   }catch(e){alert('승인 실패: '+e.message)}
 }
@@ -574,6 +608,7 @@ async function rejectJoin(id,uid){
     const doc=await ref.get();const c=doc.data();
     await ref.update({pendingJoins:(c.pendingJoins||[]).filter(x=>x.uid!==uid),
       pendingUids:(c.pendingUids||[]).filter(x=>x!==uid)});
+    DB.collection('clubJoinInfo').doc(id+'_'+uid).delete().catch(()=>{});
     loadMyClubs();
   }catch(e){alert('거절 실패: '+e.message)}
 }
@@ -594,16 +629,17 @@ async function uploadClubSymbol(clubId,file){
   await ref.put(blob,{contentType:'image/jpeg'});
   return await ref.getDownloadURL();
 }
-// 클럽 코드 자동 발급: 특수문자 없는 4자리 일련번호 (counters/clubCode +1) — 예: 0001
+// 클럽 코드 자동 발급: 연도 2자리-일련 4자리 (counters/clubCodeYY +1) — 예: 26-0001
 async function issueClubCode(){
-  const ref=DB.collection('counters').doc('clubCode');
+  const yy=String(new Date().getFullYear()%100);
+  const ref=DB.collection('counters').doc('clubCode'+yy);
   let n=1;
   await DB.runTransaction(async tx=>{
     const doc=await tx.get(ref);
     if(!doc.exists){n=1;tx.set(ref,{count:1});}
     else{n=(doc.data().count||0)+1;tx.update(ref,{count:n});}
   });
-  return String(n).padStart(4,'0');
+  return yy+'-'+String(n).padStart(4,'0');
 }
 async function createClub(){
   const m=document.getElementById('ncMsg');
