@@ -2655,6 +2655,7 @@ function renderCompsAdmin(){
       +(act.length?'<button class="btn-sub" style="background:#153A77" onclick="compCSV(\''+d.id+'\')">⬇ 명단 CSV</button>':'')
       +(act.length?'<button class="btn-sub" style="background:#7c3aed" onclick="compConsentDocs(\''+d.id+'\')">📄 동의서 출력</button>':'')
       +(confirmed.length?'<button class="btn-sub" style="background:#b8860b" onclick="compPayroll(\''+d.id+'\')">💰 수당지급내역서</button>':'')
+      +(confirmed.length?'<button class="btn-sub" style="background:#8a5a00" onclick="govPayroll(\''+d.id+'\')">📋 교육청 수당조서</button>':'')
       +'<button class="btn-sub" style="background:#b8860b" onclick="extendComp(\''+d.id+'\')">⏰ 마감 연장</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delComp(\''+d.id+'\')">🗑</button></div></div>';
   }).join('');
@@ -2967,6 +2968,154 @@ function payrollPrint(){
   const w=window.open('','_blank');
   w.document.write('<html><head><title>수당지급내역서</title></head><body>'+html+'<script>setTimeout(function(){window.print()},600)<\/script></body></html>');
   w.document.close();
+}
+// ── 📋 교육청 제출용 수당지급조서 (서식 프리셋 선택 — 부산교육청 등, 기본/초과/가산 구분) ──
+const GOV_PAY_FORMATS={
+  busan:{
+    label:'부산광역시교육청 (교육감배 심판·운영요원)',
+    title:'{년도}년 교육감배 학교스포츠클럽 플라잉디스크대회 심판 및 운영요원 수당 지급 내역 ({수당종류})',
+    cols:['연번','일시','소  속','성명','수당종류','횟수','기본','초과','가산','계','은행명','계좌번호','주민등록번호','서명'],
+    defaults:{'심판요원':{base:50000,over:20000,extra:30000},'심판운영요원':{base:50000,over:20000,extra:30000},'운영요원':{base:50000,over:20000,extra:0}}
+  }
+};
+let GOVPAY_CTX=null;
+async function govPayroll(id){
+  const doc=await DB.collection('compSlots').doc(id).get();const s=doc.data();
+  const confirmed=s.confirmed||[];
+  if(!confirmed.length){alert('확정자가 없습니다. 먼저 ✓ 확정 처리하세요.');return}
+  const act=compActiveClaims(s).filter(c=>confirmed.indexOf(c.uid)>=0);
+  const saved=s.payrollGov||{};
+  const fmt=GOV_PAY_FORMATS.busan;
+  const rows=[];
+  for(const c of act){
+    let ud={},rrn='';
+    try{const u=await DB.collection('users').doc(c.uid).get();if(u.exists)ud=u.data();}catch(e){}
+    try{const p=await DB.collection('privateInfo').doc(c.uid).get();if(p.exists)rrn=p.data().rrn||'';}catch(e){}
+    const sv=saved[c.uid]||{};
+    const role=sv.role||(s.role==='심판'?'심판요원':'운영요원');
+    const df=fmt.defaults[role]||fmt.defaults['운영요원'];
+    rows.push({uid:c.uid,name:c.name,
+      org:sv.org||ud.fedName||((ud.affiliation||[])[0]==='시도연맹'?((ud.region||'').split('·')[0]+'플라잉디스크연맹'):(ud.workSchool||'')),
+      role:role,base:(sv.base!=null?sv.base:df.base),over:(sv.over!=null?sv.over:df.over),extra:(sv.extra!=null?sv.extra:df.extra),
+      bank:ud.bank||'',accountNum:ud.accountNum||'',rrn:rrn,
+      signed:!!(ud.contracts&&ud.contracts['compapply_'+id]&&ud.contracts['compapply_'+id].sign),
+      signImg:(ud.contracts&&ud.contracts['compapply_'+id]&&ud.contracts['compapply_'+id].sign)||''});
+  }
+  GOVPAY_CTX={id:id,s:s,rows:rows,fmt:fmt};
+  const old=document.getElementById('govPayModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='govPayModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+  const inp='style="width:86px;padding:5px;border:1px solid #c6cedd;border-radius:6px;font-size:12px"';
+  div.innerHTML='<div class="authbox" style="max-width:1080px;width:100%;padding:26px;max-height:92vh;overflow:auto;margin:0">'
+    +'<b style="font-size:17px">📋 교육청 제출용 수당지급조서 — '+esc(s.title)+'</b>'
+    +'<div style="display:flex;gap:10px;align-items:center;margin:10px 0;font-size:13px;flex-wrap:wrap">'
+    +'<span style="font-weight:800">서식:</span><select id="gpFmt" style="padding:7px 11px;border:1px solid #c6cedd;border-radius:8px">'
+    +Object.keys(GOV_PAY_FORMATS).map(k=>'<option value="'+k+'">'+GOV_PAY_FORMATS[k].label+'</option>').join('')+'</select>'
+    +'<span style="font-weight:800;margin-left:8px">대회일자:</span><input id="gpDate" value="'+esc(s.date||'')+'" style="width:150px;padding:7px;border:1px solid #c6cedd;border-radius:8px">'
+    +'<span style="font-weight:800">일시(시간):</span><input id="gpTime" value="09:00~17:00" style="width:110px;padding:7px;border:1px solid #c6cedd;border-radius:8px">'
+    +'</div>'
+    +'<div style="font-size:12px;color:#666;margin-bottom:10px">수당종류를 바꾸면 단가(기본·초과·가산)가 서식 기준으로 자동 입력됩니다. 소속·금액은 직접 수정 가능. 주민번호·계좌·전자서명은 회원 정보에서 자동으로 채워집니다.</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:900px">'
+    +'<tr style="background:#eef1f6">'+['성명','소속','수당종류','기본','초과','가산','계','은행/계좌','주민번호','서명'].map(h=>'<th style="border:1px solid #c6cedd;padding:6px 7px;white-space:nowrap">'+h+'</th>').join('')+'</tr>'
+    +rows.map((r,i)=>'<tr>'
+      +'<td style="border:1px solid #c6cedd;padding:6px 7px;font-weight:700;white-space:nowrap">'+esc(r.name)+'</td>'
+      +'<td style="border:1px solid #c6cedd;padding:3px"><input id="gpOrg'+i+'" value="'+esc(r.org)+'" style="width:150px;padding:5px;border:1px solid #c6cedd;border-radius:6px;font-size:12px"></td>'
+      +'<td style="border:1px solid #c6cedd;padding:3px"><select id="gpRole'+i+'" onchange="gpRoleChg('+i+')" style="padding:5px;border:1px solid #c6cedd;border-radius:6px;font-size:12px">'
+        +Object.keys(GOV_PAY_FORMATS.busan.defaults).map(k=>'<option'+(k===r.role?' selected':'')+'>'+k+'</option>').join('')+'</select></td>'
+      +'<td style="border:1px solid #c6cedd;padding:3px"><input type="number" id="gpBase'+i+'" value="'+r.base+'" oninput="gpCalc('+i+')" '+inp+'></td>'
+      +'<td style="border:1px solid #c6cedd;padding:3px"><input type="number" id="gpOver'+i+'" value="'+r.over+'" oninput="gpCalc('+i+')" '+inp+'></td>'
+      +'<td style="border:1px solid #c6cedd;padding:3px"><input type="number" id="gpExtra'+i+'" value="'+r.extra+'" oninput="gpCalc('+i+')" '+inp+'></td>'
+      +'<td style="border:1px solid #c6cedd;padding:6px 7px;text-align:right;font-weight:800" id="gpSum'+i+'">-</td>'
+      +'<td style="border:1px solid #c6cedd;padding:6px 7px;font-size:11.5px">'+esc((r.bank+' '+r.accountNum).trim()||'-')+'</td>'
+      +'<td style="border:1px solid #c6cedd;padding:6px 7px;font-size:11.5px">'+(r.rrn?esc(r.rrn.slice(0,6))+'-'+esc(r.rrn.slice(6,7))+'******':'<span style="color:#C41E2F">미등록</span>')+'</td>'
+      +'<td style="border:1px solid #c6cedd;padding:6px 7px;text-align:center">'+(r.signed?'✓':'<span style="color:#C41E2F">×</span>')+'</td>'
+      +'</tr>').join('')
+    +'</table></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">'
+    +'<span style="font-size:12px;color:#666">인쇄물에는 주민등록번호가 전체 표기됩니다 (교육청 제출용) — 출력물 보안에 유의하세요.</span>'
+    +'<span style="flex:1"></span>'
+    +'<button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'govPayModal\').remove()">닫기</button>'
+    +'<button class="btn-sub" style="background:#0f766e" onclick="saveGovPayroll()">💾 저장</button>'
+    +'<button class="btn-sub" style="background:#153A77" onclick="govPayCSV()">⬇ CSV(엑셀)</button>'
+    +'<button class="btn-sub" style="background:#7c3aed" onclick="govPayPrint()">🖨 서식 인쇄</button></div>'
+    +'</div>';
+  document.body.appendChild(div);
+  rows.forEach((r,i)=>gpCalc(i));
+}
+function gpRoleChg(i){
+  const role=document.getElementById('gpRole'+i).value;
+  const df=GOV_PAY_FORMATS.busan.defaults[role];
+  if(df){document.getElementById('gpBase'+i).value=df.base;document.getElementById('gpOver'+i).value=df.over;document.getElementById('gpExtra'+i).value=df.extra;}
+  gpCalc(i);
+}
+function gpCalc(i){
+  const v=k=>parseInt(document.getElementById(k+i).value)||0;
+  document.getElementById('gpSum'+i).textContent=(v('gpBase')+v('gpOver')+v('gpExtra')).toLocaleString();
+}
+function gpGather(){
+  return GOVPAY_CTX.rows.map((r,i)=>{
+    const v=k=>parseInt(document.getElementById(k+i).value)||0;
+    return Object.assign({},r,{org:document.getElementById('gpOrg'+i).value.trim(),role:document.getElementById('gpRole'+i).value,
+      base:v('gpBase'),over:v('gpOver'),extra:v('gpExtra'),sum:v('gpBase')+v('gpOver')+v('gpExtra')});
+  });
+}
+async function saveGovPayroll(){
+  const data=gpGather();
+  const payrollGov={};
+  data.forEach(r=>{payrollGov[r.uid]={org:r.org,role:r.role,base:r.base,over:r.over,extra:r.extra,at:new Date().toISOString()}});
+  await DB.collection('compSlots').doc(GOVPAY_CTX.id).update({payrollGov:payrollGov});
+  alert('✓ 교육청 서식 수당조서가 저장되었습니다 ('+data.length+'명). 다음에 열면 그대로 불러옵니다.');
+}
+function govPayPrint(){
+  const s=GOVPAY_CTX.s;const data=gpGather();
+  const date=document.getElementById('gpDate').value.trim()||s.date||'';
+  const time=document.getElementById('gpTime').value.trim()||'09:00~17:00';
+  const yr=(date.match(/20\d\d/)||['2026'])[0];
+  const roleSet=[...new Set(data.map(r=>r.role))];
+  const roleLabel=roleSet.length===1?roleSet[0]:'심판요원';
+  const th='style="border:1px solid #333;padding:5px 4px;font-size:11.5px;background:#f2f2f2;white-space:nowrap"';
+  const td='style="border:1px solid #333;padding:5px 4px;font-size:11.5px;white-space:nowrap"';
+  const tot=data.reduce((a,r)=>({b:a.b+r.base,o:a.o+r.over,e:a.e+r.extra,s:a.s+r.sum}),{b:0,o:0,e:0,s:0});
+  const html='<div style="font-family:Malgun Gothic,sans-serif;max-width:1050px;margin:0 auto;padding:20px 6px">'
+    +'<h2 style="text-align:center;font-size:17px;margin:0 0 8px">'+esc(yr)+'년 교육감배 학교스포츠클럽 플라잉디스크대회 심판 및 운영요원 수당 지급 내역 ('+esc(roleLabel)+')</h2>'
+    +'<div style="display:flex;justify-content:flex-end;gap:14px;font-size:12px;margin-bottom:4px"><b>대회일자: '+esc(date)+'</b><span>(단위: 원)</span></div>'
+    +'<table style="width:100%;border-collapse:collapse">'
+    +'<tr><th '+th+' rowspan="2">연번</th><th '+th+' rowspan="2">일시</th><th '+th+' rowspan="2">소  속</th><th '+th+' rowspan="2">성명</th><th '+th+' rowspan="2">수당종류</th><th '+th+' rowspan="2">횟수</th><th '+th+' colspan="4">수당(A)</th><th '+th+' rowspan="2">은행명</th><th '+th+' rowspan="2">계좌번호</th><th '+th+' rowspan="2">주민등록번호</th><th '+th+' rowspan="2">서명</th></tr>'
+    +'<tr><th '+th+'>기본</th><th '+th+'>초과</th><th '+th+'>가산</th><th '+th+'>계</th></tr>'
+    +data.map((r,i)=>'<tr><td '+td+' align="center">'+(i+1)+'</td>'
+      +'<td '+td+'>'+esc(date)+' '+esc(time)+'</td>'
+      +'<td '+td+'>'+esc(r.org)+'</td>'
+      +'<td '+td+' align="center">'+esc(r.name)+'</td>'
+      +'<td '+td+' align="center">'+esc(r.role)+'</td>'
+      +'<td '+td+' align="center">1</td>'
+      +'<td '+td+' align="right">'+r.base.toLocaleString()+'</td>'
+      +'<td '+td+' align="right">'+r.over.toLocaleString()+'</td>'
+      +'<td '+td+' align="right">'+r.extra.toLocaleString()+'</td>'
+      +'<td '+td+' align="right"><b>'+r.sum.toLocaleString()+'</b></td>'
+      +'<td '+td+' align="center">'+esc(r.bank||'')+'</td>'
+      +'<td '+td+'>'+esc(r.accountNum||'')+'</td>'
+      +'<td '+td+'>'+esc(r.rrn?(r.rrn.slice(0,6)+'-'+r.rrn.slice(6)):'')+'</td>'
+      +'<td '+td+' style="width:52px;text-align:center;padding:2px">'+(r.signImg?'<img src="'+r.signImg+'" style="height:26px">':'')+'</td></tr>').join('')
+    +'<tr style="font-weight:800;background:#f7f7f7"><td '+td+' colspan="6" align="center">합계</td>'
+    +'<td '+td+' align="right">'+tot.b.toLocaleString()+'</td><td '+td+' align="right">'+tot.o.toLocaleString()+'</td><td '+td+' align="right">'+tot.e.toLocaleString()+'</td><td '+td+' align="right">'+tot.s.toLocaleString()+'</td>'
+    +'<td '+td+' colspan="4"></td></tr></table>'
+    +'<div style="text-align:right;margin-top:26px;font-size:13.5px">사단법인 대한민국플라잉디스크연맹&nbsp;&nbsp;&nbsp;(직인)</div></div>';
+  const w=window.open('','_blank');
+  w.document.write('<html><head><title>수당지급조서(교육청 서식)</title><style>@page{size:A4 landscape;margin:10mm}</style></head><body>'+html+'<script>setTimeout(function(){window.print()},600)<\/script></body></html>');
+  w.document.close();
+}
+function govPayCSV(){
+  const s=GOVPAY_CTX.s;const data=gpGather();
+  const date=document.getElementById('gpDate').value.trim()||s.date||'';
+  const time=document.getElementById('gpTime').value.trim()||'09:00~17:00';
+  const rows=[['연번','일시','소속','성명','수당종류','횟수','기본','초과','가산','계','은행명','계좌번호','주민등록번호','서명']];
+  data.forEach((r,i)=>rows.push([i+1,date+' '+time,r.org,r.name,r.role,1,r.base,r.over,r.extra,r.sum,r.bank,r.accountNum,r.rrn,r.signed?'전자서명':'']));
+  const tot=data.reduce((a,r)=>({b:a.b+r.base,o:a.o+r.over,e:a.e+r.extra,s:a.s+r.sum}),{b:0,o:0,e:0,s:0});
+  rows.push(['합계','','','','','',tot.b,tot.o,tot.e,tot.s,'','','','']);
+  const csv='﻿'+rows.map(r=>r.map(x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='수당지급조서_교육청서식_'+(s.title||'')+'.csv';a.click();
 }
 async function toggleCert(uid){
   const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
