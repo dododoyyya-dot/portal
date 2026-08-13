@@ -268,6 +268,15 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-main" onclick="addComp()">모집 등록</button>
         <div class="msg" id="cpMsg"></div>
       </div>
+      <div style="background:#f0f5ff;border:2px solid #b9cdec;border-radius:16px;padding:18px 22px;margin-bottom:18px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <b style="font-size:16px;color:#153A77">🏆 대회 통합 등록</b>
+          <span style="font-size:12.5px;color:var(--gray)">대회 1건 등록으로 참가자·심판·운영요원 모집과 캘린더 등재를 한 번에 처리합니다</span>
+          <span style="flex:1"></span>
+          <button class="btn-sub" style="background:#153A77" onclick="openCompWizard()">+ 새 대회 등록</button>
+        </div>
+        <div id="compMasterList" style="margin-top:12px"></div>
+      </div>
       <input id="cpSearch" oninput="renderCompsAdmin()" placeholder="🔍 대회명·권역·역할·지명자(강사)·확정자 이름 검색" style="width:100%;max-width:420px;padding:9px 13px;border:1.5px solid #dfe5ee;border-radius:10px;margin-bottom:12px">
       <div class="board" id="compAdminList"><div class="bempty">불러오는 중…</div></div>
       <h3 style="margin-top:34px">🏠 클럽 승인 관리</h3>
@@ -2463,7 +2472,196 @@ async function loadCompsAdmin(){
   const snap=await DB.collection('compSlots').orderBy('date').limit(100).get();
   CADM=snap.docs;
   renderCompsAdmin();
+  loadCompMasters().catch(()=>{});
   loadClubsAdmin().catch(()=>{});
+}
+// ══ 🏆 대회 통합 등록 (competitions) ══
+// 대회 1건 = 참가·심판·운영 공고 묶음 + 캘린더 자동 등재. 종목별 일반운영/체험부스 선택.
+const COMP_SPORTS=['얼티미트','디스크골프','원반윷놀이'];
+let CMASTERS=[];
+async function loadCompMasters(){
+  const el=document.getElementById('compMasterList');if(!el)return;
+  const snap=await DB.collection('competitions').orderBy('dateStart','desc').limit(30).get().catch(()=>null);
+  CMASTERS=snap?snap.docs:[];
+  if(!CMASTERS.length){el.innerHTML='<div style="font-size:12.5px;color:#8a919d">등록된 대회가 없습니다. [+ 새 대회 등록]으로 시작하세요.</div>';return}
+  el.innerHTML=CMASTERS.map(d=>{
+    const c=d.data();
+    const sports=(c.sports||[]).map(x=>x.name+(x.mode==='체험부스'?'(🎪부스)':'')).join(' · ');
+    const n=(c.slotIds||[]).length;
+    return '<div style="background:#fff;border:1.5px solid #d3e0f2;border-radius:12px;padding:12px 15px;margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+      +'<b style="font-size:14.5px">'+esc(c.title)+'</b>'
+      +'<span class="cpill2" style="background:#153A77;font-size:11px;color:#fff;font-weight:900;padding:3px 10px;border-radius:999px">'+esc(c.dateStart)+(c.dateEnd&&c.dateEnd!==c.dateStart?'~'+esc(c.dateEnd.slice(5)):'')+'</span>'
+      +'<span style="font-size:12px;color:#6b7280">'+esc(c.sido||'')+' · '+esc(c.place||'')+' · '+sports+'</span>'
+      +'<span style="font-size:12px;font-weight:800;color:'+(n?'#0f766e':'#C41E2F')+'">공고 '+n+'건 연결</span>'
+      +'<span style="flex:1"></span>'
+      +'<button class="btn-sub" style="background:#153A77;padding:5px 13px;font-size:12px" onclick="openCompWizard(\''+d.id+'\')">✏️ 수정</button>'
+      +'<button class="btn-sub" style="background:#7c3aed;padding:5px 13px;font-size:12px" onclick="linkSlotsModal(\''+d.id+'\')">🔗 공고 연결</button>'
+      +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F;padding:5px 13px;font-size:12px" onclick="delCompMaster(\''+d.id+'\')">🗑</button>'
+      +'</div>';
+  }).join('');
+}
+function openCompWizard(editId){
+  const ed=editId?CMASTERS.find(d=>d.id===editId):null;
+  const c=ed?ed.data():{};
+  const old=document.getElementById('cwModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='cwModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto';
+  const inp='style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px;font-family:inherit;font-size:13.5px"';
+  const lb='style="font-size:12.5px;font-weight:800;display:block;margin-top:11px"';
+  const sec=(t,inner)=>'<div style="border:1px solid #e6eaf2;border-radius:12px;padding:13px 16px;margin-top:12px"><b style="font-size:13.5px;color:#153A77">'+t+'</b>'+inner+'</div>';
+  const sportsMap={};(c.sports||[]).forEach(x=>sportsMap[x.name]=x.mode);
+  const tt=c.teamTypes||['클럽팀','학교팀','자유팀'];
+  div.innerHTML='<div style="background:#fff;border-radius:18px;max-width:660px;width:100%;max-height:94vh;overflow:auto;padding:24px 26px">'
+    +'<b style="font-size:17px">🏆 '+(ed?'대회 수정':'새 대회 등록')+'</b>'
+    +sec('① 기본 정보',
+      '<label '+lb+'>대회명 *</label><input id="cwTitle" '+inp+' value="'+esc(c.title||'')+'" placeholder="예: 2026 부산광역시교육감배 플라잉디스크대회">'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label '+lb+'>시작일 *</label><input id="cwD1" type="date" '+inp+' value="'+esc(c.dateStart||'')+'"></div><div><label '+lb+'>종료일</label><input id="cwD2" type="date" '+inp+' value="'+esc(c.dateEnd||'')+'"></div></div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label '+lb+'>장소 *</label><input id="cwPlace" '+inp+' value="'+esc(c.place||'')+'"></div><div><label '+lb+'>관할 시도 *</label><select id="cwSido" '+inp+'>'+PM_SIDOS.map(x=>'<option'+(c.sido===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div></div>'
+      +'<label '+lb+'>대회 안내 (선택)</label><textarea id="cwDesc" rows="2" '+inp+'>'+esc(c.desc||'')+'</textarea>')
+    +sec('② 종목·운영방식 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 종목별로 일반 운영(정식 경기) 또는 체험부스(현장 자유참여) 선택</span>',
+      COMP_SPORTS.map(sp=>'<div style="display:flex;gap:10px;align-items:center;margin-top:8px;font-size:13.5px">'
+        +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;min-width:120px"><input type="checkbox" class="cwSport" value="'+sp+'" style="width:auto"'+(sportsMap[sp]?' checked':'')+'> '+sp+'</label>'
+        +'<select class="cwMode" data-sp="'+sp+'" style="padding:6px 10px;border:1.5px solid #dfe5ee;border-radius:8px;font-size:12.5px"><option'+(sportsMap[sp]==='일반'?' selected':'')+'>일반</option><option'+(sportsMap[sp]==='체험부스'?' selected':'')+'>체험부스</option></select>'
+        +'</div>').join(''))
+    +sec('③ 참가자 모집 '+(ed?'<span style="font-size:11px;color:#8a919d">(수정 시 공고 내용은 공고 카드에서 개별 수정)</span>':''),
+      '<label style="display:flex;gap:7px;align-items:center;font-size:13px;font-weight:800;margin-top:8px"><input type="checkbox" id="cwHasEntry" style="width:auto"'+(ed?'':' checked')+(ed?' disabled':'')+'> 참가자 모집 공고 생성</label>'
+      +'<label '+lb+'>부문·정원 <span style="font-weight:600;color:#8a919d;font-size:11px">— 한 줄에 하나, 「부문명:정원」. 팀 단위 부문은 [팀] 붙이기</span></label>'
+      +'<textarea id="cwDivs" rows="3" '+inp+' placeholder="얼티미트 초등부[팀]:16&#10;디스크골프 오픈부:32&#10;원반윷놀이 체험:0">'+esc(c.divsRaw||'')+'</textarea>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px"><div><label '+lb+'>참가비</label><input id="cwFee" '+inp+' value="'+esc(c.fee||'')+'" placeholder="예: 무료 / 10,000원"></div><div><label '+lb+'>신청 마감일</label><input id="cwDL" type="date" '+inp+' value="'+esc(c.deadline||'')+'"></div><div><label '+lb+'>지역 제한(선택)</label><input id="cwElig" '+inp+' value="'+esc(c.eligRegion||'')+'" placeholder="예: 부산"></div></div>'
+      +'<label '+lb+'>허용 팀 단위</label><div style="display:flex;gap:14px;margin-top:5px;font-size:13px">'+['클럽팀','학교팀','자유팀'].map(t=>'<label style="display:flex;gap:5px;align-items:center;font-weight:700"><input type="checkbox" class="cwTT" value="'+t+'" style="width:auto"'+(tt.indexOf(t)>=0?' checked':'')+'> '+t+'</label>').join('')+'</div>')
+    +sec('④ 심판 모집','<label style="display:flex;gap:7px;align-items:center;font-size:13px;font-weight:800;margin-top:8px"><input type="checkbox" id="cwHasRef" style="width:auto"'+(ed?' disabled':' checked')+'> 심판 모집 공고 생성</label>'
+      +'<div style="display:grid;grid-template-columns:110px 1fr;gap:10px"><div><label '+lb+'>정원</label><input id="cwRefN" type="number" '+inp+' value="17"></div><div><label '+lb+'>임무 (쉼표 구분)</label><input id="cwRefRoles" '+inp+' value="심판장,주심,부심,점수심,기록심,선심"></div></div>')
+    +sec('⑤ 운영요원 모집','<label style="display:flex;gap:7px;align-items:center;font-size:13px;font-weight:800;margin-top:8px"><input type="checkbox" id="cwHasStaff" style="width:auto"'+(ed?' disabled':' checked')+'> 운영요원 모집 공고 생성 <span style="font-weight:600;color:#8a919d;font-size:11px">(체험부스 종목이 있으면 부스 운영 임무 자동 추가)</span></label>'
+      +'<div style="display:grid;grid-template-columns:110px 1fr;gap:10px"><div><label '+lb+'>정원</label><input id="cwStaffN" type="number" '+inp+' value="10"></div><div><label '+lb+'>임무 (쉼표 구분)</label><input id="cwStaffRoles" '+inp+' value="경기운영,안전요원,기록,의전·접수"></div></div>')
+    +sec('⑥ 동의서','<label '+lb+'>동의서 보관함에서 선택 (세 공고에 일괄 적용)</label><select id="cwTpl" '+inp+'><option value="">사용 안 함 (기본 문안)</option></select>')
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
+    +'<button class="btn-sub" style="background:#eceff4;color:#555" onclick="document.getElementById(\'cwModal\').remove()">닫기</button>'
+    +'<button class="btn-sub" style="background:#153A77" onclick="saveCompMaster(\''+(editId||'')+'\')">'+(ed?'💾 수정 저장':'🏆 대회 등록')+'</button></div>'
+    +'</div>';
+  document.body.appendChild(div);
+  // 동의서 보관함 채우기
+  DB.collection('consentTemplates').orderBy('name').get().then(sn=>{
+    const sel=document.getElementById('cwTpl');if(!sel)return;
+    sel.innerHTML='<option value="">사용 안 함 (기본 문안)</option>'+sn.docs.map(x=>'<option value="'+x.id+'"'+(c.consentTplId===x.id?' selected':'')+'>'+esc(x.data().name)+'</option>').join('');
+  }).catch(()=>{});
+}
+function cwSports(){
+  return [...document.querySelectorAll('.cwSport:checked')].map(ch=>{
+    const mode=document.querySelector('.cwMode[data-sp="'+ch.value+'"]').value;
+    return {name:ch.value,mode:mode};
+  });
+}
+async function saveCompMaster(editId){
+  const v=id=>{const e=document.getElementById(id);return e?(e.value||'').trim():''};
+  const title=v('cwTitle'),d1=v('cwD1'),place=v('cwPlace'),sido=v('cwSido');
+  if(!title||!d1||!place||!sido){alert('대회명·시작일·장소·시도를 입력해주세요.');return}
+  const sports=cwSports();
+  if(!sports.length){alert('종목을 1개 이상 선택해주세요.');return}
+  const teamTypes=[...document.querySelectorAll('.cwTT:checked')].map(x=>x.value);
+  const base={title:title,dateStart:d1,dateEnd:v('cwD2')||d1,place:place,sido:sido,desc:v('cwDesc'),
+    sports:sports,teamTypes:teamTypes,divsRaw:v('cwDivs'),fee:v('cwFee'),deadline:v('cwDL'),eligRegion:v('cwElig'),
+    consentTplId:v('cwTpl'),status:'모집중'};
+  // 동의서 문안
+  let consentText='';
+  if(base.consentTplId){
+    try{const t=await DB.collection('consentTemplates').doc(base.consentTplId).get();if(t.exists)consentText=t.data().consentText||'';}catch(e){}
+  }
+  try{
+    if(editId){
+      // 수정: 대회 문서 갱신 + 연결 공고·캘린더 동기화
+      await DB.collection('competitions').doc(editId).update(base);
+      const cm=CMASTERS.find(d=>d.id===editId);const prev=cm?cm.data():{};
+      for(const sid of (prev.slotIds||[])){
+        const upd={date:base.dateStart,region:base.sido};
+        if(base.deadline)upd.deadline=base.deadline;
+        if(consentText)upd.consentText=consentText;
+        await DB.collection('compSlots').doc(sid).update(upd).catch(()=>{});
+      }
+      if(prev.eventId)await DB.collection('events').doc(prev.eventId).update({title:'🏆 '+title,start:base.dateStart,end:base.dateEnd,sido:sido,place:place,desc:base.desc||'대회 페이지에서 신청'}).catch(()=>{});
+      alert('✓ 대회 정보가 수정되고 연결 공고·캘린더에 반영되었습니다.\n(부문·정원 등 공고 세부는 아래 공고 카드에서 개별 수정)');
+      document.getElementById('cwModal').remove();loadCompsAdmin();return;
+    }
+    // 신규: 공고들 생성
+    const slotIds=[];
+    const roleNote=base.desc||'';
+    const mkSlot=async(role,roles,quota,extra)=>{
+      const ref=await DB.collection('compSlots').add(Object.assign({
+        title:title,role:role,roles:roles,quota:quota,date:base.dateStart,region:sido,
+        deadline:base.deadline||'',fee:'',note:roleNote,consentText:consentText||'',
+        claimed:[],confirmed:[],createdAt:firebase.firestore.FieldValue.serverTimestamp()},extra||{}));
+      slotIds.push(ref.id);return ref.id;
+    };
+    // 참가 공고 — 일반 운영 종목이 있을 때만 (전부 체험부스면 생성 안 함)
+    const hasGeneral=sports.some(x=>x.mode!=='체험부스');
+    if(document.getElementById('cwHasEntry').checked&&hasGeneral){
+      const lines=v('cwDivs').split('\n').map(x=>x.trim()).filter(Boolean);
+      const roles=lines.map(x=>x.replace('[팀]',''));
+      const teamDivs=lines.filter(x=>x.indexOf('[팀]')>=0).map(x=>x.replace('[팀]','').split(':')[0].trim());
+      let quota=0;lines.forEach(x=>{const m=x.match(/:(\d+)$/);quota+=m?parseInt(m[1]):0;});
+      await mkSlot('참가',roles.length?roles:sports.filter(x=>x.mode!=='체험부스').map(x=>x.name),quota||999,{fee:base.fee,eligRegion:base.eligRegion,teamDivs:teamDivs,teamTypes:teamTypes});
+    }
+    if(document.getElementById('cwHasRef').checked)
+      await mkSlot('심판',v('cwRefRoles').split(',').map(x=>x.trim()).filter(Boolean),parseInt(v('cwRefN'))||17);
+    if(document.getElementById('cwHasStaff').checked){
+      let st=v('cwStaffRoles').split(',').map(x=>x.trim()).filter(Boolean);
+      sports.filter(x=>x.mode==='체험부스').forEach(x=>st.push(x.name+' 부스운영'));
+      await mkSlot('운영',st,parseInt(v('cwStaffN'))||10);
+    }
+    // 캘린더 등재
+    const ev=await DB.collection('events').add({title:'🏆 '+title,type:'대회',start:base.dateStart,end:base.dateEnd,
+      sido:sido,place:place,desc:base.desc||'대회 페이지에서 신청',link:'competition.html',
+      byUid:(firebase.auth().currentUser||{}).uid||'',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    const cref=await DB.collection('competitions').add(Object.assign(base,{slotIds:slotIds,eventId:ev.id,
+      byUid:(firebase.auth().currentUser||{}).uid||'',createdAt:firebase.firestore.FieldValue.serverTimestamp()}));
+    // 공고에 compId 역연결
+    for(const sid of slotIds)await DB.collection('compSlots').doc(sid).update({compId:cref.id}).catch(()=>{});
+    alert('🏆 대회가 등록되었습니다!\n· 모집 공고 '+slotIds.length+'건 생성\n· 캘린더 등재 완료\n\n공고 세부(정원·임무 등)는 아래 공고 카드에서 언제든 수정할 수 있습니다.');
+    document.getElementById('cwModal').remove();loadCompsAdmin();
+  }catch(e){alert('저장 실패: '+e.message)}
+}
+async function delCompMaster(id){
+  const cm=CMASTERS.find(d=>d.id===id);if(!cm)return;
+  const c=cm.data();
+  if(!confirm('['+c.title+'] 대회를 삭제할까요?\n연결된 공고·캘린더 일정도 함께 삭제됩니다. (신청 기록 포함 — 복구 불가)'))return;
+  try{
+    for(const sid of (c.slotIds||[]))await DB.collection('compSlots').doc(sid).delete().catch(()=>{});
+    if(c.eventId)await DB.collection('events').doc(c.eventId).delete().catch(()=>{});
+    await DB.collection('competitions').doc(id).delete();
+    loadCompsAdmin();
+  }catch(e){alert('삭제 실패: '+e.message)}
+}
+// 기존 공고를 대회로 연결
+async function linkSlotsModal(compId){
+  const cm=CMASTERS.find(d=>d.id===compId);if(!cm)return;
+  const c=cm.data();
+  const free=CADM.filter(d=>!d.data().compId);
+  const cur=c.slotIds||[];
+  const old=document.getElementById('lsModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='lsModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:88vh;overflow:auto;padding:22px">'
+    +'<b style="font-size:16px">🔗 공고 연결 — '+esc(c.title)+'</b>'
+    +'<div style="font-size:12.5px;color:#666;margin:5px 0 10px">체크한 공고가 이 대회 묶음으로 표시됩니다. (기존 부산 9.5·9.6 공고 등)</div>'
+    +(free.length?free.map(d=>{const sd=d.data();
+      return '<label style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid #e6eaf2;border-radius:9px;margin-top:6px;font-size:13px;font-weight:700;cursor:pointer">'
+        +'<input type="checkbox" class="lsChk" value="'+d.id+'" style="width:auto"> '+esc(sd.title)+' <span style="color:#8a919d;font-weight:600">('+esc(sd.role)+' · '+esc(sd.date)+')</span></label>';
+    }).join(''):'<div style="font-size:13px;color:#8a919d;margin-top:8px">연결 가능한(미연결) 공고가 없습니다.</div>')
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
+    +'<button class="btn-sub" style="background:#eceff4;color:#555" onclick="document.getElementById(\'lsModal\').remove()">닫기</button>'
+    +(free.length?'<button class="btn-sub" style="background:#7c3aed" onclick="linkSlotsSave(\''+compId+'\')">🔗 연결</button>':'')+'</div></div>';
+  document.body.appendChild(div);
+}
+async function linkSlotsSave(compId){
+  const ids=[...document.querySelectorAll('.lsChk:checked')].map(x=>x.value);
+  if(!ids.length){alert('연결할 공고를 선택하세요.');return}
+  try{
+    const cm=CMASTERS.find(d=>d.id===compId);
+    const cur=(cm.data().slotIds||[]).slice();
+    for(const sid of ids){await DB.collection('compSlots').doc(sid).update({compId:compId});if(cur.indexOf(sid)<0)cur.push(sid);}
+    await DB.collection('competitions').doc(compId).update({slotIds:cur});
+    document.getElementById('lsModal').remove();
+    alert('✓ '+ids.length+'건 연결 완료');loadCompsAdmin();
+  }catch(e){alert('연결 실패: '+e.message)}
 }
 // ── 클럽 승인·관리 ──
 async function loadClubsAdmin(){
