@@ -152,7 +152,7 @@ AUTH.onAuthStateChanged(async u=>{
       CAN_EDIT=!!(MYU&&(MYU.role==='admin'||MYU.role==='sidoOfficer'||MYU.calendarEditor===true));}catch(e){}
     // 로그인 시 대회 모집(compSlots)도 자동 표시
     try{const cs=await DB.collection('compSlots').orderBy('date').limit(100).get();
-      COMP_EVENTS=cs.docs.map(d=>{const s=d.data();return {auto:true,title:s.title+(s.role==='참가'?'':' ('+s.role+'요원 모집)'),type:'대회',start:s.date,end:s.date,sido:s.region||'',place:'',desc:'대회 페이지에서 신청 가능',link:'competition.html'}});}catch(e){}
+      COMP_EVENTS=cs.docs.filter(d=>!d.data().compId).map(d=>{const s=d.data();return {auto:true,title:s.title+(s.role==='참가'?'':' ('+s.role+'요원 모집)'),type:'대회',start:s.date,end:s.date,sido:s.region||'',place:'',desc:'대회 페이지에서 신청 가능',link:'competition.html'}});}catch(e){}
   }
   document.getElementById('addBtn').style.display=CAN_EDIT?'':'none';
   render();
