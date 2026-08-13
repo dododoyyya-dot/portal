@@ -176,6 +176,13 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
           <input id="sBirth" type="date"></div>
       </div>
 
+      <div id="sRrnBlock" style="margin-top:16px;padding:14px 16px;background:#fdf1f1;border:1.5px solid #f1c7cc;border-radius:12px">
+        <label style="margin:0;font-size:13.5px;font-weight:800;color:#8c1622">🪪 주민등록번호 <span style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 강사비 등 원천징수·자격증 발급·단체보험 가입에 사용됩니다</span></label>
+        <input id="sRrn" inputmode="numeric" maxlength="14" placeholder="000000-0000000" style="margin-top:6px">
+        <div style="font-size:11.5px;color:#8c1622;margin-top:5px">🔒 일반 회원정보와 분리된 별도 보안 저장소에 저장되며, 본인과 사무국(중앙관리자)만 열람할 수 있습니다.</div>
+        <label style="display:flex;gap:7px;align-items:center;margin-top:8px;font-weight:700;font-size:12.5px;color:#153A77"><input type="checkbox" id="sRrnAgree" style="width:auto"> (필수) 고유식별정보(주민등록번호) 수집·이용에 동의합니다.</label>
+      </div>
+
       <div id="sAddrBlock">
       <label style="color:#8c1622">집 주소 <span id="reqAddr" style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 피복·자격증·상장 등 물품 발송에 사용됩니다</span></label>
       <div style="display:flex;gap:6px">
@@ -651,6 +658,10 @@ async function go(){
       if(!gender)return say('성별을 선택해주세요');
       if(!birth)return say('생년월일을 입력해주세요');
       const ageNow=(Date.now()-new Date(birth).getTime())/31557600000;
+      // 주민등록번호 — 전 유형 공통 필수 (가입 시 바로 privateInfo에 분리 저장)
+      const rrnRaw=(document.getElementById('sRrn').value||'').replace(/[^0-9]/g,'');
+      if(rrnRaw.length!==13)return say('주민등록번호 13자리를 입력해주세요 (000000-0000000)');
+      if(!document.getElementById('sRrnAgree').checked)return say('고유식별정보(주민등록번호) 수집·이용 동의에 체크해주세요');
       const CFG=MTYPE_CFG[SIGNUP_TYPE]||MTYPE_CFG.instructor;
       if(SIGNUP_TYPE==='student'&&ageNow>=19)return say('입력하신 생년월일은 만 19세 이상입니다. 위에서 성인 유형(지도자·강사 / 교사 / 일반회원)을 선택해주세요.');
       if(SIGNUP_TYPE!=='student'&&ageNow<19)return say('입력하신 생년월일은 만 19세 미만입니다. 위에서 [🧒 학생선수]를 선택해주세요.');
@@ -755,6 +766,11 @@ async function go(){
       }
       await DB.collection('users').doc(cred.user.uid).set(Object.assign(baseDoc,typeDoc));
       await DB.collection('phoneIndex').doc(pnorm).set({uid:cred.user.uid}).catch(()=>{}); // 개인정보 최소화: 이름 미저장(중복확인은 존재여부만 사용)
+      // 주민등록번호 — 일반 회원정보와 분리된 privateInfo 컬렉션에 저장 (본인·중앙관리자만 열람)
+      await DB.collection('privateInfo').doc(cred.user.uid).set({
+        rrn:rrnRaw.slice(0,6)+'-'+rrnRaw.slice(6),name:name,
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+      },{merge:true}).catch(e=>{console.warn('rrn save failed',e)});
       if(SIGNUP_TYPE==='student'){
         say('가입 신청 완료! 사무국 승인 후 이용할 수 있습니다. 아래에서 보호자와 연동해주세요.',true);
         document.getElementById('postSignupLink').style.display='block';
