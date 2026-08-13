@@ -157,6 +157,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260808"></script>
 <script src="site_config.js"></script>
 <script>
@@ -237,15 +238,31 @@ function viewRoster(id){
   let rows;
   if(!list.length)rows='<tr><td '+td+' colspan="9" style="text-align:center;color:#8a919d">아직 신청자가 없습니다</td></tr>';
   else if(staff){
-    rows=list.map((c,i)=>'<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b></td>'
+    rows=list.map((c,i)=>{
+      if(c.team){
+        return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+' colspan="'+(entry?'4':'1')+'"><b>👥 '+cesc(c.name)+'</b> <span style="font-size:11.5px;color:#8a919d">'+cesc(c.teamType||'팀')+(c.teamOrg?' · '+cesc(c.teamOrg):'')+' · 인솔 '+cesc(c.leader||'')+'('+cesc(c.leaderRole||'')+')'+(c.leaderPhone?' '+cesc(c.leaderPhone):'')+'</span>'
+          +'<details style="margin-top:4px"><summary style="cursor:pointer;font-size:12px;font-weight:800;color:#153A77">명단 '+(c.rosterN||0)+'명'+((c.consentFiles&&c.consentFiles.length)?' · 📎동의서 '+c.consentFiles.length:'')+'</summary>'
+          +'<div style="font-size:12px;color:#4b5563;margin-top:4px">'+(c.roster||[]).map((r,j)=>(j+1)+'. '+cesc(r.name)+(r.birth?' ('+cesc(r.birth)+')':'')+(r.school?' · '+cesc(r.school):'')).join('<br>')+'</div></details></td>'
+          +'<td '+td+'>'+cesc((c.prefs||[])[0]||'-')+'</td><td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
+          +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td></tr>';
+      }
+      return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b></td>'
       +(entry?'<td '+td+'>'+cesc(c.birth||'-')+'</td><td '+td+'>'+cesc(c.gender||'-')+'</td><td '+td+'>'+cesc(c.school||c.club||'-')+'</td>':'')
       +'<td '+td+'>'+cesc((c.prefs||[]).map((p,j)=>(j+1)+'지망 '+p).join(' · ')||'-')+'</td>'
       +'<td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
-      +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td></tr>').join('');
+      +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td></tr>';
+    }).join('');
   }else{
-    rows=list.map((c,i)=>'<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(mname(c.name))+'</b></td>'
+    rows=list.map((c,i)=>{
+      if(c.team){
+        return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>👥 '+cesc(c.name)+'</b> <span style="font-size:11.5px;color:#8a919d">'+cesc(c.teamType||'팀')+(c.teamOrg?' · '+cesc(c.teamOrg):'')+' · '+(c.rosterN||0)+'명</span></td>'
+          +'<td '+td+'>'+cesc((c.prefs||[])[0]||'-')+'</td>'
+          +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td></tr>';
+      }
+      return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(mname(c.name))+'</b></td>'
       +'<td '+td+'>'+cesc((c.prefs||[])[0]||'-')+'</td>'
-      +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td></tr>').join('');
+      +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td></tr>';
+    }).join('');
   }
   const head=staff
     ?'<tr><th '+th+'>연번</th><th '+th+'>성명</th>'+(entry?'<th '+th+'>생년월일</th><th '+th+'>성별</th><th '+th+'>학교·클럽</th>':'')+'<th '+th+'>희망 '+(entry?'부문':'임무')+'</th><th '+th+'>신청일</th><th '+th+'>상태</th></tr>'
@@ -276,6 +293,215 @@ async function checkFamReq(){
     openApply(r.targetId);
   }catch(e){alert('요청 확인 실패: '+e.message)}
 }
+// ══ 👥 팀 단위 신청 (클럽팀·학교팀·자유팀 — 인솔자: 교사·클럽장·학부모 등 성인 회원) ══
+function myTeamEntries(s){
+  if(!CME)return [];
+  return compClaimList(s).filter(c=>c.team&&c.uid===CME.uid);
+}
+let TA_ID=null,TA_ROSTER=[],TA_FILES=[],TA_SIGPAD=null;
+async function openTeamApply(id){
+  const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
+  const s=doc.data();
+  // 인솔자는 성인만 (교사·클럽장·학부모·일반 성인 회원 모두 가능)
+  if(CMY.birth&&(Date.now()-new Date(CMY.birth).getTime())/31557600000<19){
+    alert('👥 팀 신청(인솔자 등록)은 성인 회원만 할 수 있습니다.\n지도교사·클럽장·보호자께 요청해주세요.');return;
+  }
+  TA_ID=id;TA_ROSTER=[];TA_FILES=[];
+  const tts=(s.teamTypes&&s.teamTypes.length)?s.teamTypes:['클럽팀','학교팀','자유팀'];
+  // 내가 클럽장인 클럽 (클럽팀용)
+  let myClubs=[];
+  try{const cs=await DB.collection('clubs').where('ownerUid','==',CME.uid).limit(10).get();
+    myClubs=cs.docs.filter(x=>['승인','임시'].indexOf(x.data().status)>=0).map(x=>({id:x.id,name:x.data().name,data:x.data()}));}catch(e){}
+  window.TA_MYCLUBS=myClubs;
+  const old=document.getElementById('taModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='taModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.6);z-index:999;display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto';
+  const inp='style="padding:9px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-family:inherit;font-size:13.5px"';
+  div.innerHTML='<div class="cmodal"><div class="mhead"><div class="mt">👥 팀 단위 참가 신청</div><div class="ms">'+cesc(s.title)+' · '+cesc(s.date)+'</div></div>'
+    +'<div class="mbody">'
+    +'<div style="font-size:13px;font-weight:800;margin-bottom:6px">① 팀 정보</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+    +'<select id="taType" '+inp+' onchange="taTypeUI()">'+tts.map(t=>'<option>'+t+'</option>').join('')+'</select>'
+    +'<input id="taName" '+inp+' placeholder="팀명 (예: 신남FC)" style="flex:1;min-width:150px">'
+    +'<select id="taDiv" '+inp+'>'+(s.teamDivs||[]).map(x=>'<option>'+cesc(x)+'</option>').join('')+'</select></div>'
+    +'<div id="taOrgRow" style="margin-top:8px"></div>'
+    +'<div style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;font-weight:700">인솔자: '+cesc(CMY.name||'')+' <select id="taRole" '+inp+'><option>지도교사</option><option>클럽장</option><option>학부모</option><option>성인 인솔자</option></select><span style="font-size:11.5px;color:#8a919d">'+cesc(CMY.phone||'')+'</span></div>'
+    +'<div style="font-size:13px;font-weight:800;margin:14px 0 4px">② 팀원 명단 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 비회원 학생도 직접 입력 가능</span></div>'
+    +'<div id="taRosterBox" style="border:1px solid #e2e7f0;border-radius:10px;padding:8px"></div>'
+    +'<div style="display:flex;gap:8px;margin-top:7px"><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px" onclick="taAddRow()">+ 팀원 추가</button>'
+    +'<button type="button" class="cbtn cbtn-soft" id="taLoadClub" style="padding:6px 14px;font-size:12.5px;display:none" onclick="taLoadClubRoster()">📋 클럽 명단 불러오기</button></div>'
+    +'<div style="font-size:13px;font-weight:800;margin:14px 0 4px">③ 보호자 동의 (미성년 팀원)</div>'
+    +'<div style="background:#fff8ed;border:1.5px solid #ecd9b0;border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.8">'
+    +'만 19세 미만 팀원은 보호자 <b>서면 동의서</b>가 필요합니다. <a href="consent_guardian.html" target="_blank" style="color:#153A77;font-weight:800">📄 동의서 양식 열기·인쇄 →</a><br>'
+    +'인솔자가 전원분을 수합·보관하고, 아래에서 사진·스캔본을 업로드해 주세요. <b>지금 없으면 신청 후 [📎 동의서 업로드] 버튼으로 나중에 제출할 수 있습니다.</b>'
+    +'<div style="margin-top:7px"><input id="taFiles" type="file" accept="image/*,.pdf" multiple style="font-size:12.5px"></div>'
+    +'<label style="display:flex;gap:7px;align-items:flex-start;margin-top:8px;font-weight:800;color:#153A77"><input type="checkbox" id="taPledge" style="width:auto;margin-top:3px"> 인솔자로서 미성년 팀원 전원의 보호자 동의를 받았으며(또는 대회 전까지 수합·제출하며), 명단이 사실임을 확인합니다.</label></div>'
+    +'<div style="font-size:13px;font-weight:800;margin:14px 0 4px">④ 인솔자 서명</div>'
+    +'<div class="sigwrap"><canvas id="taSig" width="520" height="110" style="width:100%;height:110px;touch-action:none;display:block"></canvas></div>'
+    +'<button type="button" class="cbtn cbtn-soft" style="padding:4px 12px;font-size:11.5px;margin-top:4px" onclick="taClearSig()">서명 지우기</button>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
+    +'<button class="cbtn" style="background:#eceff4;color:#555" onclick="document.getElementById(\'taModal\').remove()">닫기</button>'
+    +'<button class="cbtn cbtn-main" style="padding:11px 24px" onclick="submitTeam()">팀 참가 신청</button></div>'
+    +'</div></div>';
+  document.body.appendChild(div);
+  taAddRow();taAddRow();taAddRow();
+  taTypeUI();taInitSig();
+}
+function taTypeUI(){
+  const t=document.getElementById('taType').value;
+  const row=document.getElementById('taOrgRow');
+  const lb=document.getElementById('taLoadClub');
+  if(t==='클럽팀'){
+    const cl=window.TA_MYCLUBS||[];
+    row.innerHTML=cl.length?'소속 클럽: <select id="taOrg" style="padding:8px 11px;border:1.5px solid #d5dce8;border-radius:9px;font-size:13px">'+cl.map(c=>'<option value="'+c.id+'">'+cesc(c.name)+'</option>').join('')+'</select>'
+      :'<span style="font-size:12.5px;color:#C41E2F;font-weight:700">내가 클럽장인 클럽이 없습니다 — 학교팀/자유팀을 선택하거나 클럽을 먼저 만들어주세요.</span>';
+    if(lb)lb.style.display=cl.length?'':'none';
+  }else if(t==='학교팀'){
+    row.innerHTML='소속 학교: <input id="taOrg" placeholder="예: 부산신남초등학교" style="padding:8px 11px;border:1.5px solid #d5dce8;border-radius:9px;font-size:13px;width:220px">';
+    if(lb)lb.style.display='none';
+  }else{
+    row.innerHTML='소속(선택): <input id="taOrg" placeholder="단체·모임명 (없으면 비워두세요)" style="padding:8px 11px;border:1.5px solid #d5dce8;border-radius:9px;font-size:13px;width:220px">';
+    if(lb)lb.style.display='none';
+  }
+}
+function taAddRow(v){
+  v=v||{};
+  const box=document.getElementById('taRosterBox');
+  const i=box.children.length;
+  const row=document.createElement('div');
+  row.style.cssText='display:flex;gap:6px;margin-top:'+(i?'6px':'0')+';flex-wrap:wrap;align-items:center';
+  row.innerHTML='<span style="font-size:11.5px;color:#8a919d;width:18px">'+(i+1)+'</span>'
+    +'<input class="taR-name" placeholder="이름" value="'+cesc(v.name||'')+'" style="width:90px;padding:7px 9px;border:1px solid #d5dce8;border-radius:8px;font-size:13px">'
+    +'<input class="taR-birth" type="date" value="'+cesc(v.birth||'')+'" style="width:140px;padding:7px 9px;border:1px solid #d5dce8;border-radius:8px;font-size:13px">'
+    +'<select class="taR-g" style="padding:7px 8px;border:1px solid #d5dce8;border-radius:8px;font-size:13px"><option value="">성별</option><option'+(v.gender==='남'?' selected':'')+'>남</option><option'+(v.gender==='여'?' selected':'')+'>여</option></select>'
+    +'<input class="taR-school" placeholder="학교·소속" value="'+cesc(v.school||'')+'" style="flex:1;min-width:110px;padding:7px 9px;border:1px solid #d5dce8;border-radius:8px;font-size:13px">'
+    +'<button type="button" onclick="this.parentNode.remove()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:7px;width:26px;height:26px;cursor:pointer;font-weight:900">×</button>';
+  box.appendChild(row);
+}
+async function taLoadClubRoster(){
+  const sel=document.getElementById('taOrg');if(!sel||!sel.value)return;
+  const cl=(window.TA_MYCLUBS||[]).find(c=>c.id===sel.value);if(!cl)return;
+  const box=document.getElementById('taRosterBox');box.innerHTML='';
+  const c=cl.data;
+  const kids=(c.childMembers||[]);
+  // 자녀형 멤버(생년·학교 보유) 우선 + 성인 멤버 이름만
+  kids.forEach(k=>taAddRow({name:k.name,birth:k.birth||'',gender:k.gender||'',school:k.school||''}));
+  (c.members||[]).forEach(m=>{if(m.uid!==CME.uid)taAddRow({name:m.name||''});});
+  if(!box.children.length)taAddRow();
+  alert('클럽 명단 '+box.children.length+'명을 불러왔습니다. 참가하지 않는 인원은 ×로 지워주세요.');
+}
+let TA_DRAWN=false;
+function taInitSig(){
+  const cv=document.getElementById('taSig');const ctx=cv.getContext('2d');
+  ctx.lineWidth=2.4;ctx.lineCap='round';ctx.strokeStyle='#111';
+  let down=false,px=0,py=0;
+  const pos=e=>{const r=cv.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return [(t.clientX-r.left)*(cv.width/r.width),(t.clientY-r.top)*(cv.height/r.height)];};
+  cv.addEventListener('mousedown',e=>{down=true;[px,py]=pos(e);e.preventDefault();});
+  cv.addEventListener('mousemove',e=>{if(!down)return;const [x,y]=pos(e);ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(x,y);ctx.stroke();px=x;py=y;TA_DRAWN=true;e.preventDefault();});
+  window.addEventListener('mouseup',()=>{down=false});
+  cv.addEventListener('touchstart',e=>{down=true;[px,py]=pos(e);e.preventDefault();},{passive:false});
+  cv.addEventListener('touchmove',e=>{if(!down)return;const [x,y]=pos(e);ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(x,y);ctx.stroke();px=x;py=y;TA_DRAWN=true;e.preventDefault();},{passive:false});
+  cv.addEventListener('touchend',()=>{down=false});
+  TA_DRAWN=false;
+}
+function taClearSig(){const cv=document.getElementById('taSig');cv.getContext('2d').clearRect(0,0,cv.width,cv.height);TA_DRAWN=false;}
+async function taUploadFiles(files,slotId,pid){
+  const urls=[];
+  for(let i=0;i<Math.min(files.length,10);i++){
+    const f=files[i];
+    const ext=(f.name.split('.').pop()||'jpg').toLowerCase();
+    const ref=firebase.storage().ref('logs/'+CME.uid+'/teamconsent_'+slotId+'_'+pid+'_'+Date.now()+'_'+i+'.'+ext);
+    const snap=await ref.put(f);
+    urls.push(await snap.ref.getDownloadURL());
+  }
+  return urls;
+}
+async function submitTeam(){
+  const s0=CSLOTS.find(d=>d.id===TA_ID);if(!s0)return;
+  const teamName=document.getElementById('taName').value.trim();
+  const teamType=document.getElementById('taType').value;
+  const divName=document.getElementById('taDiv').value;
+  if(!teamName)return alert('팀명을 입력해주세요.');
+  const orgEl=document.getElementById('taOrg');
+  let teamOrg='',teamOrgId='';
+  if(teamType==='클럽팀'){
+    if(!orgEl||!orgEl.value)return alert('소속 클럽을 선택해주세요.');
+    teamOrgId=orgEl.value;
+    teamOrg=((window.TA_MYCLUBS||[]).find(c=>c.id===orgEl.value)||{}).name||'';
+  }else{
+    teamOrg=orgEl?orgEl.value.trim():'';
+    if(teamType==='학교팀'&&!teamOrg)return alert('소속 학교를 입력해주세요.');
+  }
+  const roster=[...document.querySelectorAll('#taRosterBox > div')].map(r=>({
+    name:r.querySelector('.taR-name').value.trim(),
+    birth:r.querySelector('.taR-birth').value,
+    gender:r.querySelector('.taR-g').value,
+    school:r.querySelector('.taR-school').value.trim()
+  })).filter(x=>x.name);
+  if(!roster.length)return alert('팀원을 1명 이상 입력해주세요.');
+  if(!document.getElementById('taPledge').checked)return alert('보호자 동의 수합 확인란에 체크해주세요.');
+  if(!TA_DRAWN)return alert('인솔자 서명이 필요합니다.');
+  const cv=document.getElementById('taSig');
+  let sign=cv.toDataURL('image/png');if(sign.length>150000)sign=cv.toDataURL('image/jpeg',0.7);
+  const pid='team_'+Date.now();
+  // 서면 동의서 파일 (지금 올린 경우)
+  let files=[];
+  const fEl=document.getElementById('taFiles');
+  try{if(fEl&&fEl.files&&fEl.files.length)files=await taUploadFiles(fEl.files,TA_ID,pid);}catch(e){console.warn('upload',e);alert('동의서 파일 업로드에 실패했습니다. 신청은 계속 진행되며, 신청 후 [📎 동의서 업로드]로 다시 시도할 수 있습니다.');}
+  const ref=DB.collection('compSlots').doc(TA_ID);
+  try{
+    await DB.runTransaction(async tx=>{
+      const doc=await tx.get(ref);const s=doc.data();
+      if(activeCount(s)>=s.quota)throw new Error('정원이 마감되었습니다');
+      const dv=slotDivs(s).find(d=>d.name===divName);
+      if(dv&&dv.cap&&divActiveCount(s,dv.name)>=dv.cap)throw new Error('['+dv.name+'] 부문 정원이 마감되었습니다');
+      const claimed=(s.claimed||[]).slice();
+      claimed.push({uid:CME.uid,pid:pid,team:true,name:teamName,teamType:teamType,teamOrg:teamOrg,teamOrgId:teamOrgId,
+        leader:CMY.name||'',leaderRole:document.getElementById('taRole').value,leaderPhone:CMY.phone||'',
+        roster:roster,rosterN:roster.length,prefs:[divName],consent:true,signed:true,
+        consentFiles:files,at:new Date().toISOString()});
+      tx.update(ref,{claimed:claimed});
+    });
+    // 서명·신청 기록 저장
+    const now=new Date().toISOString();
+    const c=Object.assign({},CMY.contracts||{});
+    c['compapply_'+TA_ID+'_'+pid]={title:s0.data().title,doc:'팀 참가 신청서',who:teamName,agreedAt:now,sign:sign,prefs:[divName],team:true,rosterN:roster.length};
+    await DB.collection('users').doc(CME.uid).update({contracts:c}).catch(()=>{});
+    CMY.contracts=c;
+    if(files.length)await DB.collection('teamConsents').doc(TA_ID+'_'+pid).set({slotId:TA_ID,pid:pid,uid:CME.uid,files:files,at:now}).catch(()=>{});
+    document.getElementById('taModal').remove();
+    alert('👥 ['+teamName+'] 팀 참가 신청 완료! ('+roster.length+'명)'+(files.length?'\n동의서 '+files.length+'건이 함께 제출되었습니다.':'\n\n📎 서면 동의서는 대회 전까지 [📎 동의서 업로드] 버튼으로 제출해주세요.'));
+    loadSlots();
+  }catch(e){alert(e.message)}
+}
+// 신청 후 서면 동의서 추가 업로드
+async function teamConsentUpload(slotId){
+  const s0=CSLOTS.find(d=>d.id===slotId);if(!s0)return;
+  const mine=myTeamEntries(s0.data());
+  if(!mine.length)return;
+  let pid=mine[0].pid;
+  if(mine.length>1){
+    const pick=prompt('동의서를 올릴 팀 번호를 선택하세요:\n'+mine.map((m,i)=>(i+1)+'. '+m.name+' ('+(m.rosterN||0)+'명)').join('\n'),'1');
+    if(pick===null)return;
+    const idx=parseInt(pick,10)-1;
+    if(!(idx>=0&&idx<mine.length))return alert('잘못된 번호입니다');
+    pid=mine[idx].pid;
+  }
+  const inp=document.createElement('input');
+  inp.type='file';inp.accept='image/*,.pdf';inp.multiple=true;
+  inp.onchange=async()=>{
+    if(!inp.files.length)return;
+    try{
+      const urls=await taUploadFiles(inp.files,slotId,pid);
+      const docId=slotId+'_'+pid;
+      const prev=await DB.collection('teamConsents').doc(docId).get();
+      const all=(prev.exists?(prev.data().files||[]):[]).concat(urls);
+      await DB.collection('teamConsents').doc(docId).set({slotId:slotId,pid:pid,uid:CME.uid,files:all,at:new Date().toISOString()});
+      alert('📎 동의서 '+urls.length+'건 업로드 완료 (총 '+all.length+'건 보관 중)');
+    }catch(e){alert('업로드 실패: '+e.message)}
+  };
+  inp.click();
+}
 async function openMinorReq(id){
   if(!(CMY&&CMY.guardianUid)){
     alert('👨‍👧 만 19세 미만은 보호자 승인으로 참가 신청합니다.\n아직 보호자 계정이 연동되지 않았습니다.\n마이페이지 › 보호자 연동(연동 코드)을 먼저 진행해 주세요.');return;
@@ -292,14 +518,41 @@ async function openMinorReq(id){
     alert('✓ 보호자에게 승인 요청을 보냈습니다.\n보호자가 승인·서명하면 참가 신청이 완료됩니다.');
   }catch(e){alert('요청 실패: '+e.message)}
 }
+let CCOMPS=[];
 async function loadSlots(){
   const el=document.getElementById('cSlotList');
   try{
-    const snap=await DB.collection('compSlots').orderBy('date').limit(50).get();
+    const [snap,comps]=await Promise.all([
+      DB.collection('compSlots').orderBy('date').limit(50).get(),
+      DB.collection('competitions').orderBy('dateStart','desc').limit(30).get().catch(()=>null)
+    ]);
     CSLOTS=snap.docs;
-    if(snap.empty){el.innerHTML='<div class="bempty">현재 모집 중인 대회가 없습니다. 확정 시 이곳에 게시됩니다.</div>';return}
+    CCOMPS=comps?comps.docs:[];
+    if(snap.empty&&!CCOMPS.length){el.innerHTML='<div class="bempty">현재 모집 중인 대회가 없습니다. 확정 시 이곳에 게시됩니다.</div>';return}
     const today=new Date().toISOString().slice(0,10);
-    el.innerHTML=snap.docs.map(d=>{
+    // 대회(competitions) 묶음 먼저, 미연결 공고는 아래에 기존 방식대로
+    const byComp={};CSLOTS.forEach(d=>{const cid=d.data().compId;if(cid)(byComp[cid]=byComp[cid]||[]).push(d);});
+    const linked=new Set();Object.values(byComp).forEach(a=>a.forEach(d=>linked.add(d.id)));
+    let html='';
+    CCOMPS.forEach(cd=>{
+      const c=cd.data();
+      const slots=byComp[cd.id]||[];
+      const sports=(c.sports||[]).map(x=>'<span class="rbadge" style="background:'+(x.mode==='체험부스'?'#b8860b':'#153A77')+'">'+cesc(x.name)+(x.mode==='체험부스'?' 🎪체험부스':'')+'</span>').join(' ');
+      html+='<div style="border:2px solid #b9cdec;border-radius:18px;padding:4px 16px 14px;margin-bottom:22px;background:#f8fbff">'
+        +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 4px 8px">'
+        +'<b style="font-size:17px">🏆 '+cesc(c.title)+'</b>'+sports
+        +'<span style="font-size:12.5px;color:#5b6472;font-weight:700">📅 '+cesc(c.dateStart)+(c.dateEnd&&c.dateEnd!==c.dateStart?' ~ '+cesc(c.dateEnd):'')+' · 📍 '+cesc(c.place||'')+'</span></div>'
+        +(c.desc?'<div style="font-size:12.5px;color:#4b5563;padding:0 4px 8px">'+cesc(c.desc)+'</div>':'')
+        +((c.sports||[]).some(x=>x.mode==='체험부스')?'<div style="font-size:12.5px;font-weight:800;color:#8a5a00;background:#fff8ed;border:1px solid #ecd9b0;border-radius:9px;padding:8px 12px;margin:0 4px 8px">🎪 체험부스 종목은 신청 없이 현장에서 자유롭게 참여하실 수 있습니다.</div>':'')
+        +(slots.length?slots.map(d=>slotCard(d,today)).join(''):'<div class="bempty" style="margin:4px">모집 공고 준비 중</div>')
+        +'</div>';
+    });
+    html+=snap.docs.filter(d=>!linked.has(d.id)).map(d=>slotCard(d,today)).join('');
+    el.innerHTML=html||'<div class="bempty">현재 모집 중인 대회가 없습니다.</div>';
+  }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+cesc(e.message)+'</div>'}
+}
+function slotCard(d,today){
+  {
       const s=d.data();
       const roles=(s.roles&&s.roles.length)?s.roles:(DEFAULT_ROLES[s.role]||[]);
       const entry=s.role==='참가';
@@ -336,9 +589,11 @@ async function loadSlots(){
               return '<span class="ctag'+(c>=dv.cap?'" style="color:#C41E2F;background:#fdf0f1':'')+'">'+cesc(dv.name)+' '+c+'/'+dv.cap+(c>=dv.cap?' 마감':'')+'</span>';}
             return '<span class="ctag">'+cesc(dv.name)+'</span>';
           }).join('')+'</div>'
-        +'<div class="cact">'+action+'<button class="cbtn cbtn-ghost" onclick="viewRoster(\''+d.id+'\')">👥 신청 현황</button></div></div>';
-    }).join('');
-  }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+cesc(e.message)+'</div>'}
+        +'<div class="cact">'+action
+        +((s.teamDivs&&s.teamDivs.length&&s.role==='참가'&&!closed)?'<button class="cbtn cbtn-soft" onclick="openTeamApply(\''+d.id+'\')">👥 팀 단위 신청</button>':'')
+        +(myTeamEntries(s).length?'<button class="cbtn cbtn-ghost" onclick="teamConsentUpload(\''+d.id+'\')">📎 동의서 업로드</button>':'')
+        +'<button class="cbtn cbtn-ghost" onclick="viewRoster(\''+d.id+'\')">👥 신청 현황</button></div></div>';
+  }
 }
 let APPLY_ID=null,APPLY_SEL=[],APPLY_PID=null,APPLY_MAX=3,APPLY_PARTS=[],MY_CLUBS=null;
 let RRN_OK=false;
