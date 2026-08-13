@@ -147,6 +147,16 @@
   <p class="sec-desc">승인 회원 중 강사 페이지에서 심판·운영 분야를 지원한 분만 신청할 수 있습니다. 희망 임무를 1~3순위로 선택해 신청하며, 마감 전에는 본인이 직접 취소할 수 있습니다.</p>
   <div class="gbox" id="cGate" style="display:none"></div>
   <div id="cBody" style="display:none">
+    <div id="soAdminBox" style="display:none;background:#f0f5ff;border:2px solid #b9cdec;border-radius:16px;padding:16px 20px;margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <b style="font-size:15.5px;color:#153A77">🛠 시도임원 모집공고 등록</b>
+        <span style="font-size:12px;color:var(--gray)">우리 시도 대회의 심판·운영요원 모집 공고를 직접 올릴 수 있습니다</span>
+        <span style="flex:1"></span>
+        <button class="cbtn cbtn-main" style="padding:8px 16px;font-size:13px" onclick="openSoPost()">+ 모집공고 등록</button>
+      </div>
+      <div style="font-size:11.5px;color:#8a919d;margin-top:6px">종목·체험부스·팀신청 등 대회 신설은 사무국(중앙관리자)에 요청해주세요 — 여기서는 심판·운영요원 모집만 가능합니다.</div>
+      <div id="soMyList" style="margin-top:10px"></div>
+    </div>
     <div class="board" id="cSlotList"><div class="bempty">불러오는 중…</div></div>
     <div style="margin-top:14px;font-size:12.5px;color:var(--gray);line-height:1.7;background:var(--bg-soft);border-radius:10px;padding:12px 16px">
       <b>개인정보 수집·이용 안내</b> — 신청 시 소속·성명·연락처·계좌번호를 대회 수당(심판·운영·안전요원) 지급 목적으로 수집·이용하며(보유기간 2026. 12. 31.까지), 수당 원천징수 세액 납부를 위해 성명·지급총액·결정세액·주민등록번호가 국세청에 제공됩니다(「소득세법」 제21조·제37조·제129조, 「국세기본법 시행령」 제68조). 동의를 거부할 권리가 있으나, 거부 시 수당 지급에 제한이 있을 수 있습니다. 계좌·주민등록번호는 마이페이지에서 별도 보안 저장됩니다.
@@ -200,10 +210,86 @@ AUTH.onAuthStateChanged(async u=>{
   document.getElementById('cBody').style.display='block';
   await loadSlots();
   checkFamReq();
+  initSoAdmin();
 });
 // ── 👥 신청 현황 공개 (일반회원: 마스킹 명단 / 사무국·임원: 세부정보) ──
 function isCompStaff(){
   return !!(CMY&&(CMY.owner||['admin','regionAdmin','sidoOfficer','gugunOfficer'].indexOf(CMY.role)>=0));
+}
+// ── 🛠 시도임원 제한 모집공고 등록 (심판·운영요원만 — 종목·팀신청 등 대회 신설은 중앙관리자 전용) ──
+const SO_SIDO2REG={'서울':'서울·경기','인천':'서울·경기','경기':'서울·경기','강원':'강원','대전':'충청','세종':'충청','충청북':'충청','충북':'충청','충청남':'충청','충남':'충청','광주':'전라','전라북':'전라','전북':'전라','전라남':'전라','전남':'전라','전남광주':'전라','부산':'경상','대구':'경상','울산':'경상','경상북':'경상','경북':'경상','경상남':'경상','경남':'경상','제주':'제주'};
+function isSidoOfficer(){return !!(CMY&&(CMY.role==='sidoOfficer'||(CMY.roles&&CMY.roles.indexOf('sidoOfficer')>=0)))}
+let SO_POSTS=[];
+function initSoAdmin(){
+  if(!isSidoOfficer())return;
+  const box=document.getElementById('soAdminBox');if(box)box.style.display='';
+  loadMySoPosts();
+}
+async function loadMySoPosts(){
+  const el=document.getElementById('soMyList');if(!el)return;
+  try{
+    const snap=await DB.collection('compSlots').where('byUid','==',CME.uid).get();
+    SO_POSTS=snap.docs.filter(d=>!d.data().compId).sort((a,b)=>String(a.data().date||'').localeCompare(String(b.data().date||'')));
+    el.innerHTML=SO_POSTS.length?SO_POSTS.map(d=>{
+      const s=d.data();
+      return '<div style="background:#fff;border:1.5px solid #d3e0f2;border-radius:10px;padding:10px 13px;margin-top:7px;display:flex;align-items:center;gap:9px;flex-wrap:wrap">'
+        +'<b style="font-size:13.5px">'+cesc(s.title)+'</b>'
+        +'<span style="font-size:11.5px;font-weight:800;color:'+(s.role==='심판'?'#7c3aed':'#b8860b')+'">'+cesc(s.role)+'</span>'
+        +'<span style="font-size:12px;color:#6b7280">📅 '+cesc(s.date)+(s.deadline?' · 마감 '+cesc(s.deadline):'')+' · 정원 '+cesc(String(s.quota||0))+'</span>'
+        +'<span style="flex:1"></span>'
+        +'<button class="cbtn cbtn-soft" style="padding:5px 12px;font-size:12px" onclick="openSoPost(\''+d.id+'\')">✏️ 수정</button>'
+        +'<button class="cbtn cbtn-ghost" style="padding:5px 12px;font-size:12px;color:#C41E2F" onclick="delSoPost(\''+d.id+'\')">삭제</button>'
+        +'</div>';
+    }).join(''):'<div style="font-size:12.5px;color:#8a919d;margin-top:6px">아직 등록한 모집공고가 없습니다.</div>';
+  }catch(e){el.innerHTML='<div style="font-size:12px;color:#C41E2F">불러오기 실패: '+cesc(e.message)+'</div>'}
+}
+function openSoPost(editId){
+  const ed=editId?SO_POSTS.find(d=>d.id===editId):null;
+  const s=ed?ed.data():{};
+  const old=document.getElementById('soModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='soModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto';
+  const inp='style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px;font-family:inherit;font-size:13.5px"';
+  const lb='style="font-size:12.5px;font-weight:800;display:block;margin-top:11px"';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:480px;width:100%;max-height:92vh;overflow:auto;padding:22px 24px">'
+    +'<b style="font-size:16px">🛠 '+(ed?'모집공고 수정':'심판·운영요원 모집공고 등록')+'</b>'
+    +'<div style="font-size:11.5px;color:#8a919d;margin-top:4px">'+cesc(CMY.sido||'')+' 시도연맹 소속 · 대회 신설(종목·팀신청 등)은 사무국(중앙관리자)에 요청해주세요</div>'
+    +'<label '+lb+'>대회명 *</label><input id="soTitle" '+inp+' value="'+cesc(s.title||'')+'" placeholder="예: 2026 부산광역시교육감배 플라잉디스크대회">'
+    +'<label '+lb+'>역할 *</label><select id="soRole" '+inp+'><option'+(s.role==='심판'?' selected':'')+'>심판</option><option'+(s.role==='운영'?' selected':'')+'>운영</option></select>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label '+lb+'>일자 *</label><input id="soDate" type="date" '+inp+' value="'+cesc(s.date||'')+'"></div><div><label '+lb+'>신청 마감일</label><input id="soDL" type="date" '+inp+' value="'+cesc(s.deadline||'')+'"></div></div>'
+    +'<label '+lb+'>정원 (명) *</label><input id="soQuota" type="number" min="1" '+inp+' value="'+cesc(String(s.quota||4))+'">'
+    +'<label '+lb+'>임무 목록 (쉼표 구분, 비우면 기본값)</label><input id="soRoles" '+inp+' value="'+cesc((s.roles||[]).join(', '))+'" placeholder="'+cesc((DEFAULT_ROLES[(s.role)||'심판']||[]).join(', '))+'">'
+    +'<label '+lb+'>안내문 (선택)</label><textarea id="soNote" rows="3" '+inp+'>'+cesc(s.note||'')+'</textarea>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
+    +'<button class="cbtn" style="background:#eceff4;color:#555" onclick="document.getElementById(\'soModal\').remove()">닫기</button>'
+    +'<button class="cbtn cbtn-main" style="padding:10px 22px" onclick="saveSoPost(\''+(editId||'')+'\')">'+(ed?'💾 수정 저장':'등록')+'</button></div>'
+    +'</div>';
+  document.body.appendChild(div);
+}
+async function saveSoPost(editId){
+  const v=id=>{const e=document.getElementById(id);return e?(e.value||'').trim():''};
+  const title=v('soTitle'),date=v('soDate'),role=v('soRole');
+  const quota=parseInt(v('soQuota'));
+  if(!title||!date||!quota){alert('대회명·일자·정원을 입력해주세요.');return}
+  const rolesTxt=v('soRoles');
+  const roles=rolesTxt?rolesTxt.split(',').map(x=>x.trim()).filter(Boolean):(DEFAULT_ROLES[role]||[]);
+  const region=SO_SIDO2REG[CMY.sido]||CMY.sido||'';
+  const data={title:title,role:role,roles:roles,quota:quota,date:date,region:region,
+    deadline:v('soDL'),note:v('soNote'),fee:'',byUid:CME.uid,byName:CMY.name||'',bySido:CMY.sido||''};
+  try{
+    if(editId){
+      await DB.collection('compSlots').doc(editId).update(data);
+    }else{
+      await DB.collection('compSlots').add(Object.assign({claimed:[],cancels:[],confirmed:[],createdAt:firebase.firestore.FieldValue.serverTimestamp()},data));
+    }
+    document.getElementById('soModal').remove();
+    alert((editId?'✓ 수정되었습니다.':'✓ 모집공고가 등록되었습니다.')+'\n대회 페이지에 바로 게시됩니다.');
+    loadMySoPosts();loadSlots();
+  }catch(e){alert('저장 실패: '+e.message)}
+}
+async function delSoPost(id){
+  if(!confirm('이 모집공고를 삭제할까요? (신청 기록 포함 — 복구 불가)'))return;
+  try{await DB.collection('compSlots').doc(id).delete();loadMySoPosts();loadSlots();}catch(e){alert('삭제 실패: '+e.message)}
 }
 function mname(n){
   n=String(n||'');
