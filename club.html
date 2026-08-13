@@ -164,6 +164,22 @@
     <div id="clPane3" style="display:none">
     <h3 class="sub">➕ 클럽 만들기</h3>
     <div style="background:#fff;border:1.5px solid #dfe5ee;border-radius:14px;padding:22px 24px;max-width:640px">
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <label style="flex:1;cursor:pointer;border:2px solid #1F4E9C;background:#eef3fa;border-radius:12px;padding:12px 14px;display:block" id="ncTypeFedLbl">
+          <input type="radio" name="ncType" value="federation" checked onchange="ncTypeChange()" style="width:auto;margin-right:6px">
+          <b style="font-size:13.5px">🏅 연맹 정식 클럽</b>
+          <div style="font-size:11.5px;color:#6b7280;margin-top:3px">대한민국플라잉디스크연맹 소속 클럽으로 등록합니다</div>
+        </label>
+        <label style="flex:1;cursor:pointer;border:2px solid #dfe5ee;background:#fff;border-radius:12px;padding:12px 14px;display:block" id="ncTypeExtLbl">
+          <input type="radio" name="ncType" value="external" onchange="ncTypeChange()" style="width:auto;margin-right:6px">
+          <b style="font-size:13.5px">🔗 타 단체 소속 클럽</b>
+          <div style="font-size:11.5px;color:#6b7280;margin-top:3px">다른 단체(사단체 등) 소속 클럽을 별도로 등록합니다</div>
+        </label>
+      </div>
+      <div id="ncOrgNameWrap" style="display:none;margin-bottom:4px">
+        <label class="clabel" style="margin-top:0">소속 단체명 <span style="color:#C41E2F">*</span></label>
+        <input id="ncOrgName" class="cfield" placeholder="예: ○○연합회, ○○협회 등">
+      </div>
       <label class="clabel" style="margin-top:0">클럽명 <span style="color:#C41E2F">*</span></label>
       <input id="ncName" class="cfield" placeholder="예: 김포 프리버드 얼티미트 클럽">
       <div style="display:flex;gap:10px">
@@ -247,6 +263,14 @@ function updOrgLine(){
   const s=document.getElementById('ncSido').value,g=document.getElementById('ncGugun').value;
   document.getElementById('ncOrgLine').textContent=s?('소속: 대한민국플라잉디스크연맹(KFDF) › '+s+' 연맹'+(g?' › '+g:'')):'';
 }
+function ncTypeChange(){
+  const t=(document.querySelector('input[name="ncType"]:checked')||{}).value||'federation';
+  const ext=t==='external';
+  document.getElementById('ncOrgNameWrap').style.display=ext?'block':'none';
+  const fl=document.getElementById('ncTypeFedLbl'),el2=document.getElementById('ncTypeExtLbl');
+  fl.style.borderColor=ext?'#dfe5ee':'#1F4E9C';fl.style.background=ext?'#fff':'#eef3fa';
+  el2.style.borderColor=ext?'#7c3aed':'#dfe5ee';el2.style.background=ext?'#f5f0ff':'#fff';
+}
 function showClTab(k){
   ['1','2','3','4'].forEach(n=>{const p=document.getElementById('clPane'+n);if(p)p.style.display=(n===k?'':'none')});
   document.querySelectorAll('#clTabs .st').forEach(b=>b.classList.toggle('on',b.dataset.s===k));
@@ -307,6 +331,7 @@ function renderClubs(){
       const cnt=(c.memberUids||[]).length+((c.childMembers||[]).length);
       return '<div class="clubcard"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+cavHtml(c)+'<a href="clubhome.html?id='+d.id+'" style="text-decoration:none;color:inherit"><span class="cname">'+kesc(c.name)+'</span></a>'
         +(c.status==='임시'?'<span class="cpill2" style="background:#b8860b" title="학생들이 만든 임시클럽 — 성인 회장 인수 후 정식 승인됩니다">🧪 임시클럽</span>':'')
+        +(c.clubType==='external'?'<span class="cpill2" style="background:#7c3aed" title="타 단체 소속 클럽 — 연맹 정식 클럽이 아닙니다">🔗 타단체'+(c.orgName?': '+kesc(c.orgName):'')+'</span>':'')
         +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'
         +'<span style="font-size:12px;color:#8a919d;font-weight:700">회원 '+cnt+'명</span>'
         +'<span style="flex:1"></span><a class="cbtn cbtn-soft" style="padding:7px 14px;text-decoration:none;display:inline-block" href="clubhome.html?id='+d.id+'">🏠 클럽 홈</a>'+childJoinBtn(c,d.id)+act+'</div>'
@@ -578,7 +603,9 @@ async function loadMyClubs(){
       const ownerBtns=isOwner?'<button class="cbtn cbtn-soft" style="padding:4px 12px;font-size:12px" onclick="editMyClub(\''+d.id+'\')">✏️ 수정</button>'
         +'<button class="cbtn" style="padding:4px 12px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="delMyClub(\''+d.id+'\',\''+kesc(c.name)+'\')">🗑 삭제</button>':'';
       return '<div class="clubcard"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+cavHtml(c)+'<span class="cname">'+kesc(c.name)+'</span>'
-        +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'+badge
+        +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'
+        +(c.clubType==='external'?'<span class="cpill2" style="background:#7c3aed" title="타 단체 소속 클럽 — 연맹 정식 클럽이 아닙니다">🔗 타단체'+(c.orgName?': '+kesc(c.orgName):'')+'</span>':'')
+        +badge
         +(c.code&&(isOwner||isMember)?'<span class="cpill2" style="background:#b8860b" title="이 코드로 회원을 초대할 수 있습니다">🔑 '+kesc(c.code)+'</span>':'')
         +'<span style="font-size:12px;color:#8a919d;font-weight:700">회원 '+((c.memberUids||[]).length)+'명</span>'
         +'<span style="flex:1"></span>'+homeBtn+ownerBtns+leaveBtn+'</div>'
@@ -702,7 +729,10 @@ async function createClub(){
   const name=document.getElementById('ncName').value.trim();
   const sido=document.getElementById('ncSido').value;
   const gugun=document.getElementById('ncGugun').value;
+  const ncType=(document.querySelector('input[name="ncType"]:checked')||{}).value||'federation';
+  const orgName=ncType==='external'?document.getElementById('ncOrgName').value.trim():'';
   if(!name||!sido||!gugun){m.textContent='클럽명·시도·거점 시군구를 선택하세요';m.style.color='#C41E2F';return}
+  if(ncType==='external'&&!orgName){m.textContent='소속 단체명을 입력하세요';m.style.color='#C41E2F';return}
   try{
     let code='';
     try{code=await issueClubCode();}catch(e){code='';}
@@ -713,6 +743,7 @@ async function createClub(){
       rulesText:document.getElementById('ncRules').value.trim(),
       ownerUid:KME.uid,ownerName:KMY.name||'',
       status:TEMP_CLUB?'임시':'대기',temp:TEMP_CLUB,hidden:false,code:code,
+      clubType:ncType,orgName:orgName,
       members:[{uid:KME.uid,name:KMY.name||'',at:new Date().toISOString()}],
       memberUids:[KME.uid],pendingJoins:[],pendingUids:[],
       createdAt:firebase.firestore.FieldValue.serverTimestamp()});
@@ -721,9 +752,10 @@ async function createClub(){
     if(sf){m.textContent='심볼 업로드 중…';m.style.color='#8a919d';
       try{const url=await uploadClubSymbol(ref.id,sf);await ref.update({symbol:url});}
       catch(e){console.warn('symbol',e);}}
-    alert('✓ '+(TEMP_CLUB?'임시클럽 생성 완료!':'클럽 생성 신청 완료!')+(code?'\n\n귀 클럽의 고유 코드는 [ '+code+' ] 입니다.\n회원들에게 이 코드를 알려주면 코드로 바로 가입 신청할 수 있습니다.':'')+(TEMP_CLUB?'\n\n친구들을 초대해 보세요! 성인 회장 인수 후 연맹 승인을 받으면 정식 클럽이 됩니다.':'\n\n승인 후 클럽 목록에 게시됩니다.'));
+    alert('✓ '+(TEMP_CLUB?'임시클럽 생성 완료!':(ncType==='external'?'타 단체 소속 클럽 등록 신청 완료!':'클럽 생성 신청 완료!'))+(code?'\n\n귀 클럽의 고유 코드는 [ '+code+' ] 입니다.\n회원들에게 이 코드를 알려주면 코드로 바로 가입 신청할 수 있습니다.':'')+(TEMP_CLUB?'\n\n친구들을 초대해 보세요! 성인 회장 인수 후 연맹 승인을 받으면 정식 클럽이 됩니다.':'\n\n승인 후 클럽 목록에 게시됩니다.'));
     m.textContent='✓ 생성 신청 완료'+(code?' — 클럽 코드 ['+code+']':'');m.style.color='#0f766e';
     document.getElementById('ncName').value='';document.getElementById('ncSymbol').value='';
+    document.getElementById('ncOrgName').value='';
     document.getElementById('ncSymPrev').innerHTML='🥏';
     loadMyClubs();
   }catch(e){m.textContent='실패: '+(e.code==='permission-denied'?'권한 오류 — 로그인·승인 상태를 확인해주세요':e.message);m.style.color='#C41E2F'}
