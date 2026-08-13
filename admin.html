@@ -2682,6 +2682,7 @@ function renderCompsAdmin(){
       +(act.length?'<button class="btn-sub" style="background:#7c3aed" onclick="compConsentDocs(\''+d.id+'\')">📄 동의서 출력</button>':'')
       +(confirmed.length?'<button class="btn-sub" style="background:#b8860b" onclick="compPayroll(\''+d.id+'\')">💰 수당지급내역서</button>':'')
       +(confirmed.length?'<button class="btn-sub" style="background:#8a5a00" onclick="govPayroll(\''+d.id+'\')">📋 교육청 수당조서</button>':'')
+      +(act.length?'<button class="btn-sub" style="background:#0e7490" onclick="compLicenseDocs(\''+d.id+'\')">🎖 자격증 일괄출력</button>':'')
       +'<button class="btn-sub" style="background:#b8860b" onclick="extendComp(\''+d.id+'\')">⏰ 마감 연장</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delComp(\''+d.id+'\')">🗑</button></div></div>';
   }).join('');
@@ -2839,6 +2840,74 @@ async function compCSV(id){
   a.download=s.title+'_'+s.role+'요원_신청명단.csv';a.click();
 }
 // ── 대회요원 개인정보 동의서 일괄 출력 (수당지급 증빙 — 참고서식 기반, 서명 포함) ──
+// ── 🎖 대회 신청자 자격증 일괄 출력 (명단·동의서와 함께 교육청 제출용) ──
+// 통화 반영: "대회마다 명단 엑셀 + 동의서 + 머릿수만큼의 자격증을 함께 보낸다" → 한 번에 출력
+async function compLicenseDocs(id){
+  const doc=await DB.collection('compSlots').doc(id).get();const s=doc.data();
+  const act=compActiveClaims(s);
+  if(!act.length){alert('신청자가 없습니다.');return}
+  const only=confirm('확정자만 출력할까요?\n\n[확인] 확정자만 · [취소] 전체 신청자');
+  const conf=s.confirmed||[];
+  const targets=only?act.filter(c=>conf.indexOf(c.uid)>=0):act;
+  if(!targets.length){alert('대상자가 없습니다. (확정 처리를 먼저 하세요)');return}
+  const today=new Date().toISOString().slice(0,10);
+  const pages=[];const noLic=[];const expiredList=[];
+  for(const c of targets){
+    let ud={};
+    try{const u=await DB.collection('users').doc(c.uid).get();if(u.exists)ud=u.data();}catch(e){}
+    let lics=[];
+    try{
+      const ls=await DB.collection('licenses').where('uid','==',c.uid).get();
+      lics=ls.docs.map(x=>Object.assign({_no:x.id},x.data())).filter(x=>x.status!=='이관');
+    }catch(e){}
+    if(!lics.length){noLic.push(c.name);continue}
+    // 대회 역할에 맞는 자격 우선 (심판 공고면 심판 자격 우선)
+    lics.sort((a,b)=>((s.role==='심판')?((b.type==='심판')-(a.type==='심판')):((b.type==='지도자')-(a.type==='지도자'))));
+    const l=lics[0];
+    const exp=(l.status==='만료')||(l.expireAt?l.expireAt<today:false);
+    if(exp)expiredList.push(c.name+'('+(l.expireAt||'')+')');
+    pages.push({no:l._no,l:l,name:ud.name||c.name,birth:ud.birth||'',expired:exp});
+  }
+  if(!pages.length){alert('연결된 자격증이 있는 대상자가 없습니다.\n회원이 마이페이지에서 자격 연결을 하지 않았거나, 대장에 등록되지 않았습니다.');return}
+  let warn='';
+  if(noLic.length)warn+='· 자격 미연결: '+noLic.join(', ')+'\n';
+  if(expiredList.length)warn+='· 만료 자격: '+expiredList.join(', ')+'\n';
+  if(warn&&!confirm('아래 사항을 확인해주세요.\n\n'+warn+'\n그대로 출력할까요?'))return;
+  const dot=x=>String(x||'').replace(/-/g,'.');
+  const base=location.href.replace(/[^/]*$/,'');
+  const body=pages.map(p=>{
+    const bg=base+'files/'+((p.l.type==='심판')?'cert_bg_referee.jpg':'cert_bg_leader.jpg');
+    return '<div class="paper">'
+      +'<img class="bgimg" src="'+bg+'">'
+      +(p.expired?'<div class="expmark">만&nbsp;료</div>':'')
+      +'<div class="f" style="left:39.7%;top:33.6%;font-size:8.6mm">'+esc(p.l.grade||'')+'</div>'
+      +'<div class="f" style="left:31.8%;top:40.5%;font-size:9.2mm;border-bottom:0.6mm solid #111;padding:0 3mm 1mm 1mm">'+esc(p.name)+'</div>'
+      +'<div class="f" style="left:68.2%;top:33.75%;font-size:4.9mm">'+esc(p.no)+'</div>'
+      +'<div class="f" style="left:68.2%;top:35.85%;font-size:4.9mm">'+dot(p.l.expireAt)+'</div>'
+      +'<div class="f" style="left:68.2%;top:37.95%;font-size:4.9mm">'+dot(p.birth)+'</div>'
+      +'<div class="f" style="left:68.2%;top:40.05%;font-size:4.9mm">'+esc(p.l.region||'')+'</div>'
+      +'<div class="f" style="left:36.6%;top:70.65%;font-size:6.2mm">'+dot(p.l.issuedAt)+'</div>'
+      +'</div>';
+  }).join('');
+  const w=window.open('','_blank');
+  if(!w){alert('팝업이 차단되었습니다. 주소창 오른쪽 팝업 차단 아이콘에서 «허용»으로 바꾼 뒤 다시 시도해주세요.');return}
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>자격증 일괄 '+esc(s.title||'')+'</title>'
+    +'<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">'
+    +'<style>@page{size:A4 portrait;margin:0}html,body{margin:0;padding:0;background:#eee}'
+    +'*{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
+    +'.paper{width:210mm;height:296.5mm;margin:0 auto;position:relative;background:#fff;font-family:Pretendard,"Noto Sans KR",sans-serif;overflow:hidden;page-break-after:always}'
+    +'.bgimg{position:absolute;left:0;top:0;width:210mm;height:296.5mm;object-fit:cover;z-index:0}'
+    +'.f{position:absolute;font-weight:600;color:#111;white-space:nowrap;z-index:1}'
+    +'.expmark{position:absolute;left:50%;top:55%;transform:translate(-50%,-50%) rotate(-20deg);font-size:30mm;font-weight:900;color:rgba(196,30,47,.28);border:3mm solid rgba(196,30,47,.28);padding:4mm 10mm;border-radius:6mm;z-index:2}'
+    +'@media print{body{background:#fff}.paper{margin:0}}'
+    +'</style></head><body>'+body
+    +'<scr'+'ipt>window.onload=function(){var n=document.images.length,c=0,done=false;'
+    +'function go(){if(done)return;done=true;window.print()}'
+    +'if(!n)return go();'
+    +'[].forEach.call(document.images,function(im){var f=function(){if(++c>=n)go()};'
+    +'if(im.complete)f();else{im.onload=f;im.onerror=f}});setTimeout(go,6000);}<\/scr'+'ipt></body></html>');
+  w.document.close();
+}
 async function compConsentDocs(id){
   const doc=await DB.collection('compSlots').doc(id).get();const s=doc.data();
   const act=compActiveClaims(s);
@@ -3413,9 +3482,40 @@ async function setOrg(uid){
   await DB.collection('users').doc(uid).update({org:org,orgTitle:title,fedName:fedName});
   loadUsers();
 }
+// 가입 시 입력한 자격번호를 자격 대장(licenses)과 자동 대조·연결
+// 통화 반영: "번호만 입력하면 되지 사본을 또 올릴 필요가 없다", "본인이 연결 신청해야만 뜨는 구조를 자동화"
+async function autoLinkLicense(uid,d){
+  const nos=[d.qualNoLeader,d.qualNoReferee].map(x=>String(x||'').trim()).filter(Boolean);
+  if(!nos.length)return [];
+  const linked=[];
+  for(const raw of nos){
+    // 표기 차이 흡수: 공백 제거 + 대문자
+    const no=raw.replace(/\s/g,'').toUpperCase();
+    try{
+      let snap=await DB.collection('licenses').doc(no).get();
+      if(!snap.exists){
+        // 대장 번호가 다른 형식일 수 있어 원문 그대로도 시도
+        snap=await DB.collection('licenses').doc(raw.trim()).get();
+      }
+      if(!snap.exists){linked.push('✗ '+raw+' — 대장에 없는 번호');continue}
+      const l=snap.data();
+      if(l.uid&&l.uid!==uid){linked.push('✗ '+raw+' — 이미 다른 회원에게 연결됨');continue}
+      // 성명 대조 (오등록 방지)
+      const nm=x=>String(x||'').replace(/\s/g,'');
+      if(l.name&&nm(l.name)!==nm(d.name)){linked.push('⚠ '+raw+' — 대장 성명('+l.name+')과 다름, 연결하지 않음');continue}
+      if(l.uid===uid){linked.push('· '+raw+' — 이미 연결됨');continue}
+      await snap.ref.update({uid:uid});
+      linked.push('✓ '+raw+' '+(l.type||'')+' '+(l.grade||'')+' 연결 완료');
+    }catch(e){linked.push('✗ '+raw+' — '+e.message)}
+  }
+  return linked;
+}
 async function approve(uid){
   const doc=await DB.collection('users').doc(uid).get();
   const d=doc.data();
+  // 승인 시 자격번호 자동 연결 (입력한 경우에만)
+  const licMsg=await autoLinkLicense(uid,d).catch(()=>[]);
+  if(licMsg.length)setTimeout(()=>alert('🎖 자격 연결 결과 — '+(d.name||'')+'\n\n'+licMsg.join('\n')),400);
   // 회원가입 화면에서 자율연수 자기신고 항목을 없앴으므로(혼란 유발), 이제는 내장 명단(EDU_ROSTER) 일치 여부로
   // 시스템이 자동 판단하는 것이 원칙. d.edu2026는 과거(자기신고 방식) 가입자와의 하위호환용으로만 남겨둠.
   const onRoster=inRoster(d.name);
