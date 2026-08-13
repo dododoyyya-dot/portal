@@ -318,7 +318,7 @@ function renderClubs(){
   const el=document.getElementById('clubList');
   const q=((document.getElementById('clSearch')||{}).value||'').trim().toLowerCase();
   const docs=ALLCLUBS.filter(d=>{const c=d.data();
-    if(c.hidden||(SIDO_F&&c.sido!==SIDO_F))return false;
+    if(c.hidden||c.clubType==='external'||(SIDO_F&&c.sido!==SIDO_F))return false;
     if(q&&[c.name,c.sido,c.gugun,c.intro].map(x=>String(x||'').toLowerCase()).join(' ').indexOf(q)<0)return false;
     return true});
   el.innerHTML=!docs.length?'<div class="bempty">'+(SIDO_F?SIDO_F+' 지역에 ':'')+'등록된 클럽이 없습니다. 첫 클럽을 만들어 보세요!</div>'
@@ -742,7 +742,7 @@ async function createClub(){
       intro:document.getElementById('ncIntro').value.trim(),
       rulesText:document.getElementById('ncRules').value.trim(),
       ownerUid:KME.uid,ownerName:KMY.name||'',
-      status:TEMP_CLUB?'임시':'대기',temp:TEMP_CLUB,hidden:false,code:code,
+      status:TEMP_CLUB?'임시':'대기',temp:TEMP_CLUB,hidden:ncType==='external',code:code,
       clubType:ncType,orgName:orgName,
       members:[{uid:KME.uid,name:KMY.name||'',at:new Date().toISOString()}],
       memberUids:[KME.uid],pendingJoins:[],pendingUids:[],
@@ -752,7 +752,7 @@ async function createClub(){
     if(sf){m.textContent='심볼 업로드 중…';m.style.color='#8a919d';
       try{const url=await uploadClubSymbol(ref.id,sf);await ref.update({symbol:url});}
       catch(e){console.warn('symbol',e);}}
-    alert('✓ '+(TEMP_CLUB?'임시클럽 생성 완료!':(ncType==='external'?'타 단체 소속 클럽 등록 신청 완료!':'클럽 생성 신청 완료!'))+(code?'\n\n귀 클럽의 고유 코드는 [ '+code+' ] 입니다.\n회원들에게 이 코드를 알려주면 코드로 바로 가입 신청할 수 있습니다.':'')+(TEMP_CLUB?'\n\n친구들을 초대해 보세요! 성인 회장 인수 후 연맹 승인을 받으면 정식 클럽이 됩니다.':'\n\n승인 후 클럽 목록에 게시됩니다.'));
+    alert('✓ '+(TEMP_CLUB?'임시클럽 생성 완료!':(ncType==='external'?'타 단체 소속 클럽 등록 신청 완료!':'클럽 생성 신청 완료!'))+(code?'\n\n귀 클럽의 고유 코드는 [ '+code+' ] 입니다.\n회원들에게 이 코드를 알려주면 코드로 바로 가입 신청할 수 있습니다.':'')+(ncType==='external'?'\n\n⚠ 타 단체 소속 클럽은 일반 클럽 찾기 목록에 노출되지 않습니다 — 코드를 아는 회원만 가입 신청할 수 있습니다.':'')+(TEMP_CLUB?'\n\n친구들을 초대해 보세요! 성인 회장 인수 후 연맹 승인을 받으면 정식 클럽이 됩니다.':'\n\n승인 후 클럽 목록에 게시됩니다.'));
     m.textContent='✓ 생성 신청 완료'+(code?' — 클럽 코드 ['+code+']':'');m.style.color='#0f766e';
     document.getElementById('ncName').value='';document.getElementById('ncSymbol').value='';
     document.getElementById('ncOrgName').value='';
