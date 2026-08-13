@@ -1441,6 +1441,73 @@ function compressImg(file){
     img.src=URL.createObjectURL(file);
   });
 }
+// ── ✏️ 제출한 회차보고 수정 (사진 누락·오기재 정정 — 교사확인 전까지 가능) ──
+let MYLOGS=[];
+function editLog(id){
+  const l=MYLOGS.find(x=>x._id===id);if(!l)return;
+  if(l.teacherConfirm){alert('교사 확인이 완료된 회차는 수정할 수 없습니다.\n정정이 필요하면 사무국(031-984-3248)으로 요청해주세요.');return}
+  const old=document.getElementById('elModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='elModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';
+  const inp='style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px;font-family:inherit;font-size:14px"';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:480px;width:100%;max-height:92vh;overflow:auto;padding:22px">'
+    +'<b style="font-size:16px">✏️ '+esc(l.session)+'회차 보고 수정</b>'
+    +'<div style="font-size:12.5px;color:#666;margin:4px 0 12px">'+esc(l.school||'')+' · '+esc(l.date||'')+'</div>'
+    +'<label style="font-size:12.5px;font-weight:800">수업일</label><input id="elDate" type="date" value="'+esc(l.date||'')+'" '+inp+'>'
+    +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">참여 인원</label><input id="elCount" type="number" min="1" value="'+(l.count||'')+'" '+inp+'>'
+    +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">수업 내용</label><textarea id="elContent" rows="2" '+inp+'>'+esc(l.content||'')+'</textarea>'
+    +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">비고</label><input id="elNote" value="'+esc(l.note||'')+'" '+inp+'>'
+    +'<div style="margin-top:12px;padding:12px 14px;background:#f6faf7;border:1.5px solid #cfe4d8;border-radius:10px">'
+    +'<b style="font-size:12.5px">📷 활동 사진</b>'
+    +'<div style="font-size:12px;color:#666;margin:3px 0 7px">현재 '+((l.photos||[]).length)+'장 — 새로 선택하면 <b>추가</b>됩니다 (전체 최대 3장)</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px">'+((l.photos||[]).map((p,i)=>'<span style="position:relative;display:inline-block"><img src="'+p+'" style="height:56px;border-radius:7px;border:1px solid #dfe5ee">'
+      +'<button type="button" onclick="elDelPhoto('+i+')" style="position:absolute;top:-6px;right:-6px;width:19px;height:19px;border-radius:50%;border:none;background:#C41E2F;color:#fff;font-size:11px;cursor:pointer;line-height:1">×</button></span>').join('')||'<span style="font-size:12px;color:#C41E2F;font-weight:700">등록된 사진이 없습니다</span>')+'</div>'
+    +'<input id="elPhotos" type="file" accept="image/*" multiple style="font-size:13px">'
+    +'</div>'
+    +'<div id="elMsg" style="font-size:12.5px;font-weight:700;margin-top:8px"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
+    +'<button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'elModal\').remove()">닫기</button>'
+    +'<button class="btn-sub" style="background:#0f766e" onclick="saveLogEdit(\''+id+'\')">💾 저장</button></div></div>';
+  document.body.appendChild(div);
+  EL_PHOTOS=(l.photos||[]).slice();
+}
+let EL_PHOTOS=[];
+function elDelPhoto(i){
+  if(!confirm('이 사진을 목록에서 뺄까요?'))return;
+  EL_PHOTOS.splice(i,1);
+  const box=document.getElementById('elModal');
+  const imgs=box.querySelectorAll('img');
+  if(imgs[i])imgs[i].parentNode.remove();
+}
+async function saveLogEdit(id){
+  const m=document.getElementById('elMsg');
+  const l=MYLOGS.find(x=>x._id===id);if(!l)return;
+  const date=document.getElementById('elDate').value;
+  const cnt=parseInt(document.getElementById('elCount').value);
+  const content=document.getElementById('elContent').value.trim();
+  if(!date||!cnt||cnt<1||!content){m.textContent='수업일·참여 인원·수업 내용을 확인해주세요';m.style.color='#C41E2F';return}
+  try{
+    const photos=EL_PHOTOS.slice();
+    const files=[...(document.getElementById('elPhotos').files||[])].slice(0,Math.max(0,3-photos.length));
+    for(let i=0;i<files.length;i++){
+      m.textContent='사진 업로드 중… ('+(i+1)+'/'+files.length+')';m.style.color='#8a919d';
+      const blob=await compressImg(files[i]);
+      if(!blob)continue;
+      const ref=firebase.storage().ref('logs/'+AUTH.currentUser.uid+'/'+l.appId+'_'+l.session+'_'+Date.now()+'_'+i+'.jpg');
+      const snap=await ref.put(blob,{contentType:'image/jpeg'});
+      photos.push(await snap.ref.getDownloadURL());
+    }
+    m.textContent='저장 중…';
+    await DB.collection('sessionLogs').doc(id).update({
+      date:date,count:cnt,content:content,
+      note:document.getElementById('elNote').value.trim(),
+      photos:photos,
+      editedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    document.getElementById('elModal').remove();
+    alert('✓ '+l.session+'회차 보고가 수정되었습니다.'+(photos.length?'\n사진 '+photos.length+'장이 등록되었습니다.':''));
+    loadMyLogs();
+  }catch(e){m.textContent='저장 실패: '+e.message;m.style.color='#C41E2F'}
+}
 let LGBUSY=false;
 async function submitLog(){
   const m=document.getElementById('lgMsg');
@@ -1486,6 +1553,7 @@ async function loadMyLogs(){
   try{
     const snap=await DB.collection('sessionLogs').where('uid','==',AUTH.currentUser.uid).get();
     const logs=snap.docs.map(d=>Object.assign({_id:d.id},d.data()));
+    MYLOGS=logs;   // 수정(editLog)에서 참조
     // 다음 회차 자동 제안
     const cur=document.getElementById('lgApp').value;
     const mine=logs.filter(l=>l.appId===cur);
@@ -1506,10 +1574,13 @@ async function loadMyLogs(){
         +(pend.length?'<button class="btn-sub" style="background:#153A77" onclick="reqConfirmBatch(\''+appId+'\')">📱 교사 확인 요청 (미확인 '+pend.length+'회차)</button>'
                      :'<span style="font-size:12.5px;font-weight:800;color:#0f766e">✓ 전 회차 교사확인 완료</span>')
         +'</div>'
-        +g.logs.map(l=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:13px">'
-          +'<span><b>'+esc(l.session)+'회차</b> <span style="color:var(--gray)">'+esc(l.date)+'</span>'+(l.count?' · 👥'+esc(l.count):'')+(l.photos&&l.photos.length?' · 📷'+l.photos.length:'')+'</span>'
-          +'<span>'+(l.teacherConfirm?'<b style="color:#0f766e">✓ '+esc(l.teacherConfirm.name)+'</b>':'<b style="color:#C41E2F">미확인</b>')+'</span>'
-          +'</div>').join('')
+        +g.logs.map(l=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:13px;align-items:center;flex-wrap:wrap">'
+          +'<span><b>'+esc(l.session)+'회차</b> <span style="color:var(--gray)">'+esc(l.date)+'</span>'+(l.count?' · 👥'+esc(l.count):'')
+            +(l.photos&&l.photos.length?' · <b style="color:#0f766e">📷'+l.photos.length+'</b>':' · <b style="color:#C41E2F">📷 사진 없음</b>')+'</span>'
+          +'<span style="display:flex;gap:6px;align-items:center">'
+          +(l.teacherConfirm?'<b style="color:#0f766e">✓ '+esc(l.teacherConfirm.name)+'</b>':'<b style="color:#C41E2F">미확인</b>')
+          +(l.teacherConfirm?'':'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#b8860b" onclick="editLog(\''+l._id+'\')">✏️ 수정</button>')
+          +'</span></div>').join('')
         +'</div>';
     }).join('');
   }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+esc(e.message)+'</div>'}
