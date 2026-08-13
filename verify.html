@@ -157,6 +157,17 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
     </div>
     <div style="font-size:12px;color:var(--gray);margin-top:6px">성명을 함께 입력하면 <b>본인 명의 자격인지</b>까지 확인됩니다. (성명은 대조에만 쓰이며 저장되지 않습니다)</div>
     <div id="vlResult" style="margin-top:18px"></div>
+
+    <div style="margin-top:26px;padding-top:22px;border-top:1.5px dashed var(--line)">
+      <b style="font-size:15px">🔍 이름으로 찾기</b>
+      <p style="font-size:13px;color:var(--gray);margin-top:6px">자격번호를 모를 때, 성명으로 등록 여부를 조회할 수 있습니다.</p>
+      <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+        <input id="vlSearchName" placeholder="성명 (예: 홍길동)" style="flex:1;min-width:180px;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;font-family:inherit">
+        <button class="btn-sub" style="padding:12px 22px;font-size:15px;background:#b8860b" onclick="verifyLicByName()">이름으로 조회</button>
+      </div>
+      <div style="font-size:12px;color:var(--gray);margin-top:6px">개인정보 보호를 위해 결과의 성명은 일부만 표시됩니다. 정확한 확인은 위 자격번호 조회를 이용해주세요.</div>
+      <div id="vlNameResult" style="margin-top:16px"></div>
+    </div>
   </div>
 
   <div class="authbox" style="max-width:none;margin-top:24px">
@@ -275,6 +286,35 @@ function printLicCheck(){
 }
 document.getElementById('vlCode').addEventListener('keydown',e=>{if(e.key==='Enter')verifyLic()});
 document.getElementById('vlName').addEventListener('keydown',e=>{if(e.key==='Enter')verifyLic()});
+// 이름으로 조회 — 자격번호를 모를 때 성명으로 등록 여부 확인 (결과는 마스킹된 성명·지역·번호·진위여부만)
+async function verifyLicByName(){
+  const el=document.getElementById('vlNameResult');
+  const name=(document.getElementById('vlSearchName').value||'').trim();
+  if(!name){el.innerHTML='<span style="color:var(--red);font-weight:700;font-size:14px">이름을 입력하세요</span>';return}
+  el.innerHTML='<span style="font-size:14px;color:var(--gray)">조회 중…</span>';
+  try{
+    const snap=await DB.collection('licenses').where('name','==',name).limit(10).get();
+    const docs=snap.docs.filter(d=>d.data().status!=='이관');
+    if(!docs.length){el.innerHTML='<div style="background:#fdf3f4;border:2px solid var(--red);border-radius:12px;padding:16px 18px"><b style="color:var(--red);font-size:15px">❌ 일치하는 자격 정보가 없습니다</b><div style="font-size:12.5px;color:var(--gray);margin-top:6px">성명을 정확히 입력했는지 확인해주세요. 본 연맹이 발급하지 않은 자격은 조회되지 않습니다.</div></div>';return}
+    const today=new Date().toISOString().slice(0,10);
+    el.innerHTML='<div style="background:#fff;border:1.5px solid var(--line);border-radius:12px;overflow:hidden">'
+      +docs.map(d=>{
+        const l=d.data();
+        const expired=(l.status==='만료')||(l.expireAt?l.expireAt<today:true);
+        const stat=expired?'만료':'유효';
+        return '<div style="padding:13px 16px;border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:center;flex-wrap:wrap">'
+          +'<b style="font-size:14.5px;min-width:70px">'+esc(l.maskName||'')+'</b>'
+          +'<span style="font-size:13px;color:var(--gray);min-width:70px">'+esc(l.region||'-')+'</span>'
+          +'<span style="font-size:13px;font-weight:700">'+esc(d.id)+'</span>'
+          +'<span style="flex:1"></span>'
+          +'<b style="font-size:13.5px;color:'+(expired?'var(--red)':'#0f766e')+'">'+(expired?'❌ '+stat:'✅ '+stat)+'</b>'
+          +'</div>';
+      }).join('')
+      +'</div>'
+      +'<div style="font-size:11.5px;color:var(--gray);margin-top:8px">'+docs.length+'건 조회됨 · 자격 종목·유효기간 등 상세 정보와 확인서 출력은 자격번호 조회를 이용해주세요.</div>';
+  }catch(e){el.innerHTML='<span style="color:var(--red);font-size:14px">조회 실패: '+esc(e.message)+'</span>'}
+}
+document.getElementById('vlSearchName').addEventListener('keydown',e=>{if(e.key==='Enter')verifyLicByName()});
 </script>
 <footer><div class="wrap">
   <div class="top">
