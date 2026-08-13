@@ -166,7 +166,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <button id="t1" class="on" onclick="tab(1)">회원 승인 · 목록</button>
       <button id="t2" onclick="tab(2)">포인트 부여</button>
       <button id="t3" onclick="tab(3)">강습 신청 관리</button>
-      <button id="t4" onclick="tab(4)">대회 요원</button>
+      <button id="t4" onclick="tab(4)">대회 관리</button>
       <button id="t5" onclick="tab(5)">단체 메일</button>
       <a href="perm.html" style="margin-left:auto;display:inline-flex;align-items:center;padding:10px 20px;border-radius:10px;background:linear-gradient(135deg,#1F4E9C,#153A77);color:#fff;font-weight:800;font-size:14px;text-decoration:none;box-shadow:0 3px 10px rgba(21,58,119,.25)">🛡 권한 관리 센터 →</a>
     </div>
@@ -235,46 +235,17 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       </div>
     </div>
     <div id="v4" style="display:none">
-      <div class="authbox" style="max-width:640px;margin:0 0 26px">
-        <h3>대회 요원 모집 등록</h3>
-        <label>대회명</label><input id="cpTitle" placeholder="예: 2026 충청권역 유소년 올림피아드">
-        <label>권역</label>
-        <select id="cpRegion"><option>서울·경기</option><option>강원</option><option>충청</option><option>전라</option><option>경상</option><option>제주</option></select>
-        <label>일자</label><input id="cpDate" type="date">
-        <label>역할</label>
-        <select id="cpRole"><option>심판</option><option>운영</option><option>참가</option></select>
-        <div style="font-size:11.5px;color:#8a919d;margin-top:3px">참가 = 선수 모집 (임무 목록 칸에 부문 입력: 오픈부,여자부,혼성부 등 — 자녀 참가는 보호자 계정에서 신청)</div>
-        <label>정원 (명)</label><input id="cpQuota" type="number" value="4" min="1">
-        <label>신청 마감일</label><input id="cpDeadline" type="date">
-        <label>임무 목록 (쉼표 구분 — 비우면 기본값 · 참가는 "부문:정원" 형식으로 부문별 정원 지정 가능)</label><input id="cpRoles" placeholder="심판: 심판장,주심,부심,… / 참가: 오픈부:16,여자부:8,혼성부">
-        <label>참가비 (선택 — 참가 모집 시 표시. 예: 무료 / 1인 10,000원)</label><input id="cpFee" placeholder="예: 무료 (기념품 증정) / 팀당 30,000원">
-        <label>참가 제한 지역 (선택 — 참가 모집 시. 예: 부산 → 부산 지역만 · 비우면 전체 개방)</label><input id="cpEligRegion" placeholder="예: 부산 (시·도명. 시민대회·구청장기 등 지역 제한 시)">
-        <label>참가 자격 안내 (선택 — 신청 화면 상단에 표시)</label><input id="cpEligNote" placeholder="예: 부산시 소재 학교·클럽 소속 선수만 참가 가능">
-        <label>참가 차단 클럽 (선택 — 쉼표 구분, 해당 클럽 소속은 참가 신청 불가)</label><input id="cpBlockClubs" placeholder="예: 쿠파, ○○클럽">
-        <label>안내문 (선택 — 신청 화면에 표시)</label><textarea id="cpNote" rows="3" placeholder="예: 집결 08:30 / 중식 제공 / 자격증 사본 지참"></textarea>
-        <label>개인정보 동의서 문안 (선택 — 비우면 연맹 기본 문안 사용)</label>
-        <textarea id="cpConsentText" rows="4" placeholder="행사별 수집·이용·제3자 제공 동의 문안을 직접 입력하면 기본 문안 대신 표시됩니다"></textarea>
-        <label>동의서 스캔 이미지 (선택 — 여러 장 가능, 업로드 시 문안 대신 이미지가 순서대로 표시됩니다)</label>
-        <input type="file" id="cpConsentImg" accept="image/*" multiple onchange="pickConsentImg(this,'cp')">
-        <div id="cpImgStrip" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>
-        <div id="cpImgState" style="font-size:12px;font-weight:700;margin-top:4px;color:#8a919d">이미지 없음</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;padding:10px;background:#f4f7fc;border-radius:10px">
-          <select id="cpTplSel" onfocus="fillTplSel()" style="padding:8px 11px;border:1.5px solid #dfe5ee;border-radius:8px;font-family:inherit;font-size:13px;flex:1;min-width:160px"><option value="">📂 동의서 보관함…</option></select>
-          <button type="button" class="btn-sub" style="background:#153A77" onclick="loadConsentTpl('cp')">불러오기</button>
-          <button type="button" class="btn-sub" style="background:#0f766e" onclick="saveConsentTpl('cp')">현재 동의서 저장</button>
-          <button type="button" class="btn-sub" style="background:#8a919d" onclick="delConsentTpl('cp')">삭제</button>
-          <div style="flex-basis:100%;font-size:11.5px;color:#8a919d">교육청·구청 등 기관별 동의서를 이름 붙여 저장해두고, 공고 올릴 때 골라 쓰세요 (이미지·필드배치·문안 함께 저장됨)</div>
-        </div>
-        <button class="btn-main" onclick="addComp()">모집 등록</button>
-        <div class="msg" id="cpMsg"></div>
-      </div>
       <div style="background:#f0f5ff;border:2px solid #b9cdec;border-radius:16px;padding:18px 22px;margin-bottom:18px">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <b style="font-size:16px;color:#153A77">🏆 대회 통합 등록</b>
           <span style="font-size:12.5px;color:var(--gray)">대회 1건 등록으로 참가자·심판·운영요원 모집과 캘린더 등재를 한 번에 처리합니다</span>
           <span style="flex:1"></span>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:800;cursor:pointer;background:#fff;border:1.5px solid #d3e0f2;border-radius:999px;padding:6px 14px">
+            <input type="checkbox" id="compEnableToggle" style="width:auto" onchange="toggleCompEnabled(this)"> <span id="compEnableLabel">🔒 비공개</span>
+          </label>
           <button class="btn-sub" style="background:#153A77" onclick="openCompWizard()">+ 새 대회 등록</button>
         </div>
+        <div style="font-size:12px;color:#8a5a00;background:#fff8ed;border:1px solid #ecd9b0;border-radius:9px;padding:8px 12px;margin-top:10px">⚠ 아직 준비 중인 기능입니다. 스위치를 켜야 회원 화면(대회 페이지)에 노출됩니다 — 회원 안내 전까지는 꺼두세요.</div>
         <div id="compMasterList" style="margin-top:12px"></div>
       </div>
       <input id="cpSearch" oninput="renderCompsAdmin()" placeholder="🔍 대회명·권역·역할·지명자(강사)·확정자 이름 검색" style="width:100%;max-width:420px;padding:9px 13px;border:1.5px solid #dfe5ee;border-radius:10px;margin-bottom:12px">
@@ -2255,37 +2226,34 @@ async function bulkMail(){
   m.textContent='완료 — 성공 '+ok+'건'+(fail.length?' / 실패 '+fail.length+'건: '+fail.join(', '):'');
   m.className=fail.length?'msg err':'msg ok';
 }
-async function addComp(){
-  const m=document.getElementById('cpMsg');
-  const t=document.getElementById('cpTitle').value.trim(),dt=document.getElementById('cpDate').value;
-  const q=parseInt(document.getElementById('cpQuota').value);
-  if(!t||!dt||!q){m.textContent='대회명·일자·정원을 입력하세요';m.className='msg err';return}
-  const rolesTxt=document.getElementById('cpRoles').value.trim();
-  const roles=rolesTxt?rolesTxt.split(',').map(x=>x.trim()).filter(Boolean):[];
-  await DB.collection('compSlots').add({
-    title:t,region:document.getElementById('cpRegion').value,date:dt,
-    role:document.getElementById('cpRole').value,quota:q,claimed:[],cancels:[],
-    deadline:document.getElementById('cpDeadline').value||'',roles:roles,
-    eligRegion:(document.getElementById('cpEligRegion')?document.getElementById('cpEligRegion').value.trim():''),
-    eligNote:(document.getElementById('cpEligNote')?document.getElementById('cpEligNote').value.trim():''),
-    blockClubs:(document.getElementById('cpBlockClubs')?document.getElementById('cpBlockClubs').value.split(',').map(x=>x.trim()).filter(Boolean):[]),
-    note:document.getElementById('cpNote').value.trim(),
-    fee:document.getElementById('cpFee').value.trim(),
-    consentText:document.getElementById('cpConsentText').value.trim(),
-    consentImgs:CONSENT_IMGS.cp.slice(),consentImg:'',consentOverlays:ovlPack('cp'),
-    createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-  m.textContent='등록 완료 — 메인 참여신청(선정학교 강사지원)에 즉시 게시됩니다';m.className='msg ok';
-  document.getElementById('cpTitle').value='';document.getElementById('cpNote').value='';
-  document.getElementById('cpConsentText').value='';document.getElementById('cpConsentImg').value='';
-  CONSENT_IMGS.cp=[];CONSENT_OVL.cp=[];renderImgStrip('cp');
-  loadCompsAdmin();
+// 🏆 대회 통합 등록 공개 여부 (중앙관리자 토글 — settings/global.compEnabled)
+let COMP_ENABLED=false;
+async function loadCompSettings(){
+  try{
+    const d=await DB.collection('settings').doc('global').get();
+    COMP_ENABLED=!!(d.exists&&d.data().compEnabled);
+  }catch(e){COMP_ENABLED=false}
+  const cb=document.getElementById('compEnableToggle');
+  if(cb)cb.checked=COMP_ENABLED;
+  renderCompEnableLabel();
+}
+function renderCompEnableLabel(){
+  const lb=document.getElementById('compEnableLabel');
+  if(lb)lb.innerHTML=COMP_ENABLED?'<b style="color:#0f766e">🔓 회원 공개 중</b>':'<b style="color:#C41E2F">🔒 비공개</b>';
+}
+async function toggleCompEnabled(cb){
+  const next=cb.checked;
+  try{
+    await DB.collection('settings').doc('global').set({compEnabled:next},{merge:true});
+    COMP_ENABLED=next;renderCompEnableLabel();
+  }catch(e){alert('설정 저장 실패: '+e.message);cb.checked=!next;}
 }
 // 구버전 단일 이미지(consentImg) 호환 게터
 function consentImgsOf(s){return (s.consentImgs&&s.consentImgs.length)?s.consentImgs:(s.consentImg?[s.consentImg]:[])}
 const COMP_DEFAULT_ROLES={'심판':['심판장','주심','부심','점수심','기록심','선심'],'운영':['경기운영','안전요원','미화요원','홍보요원','시상요원','의전·접수','주차·수송','보조요원'],'참가':['오픈부','여자부','혼성부']};
 function compKey(c){return c.pid||c.uid}
 // 동의서 스캔 이미지 (다중) — 장당 캔버스 축소·압축, 총합 800KB 이내 (Firestore 1MB 문서 한도)
-const CONSENT_IMGS={cp:[],ec:[]};
+const CONSENT_IMGS={cp:[],ec:[],cw:[]};
 const CONSENT_TOTAL_MAX=800000;
 function compressImgFile(f){
   return new Promise(res=>{
@@ -2339,7 +2307,7 @@ function renderImgStrip(which){
 }
 // ── 동의서 필드배치(오버레이): 스캔 양식 위 좌표에 신청자 정보 자동 기입 ──
 // 저장 형식: consentOverlays = {"이미지번호":[{f:필드,x:0~1,y:0~1,fs:px(680px 폭 기준)}...]}  ※ Firestore 중첩배열 불가 → 객체 맵
-const CONSENT_OVL={cp:[],ec:[]};
+const CONSENT_OVL={cp:[],ec:[],cw:[]};
 const OVL_FIELDS={name:'성명',rrn:'주민등록번호',phone:'연락처',bank:'은행',acct:'계좌번호',holder:'예금주',date:'날짜',sign:'서명'};
 function ovlPack(which){const o={};CONSENT_OVL[which].forEach((a,i)=>{if(a&&a.length)o[String(i)]=a});return o}
 function ovlUnpack(s){
@@ -2411,7 +2379,7 @@ function ovlFont(d){
 }
 // ── 동의서 보관함 (자주 쓰는 양식 저장·재사용) ──
 async function fillTplSel(force){
-  const sels=[document.getElementById('cpTplSel'),document.getElementById('ecTplSel')].filter(Boolean);
+  const sels=[document.getElementById('cpTplSel'),document.getElementById('ecTplSel'),document.getElementById('cwTplSel')].filter(Boolean);
   if(!sels.length)return;
   if(force||!window.__TPLS){
     const snap=await DB.collection('consentTemplates').orderBy('name').get().catch(()=>null);
@@ -2473,6 +2441,7 @@ async function loadCompsAdmin(){
   CADM=snap.docs;
   renderCompsAdmin();
   loadCompMasters().catch(()=>{});
+  loadCompSettings().catch(()=>{});
   loadClubsAdmin().catch(()=>{});
 }
 // ══ 🏆 대회 통합 등록 (competitions) ══
@@ -2533,17 +2502,28 @@ function openCompWizard(editId){
       +'<div style="display:grid;grid-template-columns:110px 1fr;gap:10px"><div><label '+lb+'>정원</label><input id="cwRefN" type="number" '+inp+' value="17"></div><div><label '+lb+'>임무 (쉼표 구분)</label><input id="cwRefRoles" '+inp+' value="심판장,주심,부심,점수심,기록심,선심"></div></div>')
     +sec('⑤ 운영요원 모집','<label style="display:flex;gap:7px;align-items:center;font-size:13px;font-weight:800;margin-top:8px"><input type="checkbox" id="cwHasStaff" style="width:auto"'+(ed?' disabled':' checked')+'> 운영요원 모집 공고 생성 <span style="font-weight:600;color:#8a919d;font-size:11px">(체험부스 종목이 있으면 부스 운영 임무 자동 추가)</span></label>'
       +'<div style="display:grid;grid-template-columns:110px 1fr;gap:10px"><div><label '+lb+'>정원</label><input id="cwStaffN" type="number" '+inp+' value="10"></div><div><label '+lb+'>임무 (쉼표 구분)</label><input id="cwStaffRoles" '+inp+' value="경기운영,안전요원,기록,의전·접수"></div></div>')
-    +sec('⑥ 동의서','<label '+lb+'>동의서 보관함에서 선택 (세 공고에 일괄 적용)</label><select id="cwTpl" '+inp+'><option value="">사용 안 함 (기본 문안)</option></select>')
+    +sec('⑥ 동의서 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 참가·심판·운영 공고에 일괄 적용, 직접 입력하거나 보관함에서 불러오기</span>',
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">'
+      +'<select id="cwTplSel" onfocus="fillTplSel()" style="padding:8px 11px;border:1.5px solid #dfe5ee;border-radius:8px;font-family:inherit;font-size:13px;flex:1;min-width:160px"><option value="">📂 보관함에서 불러오기…</option></select>'
+      +'<button type="button" class="btn-sub" style="background:#153A77;padding:8px 13px;font-size:12.5px" onclick="loadConsentTpl(\'cw\')">불러오기</button>'
+      +'<button type="button" class="btn-sub" style="background:#0f766e;padding:8px 13px;font-size:12.5px" onclick="saveConsentTpl(\'cw\')">🗄 보관함에 저장</button>'
+      +'<button type="button" class="btn-sub" style="background:#8a919d;padding:8px 13px;font-size:12.5px" onclick="delConsentTpl(\'cw\')">삭제</button>'
+      +'</div>'
+      +'<label '+lb+'>동의서 문안 (직접 타이핑 입력 가능)</label>'
+      +'<textarea id="cwConsentText" rows="4" '+inp+' placeholder="문안을 직접 입력하거나, 위에서 보관함 양식을 불러오세요 (비우면 기본 문안 사용)">'+esc(c.consentText||'')+'</textarea>'
+      +'<label '+lb+'>동의서 스캔 이미지 (선택 — 여러 장 가능, 업로드 시 문안 대신 이미지가 순서대로 표시됩니다)</label>'
+      +'<input type="file" id="cwConsentImg" accept="image/*" multiple onchange="pickConsentImg(this,\'cw\')">'
+      +'<div id="cwImgStrip" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>'
+      +'<div id="cwImgState" style="font-size:12px;font-weight:700;margin-top:4px;color:#8a919d">이미지 없음</div>')
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
     +'<button class="btn-sub" style="background:#eceff4;color:#555" onclick="document.getElementById(\'cwModal\').remove()">닫기</button>'
     +'<button class="btn-sub" style="background:#153A77" onclick="saveCompMaster(\''+(editId||'')+'\')">'+(ed?'💾 수정 저장':'🏆 대회 등록')+'</button></div>'
     +'</div>';
   document.body.appendChild(div);
-  // 동의서 보관함 채우기
-  DB.collection('consentTemplates').orderBy('name').get().then(sn=>{
-    const sel=document.getElementById('cwTpl');if(!sel)return;
-    sel.innerHTML='<option value="">사용 안 함 (기본 문안)</option>'+sn.docs.map(x=>'<option value="'+x.id+'"'+(c.consentTplId===x.id?' selected':'')+'>'+esc(x.data().name)+'</option>').join('');
-  }).catch(()=>{});
+  CONSENT_IMGS.cw=(c.consentImgs||[]).slice();
+  CONSENT_OVL.cw=ovlUnpack({consentImgs:c.consentImgs||[],consentOverlays:c.consentOverlays||{}});
+  renderImgStrip('cw');
+  fillTplSel(true);
 }
 function cwSports(){
   return [...document.querySelectorAll('.cwSport:checked')].map(ch=>{
@@ -2558,14 +2538,12 @@ async function saveCompMaster(editId){
   const sports=cwSports();
   if(!sports.length){alert('종목을 1개 이상 선택해주세요.');return}
   const teamTypes=[...document.querySelectorAll('.cwTT:checked')].map(x=>x.value);
+  const consentText=v('cwConsentText');
+  const consentImgs=CONSENT_IMGS.cw.slice();
+  const consentOverlays=ovlPack('cw');
   const base={title:title,dateStart:d1,dateEnd:v('cwD2')||d1,place:place,sido:sido,desc:v('cwDesc'),
     sports:sports,teamTypes:teamTypes,divsRaw:v('cwDivs'),fee:v('cwFee'),deadline:v('cwDL'),eligRegion:v('cwElig'),
-    consentTplId:v('cwTpl'),status:'모집중'};
-  // 동의서 문안
-  let consentText='';
-  if(base.consentTplId){
-    try{const t=await DB.collection('consentTemplates').doc(base.consentTplId).get();if(t.exists)consentText=t.data().consentText||'';}catch(e){}
-  }
+    consentText:consentText,consentImgs:consentImgs,consentOverlays:consentOverlays,status:'모집중'};
   try{
     if(editId){
       // 수정: 대회 문서 갱신 + 연결 공고·캘린더 동기화
@@ -2574,7 +2552,7 @@ async function saveCompMaster(editId){
       for(const sid of (prev.slotIds||[])){
         const upd={date:base.dateStart,region:base.sido};
         if(base.deadline)upd.deadline=base.deadline;
-        if(consentText)upd.consentText=consentText;
+        if(consentText||consentImgs.length){upd.consentText=consentText;upd.consentImgs=consentImgs;upd.consentOverlays=consentOverlays;}
         await DB.collection('compSlots').doc(sid).update(upd).catch(()=>{});
       }
       if(prev.eventId)await DB.collection('events').doc(prev.eventId).update({title:'🏆 '+title,start:base.dateStart,end:base.dateEnd,sido:sido,place:place,desc:base.desc||'대회 페이지에서 신청'}).catch(()=>{});
@@ -2587,7 +2565,7 @@ async function saveCompMaster(editId){
     const mkSlot=async(role,roles,quota,extra)=>{
       const ref=await DB.collection('compSlots').add(Object.assign({
         title:title,role:role,roles:roles,quota:quota,date:base.dateStart,region:sido,
-        deadline:base.deadline||'',fee:'',note:roleNote,consentText:consentText||'',
+        deadline:base.deadline||'',fee:'',note:roleNote,consentText:consentText||'',consentImgs:consentImgs,consentOverlays:consentOverlays,
         claimed:[],confirmed:[],createdAt:firebase.firestore.FieldValue.serverTimestamp()},extra||{}));
       slotIds.push(ref.id);return ref.id;
     };
