@@ -405,8 +405,22 @@ AUTH.onAuthStateChanged(async u=>{
   VIEWER_IS_ADMIN=true;
   document.getElementById('adminBody').style.display='block';loadDash();
   loadUsers();
+  loadExtClubMap().then(renderUsers).catch(()=>{});
   purgeOldTrash();
 });
+// 타단체 클럽 소속 회원 맵 (회원명단 배지용 — 흡수 전략 추적) — 외부 클럽만 조회해 가볍게 유지
+let EXTCLUB_MAP={};
+async function loadExtClubMap(){
+  try{
+    const snap=await DB.collection('clubs').where('clubType','==','external').get();
+    const map={};
+    snap.docs.forEach(d=>{
+      const c=d.data();if(c.status!=='승인')return;
+      (c.memberUids||[]).forEach(uid=>{(map[uid]=map[uid]||[]).push(c.name);});
+    });
+    EXTCLUB_MAP=map;
+  }catch(e){console.warn('extClubMap',e);}
+}
 function tab(n){
   [1,2,3,4,5].forEach(i=>{
     document.getElementById('t'+i).classList.toggle('on',i===n);
@@ -2026,6 +2040,7 @@ function renderUsers(){
     const v=d.data(),lv=lvOf(v.points||0);
     return '<div class="urow"><div class="grow"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span>'
       +(v.org?' '+orgChip(v.org,v.region,v.orgTitle,v.fedName):'')+(v.withdrawReq?' <span style="font-size:11px;font-weight:900;color:#fff;background:'+(v.withdrawStatus==='보류'?'#b8860b':'#C41E2F')+';padding:2px 8px;border-radius:999px">🚪 탈퇴 요청'+(v.withdrawStatus==='보류'?' · 보류중':'')+'</span>':'')
+      +(EXTCLUB_MAP[d.id]?' <span style="font-size:11px;font-weight:900;color:#fff;background:#7c3aed;padding:2px 8px;border-radius:999px" title="흡수 전략 추적용 — 클럽 승인관리에서 연맹 클럽으로 전환할 수 있습니다">🔗 타단체클럽: '+esc(EXTCLUB_MAP[d.id].join(', '))+'</span>':'')
       +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+(v.gender?' · '+esc(v.gender):'')+(v.birth?' · '+esc(v.birth):'')+(v.baseCity?' · <b style="color:#1F4E9C">📍'+esc(v.baseCity)+'</b>':' · <span style="font-size:11px;color:#C41E2F;font-weight:800">시군구 미입력</span>')+((v.activityRegions&&v.activityRegions.length)?' <span style="font-size:11px;font-weight:800;color:#0f766e">🗺활동가능: '+esc(v.activityRegions.length>=6?'전국 (전 권역)':v.activityRegions.join('·'))+'</span>':'')+(v.phone?' · '+esc(v.phone):'')+(v.bank?' · <b style="color:#b8860b">💳'+esc(v.bank)+' '+esc(v.accountNum||'')+' ('+esc(v.accountHolder||'')+')</b>':'')+' · '+(v.edu2026?('연수이수 '+(inRoster(v.name)?'<b style="color:#0f766e">✓명단확인</b>':'<b style="color:#C41E2F">⚠명단에없음</b>')):'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+((v.instructorFor&&v.instructorFor.referee)?' · <b style="color:#7c3aed">심판요원 지원</b>':'')+((v.instructorFor&&v.instructorFor.staff)?' · <b style="color:#b8860b">운영요원 지원</b>':'')+'</div>'
       +((v.affiliation&&v.affiliation.length)||(v.quals&&(v.quals.leader||v.quals.referee||v.quals.youth))||(v.qualDocs&&v.qualDocs.length)||v.degree
         ?'<div class="sub3" style="margin-top:3px">프로필: '
@@ -2642,32 +2657,53 @@ async function linkSlotsSave(compId){
   }catch(e){alert('연결 실패: '+e.message)}
 }
 // ── 클럽 승인·관리 ──
+let CLUBADM_F='전체';
 async function loadClubsAdmin(){
   const el=document.getElementById('clubAdminList');if(!el)return;
   const snap=await DB.collection('clubs').limit(300).get();
-  const docs=snap.docs.slice().sort((a,b)=>{
+  CLUBADM_DOCS=snap.docs.slice().sort((a,b)=>{
     const x=a.data(),y=b.data();
     if((x.status==='대기')!==(y.status==='대기'))return x.status==='대기'?-1:1;
     return String(x.sido||'').localeCompare(String(y.sido||''));
   });
-  // 집계: 전국 → 시도별 (승인 클럽 기준)
-  const agg={};let totC=0,totM=0;
-  docs.forEach(d=>{const c=d.data();if(c.status!=='승인')return;totC++;const m=(c.memberUids||[]).length;totM+=m;
+  renderClubsAdmin();
+}
+let CLUBADM_DOCS=[];
+function renderClubsAdmin(){
+  const el=document.getElementById('clubAdminList');if(!el)return;
+  const all=CLUBADM_DOCS;
+  // 집계: 전국 → 시도별 (승인 클럽 기준) + 연맹/타단체 카운트
+  const agg={};let totC=0,totM=0,extC=0,fedC=0;
+  all.forEach(d=>{const c=d.data();
+    if(c.clubType==='external')extC++;else fedC++;
+    if(c.status!=='승인')return;totC++;const m=(c.memberUids||[]).length;totM+=m;
     if(!agg[c.sido])agg[c.sido]={c:0,m:0};agg[c.sido].c++;agg[c.sido].m+=m;});
-  const aggHtml='<div style="background:#f6f8fb;border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:13px">'
+  const aggHtml='<div style="background:#f6f8fb;border-radius:12px;padding:12px 16px;margin-bottom:10px;font-size:13px">'
     +'<b>📊 전국 '+totC+'개 클럽 · '+totM+'명</b>'
     +(Object.keys(agg).length?' &nbsp;—&nbsp; '+Object.keys(agg).sort().map(s2=>s2+' '+agg[s2].c+'개('+agg[s2].m+'명)').join(' · '):'')
+    +'</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:12px">'
+    +['전체','연맹','타단체'].map(f=>{
+      const cnt=f==='전체'?all.length:f==='연맹'?fedC:extC;
+      return '<button class="btn-sub" style="background:'+(CLUBADM_F===f?'#153A77':'#eceff4')+';color:'+(CLUBADM_F===f?'#fff':'#555')+'" onclick="CLUBADM_F=\''+f+'\';renderClubsAdmin()">'+f+' '+cnt+'</button>';
+    }).join('')
     +'</div>';
-  el.innerHTML=aggHtml+(!docs.length?'<div class="bempty">등록된 클럽이 없습니다.</div>':docs.map(d=>{
+  const docs=all.filter(d=>{const c=d.data();
+    if(CLUBADM_F==='연맹')return c.clubType!=='external';
+    if(CLUBADM_F==='타단체')return c.clubType==='external';
+    return true;});
+  el.innerHTML=aggHtml+(!docs.length?'<div class="bempty">해당 조건의 클럽이 없습니다.</div>':docs.map(d=>{
     const c=d.data();
     return '<div class="urow"><div class="grow"><b>'+esc(c.name)+'</b> '
       +'<span style="font-size:11px;font-weight:800;color:#fff;background:#153A77;padding:2px 8px;border-radius:999px">'+esc(c.sido)+' '+esc(c.gugun||'')+'</span> '
+      +(c.clubType==='external'?'<span style="font-size:11px;font-weight:800;color:#fff;background:#7c3aed;padding:2px 8px;border-radius:999px">🔗 타단체'+(c.orgName?': '+esc(c.orgName):'')+'</span> ':'<span style="font-size:11px;font-weight:800;color:#fff;background:#1F4E9C;padding:2px 8px;border-radius:999px">🏅 연맹</span> ')
       +(c.status==='승인'?'<span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">승인</span>':'<span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px">대기</span>')
       +(c.hidden?' <span style="font-size:11px;font-weight:800;color:#fff;background:#8a919d;padding:2px 8px;border-radius:999px">숨김(코드전용)</span>':'')
       +(c.code?' <span style="font-size:11px;font-weight:800;color:#b8860b">코드: '+esc(c.code)+'</span>':'')
       +'<div class="sub3">클럽장 '+esc(c.ownerName||'')+' · 회원 '+((c.memberUids||[]).length)+'명 · 가입대기 '+((c.pendingUids||[]).length)+'명'+(c.intro?'<br>'+esc(c.intro):'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
       +(c.status!=='승인'?'<button class="btn-sub" style="background:#0f766e" onclick="approveClub(\''+d.id+'\')">✓ 승인</button>':'')
+      +(c.clubType==='external'?'<button class="btn-sub" style="background:#1F4E9C" onclick="absorbClub(\''+d.id+'\',\''+esc(c.name)+'\')">🔁 연맹 클럽으로 전환</button>':'')
       +'<button class="btn-sub" style="background:#8a919d" onclick="toggleClubHidden(\''+d.id+'\','+(!c.hidden)+')">'+(c.hidden?'👁 노출':'🙈 숨김')+'</button>'
       +'<button class="btn-sub" style="background:#b8860b" onclick="setClubCode(\''+d.id+'\')">🔑 코드</button>'
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delClub(\''+d.id+'\')">🗑</button></div></div>';
@@ -2675,6 +2711,14 @@ async function loadClubsAdmin(){
 }
 async function approveClub(id){
   await DB.collection('clubs').doc(id).update({status:'승인'});loadClubsAdmin();
+  loadExtClubMap().then(renderUsers).catch(()=>{});
+}
+// 흡수 전략: 타단체 클럽을 연맹 정식 클럽으로 전환(clubType만 변경, 회원·역사 유지)
+async function absorbClub(id,name){
+  if(!confirm('['+name+'] 클럽을 연맹 정식 클럽으로 전환할까요?\n회원·클럽장·이력은 그대로 유지되고, 타단체 표시만 사라집니다.'))return;
+  await DB.collection('clubs').doc(id).update({clubType:'federation'});
+  alert('✓ 연맹 클럽으로 전환되었습니다.');
+  loadClubsAdmin();loadExtClubMap().then(renderUsers).catch(()=>{});
 }
 // ── 페이지 콘텐츠 편집기 (siteContent/{page} — 종목소개·후원안내) ──
 const PAGE_DEFAULTS={
@@ -2825,6 +2869,7 @@ async function cbClear(uid){
 async function delClub(id){
   if(!confirm('이 클럽을 삭제할까요? (회원 명단 포함 삭제)'))return;
   await DB.collection('clubs').doc(id).delete();loadClubsAdmin();
+  loadExtClubMap().then(renderUsers).catch(()=>{});
 }
 function renderCompsAdmin(){
   const el=document.getElementById('compAdminList');
