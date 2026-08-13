@@ -522,12 +522,14 @@ let CCOMPS=[];
 async function loadSlots(){
   const el=document.getElementById('cSlotList');
   try{
-    const [snap,comps]=await Promise.all([
+    const [snap,comps,cfg]=await Promise.all([
       DB.collection('compSlots').orderBy('date').limit(50).get(),
-      DB.collection('competitions').orderBy('dateStart','desc').limit(30).get().catch(()=>null)
+      DB.collection('competitions').orderBy('dateStart','desc').limit(30).get().catch(()=>null),
+      DB.collection('settings').doc('global').get().catch(()=>null)
     ]);
     CSLOTS=snap.docs;
-    CCOMPS=comps?comps.docs:[];
+    const compEnabled=!!(cfg&&cfg.exists&&cfg.data().compEnabled);
+    CCOMPS=(comps&&compEnabled)?comps.docs:[];
     if(snap.empty&&!CCOMPS.length){el.innerHTML='<div class="bempty">현재 모집 중인 대회가 없습니다. 확정 시 이곳에 게시됩니다.</div>';return}
     const today=new Date().toISOString().slice(0,10);
     // 대회(competitions) 묶음 먼저, 미연결 공고는 아래에 기존 방식대로
@@ -680,6 +682,10 @@ function consentAnswers(){
 async function openApply(id){
   const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
   const s=doc.data();
+  if(s.role==='심판'&&CMY&&CMY.accountType==='teacher'){
+    alert('🏁 국가공인자격증(교사 및 국가공인자격증) 회원은 대회 심판으로 신청하실 수 없습니다.\n먼저 KFDF공인 심판 자격을 취득하시면 심판 신청이 가능합니다.\n\n지금은 운영요원으로 신청하실 수 있습니다.\n자격 안내: license.html · certification.html');
+    return;
+  }
   const entry=s.role==='참가';
   APPLY_ID=id;APPLY_SEL=[];APPLY_PID=null;APPLY_MAX=entry?1:3;
   const roles=(s.roles&&s.roles.length)?s.roles:(DEFAULT_ROLES[s.role]||[]);
