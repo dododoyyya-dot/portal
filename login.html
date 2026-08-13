@@ -246,12 +246,12 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
       </div>
 
       <div id="sDegreeBlock" style="margin-top:14px;max-width:340px">
-        <label style="font-size:13px;font-weight:800">학력 확인 (체육 전공) <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 증빙 첨부는 가입 후 마이페이지에서</span></label>
+        <label style="font-size:13px;font-weight:800">학력 확인 (체육 전공) <span id="reqDegree" style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 해당 없으면 「해당 없음」 선택 · 증빙 첨부는 가입 후 마이페이지에서</span></label>
         <select id="sDegree"><option value="">해당 없음</option><option>체육 전문학사</option><option>체육학사</option><option>체육석사</option><option>체육박사</option></select>
       </div>
 
       <div id="sSizeBlock" style="margin-top:16px;padding:14px 16px;background:#fbf7f0;border:1.5px solid #e8dcc8;border-radius:12px">
-        <label style="margin:0;font-size:13.5px;font-weight:800;color:#8a6d1f">👕 피복 사이즈 <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 활동복·조끼·모자 등 지급용, 나중에 입력해도 됩니다</span></label>
+        <label style="margin:0;font-size:13.5px;font-weight:800;color:#8a6d1f">👕 피복 사이즈 <span id="reqSize" style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 활동복·조끼·모자 등 지급용 (상의·하의·신발 필수)</span></label>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:8px">
           <select id="sSize"><option value="">상의</option><option>S (90)</option><option>M (95)</option><option>L (100)</option><option>XL (105)</option><option>2XL (110)</option><option>3XL (115)</option></select>
           <select id="sSizePants"><option value="">하의(허리)</option><option>26</option><option>28</option><option>30</option><option>32</option><option>34</option><option>36</option><option>38</option><option>40</option></select>
@@ -261,7 +261,7 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
       </div>
 
       <div id="sBankBlock" style="margin-top:16px;padding:14px 16px;background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:12px">
-        <label style="margin:0;font-size:13.5px;font-weight:800;color:#0f766e">💳 수당 지급 계좌 <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 선택, 나중에 마이페이지에서 입력·수정 가능합니다</span></label>
+        <label style="margin:0;font-size:13.5px;font-weight:800;color:#0f766e">💳 수당 지급 계좌 <span id="reqBank" style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 강습·심판·운영 수당 지급에 사용 (본인 명의 계좌)</span></label>
         <p style="font-size:12px;color:var(--gray);margin:4px 0 10px">강습·강사·심판·운영요원 등에 배정(위촉)되면 수당·환급금 지급에 사용됩니다. 본인 명의 계좌만 입력해 주세요.</p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div>
@@ -331,9 +331,9 @@ function mode(m){
 let SIGNUP_TYPE='instructor';
 const MTYPE_INFO={
   instructor:{bg:'#eef3fa',bd:'1.5px solid #d4e0f2',fg:'#153A77',
-    html:'🧑‍🏫 <b>지도자·강사</b> — 연맹 자격증을 보유했거나 취득 예정인 지도자입니다. 강습 배정·위촉·수당 정산·물품 발송에 필요한 정보를 받습니다. 계좌·피복 사이즈는 선택이며 나중에 마이페이지에서 입력해도 됩니다.'},
+    html:'🧑‍🏫 <b>지도자·강사</b> — 연맹 자격증을 보유했거나 취득 예정인 지도자입니다. 강습 배정·위촉·수당 정산·물품 발송에 필요한 정보를 받습니다. 수당 지급 계좌·피복 사이즈·학력은 <b>필수</b>입니다.'},
   teacher:{bg:'#f0f7f4',bd:'1.5px solid #cfe3d8',fg:'#0f766e',
-    html:'🎓 <b>교사</b> — 학교 교원 회원입니다. 지도자(강사)와 같은 군으로 관리되어 강습·대회 운영에 함께 배정됩니다. <b>근무 학교는 필수</b>이며, 수당 지급 대상이 아니면 계좌는 비워두셔도 됩니다.'},
+    html:'🎓 <b>교사</b> — 학교 교원 회원입니다. 지도자(강사)와 같은 군으로 관리되어 강습·대회 운영에 함께 배정됩니다. <b>근무 학교·수당 계좌·피복 사이즈·학력</b>이 필수입니다.'},
   general:{bg:'#fbf7f0',bd:'1.5px solid #e8dcc8',fg:'#8a5a00',
     html:'👥 <b>일반회원</b> — 학부모·동호인·타 단체 소속 등 지도자가 아닌 회원입니다. <b>꼭 필요한 정보만</b> 받습니다(계좌·피복·학력 미입력). 자녀 연동, 대회 참가, 클럽 활동에 바로 이용하실 수 있습니다.<br>나중에 강사로 활동하시려면 <b>마이페이지 → 강사 활동 지원</b>에서 추가 정보를 입력하시면 됩니다.'},
   student:{bg:'#fff8ed',bd:'1.5px solid #ecd9b0',fg:'#8a5a00',
@@ -341,10 +341,10 @@ const MTYPE_INFO={
 };
 // 유형별 표시·필수 설정 —  show: 노출 블록 / req: 필수 항목
 const MTYPE_CFG={
-  instructor:{show:['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'],req:{addr:true,area:true,aff:true,work:false}},
-  teacher:   {show:['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'],req:{addr:true,area:true,aff:true,work:true}},
-  general:   {show:['sAddrBlock','sOrgTypeBlock','sQualBlock','sPledgeBox'],req:{addr:false,area:false,aff:false,work:false}},
-  student:   {show:['sSchoolBlock','sAreaBlock'],req:{addr:false,area:false,aff:false,work:false}}
+  instructor:{show:['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true}},
+  teacher:   {show:['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'],req:{addr:true,area:true,aff:true,work:true,bank:true,size:true,degree:true}},
+  general:   {show:['sAddrBlock','sOrgTypeBlock','sQualBlock','sPledgeBox'],req:{addr:false,area:false,aff:false,work:false,bank:false,size:false,degree:false}},
+  student:   {show:['sSchoolBlock','sAreaBlock'],req:{addr:false,area:false,aff:false,work:false,bank:false,size:false,degree:false}}
 };
 const MTYPE_ALL=['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sAffBlock','sSchoolBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'];
 function setSignupType(t){
@@ -355,6 +355,7 @@ function setSignupType(t){
   // 필수 표시(*) 동기화
   const mark=(id,on)=>{const e=document.getElementById(id);if(e)e.style.display=on?'':'none';};
   mark('reqAddr',cfg.req.addr);mark('reqArea',cfg.req.area);mark('reqWork',cfg.req.work);
+  mark('reqBank',cfg.req.bank);mark('reqSize',cfg.req.size);mark('reqDegree',cfg.req.degree);
   // 교사는 소속에서 '교사(교원)' 자동 체크 + 근무지 열기
   if(t==='teacher'){
     const af2=document.getElementById('sAf2');
@@ -684,6 +685,19 @@ async function go(){
           const needWork=CFG.req.work||document.getElementById('sAf2').checked||document.getElementById('sAf3').checked;
           if(needWork&&!work)return say('근무지(학교·기관명)를 입력해주세요');
         }
+        // 지도자군(강사·교사): 수당 계좌·피복 사이즈·학력 필수
+        if(CFG.req.bank){
+          const bk=document.getElementById('sBank').value.trim();
+          const ah=document.getElementById('sAccHolder').value.trim();
+          const an=document.getElementById('sAccNum').value.replace(/[^0-9]/g,'');
+          if(!bk||!ah||!an)return say('수당 지급 계좌(은행·예금주·계좌번호)를 모두 입력해주세요. 본인 명의 계좌만 등록됩니다.');
+        }
+        if(CFG.req.size){
+          if(!document.getElementById('sSize').value||!document.getElementById('sSizePants').value||!document.getElementById('sSizeShoe').value)
+            return say('피복 사이즈(상의·하의·신발)를 선택해주세요. 활동복·조끼 등 물품 지급에 사용됩니다.');
+        }
+        if(CFG.req.degree&&!document.getElementById('sDegree').value)
+          return say('학력 확인 항목을 선택해주세요. (체육 전공이 아니면 「해당 없음」을 선택하시면 됩니다)');
         // 허위 기재 확인 서약
         const pl=document.getElementById('sPledge');
         if(pl&&!pl.checked)return say('기재 사항 확인란에 체크해주세요.');
