@@ -3227,7 +3227,9 @@ async function withdrawModal(uid){
     +'<button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'wdModal\').remove()">닫기</button>'
     +'<button class="btn-sub" style="background:#153A77" onclick="withdrawReject(\''+uid+'\',\''+esc(v.name||'')+'\')">↩ 반려(요청 취소)</button>'
     +'<button class="btn-sub" style="background:#b8860b" onclick="withdrawHold(\''+uid+'\',\''+esc(v.name||'')+'\')">⏸ 보류 — 사유 안내</button>'
-    +'<button class="btn-sub" style="background:#C41E2F" onclick="withdrawApprove(\''+uid+'\',\''+esc(v.name||'')+'\')">🚪 탈퇴 처리</button></div>'
+    +'<button class="btn-sub" style="background:#C41E2F" onclick="withdrawApprove(\''+uid+'\',\''+esc(v.name||'')+'\')">🚪 탈퇴 처리(휴지통)</button>'
+    +'<button class="btn-sub" style="background:#111" onclick="withdrawPurge(\''+uid+'\',\''+esc(v.name||'')+'\')">⛔ 완전 삭제 (계정까지)</button></div>'
+    +'<div style="font-size:11.5px;color:#8a919d;margin-top:8px;text-align:right">⛔ 완전 삭제는 로그인 계정까지 즉시 지웁니다 — 복구 불가, 콘솔 작업 불필요</div>'
     +'</div>';
   document.body.appendChild(div);
 }
@@ -3272,6 +3274,41 @@ async function withdrawApprove(uid,name){
       +'\n⚠ 반드시 남은 절차: Firebase 콘솔 > Authentication에서 해당 이메일 계정을 삭제해야 합니다.\n(삭제하지 않으면 같은 이메일·전화번호로 재가입이 불가합니다)');
     loadDash();loadUsers();
   }catch(e){alert('실패: '+e.message)}
+}
+// 완전 삭제 — Cloud Function(adminDeleteMember)이 로그인 계정까지 한 번에 정리
+async function withdrawPurge(uid,name){
+  const typed=prompt('⛔ ['+name+'] 회원을 완전 삭제합니다.\n\n· 로그인 계정(Firebase Authentication)까지 즉시 삭제됩니다\n· 회원정보·활동이력·주민번호·전화번호 인덱스 모두 파기\n· 복구할 수 없습니다 (휴지통 거치지 않음)\n· 대회 신청·수당 지급 기록은 법정 보존을 위해 남습니다\n\n삭제하려면 회원 이름을 똑같이 입력하세요:','');
+  if(typed===null)return;
+  if(typed.trim()!==name){alert('이름이 일치하지 않아 취소되었습니다.');return}
+  try{
+    // 클럽 명단 정리 (계정 삭제 전에 수행)
+    let ownerClubs=[];
+    try{
+      const cs=await DB.collection('clubs').get();
+      for(const c of cs.docs){
+        const cd=c.data();
+        if(cd.ownerUid===uid){ownerClubs.push(cd.name||'');continue}
+        if((cd.memberUids||[]).indexOf(uid)>=0||(cd.pendingUids||[]).indexOf(uid)>=0){
+          await DB.collection('clubs').doc(c.id).update({
+            members:(cd.members||[]).filter(m=>m.uid!==uid),
+            memberUids:(cd.memberUids||[]).filter(x=>x!==uid),
+            pendingJoins:(cd.pendingJoins||[]).filter(m=>m.uid!==uid),
+            pendingUids:(cd.pendingUids||[]).filter(x=>x!==uid),
+            tempUids:(cd.tempUids||[]).filter(x=>x!==uid)}).catch(()=>{});
+        }
+      }
+    }catch(e){}
+    if(ownerClubs.length&&!confirm('⚠ 이 회원이 클럽장인 클럽이 있습니다: '+ownerClubs.join(', ')+'\n삭제하면 클럽이 주인 없는 상태가 됩니다.\n\n그래도 계속할까요? (권장: 회장 인수인계 먼저)'))return;
+    const fn=FUNCS.httpsCallableFromURL('https://admindeletemember-1081847355343.asia-northeast3.run.app');
+    const res=await fn({targetUid:uid});
+    const done=(res&&res.data&&res.data.done)||[];
+    await updateLeaderboard().catch(()=>{});
+    const m=document.getElementById('wdModal');if(m)m.remove();
+    alert('✓ ['+name+'] 완전 삭제 완료\n\n'+(done.length?'· '+done.join('\n· '):'')+'\n\n같은 이메일·전화번호로 재가입할 수 있습니다.');
+    loadDash();loadUsers();
+  }catch(e){
+    alert('완전 삭제 실패: '+(e.message||e)+'\n\n※ Cloud Function(adminDeleteMember)이 아직 배포되지 않았다면\n[🚪 탈퇴 처리(휴지통)] 후 Firebase 콘솔에서 계정을 삭제해주세요.');
+  }
 }
 async function withdrawHold(uid,name){
   const why=prompt('보류 사유를 입력하세요 (회원에게 알림으로 전달됩니다)','수당 지급·원천징수 증빙 자료의 법정 보존기간(5년) 경과 후 파기 예정입니다.');
