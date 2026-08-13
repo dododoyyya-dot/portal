@@ -149,8 +149,8 @@
   <div id="cBody" style="display:none">
     <div id="soAdminBox" style="display:none;background:#f0f5ff;border:2px solid #b9cdec;border-radius:16px;padding:16px 20px;margin-bottom:20px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <b style="font-size:15.5px;color:#153A77">🛠 시도임원 모집공고 등록</b>
-        <span style="font-size:12px;color:var(--gray)">우리 시도 대회의 심판·운영요원 모집 공고를 직접 올릴 수 있습니다</span>
+        <b style="font-size:15.5px;color:#153A77">🛠 심판·운영요원 모집공고 등록</b>
+        <span style="font-size:12px;color:var(--gray)">시도연맹 임원·중앙관리자가 심판·운영요원 모집 공고를 직접 올릴 수 있습니다</span>
         <span style="flex:1"></span>
         <button class="cbtn cbtn-main" style="padding:8px 16px;font-size:13px" onclick="openSoPost()">+ 모집공고 등록</button>
       </div>
@@ -218,7 +218,7 @@ function isCompStaff(){
 }
 // ── 🛠 시도임원 제한 모집공고 등록 (심판·운영요원만 — 종목·팀신청 등 대회 신설은 중앙관리자 전용) ──
 const SO_SIDO2REG={'서울':'서울·경기','인천':'서울·경기','경기':'서울·경기','강원':'강원','대전':'충청','세종':'충청','충청북':'충청','충북':'충청','충청남':'충청','충남':'충청','광주':'전라','전라북':'전라','전북':'전라','전라남':'전라','전남':'전라','전남광주':'전라','부산':'경상','대구':'경상','울산':'경상','경상북':'경상','경북':'경상','경상남':'경상','경남':'경상','제주':'제주'};
-function isSidoOfficer(){return !!(CMY&&(CMY.role==='sidoOfficer'||(CMY.roles&&CMY.roles.indexOf('sidoOfficer')>=0)))}
+function isSidoOfficer(){return !!(CMY&&(CMY.role==='admin'||CMY.role==='sidoOfficer'||(CMY.roles&&CMY.roles.indexOf('sidoOfficer')>=0)))}
 let SO_POSTS=[];
 function initSoAdmin(){
   if(!isSidoOfficer())return;
@@ -253,7 +253,7 @@ function openSoPost(editId){
   const lb='style="font-size:12.5px;font-weight:800;display:block;margin-top:11px"';
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:480px;width:100%;max-height:92vh;overflow:auto;padding:22px 24px">'
     +'<b style="font-size:16px">🛠 '+(ed?'모집공고 수정':'심판·운영요원 모집공고 등록')+'</b>'
-    +'<div style="font-size:11.5px;color:#8a919d;margin-top:4px">'+cesc(CMY.sido||'')+' 시도연맹 소속 · 대회 신설(종목·팀신청 등)은 사무국(중앙관리자)에 요청해주세요</div>'
+    +'<div style="font-size:11.5px;color:#8a919d;margin-top:4px">'+(CMY.role==='admin'?'중앙관리자 · 대회 신설(종목·팀신청 등)은 관리자 페이지의 「대회 통합 등록」 마법사를 이용해주세요':cesc(CMY.sido||'')+' 시도연맹 소속 · 대회 신설(종목·팀신청 등)은 사무국(중앙관리자)에 요청해주세요')+'</div>'
     +'<label '+lb+'>대회명 *</label><input id="soTitle" '+inp+' value="'+cesc(s.title||'')+'" placeholder="예: 2026 부산광역시교육감배 플라잉디스크대회">'
     +'<label '+lb+'>역할 *</label><select id="soRole" '+inp+'><option'+(s.role==='심판'?' selected':'')+'>심판</option><option'+(s.role==='운영'?' selected':'')+'>운영</option></select>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label '+lb+'>일자 *</label><input id="soDate" type="date" '+inp+' value="'+cesc(s.date||'')+'"></div><div><label '+lb+'>신청 마감일</label><input id="soDL" type="date" '+inp+' value="'+cesc(s.deadline||'')+'"></div></div>'
@@ -273,7 +273,7 @@ async function saveSoPost(editId){
   if(!title||!date||!quota){alert('대회명·일자·정원을 입력해주세요.');return}
   const rolesTxt=v('soRoles');
   const roles=rolesTxt?rolesTxt.split(',').map(x=>x.trim()).filter(Boolean):(DEFAULT_ROLES[role]||[]);
-  const region=SO_SIDO2REG[CMY.sido]||CMY.sido||'';
+  const region=SO_SIDO2REG[CMY.sido]||CMY.sido||(CMY.role==='admin'?'전국':'');
   const data={title:title,role:role,roles:roles,quota:quota,date:date,region:region,
     deadline:v('soDL'),note:v('soNote'),fee:'',byUid:CME.uid,byName:CMY.name||'',bySido:CMY.sido||''};
   try{
