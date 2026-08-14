@@ -2051,6 +2051,10 @@ function renderUsers(){
             +' '+(v.degreeApproved?'<b style="color:#0f766e">✓학위승인</b> <button class="btn-sub" style="background:#8a919d;padding:2px 8px;font-size:11px" onclick="approveDegree(\''+d.id+'\',0)">승인취소</button>':'<button class="btn-sub" style="background:#b8860b;padding:2px 8px;font-size:11px" onclick="approveDegree(\''+d.id+'\',1)">학위 승인</button>'):'')
           +((v.qualDocs&&v.qualDocs.length)?' · '+v.qualDocs.map((u,i)=>'<a href="'+u+'" target="_blank" style="color:#153A77;font-weight:800">📎자격증'+(i+1)+'</a>').join(' '):'')
         +'</div>':'')
+      +(v.natCertName?'<div class="sub3" style="margin-top:3px">🏅 국가공인: '+esc(v.natCertName)
+          +(v.natCertDoc?' <a href="'+v.natCertDoc+'" target="_blank" style="color:#153A77;font-weight:800">📎사본보기</a> '+(v.natCertApproved?'<b style="color:#0f766e">✓확인됨</b> <button class="btn-sub" style="background:#8a919d;padding:2px 8px;font-size:11px" onclick="approveNatCert(\''+d.id+'\',0)">취소</button>':'<button class="btn-sub" style="background:#b8860b;padding:2px 8px;font-size:11px" onclick="approveNatCert(\''+d.id+'\',1)">자격 확인</button>')
+            :' <b style="color:#C41E2F">(사본 미첨부 — 본인 마이페이지 첨부 대기)</b>')
+        +'</div>':'')
       +'<div class="sub3" style="margin-top:3px">위촉검증: '
       +((v.consents&&v.consents.agreedAt)?'<b style="color:#0f766e">✓전자동의 '+fmtDate(v.consents.agreedAt)+'</b>':'<b style="color:#C41E2F">✗전자동의 전</b>')
       +' · '
@@ -2059,7 +2063,9 @@ function renderUsers(){
       +'</div></div>'
       +(v.status==='approved'
         ?'<span style="font-size:13px;font-weight:800;color:#0f766e">승인됨</span>'
-        :'<button class="btn-sub" onclick="approve(\''+d.id+'\')">승인하기</button>')
+        :(v.natCertName&&!v.natCertApproved
+          ?'<span style="font-size:12px;font-weight:800;color:#C41E2F">🏅 국가자격증 확인 후 승인 가능</span>'
+          :'<button class="btn-sub" onclick="approve(\''+d.id+'\')">승인하기</button>'))
       +'<button class="btn-sub" style="background:#1F4E9C" onclick="setOrg(\''+d.id+'\')">직책</button>'
       +'<button class="btn-sub" style="background:#0f766e" onclick="setBase(\''+d.id+'\')">📍 거점·권역</button>'
       +roleBadge(v)
@@ -3731,9 +3737,26 @@ async function autoLinkLicense(uid,d){
   }
   return linked;
 }
+async function approveNatCert(uid,on){
+  const u=USERS.find(x=>x.id===uid);if(!u)return;
+  const v=u.data();
+  if(on===0){
+    if(!confirm('['+v.name+'] 국가공인 체육지도사 자격 확인을 취소할까요?'))return;
+    await DB.collection('users').doc(uid).update({natCertApproved:false});loadUsers();return;
+  }
+  if(!v.natCertDoc){alert('첨부된 자격증 사본이 없습니다. 사본을 먼저 확인해주세요.');return}
+  if(!confirm(v.name+' 님의 국가공인 자격('+(v.natCertName||'')+')을 사본 확인 후 승인할까요?'))return;
+  await DB.collection('users').doc(uid).update({natCertApproved:true,natCertApprovedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  loadUsers();
+}
 async function approve(uid){
   const doc=await DB.collection('users').doc(uid).get();
   const d=doc.data();
+  // 국가공인 체육지도사 자격을 신고했는데 아직 사본 미확인이면 승인 보류(사무국이 직접 확인해야 함)
+  if(d.natCertName&&!d.natCertApproved){
+    alert('🏅 ['+(d.name||'')+'] 국가공인 체육지도사 자격("'+d.natCertName+'")을 신고했으나 아직 확인되지 않았습니다.\n회원목록에서 첨부된 자격증 사본을 먼저 확인·승인해주세요.'+(d.natCertDoc?'':'\n(아직 사본이 첨부되지 않았습니다 — 회원이 마이페이지에서 첨부할 때까지 기다려야 합니다)'));
+    return;
+  }
   // 승인 시 자격번호 자동 연결 (입력한 경우에만)
   const licMsg=await autoLinkLicense(uid,d).catch(()=>[]);
   if(licMsg.length)setTimeout(()=>alert('🎖 자격 연결 결과 — '+(d.name||'')+'\n\n'+licMsg.join('\n')),400);
