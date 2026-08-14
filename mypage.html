@@ -316,6 +316,14 @@ function orgChip(o,region,title,fed){
       <div id="pfDegLink" style="font-size:12px;margin-top:4px"></div>
     </div>
 
+    <!-- ④-1 국가공인 체육지도사 자격 (문체부 발급, 연맹 자격증·학위와 별개) -->
+    <div style="margin-top:14px;max-width:400px">
+      <label style="font-size:13px;font-weight:800">국가공인 체육지도사 자격 <span id="pfNcSt" style="font-size:11px;font-weight:900"></span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 예: 유소년스포츠지도사·생활스포츠지도사 등</span></label>
+      <input id="pfNatCertName" placeholder="자격 종류·등급 (예: 유소년스포츠지도사 2급)" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
+      <input type="file" id="pfNatCertDoc" accept="image/*" style="display:block;margin-top:6px;font-size:12px">
+      <div id="pfNatCertLink" style="font-size:12px;margin-top:4px"></div>
+    </div>
+
     <!-- ⑤ 경력 -->
     <div style="margin-top:14px">
       <label style="font-size:13px;font-weight:800">경력 사항 <span style="font-weight:600;color:var(--gray);font-size:12px">— 입상·선수 경력, KFDF 주최대회 참가 등 자유 기재</span></label>
@@ -747,6 +755,7 @@ function aaLoad(d){
 }
 function fillProfile(d){
   document.getElementById('pfDegree').value=d.degree||'';
+  document.getElementById('pfNatCertName').value=d.natCertName||'';
   const af=d.affiliation||[];
   document.getElementById('pfAf1').checked=af.indexOf('시도연맹')>=0;
   document.getElementById('pfAf2').checked=af.indexOf('초·중·고 교사')>=0;
@@ -839,6 +848,12 @@ function fillProfile(d){
   else{ds.textContent='';ds.style.color='';}  // 학위 미선택 시 상태 문구 초기화 (자격증 첨부와 무관)
   // 학위 증빙 링크는 '학위를 선택한 경우'에만 표시 — 자격증 사본과 혼동 방지
   document.getElementById('pfDegLink').innerHTML=(d.degree&&d.degreeDoc)?'<a href="'+d.degreeDoc+'" target="_blank" style="font-weight:800;color:#153A77;background:#eef3fa;border:1px solid #d4e0f2;border-radius:8px;padding:4px 10px">📎 첨부한 학위 증빙 보기</a>':'';
+  // 국가공인 체육지도사 자격 사본 상태
+  const ncs=document.getElementById('pfNcSt');
+  if(d.natCertName&&d.natCertDoc){ncs.textContent=d.natCertApproved?'✓ 확인 완료':'⏳ 사무국 확인 대기';ncs.style.color=d.natCertApproved?'#0f766e':'#b8860b';}
+  else if(d.natCertName){ncs.textContent='📎 사본 첨부 필요 — 첨부 전까지 승인 보류';ncs.style.color='#C41E2F';}
+  else{ncs.textContent='';ncs.style.color='';}
+  document.getElementById('pfNatCertLink').innerHTML=(d.natCertName&&d.natCertDoc)?'<a href="'+d.natCertDoc+'" target="_blank" style="font-weight:800;color:#153A77;background:#eef3fa;border:1px solid #d4e0f2;border-radius:8px;padding:4px 10px">📎 첨부한 자격증 사본 보기</a>':'';
   renderDocList(d.qualDocs||[]);
 }
 function renderDocList(urls){
@@ -1219,6 +1234,16 @@ async function saveProfile(){
       await ref.put(blob,{contentType:'image/jpeg'});
       degDoc=await ref.getDownloadURL();
     }
+    // 국가공인 체육지도사 자격증 사본 업로드 (새 파일 선택 시)
+    let ncDoc=MYD.natCertDoc||'';
+    const ncf=document.getElementById('pfNatCertDoc').files[0];
+    if(ncf){
+      m.textContent='국가공인자격증 사본 업로드 중…';m.style.color='#153A77';
+      const blob=await compressImg(ncf);
+      const ref=firebase.storage().ref('quals/'+AUTH.currentUser.uid+'/natcert_'+Date.now()+'.jpg');
+      await ref.put(blob,{contentType:'image/jpeg'});
+      ncDoc=await ref.getDownloadURL();
+    }
     const upd={
       region:(function(){
         const addr=document.getElementById('pfAddr').value.trim();
@@ -1233,6 +1258,8 @@ async function saveProfile(){
       gender:document.getElementById('pfGender').value,
       degree:document.getElementById('pfDegree').value,
       degreeDoc:degDoc,
+      natCertName:document.getElementById('pfNatCertName').value.trim(),
+      natCertDoc:ncDoc,
       affiliation:af,
       quals:{leader:document.getElementById('pfLeader').value,referee:document.getElementById('pfRef').value,youth:document.getElementById('pfYouth').checked},
       career:document.getElementById('pfCareer').value.trim(),
@@ -1252,6 +1279,7 @@ async function saveProfile(){
       qualDocs:docs
     };
     if(df&&MYD.degreeDoc!==degDoc)upd.degreeApproved=false; // 새 증빙 첨부 시 재확인 대상
+    if(ncf&&MYD.natCertDoc!==ncDoc)upd.natCertApproved=false; // 새 국가공인자격 증빙 첨부 시 재확인 대상
     await DB.collection('users').doc(AUTH.currentUser.uid).update(upd);
     // 주민등록번호 — 별도 보안 컬렉션 저장 (입력했을 때만)
     const rrnRaw=document.getElementById('pfRrn').value.replace(/[^0-9]/g,'');
@@ -1266,7 +1294,7 @@ async function saveProfile(){
       document.getElementById('pfRrnState').innerHTML='✅ <b style="color:#0f766e">주민등록번호 등록 완료.</b> 🔒 본인과 중앙 사무국만 열람 가능합니다.';
     }
     Object.assign(MYD,upd);
-    document.getElementById('pfDocs').value='';document.getElementById('pfDegDoc').value='';
+    document.getElementById('pfDocs').value='';document.getElementById('pfDegDoc').value='';document.getElementById('pfNatCertDoc').value='';
     renderDocList(docs);fillProfile(MYD);
     m.textContent='✓ 저장되었습니다';m.style.color='#0f766e';
     pfCollapse(MYD);window.scrollTo({top:0,behavior:'smooth'});alert('프로필이 저장되었습니다.');
