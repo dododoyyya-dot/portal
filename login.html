@@ -348,12 +348,12 @@ const MTYPE_INFO={
 };
 // 유형별 표시·필수 설정 —  show: 노출 블록 / req: 필수 항목
 const MTYPE_CFG={
-  instructor:{show:['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true}},
-  teacher:   {show:['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'],req:{addr:true,area:true,aff:true,work:true,bank:true,size:true,degree:true}},
-  general:   {show:['sAddrBlock','sOrgTypeBlock','sQualBlock','sPledgeBox'],req:{addr:false,area:false,aff:false,work:false,bank:false,size:false,degree:false}},
-  student:   {show:['sSchoolBlock','sAreaBlock'],req:{addr:false,area:false,aff:false,work:false,bank:false,size:false,degree:false}}
+  instructor:{show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
+  teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'],req:{addr:true,area:true,aff:true,work:true,bank:true,size:true,degree:true,rrn:true}},
+  general:   {show:['sAddrBlock','sOrgTypeBlock','sQualBlock','sPledgeBox'],req:{addr:false,area:false,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}},
+  student:   {show:['sSchoolBlock','sAreaBlock'],req:{addr:false,area:false,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}
 };
-const MTYPE_ALL=['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sAffBlock','sSchoolBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'];
+const MTYPE_ALL=['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sAffBlock','sSchoolBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'];
 function setSignupType(t){
   SIGNUP_TYPE=t;
   [...document.querySelectorAll('#typeBtns .mtypebtn')].forEach(b=>b.classList.toggle('on',b.dataset.t===t));
@@ -658,11 +658,14 @@ async function go(){
       if(!gender)return say('성별을 선택해주세요');
       if(!birth)return say('생년월일을 입력해주세요');
       const ageNow=(Date.now()-new Date(birth).getTime())/31557600000;
-      // 주민등록번호 — 전 유형 공통 필수 (가입 시 바로 privateInfo에 분리 저장)
-      const rrnRaw=(document.getElementById('sRrn').value||'').replace(/[^0-9]/g,'');
-      if(rrnRaw.length!==13)return say('주민등록번호 13자리를 입력해주세요 (000000-0000000)');
-      if(!document.getElementById('sRrnAgree').checked)return say('고유식별정보(주민등록번호) 수집·이용 동의에 체크해주세요');
       const CFG=MTYPE_CFG[SIGNUP_TYPE]||MTYPE_CFG.instructor;
+      // 주민등록번호 — 강사·교사 유형만 가입 시 필수 (가입 시 바로 privateInfo에 분리 저장). 일반·학생회원은 마이페이지에서 나중에 입력 가능.
+      let rrnRaw='';
+      if(CFG.req.rrn){
+        rrnRaw=(document.getElementById('sRrn').value||'').replace(/[^0-9]/g,'');
+        if(rrnRaw.length!==13)return say('주민등록번호 13자리를 입력해주세요 (000000-0000000)');
+        if(!document.getElementById('sRrnAgree').checked)return say('고유식별정보(주민등록번호) 수집·이용 동의에 체크해주세요');
+      }
       if(SIGNUP_TYPE==='student'&&ageNow>=19)return say('입력하신 생년월일은 만 19세 이상입니다. 위에서 성인 유형(지도자·강사 / 교사 / 일반회원)을 선택해주세요.');
       if(SIGNUP_TYPE!=='student'&&ageNow<19)return say('입력하신 생년월일은 만 19세 미만입니다. 위에서 [🧒 학생선수]를 선택해주세요.');
       let addr='',addr2='',zip='',af=[],work='',school='',orgType='',orgEtc='';
@@ -766,11 +769,13 @@ async function go(){
       }
       await DB.collection('users').doc(cred.user.uid).set(Object.assign(baseDoc,typeDoc));
       await DB.collection('phoneIndex').doc(pnorm).set({uid:cred.user.uid}).catch(()=>{}); // 개인정보 최소화: 이름 미저장(중복확인은 존재여부만 사용)
-      // 주민등록번호 — 일반 회원정보와 분리된 privateInfo 컬렉션에 저장 (본인·중앙관리자만 열람)
-      await DB.collection('privateInfo').doc(cred.user.uid).set({
-        rrn:rrnRaw.slice(0,6)+'-'+rrnRaw.slice(6),name:name,
-        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-      },{merge:true}).catch(e=>{console.warn('rrn save failed',e)});
+      // 주민등록번호 — 일반 회원정보와 분리된 privateInfo 컬렉션에 저장 (본인·중앙관리자만 열람). 강사·교사만 가입 시 즉시 저장, 일반·학생은 마이페이지에서 나중에 입력.
+      if(rrnRaw){
+        await DB.collection('privateInfo').doc(cred.user.uid).set({
+          rrn:rrnRaw.slice(0,6)+'-'+rrnRaw.slice(6),name:name,
+          updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+        },{merge:true}).catch(e=>{console.warn('rrn save failed',e)});
+      }
       if(SIGNUP_TYPE==='student'){
         say('가입 신청 완료! 사무국 승인 후 이용할 수 있습니다. 아래에서 보호자와 연동해주세요.',true);
         document.getElementById('postSignupLink').style.display='block';
