@@ -200,6 +200,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
       <label class="lclab" style="margin-top:10px">포스터 이미지 <span style="font-weight:600;color:var(--gray)">— 신청자에게 공고 카드에 표시됩니다 (자동 압축)</span></label>
       <input type="file" id="nPoster" accept="image/*" class="lcin" style="padding:8px">
       <div id="nPosterNow" style="font-size:12px;margin-top:4px"></div>
+      <label style="display:flex;gap:8px;align-items:center;margin-top:12px;padding:10px 12px;background:#fff8ed;border:1.5px solid #ecd9b0;border-radius:9px;font-size:13px;font-weight:800;color:#8a5a00"><input type="checkbox" id="nShowBanner" style="width:auto"> 📢 홈페이지 메인 배너에 노출 <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 체크한 공고만 접수중일 때 메인 화면 상단 배너에 표시됩니다</span></label>
       <div style="margin-top:12px"><button class="lcbtn p" id="nBtn" onclick="addNotice()">공고 게시</button>
       <a href="javascript:cancelEdit()" id="nCancel" style="display:none;font-size:12.5px;font-weight:800;color:#C41E2F;margin-left:8px">수정 취소 ✕</a>
       <span id="nMsg" style="font-size:13px;font-weight:700"></span></div>
@@ -350,6 +351,7 @@ async function loadNotices(){
         +(n.sido?'<span class="lctag" style="background:#b8860b">'+esc(n.sido)+'</span> ':'')
         +(!approved?'<span class="lctag" style="background:'+(n.approval==='반려'?'#C41E2F':'#7c3aed')+'">'+(n.approval==='반려'?'반려됨':'중앙승인 대기')+'</span> ':(closed?'<span class="lctag" style="background:#C41E2F">마감</span> ':''))
         +(rst?'<span class="lctag" style="background:'+(rst==='승인'?'#0f766e':(rst==='보완요청'?'#C41E2F':'#b8860b'))+'">보고 '+esc(rst)+'</span> ':'')
+        +(n.showOnBanner?'<span class="lctag" style="background:#e6b422;color:#1a1c22">📢 메인배너노출</span> ':'')
         +'<b style="font-size:15.5px;display:block;margin-top:6px">'+esc(n.title)+'</b>'
         +'<div style="font-size:12.5px;color:var(--gray);margin-top:4px;line-height:1.7">'+esc(n.issuer||'')+' · '+esc(n.date||'')+' · '+esc(n.place||'')+(n.fee?' · '+esc(n.fee):'')+(n.until?' · 마감 '+esc(n.until):'')
         +(n.acct?'<br>💳 수수료 입금: '+esc(n.acct):'')
@@ -426,6 +428,7 @@ async function addNotice(){
       type:ntypeVal(),target:v('nTarget'),title:v('nTitle'),date:v('nDate'),place:v('nPlace'),fee:v('nFee'),acct:v('nAcct'),until:v('nUntil'),desc:v('nDesc'),
       schedule:v('nSched'),fees:feesVal(),
       sido:(sido==='전국(중앙)'?'전국':sido),
+      showOnBanner:document.getElementById('nShowBanner').checked,
       editedAt:firebase.firestore.FieldValue.serverTimestamp()};
     const pu=await uploadPoster();if(pu)upd.posterUrl=pu;
     await DB.collection('licenseNotices').doc(EDIT_ID).update(upd);
@@ -440,10 +443,11 @@ async function addNotice(){
     issuer:(isCentral?'중앙연맹':(sido+'연맹')),
     approval:(isCentral?'승인':'대기'),
     status:(isCentral?'접수중':'중앙승인 대기'),
+    showOnBanner:document.getElementById('nShowBanner').checked,
     reportStatus:'',
     createdAt:firebase.firestore.FieldValue.serverTimestamp()});
   m.textContent=isCentral?'✓ 게시되었습니다':'✓ 등록되었습니다 — 중앙연맹 승인 후 회원에게 공개됩니다';m.style.color='#0f766e';
-  ['nTitle','nDate','nPlace','nFee','nAcct','nUntil','nDesc','nSched','nFLn','nFLg','nFLb','nFRn','nFRg','nFRb'].forEach(i=>document.getElementById(i).value='');document.getElementById('nPoster').value='';document.getElementById('nPosterNow').textContent='';
+  ['nTitle','nDate','nPlace','nFee','nAcct','nUntil','nDesc','nSched','nFLn','nFLg','nFLb','nFRn','nFRg','nFRb'].forEach(i=>document.getElementById(i).value='');document.getElementById('nPoster').value='';document.getElementById('nPosterNow').textContent='';document.getElementById('nShowBanner').checked=false;
   loadNotices();
 }
 function editNotice(id){
@@ -469,6 +473,7 @@ function editNotice(id){
   for(const id in fm)document.getElementById(id).value=(n.fees&&n.fees[fm[id]])||'';
   document.getElementById('nPoster').value='';
   document.getElementById('nPosterNow').innerHTML=n.posterUrl?('현재 포스터 등록됨 — <a href="'+n.posterUrl+'" target="_blank" style="font-weight:800;color:#153A77">보기</a> (새 파일 선택 시 교체)'):'등록된 포스터 없음';
+  document.getElementById('nShowBanner').checked=!!n.showOnBanner;
   document.getElementById('nBtn').textContent='✏️ 수정 저장';
   document.getElementById('nCancel').style.display='inline';
   document.getElementById('nMsg').textContent='수정 중: '+(n.title||'');document.getElementById('nMsg').style.color='#1F4E9C';
@@ -478,6 +483,7 @@ function editNotice(id){
 function cancelEdit(){
   EDIT_ID=null;
   ['nTitle','nDate','nPlace','nFee','nAcct','nUntil','nDesc'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('nShowBanner').checked=false;
   document.getElementById('nBtn').textContent='공고 게시';
   document.getElementById('nCancel').style.display='none';
   document.getElementById('nMsg').textContent='';
