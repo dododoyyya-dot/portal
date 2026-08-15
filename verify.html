@@ -286,7 +286,9 @@ function printLicCheck(){
 }
 document.getElementById('vlCode').addEventListener('keydown',e=>{if(e.key==='Enter')verifyLic()});
 document.getElementById('vlName').addEventListener('keydown',e=>{if(e.key==='Enter')verifyLic()});
-// 이름으로 조회 — 자격번호를 모를 때 성명으로 등록 여부 확인 (결과는 마스킹된 성명·지역·번호·진위여부만)
+// 자격번호 일부 마스킹 — 앞 4자리·뒤 2자리 숫자만 표시 (개인정보 보호)
+function maskLicNo(no){no=String(no||'');const idx=[];for(let i=0;i<no.length;i++)if(/\d/.test(no[i]))idx.push(i);const hd=idx.length<=6?2:4,tl=idx.length<=6?1:2;const keep={};idx.slice(0,hd).concat(idx.slice(-tl)).forEach(i=>keep[i]=1);let out='';for(let i=0;i<no.length;i++)out+=(/\d/.test(no[i])&&!keep[i])?'*':no[i];return out}
+// 이름으로 조회 — 자격번호를 모를 때 성명으로 등록 여부 확인 (결과는 마스킹된 성명·지역·마스킹번호·자격종류·진위여부만)
 async function verifyLicByName(){
   const el=document.getElementById('vlNameResult');
   const name=(document.getElementById('vlSearchName').value||'').trim();
@@ -305,7 +307,8 @@ async function verifyLicByName(){
         return '<div style="padding:13px 16px;border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:center;flex-wrap:wrap">'
           +'<b style="font-size:14.5px;min-width:70px">'+esc(l.maskName||'')+'</b>'
           +'<span style="font-size:13px;color:var(--gray);min-width:70px">'+esc(l.region||'-')+'</span>'
-          +'<span style="font-size:13px;font-weight:700">'+esc(d.id)+'</span>'
+          +'<span style="font-size:12.5px;font-weight:800;color:#153A77;min-width:80px">'+esc(l.type?('플라잉디스크 '+l.type+(l.grade?' '+l.grade:'')):'-')+'</span>'
+          +'<span style="font-size:13px;font-weight:700" title="개인정보 보호를 위해 자격번호 일부는 가려집니다">'+esc(maskLicNo(d.id))+'</span>'
           +'<span style="flex:1"></span>'
           +'<b style="font-size:13.5px;color:'+(expired?'var(--red)':'#0f766e')+'">'+(expired?'❌ '+stat:'✅ '+stat)+'</b>'
           +'</div>';
