@@ -234,7 +234,7 @@ function renderHeader(){
   document.title=(c.name||'클럽')+' 클럽 홈 | 대한민국플라잉디스크연맹';
   document.getElementById('chCrumb').textContent=c.name||'클럽 홈';
   document.getElementById('chTitle').textContent='🏠 '+(c.name||'클럽')+' 클럽 홈';
-  document.getElementById('chSub').textContent=(c.sido||'')+' '+(c.gugun||'')+' · KFDF 공식 클럽'+(c.status!=='승인'?' · 사무국 승인 대기 중':'');
+  document.getElementById('chSub').textContent=(c.sido||'')+' '+(c.gugun||'')+' · KFDF 공식 클럽'+(c.status==='임시'?' · 🧪 임시클럽 (성인 회장 인수 후 정식 승인)':(c.status!=='승인'?' · 사무국 승인 대기 중':''));
   const cnt=(c.memberUids||[]).length+((c.childMembers||[]).length);
   document.getElementById('chHeader').innerHTML=
     '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">'+cavHtml(c)
@@ -256,15 +256,41 @@ function showChTab(k){
 function normSchool(s){
   return String(s||'').trim().replace(/\s+/g,'').replace(/(초등학교|중학교|고등학교|초교|중교|고교|학교)$/,'');
 }
-function renderMembers(){
+async function renderMembers(){
   const el=document.getElementById('chMembers');
   const c=CCLUB;
   const kidCids=new Set((c.childMembers||[]).map(k=>k.cid));
+  const tempSet=new Set(c.tempUids||[]);
+  // 회원별 학생 여부·학교 판정 — ① members 엔트리의 birth/school ② tempUids(임시회원=학생) ③ 가능하면 users 문서로 보강(권한 없으면 무시)
+  const meta={};
+  (c.members||[]).forEach(m=>{meta[m.uid]={school:m.school||'',minor:false};
+    if(m.birth){const a=(Date.now()-new Date(m.birth).getTime())/31557600000;if(a>0&&a<19)meta[m.uid].minor=true;}});
+  try{
+    const rs=await Promise.allSettled((c.members||[]).map(m=>DB.collection('users').doc(m.uid).get()));
+    rs.forEach((r,i)=>{if(r.status==='fulfilled'&&r.value.exists){const u=r.value.data();const uid=(c.members||[])[i].uid;
+      if(u.accountType==='student'||u.memberGroup==='student')meta[uid].minor=true;
+      if(u.school&&!meta[uid].school)meta[uid].school=u.school;
+      if(u.birth&&!meta[uid].minor){const a=(Date.now()-new Date(u.birth).getTime())/31557600000;if(a>0&&a<19)meta[uid].minor=true;}}});
+  }catch(e){}
+  const isStu=m=>kidCids.has(m.uid)||tempSet.has(m.uid)||meta[m.uid].minor||!!meta[m.uid].school;
   // 계정 연동형 미성년 회원은 childMembers·members 양쪽에 등록되어 있음 — "성인 회원"에는 중복 표시하지 않음
-  const adults=(c.members||[]).filter(m=>!kidCids.has(m.uid));
+  const adults=(c.members||[]).filter(m=>!kidCids.has(m.uid)&&!isStu(m));
+  const stuMembers=(c.members||[]).filter(m=>!kidCids.has(m.uid)&&isStu(m));
   const kids=(c.childMembers||[]);
-  let html='<div style="margin-bottom:6px"><b style="font-size:12.5px;color:#374151">성인 회원 ('+adults.length+'명)</b></div>';
-  html+=adults.length?adults.map(m=>'<span class="memchip"><span class="dot">'+kesc((m.name||'?').charAt(0))+'</span>'+kesc(m.name||'')+(m.uid===c.ownerUid?' <b style="color:#C41E2F">· 클럽장</b>':'')+'</span>').join(''):'<span style="font-size:12.5px;color:#8a919d">없음</span>';
+  const tchip=uid=>tempSet.has(uid)?' <b style="color:#b8860b;font-size:10.5px" title="보호자 미연동 임시회원 — 연동 완료 시 자동 정회원 전환">🕓 임시</b>':'';
+  let html='<div style="margin-bottom:6px"><b style="font-size:12.5px;color:#374151">성인 회원 ('+adults.length+'명)</b> <span style="font-size:11.5px;color:#8a919d">· 학생 회원 '+(stuMembers.length+kids.length)+'명</span></div>';
+  html+=adults.length?adults.map(m=>'<span class="memchip"><span class="dot">'+kesc((m.name||'?').charAt(0))+'</span>'+kesc(m.name||'')+(m.uid===c.ownerUid?' <b style="color:#C41E2F">· 클럽장</b>':'')+tchip(m.uid)+'</span>').join(''):'<span style="font-size:12.5px;color:#8a919d">없음</span>';
+  if(stuMembers.length){
+    const g2={};
+    stuMembers.forEach(m=>{const raw=meta[m.uid].school||'학교 미기재';const key=normSchool(raw)||raw;
+      if(!g2[key])g2[key]={label:raw,list:[]};g2[key].list.push(m);});
+    Object.keys(g2).sort((a,b)=>g2[a].label.localeCompare(g2[b].label,'ko')).forEach(key=>{
+      const g=g2[key];
+      html+='<div class="schoolgrp"><h4>🏫 '+kesc(g.label)+' ('+g.list.length+'명)</h4>'
+        +g.list.map(m=>'<span class="memchip"><span class="dot">'+kesc((m.name||'?').charAt(0))+'</span>'+kesc(m.name||'')+tchip(m.uid)+'</span>').join('')
+        +'</div>';
+    });
+  }
   if(kids.length){
     const groups={};   // 정규화 키 → {label, list}
     kids.forEach(k=>{
