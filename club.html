@@ -328,12 +328,19 @@ function renderClubs(){
       if(st==='member')act='<span class="cpill2" style="background:#0f766e">✓ 소속</span>';
       else if(st==='pending')act='<span class="cpill2" style="background:#b8860b">승인 대기</span>';
       else act='<button class="cbtn cbtn-main" onclick="joinClub(\''+d.id+'\')">본인 가입</button>';
-      const cnt=(c.memberUids||[]).length+((c.childMembers||[]).length);
+      // 성인/학생 구분 카운트 — 계정연동형 자녀(memberUids에도 있음)는 중복 계산 제외
+      const _mu=c.memberUids||[];const _kidCids={};(c.childMembers||[]).forEach(k=>_kidCids[k.cid]=1);
+      const _tmp={};(c.tempUids||[]).forEach(u2=>_tmp[u2]=1);
+      const _isStu=m=>{if(_kidCids[m.uid]||_tmp[m.uid])return true;if(m.school)return true;
+        if(m.birth){const a2=(Date.now()-new Date(m.birth).getTime())/31557600000;if(a2>0&&a2<19)return true}return false};
+      const _kidOnly=(c.childMembers||[]).filter(k=>_mu.indexOf(k.cid)<0).length;
+      const _stuN=(c.members||[]).filter(_isStu).length+_kidOnly;
+      const cnt=_mu.length+_kidOnly;const _adN=Math.max(0,cnt-_stuN);
       return '<div class="clubcard"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+cavHtml(c)+'<a href="clubhome.html?id='+d.id+'" style="text-decoration:none;color:inherit"><span class="cname">'+kesc(c.name)+'</span></a>'
         +(c.status==='임시'?'<span class="cpill2" style="background:#b8860b" title="학생들이 만든 임시클럽 — 성인 회장 인수 후 정식 승인됩니다">🧪 임시클럽</span>':'')
         +(c.clubType==='external'?'<span class="cpill2" style="background:#7c3aed" title="타 단체 소속 클럽 — 연맹 정식 클럽이 아닙니다">🔗 타단체'+(c.orgName?': '+kesc(c.orgName):'')+'</span>':'')
         +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'
-        +'<span style="font-size:12px;color:#8a919d;font-weight:700">회원 '+cnt+'명</span>'
+        +'<span style="font-size:12px;color:#8a919d;font-weight:700" title="학생 = 학생선수 계정·연동 자녀·임시회원 기준">회원 '+cnt+'명 (성인 '+_adN+' · 학생 '+_stuN+')</span>'
         +'<span style="flex:1"></span><a class="cbtn cbtn-soft" style="padding:7px 14px;text-decoration:none;display:inline-block" href="clubhome.html?id='+d.id+'">🏠 클럽 홈</a>'+childJoinBtn(c,d.id)+act+'</div>'
         +(c.intro?'<div class="cmeta2">'+kesc(c.intro)+'</div>':'')
         +(c.rulesText?'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">클럽 내규 보기</summary><div style="font-size:12.5px;color:#4b5563;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:10px 13px;margin-top:6px">'+kesc(c.rulesText)+'</div></details>':'')
@@ -371,7 +378,7 @@ async function tempJoin(id){
       const doc=await tx.get(ref);const c=doc.data();
       if((c.memberUids||[]).indexOf(KME.uid)>=0)throw new Error('이미 소속된 클럽입니다');
       if((c.pendingUids||[]).indexOf(KME.uid)>=0)throw new Error('이미 가입 신청 중입니다');
-      const pj=(c.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',at:new Date().toISOString(),temp:true});
+      const pj=(c.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',birth:KMY.birth||'',school:KMY.school||'',at:new Date().toISOString(),temp:true});
       const pu=(c.pendingUids||[]).slice();pu.push(KME.uid);
       tx.update(ref,{pendingJoins:pj,pendingUids:pu});
     });
@@ -402,7 +409,7 @@ async function joinClub(id){
       const doc=await tx.get(ref);const c=doc.data();
       if((c.memberUids||[]).indexOf(KME.uid)>=0)throw new Error('이미 소속된 클럽입니다');
       if((c.pendingUids||[]).indexOf(KME.uid)>=0)throw new Error('이미 가입 신청 중입니다');
-      const pj=(c.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',at:new Date().toISOString()});
+      const pj=(c.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',birth:KMY.birth||'',school:KMY.school||'',at:new Date().toISOString()});
       const pu=(c.pendingUids||[]).slice();pu.push(KME.uid);
       tx.update(ref,{pendingJoins:pj,pendingUids:pu});
     });
@@ -520,7 +527,7 @@ async function joinByCode(){
     await DB.runTransaction(async tx=>{
       const ref=DB.collection('clubs').doc(d.id);
       const doc=await tx.get(ref);const cc=doc.data();
-      const pj=(cc.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',code:c.code||norm,at:new Date().toISOString()});
+      const pj=(cc.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',birth:KMY.birth||'',school:KMY.school||'',code:c.code||norm,at:new Date().toISOString()});
       const pu=(cc.pendingUids||[]).slice();pu.push(KME.uid);
       tx.update(ref,{pendingJoins:pj,pendingUids:pu});
     });
@@ -641,7 +648,7 @@ async function approveJoin(id,uid){
       const p=(c.pendingJoins||[]).find(x=>x.uid===uid);
       const members=(c.members||[]).slice();
       const mu=(c.memberUids||[]).slice();
-      if(mu.indexOf(uid)<0){members.push({uid:uid,name:p?p.name:'',at:new Date().toISOString()});mu.push(uid);}
+      if(mu.indexOf(uid)<0){members.push({uid:uid,name:p?p.name:'',birth:(p&&p.birth)||'',school:(p&&p.school)||'',at:new Date().toISOString()});mu.push(uid);}
       const tu=(c.tempUids||[]).slice();
       if(p&&p.temp&&tu.indexOf(uid)<0)tu.push(uid);
       tx.update(ref,{members:members,memberUids:mu,tempUids:tu,
