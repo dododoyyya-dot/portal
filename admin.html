@@ -2703,10 +2703,10 @@ function renderClubsAdmin(){
     return '<div class="urow"><div class="grow"><b>'+esc(c.name)+'</b> '
       +'<span style="font-size:11px;font-weight:800;color:#fff;background:#153A77;padding:2px 8px;border-radius:999px">'+esc(c.sido)+' '+esc(c.gugun||'')+'</span> '
       +(c.clubType==='external'?'<span style="font-size:11px;font-weight:800;color:#fff;background:#7c3aed;padding:2px 8px;border-radius:999px">🔗 타단체'+(c.orgName?': '+esc(c.orgName):'')+'</span> ':'<span style="font-size:11px;font-weight:800;color:#fff;background:#1F4E9C;padding:2px 8px;border-radius:999px">🏅 연맹</span> ')
-      +(c.status==='승인'?'<span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">승인</span>':'<span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px">대기</span>')
+      +(c.status==='승인'?'<span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">승인</span>':c.status==='임시'?'<span style="font-size:11px;font-weight:800;color:#fff;background:#b8860b;padding:2px 8px;border-radius:999px" title="학생들이 만든 임시클럽 — 성인 회장 인수 후 정식 승인">🧪 임시클럽</span>':'<span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px">대기</span>')
       +(c.hidden?' <span style="font-size:11px;font-weight:800;color:#fff;background:#8a919d;padding:2px 8px;border-radius:999px">숨김(코드전용)</span>':'')
       +(c.code?' <span style="font-size:11px;font-weight:800;color:#b8860b">코드: '+esc(c.code)+'</span>':'')
-      +'<div class="sub3">클럽장 '+esc(c.ownerName||'')+' · 회원 '+((c.memberUids||[]).length)+'명 · 가입대기 '+((c.pendingUids||[]).length)+'명'+(c.intro?'<br>'+esc(c.intro):'')+'</div></div>'
+      +'<div class="sub3">클럽장 '+esc(c.ownerName||'')+' · 회원 '+((c.memberUids||[]).length)+'명 · 가입대기 '+((c.pendingUids||[]).length)+'명'+((c.tempUids||[]).length?' · <b style="color:#b8860b">🕓 임시회원 '+((c.tempUids||[]).length)+'명</b>':'')+(c.intro?'<br>'+esc(c.intro):'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
       +(c.status!=='승인'?'<button class="btn-sub" style="background:#0f766e" onclick="approveClub(\''+d.id+'\')">✓ 승인</button>':'')
       +(c.clubType==='external'?'<button class="btn-sub" style="background:#1F4E9C" onclick="absorbClub(\''+d.id+'\',\''+esc(c.name)+'\')">🔁 연맹 클럽으로 전환</button>':'')
