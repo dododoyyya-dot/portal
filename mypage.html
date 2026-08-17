@@ -222,6 +222,7 @@ function orgChip(o,region,title,fed){
   <div class="mypane on" id="paneProfile">
   <div id="profileBox" style="margin-top:26px;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:20px 22px">
     <h3 style="margin:0 0 4px;font-size:16px">👤 마이 프로필 <span style="font-weight:600;color:var(--gray);font-size:12.5px">— 배정·위촉·자격 관리에 활용됩니다. 언제든 본인이 수정할 수 있습니다.</span></h3>
+    <div id="instrGuideBox" style="display:none;margin-top:10px;background:#eef3fa;border:1.5px solid #c9d9f0;border-radius:10px;padding:11px 14px;font-size:12.5px;font-weight:700;color:#153A77">💡 지도자(강사)로 활동하고 싶으신가요? 일반회원도 <a href="jobs.html" style="color:#C41E2F;font-weight:900">강사 활동 지원 →</a> 에서 언제든 신청할 수 있습니다. 자격번호를 등록해두면 검토가 빨라집니다.</div>
     <div id="pfSum" style="display:none;margin-top:12px;align-items:center;gap:12px;flex-wrap:wrap;background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:12px;padding:14px 16px">
       <span style="font-size:14.5px;font-weight:800;color:#0f766e">✅ 프로필 등록 완료</span>
       <span id="pfSumTxt" style="font-size:13px;color:var(--gray);flex:1;min-width:200px"></span>
@@ -324,16 +325,21 @@ function orgChip(o,region,title,fed){
       <div id="pfNatCertLink" style="font-size:12px;margin-top:4px"></div>
     </div>
 
+    <!-- ⑤-0 자기소개 -->
+    <div style="margin-top:14px">
+      <label style="font-size:13px;font-weight:800">자기소개 <span style="font-weight:600;color:var(--gray);font-size:12px">— 선택 · 클럽 가입, 강습·심판 매칭 검토에 참고됩니다</span></label>
+      <textarea id="pfIntro" rows="3" placeholder="예: 플라잉디스크 입문 2년차 동호인입니다. 주말 위주로 활동합니다." style="width:100%;padding:10px 13px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px;font-family:inherit;font-size:13.5px"></textarea>
+    </div>
     <!-- ⑤ 경력 -->
     <div style="margin-top:14px">
-      <label style="font-size:13px;font-weight:800">경력 사항 <span style="font-weight:600;color:var(--gray);font-size:12px">— 입상·선수 경력, KFDF 주최대회 참가 등 자유 기재</span></label>
+      <label style="font-size:13px;font-weight:800">경력 사항 <span style="font-weight:600;color:var(--gray);font-size:12px">— 입상·선수 경력, KFDF 주최대회 참가, 지도 경력 등 자유 기재</span></label>
       <textarea id="pfCareer" rows="3" style="width:100%;padding:10px 13px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px;font-family:inherit;font-size:13.5px"></textarea>
     </div>
 
     <!-- ⑥ 활동 가능 범위 -->
     <div style="margin-top:16px;padding:14px 16px;background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:12px">
         <label style="font-size:13.5px;font-weight:800;color:#0f766e">📍 활동 가능 범위 <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 강습(수업) 배정 및 동호회 활동 검토에 사용됩니다</span></label>
-        <div style="font-size:12px;color:var(--gray);margin-top:4px">실제로 이동해서 수업·활동이 가능한 지역을 선택하세요. <b>시도를 누르면 시군구가 열립니다.</b> 시군구 복수 선택 가능, 최대 4개 시도까지. 먼저 선택한 지역이 우선 배정 검토됩니다.</div>
+        <div style="font-size:12px;color:var(--gray);margin-top:4px">실제로 활동이 가능한 지역을 선택하세요. <b>시도를 누르면 시군구가 열립니다.</b> 시군구 복수 선택 가능, 최대 4개 시도까지. 먼저 선택한 지역이 우선 배정 검토됩니다.</div>
         <div id="aaSidoRow" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:10px"></div>
         <div id="aaSggRow" style="display:none;flex-wrap:wrap;gap:5px;margin-top:8px;padding:10px;background:#fff;border:1px solid #dbe8e0;border-radius:9px"></div>
         <div id="aaSelRow" style="margin-top:10px"></div>
@@ -777,6 +783,8 @@ function fillProfile(d){
   document.getElementById('pfRef').value=q.referee||'';
   document.getElementById('pfYouth').checked=!!q.youth;
   document.getElementById('pfCareer').value=d.career||'';
+  const pfIntroEl=document.getElementById('pfIntro');if(pfIntroEl)pfIntroEl.value=d.intro||'';
+  const igb=document.getElementById('instrGuideBox');if(igb&&d.accountType==='general')igb.style.display='block';
   // 활동 가능 범위
   try{aaLoad(d)}catch(e){console.warn('aa',e)}
   // 자녀(미성년) 프로필 — cid 마이그레이션 후 렌더
@@ -1083,7 +1091,7 @@ async function famApproveClub(reqId){
       if((c.childMembers||[]).some(m=>m.cid===r.childUid))throw new Error('이미 소속된 자녀입니다');
       if((c.childPending||[]).some(m=>m.cid===r.childUid))throw new Error('이미 가입 신청 중입니다');
       const cp=(c.childPending||[]).slice();
-      cp.push({parentUid:AUTH.currentUser.uid,parentName:MYD.name||'',cid:r.childUid,name:r.childName||'',birth:r.childBirth||'',school:r.childSchool||'',at:new Date().toISOString()});
+      cp.push({parentUid:AUTH.currentUser.uid,parentName:MYD.name||'',cid:r.childUid,name:r.childName||'',birth:r.childBirth||'',gender:r.childGender||'',school:r.childSchool||'',at:new Date().toISOString()});
       tx.update(ref,{childPending:cp});
     });
     await DB.collection('familyRequests').doc(reqId).update({status:'승인',decidedAt:new Date().toISOString()});
@@ -1280,6 +1288,9 @@ async function saveProfile(){
     };
     if(df&&MYD.degreeDoc!==degDoc)upd.degreeApproved=false; // 새 증빙 첨부 시 재확인 대상
     if(ncf&&MYD.natCertDoc!==ncDoc)upd.natCertApproved=false; // 새 국가공인자격 증빙 첨부 시 재확인 대상
+    // 자기소개 — 변경했을 때만 포함 (규칙 허용 목록 미반영 환경에서도 기존 저장이 막히지 않도록)
+    const introVal=(document.getElementById('pfIntro')?document.getElementById('pfIntro').value.trim():'');
+    if(introVal!==(MYD.intro||''))upd.intro=introVal;
     await DB.collection('users').doc(AUTH.currentUser.uid).update(upd);
     // 주민등록번호 — 별도 보안 컬렉션 저장 (입력했을 때만)
     const rrnRaw=document.getElementById('pfRrn').value.replace(/[^0-9]/g,'');

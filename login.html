@@ -85,6 +85,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260808"></script>
 <script>
 KFDF.initApp();
@@ -142,6 +143,7 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
       <button id="tabS" onclick="mode('S')">회원가입</button>
     </div>
     <div id="fS" style="display:none">
+      <div style="background:#eef3fa;border:1.5px solid #c9d9f0;border-radius:10px;padding:11px 14px;font-size:12.5px;font-weight:700;color:#153A77;margin-bottom:10px">💡 <b>어떤 유형으로 가입할지 고민되시나요?</b> 학교 교원·동호인·학부모 등 대부분의 경우 <b>[👥 일반회원]</b>으로 가입하시면 됩니다. 지도자(강사) 활동을 원하시면 가입 후 <b>마이페이지 → 강사 활동 지원</b>에서 언제든 신청·전환할 수 있습니다.</div>
       <div style="font-size:13px;font-weight:800;margin-bottom:7px">회원 유형을 선택해주세요 <span style="color:#C41E2F">*</span></div>
       <div id="typeBtns" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px">
         <button type="button" class="mtypebtn on" data-t="instructor" onclick="setSignupType('instructor')">🧑‍🏫 KFDF공인 심판·지도자<span>연맹 자격증 보유·취득 예정</span></button>
@@ -196,7 +198,7 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
 
       <div id="sAreaBlock" style="margin-top:16px;padding:14px 16px;background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:12px">
         <label style="margin:0;font-size:13.5px;font-weight:800;color:#0f766e">📍 활동 가능 범위 <span id="reqArea" style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 강습(수업) 배정에 사용됩니다</span></label>
-        <div style="font-size:12px;color:var(--gray);margin-top:4px">실제로 이동해서 수업·활동이 가능한 지역을 선택하세요. <b>시도를 누르면 시군구가 열립니다.</b> 시군구 복수 선택 가능, 최대 4개 시도까지. 먼저 선택한 지역이 우선 배정 검토됩니다.</div>
+        <div style="font-size:12px;color:var(--gray);margin-top:4px">실제로 활동이 가능한 지역을 선택하세요. <b>시도를 누르면 시군구가 열립니다.</b> 시군구 복수 선택 가능, 최대 4개 시도까지. 먼저 선택한 지역이 우선 배정 검토됩니다.</div>
         <div id="aaSidoRow" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:10px"></div>
         <div id="aaSggRow" style="display:none;flex-wrap:wrap;gap:5px;margin-top:8px;padding:10px;background:#fff;border:1px solid #dbe8e0;border-radius:9px"></div>
         <div id="aaSelRow" style="margin-top:10px"></div>
@@ -205,11 +207,11 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
 
       <div id="sOrgTypeBlock" style="margin-top:16px;padding:14px 16px;background:#f9f7fd;border:1.5px solid #ddd0f7;border-radius:12px">
         <label style="margin:0;font-size:13.5px;font-weight:800;color:#5b3fa8">🏷 소속 구분 <span style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 명단·통계 관리에 사용됩니다</span></label>
-        <div style="font-size:12px;color:var(--gray);margin:4px 0 8px">연맹 자격증을 갖고 계셔도 시도연맹 회원이 아니면 <b>타 단체·무소속</b>으로 선택해 주세요.</div>
+        <div style="font-size:12px;color:var(--gray);margin:4px 0 8px">연맹 자격증을 갖고 계셔도 시도연맹 회원이 아니면 <b>타 단체·소속 없음</b>으로 선택해 주세요.</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px"><input type="radio" name="sOrgType" value="연맹소속" style="width:auto" checked> 연맹 소속 (시도·구군연맹 회원)</label>
           <label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px"><input type="radio" name="sOrgType" value="타단체" style="width:auto"> 타 단체 소속</label>
-          <label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px"><input type="radio" name="sOrgType" value="무소속" style="width:auto"> 무소속</label>
+          <label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px"><input type="radio" name="sOrgType" value="무소속" style="width:auto"> 소속 없음</label>
         </div>
         <input id="sOrgEtc" placeholder="타 단체명 (예: 한국플라잉디스크협회, 학교 동아리 등)" style="margin-top:8px;display:none">
       </div>
@@ -227,9 +229,23 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
       <div id="sNatCertBlock" style="margin-top:14px;padding:14px 16px;background:#f4f7fb;border:1.5px solid #d7e2f2;border-radius:12px">
         <label style="display:flex;gap:7px;align-items:flex-start;margin:0;font-weight:800;font-size:13.5px;color:#153A77"><input type="checkbox" id="sHasNatCert" style="width:auto;margin-top:2px" onchange="document.getElementById('sNatCertSub').style.display=this.checked?'block':'none'"> 🏅 국가공인 체육지도사 자격 보유 <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 문화체육관광부 발급 국가자격 (예: 유소년스포츠지도사·생활스포츠지도사 등). 연맹(KFDF) 자격증과는 별개입니다.</span></label>
         <div id="sNatCertSub" style="display:none;margin-top:10px">
-          <label style="font-size:12px;font-weight:800">자격 종류 · 등급 <span style="color:#C41E2F">*</span></label>
-          <input id="sNatCertName" placeholder="예: 유소년스포츠지도사(플라잉디스크) 2급">
-          <div style="font-size:11.5px;color:#153A77;margin-top:6px;font-weight:700">📎 자격증 사본은 연맹 시스템으로 자동 확인이 되지 않아 <b>가입 후 마이페이지에서 첨부</b>해주세요. 사무국이 사본을 직접 확인해야 회원가입 승인이 완료됩니다.</div>
+          <label style="font-size:12px;font-weight:800">자격 종류 · 등급 <span style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11px">— 유소년 지도 관련 자격 중심</span></label>
+          <select id="sNatCertSel" onchange="document.getElementById('sNatCertName').style.display=this.value==='기타'?'block':'none'">
+            <option value="">선택해주세요</option>
+            <option>유소년스포츠지도사 (플라잉디스크)</option>
+            <option>유소년스포츠지도사 (타 종목)</option>
+            <option>생활스포츠지도사 2급</option>
+            <option>생활스포츠지도사 1급</option>
+            <option>전문스포츠지도사 2급</option>
+            <option>전문스포츠지도사 1급</option>
+            <option>초·중등 교원자격증 (체육)</option>
+            <option>초등 교원자격증</option>
+            <option>기타</option>
+          </select>
+          <input id="sNatCertName" placeholder="기타 자격명·등급 직접 입력 (예: 노인스포츠지도사)" style="display:none;margin-top:6px">
+          <label style="font-size:12px;font-weight:800;display:block;margin-top:10px">📎 자격증 사본 첨부 (사진·스캔) <span style="font-weight:600;color:var(--gray);font-size:11px">— 지금 첨부하면 승인 처리가 빨라집니다</span></label>
+          <input type="file" id="sNatCertFile" accept="image/*" style="display:block;margin-top:5px;font-size:12.5px">
+          <div style="font-size:11.5px;color:#153A77;margin-top:6px;font-weight:700">여기서 바로 첨부하거나, 가입 후 <b>마이페이지에서도 첨부</b>할 수 있습니다. 사무국이 사본을 확인해야 회원가입 승인이 완료됩니다.</div>
         </div>
       </div>
 
@@ -351,7 +367,7 @@ const MTYPE_INFO={
   teacher:{bg:'#f0f7f4',bd:'1.5px solid #cfe3d8',fg:'#0f766e',
     html:'🎓 <b>교사 및 국가공인자격증</b> — 학교 교원, 또는 체육지도자 등 국가공인자격을 보유한 회원입니다. 지도자군으로 관리되어 강습·대회 운영에 함께 배정됩니다. <b>근무(소속)·수당 계좌·피복 사이즈·학력</b>이 필수입니다.<br><span style="font-weight:700">※ 대회 심판은 KFDF공인 자격 보유자만 신청 가능합니다 — 이 유형은 대회 운영요원으로 신청하실 수 있습니다.</span>'},
   general:{bg:'#fbf7f0',bd:'1.5px solid #e8dcc8',fg:'#8a5a00',
-    html:'👥 <b>일반회원</b> — 학부모·동호인·타 단체 소속 등 지도자가 아닌 회원입니다. <b>꼭 필요한 정보만</b> 받습니다(계좌·피복·학력 미입력). 자녀 연동, 대회 참가, 클럽 활동에 바로 이용하실 수 있습니다.<br>나중에 강사로 활동하시려면 <b>마이페이지 → 강사 활동 지원</b>에서 추가 정보를 입력하시면 됩니다.'},
+    html:'👥 <b>일반회원</b> — 학부모·동호인·타 단체 소속 등 지도자가 아닌 회원입니다. <b>꼭 필요한 정보만</b> 받습니다(계좌·피복·학력 미입력). 필수 입력은 <b>성명·생년월일·주소·활동 가능 지역(시도/시군구)</b>입니다. 자녀 연동, 대회 참가, 클럽 활동에 바로 이용하실 수 있습니다.<br>나중에 강사로 활동하시려면 <b>마이페이지 → 강사 활동 지원</b>에서 추가 정보를 입력하시면 됩니다.'},
   student:{bg:'#fff8ed',bd:'1.5px solid #ecd9b0',fg:'#8a5a00',
     html:'🧒 <b>학생선수</b> — 만 19세 미만 학생 본인이 가입합니다. 본인 명의 휴대폰 인증이 필요하며, 가입 후 <b>보호자 연동 코드</b>를 입력하면 보호자와 연결됩니다.<br>본인 휴대폰이 없다면 <b>보호자가 먼저 가입</b>한 뒤 마이페이지 → 자녀 관리에서 계정을 만들어 주세요.'}
 };
@@ -359,7 +375,7 @@ const MTYPE_INFO={
 const MTYPE_CFG={
   instructor:{show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
   teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'],req:{addr:true,area:true,aff:true,work:true,bank:true,size:true,degree:true,rrn:true}},
-  general:   {show:['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sPledgeBox'],req:{addr:false,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}},
+  general:   {show:['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sPledgeBox'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}},
   student:   {show:['sSchoolBlock','sAddrBlock'],req:{addr:true,area:false,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}
 };
 const MTYPE_ALL=['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sSchoolBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'];
@@ -421,6 +437,19 @@ async function postRedeemCode(){
   }catch(e){m.textContent='연동 실패: '+e.message;m.style.color='#C41E2F'}
 }
 function say(t,ok){const e=document.getElementById('aMsg');e.textContent=t;e.className='msg '+(ok?'ok':'err')}
+function compressImg(file){
+  return new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>{
+      const sc=Math.min(1,1280/Math.max(img.width,img.height));
+      const c=document.createElement('canvas');
+      c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      c.toBlob(b=>res(b),'image/jpeg',0.8);
+    };
+    img.src=URL.createObjectURL(file);
+  });
+}
 function syncAffS(){
   document.getElementById('sAfFed').style.display=document.getElementById('sAf1').checked?'block':'none';
   document.getElementById('sTeachLv').style.display=document.getElementById('sAf2').checked?'block':'none';
@@ -744,8 +773,9 @@ async function go(){
       // 국가공인 체육지도사 자격 — 교사 유형에서 체크 시 종류·등급 입력 필수(사본은 가입 후 마이페이지에서 첨부)
       let natCertName='';
       if(SIGNUP_TYPE==='teacher'&&document.getElementById('sHasNatCert').checked){
-        natCertName=document.getElementById('sNatCertName').value.trim();
-        if(!natCertName)return say('보유하신 국가공인 자격의 종류·등급을 입력해주세요');
+        const ncSel=document.getElementById('sNatCertSel').value;
+        natCertName=(ncSel==='기타')?document.getElementById('sNatCertName').value.trim():ncSel;
+        if(!natCertName)return say('보유하신 국가공인 자격의 종류·등급을 선택해주세요');
       }
       if(CFG.req.area&&!AA.length)return say('활동 가능 범위를 최소 1곳 이상 선택해주세요');
       const pnorm=phone.replace(/[^0-9]/g,'');
@@ -801,6 +831,19 @@ async function go(){
       }
       await DB.collection('users').doc(cred.user.uid).set(Object.assign(baseDoc,typeDoc));
       await DB.collection('phoneIndex').doc(pnorm).set({uid:cred.user.uid}).catch(()=>{}); // 개인정보 최소화: 이름 미저장(중복확인은 존재여부만 사용)
+      // 국가공인자격 사본 즉시 업로드 — 가입 화면에서 파일을 첨부한 경우 (실패해도 가입은 유지, 마이페이지에서 재첨부 가능)
+      try{
+        const ncEl=document.getElementById('sNatCertFile');
+        const ncFile=ncEl&&ncEl.files&&ncEl.files[0];
+        if(natCertName&&ncFile&&firebase.storage){
+          say('자격증 사본 업로드 중… 잠시만 기다려주세요.',true);
+          const blob=await compressImg(ncFile);
+          const sref=firebase.storage().ref('quals/'+cred.user.uid+'/natcert_'+Date.now()+'.jpg');
+          await sref.put(blob,{contentType:'image/jpeg'});
+          const ncUrl=await sref.getDownloadURL();
+          await DB.collection('users').doc(cred.user.uid).update({natCertDoc:ncUrl});
+        }
+      }catch(e){console.warn('natcert upload',e)}
       // 주민등록번호 — 일반 회원정보와 분리된 privateInfo 컬렉션에 저장 (본인·중앙관리자만 열람). 강사·교사만 가입 시 즉시 저장, 일반·학생은 마이페이지에서 나중에 입력.
       if(rrnRaw){
         await DB.collection('privateInfo').doc(cred.user.uid).set({
