@@ -287,13 +287,13 @@ function orgChip(o,region,title,fed){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
       <div>
         <label style="font-size:13px;font-weight:800">KFDF 지도자 자격번호</label>
-        <input id="pfLeaderNo" placeholder="예: KFDF-L-2024-0123" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px;font-family:monospace;font-size:13px">
-        <div style="font-size:11px;color:var(--gray);margin-top:3px">자격증에 기재된 번호 — 관리자 확인 후 연동</div>
+        <input id="pfLeaderNo" placeholder="예: 0301-09080001" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px;font-family:monospace;font-size:13px" onblur="checkQualNo('leader')" onkeydown="if(event.key==='Enter'){event.preventDefault();checkQualNo('leader')}">
+        <div id="pfLeaderNoSt" style="font-size:11px;color:var(--gray);margin-top:3px">자격증에 기재된 번호를 입력하면 자동으로 조회·연동됩니다</div>
       </div>
       <div>
         <label style="font-size:13px;font-weight:800">KFDF 심판 자격번호</label>
-        <input id="pfRefNo" placeholder="예: KFDF-R-2024-0456" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px;font-family:monospace;font-size:13px">
-        <div style="font-size:11px;color:var(--gray);margin-top:3px">자격증에 기재된 번호 — 관리자 확인 후 연동</div>
+        <input id="pfRefNo" placeholder="예: 01-230001" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px;font-family:monospace;font-size:13px" onblur="checkQualNo('referee')" onkeydown="if(event.key==='Enter'){event.preventDefault();checkQualNo('referee')}">
+        <div id="pfRefNoSt" style="font-size:11px;color:var(--gray);margin-top:3px">자격증에 기재된 번호를 입력하면 자동으로 조회·연동됩니다</div>
       </div>
     </div>
     <div style="margin-top:10px">
@@ -775,6 +775,8 @@ function fillProfile(d){
   document.getElementById('pfLeaderNo').value=d.qualNoLeader||q.leaderNo||'';
   document.getElementById('pfRefNo').value=d.qualNoReferee||q.refNo||'';
   document.getElementById('pfYouth').checked=!!q.youth;
+  if(document.getElementById('pfLeaderNo').value)checkQualNo('leader');
+  if(document.getElementById('pfRefNo').value)checkQualNo('referee');
   document.getElementById('pfCareer').value=d.career||'';
   const pfIntroEl=document.getElementById('pfIntro');if(pfIntroEl)pfIntroEl.value=d.intro||'';
   const igb=document.getElementById('instrGuideBox');if(igb&&d.accountType==='general')igb.style.display='block';
@@ -1782,6 +1784,43 @@ function printContract(id){
 function certNo(){return 'KFDF-2026-EDU-'+AUTH.currentUser.uid.slice(0,6).toUpperCase()}
 // ── 기존 자격 연결 신청 ──
 function maskNm(n){n=String(n||'');return n.length<2?n:n[0]+'*'.repeat(Math.max(1,n.length-2))+(n.length>2?n[n.length-1]:'')}
+// 프로필의 지도자·심판 자격번호 입력 → licenses DB 자동조회 후 자동 연동신청 (기존 "기존 자격증 연결" 로직 재사용)
+async function checkQualNo(kind){
+  const inputId=(kind==='leader')?'pfLeaderNo':'pfRefNo';
+  const stId=(kind==='leader')?'pfLeaderNoSt':'pfRefNoSt';
+  const typeLabel=(kind==='leader')?'지도자':'심판';
+  const st=document.getElementById(stId);
+  const inputEl=document.getElementById(inputId);
+  const no=inputEl.value.trim().toUpperCase().replace(/\s/g,'');
+  inputEl.value=no;
+  if(!no){st.textContent='자격증에 기재된 번호를 입력하면 자동으로 조회·연동됩니다';st.style.color='var(--gray)';return}
+  if(!AUTH.currentUser||!MYD)return;
+  if(MYD.status!=='approved'){st.textContent='사무국 승인 후 자동조회가 가능합니다';st.style.color='#C41E2F';return}
+  st.textContent='🔍 자동조회 중…';st.style.color='var(--gray)';
+  try{
+    const doc=await DB.collection('licenses').doc(no).get();
+    if(!doc.exists){st.textContent='⚠ 등록되지 않은 자격번호입니다. 번호를 다시 확인해주세요';st.style.color='#C41E2F';return}
+    const l=doc.data();
+    if(l.uid===AUTH.currentUser.uid){st.textContent='✓ 확인 완료 — 이미 연동된 '+esc(l.type)+' '+esc(l.grade)+' 자격입니다';st.style.color='#0f766e';return}
+    if(l.uid){st.textContent='⚠ 이미 다른 회원에게 연동된 번호입니다. 본인 자격이 맞다면 사무국에 문의하세요';st.style.color='#C41E2F';return}
+    if(l.type&&l.type!==typeLabel){st.textContent='⚠ 조회는 되었으나 '+esc(l.type)+' 자격입니다 — 맞는 칸에 입력해주세요';st.style.color='#b8860b';return}
+    const dup=await DB.collection('licenseClaims').where('uid','==',AUTH.currentUser.uid).where('licenseNo','==',no).get();
+    if(!dup.empty){
+      const last=dup.docs[dup.docs.length-1].data();
+      st.textContent=(last.status==='승인')?'✓ 자동조회 완료 — 연동 승인됨':'⏳ 자동조회 완료 — 연동 신청 검토 중입니다 ('+esc(last.status||'대기')+')';
+      st.style.color=(last.status==='승인')?'#0f766e':'#b8860b';
+      return;
+    }
+    const match=(l.maskName===maskNm(MYD.name));
+    await DB.collection('licenseClaims').add({
+      uid:AUTH.currentUser.uid,name:MYD.name,phone:MYD.phone||'',
+      licenseNo:no,licMask:l.maskName,licType:l.type,licGrade:l.grade,licRegion:l.region||'',
+      nameMatch:match,status:'대기',source:'profile-autocheck',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    st.textContent='✓ 자동조회 성공 — '+esc(l.type)+' '+esc(l.grade)+' 확인됨. '+(match?'연동 신청이 자동 접수되었습니다.':'성명 대조 필요 — 관할 연맹 확인 후 연동됩니다.');
+    st.style.color='#0f766e';
+    loadMyClaims();
+  }catch(e){st.textContent='조회 중 오류: '+e.message;st.style.color='#C41E2F'}
+}
 async function claimLic(){
   const m=document.getElementById('clMsg');
   const no=document.getElementById('clNo').value.trim().toUpperCase().replace(/\s/g,'');
