@@ -762,7 +762,7 @@ async function go(){
         name:name, email:email,
         phone:phone,
         gender:gender, birth:birth,
-        activityAreas:aaSave(), activityRegions:aaRegions(), baseCity:aaBase(),
+        activityAreas:aaSave(), activityRegions:aaRegions(), baseCity:(aaBase()||(addr?addr.split(' ').slice(0,2).join(' '):'')),
         region:(aaRegions()[0]||regionFromAddr(addr)||'서울·경기'),
         accountType:SIGNUP_TYPE,
         memberGroup:(SIGNUP_TYPE==='instructor'||SIGNUP_TYPE==='teacher')?'active':(SIGNUP_TYPE==='student'?'student':'general'),
@@ -777,7 +777,7 @@ async function go(){
       const gv=id=>{const e=document.getElementById(id);return e?(e.value||'').trim():''};
       let typeDoc;
       if(SIGNUP_TYPE==='student'){
-        typeDoc={school:school, schoolNorm:normSchool(school)};
+        typeDoc={school:school, schoolNorm:normSchool(school), address:(zip?('['+zip+'] '):'')+addr+' '+addr2};
       }else if(SIGNUP_TYPE==='general'){
         // 일반회원(학부모·동호인·타단체) — 계좌·주민번호·피복·학력 미수집
         typeDoc={address:addr?((zip?('['+zip+'] '):'')+addr+' '+addr2):''};
