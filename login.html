@@ -277,6 +277,17 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
         <div style="font-size:11.5px;color:var(--gray);margin-top:4px">띄어쓰기나 표기가 조금 달라도(예: "부산 신남 초" = "부산신남초등학교") 자동으로 같은 학교로 인식됩니다.</div>
       </div>
 
+      <div id="sStudentAffBlock" style="display:none;margin-top:16px;padding:14px 16px;background:#f4f6ff;border:1.5px solid #c7d2f0;border-radius:12px">
+        <label style="margin:0;font-size:13.5px;font-weight:800;color:#3730a3">🏷 소속 구분 <span style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 중복 선택 가능, 명단·통계 관리에 사용됩니다</span></label>
+        <div style="font-size:12px;color:var(--gray);margin:4px 0 8px">해당하는 소속을 모두 선택해 주세요. 없으면 「소속없음」을 선택하세요.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px"><input type="checkbox" id="sSaf1" style="width:auto"> KFDF 소속</label>
+          <label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px"><input type="checkbox" id="sSaf2" style="width:auto"> 학교스포츠클럽 소속</label>
+          <label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px"><input type="checkbox" id="sSaf3" style="width:auto"> 타단체 소속</label>
+          <label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px;color:#6b7280"><input type="checkbox" id="sSaf0" style="width:auto"> 소속없음</label>
+        </div>
+      </div>
+
       <div id="sDegreeBlock" style="margin-top:14px;max-width:340px">
         <label style="font-size:13px;font-weight:800">학력 확인 (체육 전공) <span id="reqDegree" style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 해당 없으면 「해당 없음」 선택 · 증빙 첨부는 가입 후 마이페이지에서</span></label>
         <select id="sDegree"><option value="">해당 없음</option><option>체육 전문학사</option><option>체육학사</option><option>체육석사</option><option>체육박사</option></select>
@@ -376,9 +387,9 @@ const MTYPE_CFG={
   instructor:{show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
   teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'],req:{addr:true,area:true,aff:true,work:true,bank:true,size:true,degree:true,rrn:true}},
   general:   {show:['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sPledgeBox'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}},
-  student:   {show:['sSchoolBlock','sAddrBlock'],req:{addr:true,area:false,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}
+  student:   {show:['sSchoolBlock','sAddrBlock','sAreaBlock','sStudentAffBlock'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}
 };
-const MTYPE_ALL=['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sSchoolBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'];
+const MTYPE_ALL=['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sSchoolBlock','sStudentAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'];
 function setSignupType(t){
   // 생년월일 기준 유형 가드 — 미성년(만 19세 미만)은 학생선수만, 성인은 학생선수 불가
   const bEl=document.getElementById('sBirth');
@@ -726,6 +737,14 @@ async function go(){
         addr2=document.getElementById('sAddr2').value.trim();
         if(!addr)return say('집 주소를 [주소 검색]으로 입력해주세요');
         if(!addr2)return say('상세주소(동·호수)를 입력해주세요 — 해당 없으면 「해당없음」이라고 적어주세요');
+        // 학생선수 소속 (중복 가능)
+        const sStAf=[];
+        if(document.getElementById('sSaf1')&&document.getElementById('sSaf1').checked)sStAf.push('KFDF 소속');
+        if(document.getElementById('sSaf2')&&document.getElementById('sSaf2').checked)sStAf.push('학교스포츠클럽 소속');
+        if(document.getElementById('sSaf3')&&document.getElementById('sSaf3').checked)sStAf.push('타단체 소속');
+        if(document.getElementById('sSaf0')&&document.getElementById('sSaf0').checked)sStAf.push('소속없음');
+        if(!sStAf.length)return say('소속을 1개 이상 선택해주세요 (해당 없으면 「소속없음」 체크)');
+        af=sStAf;
       }else{
         // 주소 — 지도자군(강사·교사)은 필수, 일반회원은 선택
         zip=document.getElementById('sZip').value.trim();
@@ -807,7 +826,7 @@ async function go(){
       const gv=id=>{const e=document.getElementById(id);return e?(e.value||'').trim():''};
       let typeDoc;
       if(SIGNUP_TYPE==='student'){
-        typeDoc={school:school, schoolNorm:normSchool(school), address:(zip?('['+zip+'] '):'')+addr+' '+addr2};
+        typeDoc={school:school, schoolNorm:normSchool(school), address:(zip?('['+zip+'] '):'')+addr+' '+addr2, affiliation:af};
       }else if(SIGNUP_TYPE==='general'){
         // 일반회원(학부모·동호인·타단체) — 계좌·주민번호·피복·학력 미수집
         typeDoc={address:addr?((zip?('['+zip+'] '):'')+addr+' '+addr2):''};
