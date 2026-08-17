@@ -284,27 +284,20 @@ function orgChip(o,region,title,fed){
     </div>
 
     <!-- ③ 자격 -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:14px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
       <div>
-        <label style="font-size:13px;font-weight:800">KFDF 지도자 자격</label>
-        <select id="pfLeader" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
-          <option value="">없음</option><option>지도자 1급</option><option>지도자 2급</option><option>지도자 3급</option>
-        </select>
+        <label style="font-size:13px;font-weight:800">KFDF 지도자 자격번호</label>
+        <input id="pfLeaderNo" placeholder="예: KFDF-L-2024-0123" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px;font-family:monospace;font-size:13px">
+        <div style="font-size:11px;color:var(--gray);margin-top:3px">자격증에 기재된 번호 — 관리자 확인 후 연동</div>
       </div>
       <div>
-        <label style="font-size:13px;font-weight:800">KFDF 심판 자격</label>
-        <select id="pfRef" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px">
-          <option value="">없음</option><option>심판 1급</option><option>심판 2급</option><option>심판 3급</option>
-        </select>
-      </div>
-      <div style="display:flex;align-items:end;padding-bottom:6px">
-        <label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:13.5px"><input type="checkbox" id="pfYouth" style="width:auto">유소년스포츠지도사 (플라잉디스크)</label>
+        <label style="font-size:13px;font-weight:800">KFDF 심판 자격번호</label>
+        <input id="pfRefNo" placeholder="예: KFDF-R-2024-0456" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px;font-family:monospace;font-size:13px">
+        <div style="font-size:11px;color:var(--gray);margin-top:3px">자격증에 기재된 번호 — 관리자 확인 후 연동</div>
       </div>
     </div>
-    <div style="margin-top:14px">
-      <label style="font-size:13px;font-weight:800">자격증 사본 첨부 <span style="font-weight:600;color:var(--gray);font-size:12px">(이미지, 최대 3장 · 자동 압축)</span></label>
-      <input type="file" id="pfDocs" accept="image/*" multiple style="display:block;margin-top:6px;font-size:13px">
-      <div id="pfDocList" style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"></div>
+    <div style="margin-top:10px">
+      <label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:13.5px"><input type="checkbox" id="pfYouth" style="width:auto">유소년스포츠지도사 (플라잉디스크)</label>
     </div>
 
     <!-- ④ 학위 -->
@@ -779,8 +772,8 @@ function fillProfile(d){
   });
   ['pfAf1','pfAf2','pfAf3'].forEach(function(id){document.getElementById(id).addEventListener('change',function(e){if(e.target.checked)document.getElementById('pfAf0').checked=false})});
   const q=d.quals||{};
-  document.getElementById('pfLeader').value=q.leader||'';
-  document.getElementById('pfRef').value=q.referee||'';
+  document.getElementById('pfLeaderNo').value=d.qualNoLeader||q.leaderNo||'';
+  document.getElementById('pfRefNo').value=d.qualNoReferee||q.refNo||'';
   document.getElementById('pfYouth').checked=!!q.youth;
   document.getElementById('pfCareer').value=d.career||'';
   const pfIntroEl=document.getElementById('pfIntro');if(pfIntroEl)pfIntroEl.value=d.intro||'';
@@ -862,11 +855,6 @@ function fillProfile(d){
   else if(d.natCertName){ncs.textContent='📎 사본 첨부 필요 — 첨부 전까지 승인 보류';ncs.style.color='#C41E2F';}
   else{ncs.textContent='';ncs.style.color='';}
   document.getElementById('pfNatCertLink').innerHTML=(d.natCertName&&d.natCertDoc)?'<a href="'+d.natCertDoc+'" target="_blank" style="font-weight:800;color:#153A77;background:#eef3fa;border:1px solid #d4e0f2;border-radius:8px;padding:4px 10px">📎 첨부한 자격증 사본 보기</a>':'';
-  renderDocList(d.qualDocs||[]);
-}
-function renderDocList(urls){
-  document.getElementById('pfDocList').innerHTML=urls.map((u,i)=>
-    '<a href="'+u+'" target="_blank" style="display:inline-block;font-size:12px;font-weight:800;color:#153A77;background:#eef3fa;border:1px solid #d4e0f2;border-radius:8px;padding:6px 12px">📎 자격증 '+(i+1)+' 보기</a>').join('');
 }
 function openPostcode(){
   function launch(){
@@ -1014,7 +1002,7 @@ function showMyTab(k){
   if(tb){const r=tb.getBoundingClientRect();if(r.top<0||r.top>window.innerHeight-80)tb.scrollIntoView({block:'start'});}
 }
 (function(){
-  const map={alarmBox:'Alarm',famReqBox:'Alarm',profileBox:'Profile',pfDocList:'Profile',kidsBox:'Family',certBox:'Career',licBox:'Career',claimBox:'Career',contractBox:'Work',compContractBox:'Work',logBox:'Work',actList:'Work',consentBox:'Work'};
+  const map={alarmBox:'Alarm',famReqBox:'Alarm',profileBox:'Profile',kidsBox:'Family',certBox:'Career',licBox:'Career',claimBox:'Career',contractBox:'Work',compContractBox:'Work',logBox:'Work',actList:'Work',consentBox:'Work'};
   const h=(location.hash||'').replace('#','');
   if(map[h]&&map[h]!=='Profile'){
     showMyTab(map[h]);
@@ -1221,17 +1209,6 @@ async function saveProfile(){
     const etc=document.getElementById('pfAfEtc').value.trim();
     if(etc)af.push(etc);
     if(document.getElementById('pfAf0').checked&&!af.length)af.push('소속 없음');
-    // 자격증 이미지 업로드 (새로 선택한 파일이 있으면 추가)
-    let docs=(MYD.qualDocs||[]).slice();
-    const files=[...document.getElementById('pfDocs').files].slice(0,3);
-    for(let i=0;i<files.length;i++){
-      if(docs.length>=3)break;
-      m.textContent='자격증 업로드 중… '+(i+1)+'/'+files.length;m.style.color='#153A77';
-      const blob=await compressImg(files[i]);
-      const ref=firebase.storage().ref('quals/'+AUTH.currentUser.uid+'/'+Date.now()+'_'+i+'.jpg');
-      await ref.put(blob,{contentType:'image/jpeg'});
-      docs.push(await ref.getDownloadURL());
-    }
     // 학위 증빙 업로드 (새 파일 선택 시)
     let degDoc=MYD.degreeDoc||'';
     const df=document.getElementById('pfDegDoc').files[0];
@@ -1269,7 +1246,9 @@ async function saveProfile(){
       natCertName:document.getElementById('pfNatCertName').value.trim(),
       natCertDoc:ncDoc,
       affiliation:af,
-      quals:{leader:document.getElementById('pfLeader').value,referee:document.getElementById('pfRef').value,youth:document.getElementById('pfYouth').checked},
+      quals:{youth:document.getElementById('pfYouth').checked},
+      qualNoLeader:document.getElementById('pfLeaderNo').value.trim(),
+      qualNoReferee:document.getElementById('pfRefNo').value.trim(),
       career:document.getElementById('pfCareer').value.trim(),
       clothingSize:document.getElementById('pfSize').value,
       address:((document.getElementById('pfZip').value.trim())?('['+document.getElementById('pfZip').value.trim()+'] '):'')+document.getElementById('pfAddr').value.trim()+' '+document.getElementById('pfAddr2').value.trim(),
@@ -1284,7 +1263,6 @@ async function saveProfile(){
       workSchool:document.getElementById('pfWork').value.trim(),
       school:(document.getElementById('pfSchool')?document.getElementById('pfSchool').value.trim():(MYD.school||'')),
       birth:document.getElementById('pfBirth').value,
-      qualDocs:docs
     };
     if(df&&MYD.degreeDoc!==degDoc)upd.degreeApproved=false; // 새 증빙 첨부 시 재확인 대상
     if(ncf&&MYD.natCertDoc!==ncDoc)upd.natCertApproved=false; // 새 국가공인자격 증빙 첨부 시 재확인 대상
@@ -1305,8 +1283,8 @@ async function saveProfile(){
       document.getElementById('pfRrnState').innerHTML='✅ <b style="color:#0f766e">주민등록번호 등록 완료.</b> 🔒 본인과 중앙 사무국만 열람 가능합니다.';
     }
     Object.assign(MYD,upd);
-    document.getElementById('pfDocs').value='';document.getElementById('pfDegDoc').value='';document.getElementById('pfNatCertDoc').value='';
-    renderDocList(docs);fillProfile(MYD);
+    document.getElementById('pfDegDoc').value='';document.getElementById('pfNatCertDoc').value='';
+    fillProfile(MYD);
     m.textContent='✓ 저장되었습니다';m.style.color='#0f766e';
     pfCollapse(MYD);window.scrollTo({top:0,behavior:'smooth'});alert('프로필이 저장되었습니다.');
   }catch(e){
