@@ -777,6 +777,12 @@ async function openApply(id){
   const roles=(s.roles&&s.roles.length)?s.roles:(DEFAULT_ROLES[s.role]||[]);
   const aff=(CMY.affiliation&&CMY.affiliation.length)?CMY.affiliation.join('·'):(CMY.workSchool||CMY.fedName||'-');
   const acct=(CMY.bank&&CMY.accountNum)?(CMY.bank+' '+CMY.accountNum+(CMY.accountHolder?' ('+CMY.accountHolder+')':'')):'';
+  if(!entry){
+    if(!CMY.bank||!CMY.accountNum){alert('수당 지급을 위한 은행·계좌번호를 마이페이지에서 먼저 등록해주세요.');return}
+    const holder=(CMY.accountHolder||'').trim();
+    const myName=(CMY.name||'').trim();
+    if(holder!==myName){alert('예금주('+holder+')가 본인 성명('+myName+')과 일치하지 않습니다. 마이페이지에서 수정해주세요.');return}
+  }
   if(!entry&&!window.__rrnChecked){
     try{const pd=await DB.collection('privateInfo').doc(CME.uid).get();RRN_OK=!!(pd.exists&&pd.data().rrn);}catch(e){RRN_OK=false;}
     window.__rrnChecked=true;
@@ -792,7 +798,7 @@ async function openApply(id){
   const today=new Date().toISOString().slice(0,10);
   let inner='';
   if(entry){
-    // ── 참가(선수) 신청 — 본인 또는 자녀 선택, 자녀는 법정대리인(보호자) 서명 동의 ──
+    // ── 참가(선수) 신청 — 본인(성인) 또는 자녀 선택, 자녀는 법정대리인(보호자) 서명 동의 ──
     // 본인이 만 19세 미만이면 보호자 승인 요청으로 전환 (미성년은 보호자 승인·서명으로만 참가)
     const selfMinor=CMY.birth?((Date.now()-new Date(CMY.birth).getTime())/31557600000<19):false;
     if(selfMinor&&!FAMREQ){openMinorReq(id);return;}

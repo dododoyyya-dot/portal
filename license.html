@@ -660,17 +660,27 @@ async function applyNotice(id){
   const gsel=await pickDialog('등급을 선택하세요 (선택한 전 코스에 적용)',['1급','2급','3급']);
   if(gsel===null)return;
   const g=gsel.charAt(0);
+  // ── 만 18세 미만 자격 신청·취득 차단 ──
+  function ageOf(b){if(!b)return 0;const t=new Date(b);if(isNaN(t.getTime()))return 0;const now=new Date();let a=now.getFullYear()-t.getFullYear();if(now.getMonth()<t.getMonth()||(now.getMonth()===t.getMonth()&&now.getDate()<t.getDate()))a--;return a;}
+  if(ageOf(LMY.birth)<18){alert('만 18세 미만은 연맹 자격을 신청·취득할 수 없습니다.');return}
+  // ── 상위 등급 신청 시 하위 등급 보유 검증 ──
+  if(g!=='3'){const need=g==='1'?'2':'3';const low=await DB.collection('licenses').where('uid','==',LME.uid).where('grade','==',need).where('type','in',targets).get();if(low.empty){alert('상위 등급 신청은 '+need+'급 '+targets.join('·')+' 자격 보유가 필요합니다.\n하위 등급 발급 후 신청해주세요.');return}}
   let sido=await pickDialog('소속(담당) 연맹을 선택하세요 — 교육 장소·주관과 달라도 됩니다 (교차 지원 가능)',FED_LIST);
   if(sido===null)return;
   if(sido==='기타(중앙 처리)')sido='중앙';
+  // ── 실물 자격증(케이스/우편) 발급비 옵션 ──
+  const phy=await pickDialog('자격증 발급 형태를 선택하세요',['🪪 디지털 자격증 (무료)','📦 실물 자격증(케이스/우편) +5,000원']);
+  if(phy===null)return;
+  const physical=(phy.indexOf('실물')>=0);
+  const physicalFee=physical?5000:0;
   const phone=LMY.phone;
   const courses=sel.map(o=>({target:o.tg,type:o.tp,fee:o.fee}));
-  const totalFee=courses.reduce((a,c)=>a+(c.fee||0),0);
+  const totalFee=courses.reduce((a,c)=>a+(c.fee||0),0)+physicalFee;
   const appType=[...new Set(courses.map(c=>c.type))].join('·');
   const appTarget=[...new Set(courses.map(c=>c.target))].join('·');
   await DB.collection('licenseApps').add({
     noticeId:id,noticeTitle:n.title,noticeType:n.type,appType:appType,target:appTarget,
-    courses:courses,totalFee:totalFee,
+    courses:courses,totalFee:totalFee,physicalCert:physical,physicalFee:physicalFee,
     uid:LME.uid,name:LMY.name,email:LME.email||'',phone:phone,grade:g,sido:sido,
     birth:LMY.birth||'',address:LMY.address||'',fedName:LMY.fedName||'',
     status:'접수',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
@@ -685,6 +695,7 @@ async function applyNotice(id){
     +'<span style="font-size:13px;color:#5b6472">입금이 확인되면 접수가 확정됩니다</span>'
     +'<div style="text-align:left;background:#f6f8fb;border-radius:12px;padding:16px 18px;margin-top:16px;font-size:14.5px;line-height:2">'
     +courses.map(c=>'<div style="display:flex;justify-content:space-between"><span>'+esc(c.target)+' '+esc(c.type)+' '+g+'급</span><b>'+(c.fee?c.fee.toLocaleString('ko-KR')+'원':'-')+'</b></div>').join('')
+    +(physicalFee?'<div style="display:flex;justify-content:space-between"><span>📦 실물 자격증(케이스/우편)</span><b>'+physicalFee.toLocaleString('ko-KR')+'원</b></div>':'')
     +'<div style="border-top:1.5px solid #dfe5ee;margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;font-size:16px"><b>납부 총액</b><b style="color:#C41E2F">'+(totalFee?totalFee.toLocaleString('ko-KR')+'원':'공고 참조')+'</b></div>'
     +(n.acct?'<div style="margin-top:10px;font-size:13.5px">💳 입금 계좌<br><b>'+esc(n.acct)+'</b></div>':'')
     +'</div>'
@@ -697,7 +708,7 @@ async function loadMyApps(){
   if(snap.empty)return;
   document.getElementById('myApps').style.display='block';
   const stc={'접수':'#b8860b','접수완료':'#8a919d','합격':'#1F4E9C','발급완료':'#0f766e','불합격':'#C41E2F'};
-  const stl={'접수':'신청 접수 (입금 확인 전)','접수완료':'접수 완료 (입금 확인)'};
+  const stl={'접수':'신청 접수','접수완료':'시도 1차 검토 완료','합격':'중앙 최종 발급 승인','불합격':'심사 반려','발급완료':'발급 완료'};
   MYAPPS=snap.docs.filter(d=>!d.data().deleted);
   document.getElementById('myAppList').innerHTML=MYAPPS.map(d=>{
     const a=d.data();
@@ -706,6 +717,7 @@ async function loadMyApps(){
       +'<span class="lctag" style="background:'+(stc[a.status]||'#8a919d')+'">'+esc(stl[a.status]||a.status)+'</span>'
       +'<div style="margin-top:8px;background:#f6f8fb;border-radius:10px;padding:10px 14px;font-size:13.5px;line-height:1.9">'
       +cl.map(c=>'<div style="display:flex;justify-content:space-between;gap:10px"><span>'+esc(c.target||'')+' '+esc(c.type||'')+' '+esc(a.grade)+'급</span><b>'+(c.fee?Number(c.fee).toLocaleString('ko-KR')+'원':'')+'</b></div>').join('')
+      +(a.physicalFee?'<div style="display:flex;justify-content:space-between;gap:10px"><span>📦 실물 자격증(케이스/우편)</span><b>'+Number(a.physicalFee).toLocaleString('ko-KR')+'원</b></div>':'')
       +(a.totalFee?'<div style="border-top:1px solid #e3e8f0;margin-top:6px;padding-top:6px;display:flex;justify-content:space-between"><b>납부 총액</b><b style="color:#C41E2F">'+Number(a.totalFee).toLocaleString('ko-KR')+'원</b></div>':'')
       +'</div>'
       +(a.status==='접수'?'<div style="margin-top:8px;display:flex;gap:6px"><button class="lcbtn b" onclick="editMyApp(\''+d.id+'\')">✏️ 수정</button><button class="lcbtn d" onclick="delMyApp(\''+d.id+'\')">삭제</button></div>':'')
@@ -921,7 +933,7 @@ async function loadApps(){
   document.getElementById('apCount').textContent=LAPPS.length+'명 신청';
   if(!LAPPS.length){el.innerHTML='<div class="bempty">신청자가 없습니다.</div>';return}
   const stc={'접수':'#b8860b','접수완료':'#8a919d','합격':'#1F4E9C','발급완료':'#0f766e','불합격':'#C41E2F'};
-  const stl={'접수':'입금 전','접수완료':'입금 확인'};
+  const stl={'접수':'신청 접수','접수완료':'시도 1차 검토 완료','합격':'중앙 최종 발급 승인','불합격':'심사 반려','발급완료':'발급 완료'};
   el.innerHTML=LAPPS.map(d=>{
     const a=d.data();
     return '<div class="lccard" style="padding:12px 16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div>'
@@ -930,10 +942,10 @@ async function loadApps(){
       +' <span class="lctag" style="background:'+(stc[a.status]||'#8a919d')+'">'+esc(stl[a.status]||a.status)+'</span>'
       +(a.licenseNos&&a.licenseNos.length>1?' <b style="font-size:12px;color:#0f766e">'+a.licenseNos.map(x=>esc(x.type+' '+x.no)).join(', ')+'</b>':(a.licenseNo?' <b style="font-size:12px;color:#0f766e">'+esc(a.licenseNo)+'</b>':''))+'</div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +(a.status==='접수'?'<button class="lcbtn s" onclick="setApp(\''+d.id+'\',\'접수완료\')">💰 입금 확인</button>':'')
+      +(a.status==='접수'?'<button class="lcbtn s" onclick="setApp(\''+d.id+'\',\'접수완료\')">✅ 시도 1차 승인</button>':'')
       +(a.status==='접수완료'?resultBtns(d.id,a):'')
       +(a.status==='합격'?'<button class="lcbtn s" onclick="issueLic(\''+d.id+'\')">🎖 자격 발급</button>':'')
-      +((a.status==='합격'||a.status==='불합격')?'<button class="lcbtn ghost" onclick="cancelResult(\''+d.id+'\')" title="결과를 취소하고 심사 전(입금 확인) 상태로 되돌립니다">↩ 결과 취소</button>':'')
+      +((a.status==='합격'||a.status==='불합격')?'<button class="lcbtn ghost" onclick="cancelResult(\''+d.id+'\')" title="결과를 취소하고 시도 1차 검토 완료 상태로 되돌립니다">↩ 결과 취소</button>':'')
       +(a.status!=='발급완료'?'<button class="lcbtn g" onclick="transferApp(\''+d.id+'\')">↪ 이관</button>':'')
       +(CENTRAL?'<button class="lcbtn ghost" onclick="delLicApp(\''+d.id+'\')">🗑</button>':'')
       +'</div></div>';
@@ -943,7 +955,7 @@ async function loadApps(){
 function resultBtns(id,a){
   const types=licenseTypesOf(a);
   if(types.length<2){
-    return '<button class="lcbtn b" onclick="setApp(\''+id+'\',\'합격\')">합격</button><button class="lcbtn d" onclick="setApp(\''+id+'\',\'불합격\')">불합격</button>';
+    return '<button class="lcbtn b" onclick="setApp(\''+id+'\',\'합격\')">중앙 최종 승인</button><button class="lcbtn d" onclick="setApp(\''+id+'\',\'불합격\')">반려</button>';
   }
   const pr=a.passResults||{};
   return types.map(t=>{
