@@ -466,7 +466,7 @@ function appRegion(s){
   if(norm)return norm;
   const src=String(s.city||'')||String(s.school||'');
   for(const k in SIDO2REG){if(src.indexOf(k)===0)return SIDO2REG[k]}
-  // 학교명에 시도가 섞인 경우 (예: 부산신남초)
+  // 학교명에 시도가 섞인 경우 (예: 서울 / 대전신남초)
   for(const k in SIDO2REG){if(String(s.school||'').indexOf(k)===0)return SIDO2REG[k]}
   return raw||'';
 }
@@ -1052,7 +1052,7 @@ async function setCity(id){
   const val=prompt('시도 + 시군구를 입력하세요 (예: 경기도 김포시 / 부산광역시 수영구)',s.city||'');
   if(val===null)return;
   const upd={city:val.trim()};
-  // 권역도 함께 확인 (잘못 접수된 권역 정정 — 예: 부산 학교가 서울·경기로 접수)
+  // 권역도 함께 확인 (잘못 접수된 권역 정정 — 예: 서울 / 대전 학교가 서울·경기로 접수)
   const rn=prompt('권역 확인 — 현재 ['+(s.region||'미지정')+']\n맞으면 그냥 [확인], 바꾸려면 번호 입력:\n1=서울·경기 2=강원 3=충청 4=전라 5=경상 6=제주',' ');
   if(rn!==null){
     const R={'1':'서울·경기','2':'강원','3':'충청','4':'전라','5':'경상','6':'제주'}[rn.trim()];
@@ -2428,7 +2428,7 @@ async function saveConsentTpl(which){
   const text=document.getElementById(which+'ConsentText').value.trim();
   const imgs=CONSENT_IMGS[which];
   if(!text&&!imgs.length){alert('저장할 동의서(문안 또는 이미지)가 없습니다.');return}
-  const name=prompt('보관함에 저장할 이름을 입력하세요 (예: 부산교육청 동의서, 연맹 기본):');
+  const name=prompt('보관함에 저장할 이름을 입력하세요 (예: 서울 / 대전교육청 동의서, 연맹 기본):');
   if(!name||!name.trim())return;
   await DB.collection('consentTemplates').add({name:name.trim(),consentText:text,consentImgs:imgs.slice(),consentOverlays:ovlPack(which),createdAt:firebase.firestore.FieldValue.serverTimestamp()});
   alert('✓ 보관함에 저장되었습니다: '+name.trim());
@@ -2520,7 +2520,7 @@ function openCompWizard(editId){
   div.innerHTML='<div style="background:#fff;border-radius:18px;max-width:660px;width:100%;max-height:94vh;overflow:auto;padding:24px 26px">'
     +'<b style="font-size:17px">🏆 '+(ed?'대회 수정':'새 대회 등록')+'</b>'
     +sec('① 기본 정보',
-      '<label '+lb+'>대회명 *</label><input id="cwTitle" '+inp+' value="'+esc(c.title||'')+'" placeholder="예: 2026 부산광역시교육감배 플라잉디스크대회">'
+      '<label '+lb+'>대회명 *</label><input id="cwTitle" '+inp+' value="'+esc(c.title||'')+'" placeholder="예: 2026 전국 플라잉디스크대회">'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label '+lb+'>시작일 *</label><input id="cwD1" type="date" '+inp+' value="'+esc(c.dateStart||'')+'"></div><div><label '+lb+'>종료일</label><input id="cwD2" type="date" '+inp+' value="'+esc(c.dateEnd||'')+'"></div></div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label '+lb+'>장소 *</label><input id="cwPlace" '+inp+' value="'+esc(c.place||'')+'"></div><div><label '+lb+'>관할 시도 *</label><select id="cwSido" '+inp+'>'+PM_SIDOS.map(x=>'<option'+(c.sido===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div></div>'
       +'<label '+lb+'>대회 안내 (선택)</label><textarea id="cwDesc" rows="2" '+inp+'>'+esc(c.desc||'')+'</textarea>')
@@ -2533,7 +2533,7 @@ function openCompWizard(editId){
       '<label style="display:flex;gap:7px;align-items:center;font-size:13px;font-weight:800;margin-top:8px"><input type="checkbox" id="cwHasEntry" style="width:auto"'+(ed?'':' checked')+(ed?' disabled':'')+'> 참가자 모집 공고 생성</label>'
       +'<label '+lb+'>부문·정원 <span style="font-weight:600;color:#8a919d;font-size:11px">— 한 줄에 하나, 「부문명:정원」. 팀 단위 부문은 [팀] 붙이기</span></label>'
       +'<textarea id="cwDivs" rows="3" '+inp+' placeholder="얼티미트 초등부[팀]:16&#10;디스크골프 오픈부:32&#10;원반윷놀이 체험:0">'+esc(c.divsRaw||'')+'</textarea>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px"><div><label '+lb+'>참가비</label><input id="cwFee" '+inp+' value="'+esc(c.fee||'')+'" placeholder="예: 무료 / 10,000원"></div><div><label '+lb+'>신청 마감일</label><input id="cwDL" type="date" '+inp+' value="'+esc(c.deadline||'')+'"></div><div><label '+lb+'>지역 제한(선택)</label><input id="cwElig" '+inp+' value="'+esc(c.eligRegion||'')+'" placeholder="예: 부산"></div></div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px"><div><label '+lb+'>참가비</label><input id="cwFee" '+inp+' value="'+esc(c.fee||'')+'" placeholder="예: 무료 / 10,000원"></div><div><label '+lb+'>신청 마감일</label><input id="cwDL" type="date" '+inp+' value="'+esc(c.deadline||'')+'"></div><div><label '+lb+'>지역 제한(선택)</label><input id="cwElig" '+inp+' value="'+esc(c.eligRegion||'')+'" placeholder="예: 서울 / 대전"></div></div>'
       +'<label '+lb+'>허용 팀 단위</label><div style="display:flex;gap:14px;margin-top:5px;font-size:13px">'+['클럽팀','학교팀','자유팀'].map(t=>'<label style="display:flex;gap:5px;align-items:center;font-weight:700"><input type="checkbox" class="cwTT" value="'+t+'" style="width:auto"'+(tt.indexOf(t)>=0?' checked':'')+'> '+t+'</label>').join('')+'</div>')
     +sec('④ 심판 모집','<label style="display:flex;gap:7px;align-items:center;font-size:13px;font-weight:800;margin-top:8px"><input type="checkbox" id="cwHasRef" style="width:auto"'+(ed?' disabled':' checked')+'> 심판 모집 공고 생성</label>'
       +'<div style="display:grid;grid-template-columns:110px 1fr;gap:10px"><div><label '+lb+'>정원</label><input id="cwRefN" type="number" '+inp+' value="17"></div><div><label '+lb+'>임무 (쉼표 구분)</label><input id="cwRefRoles" '+inp+' value="심판장,주심,부심,점수심,기록심,선심"></div></div>')
@@ -3002,8 +3002,8 @@ function editComp(id){
     +'<label>신청 마감일</label><input id="ecDeadline" type="date" value="'+esc(s.deadline||'')+'">'
     +'<label>임무 목록 (쉼표 구분 — 비우면 기본값: '+esc((COMP_DEFAULT_ROLES[s.role]||[]).join(','))+' · 참가는 "부문:정원" 가능)</label><input id="ecRoles" value="'+esc((s.roles||[]).join(','))+'">'
     +'<label>참가비 (참가 모집 시 표시)</label><input id="ecFee" value="'+esc(s.fee||'')+'" placeholder="예: 무료 / 1인 10,000원">'
-    +'<label>참가 제한 지역 (비우면 전체 개방)</label><input id="ecEligRegion" value="'+esc(s.eligRegion||'')+'" placeholder="예: 부산 (시·도명)">'
-    +'<label>참가 자격 안내</label><input id="ecEligNote" value="'+esc(s.eligNote||'')+'" placeholder="예: 부산시 소재 학교·클럽 소속 선수만">'
+    +'<label>참가 제한 지역 (비우면 전체 개방)</label><input id="ecEligRegion" value="'+esc(s.eligRegion||'')+'" placeholder="예: 서울 / 대전 (시·도명)">'
+    +'<label>참가 자격 안내</label><input id="ecEligNote" value="'+esc(s.eligNote||'')+'" placeholder="예: 서울시 소재 학교·클럽 소속 선수만">'
     +'<label>참가 차단 클럽 (쉼표 구분 — 해당 클럽 소속은 신청 불가)</label><input id="ecBlockClubs" value="'+esc((s.blockClubs||[]).join(', '))+'" placeholder="예: 쿠파, ○○클럽">'
     +'<label>안내문 (신청 화면에 표시)</label><textarea id="ecNote" rows="3">'+esc(s.note||'')+'</textarea>'
     +'<label>심판·운영요원 확정 통보문 (비우면 기본 문안)</label><textarea id="ecNoticeText" rows="4" placeholder="예: [플라잉디스크연맹] ○○대회 심판요원으로 확정되었습니다.">'+esc(s.noticeText||'')+'</textarea>'
@@ -3711,7 +3711,7 @@ async function setBase(uid){
   if(rp===null)return;
   const regs=[...new Set(rp.split(',').map(x=>REG[parseInt(x.trim(),10)-1]).filter(Boolean))];
   if(!regs.length){alert('권역 번호를 1개 이상 입력하세요.');return}
-  const bc=prompt('['+v.name+'] 거점 시군구 — "시도 시군구" 형태로 입력\n(예: 부산광역시 수영구 / 서울특별시 강서구)\n비워두면 기존값 유지',v.baseCity||'');
+  const bc=prompt('['+v.name+'] 거점 시군구 — "시도 시군구" 형태로 입력\n(예: 서울 / 대전광역시 수영구 / 서울특별시 강서구)\n비워두면 기존값 유지',v.baseCity||'');
   if(bc===null)return;
   const upd={activityRegions:regs};
   if(String(bc).trim())upd.baseCity=String(bc).trim();

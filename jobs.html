@@ -214,7 +214,7 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
     <label style="font-size:12.5px;font-weight:800">공고 제목 *</label><input id="gTitle" placeholder="예: ○○초 학부모 체험행사 플라잉디스크 강사" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin:4px 0 8px">
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <div style="flex:1;min-width:130px"><label style="font-size:12.5px;font-weight:800">기관·단체명 *</label><input id="gOrg" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></div>
-      <div style="flex:1;min-width:130px"><label style="font-size:12.5px;font-weight:800">지역(시군구) *</label><input id="gArea" placeholder="예: 부산 강서구" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></div>
+      <div style="flex:1;min-width:130px"><label style="font-size:12.5px;font-weight:800">지역(시군구) *</label><input id="gArea" placeholder="예: 서울 강남구" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
       <div style="flex:1;min-width:130px"><label style="font-size:12.5px;font-weight:800">일시 *</label><input id="gWhen" placeholder="예: 9/20(토) 10~13시" style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px"></div>
@@ -372,6 +372,7 @@ async function submitGig(){
 async function loadGigs(){
   const el=document.getElementById('gigList');
   try{
+    // 승인 게시분 + 내가 올린 대기 건
     const snap=await DB.collection('gigs').where('status','==','승인').limit(100).get();
     let gigs=snap.docs.map(d=>Object.assign({_id:d.id},d.data()));
     try{const mine=await DB.collection('gigs').where('byUid','==',JME.uid).get();
@@ -416,9 +417,6 @@ async function delGig(id){
   if(!confirm('이 공고를 삭제할까요?'))return;
   try{await DB.collection('gigs').doc(id).delete();loadGigs();}catch(e){alert('삭제 실패: '+e.message)}
 }
-
-// loadSlots()/claim() 제거 — 지명 기능 폐쇄
-
 </script>
 
 <footer><div class="wrap">
