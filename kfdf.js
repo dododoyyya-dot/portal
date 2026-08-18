@@ -129,8 +129,58 @@
     } catch (e) { return Promise.resolve(); }
   }
 
+  // ── 전국 학교 표준 DB (내장 JSON) 자동완성 ──
+  var _schools=null, _schoolLoading=false, _schoolWaiters=[];
+  function escHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function loadSchools(cb){
+    if(_schools) return cb(_schools);
+    _schoolWaiters.push(cb);
+    if(_schoolLoading) return;
+    _schoolLoading=true;
+    fetch('schools_min.json?v=20260818')
+      .then(function(r){ return r.json(); })
+      .then(function(a){ _schools=a; _schoolLoading=false; var w=_schoolWaiters.slice(); _schoolWaiters=[]; w.forEach(function(fn){ fn(_schools); }); })
+      .catch(function(e){ _schoolLoading=false; console.warn('schools load fail',e); var w=_schoolWaiters.slice(); _schoolWaiters=[]; w.forEach(function(fn){ fn([]); }); });
+  }
+  function schoolSearch(q, limit){
+    if(!_schools) return [];
+    q=String(q||'').trim().replace(/\s+/g,'');
+    if(!q) return [];
+    var q2=q.replace(/(초등학교|중학교|고등학교|학교)$/,'');
+    var re=new RegExp(q,'i');
+    return _schools.filter(function(x){ return re.test(x.name) || (q2&&q2!==q && x.name.replace(/(초등학교|중학교|고등학교|학교)$/,'').indexOf(q2)>=0); }).slice(0, limit||10);
+  }
+  function schoolAuto(input, onSelect){
+    input.setAttribute('autocomplete','off');
+    var wrap=input.parentElement;
+    var dd=document.createElement('div');
+    dd.style.cssText='position:absolute;z-index:10000;top:'+(input.offsetTop+input.offsetHeight)+'px;left:'+input.offsetLeft+'px;max-height:240px;overflow:auto;background:#fff;border:1.5px solid #dfe5ee;border-radius:10px;padding:6px 0;box-shadow:0 10px 28px rgba(0,0,0,.12);width:'+input.offsetWidth+'px;display:none;';
+    if(wrap){ wrap.style.position='relative'; wrap.appendChild(dd); }
+    else { dd.style.position='fixed'; document.body.appendChild(dd); }
+    function show(){ dd.style.display='block'; }
+    function hide(){ dd.style.display='none'; }
+    function fill(list){
+      dd.innerHTML='';
+      if(!list.length){ dd.innerHTML='<div style="padding:8px 14px;font-size:12.5px;color:#8a919d">검색 결과가 없습니다</div>'; show(); return; }
+      list.forEach(function(s){
+        var d=document.createElement('div');
+        d.className='sch-item';
+        d.style.cssText='padding:8px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9';
+        d.innerHTML=escHtml(s.name)+' <span style="font-size:11px;color:#8a919d">('+(s.kind||'-')+')</span>';
+        d.onmousedown=function(e){ e.preventDefault(); input.value=s.name; hide(); if(typeof onSelect==='function') onSelect(s.name); };
+        dd.appendChild(d);
+      });
+      show();
+    }
+    input.addEventListener('focus', function(){ loadSchools(function(){ fill(schoolSearch(input.value, 10)); }); });
+    input.addEventListener('input', function(){ loadSchools(function(){ fill(schoolSearch(input.value, 10)); }); });
+    input.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+    document.addEventListener('click', function(e){ if(e.target!==input && e.target!==dd) hide(); });
+  }
+
   var API = {
     CFG: CFG, initApp: initApp, ready: ready, notify: notify,
+    loadSchools: loadSchools, schoolSearch: schoolSearch, schoolAuto: schoolAuto,
     // 등급
     roleOf: roleOf, isOwner: isOwner, isAdmin: isAdmin, isSidoOfficer: isSidoOfficer, isGugunOfficer: isGugunOfficer,
     isRegionAdmin: isRegionAdmin, regionActive: regionActive, isApproved: isApproved,
