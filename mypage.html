@@ -865,11 +865,6 @@ function fillProfile(d){
   else if(d.natCertName){ncs.textContent='📎 사본 첨부 필요 — 첨부 전까지 승인 보류';ncs.style.color='#C41E2F';}
   else{ncs.textContent='';ncs.style.color='';}
   document.getElementById('pfNatCertLink').innerHTML=(d.natCertName&&d.natCertDoc)?'<a href="'+d.natCertDoc+'" target="_blank" style="font-weight:800;color:#153A77;background:#eef3fa;border:1px solid #d4e0f2;border-radius:8px;padding:4px 10px">📎 첨부한 자격증 사본 보기</a>':'';
-  renderDocList(d.qualDocs||[]);
-}
-function renderDocList(urls){
-  document.getElementById('pfDocList').innerHTML=urls.map((u,i)=>
-    '<a href="'+u+'" target="_blank" style="display:inline-block;font-size:12px;font-weight:800;color:#153A77;background:#eef3fa;border:1px solid #d4e0f2;border-radius:8px;padding:6px 12px">📎 자격증 '+(i+1)+' 보기</a>').join('');
 }
 function openPostcode(){
   function launch(){
@@ -1031,7 +1026,7 @@ function showMyTab(k){
   if(tb){const r=tb.getBoundingClientRect();if(r.top<0||r.top>window.innerHeight-80)tb.scrollIntoView({block:'start'});}
 }
 (function(){
-  const map={alarmBox:'Alarm',famReqBox:'Alarm',profileBox:'Profile',pfDocList:'Profile',kidsBox:'Family',certBox:'Career',licBox:'Career',claimBox:'Career',contractBox:'Work',compContractBox:'Work',logBox:'Work',actList:'Work',consentBox:'Work'};
+  const map={alarmBox:'Alarm',famReqBox:'Alarm',profileBox:'Profile',kidsBox:'Family',certBox:'Career',licBox:'Career',claimBox:'Career',contractBox:'Work',compContractBox:'Work',logBox:'Work',actList:'Work',consentBox:'Work'};
   const h=(location.hash||'').replace('#','');
   if(map[h]&&map[h]!=='Profile'){
     showMyTab(map[h]);
@@ -1335,8 +1330,8 @@ async function saveProfile(){
       document.getElementById('pfRrnState').innerHTML='✅ <b style="color:#0f766e">주민등록번호 등록 완료.</b> 🔒 본인과 중앙 사무국만 열람 가능합니다.';
     }
     Object.assign(MYD,upd);
-    document.getElementById('pfDocs').value='';document.getElementById('pfDegDoc').value='';document.getElementById('pfNatCertDoc').value='';
-    renderDocList(docs);fillProfile(MYD);
+    document.getElementById('pfDegDoc').value='';document.getElementById('pfNatCertDoc').value='';
+    fillProfile(MYD);
     m.textContent='✓ 저장되었습니다';m.style.color='#0f766e';
     pfCollapse(MYD);window.scrollTo({top:0,behavior:'smooth'});alert('프로필이 저장되었습니다.');
   }catch(e){
