@@ -1700,14 +1700,16 @@ function renderInstTable(docs){
   const rows=list.map(d=>{const v=d.data();const f=v.instructorFor||{};
     const sup=['school','after','referee','staff'].filter(k=>f[k]).map(k=>'<span style="font-size:10px;font-weight:900;color:#fff;background:'+bg[k]+';padding:2px 7px;border-radius:999px;margin-right:2px">'+lb[k]+'</span>').join('');
     const area=(v.activityAreas&&v.activityAreas.length)?v.activityAreas.map(a=>String(a).replace(/(특별자치도|특별자치시|광역시|특별시)/,'')).join(', '):(v.baseCity?String(v.baseCity).replace(/(특별자치도|특별자치시|광역시|특별시)/,''):((v.activityRegions||[]).join('·')||'-'));
+    const assigned=(APPS||[]).filter(a=>{const s=a.data();return s.status==='배정완료'&&s.assignedUid===d.id}).length;
     return '<tr><td style="cursor:pointer;color:#153A77" onclick="showMemberModal(\''+d.id+'\')"><b style="text-decoration:underline">'+esc(v.name)+'</b></td><td>'+esc(v.region||'')+'</td><td style="max-width:260px">'+esc(area)+'</td><td>'+sup+'</td>'
       +'<td>'+(v.edu2026?(inRoster(v.name)?'<b style="color:#0f766e">✓</b>':'<b style="color:#C41E2F">⚠</b>'):'-')+'</td>'
       +'<td>'+(v.phone?esc(v.phone):'-')+'</td>'
       +'<td>'+(v.bank?esc(v.bank)+' '+esc(v.accountNum||''):'-')+'</td>'
+      +'<td style="text-align:center"><b>'+assigned+'</b></td>'
       +'<td><button class="btn-sub" style="background:#0f766e;padding:4px 10px;min-height:0" onclick="setBase(\''+d.id+'\')">📍지정</button></td></tr>';
   }).join('');
   return '<div style="font-size:12.5px;color:var(--gray);margin-bottom:6px">사업 지원(학교체육·방과후·심판·운영) 강사·요원만 표시 · '+list.length+'명 · 위 검색·시도 필터와 연동</div>'
-    +'<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th>성명</th><th>권역</th><th>활동 가능 범위</th><th>지원</th><th>연수</th><th>휴대전화</th><th>계좌</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    +'<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th>성명</th><th>권역</th><th>활동 가능 범위</th><th>지원</th><th>연수</th><th>휴대전화</th><th>계좌</th><th>배정</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 // ── 강사비 지급 인적사항·위촉계약 서명 관리 (e나라도움 이체·증빙용) ──
 let PAYROWS=[];
