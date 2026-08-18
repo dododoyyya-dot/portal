@@ -212,9 +212,7 @@ async function loadClub(){
     CH_IS_OWNER=CCLUB.ownerUid===CHME.uid;
     CH_IS_ADMIN=!!(CHMY.role==='admin'||CHMY.owner);
     const isMemberAcc=(CCLUB.memberUids||[]).indexOf(CHME.uid)>=0;
-    const isTempAcc=(CCLUB.tempUids||[]).indexOf(CHME.uid)>=0; // 임시회원(보호자 미연동 학생)도 소속원
-    const isGuardianOfKid=(CCLUB.childMembers||[]).some(k=>k.parentUid===CHME.uid); // 소속 자녀의 보호자
-    CH_IS_MEMBER=CH_IS_OWNER||isMemberAcc||CH_IS_ADMIN||isTempAcc||isGuardianOfKid;
+    CH_IS_MEMBER=CH_IS_OWNER||isMemberAcc||CH_IS_ADMIN;
     document.getElementById('chGate').style.display='none';
     document.getElementById('chBody').style.display='block';
     renderHeader();
@@ -236,7 +234,7 @@ function renderHeader(){
   document.title=(c.name||'클럽')+' 클럽 홈 | 대한민국플라잉디스크연맹';
   document.getElementById('chCrumb').textContent=c.name||'클럽 홈';
   document.getElementById('chTitle').textContent='🏠 '+(c.name||'클럽')+' 클럽 홈';
-  document.getElementById('chSub').textContent=(c.sido||'')+' '+(c.gugun||'')+' · KFDF 공식 클럽'+(c.status==='임시'?' · 🧪 임시클럽 (성인 회장 인수 후 정식 승인)':(c.status!=='승인'?' · 사무국 승인 대기 중':''));
+  document.getElementById('chSub').textContent=(c.sido||'')+' '+(c.gugun||'')+' · KFDF 공식 클럽'+(c.status!=='승인'?' · 사무국 승인 대기 중':'');
   const cnt=(c.memberUids||[]).length+((c.childMembers||[]).length);
   document.getElementById('chHeader').innerHTML=
     '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">'+cavHtml(c)
@@ -244,42 +242,8 @@ function renderHeader(){
     +'<div style="font-size:12.5px;color:#8a919d;margin-top:3px">'+kesc(c.sido)+' '+kesc(c.gugun||'')+' · 회원 '+cnt+'명'+(c.code&&CH_IS_MEMBER?' · 🔑 초대코드 '+kesc(c.code):'')+'</div></div>'
     +(CH_IS_OWNER?'<span class="cpill2" style="background:#C41E2F">클럽장</span>':CH_IS_MEMBER?'<span class="cpill2" style="background:#0f766e">✓ 소속 회원</span>':'')
     +'</div>'
-    +((c.sports&&c.sports.length)?'<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+c.sports.map(sp=>'<span class="cpill2" style="background:#0f766e">🥏 '+kesc(sp)+'</span>').join('')+'</div>':'')
     +(c.intro?'<div style="font-size:13.5px;color:#374151;margin-top:12px;line-height:1.6">'+kesc(c.intro)+'</div>':'')
-    +(c.rulesText?'<details style="margin-top:10px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">클럽 내규 보기</summary><div style="font-size:12.5px;color:#4b5563;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:10px 13px;margin-top:6px">'+kesc(c.rulesText)+'</div></details>':'')
-    +'<div id="chStats"></div>';
-  renderClubStats();
-}
-// ── 클럽 구성 통계 (남녀 비율 · 연령대 분포) — 개인 식별정보 없이 집계만 표시 ──
-function renderClubStats(){
-  const c=CCLUB;const el=document.getElementById('chStats');if(!el)return;
-  const kidCidSet=new Set((c.childMembers||[]).map(k=>k.cid));
-  const ppl=[];
-  (c.members||[]).forEach(m=>{if(!kidCidSet.has(m.uid))ppl.push({birth:m.birth||'',gender:m.gender||''})});
-  (c.childMembers||[]).forEach(k=>ppl.push({birth:k.birth||'',gender:k.gender||''}));
-  if(!ppl.length){el.innerHTML='';return}
-  let mCnt=0,fCnt=0,uCnt=0;
-  const ageKeys=['10대 미만','10대','20대','30대','40대','50대 이상'];
-  const ages={'10대 미만':0,'10대':0,'20대':0,'30대':0,'40대':0,'50대 이상':0};let ageU=0;
-  ppl.forEach(p=>{
-    if(p.gender==='남')mCnt++;else if(p.gender==='여')fCnt++;else uCnt++;
-    if(p.birth){const a=(Date.now()-new Date(p.birth).getTime())/31557600000;
-      if(a<10)ages['10대 미만']++;else if(a<20)ages['10대']++;else if(a<30)ages['20대']++;else if(a<40)ages['30대']++;else if(a<50)ages['40대']++;else ages['50대 이상']++;
-    }else ageU++;
-  });
-  const tot=ppl.length;
-  const gKnown=mCnt+fCnt;
-  const bar=(lab,n,color)=>{const pc=tot?Math.round(n/tot*100):0;
-    return '<div style="display:flex;align-items:center;gap:8px;margin-top:4px"><span style="width:64px;font-size:11.5px;font-weight:800;color:#4b5563;flex-shrink:0">'+lab+'</span>'
-      +'<div style="flex:1;height:9px;background:#eef1f6;border-radius:99px;overflow:hidden"><div style="width:'+pc+'%;height:100%;background:'+color+'"></div></div>'
-      +'<span style="width:58px;font-size:11.5px;color:#8a919d;text-align:right;flex-shrink:0">'+n+'명 '+pc+'%</span></div>'};
-  el.innerHTML='<details style="margin-top:12px" open><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">📊 클럽 구성 통계 (총 '+tot+'명)</summary>'
-    +'<div style="background:#f8fafc;border-radius:10px;padding:12px 14px;margin-top:6px">'
-    +'<div style="font-size:12px;font-weight:900;color:#374151">남녀 비율'+(gKnown<tot?' <span style="font-weight:600;color:#8a919d">(성별 미등록 '+uCnt+'명 포함)</span>':'')+'</div>'
-    +bar('남',mCnt,'#1F4E9C')+bar('여',fCnt,'#C41E2F')+(uCnt?bar('미등록',uCnt,'#c3cad6'):'')
-    +'<div style="font-size:12px;font-weight:900;color:#374151;margin-top:10px">연령대 분포</div>'
-    +ageKeys.filter(k=>ages[k]).map(k=>bar(k,ages[k],'#0f766e')).join('')+(ageU?bar('미등록',ageU,'#c3cad6'):'')
-    +'</div></details>';
+    +(c.rulesText?'<details style="margin-top:10px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">클럽 내규 보기</summary><div style="font-size:12.5px;color:#4b5563;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:10px 13px;margin-top:6px">'+kesc(c.rulesText)+'</div></details>':'');
 }
 
 function showChTab(k){
@@ -292,41 +256,59 @@ function showChTab(k){
 function normSchool(s){
   return String(s||'').trim().replace(/\s+/g,'').replace(/(초등학교|중학교|고등학교|초교|중교|고교|학교)$/,'');
 }
-async function renderMembers(){
+function ageOf(birth){
+  if(!birth)return 0;
+  const t=new Date(birth);
+  if(isNaN(t.getTime()))return 0;
+  const now=new Date();
+  let age=now.getFullYear()-t.getFullYear();
+  if(now.getMonth()<t.getMonth()||(now.getMonth()===t.getMonth()&&now.getDate()<t.getDate())) age--;
+  return age;
+}
+function renderMembers(){
   const el=document.getElementById('chMembers');
   const c=CCLUB;
   const kidCids=new Set((c.childMembers||[]).map(k=>k.cid));
-  const tempSet=new Set(c.tempUids||[]);
-  // 회원별 학생 여부·학교 판정 — ① members 엔트리의 birth/school ② tempUids(임시회원=학생) ③ 가능하면 users 문서로 보강(권한 없으면 무시)
-  const meta={};
-  (c.members||[]).forEach(m=>{meta[m.uid]={school:m.school||'',minor:false};
-    if(m.birth){const a=(Date.now()-new Date(m.birth).getTime())/31557600000;if(a>0&&a<19)meta[m.uid].minor=true;}});
-  try{
-    const rs=await Promise.allSettled((c.members||[]).map(m=>DB.collection('users').doc(m.uid).get()));
-    rs.forEach((r,i)=>{if(r.status==='fulfilled'&&r.value.exists){const u=r.value.data();const uid=(c.members||[])[i].uid;
-      if(u.accountType==='student'||u.memberGroup==='student')meta[uid].minor=true;
-      if(u.school&&!meta[uid].school)meta[uid].school=u.school;
-      if(u.birth&&!meta[uid].minor){const a=(Date.now()-new Date(u.birth).getTime())/31557600000;if(a>0&&a<19)meta[uid].minor=true;}}});
-  }catch(e){}
-  const isStu=m=>kidCids.has(m.uid)||tempSet.has(m.uid)||meta[m.uid].minor||!!meta[m.uid].school;
   // 계정 연동형 미성년 회원은 childMembers·members 양쪽에 등록되어 있음 — "성인 회원"에는 중복 표시하지 않음
-  const adults=(c.members||[]).filter(m=>!kidCids.has(m.uid)&&!isStu(m));
-  const stuMembers=(c.members||[]).filter(m=>!kidCids.has(m.uid)&&isStu(m));
+  const adults=(c.members||[]).filter(m=>!kidCids.has(m.uid));
   const kids=(c.childMembers||[]);
-  const tchip=uid=>tempSet.has(uid)?' <b style="color:#b8860b;font-size:10.5px" title="보호자 미연동 임시회원 — 연동 완료 시 자동 정회원 전환">🕓 임시</b>':'';
-  let html='<div style="margin-bottom:6px"><b style="font-size:12.5px;color:#374151">성인 회원 ('+adults.length+'명)</b> <span style="font-size:11.5px;color:#8a919d">· 학생 회원 '+(stuMembers.length+kids.length)+'명</span></div>';
-  html+=adults.length?adults.map(m=>'<span class="memchip"><span class="dot">'+kesc((m.name||'?').charAt(0))+'</span>'+kesc(m.name||'')+(m.uid===c.ownerUid?' <b style="color:#C41E2F">· 클럽장</b>':'')+tchip(m.uid)+'</span>').join(''):'<span style="font-size:12.5px;color:#8a919d">없음</span>';
-  if(stuMembers.length){
-    const g2={};
-    stuMembers.forEach(m=>{const raw=meta[m.uid].school||'학교 미기재';const key=normSchool(raw)||raw;
-      if(!g2[key])g2[key]={label:raw,list:[]};g2[key].list.push(m);});
-    Object.keys(g2).sort((a,b)=>g2[a].label.localeCompare(g2[b].label,'ko')).forEach(key=>{
-      const g=g2[key];
-      html+='<div class="schoolgrp"><h4>🏫 '+kesc(g.label)+' ('+g.list.length+'명)</h4>'
-        +g.list.map(m=>'<span class="memchip"><span class="dot">'+kesc((m.name||'?').charAt(0))+'</span>'+kesc(m.name||'')+tchip(m.uid)+'</span>').join('')
-        +'</div>';
+
+  // ── 비관리자 대시보드(통계만) ──
+  const canSeeFullList = CH_IS_OWNER || CH_IS_ADMIN;
+  if(!canSeeFullList){
+    const ageGroups={ '10세 이하':0,'11~13세':0,'14~17세':0,'18세 이상':0,'미기재':0 };
+    kids.forEach(k=>{
+      if(!k.birth){ ageGroups['미기재']++; return; }
+      const a=ageOf(k.birth);
+      if(a<=10) ageGroups['10세 이하']++;
+      else if(a<=13) ageGroups['11~13세']++;
+      else if(a<=17) ageGroups['14~17세']++;
+      else ageGroups['18세 이상']++;
     });
+    const schGroups={};
+    kids.forEach(k=>{
+      const raw=k.school||'학교 미기재';
+      const key=normSchool(raw)||raw;
+      if(!schGroups[key]) schGroups[key]={label:raw,count:0};
+      schGroups[key].count++;
+    });
+    const ageHtml=Object.keys(ageGroups).map(g=>g+' '+ageGroups[g]+'명').join(' · ');
+    const schHtml=Object.values(schGroups).sort((a,b)=>a.label.localeCompare(b.label,'ko')).map(g=>kesc(g.label)+' '+g.count+'명').join(' · ');
+    el.innerHTML=
+      '<div style="margin-bottom:10px"><b style="font-size:13px;color:#374151">📊 클럽 구성원 통계</b></div>'
+      +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
+      +'<div style="flex:1;min-width:80px;background:#f4f7fc;border-radius:10px;padding:10px;text-align:center"><div style="font-size:11px;color:#6b7280">성인</div><b style="font-size:17px;color:#153A77">'+adults.length+'</b></div>'
+      +'<div style="flex:1;min-width:80px;background:#f4f7fc;border-radius:10px;padding:10px;text-align:center"><div style="font-size:11px;color:#6b7280">유소년</div><b style="font-size:17px;color:#0f766e">'+kids.length+'</b></div>'
+      +'<div style="flex:1;min-width:80px;background:#f4f7fc;border-radius:10px;padding:10px;text-align:center"><div style="font-size:11px;color:#6b7280">전체</div><b style="font-size:17px;color:#b8860b">'+(adults.length+kids.length)+'</b></div>'
+      +'</div>'
+      +'<div style="font-size:12.5px;margin-bottom:8px"><b>연령대 분포</b> · '+ageHtml+'</div>'
+      +'<div style="font-size:12.5px"><b>학교별 유소년</b> · '+(schHtml||'없음')+'</div>'
+      +'<div style="font-size:11.5px;color:#8a919d;margin-top:10px">개별 회원 명단은 클럽장/관리자만 확인할 수 있습니다.</div>';
+    return;
   }
+
+  let html='<div style="margin-bottom:6px"><b style="font-size:12.5px;color:#374151">성인 회원 ('+adults.length+'명)</b></div>';
+  html+=adults.length?adults.map(m=>'<span class="memchip"><span class="dot">'+kesc((m.name||'?').charAt(0))+'</span>'+kesc(m.name||'')+(m.uid===c.ownerUid?' <b style="color:#C41E2F">· 클럽장</b>':'')+'</span>').join(''):'<span style="font-size:12.5px;color:#8a919d">없음</span>';
   if(kids.length){
     const groups={};   // 정규화 키 → {label, list}
     kids.forEach(k=>{
@@ -431,6 +413,7 @@ async function postWall(){
     loadWall();
   }catch(e){m.style.color='#C41E2F';m.textContent='실패: '+(e.code==='permission-denied'?'권한 오류 — 소속 회원만 남길 수 있습니다':e.message)}
 }
+
 // ── 모달 ──
 function showModal(title,html){
   closeModal();
