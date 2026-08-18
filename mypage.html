@@ -1812,14 +1812,29 @@ async function claimLic(){
     const l=doc.data();
     if(l.uid){m.textContent=(l.uid===AUTH.currentUser.uid?'이미 내 계정에 연결된 자격입니다.':'이미 다른 회원에게 연결된 자격입니다. 본인 자격이 맞다면 사무국에 문의하세요.');m.style.color='#C41E2F';return}
     const match=(l.maskName===maskNm(MYD.name));
-    await DB.collection('licenseClaims').add({
-      uid:AUTH.currentUser.uid,name:MYD.name,phone:MYD.phone||'',
-      licenseNo:no,licMask:l.maskName,licType:l.type,licGrade:l.grade,licRegion:l.region||'',
-      nameMatch:match,status:'대기',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-    m.textContent='✓ 연결 신청이 접수되었습니다. '+(match?'성명 대조 일치 — 관할 연맹 승인 후 표시됩니다.':'성명 대조가 일치하지 않아 관할 연맹에서 추가 확인 후 처리됩니다.');
-    m.style.color='#0f766e';
-    document.getElementById('clNo').value='';
-    loadMyClaims();
+    if(match){
+      // 성명 대조 일치 시 즉시 활성화
+      await DB.collection('licenses').doc(no).update({
+        uid:AUTH.currentUser.uid,
+        claimedByName:MYD.name,
+        claimedAt:firebase.firestore.FieldValue.serverTimestamp()
+      });
+      m.textContent='✓ 성명 대조가 일치하여 자격이 즉시 활성화되었습니다. 마이페이지에 자격증이 표시됩니다.';
+      m.style.color='#0f766e';
+      document.getElementById('clNo').value='';
+      loadMyLics(AUTH.currentUser.uid);
+      loadMyClaims();
+    }else{
+      // 불일치 시 관할 연맹 승인 대기
+      await DB.collection('licenseClaims').add({
+        uid:AUTH.currentUser.uid,name:MYD.name,phone:MYD.phone||'',
+        licenseNo:no,licMask:l.maskName,licType:l.type,licGrade:l.grade,licRegion:l.region||'',
+        nameMatch:false,status:'대기',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+      m.textContent='✓ 연결 신청이 접수되었습니다. 성명 대조가 일치하지 않아 관할 연맹에서 추가 확인 후 처리됩니다.';
+      m.style.color='#0f766e';
+      document.getElementById('clNo').value='';
+      loadMyClaims();
+    }
   }catch(e){m.textContent='신청 실패: '+e.message;m.style.color='#C41E2F'}
 }
 async function loadMyClaims(){
