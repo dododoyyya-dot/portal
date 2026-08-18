@@ -182,12 +182,12 @@
       <label class="clabel" style="margin-top:0">클럽명 <span style="color:#C41E2F">*</span></label>
       <input id="ncName" class="cfield" placeholder="예: 김포 프리버드 얼티미트 클럽">
       <div style="display:flex;gap:10px">
-        <div style="flex:1"><label class="clabel">소속 시도연맹 <span style="color:#C41E2F">*</span></label>
+        <div style="flex:1"><label class="clabel" id="ncSidoLbl">소속 시도연맹 <span style="color:#C41E2F">*</span></label>
           <select id="ncSido" class="cfield" onchange="fillGugun()"></select></div>
-        <div style="flex:1"><label class="clabel">거점 시·군·구 <span style="color:#C41E2F">*</span></label>
+        <div style="flex:1"><label class="clabel" id="ncGugunLbl">거점 시·군·구 <span style="color:#C41E2F">*</span></label>
           <select id="ncGugun" class="cfield"><option value="">시도를 먼저 선택</option></select></div>
       </div>
-      <div style="font-size:12px;color:#8a5a00;background:#fff8ed;border-radius:8px;padding:8px 12px;margin-top:8px">📍 거점은 <b>실제 활동하며 서류(체육회 등록 등)를 제출할 수 있는 시·군·구 한 곳</b>을 선택합니다. "전지역"으로는 등록할 수 없습니다.</div>
+      <div id="ncBaseNote" style="font-size:12px;color:#8a5a00;background:#fff8ed;border-radius:8px;padding:8px 12px;margin-top:8px">📍 거점은 <b>실제 활동하며 서류(체육회 등록 등)를 제출할 수 있는 시·군·구 한 곳</b>을 선택합니다. "전지역"으로는 등록할 수 없습니다.</div>
       <div id="ncOrgLine" style="font-size:12.5px;font-weight:800;color:#153A77;margin-top:8px"></div>
       <label class="clabel">클럽 심볼 (엠블럼 · 선택)</label>
       <div style="display:flex;gap:12px;align-items:center;margin-top:5px">
@@ -269,6 +269,12 @@ function ncTypeChange(){
   const fl=document.getElementById('ncTypeFedLbl'),el2=document.getElementById('ncTypeExtLbl');
   fl.style.borderColor=ext?'#dfe5ee':'#1F4E9C';fl.style.background=ext?'#fff':'#eef3fa';
   el2.style.borderColor=ext?'#7c3aed':'#dfe5ee';el2.style.background=ext?'#f5f0ff':'#fff';
+  // 타단체: "소속 지역"이 아니라 "활동 거점" 개념 (시군구는 공식 소속 인정 지역이므로 구분)
+  document.getElementById('ncSidoLbl').innerHTML=ext?'활동 거점 시·도 <span style="color:#C41E2F">*</span>':'소속 시도연맹 <span style="color:#C41E2F">*</span>';
+  document.getElementById('ncGugunLbl').innerHTML=ext?'활동 거점 시·군·구 <span style="color:#C41E2F">*</span>':'거점 시·군·구 <span style="color:#C41E2F">*</span>';
+  document.getElementById('ncBaseNote').innerHTML=ext
+    ?'📍 타 단체 소속 클럽은 <b>클럽이 주로 활동하는 지역 중 한 곳</b>을 활동 거점으로 기입합니다. (시·군·구 소속 인정은 연맹 정식 클럽에만 적용되어, 소속 지역 선택이 아닌 <b>활동 거점 선택</b>입니다)<br><span style="color:#1F4E9C">💙 지금 그대로 활동하시다가, 언젠가 대한민국플라잉디스크연맹과 함께하고 싶어지시면 — 여기 기입하신 활동 거점의 시·군·구 연맹으로 클럽이 그대로 등록됩니다. 회원·기록·클럽홈 모두 유지되며, 절차는 사무국이 도와드립니다. 언제든 환영합니다!</span>'
+    :'📍 거점은 <b>실제 활동하며 서류(체육회 등록 등)를 제출할 수 있는 시·군·구 한 곳</b>을 선택합니다. "전지역"으로는 등록할 수 없습니다.';
 }
 function showClTab(k){
   ['1','2','3'].forEach(n=>{const p=document.getElementById('clPane'+n);if(p)p.style.display=(n===k?'':'none')});
@@ -330,14 +336,47 @@ function renderClubs(){
       return '<div class="clubcard"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+cavHtml(c)+'<a href="clubhome.html?id='+d.id+'" style="text-decoration:none;color:inherit"><span class="cname">'+kesc(c.name)+'</span></a>'
         +(c.status==='임시'?'<span class="cpill2" style="background:#b8860b" title="학생들이 만든 임시클럽 — 성인 회장 인수 후 정식 승인됩니다">🧪 임시클럽</span>':'')
         +(c.clubType==='external'?'<span class="cpill2" style="background:#7c3aed" title="타 단체 소속 클럽 — 연맹 정식 클럽이 아닙니다">🔗 타단체'+(c.orgName?': '+kesc(c.orgName):'')+'</span>':'')
-        +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'
+        +'<span class="cpill2" style="background:#153A77">'+(c.clubType==='external'?'📍거점 ':'')+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'
         +'<span style="font-size:12px;color:#8a919d;font-weight:700">회원 '+cnt+'명 · 👑 '+kesc(c.ownerName||'')
         +((c.temp||c.status==='임시')?' <b style="color:#8a5a00;font-size:11px">🧒학생(임시)</b>':' <b style="color:#0f766e;font-size:11px">✓성인</b>')+'</span>'
         +'<span style="flex:1"></span><a class="cbtn cbtn-soft" style="padding:7px 14px;text-decoration:none;display:inline-block" href="clubhome.html?id='+d.id+'">🏠 클럽 홈</a>'+childJoinBtn(c,d.id)+act+'</div>'
         +(c.intro?'<div class="cmeta2">'+kesc(c.intro)+'</div>':'')
+        +clubInfoHtml(c)
         +(c.rulesText?'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">클럽 내규 보기</summary><div style="font-size:12.5px;color:#4b5563;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:10px 13px;margin-top:6px">'+kesc(c.rulesText)+'</div></details>':'')
         +'</div>';
     }).join('');
+}
+// ── 클럽정보 칸 (내규 앞) — 구성원 나이대·성별 비율 등 통계만 공개, 명단은 클럽 회원만(클럽홈) ──
+function clubInfoHtml(c){
+  const adults=(c.members||[]),kids=(c.childMembers||[]);
+  const kidCids=new Set(kids.map(k=>k.cid));
+  const adultsOnly=adults.filter(m=>!kidCids.has(m.uid));
+  const total=adultsOnly.length+kids.length;
+  // 나이대 분포 (birth 있는 인원 기준)
+  const ages={'10세 이하':0,'11~13세':0,'14~17세':0,'18~29세':0,'30~49세':0,'50세 이상':0};
+  let aged=0;
+  const addAge=b=>{if(!b)return;const a=ageOf(b);if(a<=0)return;aged++;
+    if(a<=10)ages['10세 이하']++;else if(a<=13)ages['11~13세']++;else if(a<=17)ages['14~17세']++;
+    else if(a<=29)ages['18~29세']++;else if(a<=49)ages['30~49세']++;else ages['50세 이상']++;};
+  adultsOnly.forEach(m=>addAge(m.birth));kids.forEach(k=>addAge(k.birth));
+  // 성별 비율 (gender 기재 인원 기준)
+  let male=0,female=0;
+  const addG=g=>{g=String(g||'');if(g.indexOf('남')>=0)male++;else if(g.indexOf('여')>=0)female++;};
+  adultsOnly.forEach(m=>addG(m.gender));kids.forEach(k=>addG(k.gender));
+  const gTot=male+female;
+  const ageTxt=Object.keys(ages).filter(k=>ages[k]>0).map(k=>k+' '+ages[k]+'명').join(' · ');
+  const created=c.createdAt&&c.createdAt.toDate?c.createdAt.toDate().toISOString().slice(0,10):'';
+  return '<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#0f766e">📋 클럽 정보 보기</summary>'
+    +'<div style="font-size:12.5px;color:#4b5563;background:#f6fbf8;border:1px solid #d9ebe2;border-radius:10px;padding:10px 13px;margin-top:6px;line-height:1.9">'
+    +(c.clubType==='external'?'📍 활동 거점: ':'📍 소속·거점: ')+kesc(c.sido||'')+' '+kesc(c.gugun||'')
+    +(c.clubType==='external'&&c.orgName?' · 소속 단체: '+kesc(c.orgName):'')
+    +'<br>👑 클럽장: '+kesc(c.ownerName||'')+((c.temp||c.status==='임시')?' <b style="color:#8a5a00">🧒학생(임시)</b>':' <b style="color:#0f766e">✓성인</b>')
+    +(created?' · 개설일 '+created:'')
+    +'<br>👥 구성원: 총 '+total+'명 (성인 '+adultsOnly.length+' · 유소년 '+kids.length+')'
+    +(ageTxt?'<br>📊 나이대: '+ageTxt+(aged<total?' <span style="color:#8a919d">(미기재 '+(total-aged)+'명 제외)</span>':''):'')
+    +(gTot?'<br>⚖️ 성별: 남 '+Math.round(male/gTot*100)+'% · 여 '+Math.round(female/gTot*100)+'%'+(gTot<total?' <span style="color:#8a919d">(기재 '+gTot+'명 기준)</span>':''):'')
+    +'<br><span style="font-size:11.5px;color:#8a919d">개별 회원 명단은 클럽 회원만 클럽 홈에서 확인할 수 있습니다.</span>'
+    +'</div></details>';
 }
 function ageOf(birth){
   if(!birth)return 0;
@@ -379,7 +418,7 @@ async function tempJoin(id){
       const doc=await tx.get(ref);const c=doc.data();
       if((c.memberUids||[]).indexOf(KME.uid)>=0)throw new Error('이미 소속된 클럽입니다');
       if((c.pendingUids||[]).indexOf(KME.uid)>=0)throw new Error('이미 가입 신청 중입니다');
-      const pj=(c.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',at:new Date().toISOString(),temp:true});
+      const pj=(c.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',gender:KMY.gender||'',birth:KMY.birth||'',at:new Date().toISOString(),temp:true});
       const pu=(c.pendingUids||[]).slice();pu.push(KME.uid);
       tx.update(ref,{pendingJoins:pj,pendingUids:pu});
     });
@@ -410,7 +449,7 @@ async function joinClub(id){
       const doc=await tx.get(ref);const c=doc.data();
       if((c.memberUids||[]).indexOf(KME.uid)>=0)throw new Error('이미 소속된 클럽입니다');
       if((c.pendingUids||[]).indexOf(KME.uid)>=0)throw new Error('이미 가입 신청 중입니다');
-      const pj=(c.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',at:new Date().toISOString()});
+      const pj=(c.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',gender:KMY.gender||'',birth:KMY.birth||'',at:new Date().toISOString()});
       const pu=(c.pendingUids||[]).slice();pu.push(KME.uid);
       tx.update(ref,{pendingJoins:pj,pendingUids:pu});
     });
@@ -528,7 +567,7 @@ async function joinByCode(){
     await DB.runTransaction(async tx=>{
       const ref=DB.collection('clubs').doc(d.id);
       const doc=await tx.get(ref);const cc=doc.data();
-      const pj=(cc.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',code:c.code||norm,at:new Date().toISOString()});
+      const pj=(cc.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',gender:KMY.gender||'',birth:KMY.birth||'',code:c.code||norm,at:new Date().toISOString()});
       const pu=(cc.pendingUids||[]).slice();pu.push(KME.uid);
       tx.update(ref,{pendingJoins:pj,pendingUids:pu});
     });
@@ -611,7 +650,7 @@ async function loadMyClubs(){
       const ownerBtns=isOwner?'<button class="cbtn cbtn-soft" style="padding:4px 12px;font-size:12px" onclick="editMyClub(\''+d.id+'\')">✏️ 수정</button>'
         +'<button class="cbtn" style="padding:4px 12px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="delMyClub(\''+d.id+'\',\''+kesc(c.name)+'\')">🗑 삭제</button>':'';
       return '<div class="clubcard"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+cavHtml(c)+'<span class="cname">'+kesc(c.name)+'</span>'
-        +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'
+        +'<span class="cpill2" style="background:#153A77">'+(c.clubType==='external'?'📍거점 ':'')+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'
         +(c.clubType==='external'?'<span class="cpill2" style="background:#7c3aed" title="타 단체 소속 클럽 — 연맹 정식 클럽이 아닙니다">🔗 타단체'+(c.orgName?': '+kesc(c.orgName):'')+'</span>':'')
         +badge
         +(c.code&&(isOwner||isMember)?'<span class="cpill2" style="background:#b8860b" title="이 코드로 회원을 초대할 수 있습니다">🔑 '+kesc(c.code)+'</span>':'')
@@ -649,7 +688,7 @@ async function approveJoin(id,uid){
       const p=(c.pendingJoins||[]).find(x=>x.uid===uid);
       const members=(c.members||[]).slice();
       const mu=(c.memberUids||[]).slice();
-      if(mu.indexOf(uid)<0){members.push({uid:uid,name:p?p.name:'',at:new Date().toISOString()});mu.push(uid);}
+      if(mu.indexOf(uid)<0){members.push({uid:uid,name:p?p.name:'',gender:(p&&p.gender)||'',birth:(p&&p.birth)||'',at:new Date().toISOString()});mu.push(uid);}
       const tu=(c.tempUids||[]).slice();
       if(p&&p.temp&&tu.indexOf(uid)<0)tu.push(uid);
       tx.update(ref,{members:members,memberUids:mu,tempUids:tu,
@@ -925,7 +964,7 @@ async function loadSidoApprovals(){
       :docs.map(d=>{const c=d.data();
         return '<div class="clubcard" style="margin-bottom:8px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
           +'<span class="cname">'+kesc(c.name)+'</span>'
-          +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'
+          +'<span class="cpill2" style="background:#153A77">'+(c.clubType==='external'?'📍거점 ':'')+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'
           +'<span style="font-size:12px;color:#8a919d">클럽장 '+kesc(c.ownerName||'')+(c.code?' · 코드 '+kesc(c.code):'')+'</span>'
           +'<span style="flex:1"></span>'
           +'<button class="cbtn cbtn-teal" style="padding:5px 14px" onclick="sidoApprove(\''+d.id+'\')">✓ 승인</button>'
