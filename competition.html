@@ -177,6 +177,15 @@ function cesc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;'
 let CME=null,CMY=null,CSLOTS=[];
 const DEFAULT_ROLES={'심판':['심판장','주심','부심','점수심','기록심','선심'],'운영':['경기운영','안전요원','미화요원','홍보요원','시상요원','의전·접수','주차·수송','보조요원'],'참가':['오픈부','여자부','혼성부']};
 const ROLE_COLOR={'심판':'#7c3aed','운영':'#b8860b','참가':'#0f766e'};
+function ageOf(birth){
+  if(!birth)return 0;
+  const t=new Date(birth);
+  if(isNaN(t.getTime()))return 0;
+  const now=new Date();
+  let age=now.getFullYear()-t.getFullYear();
+  if(now.getMonth()<t.getMonth()||(now.getMonth()===t.getMonth()&&now.getDate()<t.getDate())) age--;
+  return age;
+}
 function ckey(c){return c.pid||c.uid}  // 참가는 참가자 단위(pid), 심판·운영은 계정 단위
 // 유효 신청 판정: 신청 횟수 - 취소 횟수 (재신청 허용) — key = 참가자 단위(pid) 또는 계정(uid)
 function activeOfKey(s,key){
@@ -389,7 +398,7 @@ async function openTeamApply(id){
   const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
   const s=doc.data();
   // 인솔자는 성인만 (교사·클럽장·학부모·일반 성인 회원 모두 가능)
-  if(CMY.birth&&(Date.now()-new Date(CMY.birth).getTime())/31557600000<19){
+  if(CMY.birth&&ageOf(CMY.birth)<18){
     alert('👥 팀 신청(인솔자 등록)은 성인 회원만 할 수 있습니다.\n지도교사·클럽장·보호자께 요청해주세요.');return;
   }
   TA_ID=id;TA_ROSTER=[];TA_FILES=[];
@@ -418,7 +427,7 @@ async function openTeamApply(id){
     +'<button type="button" class="cbtn cbtn-soft" id="taLoadClub" style="padding:6px 14px;font-size:12.5px;display:none" onclick="taLoadClubRoster()">📋 클럽 명단 불러오기</button></div>'
     +'<div style="font-size:13px;font-weight:800;margin:14px 0 4px">③ 보호자 동의 (미성년 팀원)</div>'
     +'<div style="background:#fff8ed;border:1.5px solid #ecd9b0;border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.8">'
-    +'만 19세 미만 팀원은 보호자 <b>서면 동의서</b>가 필요합니다. <a href="consent_guardian.html" target="_blank" style="color:#153A77;font-weight:800">📄 동의서 양식 열기·인쇄 →</a><br>'
+    +'만 18세 미만 팀원은 보호자 <b>서면 동의서</b>가 필요합니다. <a href="consent_guardian.html" target="_blank" style="color:#153A77;font-weight:800">📄 동의서 양식 열기·인쇄 →</a><br>'
     +'인솔자가 전원분을 수합·보관하고, 아래에서 사진·스캔본을 업로드해 주세요. <b>지금 없으면 신청 후 [📎 동의서 업로드] 버튼으로 나중에 제출할 수 있습니다.</b>'
     +'<div style="margin-top:7px"><input id="taFiles" type="file" accept="image/*,.pdf" multiple style="font-size:12.5px"></div>'
     +'<label style="display:flex;gap:7px;align-items:flex-start;margin-top:8px;font-weight:800;color:#153A77"><input type="checkbox" id="taPledge" style="width:auto;margin-top:3px"> 인솔자로서 미성년 팀원 전원의 보호자 동의를 받았으며(또는 대회 전까지 수합·제출하며), 명단이 사실임을 확인합니다.</label></div>'
@@ -590,7 +599,7 @@ async function teamConsentUpload(slotId){
 }
 async function openMinorReq(id){
   if(!(CMY&&CMY.guardianUid)){
-    alert('👨‍👧 만 19세 미만은 보호자 승인으로 참가 신청합니다.\n아직 보호자 계정이 연동되지 않았습니다.\n마이페이지 › 보호자 연동(연동 코드)을 먼저 진행해 주세요.');return;
+    alert('👨‍👧 만 18세 미만은 보호자 승인으로 참가 신청합니다.\n아직 보호자 계정이 연동되지 않았습니다.\n마이페이지 › 보호자 연동(연동 코드)을 먼저 진행해 주세요.');return;
   }
   const doc0=CSLOTS.find(d=>d.id===id);const s0=doc0?doc0.data():{};
   if(!confirm('['+(s0.title||'대회')+']\n보호자에게 참가 승인 요청을 보낼까요?\n보호자가 신청서를 확인·서명하면 참가 신청이 완료됩니다.'))return;
@@ -799,8 +808,8 @@ async function openApply(id){
   let inner='';
   if(entry){
     // ── 참가(선수) 신청 — 본인(성인) 또는 자녀 선택, 자녀는 법정대리인(보호자) 서명 동의 ──
-    // 본인이 만 19세 미만이면 보호자 승인 요청으로 전환 (미성년은 보호자 승인·서명으로만 참가)
-    const selfMinor=CMY.birth?((Date.now()-new Date(CMY.birth).getTime())/31557600000<19):false;
+    // 본인이 만 18세 미만이면 보호자 승인 요청으로 전환 (미성년은 보호자 승인·서명으로만 참가)
+    const selfMinor=CMY.birth?(ageOf(CMY.birth)<18):false;
     if(selfMinor&&!FAMREQ){openMinorReq(id);return;}
     const parts=(FAMREQ?[{pid:FAMREQ.childUid,name:FAMREQ.childName||'',label:(FAMREQ.childName||'자녀')+' · 자녀(승인 진행)',birth:FAMREQ.childBirth||'',gender:FAMREQ.childGender||'',school:FAMREQ.childSchool||'',kid:true}]
       :(selfMinor?[]:[{pid:CME.uid+'#self',name:CMY.name||'',label:(CMY.name||'본인')+' · 본인',birth:CMY.birth||'',gender:CMY.gender||'',school:'',kid:false}]))
@@ -813,7 +822,7 @@ async function openApply(id){
       +'<div style="font-size:11.5px;color:#8a919d;text-align:right;margin-bottom:8px">작성일 '+today+' · 자녀는 <a href="mypage.html" style="color:var(--red);font-weight:800">마이페이지 자녀 프로필</a>에서 등록</div>'
       +'<div style="font-size:13px;font-weight:800;margin-bottom:7px">① 참가자 선택</div>'
       +'<div id="cPartBtns" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
-      +(APPLY_PARTS.length?APPLY_PARTS.map((p,i)=>'<button type="button" class="rolechip" data-pid="'+cesc(p.pid)+'" onclick="selPart('+i+')">'+cesc(p.label)+'</button>').join(''):'<span style="font-size:12.5px;color:#C41E2F;font-weight:700">'+(selfMinor?'👨‍👧 만 19세 미만은 본인이 직접 신청할 수 없습니다. 보호자 계정에서 자녀 프로필을 등록해 신청해 주세요.':'신청 가능한 참가자가 없습니다 (전원 신청 완료)')+'</span>')
+      +(APPLY_PARTS.length?APPLY_PARTS.map((p,i)=>'<button type="button" class="rolechip" data-pid="'+cesc(p.pid)+'" onclick="selPart('+i+')">'+cesc(p.label)+'</button>').join(''):'<span style="font-size:12.5px;color:#C41E2F;font-weight:700">'+(selfMinor?'👨‍👧 만 18세 미만은 본인이 직접 신청할 수 없습니다. 보호자 계정에서 자녀 프로필을 등록해 신청해 주세요.':'신청 가능한 참가자가 없습니다 (전원 신청 완료)')+'</span>')
       +'</div>'
       +'<div class="docsec"><div class="dtitle">대 회 참 가 신 청 서</div>'
       +'<table class="itable">'
@@ -950,9 +959,9 @@ function togRole(btn){
 async function submitEntry(){
   const p=APPLY_PARTS.find(x=>x.pid===APPLY_PID);
   if(!p){alert('참가자를 선택해주세요.');return}
-  // 성인 전환 검사 — 자녀 프로필이 만 19세 도달 시 본인 계정으로 활동
-  if(p.kid&&p.birth&&(Date.now()-new Date(p.birth).getTime())/31557600000>=19){
-    alert('🎓 '+p.name+' 님은 만 19세 이상으로 성인 전환 대상입니다.\n본인 명의 계정으로 가입한 뒤 직접 신청해주세요.');return;
+  // 성인 전환 검사 — 자녀 프로필이 만 18세 도달 시 본인 계정으로 활동
+  if(p.kid&&p.birth&&ageOf(p.birth)>=18){
+    alert('🎓 '+p.name+' 님은 만 18세 이상으로 성인 전환 대상입니다.\n본인 명의 계정으로 가입한 뒤 직접 신청해주세요.');return;
   }
   if(!APPLY_SEL.length){alert('참가 부문을 선택해주세요.');return}
   if(!consentGate())return;

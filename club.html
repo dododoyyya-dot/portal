@@ -122,7 +122,6 @@
       <button class="st on" data-s="1" onclick="showClTab('1')">🏠 내 클럽</button>
       <button class="st" data-s="2" onclick="showClTab('2')">🔍 클럽 찾기 · 가입</button>
       <button class="st" data-s="3" onclick="showClTab('3')">➕ 클럽 만들기</button>
-      <button class="st" data-s="4" onclick="showClTab('4')">⚔️ 교류전</button>
     </div>
 
     <div id="clPane1">
@@ -183,22 +182,12 @@
       <label class="clabel" style="margin-top:0">클럽명 <span style="color:#C41E2F">*</span></label>
       <input id="ncName" class="cfield" placeholder="예: 김포 프리버드 얼티미트 클럽">
       <div style="display:flex;gap:10px">
-        <div style="flex:1"><label class="clabel"><span id="ncSidoLbl">소속 시도연맹</span> <span style="color:#C41E2F">*</span></label>
+        <div style="flex:1"><label class="clabel">소속 시도연맹 <span style="color:#C41E2F">*</span></label>
           <select id="ncSido" class="cfield" onchange="fillGugun()"></select></div>
-        <div style="flex:1"><label class="clabel"><span id="ncGugunLbl">거점 시·군·구</span> <span style="color:#C41E2F">*</span></label>
+        <div style="flex:1"><label class="clabel">거점 시·군·구 <span style="color:#C41E2F">*</span></label>
           <select id="ncGugun" class="cfield"><option value="">시도를 먼저 선택</option></select></div>
       </div>
-      <div id="ncBaseNote" style="font-size:12px;color:#8a5a00;background:#fff8ed;border-radius:8px;padding:8px 12px;margin-top:8px">📍 거점은 <b>실제 활동하며 서류(체육회 등록 등)를 제출할 수 있는 시·군·구 한 곳</b>을 선택합니다. "전지역"으로는 등록할 수 없습니다.</div>
-      <div id="ncExtNote" style="display:none;font-size:12px;color:#5b3fa8;background:#f5f0ff;border-radius:8px;padding:8px 12px;margin-top:8px">🔗 타 단체 소속 클럽은 시도연맹에 배속되지 않으며, <b>실제 활동하는 시도·시군구</b>만 입력합니다. 나중에 연맹 정식 클럽으로 전환하면 활동 지역을 기준으로 해당 지역 연맹이 배정됩니다.</div>
-      <label class="clabel">활동 종목 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 복수 선택 가능</span></label>
-      <div id="ncSportsRow" style="display:flex;gap:7px;flex-wrap:wrap;margin-top:6px">
-        <button type="button" class="spbtn" data-v="얼티미트" onclick="toggleSport(this)">🥏 얼티미트</button>
-        <button type="button" class="spbtn" data-v="디스크골프" onclick="toggleSport(this)">⛳ 디스크골프</button>
-        <button type="button" class="spbtn" data-v="원반윷놀이" onclick="toggleSport(this)">🎯 원반윷놀이</button>
-        <button type="button" class="spbtn" data-v="기타" onclick="toggleSport(this)">✏️ 기타 (직접 입력)</button>
-      </div>
-      <input id="ncSportsEtc" class="cfield" placeholder="기타 종목명 직접 입력 (예: 거츠, 프리스타일)" style="display:none;margin-top:7px">
-      <style>.spbtn{padding:8px 14px;border:1.5px solid var(--line,#dfe5ee);background:#fff;border-radius:999px;font-family:inherit;font-size:13px;font-weight:800;color:#4b5563;cursor:pointer;transition:.13s}.spbtn.on{border-color:#1F4E9C;background:#eef3fa;color:#153A77}</style>
+      <div style="font-size:12px;color:#8a5a00;background:#fff8ed;border-radius:8px;padding:8px 12px;margin-top:8px">📍 거점은 <b>실제 활동하며 서류(체육회 등록 등)를 제출할 수 있는 시·군·구 한 곳</b>을 선택합니다. "전지역"으로는 등록할 수 없습니다.</div>
       <div id="ncOrgLine" style="font-size:12.5px;font-weight:800;color:#153A77;margin-top:8px"></div>
       <label class="clabel">클럽 심볼 (엠블럼 · 선택)</label>
       <div style="display:flex;gap:12px;align-items:center;margin-top:5px">
@@ -271,10 +260,7 @@ function fillGugun(){
 }
 function updOrgLine(){
   const s=document.getElementById('ncSido').value,g=document.getElementById('ncGugun').value;
-  const ext=((document.querySelector('input[name="ncType"]:checked')||{}).value||'federation')==='external';
-  document.getElementById('ncOrgLine').textContent=ext
-    ?(s?('활동 지역: '+s+(g?' › '+g:'')):'')
-    :(s?('소속: 대한민국플라잉디스크연맹(KFDF) › '+s+' 연맹'+(g?' › '+g:'')):'');
+  document.getElementById('ncOrgLine').textContent=s?('소속: 대한민국플라잉디스크연맹(KFDF) › '+s+' 연맹'+(g?' › '+g:'')):'';
 }
 function ncTypeChange(){
   const t=(document.querySelector('input[name="ncType"]:checked')||{}).value||'federation';
@@ -283,29 +269,10 @@ function ncTypeChange(){
   const fl=document.getElementById('ncTypeFedLbl'),el2=document.getElementById('ncTypeExtLbl');
   fl.style.borderColor=ext?'#dfe5ee':'#1F4E9C';fl.style.background=ext?'#fff':'#eef3fa';
   el2.style.borderColor=ext?'#7c3aed':'#dfe5ee';el2.style.background=ext?'#f5f0ff':'#fff';
-  // 타 단체 클럽: '소속 시도연맹' 고정 표기 제거 → '활동 시도/시군구' + 연맹 배정 안내
-  document.getElementById('ncSidoLbl').textContent=ext?'활동 시도':'소속 시도연맹';
-  document.getElementById('ncGugunLbl').textContent=ext?'활동 시·군·구':'거점 시·군·구';
-  document.getElementById('ncExtNote').style.display=ext?'block':'none';
-  document.getElementById('ncBaseNote').style.display=ext?'none':'block';
-  updOrgLine();
-}
-// 활동 종목 버튼식 다중선택
-function toggleSport(btn){
-  btn.classList.toggle('on');
-  if(btn.dataset.v==='기타')document.getElementById('ncSportsEtc').style.display=btn.classList.contains('on')?'block':'none';
-}
-function sportsVal(){
-  const arr=[...document.querySelectorAll('#ncSportsRow .spbtn.on')].map(b=>b.dataset.v).filter(v=>v!=='기타');
-  const etc=(document.getElementById('ncSportsEtc').value||'').trim();
-  const etcOn=document.querySelector('#ncSportsRow .spbtn[data-v="기타"]').classList.contains('on');
-  if(etcOn&&etc)arr.push(etc);
-  return arr;
 }
 function showClTab(k){
-  ['1','2','3','4'].forEach(n=>{const p=document.getElementById('clPane'+n);if(p)p.style.display=(n===k?'':'none')});
+  ['1','2','3'].forEach(n=>{const p=document.getElementById('clPane'+n);if(p)p.style.display=(n===k?'':'none')});
   document.querySelectorAll('#clTabs .st').forEach(b=>b.classList.toggle('on',b.dataset.s===k));
-  if(k==='4')loadMatches();
   window.scrollTo({top:0});
 }
 let KME=null,KMY=null,ALLCLUBS=[],SIDO_F='',MYCLUB_CACHE=[];
@@ -359,29 +326,30 @@ function renderClubs(){
       if(st==='member')act='<span class="cpill2" style="background:#0f766e">✓ 소속</span>';
       else if(st==='pending')act='<span class="cpill2" style="background:#b8860b">승인 대기</span>';
       else act='<button class="cbtn cbtn-main" onclick="joinClub(\''+d.id+'\')">본인 가입</button>';
-      // 성인/학생 구분 카운트 — 계정연동형 자녀(memberUids에도 있음)는 중복 계산 제외
-      const _mu=c.memberUids||[];const _kidCids={};(c.childMembers||[]).forEach(k=>_kidCids[k.cid]=1);
-      const _tmp={};(c.tempUids||[]).forEach(u2=>_tmp[u2]=1);
-      const _isStu=m=>{if(_kidCids[m.uid]||_tmp[m.uid])return true;if(m.school)return true;
-        if(m.birth){const a2=(Date.now()-new Date(m.birth).getTime())/31557600000;if(a2>0&&a2<19)return true}return false};
-      const _kidOnly=(c.childMembers||[]).filter(k=>_mu.indexOf(k.cid)<0).length;
-      const _stuN=(c.members||[]).filter(_isStu).length+_kidOnly;
-      const cnt=_mu.length+_kidOnly;const _adN=Math.max(0,cnt-_stuN);
+      const cnt=(c.memberUids||[]).length+((c.childMembers||[]).length);
       return '<div class="clubcard"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+cavHtml(c)+'<a href="clubhome.html?id='+d.id+'" style="text-decoration:none;color:inherit"><span class="cname">'+kesc(c.name)+'</span></a>'
         +(c.status==='임시'?'<span class="cpill2" style="background:#b8860b" title="학생들이 만든 임시클럽 — 성인 회장 인수 후 정식 승인됩니다">🧪 임시클럽</span>':'')
         +(c.clubType==='external'?'<span class="cpill2" style="background:#7c3aed" title="타 단체 소속 클럽 — 연맹 정식 클럽이 아닙니다">🔗 타단체'+(c.orgName?': '+kesc(c.orgName):'')+'</span>':'')
         +'<span class="cpill2" style="background:#153A77">'+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'
-        +((c.sports&&c.sports.length)?c.sports.map(sp=>'<span class="cpill2" style="background:#0f766e">🥏 '+kesc(sp)+'</span>').join(''):'')
-        +'<span style="font-size:12px;color:#8a919d;font-weight:700" title="학생 = 학생선수 계정·연동 자녀·임시회원 기준">회원 '+cnt+'명 (성인 '+_adN+' · 학생 '+_stuN+')</span>'
+        +'<span style="font-size:12px;color:#8a919d;font-weight:700">회원 '+cnt+'명</span>'
         +'<span style="flex:1"></span><a class="cbtn cbtn-soft" style="padding:7px 14px;text-decoration:none;display:inline-block" href="clubhome.html?id='+d.id+'">🏠 클럽 홈</a>'+childJoinBtn(c,d.id)+act+'</div>'
         +(c.intro?'<div class="cmeta2">'+kesc(c.intro)+'</div>':'')
         +(c.rulesText?'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">클럽 내규 보기</summary><div style="font-size:12.5px;color:#4b5563;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:10px 13px;margin-top:6px">'+kesc(c.rulesText)+'</div></details>':'')
         +'</div>';
     }).join('');
 }
+function ageOf(birth){
+  if(!birth)return 0;
+  const t=new Date(birth);
+  if(isNaN(t.getTime()))return 0;
+  const now=new Date();
+  let age=now.getFullYear()-t.getFullYear();
+  if(now.getMonth()<t.getMonth()||(now.getMonth()===t.getMonth()&&now.getDate()<t.getDate())) age--;
+  return age;
+}
 function isMinorSelf(){
   const b=KMY&&KMY.birth;if(!b)return false;
-  return (Date.now()-new Date(b).getTime())/31557600000 < 19;
+  return ageOf(b) < 18;
 }
 // 미성년 계정: 클럽 가입은 보호자 승인 요청 → 보호자가 마이페이지에서 승인 시 접수
 async function requestGuardianJoin(id){
@@ -396,7 +364,7 @@ async function requestGuardianJoin(id){
     const dup=await DB.collection('familyRequests').where('childUid','==',KME.uid).where('targetId','==',id).where('status','==','대기').get();
     if(!dup.empty)throw new Error('이미 보호자 승인 대기 중입니다');
     await DB.collection('familyRequests').add({kind:'club',targetId:id,targetName:cname,
-      childUid:KME.uid,childName:KMY.name||'',childBirth:KMY.birth||'',childGender:KMY.gender||'',childSchool:KMY.school||'',
+      childUid:KME.uid,childName:KMY.name||'',childBirth:KMY.birth||'',childSchool:KMY.school||'',
       guardianUid:KMY.guardianUid,status:'대기',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
     KFDF.notify(KMY.guardianUid,'👨‍👧 '+(KMY.name||'자녀')+' — ['+cname+'] 클럽 가입 승인 요청','mypage.html#famReqBox');
     alert('✓ 보호자에게 승인 요청을 보냈습니다.\n보호자가 승인하면 클럽장 승인 절차로 넘어갑니다.');
@@ -410,7 +378,7 @@ async function tempJoin(id){
       const doc=await tx.get(ref);const c=doc.data();
       if((c.memberUids||[]).indexOf(KME.uid)>=0)throw new Error('이미 소속된 클럽입니다');
       if((c.pendingUids||[]).indexOf(KME.uid)>=0)throw new Error('이미 가입 신청 중입니다');
-      const pj=(c.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',birth:KMY.birth||'',gender:KMY.gender||'',school:KMY.school||'',at:new Date().toISOString(),temp:true});
+      const pj=(c.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',at:new Date().toISOString(),temp:true});
       const pu=(c.pendingUids||[]).slice();pu.push(KME.uid);
       tx.update(ref,{pendingJoins:pj,pendingUids:pu});
     });
@@ -441,7 +409,7 @@ async function joinClub(id){
       const doc=await tx.get(ref);const c=doc.data();
       if((c.memberUids||[]).indexOf(KME.uid)>=0)throw new Error('이미 소속된 클럽입니다');
       if((c.pendingUids||[]).indexOf(KME.uid)>=0)throw new Error('이미 가입 신청 중입니다');
-      const pj=(c.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',birth:KMY.birth||'',gender:KMY.gender||'',school:KMY.school||'',at:new Date().toISOString()});
+      const pj=(c.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',at:new Date().toISOString()});
       const pu=(c.pendingUids||[]).slice();pu.push(KME.uid);
       tx.update(ref,{pendingJoins:pj,pendingUids:pu});
     });
@@ -489,7 +457,7 @@ async function doChildJoin(id,cid){
       if((c.childMembers||[]).some(m=>m.cid===cid))throw new Error('이미 소속된 자녀입니다');
       if((c.childPending||[]).some(m=>m.cid===cid))throw new Error('이미 신청 중입니다');
       const cp=(c.childPending||[]).slice();
-      cp.push({parentUid:KME.uid,parentName:KMY.name||'',cid:cid,name:k.name||'',birth:k.birth||'',gender:k.gender||'',school:k.school||'',at:new Date().toISOString()});
+      cp.push({parentUid:KME.uid,parentName:KMY.name||'',cid:cid,name:k.name||'',birth:k.birth||'',school:k.school||'',at:new Date().toISOString()});
       tx.update(ref,{childPending:cp});
     });
     closeModal();alert('✓ '+k.name+' 가입 신청 완료 — 클럽장 승인 후 소속으로 표시됩니다.');
@@ -504,7 +472,7 @@ async function approveChild(id,cid){
       const ref=DB.collection('clubs').doc(id);const doc=await tx.get(ref);const c=doc.data();
       const p=(c.childPending||[]).find(x=>x.cid===cid);if(!p)return;
       const cm=(c.childMembers||[]).slice();
-      if(!cm.some(x=>x.cid===cid))cm.push({parentUid:p.parentUid,parentName:p.parentName||'',cid:cid,name:p.name||'',birth:p.birth||'',gender:p.gender||'',school:p.school||'',at:new Date().toISOString()});
+      if(!cm.some(x=>x.cid===cid))cm.push({parentUid:p.parentUid,parentName:p.parentName||'',cid:cid,name:p.name||'',birth:p.birth||'',school:p.school||'',at:new Date().toISOString()});
       const upd={childMembers:cm,childPending:(c.childPending||[]).filter(x=>x.cid!==cid)};
       // 계정 연동형 미성년 회원은 memberUids/members에도 등록 — 클럽 미니페이지 등 회원 전용 기능 이용 가능하도록
       if(isAcctLinked && !(c.memberUids||[]).includes(cid)){
@@ -539,7 +507,7 @@ async function removeChildMember(id,cid,nm){
 }
 async function joinByCode(){
   const m=document.getElementById('codeMsg');
-  if(isMinorSelf()){m.textContent='만 19세 미만은 클럽 찾기에서 [가입] 클릭 → 보호자 승인 요청으로 가입해 주세요';m.style.color='#C41E2F';return}
+  if(isMinorSelf()){m.textContent='만 18세 미만은 클럽 찾기에서 [가입] 클릭 → 보호자 승인 요청으로 가입해 주세요';m.style.color='#C41E2F';return}
   const code=document.getElementById('codeInput').value.trim().toUpperCase();
   if(!code){m.textContent='코드를 입력하세요';m.style.color='#C41E2F';return}
   // '-'·공백 유무, 자릿수(앞자리 0)와 무관하게 인식 — 후보 코드를 모두 조회
@@ -559,7 +527,7 @@ async function joinByCode(){
     await DB.runTransaction(async tx=>{
       const ref=DB.collection('clubs').doc(d.id);
       const doc=await tx.get(ref);const cc=doc.data();
-      const pj=(cc.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',birth:KMY.birth||'',gender:KMY.gender||'',school:KMY.school||'',code:c.code||norm,at:new Date().toISOString()});
+      const pj=(cc.pendingJoins||[]).slice();pj.push({uid:KME.uid,name:KMY.name||'',code:c.code||norm,at:new Date().toISOString()});
       const pu=(cc.pendingUids||[]).slice();pu.push(KME.uid);
       tx.update(ref,{pendingJoins:pj,pendingUids:pu});
     });
@@ -680,7 +648,7 @@ async function approveJoin(id,uid){
       const p=(c.pendingJoins||[]).find(x=>x.uid===uid);
       const members=(c.members||[]).slice();
       const mu=(c.memberUids||[]).slice();
-      if(mu.indexOf(uid)<0){members.push({uid:uid,name:p?p.name:'',birth:(p&&p.birth)||'',gender:(p&&p.gender)||'',school:(p&&p.school)||'',at:new Date().toISOString()});mu.push(uid);}
+      if(mu.indexOf(uid)<0){members.push({uid:uid,name:p?p.name:'',at:new Date().toISOString()});mu.push(uid);}
       const tu=(c.tempUids||[]).slice();
       if(p&&p.temp&&tu.indexOf(uid)<0)tu.push(uid);
       tx.update(ref,{members:members,memberUids:mu,tempUids:tu,
@@ -762,7 +730,7 @@ async function createClub(){
   const m=document.getElementById('ncMsg');
   let TEMP_CLUB=false;
   if(isMinorSelf()){
-    if(!confirm('🧒 만 19세 미만은 [임시클럽]으로 개설됩니다.\n\n· 임시클럽: 학생들끼리 모여 클럽홈·담벼락을 쓸 수 있는 클럽 (정식 승인 전 — 대회 참가·체육회 등록 불가)\n· 성인 회원(보호자·지도자)이 가입한 뒤 회장직을 넘겨받고 연맹 승인을 받으면 정식 클럽이 됩니다.\n\n임시클럽으로 만들까요?'))return;
+    if(!confirm('🧒 만 18세 미만은 [임시클럽]으로 개설됩니다.\n\n· 임시클럽: 학생들끼리 모여 클럽홈·담벼락을 쓸 수 있는 클럽 (정식 승인 전 — 대회 참가·체육회 등록 불가)\n· 성인 회원(보호자·지도자)이 가입한 뒤 회장직을 넘겨받고 연맹 승인을 받으면 정식 클럽이 됩니다.\n\n임시클럽으로 만들까요?'))return;
     TEMP_CLUB=true;
   }
   const name=document.getElementById('ncName').value.trim();
@@ -782,7 +750,7 @@ async function createClub(){
       rulesText:document.getElementById('ncRules').value.trim(),
       ownerUid:KME.uid,ownerName:KMY.name||'',
       status:TEMP_CLUB?'임시':'대기',temp:TEMP_CLUB,hidden:ncType==='external',code:code,
-      clubType:ncType,orgName:orgName,sports:sportsVal(),
+      clubType:ncType,orgName:orgName,
       members:[{uid:KME.uid,name:KMY.name||'',at:new Date().toISOString()}],
       memberUids:[KME.uid],pendingJoins:[],pendingUids:[],
       createdAt:firebase.firestore.FieldValue.serverTimestamp()});
@@ -815,11 +783,6 @@ function editMyClub(id){
     +'<div style="flex:1"><input type="file" id="mcSymbol" accept="image/*" onchange="previewSymbol(this,\'mcSymPrev\')" style="font-size:13px">'
     +'<div style="font-size:11.5px;color:#8a919d;margin-top:3px">정사각형 이미지 권장 · 자동 압축 (2MB 이하)</div></div></div>'
     +'<label class="clabel">클럽명</label><input id="mcName" class="cfield" value="'+kesc(c.name||'')+'">'
-    +'<label class="clabel">활동 종목 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 복수 선택</span></label>'
-    +'<div id="mcSportsRow" style="display:flex;gap:7px;flex-wrap:wrap;margin-top:6px">'
-    +['얼티미트','디스크골프','원반윷놀이'].map(s2=>'<button type="button" class="spbtn'+((c.sports||[]).indexOf(s2)>=0?' on':'')+'" data-v="'+s2+'" onclick="this.classList.toggle(\'on\')">'+s2+'</button>').join('')
-    +'<button type="button" class="spbtn'+((c.sports||[]).some(s2=>['얼티미트','디스크골프','원반윷놀이'].indexOf(s2)<0)?' on':'')+'" data-v="기타" onclick="this.classList.toggle(\'on\');document.getElementById(\'mcSportsEtc\').style.display=this.classList.contains(\'on\')?\'block\':\'none\'">기타</button></div>'
-    +'<input id="mcSportsEtc" class="cfield" placeholder="기타 종목명 직접 입력" value="'+kesc(((c.sports||[]).filter(s2=>['얼티미트','디스크골프','원반윷놀이'].indexOf(s2)<0)[0])||'')+'" style="'+((c.sports||[]).some(s2=>['얼티미트','디스크골프','원반윷놀이'].indexOf(s2)<0)?'':'display:none;')+'margin-top:7px">'
     +'<label class="clabel">클럽 소개</label><input id="mcIntro" class="cfield" value="'+kesc(c.intro||'')+'">'
     +'<label class="clabel">클럽 내규</label><textarea id="mcRules" class="cfield" rows="6">'+kesc(c.rulesText||'')+'</textarea>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
@@ -834,14 +797,6 @@ async function saveMyClub(id){
     const upd={name:name,
       intro:document.getElementById('mcIntro').value.trim(),
       rulesText:document.getElementById('mcRules').value.trim()};
-    // 활동 종목 (버튼 다중선택 + 기타 직접입력)
-    (function(){
-      const arr=[...document.querySelectorAll('#mcSportsRow .spbtn.on')].map(b=>b.dataset.v).filter(v=>v!=='기타');
-      const etcOn=(document.querySelector('#mcSportsRow .spbtn[data-v="기타"]')||{classList:{contains:()=>false}}).classList.contains('on');
-      const etc=(document.getElementById('mcSportsEtc')?document.getElementById('mcSportsEtc').value:'').trim();
-      if(etcOn&&etc)arr.push(etc);
-      upd.sports=arr;
-    })();
     const sf=document.getElementById('mcSymbol')&&document.getElementById('mcSymbol').files[0];
     if(sf)upd.symbol=await uploadClubSymbol(id,sf);
     await DB.collection('clubs').doc(id).update(upd);
@@ -1018,7 +973,7 @@ async function cancelHandover(id){
   catch(e){alert('취소 실패: '+e.message)}
 }
 async function acceptHandover(id,name){
-  if(isMinorSelf()){alert('🔞 클럽장(회장)은 만 19세 이상 성인만 맡을 수 있습니다.');return}
+  if(isMinorSelf()){alert('🔞 클럽장(회장)은 만 18세 이상 성인만 맡을 수 있습니다.');return}
   if(!confirm('['+name+'] 클럽의 회장을 맡을까요?\n수락하면 클럽이 [연맹 승인 대기] 상태로 전환되고, 승인되면 정식 클럽이 됩니다.'))return;
   try{
     await DB.collection('clubs').doc(id).update({
