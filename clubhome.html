@@ -239,9 +239,17 @@ function renderHeader(){
   document.getElementById('chHeader').innerHTML=
     '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">'+cavHtml(c)
     +'<div style="flex:1;min-width:180px"><div class="cname" style="font-size:19px;font-weight:900">'+kesc(c.name)+'</div>'
-    +'<div style="font-size:12.5px;color:#8a919d;margin-top:3px">'+kesc(c.sido)+' '+kesc(c.gugun||'')+' · 회원 '+cnt+'명'+(c.code&&CH_IS_MEMBER?' · 🔑 초대코드 '+kesc(c.code):'')+'</div></div>'
+    +'<div style="font-size:12.5px;color:#8a919d;margin-top:3px">'+kesc(c.sido)+' '+kesc(c.gugun||'')+' · 회원 '+cnt+'명'+(c.code&&CH_IS_MEMBER?' · 🔑 초대코드 '+kesc(c.code):'')
+    +'<br>👑 클럽장: <b style="color:#374151">'+kesc(c.ownerName||'')+'</b> '
+    +((c.temp||c.status==='임시')
+      ?'<span style="background:#fdf6e3;color:#8a5a00;border:1px solid #ecd9b0;border-radius:999px;padding:1px 9px;font-size:11px;font-weight:900">🧒 학생 (임시 클럽장)</span>'
+      :'<span style="background:#eafaf3;color:#0f766e;border:1px solid #bfe3d4;border-radius:999px;padding:1px 9px;font-size:11px;font-weight:900">✓ 성인</span>')
+    +'</div></div>'
     +(CH_IS_OWNER?'<span class="cpill2" style="background:#C41E2F">클럽장</span>':CH_IS_MEMBER?'<span class="cpill2" style="background:#0f766e">✓ 소속 회원</span>':'')
     +'</div>'
+    +(((c.temp||c.status==='임시')&&CH_IS_MEMBER&&!CH_IS_OWNER&&ageOf(CHMY.birth)>=18)
+      ?'<div style="margin-top:12px;background:#fdf6e3;border:1.5px solid #ecd9b0;border-radius:12px;padding:12px 15px;font-size:13px;line-height:1.7"><b style="color:#8a5a00">👑 이 클럽은 학생이 임시로 운영 중입니다.</b><br>성인 회원은 클럽장 인계를 신청할 수 있습니다. 관리자(연맹) 승인 시 클럽장이 인계되고 정식 클럽 전환 절차가 시작됩니다.<br><button class="cbtn cbtn-main" style="margin-top:8px;padding:8px 18px;font-size:13px" onclick="requestClubTransfer()">👑 클럽장 인계 신청</button><span id="ctMsg" style="font-size:12.5px;font-weight:800;margin-left:8px"></span></div>'
+      :'')
     +(c.intro?'<div style="font-size:13.5px;color:#374151;margin-top:12px;line-height:1.6">'+kesc(c.intro)+'</div>':'')
     +(c.rulesText?'<details style="margin-top:10px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">클럽 내규 보기</summary><div style="font-size:12.5px;color:#4b5563;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:10px 13px;margin-top:6px">'+kesc(c.rulesText)+'</div></details>':'');
 }
@@ -307,8 +315,12 @@ function renderMembers(){
     return;
   }
 
-  let html='<div style="margin-bottom:6px"><b style="font-size:12.5px;color:#374151">성인 회원 ('+adults.length+'명)</b></div>';
-  html+=adults.length?adults.map(m=>'<span class="memchip"><span class="dot">'+kesc((m.name||'?').charAt(0))+'</span>'+kesc(m.name||'')+(m.uid===c.ownerUid?' <b style="color:#C41E2F">· 클럽장</b>':'')+'</span>').join(''):'<span style="font-size:12.5px;color:#8a919d">없음</span>';
+  const tempSet=new Set(c.tempUids||[]);
+  let html='<div style="margin-bottom:6px"><b style="font-size:12.5px;color:#374151">회원 ('+adults.length+'명)</b> <span style="font-size:11px;color:#8a919d">— 🔗 보호자연동 완료 · ⚠️ 보호자 미연동(임시회원)</span></div>';
+  html+=adults.length?adults.map(m=>'<span class="memchip"><span class="dot">'+kesc((m.name||'?').charAt(0))+'</span>'+kesc(m.name||'')
+    +(m.uid===c.ownerUid?' <b style="color:#C41E2F">· 클럽장'+((c.temp||c.status==='임시')?'(학생·임시)':'')+'</b>':'')
+    +(tempSet.has(m.uid)?' <b style="color:#b8860b;font-size:11px">⚠️ 보호자 미연동</b>':'')
+    +'</span>').join(''):'<span style="font-size:12.5px;color:#8a919d">없음</span>';
   if(kids.length){
     const groups={};   // 정규화 키 → {label, list}
     kids.forEach(k=>{
@@ -320,13 +332,31 @@ function renderMembers(){
     Object.keys(groups).sort((a,b)=>groups[a].label.localeCompare(groups[b].label,'ko')).forEach(key=>{
       const g=groups[key];
       html+='<div class="schoolgrp"><h4>🏫 '+kesc(g.label)+' ('+g.list.length+'명)</h4>'
-        +g.list.map(k=>'<span class="memchip"><span class="dot">'+kesc((k.name||'?').charAt(0))+'</span>'+kesc(k.name||'')+'</span>').join('')
+        +g.list.map(k=>'<span class="memchip"><span class="dot">'+kesc((k.name||'?').charAt(0))+'</span>'+kesc(k.name||'')+' <b style="color:#0f766e;font-size:11px" title="보호자 계정을 통해 등록·승인된 자녀 회원">🔗</b></span>').join('')
         +'</div>';
     });
   }
   el.innerHTML=html;
 }
 
+// ── 클럽장 인계 신청 (성인 회원 → 관리자 승인 시 인계) ──
+async function requestClubTransfer(){
+  const m=document.getElementById('ctMsg');
+  if(ageOf(CHMY.birth)<18){alert('🔞 클럽장(회장)은 만 18세 이상 성인만 맡을 수 있습니다.');return}
+  if(!confirm('['+(CCLUB.name||'')+'] 클럽의 클럽장 인계를 신청할까요?\n관리자(연맹) 승인 시 클럽장이 본인으로 변경되고 정식 클럽 전환 절차가 시작됩니다.'))return;
+  try{
+    const dup=await DB.collection('clubTransfers').where('clubId','==',CID).where('toUid','==',CHME.uid).where('status','==','대기').get();
+    if(!dup.empty){if(m){m.textContent='⏳ 이미 신청됨 — 관리자 승인 대기 중';m.style.color='#b8860b'}return}
+    await DB.collection('clubTransfers').add({
+      clubId:CID,clubName:CCLUB.name||'',
+      fromUid:CCLUB.ownerUid||'',fromName:CCLUB.ownerName||'',
+      toUid:CHME.uid,toName:CHMY.name||'',toBirth:CHMY.birth||'',
+      status:'대기',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    KFDF.notify(CCLUB.ownerUid,'👑 '+(CHMY.name||'')+' 님(성인)이 ['+(CCLUB.name||'')+'] 클럽장 인계를 신청했습니다 — 관리자 승인 대기','clubhome.html?id='+CID);
+    if(m){m.textContent='✓ 신청 완료 — 관리자 승인 대기';m.style.color='#0f766e'}
+    alert('✓ 인계 신청이 접수되었습니다.\n관리자(연맹) 승인 후 클럽장이 인계됩니다.');
+  }catch(e){if(m){m.textContent='신청 실패: '+e.message;m.style.color='#C41E2F'}else alert('신청 실패: '+e.message)}
+}
 // ── 모임공고 (clubPosts) ──
 let CH_POSTS=[];
 async function loadPosts(){
