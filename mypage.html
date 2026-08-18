@@ -942,6 +942,7 @@ function renderKids(){
     :kids.map((k,i)=>{
       const age=k.birth?ageOf(k.birth):0;
       const adult=age>=18;
+      const hist=(k.schoolHistory||[]).map(h=>String(h.school||'').replace(/</g,'&lt;')+' ('+String(h.at||'').slice(0,10)+')').join(' → ');
       return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#f6f8fb;border-radius:10px;padding:9px 13px;margin-bottom:6px;font-size:13.5px">'
       +'<b>'+String(k.name||'').replace(/</g,'&lt;')+'</b>'
       +'<span style="color:#666">'+String(k.birth||'')+' · '+String(k.gender||'-')+(k.school?' · '+String(k.school).replace(/</g,'&lt;'):'')+'</span>'
@@ -949,7 +950,9 @@ function renderKids(){
         :'<span style="font-size:11.5px;color:#0f766e;font-weight:800">보호자 동의 '+(k.consentAt?String(k.consentAt).slice(0,10):'')+' ✓</span>')
       +'<span style="flex:1"></span>'
       +'<button class="btn-sub" style="background:#fff;color:#153A77;border:1.5px solid #153A77;padding:4px 12px;font-size:12px" onclick="editKid('+i+')">✏️ 수정</button>'
-      +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F;padding:4px 12px;font-size:12px" onclick="delKid('+i+')">삭제</button></div>'}).join('');
+      +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F;padding:4px 12px;font-size:12px" onclick="delKid('+i+')">삭제</button>'
+      +(hist?'<div style="width:100%;font-size:11.5px;color:#8a919d;margin-top:4px">📚 학교 이력: '+hist+'</div>':'')
+      +'</div>'}).join('');
 }
 // 자녀 정보 수정 — 진학·전학 시 소속 학교 변경 (초→중→고, 미변경 시 그대로 유지)
 async function editKid(i){
@@ -957,7 +960,18 @@ async function editKid(i){
   const k=kids[i];if(!k)return;
   const nv=prompt('['+k.name+'] 소속 학교·학년 변경\n(진학·전학 시 새 학교로 바꿔주세요. 예: ○○중학교 1학년)\n\n현재: '+(k.school||'미입력'),k.school||'');
   if(nv===null)return;
-  kids[i]=Object.assign({},k,{school:nv.trim(),schoolNorm:normSchool(nv.trim())});
+  const old=k.school||'';
+  const changed=nv.trim()!==old;
+  const hist=(k.schoolHistory||[]).slice();
+  if(changed && old){
+    hist.push({school:old, at:new Date().toISOString()});
+  }
+  kids[i]=Object.assign({},k,{
+    school:nv.trim(),
+    schoolNorm:normSchool(nv.trim()),
+    schoolHistory:hist,
+    updatedAt:new Date().toISOString()
+  });
   try{
     await DB.collection('users').doc(AUTH.currentUser.uid).update({children:kids});
     MYD.children=kids;renderKids();
