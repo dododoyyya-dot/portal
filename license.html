@@ -312,7 +312,7 @@ AUTH.onAuthStateChanged(async u=>{
 });
 
 // ── 공고 ──
-let APPCNT={};
+let APPCNT={},APPFEE={};
 async function loadNotices(){
   const el=document.getElementById('ntList');
   try{
@@ -329,14 +329,20 @@ async function loadNotices(){
       return CENTRAL||MFEDS.indexOf(n.sido)>=0;
     });
     if(!visible.length){el.innerHTML='<div class="bempty">현재 게시된 공고가 없습니다. 검정·갱신교육 일정이 확정되면 이곳에 공고됩니다.</div>';return}
-    // 관리자: 공고별 신청 수 집계 (1쿼리)
-    APPCNT={};
+    // 관리자: 공고별 신청 수/납부액 집계 (1쿼리, 삭제/취소 제외)
+    APPCNT={}; APPFEE={};
     if(ISMGR){
       try{
         let asnap;
         if(CENTRAL)asnap=await DB.collection('licenseApps').get();
         else asnap=await DB.collection('licenseApps').where('sido','in',MFEDS.length?MFEDS:['-']).get();
-        asnap.forEach(a=>{const nid=a.data().noticeId;if(nid)APPCNT[nid]=(APPCNT[nid]||0)+1});
+        asnap.forEach(a=>{
+          const ad=a.data();
+          if(ad.deleted || ad.status==='취소' || ad.status==='삭제') return;
+          const nid=ad.noticeId; if(!nid) return;
+          APPCNT[nid]=(APPCNT[nid]||0)+1;
+          APPFEE[nid]=(APPFEE[nid]||0)+(Number(ad.totalFee)||0);
+        });
       }catch(e){console.warn('cnt',e)}
     }
     el.innerHTML=visible.map(d=>{
@@ -363,7 +369,7 @@ async function loadNotices(){
         +((mine||CENTRAL)&&n.reportStatus==='보완요청'&&n.reportRemand?'<br><span style="color:#C41E2F;font-weight:700">✏️ 보고 보완요청: '+esc(n.reportRemand)+'</span>':'')
         +'</div></div>'
         +'<div class="ntacts">'
-        +(ISMGR&&(mine||CENTRAL)?'<span class="lctag" style="background:#153A77;font-size:12px">👥 신청 '+(APPCNT[d.id]||0)+'명</span> <button class="lcbtn b" onclick="gotoApps(\''+d.id+'\')">📋 신청현황</button>':'')
+        +(ISMGR&&(mine||CENTRAL)?'<span class="lctag" style="background:#153A77;font-size:12px">👥 신청 '+(APPCNT[d.id]||0)+'명'+(APPFEE[d.id]?' · 총 '+Number(APPFEE[d.id]).toLocaleString('ko-KR')+'원':'')+'</span> <button class="lcbtn b" onclick="gotoApps(\''+d.id+'\')">📋 신청현황</button>':'')
         +(approved&&!closed?'<button class="lcbtn d" onclick="applyNotice(\''+d.id+'\')">신청하기</button>':'')
         // 중앙: 승인·반려
         +((!approved&&CENTRAL&&ISMGR&&n.approval==='대기')?'<button class="lcbtn s" onclick="approveNotice(\''+d.id+'\')">✅ 승인 게시</button><button class="lcbtn d" onclick="remandNotice(\''+d.id+'\')">반려</button>':'')
@@ -930,7 +936,8 @@ async function loadApps(){
     snap=await DB.collection('licenseApps').where('noticeId','==',nid).get();
     LAPPS=snap.docs.filter(d=>!d.data().deleted);
   }
-  document.getElementById('apCount').textContent=LAPPS.length+'명 신청';
+  const apFee=LAPPS.reduce((n,d)=>n+(Number(d.data().totalFee)||0),0);
+  document.getElementById('apCount').textContent=LAPPS.length+'명 신청'+(apFee?' · 총 '+apFee.toLocaleString('ko-KR')+'원':'');
   if(!LAPPS.length){el.innerHTML='<div class="bempty">신청자가 없습니다.</div>';return}
   const stc={'접수':'#b8860b','접수완료':'#8a919d','합격':'#1F4E9C','발급완료':'#0f766e','불합격':'#C41E2F'};
   const stl={'접수':'신청 접수','접수완료':'시도 1차 검토 완료','합격':'중앙 최종 발급 승인','불합격':'심사 반려','발급완료':'발급 완료'};
@@ -1017,7 +1024,8 @@ async function delLicApp(id){
   if(!confirm('신청 내역을 휴지통으로 이동합니다 (7일 후 자동 완전삭제, 그 전 복구 가능 — 관리자 페이지 > 강습 신청 관리 > 🗑 휴지통).\n'+a.name+' · '+a.target+' '+a.grade+'급 ('+(a.status||'')+')\n\n※ 이미 발급된 자격(대장)은 삭제되지 않습니다.'))return;
   try{
     await DB.collection('licenseApps').doc(id).update({deleted:true,deletedAt:firebase.firestore.FieldValue.serverTimestamp(),delBy:(firebase.auth().currentUser||{}).email||''});
-    loadApps();
+    await loadApps();
+    await loadNotices(); // 공고별 신청 집계 즉시 갱신
   }catch(e){alert('실패: '+e.message+'\n(신청 삭제는 중앙 관리자만 가능합니다)')}
 }
 // ── 신청 건 타 연맹 이관 (특별한 경우 — 이관 즉시 해당 연맹 관할로 넘어감) ──

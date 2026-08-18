@@ -396,13 +396,19 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
 <script>
 let USERS=[];
 let IS_OWNER=false,VIEWER_IS_ADMIN=false;
+let CMY=null,IS_SIDO=false;
 AUTH.onAuthStateChanged(async u=>{
   if(!u){document.getElementById('deny').style.display='block';return}
   const me=await DB.collection('users').doc(u.uid).get();
-  // 겸직(roles 배열) 계정도 중앙관리자 권한으로 접근 허용
-  if(!me.exists||!hasRole(me.data(),'admin')){document.getElementById('deny').style.display='block';return}
-  IS_OWNER=me.data().owner===true;
-  VIEWER_IS_ADMIN=true;
+  const md=me.data()||{};
+  const isAdmin=hasRole(md,'admin');
+  const isSido=hasRole(md,'sidoOfficer');
+  // 중앙관리자 또는 시도연맹 임원만 접근
+  if(!me.exists||(!isAdmin&&!isSido)){document.getElementById('deny').style.display='block';return}
+  CMY=md;
+  IS_SIDO=isSido&&!isAdmin;
+  IS_OWNER=md.owner===true;
+  VIEWER_IS_ADMIN=isAdmin;
   document.getElementById('adminBody').style.display='block';loadDash();
   loadUsers();
   loadExtClubMap().then(renderUsers).catch(()=>{});
@@ -437,12 +443,17 @@ function appFilter(f,btn){
 }
 async function loadApps(){
   const snap=await DB.collection('schoolApplications').orderBy('createdAt','desc').get();
-  TRASH.apps=snap.docs.filter(d=>d.data().deleted);
-  APPS=snap.docs.filter(d=>!d.data().deleted);
+  TRASH.apps=snap.docs.filter(d=>{const s=d.data();return s.deleted&&sameSidoApp(s);});
+  APPS=snap.docs.filter(d=>{const s=d.data();return !s.deleted&&sameSidoApp(s);});
   try{const g=await DB.collection('goodsConfirms').get();window.GOODS={};g.docs.forEach(x=>window.GOODS[x.id]=x.data());}catch(e){window.GOODS={};}
   renderApps();
 }
 const SIDO_ALIAS={'서울':['서울'],'인천':['인천'],'경기':['경기'],'강원':['강원'],'대전':['대전'],'세종':['세종'],'충북':['충북','충청북도'],'충남':['충남','충청남도'],'광주':['광주'],'전북':['전북','전라북도'],'전남':['전남','전라남도'],'부산':['부산'],'대구':['대구'],'울산':['울산'],'경북':['경북','경상북도'],'경남':['경남','경상남도'],'제주':['제주'],'전남광주':['광주','전남','전라남도','전남광주']};
+function inSido(str,sido){ const A=SIDO_ALIAS[sido]||[sido]; const s=String(str||''); return A.some(a=>s.indexOf(a)>=0); }
+function sameSidoUser(v){ return !IS_SIDO || inSido(v.sido,CMY.sido) || inSido(v.baseCity,CMY.sido) || inSido(v.region,CMY.sido) || inSido((v.activityRegions||[]).join(' '),CMY.sido); }
+function sameSidoApp(s){ return !IS_SIDO || inSido(s.sido,CMY.sido) || inSido(s.city,CMY.sido) || inSido(s.school,CMY.sido) || inSido(s.region,CMY.sido); }
+function sameSidoClub(c){ return !IS_SIDO || inSido(c.sido,CMY.sido); }
+function sameSidoComp(s){ return !IS_SIDO || inSido(s.sido,CMY.sido) || inSido(s.region,CMY.sido) || inSido(s.bySido,CMY.sido); }
 
 // ── 권역 보정: region 미저장·비표준(극초반 신청)은 주소로 자동 판정 ──
 const KFDF_REGIONS=['서울·경기','강원','충청','전라','경상','제주'];
@@ -1677,8 +1688,8 @@ function uMatch(v){
 }
 async function loadUsers(){
   const snap=await DB.collection('users').orderBy('createdAt','desc').get();
-  TRASH.users=snap.docs.filter(d=>d.data().deleted);
-  USERS=snap.docs.filter(d=>!d.data().deleted);
+  TRASH.users=snap.docs.filter(d=>{const v=d.data();return v.deleted&&sameSidoUser(v);});
+  USERS=snap.docs.filter(d=>{const v=d.data();return !v.deleted&&sameSidoUser(v);});
   renderUsers();
 }
 function renderInstTable(docs){
@@ -2459,7 +2470,7 @@ function compActiveClaims(s){
 }
 async function loadCompsAdmin(){
   const snap=await DB.collection('compSlots').orderBy('date').limit(100).get();
-  CADM=snap.docs;
+  CADM=snap.docs.filter(d=>sameSidoComp(d.data()));
   renderCompsAdmin();
   loadCompMasters().catch(()=>{});
   loadCompSettings().catch(()=>{});
@@ -2472,7 +2483,10 @@ let CMASTERS=[];
 async function loadCompMasters(){
   const el=document.getElementById('compMasterList');if(!el)return;
   const snap=await DB.collection('competitions').orderBy('dateStart','desc').limit(30).get().catch(()=>null);
-  CMASTERS=snap?snap.docs:[];
+  CMASTERS=snap?snap.docs.filter(d=>{
+    const c=d.data();
+    return !IS_SIDO || c.byUid===CMY.uid || sameSidoComp(c);
+  }):[];
   if(!CMASTERS.length){el.innerHTML='<div style="font-size:12.5px;color:#8a919d">등록된 대회가 없습니다. [+ 새 대회 등록]으로 시작하세요.</div>';return}
   el.innerHTML=CMASTERS.map(d=>{
     const c=d.data();
@@ -2556,6 +2570,7 @@ async function saveCompMaster(editId){
   const v=id=>{const e=document.getElementById(id);return e?(e.value||'').trim():''};
   const title=v('cwTitle'),d1=v('cwD1'),place=v('cwPlace'),sido=v('cwSido');
   if(!title||!d1||!place||!sido){alert('대회명·시작일·장소·시도를 입력해주세요.');return}
+  if(IS_SIDO && sido!==CMY.sido){alert('자신의 관할 시도('+CMY.sido+')만 등록할 수 있습니다.');return}
   const sports=cwSports();
   if(!sports.length){alert('종목을 1개 이상 선택해주세요.');return}
   const teamTypes=[...document.querySelectorAll('.cwTT:checked')].map(x=>x.value);
@@ -2584,8 +2599,10 @@ async function saveCompMaster(editId){
     const slotIds=[];
     const roleNote=base.desc||'';
     const mkSlot=async(role,roles,quota,extra)=>{
+      const byUid=(firebase.auth().currentUser||{}).uid||'';
       const ref=await DB.collection('compSlots').add(Object.assign({
         title:title,role:role,roles:roles,quota:quota,date:base.dateStart,region:sido,
+        bySido:sido,byUid:byUid,
         deadline:base.deadline||'',fee:'',note:roleNote,consentText:consentText||'',consentImgs:consentImgs,consentOverlays:consentOverlays,
         claimed:[],confirmed:[],createdAt:firebase.firestore.FieldValue.serverTimestamp()},extra||{}));
       slotIds.push(ref.id);return ref.id;
@@ -2621,6 +2638,7 @@ async function saveCompMaster(editId){
 async function delCompMaster(id){
   const cm=CMASTERS.find(d=>d.id===id);if(!cm)return;
   const c=cm.data();
+  if(IS_SIDO && c.byUid!==CMY.uid && !sameSidoComp(c)){alert('본인이 등록하거나 관할 시도의 대회만 삭제할 수 있습니다.');return;}
   if(!confirm('['+c.title+'] 대회를 삭제할까요?\n연결된 공고·캘린더 일정도 함께 삭제됩니다. (신청 기록 포함 — 복구 불가)'))return;
   try{
     for(const sid of (c.slotIds||[]))await DB.collection('compSlots').doc(sid).delete().catch(()=>{});
@@ -2667,7 +2685,7 @@ let CLUBADM_F='전체';
 async function loadClubsAdmin(){
   const el=document.getElementById('clubAdminList');if(!el)return;
   const snap=await DB.collection('clubs').limit(300).get();
-  CLUBADM_DOCS=snap.docs.slice().sort((a,b)=>{
+  CLUBADM_DOCS=snap.docs.filter(d=>sameSidoClub(d.data())).sort((a,b)=>{
     const x=a.data(),y=b.data();
     if((x.status==='대기')!==(y.status==='대기'))return x.status==='대기'?-1:1;
     return String(x.sido||'').localeCompare(String(y.sido||''));
@@ -2716,6 +2734,8 @@ function renderClubsAdmin(){
   }).join(''));
 }
 async function approveClub(id){
+  const c=(await DB.collection('clubs').doc(id).get()).data();
+  if(IS_SIDO && !sameSidoClub(c)){alert('관할 시도가 아닌 클럽입니다.');return;}
   await DB.collection('clubs').doc(id).update({status:'승인'});loadClubsAdmin();
   loadExtClubMap().then(renderUsers).catch(()=>{});
 }
@@ -2873,6 +2893,8 @@ async function cbClear(uid){
   cbFind().catch(()=>{});cbListAdmins().catch(()=>{});
 }
 async function delClub(id){
+  const c=(await DB.collection('clubs').doc(id).get()).data();
+  if(IS_SIDO && !sameSidoClub(c)){alert('관할 시도가 아닌 클럽입니다.');return;}
   if(!confirm('이 클럽을 삭제할까요? (회원 명단 포함 삭제)'))return;
   await DB.collection('clubs').doc(id).delete();loadClubsAdmin();
   loadExtClubMap().then(renderUsers).catch(()=>{});
@@ -2958,6 +2980,7 @@ let EC_SNAP=null;
 function editComp(id){
   const d=CADM.find(x=>x.id===id);if(!d)return;
   const s=d.data();EC_SNAP={id:id,s:s};
+  if(IS_SIDO && s.bySido && s.bySido!==CMY.sido && s.region!==CMY.sido && s.byUid!==CMY.uid){alert('관할 시도의 공고만 수정할 수 있습니다.');return;}
   const act=compActiveClaims(s);
   const regions=['서울·경기','강원','충청','전라','경상','제주'];
   const old=document.getElementById('ecModal');if(old)old.remove();
@@ -3033,6 +3056,7 @@ async function saveEditComp(){
     consentText:document.getElementById('ecConsentText').value.trim(),
     consentImgs:CONSENT_IMGS.ec.slice(),consentImg:'',consentOverlays:ovlPack('ec')};
   if(!act.length)upd.role=newRole;
+  if(IS_SIDO && upd.region!==CMY.sido){alert('자신의 관할 시도('+CMY.sido+')만 수정할 수 있습니다.');return}
   await DB.collection('compSlots').doc(id).update(upd);
   document.getElementById('ecModal').remove();EC_SNAP=null;
   alert('공고가 수정되었습니다. 신청 화면에 즉시 반영됩니다.'+(hit.length?'\n⚠ 제외 임무 지망자 '+hit.length+'명 — 개별 안내를 잊지 마세요.':''));
@@ -3180,6 +3204,8 @@ async function compConsentDocs(id){
   w.document.close();
 }
 async function delComp(id){
+  const s=(await DB.collection('compSlots').doc(id).get()).data();
+  if(IS_SIDO && !sameSidoComp(s)){alert('관할 시도가 아닌 공고입니다.');return;}
   if(!confirm('이 대회 모집을 삭제할까요? (지명 기록도 함께 삭제)'))return;
   await DB.collection('compSlots').doc(id).delete();loadCompsAdmin();
 }
@@ -3754,6 +3780,7 @@ async function approveNatCert(uid,on){
 async function approve(uid){
   const doc=await DB.collection('users').doc(uid).get();
   const d=doc.data();
+  if(IS_SIDO && !sameSidoUser(d)){alert('관할 시도가 아닌 회원입니다.');return;}
   // 국가공인 체육지도사 자격을 신고했는데 아직 사본 미확인이면 승인 보류(사무국이 직접 확인해야 함)
   if(d.natCertName&&!d.natCertApproved){
     alert('🏅 ['+(d.name||'')+'] 국가공인 체육지도사 자격("'+d.natCertName+'")을 신고했으나 아직 확인되지 않았습니다.\n회원목록에서 첨부된 자격증 사본을 먼저 확인·승인해주세요.'+(d.natCertDoc?'':'\n(아직 사본이 첨부되지 않았습니다 — 회원이 마이페이지에서 첨부할 때까지 기다려야 합니다)'));
