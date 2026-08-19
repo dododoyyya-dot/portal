@@ -127,7 +127,7 @@ AUTH.onAuthStateChanged(async u=>{
     const wb=document.getElementById('stWriteBox');wb.style.display='block';
     document.getElementById('stWriteHint').textContent=(isAdminU()||isSidoU())
       ?'중앙·시도연맹 임원 — 즉시 게시됩니다'
-      :'일반 회원·클럽장 — 등록 후 시도연맹 승인을 거쳐 게시됩니다';
+      :'일반 회원·클럽장 — 등록 후 관리자 승인을 거쳐 게시됩니다';
   }
   loadMyLic();
   loadPosts();
@@ -195,7 +195,7 @@ function renderList(){
       +(p.deadline?'<span style="font-size:12px;color:#b8860b;font-weight:700">마감 '+fmtD(p.deadline)+'</span>':'')
       +'</div>'
       +(canManage(p)?'<div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap">'
-        +(!p.approved&&(isAdminU()||isSidoU())?'<button class="stbtn stbtn-teal" style="padding:5px 13px;font-size:12px" onclick="approvePost(\''+p.id+'\',1)">✓ 게시 승인</button><button class="stbtn" style="padding:5px 13px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="approvePost(\''+p.id+'\',0)">반려</button>':'')
+        +(!p.approved&&isAdminU()?'<button class="stbtn stbtn-teal" style="padding:5px 13px;font-size:12px" onclick="approvePost(\''+p.id+'\',1)">✓ 게시 승인</button><button class="stbtn" style="padding:5px 13px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="approvePost(\''+p.id+'\',0)">반려</button>':'')
         +'<button class="stbtn stbtn-soft" style="padding:5px 13px;font-size:12px" onclick="openPostForm(\''+p.id+'\')">✏️ 수정</button>'
         +'<button class="stbtn stbtn-ghost" style="padding:5px 13px;font-size:12px" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button>'
         +'<button class="stbtn" style="padding:5px 13px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="delPost(\''+p.id+'\')">삭제</button>'
@@ -236,7 +236,9 @@ function openPostForm(editId){
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:660px;width:100%;padding:24px 26px;margin:10px 0">'
     +'<b style="font-size:17px">🛠 '+(ed?'공고 수정':'심판·운영요원 모집 공고 등록')+'</b>'
     +'<div style="font-size:12px;color:#8a919d;margin-top:3px">작성자: <b>'+esc(myOrg())+'</b>'+(SMY.phone?' · '+esc(mphone(SMY.phone)):'')+(SMY.email?' · '+esc(SMY.email):'')+'</div>'
-    +'<label class="stlabel">대회명 *</label><input id="pfName" class="stfield" value="'+esc(ed?ed.competitionName:'')+'" placeholder="예: 2026 부산 유소년 플라잉디스크 대회">'
+    +'<label class="stlabel">주최 (표시명) * <span style="font-weight:600;color:#8a919d;font-size:11px">— 공고에 "주최: ○○"로 표시됩니다. 대행 등록 시 실제 주최 연맹·단체명을 입력하세요</span></label>'
+    +'<input id="pfHost" class="stfield" value="'+esc(ed?((ed.author&&ed.author.organization)||''):myOrg())+'" placeholder="예: ○○연맹 / ○○교육청 / ○○대회 조직위">'
+    +'<label class="stlabel">대회명 *</label><input id="pfName" class="stfield" value="'+esc(ed?ed.competitionName:'')+'" placeholder="예: 2026 유소년 플라잉디스크 대회">'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
     +'<div><label class="stlabel">대회 시작일 *</label><input id="pfStart" type="date" class="stfield" value="'+esc(ed?ed.startDate:'')+'" onchange="pfDates()"></div>'
     +'<div><label class="stlabel">대회 종료일 *</label><input id="pfEnd" type="date" class="stfield" value="'+esc(ed?ed.endDate:'')+'" onchange="pfDates()"></div></div>'
@@ -263,7 +265,7 @@ function openPostForm(editId){
     +'<textarea id="pfDesc" rows="4" class="stfield">'+esc(ed?ed.description:'')+'</textarea>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
     +'<button class="stbtn stbtn-ghost" onclick="document.getElementById(\'pfModal\').remove()">닫기</button>'
-    +'<button class="stbtn stbtn-main" style="padding:11px 26px" id="pfSaveBtn" onclick="savePost(\''+(editId||'')+'\')">'+(ed?'💾 수정 저장':(isAdminU()||isSidoU()?'등록 (즉시 게시)':'등록 (시도연맹 승인 후 게시)'))+'</button></div>'
+    +'<button class="stbtn stbtn-main" style="padding:11px 26px" id="pfSaveBtn" onclick="savePost(\''+(editId||'')+'\')">'+(ed?'💾 수정 저장':(isAdminU()||isSidoU()?'등록 (즉시 게시)':'등록 (관리자 승인 후 게시)'))+'</button></div>'
     +'</div>';
   document.body.appendChild(div);
   window.PF_ED=ed||null;
@@ -358,6 +360,7 @@ function readDaySec(sec){
 async function savePost(editId){
   const v=id=>{const e=document.getElementById(id);return e?(e.value||'').trim():''};
   const name=v('pfName'),s=v('pfStart'),e=v('pfEnd')||s,loc=v('pfLoc'),time=v('pfTime'),dl=v('pfDL');
+  if(!v('pfHost')){alert('주최 (표시명)을 입력해주세요.');return}
   if(!name||!s||!loc||!time||!dl){alert('대회명·시작일·장소·시간·모집 마감일을 입력해주세요.');return}
   const dates=dateRange(s,e);
   if(!dates.length||dates.length>14){alert('대회 기간을 확인해주세요 (최대 14일).');return}
@@ -390,11 +393,13 @@ async function savePost(editId){
       location:loc,time:time,sport:v('pfSport'),deadline:dl,
       transportation:v('pfTrans'),meal:v('pfMeal'),supplies:supplies,
       posters:posters,description:v('pfDesc'),
-      author:{uid:SME.uid,name:SMY.name||'',organization:myOrg(),contact:SMY.phone||'',email:SMY.email||''},
+      author:{uid:SME.uid,name:SMY.name||'',organization:(v('pfHost')||myOrg()),contact:SMY.phone||'',email:SMY.email||''},
       status:'모집중',
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()
     };
     if(editId){
+      const ed0=POSTS.find(x=>x.id===editId);
+      if(ed0&&ed0.author)data.author=Object.assign({},ed0.author,{organization:(v('pfHost')||ed0.author.organization||'')});
       await DB.collection('competitionStaff').doc(editId).update(data);
     }else{
       data.approved=instant;
