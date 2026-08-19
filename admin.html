@@ -1602,7 +1602,7 @@ function showMemberModal(uid){
   const quals=[q.leader,q.referee,q.youth?'유소년지도사':''].filter(Boolean).join(' · ')||'-';
   const hire=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc);
   const rows=[
-    ['회원 유형',esc({instructor:'지도자·강사',teacher:'교사',general:'일반회원',student:'학생선수'}[v.accountType]||v.accountType||'-')+(v.typeConvertedFrom?' <span style="font-size:11px;color:#8a919d">(전환 전: '+esc(v.typeConvertedFrom)+')</span>':'')],
+    ['회원 유형',esc({instructor:'지도자·강사',teacher:'교사',general:'일반회원',student:'학생회원'}[v.accountType]||v.accountType||'-')+(v.typeConvertedFrom?' <span style="font-size:11px;color:#8a919d">(전환 전: '+esc(v.typeConvertedFrom)+')</span>':'')],
     ['이메일',esc(v.email||'-')],
     ['성별·생년월일',esc(v.gender||'-')+' · '+esc(v.birth||'-')],
     ['KFDF 자격번호',[v.qualNoLeader?'지도자 '+esc(v.qualNoLeader):'',v.qualNoReferee?'심판 '+esc(v.qualNoReferee):''].filter(Boolean).join(' · ')||'-'],
@@ -3875,7 +3875,7 @@ async function convertUserType(uid){
   try{
     const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
     const cur=d.accountType||'?';
-    const t=prompt('['+(d.name||'')+'] 현재 유형: '+cur+'\n\n전환할 유형 번호를 입력하세요:\n1 = 일반회원 (general)\n2 = 지도자·강사 (instructor)\n3 = 교사 (teacher)\n4 = 학생선수 (student)');
+    const t=prompt('['+(d.name||'')+'] 현재 유형: '+cur+'\n\n전환할 유형 번호를 입력하세요:\n1 = 일반회원 (general)\n2 = 지도자·강사 (instructor)\n3 = 교사 (teacher)\n4 = 학생회원 (student)');
     if(t===null)return;
     const map={'1':['general','general'],'2':['instructor','active'],'3':['teacher','active'],'4':['student','student']};
     if(!map[t.trim()]){alert('1~4 중에서 입력해주세요.');return}
