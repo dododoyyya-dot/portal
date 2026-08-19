@@ -150,10 +150,12 @@
     <div id="soAdminBox" style="display:none;background:#f0f5ff;border:2px solid #b9cdec;border-radius:16px;padding:14px 18px;margin-bottom:20px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <b style="font-size:14.5px;color:#153A77">🛠 심판·운영요원 모집공고 관리</b>
-        <span style="font-size:12px;color:var(--gray)">새 양식으로 공고를 등록·수정할 수 있습니다</span>
         <span style="flex:1"></span>
+        <button class="cbtn" style="background:#fff8ed;color:#8a5a00;border:1.5px solid #ecd9b0;padding:7px 14px;font-size:12.5px" onclick="migrateSoPosts()">⬆️ 구 공고 → 새 양식 마이그레이션</button>
         <a href="staff.html" class="cbtn cbtn-main" style="padding:8px 16px;font-size:13px;text-decoration:none">+ 모집공고 등록 · 관리 →</a>
       </div>
+      <div style="font-size:11.5px;color:#6b7280;margin-top:6px">구 양식 공고 2건이 있으면 <b>마이그레이션</b> 버튼으로 새 양식으로 일괄 전환하세요. 신청자 정보도 함께 이전됩니다. 이미 이전된 공고는 자동 건너뜁니다.</div>
+      <div id="migrateMsg" style="font-size:12.5px;font-weight:800;margin-top:6px"></div>
     </div>
     <!-- 심판·운영요원 모집 (새 양식 — competitionStaff 컬렉션) -->
     <div id="stEmbedWrap" style="margin-bottom:18px">
@@ -241,43 +243,148 @@ function initSoAdmin(){
   if(!isSidoOfficer())return;
   const box=document.getElementById('soAdminBox');if(box)box.style.display='';
   // 구 soMyList는 삭제됨 — staff.html에서 관리
+  _autoMigrateOldSlots(); // 구 심판·운영 공고 자동 마이그레이션 (1회성)
+}
+async function _autoMigrateOldSlots(){
+  try{
+    const snap=await DB.collection('compSlots').where('role','in',['심판','운영']).get();
+    const toMigrate=snap.docs.filter(d=>!d.data()._migrated);
+    if(!toMigrate.length)return;
+    const msg=document.getElementById('migrateMsg');
+    if(msg)msg.innerHTML='<span style="color:#1d4ed8">⏳ 구 공고 '+toMigrate.length+'건 자동 이전 중…</span>';
+    const DOW=['일','월','화','수','목','금','토'];
+    const DEF_ROLES={'심판':['주심','부심','선심','기록원'],'운영':['경기운영','안내','시설관리','사무국']};
+    let pc=0,ac=0;
+    for(const d of toMigrate){
+      const s=d.data();
+      const dateStr=s.date||'';
+      const dow=dateStr?DOW[new Date(dateStr+'T00:00:00').getDay()]:'';
+      const newRef=await DB.collection('competitionStaff').add({
+        competitionName:s.title||'',startDate:dateStr,endDate:dateStr,
+        location:s.region||s.bySido||'',deadline:s.deadline||'',sport:'플라잉디스크',time:'',
+        description:s.note||'',
+        dates:[{date:dateStr,dayOfWeek:dow,roles:s.roles||(DEF_ROLES[s.role]||[]),
+          quota:{total:s.quota||0},allowance:{mode:'미정',items:[]}}],
+        transportation:'안내문 참조',meal:'안내문 참조',uniform:'안내문 참조',lodging:'미제공',
+        author:{uid:s.byUid||'',name:s.byName||'',organization:s.bySido||'',contact:''},
+        approved:true,_migratedFrom:d.id,
+        createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+      });
+      pc++;
+      const claimed=s.claimed||[],cancels=s.cancels||[],confirmed=s.confirmed||[],seen=new Set();
+      for(const c of claimed){
+        const uid=c&&c.uid;if(!uid||seen.has(uid))continue;
+        const claimN=claimed.filter(x=>x&&x.uid===uid).length;
+        const cancelN=cancels.filter(x=>x&&x.uid===uid).length;
+        if(claimN<=cancelN)continue;
+        seen.add(uid);
+        let phone='',lic='',uname=c.name||'';
+        try{const us=await DB.collection('users').doc(uid).get();if(us.exists){const ud=us.data();phone=ud.phone||'';if(!uname)uname=ud.name||'';}}catch(e){}
+        try{const ls=await DB.collection('licenses').where('uid','==',uid).get();lic=ls.docs.map(l=>{const ld=l.data();return((ld.type||'')+' '+(ld.grade||'')).trim()}).filter(Boolean).join(' · ');}catch(e){}
+        const isConf=confirmed.includes(uid);
+        await DB.collection('staffApplications').add({
+          postId:newRef.id,competitionName:s.title||'',uid,name:uname,phone,lic,
+          days:dateStr?[dateStr]:[],prefs:dateStr?{[dateStr]:c.prefs||[]}:{},
+          status:dateStr?{[dateStr]:isConf?'확정':'대기'}:{},
+          agree:{privacy:true,rules:true,safety:true,signed:!!(c.signed),at:c.at||new Date().toISOString()},
+          createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+        ac++;
+      }
+      await DB.collection('compSlots').doc(d.id).update({_migrated:true,_migratedTo:newRef.id,_migratedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    }
+    if(msg)msg.innerHTML='<span style="color:#059669;font-weight:800">✅ 자동 이전 완료 — 공고 '+pc+'건, 신청자 '+ac+'명</span>';
+    loadStaffEmbed();
+  }catch(e){
+    const msg=document.getElementById('migrateMsg');
+    if(msg)msg.innerHTML='<span style="color:#dc2626">❌ 이전 오류: '+e.message+'</span>';
+  }
 }
 // ══════════════ 심판·운영요원 모집 (새 양식 — competitionStaff 컬렉션) ══════════════
 async function loadStaffEmbed(){
   const el=document.getElementById('stEmbedList');if(!el)return;
   const today=new Date().toISOString().slice(0,10);
   try{
-    const [postSnap,myAppSnap]=await Promise.all([
+    // 새 양식(competitionStaff) + 구 양식(compSlots 중 심판·운영) 동시 로드
+    const [newSnap,oldSnap,myAppSnap,myClaimSnap]=await Promise.all([
       DB.collection('competitionStaff').limit(100).get(),
-      DB.collection('staffApplications').where('uid','==',CME.uid).limit(100).get()
+      DB.collection('compSlots').where('role','in',['심판','운영']).limit(50).get(),
+      DB.collection('staffApplications').where('uid','==',CME.uid).limit(100).get(),
+      DB.collection('compSlots').limit(200).get() // 구 신청 확인용
     ]);
-    const myPostIds=new Set(myAppSnap.docs.map(d=>d.data().postId));
-    const posts=postSnap.docs.map(x=>({id:x.id,...x.data()}))
-      .filter(p=>p.approved||isSidoOfficer())
-      .sort((a,b)=>String(b.startDate||'').localeCompare(String(a.startDate||'')));
-    if(!posts.length){el.innerHTML='<div class="bempty">현재 등록된 심판·운영요원 모집공고가 없습니다.</div>';return}
-    const active=[],past=[];
-    posts.forEach(p=>{
-      const last=(p.dates||[]).map(d=>d.date||'').sort().pop()||p.endDate||p.startDate||'';
-      if(last>=today)active.push(p);else past.push(p);
+
+    // 내가 신청한 새 공고 ID
+    const myNewIds=new Set(myAppSnap.docs.map(d=>d.data().postId));
+    // 내가 신청한 구 공고 ID
+    const myOldIds=new Set(
+      (myClaimSnap.docs||[]).map(d=>d.data()).filter(s=>(s.claimed||[]).some(c=>c.uid===CME.uid)).map((_,i)=>myClaimSnap.docs[i].id)
+    );
+    // 사실 위는 복잡하므로 간단하게: claimed 배열 안에 내 uid 있으면 신청 처리
+    const myOldIdsSimple=new Set();
+    myClaimSnap.docs.forEach(d=>{if((d.data().claimed||[]).some(c=>c.uid===CME.uid))myOldIdsSimple.add(d.id);});
+
+    // 새 공고 정규화
+    const newPosts=newSnap.docs.map(x=>({id:x.id,_src:'new',...x.data()}))
+      .filter(p=>p.approved||isSidoOfficer());
+
+    // 구 공고 → 새 양식으로 변환
+    const oldPosts=oldSnap.docs.map(d=>{
+      const s=d.data();
+      return {
+        id:d.id, _src:'old',
+        competitionName: s.title||'',
+        startDate: s.date||'',
+        endDate: s.date||'',
+        location: s.region||s.bySido||'',
+        deadline: s.deadline||'',
+        dates: s.date?[{date:s.date}]:[],
+        author:{organization: s.bySido||(s.byName?s.byName+'('+s.bySido+')':'')},
+        _oldRole: s.role||'심판',
+        _note: s.note||''
+      };
     });
+
+    // 합쳐서 날짜 내림차순 정렬
+    const all=[...newPosts,...oldPosts]
+      .sort((a,b)=>String(b.startDate||'').localeCompare(String(a.startDate||'')));
+
+    if(!all.length){el.innerHTML='<div class="bempty">현재 등록된 심판·운영요원 모집공고가 없습니다.</div>';return}
+
+    // 진행중 / 지난 공고 분류
+    const active=[],past=[];
+    all.forEach(p=>{
+      const last=(p.dates||[]).map(d=>d.date||'').sort().pop()||p.endDate||p.startDate||'';
+      (last>=today?active:past).push(p);
+    });
+
+    // 카드 렌더
     const stEmbedCard=p=>{
       const ds=(p.dates||[]).map(d=>d.date).filter(Boolean).sort();
       const first=ds[0]||p.startDate||'';
-      const last=ds[ds.length-1]||p.endDate||first;
-      const dateTxt=first===last?cDateFmt(first):cDateFmt(first)+' ~ '+cDateFmt(last.slice(5));
+      const last2=ds[ds.length-1]||p.endDate||first;
+      const dateTxt=first===last2?cDateFmt(first):cDateFmt(first)+' ~ '+cDateFmt(last2.slice(5));
       const isDead=p.deadline&&p.deadline<today;
-      const applied=myPostIds.has(p.id);
+      const applied=p._src==='new'?myNewIds.has(p.id):myOldIdsSimple.has(p.id);
+      const isOld=p._src==='old';
+      // 구 공고는 openApply(competition.html), 새 공고는 staff.html로 연결
+      const btn=isOld
+        ?'<button class="cbtn cbtn-main" style="font-size:12.5px;padding:7px 14px;white-space:nowrap" onclick="openApply(\''+p.id+'\')">✍ 신청하기</button>'
+        :'<a href="staff.html" style="font-size:12.5px;font-weight:800;color:#fff;background:#1F4E9C;border-radius:9px;padding:7px 14px;text-decoration:none;white-space:nowrap">자세히 · 신청 →</a>';
       return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid #eef0f4;padding:11px 4px">'
         +'<div style="flex:1;min-width:0">'
         +'<b style="font-size:14px">'+cesc(p.competitionName||'')+'</b>'
-        +(isDead?'<span style="font-size:11px;font-weight:800;color:#8a919d;margin-left:6px;background:#f1f3f5;border-radius:5px;padding:1px 6px">마감</span>':'<span style="font-size:11px;font-weight:800;color:#0f766e;margin-left:6px;background:#f0fdf4;border-radius:5px;padding:1px 6px">모집중</span>')
+        +(isOld?'<span style="font-size:10.5px;font-weight:800;color:#7c3aed;margin-left:5px;background:#f5f0ff;border-radius:4px;padding:1px 6px">'+cesc(p._oldRole||'심판')+'</span>':'')
+        +(isDead?'<span style="font-size:11px;font-weight:800;color:#8a919d;margin-left:5px;background:#f1f3f5;border-radius:5px;padding:1px 6px">마감</span>':'<span style="font-size:11px;font-weight:800;color:#0f766e;margin-left:5px;background:#f0fdf4;border-radius:5px;padding:1px 6px">모집중</span>')
         +(applied?'<span style="font-size:11px;font-weight:800;color:#1F4E9C;margin-left:4px;background:#eef3fa;border-radius:5px;padding:1px 7px">✓ 신청완료</span>':'')
         +'<div style="font-size:12px;color:#6b7280;margin-top:2px">📅 '+cesc(dateTxt)+' &nbsp;·&nbsp; 📍 '+cesc(p.location||'')+( p.deadline?' &nbsp;·&nbsp; 마감 '+cesc(p.deadline):'')+' &nbsp;·&nbsp; 주최: '+cesc((p.author&&p.author.organization)||'')+'</div>'
+        +(p._note?'<div style="font-size:11.5px;color:#555;margin-top:2px">📌 '+cesc(p._note)+'</div>':'')
         +'</div>'
-        +'<a href="staff.html" style="font-size:12.5px;font-weight:800;color:#fff;background:#1F4E9C;border-radius:9px;padding:7px 14px;text-decoration:none;white-space:nowrap">자세히 · 신청 →</a>'
+        +btn
         +'</div>';
     };
+
     let html='';
     if(active.length){
       html+='<div style="font-size:12.5px;font-weight:800;color:#0f766e;margin-bottom:4px">📢 진행중 공고 ('+active.length+'건)</div>';
