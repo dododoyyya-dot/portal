@@ -316,9 +316,14 @@ function pfDates(){
   const same=document.getElementById('pfSame').checked;
   const box=document.getElementById('pfDaySecs');
   const ed=window.PF_ED;
-  if(!dates.length){box.innerHTML='';return}
+  if(!dates.length){
+    box.innerHTML='<div style="margin-top:12px;border:2px dashed #c7d2f0;border-radius:12px;padding:18px;text-align:center;background:#f8faff">'
+      +'<b style="font-size:14px;color:#153A77">👥 심판·운영요원 모집 정보 입력칸</b>'
+      +'<div style="font-size:12.5px;color:#6b7280;margin-top:6px">위에서 <b>대회 시작일·종료일</b>을 먼저 선택하세요.<br>선택하는 즉시 이곳에 날짜별 <b>모집 정원(관리위원·심판·운영요원·봉사요원) · 임무 목록 · 수당</b> 입력칸이 나타납니다.</div></div>';
+    return;
+  }
   const cfgOf=d=>{if(!ed||!ed.dates)return null;const f=ed.dates.find(x=>x.date===d);return f||null};
-  if(same){box.innerHTML='<div style="font-size:11.5px;color:#8a919d;margin-top:8px">아래 설정이 모든 날짜('+dates.length+'일)에 동일하게 적용됩니다.</div>'+daySecHtml(dates[0],0,cfgOf(dates[0])||cfgOf&&null||undefined);}
+  if(same){box.innerHTML='<div style="font-size:11.5px;color:#8a919d;margin-top:8px">아래 설정이 모든 날짜('+dates.length+'일)에 동일하게 적용됩니다.</div>'+daySecHtml(dates[0],0,cfgOf(dates[0])||undefined);}
   else box.innerHTML=dates.map((d,i)=>daySecHtml(d,i,cfgOf(d)||undefined)).join('');
 }
 function pfAddPosters(input){
