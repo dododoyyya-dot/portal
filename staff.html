@@ -29,6 +29,19 @@
 .chipck{display:inline-flex;gap:5px;align-items:center;font-weight:700;font-size:12.5px;background:#f6f8fb;border:1.5px solid #e3e9f2;border-radius:999px;padding:6px 12px;cursor:pointer;margin:3px 4px 0 0}
 .chipck input{width:auto}
 .chipck.on{background:#eef3fa;border-color:#1F4E9C;color:#153A77}
+/* ── 공고 목록 컴팩트 로우 ── */
+.strowlist{border:1.5px solid #e6eaf2;border-radius:14px;overflow:hidden;margin-bottom:16px;background:#fff}
+.strhead{font-size:12px;font-weight:800;color:#374151;padding:9px 16px;background:#f3f6fb;border-bottom:1px solid #e6eaf2;letter-spacing:.02em}
+.strow{display:flex;align-items:center;gap:8px;padding:11px 15px;border-bottom:1px solid #eef0f5;cursor:pointer;flex-wrap:wrap;transition:background .15s;user-select:none}
+.strow:hover{background:#f5f8ff}
+.strowname{font-weight:800;font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.strowmeta{font-size:11.5px;color:#6b7280;white-space:nowrap;flex-shrink:0}
+.strowend{font-size:11.5px;color:#b8860b;font-weight:700;white-space:nowrap;flex-shrink:0}
+.strowangl{font-size:18px;color:#aab3c0;font-weight:400;transition:transform .2s;flex-shrink:0;line-height:1}
+.strowbody{padding:14px 16px 16px;border-bottom:1px solid #eef0f5;background:#fbfdff;font-size:12.5px;line-height:1.65}
+.strowitem:last-child>.strow{border-bottom:none}
+.strowitem.open>.strow{background:#f0f5ff;border-bottom:1px solid #d3e0f2}
+.strowitem:last-child>.strowbody{border-bottom:none}
 </style>
 </head>
 <body>
@@ -89,6 +102,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260808"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 KFDF.initApp();
 const AUTH=firebase.auth(),DB=firebase.firestore();
@@ -180,38 +194,91 @@ function postStatus(p){
   if(p.endDate&&p.endDate<today)return ['종료','#8a919d'];
   return ['모집 중','#0f766e'];
 }
+function rowHtml(p){
+  const t=postTotals(p);
+  const [stTxt,stCol]=postStatus(p);
+  const period=periodTxt(p);
+  return '<div class="strowitem" id="row_'+p.id+'">'
+    +'<div class="strow" onclick="toggleRow(\''+p.id+'\')">'
+    +'<span class="stpill" style="background:'+stCol+';font-size:11px;padding:2px 9px">'+stTxt+'</span>'
+    +(!p.approved?'<span class="stpill" style="background:#C41E2F;font-size:11px;padding:2px 9px">승인대기</span>':'')
+    +'<span class="strowname">'+esc(p.competitionName)+'</span>'
+    +'<span class="strowmeta">'+esc((p.author&&p.author.organization)||'')+' · '+period+'</span>'
+    +'<span class="strowend">마감 '+fmtD(p.deadline||'')+' · <b>'+t.applied+'/'+t.quota+'명</b></span>'
+    +'<span class="strowangl" id="angl_'+p.id+'">›</span>'
+    +'</div>'
+    +'<div class="strowbody" id="body_'+p.id+'" style="display:none">'
+    +expandRowHtml(p)
+    +'</div>'
+    +'</div>';
+}
+function expandRowHtml(p){
+  const manage=canManage(p);
+  const t=postTotals(p);
+  const pct=t.quota?Math.min(100,Math.round(t.applied/t.quota*100)):0;
+  const posters=p.posters&&p.posters.length
+    ?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+p.posters.map(img=>'<img src="'+img.url+'" class="stthumb" onclick="window.open(this.src)" alt="포스터">').join('')+'</div>':'';
+  const roles=(p.dates&&p.dates[0]&&p.dates[0].roles)||[];
+  const rolesHtml=roles.length?'<div style="margin-bottom:6px"><span style="font-weight:800">모집 임무:</span> '+esc(roles.join(' · '))+'</div>':'';
+  return posters
+    +'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px">'
+    +'<span>📍 <b>장소:</b> '+esc(p.location||'')+'</span>'
+    +'<span>🕐 <b>집합시간:</b> '+esc(p.time||'')+'</span>'
+    +'<span>🏅 <b>종목:</b> '+esc(p.sport||'')+'</span>'
+    +'</div>'
+    +rolesHtml
+    +'<div style="margin-bottom:6px">'
+    +'<span style="font-weight:800">교통비</span> '+esc(p.transportation||'미정')
+    +' &nbsp;·&nbsp; <span style="font-weight:800">식사</span> '+esc(p.meal||'미정')
+    +' &nbsp;·&nbsp; <span style="font-weight:800">숙박</span> '+esc(p.lodging||'미정')
+    +' &nbsp;·&nbsp; <span style="font-weight:800">심판복</span> '+esc(p.uniform||'미정')
+    +'</div>'
+    +(p.supplies&&p.supplies.length?'<div style="margin-bottom:6px"><span style="font-weight:800">준비물:</span> '+esc(p.supplies.join(', '))+'</div>':'')
+    +(p.description?'<div style="margin-bottom:8px;color:#374151;white-space:pre-wrap;border-left:3px solid #d3e0f2;padding-left:10px">'+esc(p.description)+'</div>':'')
+    +(p.contactInfo?'<div style="margin-bottom:10px;color:#6b7280">📞 '+esc(p.contactInfo)+'</div>':'')
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+    +'<div class="stprog" style="max-width:140px"><div style="width:'+pct+'%"></div></div>'
+    +'<span style="font-size:12.5px;font-weight:800;color:#153A77">신청 '+t.applied+' / 모집 '+t.quota+'명 ('+pct+'%)</span>'
+    +'<span style="flex:1"></span>'
+    +(manage
+      ?(!p.approved&&isAdminU()?'<button class="stbtn stbtn-teal" style="padding:5px 11px;font-size:12px" onclick="approvePost(\''+p.id+'\',1)">✓ 승인</button>'
+        +'<button class="stbtn" style="padding:5px 11px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="approvePost(\''+p.id+'\',0)">반려</button>':'')
+        +'<button class="stbtn stbtn-soft" style="padding:5px 11px;font-size:12px" onclick="event.stopPropagation();openPostForm(\''+p.id+'\')">✏️ 수정</button>'
+        +'<button class="stbtn stbtn-ghost" style="padding:5px 11px;font-size:12px" onclick="copyRoster(\''+p.id+'\')">📋 명단복사</button>'
+        +'<button class="stbtn" style="padding:5px 11px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="delPost(\''+p.id+'\')">삭제</button>'
+      :'')
+    +'<button class="stbtn stbtn-main" style="padding:8px 20px" onclick="openApplyForm(\''+p.id+'\')">✍️ 신청하기</button>'
+    +'</div>';
+}
+function toggleRow(id){
+  const body=document.getElementById('body_'+id);
+  const angl=document.getElementById('angl_'+id);
+  const item=document.getElementById('row_'+id);
+  if(!body)return;
+  const open=body.style.display==='none';
+  body.style.display=open?'block':'none';
+  if(angl)angl.style.transform=open?'rotate(90deg)':'';
+  if(item)item.classList.toggle('open',open);
+}
 function renderList(){
   const el=document.getElementById('stList');
   if(!POSTS.length){el.innerHTML='<div class="bempty">현재 등록된 모집 공고가 없습니다.</div>';return}
-  el.innerHTML=POSTS.map(p=>{
-    const t=postTotals(p);
-    const pct=t.quota?Math.min(100,Math.round(t.applied/t.quota*100)):0;
-    const [stTxt,stCol]=postStatus(p);
-    const period=periodTxt(p);
-    return '<div class="stcard">'
-      +'<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">'
-      +'<span class="stpill" style="background:#7c3aed">주최: '+esc((p.author&&p.author.organization)||'')+'</span>'
-      +'<b style="font-size:15.5px">'+esc(p.competitionName)+'</b>'
-      +'<span class="stpill" style="background:'+stCol+'">'+stTxt+'</span>'
-      +(!p.approved?'<span class="stpill" style="background:#C41E2F">승인 대기</span>':'')
-      +'<span style="flex:1"></span>'
-      +'<button class="stbtn stbtn-main" style="padding:7px 16px" onclick="openDetail(\''+p.id+'\')">상세 · 신청 →</button>'
-      +'</div>'
-      +'<div style="font-size:12.5px;color:#6b7280;margin-top:7px">📅 '+period+' · 📍 '+esc(p.location||'')+' · 🕐 '+esc(p.time||'')+' · '+esc(p.sport||'')+'</div>'
-      +'<div style="display:flex;align-items:center;gap:10px;margin-top:9px">'
-      +'<span style="font-size:12.5px;font-weight:800;color:#153A77">신청 '+t.applied+'명 / 모집 '+t.quota+'명</span>'
-      +'<div class="stprog"><div style="width:'+pct+'%"></div></div>'
-      +'<span style="font-size:12px;font-weight:800;color:#0f766e">'+pct+'%</span>'
-      +(p.deadline?'<span style="font-size:12px;color:#b8860b;font-weight:700">마감 '+fmtD(p.deadline)+'</span>':'')
-      +'</div>'
-      +(canManage(p)?'<div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap">'
-        +(!p.approved&&isAdminU()?'<button class="stbtn stbtn-teal" style="padding:5px 13px;font-size:12px" onclick="approvePost(\''+p.id+'\',1)">✓ 게시 승인</button><button class="stbtn" style="padding:5px 13px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="approvePost(\''+p.id+'\',0)">반려</button>':'')
-        +'<button class="stbtn stbtn-soft" style="padding:5px 13px;font-size:12px" onclick="openPostForm(\''+p.id+'\')">✏️ 수정</button>'
-        +'<button class="stbtn stbtn-ghost" style="padding:5px 13px;font-size:12px" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button>'
-        +'<button class="stbtn" style="padding:5px 13px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="delPost(\''+p.id+'\')">삭제</button>'
-        +'</div>':'')
-      +'</div>';
-  }).join('');
+  const today=new Date().toISOString().slice(0,10);
+  const active=POSTS.filter(p=>!p.endDate||p.endDate>=today);
+  const past=POSTS.filter(p=>p.endDate&&p.endDate<today);
+  let html='<div class="strowlist">';
+  if(active.length){
+    html+='<div class="strhead">📢 진행중 공고 <span style="font-weight:600;color:#8a919d">('+active.length+'건)</span></div>';
+    html+=active.map(rowHtml).join('');
+  }
+  if(past.length){
+    if(active.length)html+='<div style="height:8px;background:#f3f6fb;border-top:1px solid #e6eaf2;border-bottom:1px solid #e6eaf2"></div>';
+    html+='<div class="strhead" style="color:#8a919d">🗂 지난 공고 <span style="font-weight:600">('+past.length+'건)</span></div>';
+    html+=past.map(rowHtml).join('');
+  }
+  if(!active.length&&!past.length)html+='<div class="bempty">현재 등록된 모집 공고가 없습니다.</div>';
+  html+='</div>';
+  el.innerHTML=html;
 }
 async function approvePost(id,ok){
   const p=POSTS.find(x=>x.id===id);if(!p)return;
@@ -518,7 +585,7 @@ function renderDetail(){
   let appsHtml;
   if(!dayApps.length)appsHtml='<div style="font-size:12.5px;color:#8a919d;padding:8px 0">이 날짜 신청자가 아직 없습니다.</div>';
   else{
-    appsHtml='<table class="sttbl" style="margin-top:6px"><tr><th>번호</th><th>성명</th>'+(manage?'<th>연락처</th>':'')+'<th>자격증</th><th>희망 임무</th><th>상태</th>'+(manage?'<th>처리</th>':'')+'</tr>'
+    appsHtml='<table class="sttbl" style="margin-top:6px"><tr><th>번호</th><th>성명</th>'+(manage?'<th>연락처</th>':'')+'<th>자격증</th><th>희망 임무</th><th>상태</th>'+(manage?'<th>동의서</th>':'')+(manage?'<th>처리</th>':'')+'</tr>'
       +dayApps.map((a,i)=>{
         const st=(a.status&&a.status[dd.date])||'대기';
         const asg=a.assign&&a.assign[dd.date];
@@ -526,9 +593,10 @@ function renderDetail(){
         return '<tr><td>'+(i+1)+'</td>'
           +'<td><b>'+esc(manage?a.name:mname(a.name))+'</b></td>'
           +(manage?'<td>'+esc(a.phone||'-')+'</td>':'')
-          +'<td>'+esc(a.lic||'-')+'</td>'
+          +'<td>'+esc(topLic(a.lic||'-'))+'</td>'
           +'<td>'+esc(((a.prefs||{})[dd.date]||[]).join(', ')||'-')+'</td>'
           +'<td style="text-align:center">'+stHtml+'</td>'
+          +(manage?'<td style="text-align:center">'+sigCell(a)+'</td>':'')
           +(manage?'<td style="white-space:nowrap"><button class="stbtn stbtn-teal" style="padding:4px 10px;font-size:11.5px" onclick="decideApp(\''+a.id+'\',\''+dd.date+'\',\'확정\')">확정</button> <button class="stbtn" style="padding:4px 10px;font-size:11.5px;background:#fdf6e3;color:#8a5a00" onclick="decideApp(\''+a.id+'\',\''+dd.date+'\',\'보류\')">보류</button> <button class="stbtn" style="padding:4px 10px;font-size:11.5px;background:#fff;color:#C41E2F;border:1px solid #f1c7cc" onclick="decideApp(\''+a.id+'\',\''+dd.date+'\',\'거절\')">거절</button></td>':'')
           +'</tr>';
       }).join('')+'</table>';
@@ -560,7 +628,7 @@ function renderDetail(){
     +'<div style="font-size:13px;margin-top:12px"><b>👥 신청 현황 ('+dayApps.length+'명)</b></div>'+appsHtml
     +'</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">'
-    +(manage?'<button class="stbtn stbtn-soft" onclick="document.getElementById(\'dtModal\').remove();openPostForm(\''+p.id+'\')">✏️ 공고 수정</button><button class="stbtn stbtn-ghost" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button>':'')
+    +(manage?'<button class="stbtn stbtn-soft" onclick="document.getElementById(\'dtModal\').remove();openPostForm(\''+p.id+'\')">✏️ 공고 수정</button><button class="stbtn stbtn-ghost" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button><button class="stbtn" style="background:#f0fdf4;color:#0f766e;border:1.5px solid #a7f3d0" onclick="exportPayExcel(\''+p.id+'\')">💰 수당지급 엑셀</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button>':'')
     +'<button class="stbtn stbtn-main" style="padding:11px 26px" onclick="openApplyForm(\''+p.id+'\')">✍️ 신청하기 (날짜 선택)</button>'
     +'</div></div>';
   document.body.appendChild(div);
@@ -602,11 +670,17 @@ function openApplyForm(id){
     +'<label style="display:flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="apAg2" style="width:auto"> (필수) 대회 참여 규정을 준수하겠습니다</label>'
     +'<label style="display:flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="apAg3" style="width:auto"> (필수) 안전 수칙을 준수하겠습니다</label>'
     +'</div>'
+    +'<div style="font-size:13px;font-weight:800;margin-top:16px">③ 서명 <span style="font-size:11.5px;font-weight:600;color:#8a919d">(선택 — 아래 박스에 손가락/마우스로 서명)</span></div>'
+    +'<div style="position:relative;border:1.5px solid #dfe5ee;border-radius:10px;background:#f9fafb;margin:7px 0 4px">'
+    +'<canvas id="sigCanvas" width="480" height="110" style="display:block;width:100%;height:110px;touch-action:none;cursor:crosshair;border-radius:10px"></canvas>'
+    +'<button type="button" onclick="_sigClear()" style="position:absolute;top:6px;right:6px;font-size:11px;padding:3px 9px;border:1px solid #dfe5ee;border-radius:6px;background:#fff;cursor:pointer;z-index:1">지우기</button>'
+    +'</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
     +'<button class="stbtn stbtn-ghost" onclick="document.getElementById(\'apModal\').remove()">닫기</button>'
     +'<button class="stbtn stbtn-main" style="padding:11px 26px" onclick="submitApply(\''+p.id+'\')">신청 완료</button></div>'
     +'</div>';
   document.body.appendChild(div);
+  _initSigCanvas();
 }
 async function submitApply(postId){
   const p=POSTS.find(x=>x.id===postId);if(!p)return;
@@ -629,7 +703,7 @@ async function submitApply(postId){
     const data={postId:postId,competitionName:p.competitionName||'',
       uid:SME.uid,name:SMY.name||'',phone:SMY.phone||'',lic:MYLIC||'',
       days:days,prefs:prefs,status:status,
-      agree:{privacy:true,rules:true,safety:true,at:new Date().toISOString()},
+      agree:{privacy:true,rules:true,safety:true,signature:_getSigData()||null,signed:!!_getSigData(),at:new Date().toISOString()},
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
     if(my)await DB.collection('staffApplications').doc(my.id).update(data);
     else{data.createdAt=firebase.firestore.FieldValue.serverTimestamp();await DB.collection('staffApplications').add(data);}
@@ -665,6 +739,179 @@ async function decideApp(appId,date,decision){
     KFDF.notify(app.uid,'['+(app.competitionName||'대회')+'] '+fmtD(date)+' 심판·운영요원 신청이 '+msg,'staff.html');
     await loadPosts();renderDetail();
   }catch(e){alert('처리 실패: '+e.message)}
+}
+// ══════════════ [신규] 자격증 상위 1개씩 추출 ══════════════
+const _LIC_R_RANK={'국제심판':0,'1급':1,'2급':2,'3급':3,'4급':4,'5급':5};
+const _LIC_I_RANK={'1급':0,'2급':1,'3급':2,'4급':3};
+function topLic(str){
+  if(!str||str==='-')return str||'-';
+  const parts=str.split('·').map(s=>s.trim()).filter(Boolean);
+  let br=null,bi=null;
+  parts.forEach(s=>{
+    const m=s.match(/^(심판|지도자)\s*(.*)$/);
+    if(!m)return;
+    const tp=m[1],gr=(m[2]||'').trim();
+    if(tp==='심판'){const rk=_LIC_R_RANK[gr]??99;if(br===null||rk<br.rk)br={s,rk};}
+    else{const rk=_LIC_I_RANK[gr]??99;if(bi===null||rk<bi.rk)bi={s,rk};}
+  });
+  const res=[br&&br.s,bi&&bi.s].filter(Boolean).join(' · ');
+  return res||str;
+}
+// ── 동의서 서명 셀 ──
+function sigCell(a){
+  if(a.agree&&a.agree.signature)
+    return '<button class="stbtn" style="padding:3px 9px;font-size:11px;background:#f0fdf4;color:#0f766e;border:1px solid #a7f3d0" onclick="viewSig(\''+a.id+'\')">✍️ 서명</button>';
+  if(a.agree&&a.agree.privacy)
+    return '<span style="color:#b8860b;font-size:11.5px;font-weight:700">☑ 체크</span>';
+  return '<span style="color:#8a919d;font-size:11.5px">—</span>';
+}
+// ── 서명 보기 ──
+function viewSig(appId){
+  const app=Object.values(APPS).flat().find(a=>a.id===appId);
+  if(!app||!app.agree||!app.agree.signature){alert('서명 데이터가 없습니다.');return}
+  const old=document.getElementById('sigViewModal');if(old)old.remove();
+  const d=document.createElement('div');d.id='sigViewModal';
+  d.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.6);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px';
+  d.innerHTML='<div style="background:#fff;border-radius:14px;padding:22px 24px;text-align:center;max-width:520px;width:100%">'
+    +'<b style="font-size:14px">✍️ 서명 확인</b><br>'
+    +'<div style="font-size:12px;color:#6b7280;margin:3px 0 12px">'+esc(app.name||'')+' · 동의일시: '+esc((app.agree.at||'').slice(0,16).replace('T',' '))+'</div>'
+    +'<img src="'+app.agree.signature+'" style="border:1.5px solid #dfe5ee;border-radius:10px;max-width:100%;background:#fff;display:block;margin:0 auto">'
+    +'<div style="display:flex;gap:8px;justify-content:center;margin-top:14px">'
+    +'<button class="stbtn stbtn-ghost" onclick="document.getElementById(\'sigViewModal\').remove()">닫기</button>'
+    +'<button class="stbtn" style="background:#f0fdf4;color:#0f766e;border:1px solid #a7f3d0" onclick="_dlSig(\''+esc(app.name||'')+'\',\''+appId+'\')">💾 이미지 저장</button>'
+    +'</div></div>';
+  document.body.appendChild(d);
+}
+function _dlSig(name,appId){
+  const app=Object.values(APPS).flat().find(a=>a.id===appId);
+  if(!app||!app.agree||!app.agree.signature)return;
+  const a=document.createElement('a');a.href=app.agree.signature;a.download='서명_'+name+'.png';a.click();
+}
+// ══════════════ [신규] 수당지급 엑셀 출력 ══════════════
+function exportPayExcel(postId){
+  if(typeof XLSX==='undefined'){alert('엑셀 라이브러리 로딩 중입니다. 잠시 후 다시 눌러주세요.');return}
+  const p=POSTS.find(x=>x.id===postId);if(!p)return;
+  const apps=APPS[p.id]||[];
+  const rows=[];
+  (p.dates||[]).forEach(dd=>{
+    const conf=apps.filter(a=>a.status&&a.status[dd.date]==='확정');
+    conf.forEach((a,i)=>{
+      const asg=(a.assign&&a.assign[dd.date])||{};
+      rows.push({
+        '날짜':fmtD(dd.date)+' ('+dowOf(dd.date)+')',
+        '번호':i+1,
+        '성명':a.name||'',
+        '연락처':a.phone||'',
+        '자격증':topLic(a.lic||''),
+        '배정임무':asg.duty||'',
+        '수당':asg.pay||'',
+        '동의서':a.agree&&a.agree.signature?'서명완료':a.agree&&a.agree.privacy?'체크완료':'미완',
+        '확정일시':asg.assignedAt?String(asg.assignedAt).slice(0,10):''
+      });
+    });
+  });
+  if(!rows.length){alert('확정된 신청자가 없습니다. 먼저 신청자를 확정해주세요.');return}
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.json_to_sheet(rows);
+  // 열 너비 자동 조정
+  const cols=[{wch:16},{wch:5},{wch:8},{wch:14},{wch:16},{wch:12},{wch:12},{wch:8},{wch:12}];
+  ws['!cols']=cols;
+  XLSX.utils.book_append_sheet(wb,ws,'수당지급명단');
+  XLSX.writeFile(wb,(p.competitionName||'대회')+'_수당지급명단.xlsx');
+}
+// ══════════════ [신규] 자격증 일괄확인 ══════════════
+async function viewAllLicenses(postId){
+  const p=POSTS.find(x=>x.id===postId);if(!p)return;
+  const apps=APPS[p.id]||[];
+  if(!apps.length){alert('신청자가 없습니다.');return}
+  const old=document.getElementById('licModal');if(old)old.remove();
+  const mdiv=document.createElement('div');mdiv.id='licModal';
+  mdiv.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
+  mdiv.innerHTML='<div style="background:#fff;border-radius:16px;max-width:740px;width:100%;padding:24px 26px;margin:10px 0">'
+    +'<div style="display:flex;align-items:center;gap:8px"><b style="font-size:16px">🎖 자격증 일괄확인</b><span style="font-size:12.5px;color:#8a919d">— '+esc(p.competitionName)+'</span><span style="flex:1"></span><button class="stbtn stbtn-ghost" onclick="document.getElementById(\'licModal\').remove()">닫기 ✕</button></div>'
+    +'<div id="licModalBody" style="margin-top:14px"><div class="bempty">자격증 정보를 불러오는 중…</div></div>'
+    +'</div>';
+  document.body.appendChild(mdiv);
+  try{
+    const uids=[...new Set(apps.map(a=>a.uid))];
+    const licMap={};
+    await Promise.all(uids.map(async uid=>{
+      const snap=await DB.collection('licenses').where('uid','==',uid).get();
+      licMap[uid]=snap.docs.map(d=>d.data());
+    }));
+    let html='<div style="font-size:12px;color:#6b7280;margin-bottom:8px">심판·지도자 자격증 중 <b>최상위 1개씩</b>만 표시합니다. Firestore licenses 컬렉션 기준.</div>';
+    html+='<table class="sttbl"><tr><th>#</th><th>성명</th><th>연락처</th><th>심판 최상위</th><th>지도자 최상위</th><th>전체 자격</th></tr>';
+    apps.forEach((a,i)=>{
+      const lics=licMap[a.uid]||[];
+      const refLics=lics.filter(l=>(l.type||'').includes('심판')).sort((a,b)=>(_LIC_R_RANK[a.grade]??99)-(_LIC_R_RANK[b.grade]??99));
+      const insLics=lics.filter(l=>(l.type||'').includes('지도자')).sort((a,b)=>(_LIC_I_RANK[a.grade]??99)-(_LIC_I_RANK[b.grade]??99));
+      const bRef=refLics[0],bIns=insLics[0];
+      const allTxt=lics.map(l=>esc((l.type||'')+' '+(l.grade||''))).join(', ')||'없음';
+      html+='<tr>'
+        +'<td>'+(i+1)+'</td>'
+        +'<td><b>'+esc(a.name||'')+'</b></td>'
+        +'<td>'+esc(a.phone||'-')+'</td>'
+        +'<td>'+(bRef?'<b style="color:#0f766e">'+esc(bRef.type+' '+bRef.grade)+'</b>'+'<br><span style="font-size:11px;color:#8a919d">'+esc(bRef.status||'')+'</span>':'<span style="color:#8a919d">없음</span>')+'</td>'
+        +'<td>'+(bIns?'<b style="color:#153A77">'+esc(bIns.type+' '+bIns.grade)+'</b>'+'<br><span style="font-size:11px;color:#8a919d">'+esc(bIns.status||'')+'</span>':'<span style="color:#8a919d">없음</span>')+'</td>'
+        +'<td style="font-size:11.5px;color:#555">'+allTxt+'</td>'
+        +'</tr>';
+    });
+    html+='</table>';
+    if(typeof XLSX!=='undefined'){
+      html+='<div style="text-align:right;margin-top:10px"><button class="stbtn" style="background:#f0fdf4;color:#0f766e;border:1.5px solid #a7f3d0" onclick="_exportLicExcel(\''+postId+'\')">💾 엑셀로 저장</button></div>';
+    }
+    document.getElementById('licModalBody').innerHTML=html;
+    // 엑셀 내보내기 (자격증 모달에서)
+    window._licData={apps,licMap};
+  }catch(e){const el=document.getElementById('licModalBody');if(el)el.innerHTML='<div class="bempty">불러오기 실패: '+esc(e.message)+'</div>'}
+}
+function _exportLicExcel(postId){
+  if(!window._licData||typeof XLSX==='undefined')return;
+  const p=POSTS.find(x=>x.id===postId);
+  const {apps,licMap}=window._licData;
+  const rows=apps.map((a,i)=>{
+    const lics=licMap[a.uid]||[];
+    const bRef=lics.filter(l=>(l.type||'').includes('심판')).sort((x,y)=>(_LIC_R_RANK[x.grade]??99)-(_LIC_R_RANK[y.grade]??99))[0];
+    const bIns=lics.filter(l=>(l.type||'').includes('지도자')).sort((x,y)=>(_LIC_I_RANK[x.grade]??99)-(_LIC_I_RANK[y.grade]??99))[0];
+    return {'#':i+1,'성명':a.name||'','연락처':a.phone||'',
+      '심판 최상위':bRef?(bRef.type+' '+bRef.grade):'없음',
+      '지도자 최상위':bIns?(bIns.type+' '+bIns.grade):'없음',
+      '전체 자격':lics.map(l=>(l.type||'')+' '+(l.grade||'')).join(', ')||'없음'};
+  });
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:4},{wch:8},{wch:14},{wch:14},{wch:14},{wch:28}];
+  XLSX.utils.book_append_sheet(wb,ws,'자격증명단');
+  XLSX.writeFile(wb,(p&&p.competitionName||'대회')+'_자격증명단.xlsx');
+}
+// ══════════════ [신규] 서명 캔버스 ══════════════
+function _initSigCanvas(){
+  const canvas=document.getElementById('sigCanvas');if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  ctx.strokeStyle='#1a1a2e';ctx.lineWidth=2.2;ctx.lineCap='round';ctx.lineJoin='round';
+  let drawing=false,lx=0,ly=0;
+  function pos(e){
+    const r=canvas.getBoundingClientRect();
+    const scaleX=canvas.width/r.width,scaleY=canvas.height/r.height;
+    const src=e.touches?e.touches[0]:e;
+    return{x:(src.clientX-r.left)*scaleX,y:(src.clientY-r.top)*scaleY};
+  }
+  function start(e){e.preventDefault();drawing=true;const p=pos(e);lx=p.x;ly=p.y;ctx.beginPath();ctx.arc(lx,ly,1,0,Math.PI*2);ctx.fillStyle='#1a1a2e';ctx.fill();}
+  function move(e){e.preventDefault();if(!drawing)return;const p=pos(e);ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(p.x,p.y);ctx.stroke();lx=p.x;ly=p.y;}
+  function end(e){e.preventDefault();drawing=false;}
+  canvas.addEventListener('mousedown',start);canvas.addEventListener('mousemove',move);canvas.addEventListener('mouseup',end);canvas.addEventListener('mouseleave',end);
+  canvas.addEventListener('touchstart',start,{passive:false});canvas.addEventListener('touchmove',move,{passive:false});canvas.addEventListener('touchend',end,{passive:false});
+}
+function _sigClear(){
+  const c=document.getElementById('sigCanvas');if(!c)return;
+  c.getContext('2d').clearRect(0,0,c.width,c.height);
+}
+function _getSigData(){
+  const c=document.getElementById('sigCanvas');if(!c)return null;
+  const ctx=c.getContext('2d');
+  const d=ctx.getImageData(0,0,c.width,c.height).data;
+  const hasData=Array.from(d).some((v,i)=>i%4===3&&v>0);
+  return hasData?c.toDataURL('image/png'):null;
 }
 // ══════════════ 공고문 복사 (날짜별 확정 명단) ══════════════
 async function copyRoster(id){
