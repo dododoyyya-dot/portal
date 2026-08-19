@@ -247,7 +247,11 @@ function openPostForm(editId){
     +'<div><label class="stlabel">대회 장소 (상세 주소) *</label><input id="pfLoc" class="stfield" value="'+esc(ed?ed.location:'')+'" placeholder="예: 강원 춘천시 ○○체육관"></div>'
     +'<div><label class="stlabel">대회 시간 *</label><input id="pfTime" class="stfield" value="'+esc(ed?ed.time:'')+'" placeholder="예: 09:00~18:00"></div></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
-    +'<div><label class="stlabel">대회 종목 *</label><select id="pfSport" class="stfield"><option'+(ed&&ed.sport==='얼티미트'?' selected':'')+'>얼티미트</option><option'+(ed&&ed.sport==='디스크골프'?' selected':'')+'>디스크골프</option><option'+(ed&&ed.sport==='기타'?' selected':'')+'>기타</option></select></div>'
+    +'<div><label class="stlabel">대회 종목 * <span style="font-weight:600;color:#8a919d;font-size:11px">(복수 선택 가능)</span></label>'
+    +'<div style="margin-top:6px">'
+    +['얼티미트','디스크골프','거리던지기','정확성던지기'].map(function(sp){var on=(ed&&(ed.sports||String(ed.sport||'').split(' · ')).indexOf(sp)>=0);return '<label class="chipck'+(on?' on':'')+'"><input type="checkbox" class="pfSportCk" value="'+sp+'"'+(on?' checked':'')+' onchange="this.parentElement.classList.toggle(\'on\',this.checked)"> '+sp+'</label>'}).join('')
+    +'<input id="pfSportEtc" class="stfield" style="margin-top:6px" placeholder="기타 종목 직접 입력 (쉼표 구분)" value="'+esc(ed?(ed.sports||String(ed.sport||'').split(' · ')).filter(function(x){return ['얼티미트','디스크골프','거리던지기','정확성던지기'].indexOf(x)<0}).join(', '):'')+'">'
+    +'</div></div>'
     +'<div><label class="stlabel">모집 마감일 *</label><input id="pfDL" type="date" class="stfield" value="'+esc(ed?ed.deadline:'')+'"></div></div>'
     +'<div style="margin-top:16px;padding:12px 14px;background:#f6f8fb;border-radius:12px">'
     +'<label style="display:flex;gap:7px;align-items:center;font-weight:800;font-size:13px"><input type="checkbox" id="pfSame" checked onchange="pfDates()" style="width:auto"> 모든 날짜 동일 설정 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 해제하면 날짜별로 정원·임무·수당을 따로 설정합니다 (심판은 요일마다 다를 수 있음)</span></label>'
@@ -378,6 +382,9 @@ async function savePost(editId){
   }else{
     dateArr=secs.map(sec=>Object.assign({date:sec.dataset.date,dayOfWeek:dowOf(sec.dataset.date)},readDaySec(sec)));
   }
+  const SPORTS=[...document.querySelectorAll('.pfSportCk:checked')].map(x=>x.value)
+    .concat((v('pfSportEtc')||'').split(',').map(x=>x.trim()).filter(Boolean));
+  if(!SPORTS.length){alert('대회 종목을 1개 이상 선택해주세요.');return}
   const supplies=[...document.querySelectorAll('.pfSup:checked')].map(x=>x.value)
     .concat((v('pfSupEtc')||'').split(',').map(x=>x.trim()).filter(Boolean));
   const btn=document.getElementById('pfSaveBtn');btn.disabled=true;btn.textContent='저장 중…';
@@ -395,7 +402,7 @@ async function savePost(editId){
     const instant=isAdminU()||isSidoU();
     const data={
       competitionName:name,startDate:s,endDate:e,dates:dateArr,
-      location:loc,time:time,sport:v('pfSport'),deadline:dl,
+      location:loc,time:time,sport:SPORTS.join(' · '),sports:SPORTS,deadline:dl,
       transportation:v('pfTrans'),meal:v('pfMeal'),supplies:supplies,
       posters:posters,description:v('pfDesc'),
       author:{uid:SME.uid,name:SMY.name||'',organization:(v('pfHost')||myOrg()),contact:SMY.phone||'',email:SMY.email||''},
