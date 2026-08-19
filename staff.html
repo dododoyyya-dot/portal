@@ -100,7 +100,7 @@ function dowOf(d){try{return DOW[new Date(d+'T00:00:00').getDay()]}catch(e){retu
 function fmtD(d){return String(d||'').replace(/-/g,'.')}
 // ── 역할 분류 3단계 체계 ──
 const ROLE_TREE={
-  '관리위원':['심판장 (감독관)','심판위원','운영위원'],
+  '관리위원':['심판총괄','심판위원장','심판장','감독관','운영위원장','기타위원장'],
   '심판':['주심','부심 (선심)','기록원','점수원'],
   '운영요원':['일반 운영요원','봉사요원','환경요원','주차요원','안내요원']
 };
@@ -262,12 +262,11 @@ function openPostForm(editId){
     +'<label style="display:flex;gap:7px;align-items:center;font-weight:800;font-size:13px"><input type="checkbox" id="pfSame" checked onchange="pfDates()" style="width:auto"> 모든 날짜 동일 설정 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 해제하면 선택한 날짜별로 정원·임무·수당을 따로 설정합니다 (심판은 날짜마다 다를 수 있음)</span></label>'
     +'</div>'
     +'<div id="pfDaySecs"></div>'
-    +'<label class="stlabel">교통비 지원</label><select id="pfTrans" class="stfield">'+['지원 (거리별 차등)','심판비 포함','안내문 참조','없음'].map(o=>'<option'+(ed&&(ed.transportation===o||(ed.transportation==='별도 안내'&&o==='안내문 참조'))?' selected':'')+'>'+o+'</option>').join('')+'</select>'
-    +'<label class="stlabel">식사 제공</label><select id="pfMeal" class="stfield">'+['제공','수당 포함','안내문 참조','없음'].map(o=>'<option'+(ed&&(ed.meal===o||(String(ed.meal||'').indexOf('제공')>=0&&o==='제공')||(ed.meal==='심판비 포함'&&o==='수당 포함')||(ed.meal==='별도 안내'&&o==='안내문 참조'))?' selected':'')+'>'+o+'</option>').join('')+'</select>'
+    +'<label class="stlabel">교통비 지원</label><div style="margin-top:4px">'+['제공','미제공','안내문 참조'].map(function(o){var cur=(ed&&ed.transportation)||'미제공';var legacy=(ed&&(ed.transportation==='지원 (거리별 차등)'||ed.transportation==='심판비 포함')&&o==='제공')||(ed&&ed.transportation==='없음'&&o==='미제공')||(ed&&ed.transportation==='별도 안내'&&o==='안내문 참조');var on=(cur===o||legacy);return '<label class="chipck'+(on?' on':'')+'"><input type="radio" name="pfTrans" value="'+o+'"'+(on?' checked':'')+' onchange="[...document.querySelectorAll(\'input[name=pfTrans]\')].forEach(function(r){r.parentElement.classList.toggle(\'on\',r.checked)})"> '+o+'</label>'}).join('')+'</div>'
+    +'<label class="stlabel">식사 제공</label><div style="margin-top:4px">'+['제공','미제공','안내문 참조'].map(function(o){var cur=(ed&&ed.meal)||'제공';var legacy=(ed&&ed.meal==='수당 포함'&&o==='제공')||(ed&&ed.meal==='없음'&&o==='미제공')||(ed&&ed.meal==='별도 안내'&&o==='안내문 참조');var on=(cur===o||legacy);return '<label class="chipck'+(on?' on':'')+'"><input type="radio" name="pfMeal" value="'+o+'"'+(on?' checked':'')+' onchange="[...document.querySelectorAll(\'input[name=pfMeal]\')].forEach(function(r){r.parentElement.classList.toggle(\'on\',r.checked)})"> '+o+'</label>'}).join('')+'</div>'
     +'<label class="stlabel">심판복 제공 여부</label><div id="pfUniformRow" style="margin-top:4px">'
     +['제공','미제공','안내문 참조'].map(function(o){var cur=(ed&&ed.uniform)||'제공';return '<label class="chipck'+(cur===o?' on':'')+'"><input type="radio" name="pfUniform" value="'+o+'"'+(cur===o?' checked':'')+' onchange="pfUniformSync(this)"> '+o+'</label>'}).join('')+'</div>'
-    +'<label class="stlabel">숙박</label><div style="margin-top:4px">'
-    +['제공','수당 포함','해당없음'].map(function(o){var cur=(ed&&ed.lodging)||'해당없음';return '<label class="chipck'+(cur===o?' on':'')+'"><input type="radio" name="pfLodging" value="'+o+'"'+(cur===o?' checked':'')+' onchange="[...document.querySelectorAll(\'input[name=pfLodging]\')].forEach(function(r){r.parentElement.classList.toggle(\'on\',r.checked)})"> '+o+'</label>'}).join('')+'</div>'
+    +'<label class="stlabel">숙박</label><div style="margin-top:4px">'+['제공','미제공','안내문 참조'].map(function(o){var cur=(ed&&ed.lodging)||'미제공';var legacy=(ed&&ed.lodging==='수당 포함'&&o==='제공')||(ed&&ed.lodging==='해당없음'&&o==='미제공');var on=(cur===o||legacy);return '<label class="chipck'+(on?' on':'')+'"><input type="radio" name="pfLodging" value="'+o+'"'+(on?' checked':'')+' onchange="[...document.querySelectorAll(\'input[name=pfLodging]\')].forEach(function(r){r.parentElement.classList.toggle(\'on\',r.checked)})"> '+o+'</label>'}).join('')+'</div>'
     +'<label class="stlabel">준비물</label><div id="pfSupWrap">'
     +DEFAULT_SUPPLIES.map(s2=>'<label class="chipck"><input type="checkbox" class="pfSup" value="'+esc(s2)+'"'+((ed?(ed.supplies||[]):DEFAULT_CHECKED).indexOf(s2)>=0?' checked':'')+'> '+esc(s2)+'</label>').join('')
     +'<input id="pfSupEtc" class="stfield" style="display:inline-block;width:220px;margin-left:6px" placeholder="기타 준비물 (쉼표 구분)" value="'+esc(ed?(ed.supplies||[]).filter(x=>DEFAULT_SUPPLIES.indexOf(x)<0).join(', '):'')+'"></div>'
@@ -349,7 +348,16 @@ function daySecHtml(date,i,cfg){
     h+='<div style="margin-top:5px"><span style="font-size:11px;font-weight:900;color:#7c3aed">'+grp+'</span> ';
     ROLE_TREE[grp].forEach(r=>{
       const on=duties.length?duties.indexOf(r)>=0:(grp!=='관리위원');
-      h+='<label class="chipck'+(on?' on':'')+'"><input type="checkbox" class="pfDuty" value="'+esc(r)+'"'+(on?' checked':'')+' onchange="this.parentElement.classList.toggle(\'on\',this.checked)"> '+esc(r)+'</label>';
+      if(r==='기타위원장'){
+        // 기타위원장: 체크 시 직책명 직접 입력
+        const mgrEtcSaved=duties.filter(d=>d!=='심판총괄'&&d!=='심판위원장'&&d!=='심판장'&&d!=='감독관'&&d!=='운영위원장'&&d!=='기타위원장'&&Object.values(ROLE_TREE).flat().indexOf(d)<0&&d.endsWith('위원장'));
+        const mgrEtcVal=mgrEtcSaved[0]||'';
+        const mgrOn=on||mgrEtcVal.length>0;
+        h+='<label class="chipck'+(mgrOn?' on':'')+'"><input type="checkbox" class="pfDuty pfDutyMgrEtc" value="기타위원장"'+(mgrOn?' checked':'')+' onchange="this.parentElement.classList.toggle(\'on\',this.checked);var inp=this.closest(\'.pfDaySec\').querySelector(\'.pfMgrEtcInp\');if(inp)inp.style.display=this.checked?\'inline-block\':\'none\'"> 기타위원장</label>'
+          +'<input class="pfMgrEtcInp" style="display:'+(mgrOn?'inline-block':'none')+';width:130px;margin-left:5px;padding:4px 9px;border:1.5px solid #c3d1e8;border-radius:7px;font-size:12px;vertical-align:middle" placeholder="직책명 기입 (예: 대회위원장)" value="'+esc(mgrEtcVal)+'">';
+      }else{
+        h+='<label class="chipck'+(on?' on':'')+'"><input type="checkbox" class="pfDuty" value="'+esc(r)+'"'+(on?' checked':'')+' onchange="this.parentElement.classList.toggle(\'on\',this.checked)"> '+esc(r)+'</label>';
+      }
     });
     h+='</div>';
   });
@@ -411,7 +419,14 @@ function stCompress(file){
 }
 function readDaySec(sec){
   const quota={};QUOTA_KEYS.forEach(([k])=>{quota[k]=parseInt(sec.querySelector('.pfQ_'+k).value)||0});
-  const duties=[...sec.querySelectorAll('.pfDuty:checked')].map(x=>x.value);
+  let duties=[...sec.querySelectorAll('.pfDuty:checked')].map(x=>x.value);
+  // 기타위원장 → 입력된 직책명으로 대체 (입력 없으면 '기타위원장'으로 저장)
+  const mgrEtcCk=sec.querySelector('.pfDutyMgrEtc');
+  const mgrEtcInp=sec.querySelector('.pfMgrEtcInp');
+  if(mgrEtcCk&&mgrEtcCk.checked&&mgrEtcInp&&mgrEtcInp.value.trim()){
+    const idx=duties.indexOf('기타위원장');
+    if(idx>=0)duties[idx]=mgrEtcInp.value.trim();
+  }
   const etc=(sec.querySelector('.pfDutyEtc').value||'').split(',').map(x=>x.trim()).filter(Boolean);
   const mode=sec.querySelector('.pfPayMode').value;
   const items=mode==='직접입력'?[...sec.querySelectorAll('.pfPayRow')].map(r=>{
@@ -441,7 +456,7 @@ async function savePost(editId){
   const supplies=[...document.querySelectorAll('.pfSup:checked')].map(x=>x.value)
     .concat((v('pfSupEtc')||'').split(',').map(x=>x.trim()).filter(Boolean));
   const uniform=(document.querySelector('input[name=pfUniform]:checked')||{}).value||'제공';
-  const lodging=(document.querySelector('input[name=pfLodging]:checked')||{}).value||'해당없음';
+  const lodging=(document.querySelector('input[name=pfLodging]:checked')||{}).value||'미제공';
   const btn=document.getElementById('pfSaveBtn');btn.disabled=true;btn.textContent='저장 중…';
   try{
     const posters=[];
@@ -457,7 +472,9 @@ async function savePost(editId){
     const data={
       competitionName:name,startDate:dates[0],endDate:dates[dates.length-1],dates:dateArr,
       location:loc,time:time,sport:SPORTS.join(' · '),sports:SPORTS,deadline:dl,
-      transportation:v('pfTrans'),meal:v('pfMeal'),uniform:uniform,lodging:lodging,
+      transportation:(document.querySelector('input[name=pfTrans]:checked')||{}).value||'미제공',
+      meal:(document.querySelector('input[name=pfMeal]:checked')||{}).value||'제공',
+      uniform:uniform,lodging:lodging,
       supplies:supplies,posters:posters,description:v('pfDesc'),contactInfo:v('pfContact'),
       author:{uid:SME.uid,name:SMY.name||'',organization:(v('pfHost')||myOrg()),contact:SMY.phone||'',email:SMY.email||''},
       status:'모집중',

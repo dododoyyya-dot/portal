@@ -320,6 +320,11 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
       입력하신 소속·자격·근무지는 연맹 자료 및 발급기관 정보와 대조됩니다. <b>허위로 기재한 경우</b> 승인 취소, 배정·위촉 제한, 자격 정지 등의 조치가 있을 수 있으며, 그로 인한 불이익은 본인에게 있습니다.
       <label style="display:flex;gap:7px;align-items:center;margin-top:8px;font-weight:800;color:#153A77"><input type="checkbox" id="sPledge" style="width:auto"> 위 내용을 확인했으며, 기재한 정보가 사실임을 확인합니다.</label>
     </div>
+    <div id="sPrivacyBox" style="display:none;margin-top:10px;padding:11px 15px;background:#f0f7f4;border:1.5px solid #cfe3d8;border-radius:10px;font-size:12.5px;line-height:1.7">
+      📋 <b>개인정보 수집·이용 동의 (필수)</b> &nbsp;<a href="privacy.html" target="_blank" style="font-size:11px;color:#1F4E9C;font-weight:700">전문 보기 →</a><br>
+      <span style="color:#555;font-size:12px">이름·연락처·주소 등 수집 정보는 연맹 회원 관리, 사업 운영, 물품 발송 목적으로 수집·이용되며, 법령에 따라 보관됩니다. 동의 철회 시 사무국(031-984-3248)으로 문의하시면 됩니다.</span>
+      <label style="display:flex;gap:7px;align-items:center;margin-top:8px;font-weight:800;color:#0f766e"><input type="checkbox" id="sPrivacyAgree" style="width:auto"> (필수) 개인정보 수집·이용에 동의합니다.</label>
+    </div>
     <label>이메일 <span id="emailHint" style="font-weight:600;color:#8a919d;font-size:12px">· 자녀 계정은 아이디만 입력</span></label><input id="aEmail" type="text" placeholder="example@email.com">
     <label>비밀번호</label><input id="aPw" type="password" placeholder="6자 이상">
     <button class="btn-main" id="goBtn" onclick="go()">로그인</button>
@@ -374,12 +379,12 @@ const MTYPE_INFO={
 };
 // 유형별 표시·필수 설정 —  show: 노출 블록 / req: 필수 항목
 const MTYPE_CFG={
-  instructor:{show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
-  teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'],req:{addr:true,area:true,aff:true,work:true,bank:true,size:true,degree:true,rrn:true}},
-  general:   {show:['sAddrBlock','sOrgTypeBlock','sQualBlock','sPledgeBox'],req:{addr:false,area:false,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}},
-  student:   {show:['sSchoolBlock','sAddrBlock','sAreaBlock','sStudentAffBlock'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}
+  instructor:{show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
+  teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:true,bank:true,size:true,degree:true,rrn:true}},
+  general:   {show:['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sPledgeBox','sPrivacyBox'],req:{addr:false,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}},
+  student:   {show:['sSchoolBlock','sAddrBlock','sAreaBlock','sStudentAffBlock','sPrivacyBox'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}
 };
-const MTYPE_ALL=['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sSchoolBlock','sStudentAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox'];
+const MTYPE_ALL=['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sSchoolBlock','sStudentAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'];
 function setSignupType(t){
   // 생년월일 기준 유형 가드 — 미성년(만 18세 미만)은 학생회원만, 성인은 학생회원 불가
   var _bv=document.getElementById('sBirth')?document.getElementById('sBirth').value:'';
@@ -779,6 +784,8 @@ async function go(){
         if(!ncFile&&!confirm('📎 자격증 사본이 첨부되지 않았습니다.\n\n사본 확인 전까지 회원가입 승인이 보류됩니다.\n(가입 후 마이페이지에서도 첨부 가능)\n\n첨부 없이 계속할까요?'))return say('자격증 사본을 첨부한 뒤 다시 시도해주세요');
       }
       if(CFG.req.area&&!AA.length)return say('활동 가능 범위를 최소 1곳 이상 선택해주세요');
+      // 개인정보 동의 — 전 유형 필수
+      if(!document.getElementById('sPrivacyAgree').checked)return say('개인정보 수집·이용 동의에 체크해주세요.');
       const pnorm=phone.replace(/[^0-9]/g,'');
       if(pnorm.length<10){say('휴대전화 번호를 정확히 입력해주세요');return}
       // 휴대폰 본인인증 필수 — 인증 완료된 번호와 입력 번호가 일치해야 가입 진행 (미인증이면 계정 생성 안 됨)
