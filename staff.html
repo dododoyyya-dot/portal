@@ -106,7 +106,8 @@ const ROLE_TREE={
 };
 const QUOTA_KEYS=[['manager','관리위원'],['referee','심판'],['staff','운영요원'],['volunteer','봉사요원']];
 const DEFAULT_PAY=[['주심','100,000원'],['부심','80,000원'],['기록원','50,000원'],['운영요원','40,000원']];
-const DEFAULT_SUPPLIES=['필기구','텀블러 (물병 지참)','운동화'];
+const DEFAULT_SUPPLIES=['필기구','텀블러 (물병 지참)','운동화','심판복'];
+const DEFAULT_CHECKED=['필기구','텀블러 (물병 지참)','운동화'];
 
 let SME=null,SMY=null,POSTS=[],APPS={},MYLIC='';
 function isAdminU(){return !!(SMY&&(SMY.role==='admin'||SMY.owner))}
@@ -162,6 +163,16 @@ function postTotals(p){
   let n=0;apps.forEach(a=>n+=(a.days||[]).length);
   return {quota:q.total,applied:n};
 }
+function periodTxt(p){
+  const ds=((p.dates||[]).map(x=>x.date)).sort();
+  if(!ds.length)return fmtD(p.startDate||'');
+  if(ds.length===1)return fmtD(ds[0])+' ('+dowOf(ds[0])+')';
+  let cont=true;
+  for(let i=1;i<ds.length;i++){if((new Date(ds[i]+'T00:00:00')-new Date(ds[i-1]+'T00:00:00'))!==86400000){cont=false;break}}
+  if(cont)return fmtD(ds[0])+' ~ '+fmtD(ds[ds.length-1].slice(5))+' ('+ds.length+'일)';
+  const shown=ds.slice(0,4).map(d=>fmtD(d.slice(5))+'('+dowOf(d)+')').join(' · ');
+  return ds[0].slice(0,4)+'년 '+shown+(ds.length>4?' 외 '+(ds.length-4)+'일':'')+' — 총 '+ds.length+'일';
+}
 function postStatus(p){
   const today=new Date().toISOString().slice(0,10);
   if(p.closed)return ['확정','#153A77'];
@@ -176,8 +187,7 @@ function renderList(){
     const t=postTotals(p);
     const pct=t.quota?Math.min(100,Math.round(t.applied/t.quota*100)):0;
     const [stTxt,stCol]=postStatus(p);
-    const days=(p.dates||[]).length;
-    const period=p.startDate===p.endDate?fmtD(p.startDate)+' ('+dowOf(p.startDate)+')':fmtD(p.startDate)+' ~ '+fmtD((p.endDate||'').slice(5))+' ('+days+'일)';
+    const period=periodTxt(p);
     return '<div class="stcard">'
       +'<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">'
       +'<span class="stpill" style="background:#7c3aed">주최: '+esc((p.author&&p.author.organization)||'')+'</span>'
@@ -219,30 +229,25 @@ async function delPost(id){
   try{await DB.collection('competitionStaff').doc(id).delete();loadPosts();}catch(e){alert('삭제 실패: '+e.message)}
 }
 // ══════════════ 공고 등록/수정 폼 ══════════════
-let PF_POSTERS=[];
-function dateRange(s,e){
-  const out=[];if(!s)return out;if(!e)e=s;
-  let d=new Date(s+'T00:00:00');const end=new Date(e+'T00:00:00');
-  let guard=0;
-  while(d<=end&&guard++<31){out.push(d.toISOString().slice(0,10));d.setDate(d.getDate()+1);}
-  return out;
-}
+let PF_POSTERS=[],PF_DATES=[],PF_CAL_Y=0,PF_CAL_M=0;
 function openPostForm(editId){
   const ed=editId?POSTS.find(x=>x.id===editId):null;
   PF_POSTERS=(ed&&ed.posters)?ed.posters.slice():[];
+  PF_DATES=(ed&&ed.dates)?ed.dates.map(d=>d.date).sort():[];
+  const base=PF_DATES.length?new Date(PF_DATES[0]+'T00:00:00'):new Date();
+  PF_CAL_Y=base.getFullYear();PF_CAL_M=base.getMonth();
   const old=document.getElementById('pfModal');if(old)old.remove();
   const div=document.createElement('div');div.id='pfModal';
   div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:660px;width:100%;padding:24px 26px;margin:10px 0">'
     +'<b style="font-size:17px">🛠 '+(ed?'공고 수정':'심판·운영요원 모집 공고 등록')+'</b>'
-    +'<div style="font-size:12px;color:#8a919d;margin-top:3px">작성자: <b>'+esc(myOrg())+'</b>'+(SMY.phone?' · '+esc(mphone(SMY.phone)):'')+(SMY.email?' · '+esc(SMY.email):'')+'</div>'
+    +'<div style="font-size:12px;color:#8a919d;margin-top:3px">작성자: <b>'+esc(myOrg())+'</b>'+(SMY.phone?' · '+esc(mphone(SMY.phone)):'')+(SMY.email?' · '+esc(SMY.email):'')+' — 등록 후에도 목록·상세의 [✏️ 수정]으로 언제든 수정할 수 있습니다</div>'
     +'<label class="stlabel">주최 (표시명) * <span style="font-weight:600;color:#8a919d;font-size:11px">— 공고에 "주최: ○○"로 표시됩니다. 대행 등록 시 실제 주최 연맹·단체명을 입력하세요</span></label>'
     +'<input id="pfHost" class="stfield" value="'+esc(ed?((ed.author&&ed.author.organization)||''):myOrg())+'" placeholder="예: ○○연맹 / ○○교육청 / ○○대회 조직위">'
     +'<label class="stlabel">대회명 *</label><input id="pfName" class="stfield" value="'+esc(ed?ed.competitionName:'')+'" placeholder="예: 2026 강원 유소년 플라잉디스크 대회">'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
-    +'<div><label class="stlabel">대회 시작일 *</label><input id="pfStart" type="date" class="stfield" value="'+esc(ed?ed.startDate:'')+'" onchange="pfDates()"></div>'
-    +'<div><label class="stlabel">대회 종료일 *</label><input id="pfEnd" type="date" class="stfield" value="'+esc(ed?ed.endDate:'')+'" onchange="pfDates()"></div></div>'
-    +'<div id="pfDayCount" style="font-size:12px;font-weight:800;color:#0f766e;margin-top:4px"></div>'
+    +'<label class="stlabel">대회 일자 * <span style="font-weight:600;color:#8a919d;font-size:11px">— 달력에서 날짜를 클릭해 선택 (복수 선택 가능 · 7일, 14일처럼 떨어진 날도 OK · 다음 달로 넘겨도 선택 유지)</span></label>'
+    +'<div id="pfCal" style="border:1.5px solid #dfe5ee;border-radius:12px;padding:12px 14px;margin-top:6px"></div>'
+    +'<div id="pfPickedDates" style="margin-top:6px"></div>'
     +'<div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">'
     +'<div><label class="stlabel">대회 장소 (상세 주소) *</label><input id="pfLoc" class="stfield" value="'+esc(ed?ed.location:'')+'" placeholder="예: 강원 춘천시 ○○체육관"></div>'
     +'<div><label class="stlabel">대회 시간 *</label><input id="pfTime" class="stfield" value="'+esc(ed?ed.time:'')+'" placeholder="예: 09:00~18:00"></div></div>'
@@ -254,26 +259,77 @@ function openPostForm(editId){
     +'</div></div>'
     +'<div><label class="stlabel">모집 마감일 *</label><input id="pfDL" type="date" class="stfield" value="'+esc(ed?ed.deadline:'')+'"></div></div>'
     +'<div style="margin-top:16px;padding:12px 14px;background:#f6f8fb;border-radius:12px">'
-    +'<label style="display:flex;gap:7px;align-items:center;font-weight:800;font-size:13px"><input type="checkbox" id="pfSame" checked onchange="pfDates()" style="width:auto"> 모든 날짜 동일 설정 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 해제하면 날짜별로 정원·임무·수당을 따로 설정합니다 (심판은 요일마다 다를 수 있음)</span></label>'
+    +'<label style="display:flex;gap:7px;align-items:center;font-weight:800;font-size:13px"><input type="checkbox" id="pfSame" checked onchange="pfDates()" style="width:auto"> 모든 날짜 동일 설정 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 해제하면 선택한 날짜별로 정원·임무·수당을 따로 설정합니다 (심판은 날짜마다 다를 수 있음)</span></label>'
     +'</div>'
     +'<div id="pfDaySecs"></div>'
-    +'<label class="stlabel">교통비 지원</label><select id="pfTrans" class="stfield">'+['지원 (거리별 차등)','심판비 포함','별도 안내','없음'].map(o=>'<option'+(ed&&ed.transportation===o?' selected':'')+'>'+o+'</option>').join('')+'</select>'
-    +'<label class="stlabel">식사 제공</label><select id="pfMeal" class="stfield">'+['점심 제공','저녁 제공','점심·저녁 제공','심판비 포함','별도 안내','없음'].map(o=>'<option'+(ed&&ed.meal===o?' selected':'')+'>'+o+'</option>').join('')+'</select>'
+    +'<label class="stlabel">교통비 지원</label><select id="pfTrans" class="stfield">'+['지원 (거리별 차등)','심판비 포함','안내문 참조','없음'].map(o=>'<option'+(ed&&(ed.transportation===o||(ed.transportation==='별도 안내'&&o==='안내문 참조'))?' selected':'')+'>'+o+'</option>').join('')+'</select>'
+    +'<label class="stlabel">식사 제공</label><select id="pfMeal" class="stfield">'+['제공','수당 포함','안내문 참조','없음'].map(o=>'<option'+(ed&&(ed.meal===o||(String(ed.meal||'').indexOf('제공')>=0&&o==='제공')||(ed.meal==='심판비 포함'&&o==='수당 포함')||(ed.meal==='별도 안내'&&o==='안내문 참조'))?' selected':'')+'>'+o+'</option>').join('')+'</select>'
+    +'<label class="stlabel">심판복 제공 여부</label><div id="pfUniformRow" style="margin-top:4px">'
+    +['제공','미제공','안내문 참조'].map(function(o){var cur=(ed&&ed.uniform)||'제공';return '<label class="chipck'+(cur===o?' on':'')+'"><input type="radio" name="pfUniform" value="'+o+'"'+(cur===o?' checked':'')+' onchange="pfUniformSync(this)"> '+o+'</label>'}).join('')+'</div>'
+    +'<label class="stlabel">숙박</label><div style="margin-top:4px">'
+    +['제공','수당 포함','해당없음'].map(function(o){var cur=(ed&&ed.lodging)||'해당없음';return '<label class="chipck'+(cur===o?' on':'')+'"><input type="radio" name="pfLodging" value="'+o+'"'+(cur===o?' checked':'')+' onchange="[...document.querySelectorAll(\'input[name=pfLodging]\')].forEach(function(r){r.parentElement.classList.toggle(\'on\',r.checked)})"> '+o+'</label>'}).join('')+'</div>'
     +'<label class="stlabel">준비물</label><div id="pfSupWrap">'
-    +DEFAULT_SUPPLIES.map(s2=>'<label class="chipck"><input type="checkbox" class="pfSup" value="'+esc(s2)+'"'+((ed?(ed.supplies||[]):DEFAULT_SUPPLIES).indexOf(s2)>=0?' checked':'')+'> '+esc(s2)+'</label>').join('')
+    +DEFAULT_SUPPLIES.map(s2=>'<label class="chipck"><input type="checkbox" class="pfSup" value="'+esc(s2)+'"'+((ed?(ed.supplies||[]):DEFAULT_CHECKED).indexOf(s2)>=0?' checked':'')+'> '+esc(s2)+'</label>').join('')
     +'<input id="pfSupEtc" class="stfield" style="display:inline-block;width:220px;margin-left:6px" placeholder="기타 준비물 (쉼표 구분)" value="'+esc(ed?(ed.supplies||[]).filter(x=>DEFAULT_SUPPLIES.indexOf(x)<0).join(', '):'')+'"></div>'
     +'<label class="stlabel">대회 안내 포스터·자료 첨부 <span style="font-weight:600;color:#8a919d;font-size:11px">(최대 10개 — 대진표·시간표 필수 포함 권장, 썸네일로 표시됩니다)</span></label>'
     +'<input type="file" id="pfPoster" accept="image/*" multiple style="display:block;margin-top:5px;font-size:13px" onchange="pfAddPosters(this)">'
     +'<div id="pfPosterList" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>'
-    +'<label class="stlabel">기타 안내사항 <span style="font-weight:600;color:#8a919d;font-size:11px">— 세부 안내·주의사항·연락처·집합 시간 등</span></label>'
+    +'<label class="stlabel">안내사항 <span style="font-weight:600;color:#8a919d;font-size:11px">— 세부 안내·주의사항·집합 시간 등</span></label>'
     +'<textarea id="pfDesc" rows="4" class="stfield">'+esc(ed?ed.description:'')+'</textarea>'
+    +'<label class="stlabel">문의처 <span style="font-weight:600;color:#8a919d;font-size:11px">— 담당자·연락처·이메일 등 (공고 하단에 표시)</span></label>'
+    +'<input id="pfContact" class="stfield" value="'+esc(ed?(ed.contactInfo||''):'')+'" placeholder="예: 사무국 031-984-3248 / kfdf60@hanmail.net">'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
     +'<button class="stbtn stbtn-ghost" onclick="document.getElementById(\'pfModal\').remove()">닫기</button>'
     +'<button class="stbtn stbtn-main" style="padding:11px 26px" id="pfSaveBtn" onclick="savePost(\''+(editId||'')+'\')">'+(ed?'💾 수정 저장':(isAdminU()||isSidoU()?'등록 (즉시 게시)':'등록 (관리자 승인 후 게시)'))+'</button></div>'
     +'</div>';
   document.body.appendChild(div);
   window.PF_ED=ed||null;
-  pfDates();pfRenderPosters();
+  renderCal();pfDates();pfRenderPosters();
+}
+// 심판복 라디오 — "미제공" 선택 시 준비물 [심판복] 자동 체크
+function pfUniformSync(radio){
+  [...document.querySelectorAll('input[name=pfUniform]')].forEach(function(r){r.parentElement.classList.toggle('on',r.checked)});
+  if(radio.value==='미제공'){
+    const sup=[...document.querySelectorAll('.pfSup')].find(x=>x.value==='심판복');
+    if(sup&&!sup.checked){sup.checked=true;}
+  }
+}
+// ── 클릭형 달력 (개별 날짜 다중선택 · 월 이동해도 선택 유지) ──
+function renderCal(){
+  const el=document.getElementById('pfCal');if(!el)return;
+  const y=PF_CAL_Y,m=PF_CAL_M;
+  const first=new Date(y,m,1),firstDow=first.getDay(),days=new Date(y,m+1,0).getDate();
+  const today=new Date();today.setHours(0,0,0,0);
+  let h='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+    +'<button type="button" class="stbtn stbtn-ghost" style="padding:4px 12px" onclick="PF_CAL_M--;if(PF_CAL_M<0){PF_CAL_M=11;PF_CAL_Y--}renderCal()">◀</button>'
+    +'<b style="flex:1;text-align:center;font-size:14px">'+y+'년 '+(m+1)+'월</b>'
+    +'<button type="button" class="stbtn stbtn-ghost" style="padding:4px 12px" onclick="PF_CAL_M++;if(PF_CAL_M>11){PF_CAL_M=0;PF_CAL_Y++}renderCal()">▶</button></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center;font-size:11px;font-weight:800;color:#8a919d">'+DOW.map((d,i)=>'<div style="'+(i===0?'color:#C41E2F':'')+'">'+d+'</div>').join('')+'</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:3px">';
+  for(let i=0;i<firstDow;i++)h+='<div></div>';
+  for(let d=1;d<=days;d++){
+    const ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const sel=PF_DATES.indexOf(ds)>=0;
+    const past=new Date(y,m,d)<today;
+    h+='<button type="button" onclick="calToggle(\''+ds+'\')" '+(past&&!sel?'disabled':'')
+      +' style="padding:8px 0;border-radius:8px;border:1.5px solid '+(sel?'#153A77':'#eceff4')+';background:'+(sel?'#153A77':(past?'#f8f9fb':'#fff'))+';color:'+(sel?'#fff':(past?'#c3c9d4':'#374151'))+';font-weight:800;font-size:13px;cursor:'+(past&&!sel?'default':'pointer')+';font-family:inherit">'+d+'</button>';
+  }
+  h+='</div>';
+  el.innerHTML=h;
+  renderPicked();
+}
+function calToggle(ds){
+  const i=PF_DATES.indexOf(ds);
+  if(i>=0)PF_DATES.splice(i,1);else{if(PF_DATES.length>=14){alert('대회 일자는 최대 14일까지 선택할 수 있습니다.');return}PF_DATES.push(ds);}
+  PF_DATES.sort();
+  renderCal();pfDates();
+}
+function renderPicked(){
+  const el=document.getElementById('pfPickedDates');if(!el)return;
+  el.innerHTML=PF_DATES.length
+    ?'<span style="font-size:12px;font-weight:800;color:#0f766e">✓ 선택한 날짜 ('+PF_DATES.length+'일): </span>'
+      +PF_DATES.map(d=>'<span class="chipck on" style="cursor:pointer" onclick="calToggle(\''+d+'\')" title="클릭하면 선택 해제">'+fmtD(d.slice(5))+' ('+dowOf(d)+') ✕</span>').join('')
+    :'<span style="font-size:12px;color:#C41E2F;font-weight:700">달력에서 대회 일자를 클릭해 선택하세요 (최소 1일)</span>';
 }
 function daySecHtml(date,i,cfg){
   cfg=cfg||{};
@@ -281,13 +337,14 @@ function daySecHtml(date,i,cfg){
   const duties=cfg.roles||[];
   const pays=cfg.allowance&&cfg.allowance.items?cfg.allowance.items:DEFAULT_PAY.map(x=>({role:x[0],amount:x[1]}));
   const payMode=(cfg.allowance&&cfg.allowance.mode)||'직접입력';
-  let h='<div class="pfDaySec" data-date="'+date+'" style="margin-top:12px;border:1.5px solid #d3e0f2;border-radius:12px;padding:14px 16px;background:#fbfdff">'
-    +'<b style="font-size:13.5px;color:#153A77">📅 '+fmtD(date)+' ('+dowOf(date)+')</b>'
+  const head=date?('📅 '+fmtD(date)+' ('+dowOf(date)+')'):'👥 공통 모집 설정 <span style="font-weight:600;color:#8a919d;font-size:11px">— 선택한 모든 날짜에 동일 적용</span>';
+  let h='<div class="pfDaySec" data-date="'+(date||'')+'" style="margin-top:12px;border:1.5px solid #d3e0f2;border-radius:12px;padding:14px 16px;background:#fbfdff">'
+    +'<b style="font-size:13.5px;color:#153A77">'+head+'</b>'
     +'<div style="font-size:12px;font-weight:800;margin-top:9px">모집 정원</div>'
     +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px">'
     +QUOTA_KEYS.map(([k,lb])=>'<div><label style="font-size:11px;font-weight:700;color:#6b7280">'+lb+'</label><input type="number" min="0" class="stfield pfQ_'+k+'" style="margin-top:2px" value="'+(q[k]||0)+'"></div>').join('')
     +'</div>'
-    +'<div style="font-size:12px;font-weight:800;margin-top:11px">임무 목록 <span style="font-weight:600;color:#8a919d;font-size:11px">(모집할 임무 체크)</span></div>';
+    +'<div style="font-size:12px;font-weight:800;margin-top:11px">임무 분야 <span style="font-weight:600;color:#8a919d;font-size:11px">(모집할 임무 체크)</span></div>';
   Object.keys(ROLE_TREE).forEach(grp=>{
     h+='<div style="margin-top:5px"><span style="font-size:11px;font-weight:900;color:#7c3aed">'+grp+'</span> ';
     ROLE_TREE[grp].forEach(r=>{
@@ -297,9 +354,9 @@ function daySecHtml(date,i,cfg){
     h+='</div>';
   });
   h+='<input class="stfield pfDutyEtc" style="margin-top:6px" placeholder="기타 임무 직접 입력 (쉼표 구분)" value="'+esc(duties.filter(d=>Object.values(ROLE_TREE).flat().indexOf(d)<0).join(', '))+'">'
-    +'<div style="font-size:12px;font-weight:800;margin-top:11px">수당 정보</div>'
+    +'<div style="font-size:12px;font-weight:800;margin-top:11px">수당 안내</div>'
     +'<select class="stfield pfPayMode" onchange="this.parentElement.querySelector(\'.pfPayRows\').style.display=this.value===\'직접입력\'?\'block\':\'none\'">'
-    +['직접입력','안내문 참조','별도 안내','미정'].map(o=>'<option'+(payMode===o?' selected':'')+'>'+o+'</option>').join('')+'</select>'
+    +['직접입력','안내문 참조','미정'].map(o=>'<option'+((payMode===o||(payMode==='별도 안내'&&o==='안내문 참조'))?' selected':'')+'>'+o+'</option>').join('')+'</select>'
     +'<div class="pfPayRows" style="display:'+(payMode==='직접입력'?'block':'none')+';margin-top:6px">'
     +pays.map(pp=>'<div class="pfPayRow" style="display:flex;gap:6px;margin-top:5px"><input class="stfield" style="flex:1;margin-top:0" placeholder="역할명" value="'+esc(pp.role||'')+'"><input class="stfield" style="flex:1;margin-top:0" placeholder="금액 (예: 100,000원)" value="'+esc(pp.amount||'')+'"><button class="stbtn stbtn-ghost" style="padding:6px 12px" onclick="this.parentElement.remove()">✕</button></div>').join('')
     +'<button class="stbtn stbtn-soft" style="padding:6px 14px;font-size:12px;margin-top:6px" onclick="pfAddPayRow(this)">+ 수당 항목 추가</button>'
@@ -313,22 +370,18 @@ function pfAddPayRow(btn){
   wrap.insertBefore(row,btn);
 }
 function pfDates(){
-  const s=document.getElementById('pfStart').value,e=document.getElementById('pfEnd').value||s;
-  if(e&&s&&e<s){document.getElementById('pfEnd').value=s;}
-  const dates=dateRange(s,document.getElementById('pfEnd').value||s);
-  document.getElementById('pfDayCount').textContent=dates.length?('총 '+dates.length+'일 대회 — 공고는 하나로 통합 게시되고, 신청자가 날짜를 선택합니다'):'';
-  const same=document.getElementById('pfSame').checked;
-  const box=document.getElementById('pfDaySecs');
+  const same=document.getElementById('pfSame')?document.getElementById('pfSame').checked:true;
+  const box=document.getElementById('pfDaySecs');if(!box)return;
   const ed=window.PF_ED;
-  if(!dates.length){
-    box.innerHTML='<div style="margin-top:12px;border:2px dashed #c7d2f0;border-radius:12px;padding:18px;text-align:center;background:#f8faff">'
-      +'<b style="font-size:14px;color:#153A77">👥 심판·운영요원 모집 정보 입력칸</b>'
-      +'<div style="font-size:12.5px;color:#6b7280;margin-top:6px">위에서 <b>대회 시작일·종료일</b>을 먼저 선택하세요.<br>선택하는 즉시 이곳에 날짜별 <b>모집 정원(관리위원·심판·운영요원·봉사요원) · 임무 목록 · 수당</b> 입력칸이 나타납니다.</div></div>';
-    return;
-  }
   const cfgOf=d=>{if(!ed||!ed.dates)return null;const f=ed.dates.find(x=>x.date===d);return f||null};
-  if(same){box.innerHTML='<div style="font-size:11.5px;color:#8a919d;margin-top:8px">아래 설정이 모든 날짜('+dates.length+'일)에 동일하게 적용됩니다.</div>'+daySecHtml(dates[0],0,cfgOf(dates[0])||undefined);}
-  else box.innerHTML=dates.map((d,i)=>daySecHtml(d,i,cfgOf(d)||undefined)).join('');
+  if(same){
+    // 공통 설정 — 날짜 선택 전에도 항상 표시 (정원·임무·수당 입력칸)
+    box.innerHTML=daySecHtml('',0,(PF_DATES.length?cfgOf(PF_DATES[0]):(ed&&ed.dates&&ed.dates[0]))||undefined);
+  }else{
+    box.innerHTML=PF_DATES.length
+      ?PF_DATES.map((d,i)=>daySecHtml(d,i,cfgOf(d)||undefined)).join('')
+      :'<div style="margin-top:10px;font-size:12.5px;color:#C41E2F;font-weight:700">달력에서 날짜를 먼저 선택하면 날짜별 설정칸이 나타납니다.</div>';
+  }
 }
 function pfAddPosters(input){
   const files=[...input.files];
@@ -368,11 +421,11 @@ function readDaySec(sec){
 }
 async function savePost(editId){
   const v=id=>{const e=document.getElementById(id);return e?(e.value||'').trim():''};
-  const name=v('pfName'),s=v('pfStart'),e=v('pfEnd')||s,loc=v('pfLoc'),time=v('pfTime'),dl=v('pfDL');
+  const name=v('pfName'),loc=v('pfLoc'),time=v('pfTime'),dl=v('pfDL');
   if(!v('pfHost')){alert('주최 (표시명)을 입력해주세요.');return}
-  if(!name||!s||!loc||!time||!dl){alert('대회명·시작일·장소·시간·모집 마감일을 입력해주세요.');return}
-  const dates=dateRange(s,e);
-  if(!dates.length||dates.length>14){alert('대회 기간을 확인해주세요 (최대 14일).');return}
+  if(!name||!loc||!time||!dl){alert('대회명·장소·시간·모집 마감일을 입력해주세요.');return}
+  if(!PF_DATES.length){alert('달력에서 대회 일자를 1일 이상 클릭해 선택해주세요.');return}
+  const dates=PF_DATES.slice().sort();
   const same=document.getElementById('pfSame').checked;
   const secs=[...document.querySelectorAll('.pfDaySec')];
   let dateArr;
@@ -380,16 +433,17 @@ async function savePost(editId){
     const cfg=readDaySec(secs[0]);
     dateArr=dates.map(d=>Object.assign({date:d,dayOfWeek:dowOf(d)},JSON.parse(JSON.stringify(cfg))));
   }else{
-    dateArr=secs.map(sec=>Object.assign({date:sec.dataset.date,dayOfWeek:dowOf(sec.dataset.date)},readDaySec(sec)));
+    dateArr=secs.filter(s2=>s2.dataset.date).map(sec=>Object.assign({date:sec.dataset.date,dayOfWeek:dowOf(sec.dataset.date)},readDaySec(sec)));
   }
   const SPORTS=[...document.querySelectorAll('.pfSportCk:checked')].map(x=>x.value)
     .concat((v('pfSportEtc')||'').split(',').map(x=>x.trim()).filter(Boolean));
   if(!SPORTS.length){alert('대회 종목을 1개 이상 선택해주세요.');return}
   const supplies=[...document.querySelectorAll('.pfSup:checked')].map(x=>x.value)
     .concat((v('pfSupEtc')||'').split(',').map(x=>x.trim()).filter(Boolean));
+  const uniform=(document.querySelector('input[name=pfUniform]:checked')||{}).value||'제공';
+  const lodging=(document.querySelector('input[name=pfLodging]:checked')||{}).value||'해당없음';
   const btn=document.getElementById('pfSaveBtn');btn.disabled=true;btn.textContent='저장 중…';
   try{
-    // 포스터 업로드 (신규 파일만)
     const posters=[];
     for(const p of PF_POSTERS){
       if(p.url){posters.push({url:p.url,name:p.name||''});continue}
@@ -401,10 +455,10 @@ async function savePost(editId){
     }
     const instant=isAdminU()||isSidoU();
     const data={
-      competitionName:name,startDate:s,endDate:e,dates:dateArr,
+      competitionName:name,startDate:dates[0],endDate:dates[dates.length-1],dates:dateArr,
       location:loc,time:time,sport:SPORTS.join(' · '),sports:SPORTS,deadline:dl,
-      transportation:v('pfTrans'),meal:v('pfMeal'),supplies:supplies,
-      posters:posters,description:v('pfDesc'),
+      transportation:v('pfTrans'),meal:v('pfMeal'),uniform:uniform,lodging:lodging,
+      supplies:supplies,posters:posters,description:v('pfDesc'),contactInfo:v('pfContact'),
       author:{uid:SME.uid,name:SMY.name||'',organization:(v('pfHost')||myOrg()),contact:SMY.phone||'',email:SMY.email||''},
       status:'모집중',
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()
@@ -419,7 +473,7 @@ async function savePost(editId){
       await DB.collection('competitionStaff').add(data);
     }
     document.getElementById('pfModal').remove();
-    alert(editId?'✓ 수정되었습니다.':(instant?'✓ 공고가 등록·게시되었습니다.':'✓ 공고가 등록되었습니다.\n시도연맹 승인 후 게시됩니다.'));
+    alert(editId?'✓ 수정되었습니다.':(instant?'✓ 공고가 등록·게시되었습니다.':'✓ 공고가 등록되었습니다.\n관리자 승인 후 게시됩니다.'));
     loadPosts();
   }catch(err){alert('저장 실패: '+err.message);btn.disabled=false;btn.textContent='등록'}
 }
@@ -468,15 +522,17 @@ function renderDetail(){
     +'<b style="font-size:17px">'+esc(p.competitionName)+'</b>'
     +'<span style="flex:1"></span><button class="stbtn stbtn-ghost" onclick="document.getElementById(\'dtModal\').remove()">닫기 ✕</button></div>'
     +'<div style="font-size:13px;color:#4b5563;margin-top:8px;line-height:1.9">'
-    +'📅 '+fmtD(p.startDate)+(p.endDate!==p.startDate?' ~ '+fmtD(p.endDate)+' ('+dates.length+'일)':' ('+dowOf(p.startDate)+')')
+    +'📅 '+periodTxt(p)
     +' &nbsp;·&nbsp; 📍 '+esc(p.location||'')+' &nbsp;·&nbsp; 🕐 '+esc(p.time||'')+' &nbsp;·&nbsp; 🥏 '+esc(p.sport||'')
     +'<br>🗓 모집 마감: <b>'+fmtD(p.deadline)+'</b>'
     +' &nbsp;·&nbsp; 🚌 교통비: '+esc(p.transportation||'-')+' &nbsp;·&nbsp; 🍱 식사: '+esc(p.meal||'-')
+    +'<br>🥋 심판복: '+esc(p.uniform||'-')+' &nbsp;·&nbsp; 🛏 숙박: '+esc(p.lodging||'-')
     +'<br>🎒 준비물: '+esc((p.supplies||[]).join(', ')||'-')
     +'<br>👤 담당: '+esc((p.author&&p.author.organization)||'')+(p.author&&p.author.contact?' · '+esc(mphone(p.author.contact)):'')+(manage&&p.author&&p.author.email?' · '+esc(p.author.email):'')
     +'</div>'
     +((p.posters||[]).length?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+(p.posters||[]).map(ps=>'<img class="stthumb" src="'+esc(ps.url)+'" title="'+esc(ps.name||'')+'" onclick="window.open(this.src)">').join('')+'</div>':'')
-    +(p.description?'<div style="font-size:13px;color:#374151;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:11px 14px;margin-top:10px;line-height:1.7">'+esc(p.description)+'</div>':'')
+    +(p.description?'<div style="font-size:13px;color:#374151;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:11px 14px;margin-top:10px;line-height:1.7"><b style="font-size:12px;color:#153A77">📢 안내사항</b><br>'+esc(p.description)+'</div>':'')
+    +(p.contactInfo?'<div style="font-size:12.5px;font-weight:700;color:#153A77;background:#eef3fa;border-radius:10px;padding:9px 14px;margin-top:8px">☎ 문의처: '+esc(p.contactInfo)+'</div>':'')
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:16px">'
     +dates.map((d2,i)=>'<button class="daytab'+(i===DT_DAY?' on':'')+'" onclick="DT_DAY='+i+';renderDetail()">'+fmtD((d2.date||'').slice(5))+' ('+(d2.dayOfWeek||dowOf(d2.date))+')</button>').join('')
     +'</div>'
@@ -487,7 +543,7 @@ function renderDetail(){
     +'<div style="font-size:13px;margin-top:12px"><b>👥 신청 현황 ('+dayApps.length+'명)</b></div>'+appsHtml
     +'</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">'
-    +(manage?'<button class="stbtn stbtn-ghost" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button>':'')
+    +(manage?'<button class="stbtn stbtn-soft" onclick="document.getElementById(\'dtModal\').remove();openPostForm(\''+p.id+'\')">✏️ 공고 수정</button><button class="stbtn stbtn-ghost" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button>':'')
     +'<button class="stbtn stbtn-main" style="padding:11px 26px" onclick="openApplyForm(\''+p.id+'\')">✍️ 신청하기 (날짜 선택)</button>'
     +'</div></div>';
   document.body.appendChild(div);

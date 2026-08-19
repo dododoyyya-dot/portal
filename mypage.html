@@ -1211,8 +1211,14 @@ async function saveProfile(){
   if(req('pfGender','성별'))return;
   if(req('pfAddr','집 주소'))return;
   if(req('pfAddr2','상세주소 (동·호수)'))return;
-  if(!AA.length&&!window._AA_LEGACY&&!(MYD&&MYD.baseCity)){
-    m.textContent='⚠ 「활동 가능 범위」를 최소 1곳 이상 선택해주세요 (강습 배정에 필수)';m.style.color='#8c1622';
+  if(!aaSave().length){
+    m.textContent='⚠ 「활동 지역(활동 가능 범위)」은 모든 회원 필수입니다 — 지도에서 최소 1곳 이상 선택해주세요';m.style.color='#8c1622';
+    const box=document.getElementById('aaSidoRow');
+    if(box){box.scrollIntoView({behavior:'smooth',block:'center'});box.style.outline='2px solid #C41E2F';setTimeout(()=>{box.style.outline=''},4000);}
+    PFBUSY=false;return;
+  }
+  if(!(aaBase()||(typeof MYD!=='undefined'&&MYD&&MYD.baseCity))){
+    m.textContent='⚠ 「거점 시·군·구」는 모든 회원 필수입니다 — 활동 지역에서 첫 번째로 선택한 시·군·구가 거점이 됩니다';m.style.color='#8c1622';
     const box=document.getElementById('aaSidoRow');
     if(box){box.scrollIntoView({behavior:'smooth',block:'center'});box.style.outline='2px solid #C41E2F';setTimeout(()=>{box.style.outline=''},4000);}
     PFBUSY=false;return;
@@ -1295,10 +1301,10 @@ async function saveProfile(){
       workSchool:document.getElementById('pfWork').value.trim(),
       school:(document.getElementById('pfSchool')?document.getElementById('pfSchool').value.trim():(MYD.school||'')),
       schoolNorm:normSchool(document.getElementById('pfSchool')?document.getElementById('pfSchool').value.trim():(MYD.school||'')),
-      birth:document.getElementById('pfBirth').value,
-      qualNoLeader:qualLeader,
-      qualNoReferee:qualRef
+      birth:document.getElementById('pfBirth').value
     };
+    if(qualLeader!==(MYD.qualNoLeader||''))upd.qualNoLeader=qualLeader;
+    if(qualRef!==(MYD.qualNoReferee||''))upd.qualNoReferee=qualRef;
     if(df&&MYD.degreeDoc!==degDoc)upd.degreeApproved=false; // 새 증빙 첨부 시 재확인 대상
     if(ncf&&MYD.natCertDoc!==ncDoc)upd.natCertApproved=false; // 새 국가공인자격 증빙 첨부 시 재확인 대상
     await DB.collection('users').doc(AUTH.currentUser.uid).update(upd);
@@ -1318,6 +1324,14 @@ async function saveProfile(){
                   claimedByName:MYD.name,
                   claimedAt:firebase.firestore.FieldValue.serverTimestamp()
                 });
+                // 자격증 등록(연동) 성공 → 잠정 강사 전환 (강사등록 버튼 불필요)
+                if(MYD.accountType!=='instructor'&&MYD.accountType!=='teacher'&&ageOf(MYD.birth)>=18){
+                  try{
+                    await DB.collection('users').doc(AUTH.currentUser.uid).update({accountType:'instructor',memberGroup:'active'});
+                    MYD.accountType='instructor';MYD.memberGroup='active';
+                    alert('🎖 자격증('+no+')이 연동되어 회원 유형이 [지도자·강사]로 전환되었습니다.\n이제 강사 활동 지원·배정 대상이 됩니다.');
+                  }catch(e2){console.warn('type convert',e2)}
+                }
               }
             }
           }
