@@ -148,14 +148,17 @@ AUTH.onAuthStateChanged(async u=>{
   loadPosts();
 });
 async function loadMyLic(){
+  MYLIC_DOCS._valid=[];  // 안전 초기값 — fetch 실패해도 빈 배열 유지
   try{
     const today=new Date().toISOString().slice(0,10);
     const snap=await DB.collection('licenses').where('uid','==',SME.uid).get();
     MYLIC_DOCS=snap.docs.map(d=>d.data());
+    MYLIC_DOCS._valid=[];  // Array 속성 재부착 (docs.map 결과는 순수 배열)
     MYLIC=MYLIC_DOCS.map(l=>(l.type||'')+' '+(l.grade||'')).filter(Boolean).join(' · ');
-    // 유효 자격증만 별도 문자열 (신청 유효성 검사에 사용)
-    MYLIC_DOCS._valid=MYLIC_DOCS.filter(l=>l.status!=='만료'&&(!l.expireAt||l.expireAt>=today));
-  }catch(e){}
+    // 유효 자격증만 별도 (신청 유효성 검사에 사용)
+    const valid=MYLIC_DOCS.filter(l=>l.status!=='만료'&&(!l.expireAt||l.expireAt>=today));
+    MYLIC_DOCS._valid=valid;
+  }catch(e){MYLIC_DOCS._valid=[];}
 }
 // ══════════════ 목록 ══════════════
 async function loadPosts(){
@@ -244,6 +247,7 @@ function expandRowHtml(p){
     +'<div class="stprog" style="max-width:140px"><div style="width:'+pct+'%"></div></div>'
     +'<span style="font-size:12.5px;font-weight:800;color:#153A77">신청 '+t.applied+' / 모집 '+t.quota+'명 ('+pct+'%)</span>'
     +'<span style="flex:1"></span>'
+    +'<button class="stbtn" style="padding:5px 12px;font-size:12px;background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="event.stopPropagation();openDetail(\''+p.id+'\')">👥 신청현황</button>'
     +(manage
       ?(!p.approved&&isAdminU()?'<button class="stbtn stbtn-teal" style="padding:5px 11px;font-size:12px" onclick="approvePost(\''+p.id+'\',1)">✓ 승인</button>'
         +'<button class="stbtn" style="padding:5px 11px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="approvePost(\''+p.id+'\',0)">반려</button>':'')
@@ -566,16 +570,24 @@ async function savePost(editId){
   }catch(err){alert('저장 실패: '+err.message);btn.disabled=false;btn.textContent='등록'}
 }
 // ══════════════ 상세 (날짜별 탭) ══════════════
-let DT_ID=null,DT_DAY=0;
+let DT_ID=null,DT_DAY=0,_rdRunning=false;
 function openDetail(id){
   DT_ID=id;DT_DAY=0;LIC_CACHE={};renderDetail();
 }
 async function renderDetail(){
+  // BUG-2/3 fix: 동시 호출 방지 — 이미 실행 중이면 무시
+  if(_rdRunning)return;
+  _rdRunning=true;
+  try{ await _renderDetailInner(); }finally{ _rdRunning=false; }
+}
+async function _renderDetailInner(){
   const p=POSTS.find(x=>x.id===DT_ID);if(!p)return;
   const apps=APPS[p.id]||[];
   const old=document.getElementById('dtModal');if(old)old.remove();
   const div=document.createElement('div');div.id='dtModal';
   div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.6);z-index:9998;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
+  // BUG-2 fix: await 전에 DOM에 추가해야 동시 호출 시 중복 모달 방지
+  document.body.appendChild(div);
   const dates=p.dates||[];
   const dd=dates[DT_DAY]||dates[0]||{};
   const manage=canManage(p);
@@ -592,10 +604,9 @@ async function renderDetail(){
     if(missing.length){
       await Promise.all(missing.map(async uid=>{
         try{
-          const today=new Date().toISOString().slice(0,10);
           const snap=await DB.collection('licenses').where('uid','==',uid).get();
           const lics=snap.docs.map(d=>d.data());
-          // 심판 최상위
+          // 심판 · 지도자 각 최상위 1개 (급수 기준 정렬)
           const refSort=lics.filter(l=>(l.type||'').includes('심판')).sort((a,b)=>(_LIC_R_RANK[a.grade]??99)-(_LIC_R_RANK[b.grade]??99));
           const insSort=lics.filter(l=>(l.type||'').includes('지도자')).sort((a,b)=>(_LIC_I_RANK[a.grade]??99)-(_LIC_I_RANK[b.grade]??99));
           LIC_CACHE[uid]={ref:refSort[0]||null,ins:insSort[0]||null};
@@ -666,7 +677,7 @@ async function renderDetail(){
     +(manage?'<button class="stbtn stbtn-soft" onclick="document.getElementById(\'dtModal\').remove();openPostForm(\''+p.id+'\')">✏️ 공고 수정</button><button class="stbtn stbtn-ghost" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button><button class="stbtn" style="background:#f0fdf4;color:#0f766e;border:1.5px solid #a7f3d0" onclick="exportPayExcel(\''+p.id+'\')">💰 수당지급 엑셀</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button>':'')
     +'<button class="stbtn stbtn-main" style="padding:11px 26px" onclick="openApplyForm(\''+p.id+'\')">✍️ 신청하기 (날짜 선택)</button>'
     +'</div></div>';
-  document.body.appendChild(div);
+  // div는 await 전에 이미 DOM에 추가됨 — innerHTML 설정만으로 내용 갱신
 }
 // ══════════════ 신청 ══════════════
 function openApplyForm(id){
@@ -875,7 +886,9 @@ async function viewAllLicenses(postId){
       const snap=await DB.collection('licenses').where('uid','==',uid).get();
       licMap[uid]=snap.docs.map(d=>d.data());
     }));
-    let html='<div style="font-size:12px;color:#6b7280;margin-bottom:8px">심판·지도자 자격증 중 <b>최상위 1개씩</b>만 표시합니다. Firestore licenses 컬렉션 기준.</div>';
+    const _todayL=new Date().toISOString().slice(0,10);
+    const licValid=l=>l.status!=='만료'&&(!l.expireAt||l.expireAt>=_todayL);
+    let html='<div style="font-size:12px;color:#6b7280;margin-bottom:8px">심판·지도자 자격증 중 <b>최상위 1개씩</b>만 표시합니다. Firestore licenses 컬렉션 기준. <b style="color:#0f766e">✓유효</b> <b style="color:#C41E2F">✗만료</b></div>';
     html+='<table class="sttbl"><tr><th>#</th><th>성명</th><th>연락처</th><th>심판 최상위</th><th>지도자 최상위</th><th>전체 자격</th></tr>';
     apps.forEach((a,i)=>{
       const lics=licMap[a.uid]||[];
@@ -883,12 +896,16 @@ async function viewAllLicenses(postId){
       const insLics=lics.filter(l=>(l.type||'').includes('지도자')).sort((a,b)=>(_LIC_I_RANK[a.grade]??99)-(_LIC_I_RANK[b.grade]??99));
       const bRef=refLics[0],bIns=insLics[0];
       const allTxt=lics.map(l=>esc((l.type||'')+' '+(l.grade||''))).join(', ')||'없음';
+      // BUG-6 fix: 만료 자격증은 빨간색으로 표시
+      const refOk=bRef&&licValid(bRef),insOk=bIns&&licValid(bIns);
+      const refCol=bRef?(refOk?'#0f766e':'#C41E2F'):'#8a919d';
+      const insCol=bIns?(insOk?'#153A77':'#C41E2F'):'#8a919d';
       html+='<tr>'
         +'<td>'+(i+1)+'</td>'
         +'<td><b>'+esc(a.name||'')+'</b></td>'
         +'<td>'+esc(a.phone||'-')+'</td>'
-        +'<td>'+(bRef?'<b style="color:#0f766e">'+esc(bRef.type+' '+bRef.grade)+'</b>'+'<br><span style="font-size:11px;color:#8a919d">'+esc(bRef.status||'')+'</span>':'<span style="color:#8a919d">없음</span>')+'</td>'
-        +'<td>'+(bIns?'<b style="color:#153A77">'+esc(bIns.type+' '+bIns.grade)+'</b>'+'<br><span style="font-size:11px;color:#8a919d">'+esc(bIns.status||'')+'</span>':'<span style="color:#8a919d">없음</span>')+'</td>'
+        +'<td>'+(bRef?'<b style="color:'+refCol+'">'+(refOk?'✓ ':'✗ ')+esc(bRef.type+' '+bRef.grade)+'</b><br><span style="font-size:11px;color:'+refCol+'">'+(refOk?'유효':'만료')+(bRef.expireAt?' ~'+bRef.expireAt.slice(0,10):'')+'</span>':'<span style="color:#8a919d">없음</span>')+'</td>'
+        +'<td>'+(bIns?'<b style="color:'+insCol+'">'+(insOk?'✓ ':'✗ ')+esc(bIns.type+' '+bIns.grade)+'</b><br><span style="font-size:11px;color:'+insCol+'">'+(insOk?'유효':'만료')+(bIns.expireAt?' ~'+bIns.expireAt.slice(0,10):'')+'</span>':'<span style="color:#8a919d">없음</span>')+'</td>'
         +'<td style="font-size:11.5px;color:#555">'+allTxt+'</td>'
         +'</tr>';
     });
