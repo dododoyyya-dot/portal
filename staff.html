@@ -674,7 +674,7 @@ async function _renderDetailInner(){
     +'<div style="font-size:13px;margin-top:12px"><b>👥 신청 현황 ('+dayApps.length+'명)</b></div>'+appsHtml
     +'</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">'
-    +(manage?'<button class="stbtn stbtn-soft" onclick="document.getElementById(\'dtModal\').remove();openPostForm(\''+p.id+'\')">✏️ 공고 수정</button><button class="stbtn stbtn-ghost" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button><button class="stbtn" style="background:#f0fdf4;color:#0f766e;border:1.5px solid #a7f3d0" onclick="exportPayExcel(\''+p.id+'\')">💰 수당지급 엑셀</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button>':'')
+    +(manage?'<button class="stbtn stbtn-soft" onclick="document.getElementById(\'dtModal\').remove();openPostForm(\''+p.id+'\')">✏️ 공고 수정</button><button class="stbtn stbtn-ghost" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button><button class="stbtn" style="background:#f0fdf4;color:#0f766e;border:1.5px solid #a7f3d0" onclick="exportPayExcel(\''+p.id+'\')">💰 수당지급 엑셀</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
     +'<button class="stbtn stbtn-main" style="padding:11px 26px" onclick="openApplyForm(\''+p.id+'\')">✍️ 신청하기 (날짜 선택)</button>'
     +'</div></div>';
   // div는 await 전에 이미 DOM에 추가됨 — innerHTML 설정만으로 내용 갱신
@@ -786,6 +786,42 @@ async function decideApp(appId,date,decision){
     KFDF.notify(app.uid,'['+(app.competitionName||'대회')+'] '+fmtD(date)+' 심판·운영요원 신청이 '+msg,'staff.html');
     await loadPosts();renderDetail();
   }catch(e){alert('처리 실패: '+e.message)}
+}
+// ══════════════ 경력 일괄등록 ══════════════
+async function registerCareer(postId,date){
+  const p=POSTS.find(x=>x.id===postId);if(!p)return;
+  const dd=(p.dates||[]).find(x=>x.date===date)||{};
+  const apps=(APPS[postId]||[]).filter(a=>(a.status||{})[date]==='확정');
+  if(!apps.length){alert('해당 날짜에 확정된 신청자가 없습니다.');return}
+  if(!confirm('📝 경력 일괄등록\n\n대회: '+p.competitionName+'\n날짜: '+fmtD(date)+'\n확정인원: '+apps.length+'명\n\n확정된 심판·운영요원 전원의 경력을 staffCareer 컬렉션에 등록합니다.\n이미 등록된 기록은 건너뜁니다.\n\n계속하시겠습니까?'))return;
+  try{
+    const today=new Date().toISOString().slice(0,10);
+    let added=0,skipped=0;
+    for(const app of apps){
+      const dupSnap=await DB.collection('staffCareer')
+        .where('postId','==',postId)
+        .where('date','==',date)
+        .where('uid','==',app.uid)
+        .limit(1).get();
+      if(!dupSnap.empty){skipped++;continue;}
+      const assign=(app.assign||{})[date]||{};
+      await DB.collection('staffCareer').add({
+        uid:app.uid,
+        name:app.name||'',
+        phone:app.phone||'',
+        postId:postId,
+        competitionName:p.competitionName||'',
+        date:date,
+        duty:assign.duty||((app.prefs||{})[date]||[]).join(', ')||'-',
+        location:p.location||'',
+        sport:p.sport||'',
+        organizer:(p.author&&p.author.organization)||'',
+        registeredAt:firebase.firestore.FieldValue.serverTimestamp()
+      });
+      added++;
+    }
+    alert('✅ 경력 등록 완료!\n등록: '+added+'명 / 중복(건너뜀): '+skipped+'명');
+  }catch(e){alert('경력 등록 실패: '+e.message);}
 }
 // ══════════════ [신규] 자격증 상위 1개씩 추출 ══════════════
 const _LIC_R_RANK={'국제심판':0,'1급':1,'2급':2,'3급':3,'4급':4,'5급':5};

@@ -505,6 +505,11 @@ function orgChip(o,region,title,fed){
     <div class="board" id="compContractList"></div>
     <div class="note" style="margin-top:14px">대회 심판·운영요원으로 확정되면 이곳에 표시됩니다. 계약서를 확인한 뒤 화면에 직접 서명하면 전자서명·동의 일시가 기록됩니다.</div>
   </div>
+  <div id="staffCareerBox" style="display:none;margin-top:44px">
+    <h3 class="sub">심판·운영요원 경력</h3>
+    <div class="board" id="staffCareerList"><div class="bempty">불러오는 중…</div></div>
+    <div class="note" style="margin-top:14px">대회 심판·운영요원으로 확정·활동한 기록이 사무국에 의해 등록됩니다. 누락된 경력은 kfdf60@hanmail.net으로 문의하세요.</div>
+  </div>
   <div id="logBox" style="display:none;margin-top:44px">
     <h3 class="sub">회차 보고 (운영일지)</h3>
     <div style="background:#eef3fa;border:1.5px solid #b9cdec;border-radius:12px;padding:13px 17px;margin-bottom:14px;font-size:13px;line-height:1.75;color:#1a2b4a">
@@ -1033,7 +1038,7 @@ function showMyTab(k){
   if(tb){const r=tb.getBoundingClientRect();if(r.top<0||r.top>window.innerHeight-80)tb.scrollIntoView({block:'start'});}
 }
 (function(){
-  const map={alarmBox:'Alarm',famReqBox:'Alarm',profileBox:'Profile',kidsBox:'Family',certBox:'Career',licBox:'Career',claimBox:'Career',contractBox:'Work',compContractBox:'Work',logBox:'Work',actList:'Work',consentBox:'Work'};
+  const map={alarmBox:'Alarm',famReqBox:'Alarm',profileBox:'Profile',kidsBox:'Family',certBox:'Career',licBox:'Career',claimBox:'Career',contractBox:'Work',compContractBox:'Work',staffCareerBox:'Work',logBox:'Work',actList:'Work',consentBox:'Work'};
   const h=(location.hash||'').replace('#','');
   if(map[h]&&map[h]!=='Profile'){
     showMyTab(map[h]);
@@ -1476,6 +1481,22 @@ AUTH.onAuthStateChanged(async u=>{
     if(MYCOMP.length){
       document.getElementById('compContractBox').style.display='block';
       renderCompContracts();
+    }
+  }catch(e){}
+  try{
+    const careerSnap=await DB.collection('staffCareer').where('uid','==',u.uid).orderBy('date','desc').limit(100).get();
+    if(!careerSnap.empty){
+      document.getElementById('staffCareerBox').style.display='block';
+      const rows=careerSnap.docs.map(d2=>{const c=d2.data();return '<div class="brow" style="display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;padding:10px 14px">'
+        +'<span style="font-size:12px;color:#8a919d;min-width:80px">'+esc(c.date||'')+'</span>'
+        +'<span style="font-weight:800;font-size:13.5px;flex:1;min-width:120px">'+esc(c.competitionName||'')+'</span>'
+        +'<span class="cat" style="font-size:12px">'+esc(c.duty||'-')+'</span>'
+        +'<span style="font-size:12px;color:#6b7280">'+esc(c.location||'-')+'</span>'
+        +'<span style="font-size:12px;color:#6b7280">'+esc(c.sport||'-')+'</span>'
+        +'</div>';}).join('');
+      document.getElementById('staffCareerList').innerHTML='<div class="head" style="display:flex;flex-wrap:wrap;gap:6px 16px;padding:8px 14px;font-size:11.5px;font-weight:800;color:#374151">'
+        +'<span style="min-width:80px">날짜</span><span style="flex:1;min-width:120px">대회명</span><span>임무</span><span>지역</span><span>종목</span></div>'
+        +rows;
     }
   }catch(e){}
   // 계좌·주민번호 입력은 누구나 상시 가능(배정 여부 무관 — 2026-07-31 사용자 요청으로 재상시화). 전자동의는 배정(위촉)된 경우에만 노출.
