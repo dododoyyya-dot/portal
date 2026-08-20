@@ -123,7 +123,7 @@ const DEFAULT_PAY=[['주심','150,000원'],['부심','120,000원'],['기록원',
 const DEFAULT_SUPPLIES=['필기구','텀블러 (물병 지참)','운동화','심판복'];
 const DEFAULT_CHECKED=['필기구','텀블러 (물병 지참)','운동화'];
 
-let SME=null,SMY=null,POSTS=[],APPS={},MYLIC='';
+let SME=null,SMY=null,POSTS=[],APPS={},MYLIC='',MYLIC_DOCS=[],LIC_CACHE={};
 function isAdminU(){return !!(SMY&&(SMY.role==='admin'||SMY.owner))}
 function isSidoU(){return !!(SMY&&(SMY.role==='sidoOfficer'||(SMY.roles&&SMY.roles.indexOf('sidoOfficer')>=0)))}
 function canManage(p){return isAdminU()||isSidoU()||(SME&&p.author&&p.author.uid===SME.uid)}
@@ -149,8 +149,12 @@ AUTH.onAuthStateChanged(async u=>{
 });
 async function loadMyLic(){
   try{
+    const today=new Date().toISOString().slice(0,10);
     const snap=await DB.collection('licenses').where('uid','==',SME.uid).get();
-    MYLIC=snap.docs.map(x=>{const l=x.data();return (l.type||'')+' '+(l.grade||'')}).filter(Boolean).join(' · ');
+    MYLIC_DOCS=snap.docs.map(d=>d.data());
+    MYLIC=MYLIC_DOCS.map(l=>(l.type||'')+' '+(l.grade||'')).filter(Boolean).join(' · ');
+    // 유효 자격증만 별도 문자열 (신청 유효성 검사에 사용)
+    MYLIC_DOCS._valid=MYLIC_DOCS.filter(l=>l.status!=='만료'&&(!l.expireAt||l.expireAt>=today));
   }catch(e){}
 }
 // ══════════════ 목록 ══════════════
@@ -566,7 +570,7 @@ let DT_ID=null,DT_DAY=0;
 function openDetail(id){
   DT_ID=id;DT_DAY=0;renderDetail();
 }
-function renderDetail(){
+async function renderDetail(){
   const p=POSTS.find(x=>x.id===DT_ID);if(!p)return;
   const apps=APPS[p.id]||[];
   const old=document.getElementById('dtModal');if(old)old.remove();
@@ -582,22 +586,53 @@ function renderDetail(){
   const payHtml=pay.mode==='직접입력'&&(pay.items||[]).length
     ?'<table class="sttbl" style="max-width:340px;margin-top:5px">'+(pay.items||[]).map(i2=>'<tr><td>'+esc(i2.role)+'</td><td style="text-align:right;font-weight:800">'+esc(i2.amount)+'</td></tr>').join('')+'</table>'
     :'<b>'+esc(pay.mode||'미정')+'</b>';
+  // 관리자 뷰: 신청자별 자격증 유효성 캐시 로드
+  if(manage&&dayApps.length){
+    const missing=dayApps.map(a=>a.uid).filter(uid=>!LIC_CACHE[uid]);
+    if(missing.length){
+      await Promise.all(missing.map(async uid=>{
+        try{
+          const today=new Date().toISOString().slice(0,10);
+          const snap=await DB.collection('licenses').where('uid','==',uid).get();
+          const lics=snap.docs.map(d=>d.data());
+          // 심판 최상위
+          const refSort=lics.filter(l=>(l.type||'').includes('심판')).sort((a,b)=>(_LIC_R_RANK[a.grade]??99)-(_LIC_R_RANK[b.grade]??99));
+          const insSort=lics.filter(l=>(l.type||'').includes('지도자')).sort((a,b)=>(_LIC_I_RANK[a.grade]??99)-(_LIC_I_RANK[b.grade]??99));
+          LIC_CACHE[uid]={ref:refSort[0]||null,ins:insSort[0]||null};
+        }catch(e){LIC_CACHE[uid]={ref:null,ins:null};}
+      }));
+    }
+  }
+  const licBadge=(l,today)=>{
+    if(!l)return '<span style="color:#d1d5db;font-size:11px">없음</span>';
+    const valid=l.status!=='만료'&&(!l.expireAt||l.expireAt>=today);
+    const label=(l.type||'')+' '+(l.grade||'');
+    return '<span style="font-weight:800;color:'+(valid?'#0f766e':'#C41E2F')+'">'+(valid?'✓ ':'✗ ')+esc(label)+'</span>'
+      +'<span style="display:block;font-size:10.5px;color:'+(valid?'#6b7280':'#C41E2F')+';margin-top:1px">'+(valid?'유효':'만료')+(l.expireAt?' ~'+l.expireAt.slice(0,10):'')+'</span>';
+  };
   let appsHtml;
   if(!dayApps.length)appsHtml='<div style="font-size:12.5px;color:#8a919d;padding:8px 0">이 날짜 신청자가 아직 없습니다.</div>';
   else{
-    appsHtml='<table class="sttbl" style="margin-top:6px"><tr><th>번호</th><th>성명</th>'+(manage?'<th>연락처</th>':'')+'<th>자격증</th><th>희망 임무</th><th>상태</th>'+(manage?'<th>동의서</th>':'')+(manage?'<th>처리</th>':'')+'</tr>'
+    const today=new Date().toISOString().slice(0,10);
+    appsHtml='<table class="sttbl" style="margin-top:6px"><tr><th>번호</th><th>성명</th>'+(manage?'<th>연락처</th>':'')+(manage?'<th>심판 자격</th><th>지도자 자격</th>':'<th>자격증</th>')+'<th>희망 임무</th><th>상태</th>'+(manage?'<th>동의서</th>':'')+(manage?'<th>선정</th>':'')+'</tr>'
       +dayApps.map((a,i)=>{
         const st=(a.status&&a.status[dd.date])||'대기';
         const asg=a.assign&&a.assign[dd.date];
-        const stHtml=st==='확정'?'<b style="color:#0f766e">✓ 확정'+(asg?' ('+esc(asg.duty)+')':'')+'</b>':st==='거절'?'<b style="color:#C41E2F">거절</b>':st==='보류'?'<b style="color:#b8860b">보류</b>':'대기';
-        return '<tr><td>'+(i+1)+'</td>'
+        const stHtml=st==='확정'?'<b style="color:#0f766e">✅ 확정'+(asg?' <span style="font-size:11px">('+esc(asg.duty)+')</span>':'')+'</b>':st==='거절'?'<b style="color:#C41E2F">❌ 거절</b>':st==='보류'?'<b style="color:#b8860b">⏳ 보류</b>':'<span style="color:#6b7280">대기</span>';
+        const cache=manage?(LIC_CACHE[a.uid]||{}):{};
+        return '<tr>'
+          +'<td style="text-align:center;color:#8a919d">'+(i+1)+'</td>'
           +'<td><b>'+esc(manage?a.name:mname(a.name))+'</b></td>'
-          +(manage?'<td>'+esc(a.phone||'-')+'</td>':'')
-          +'<td>'+esc(topLic(a.lic||'-'))+'</td>'
-          +'<td>'+esc(((a.prefs||{})[dd.date]||[]).join(', ')||'-')+'</td>'
-          +'<td style="text-align:center">'+stHtml+'</td>'
+          +(manage?'<td style="font-size:12px">'+esc(a.phone||'-')+'</td>':'')
+          +(manage?'<td style="min-width:90px">'+licBadge(cache.ref,today)+'</td><td style="min-width:90px">'+licBadge(cache.ins,today)+'</td>':'<td>'+esc(topLic(a.lic||'-'))+'</td>')
+          +'<td style="font-size:12px">'+esc(((a.prefs||{})[dd.date]||[]).join(', ')||'-')+'</td>'
+          +'<td style="text-align:center;white-space:nowrap">'+stHtml+'</td>'
           +(manage?'<td style="text-align:center">'+sigCell(a)+'</td>':'')
-          +(manage?'<td style="white-space:nowrap"><button class="stbtn stbtn-teal" style="padding:4px 10px;font-size:11.5px" onclick="decideApp(\''+a.id+'\',\''+dd.date+'\',\'확정\')">확정</button> <button class="stbtn" style="padding:4px 10px;font-size:11.5px;background:#fdf6e3;color:#8a5a00" onclick="decideApp(\''+a.id+'\',\''+dd.date+'\',\'보류\')">보류</button> <button class="stbtn" style="padding:4px 10px;font-size:11.5px;background:#fff;color:#C41E2F;border:1px solid #f1c7cc" onclick="decideApp(\''+a.id+'\',\''+dd.date+'\',\'거절\')">거절</button></td>':'')
+          +(manage?'<td style="white-space:nowrap;text-align:center">'
+            +'<button class="stbtn stbtn-teal" style="padding:4px 9px;font-size:11.5px;font-weight:800" title="확정" onclick="decideApp(\''+a.id+'\',\''+dd.date+'\',\'확정\')">✅ 확정</button><br>'
+            +'<button class="stbtn" style="padding:3px 7px;font-size:11px;background:#fdf6e3;color:#8a5a00;margin-top:3px" title="보류" onclick="decideApp(\''+a.id+'\',\''+dd.date+'\',\'보류\')">⏳ 보류</button> '
+            +'<button class="stbtn" style="padding:3px 7px;font-size:11px;background:#fff;color:#C41E2F;border:1px solid #f1c7cc;margin-top:3px" title="거절" onclick="decideApp(\''+a.id+'\',\''+dd.date+'\',\'거절\')">❌ 거절</button>'
+            +'</td>':'')
           +'</tr>';
       }).join('')+'</table>';
   }
@@ -638,6 +673,7 @@ function openApplyForm(id){
   const p=POSTS.find(x=>x.id===id);if(!p)return;
   if(!SMY||SMY.status!=='approved'){alert('사무국 승인 후 신청할 수 있습니다.');return}
   if(SMY.sanction&&SMY.sanction.active){alert('🚫 현재 징계 기간 중이어서 심판·운영요원 신청이 제한됩니다.\n문의: 사무국 031-984-3248');return}
+  if(!MYLIC_DOCS._valid||!MYLIC_DOCS._valid.length){alert('❌ 유효한 연맹 자격증이 없어 신청할 수 없습니다.\n만료된 자격증만 있거나 등록된 자격이 없습니다.\n자격증 갱신·등록 후 신청해주세요.');return}
   const today=new Date().toISOString().slice(0,10);
   if(p.deadline&&p.deadline<today){alert('모집이 마감된 공고입니다.');return}
   const my=(APPS[p.id]||[]).find(a=>a.uid===SME.uid);
@@ -651,7 +687,7 @@ function openApplyForm(id){
     +(my?'<div style="font-size:12px;font-weight:800;color:#b8860b;background:#fff8ed;border-radius:8px;padding:7px 11px;margin-top:8px">⏳ 이미 신청한 공고입니다 — 다시 제출하면 이전 신청 내용을 덮어씁니다.</div>':'')
     +'<div style="background:#f6f8fb;border-radius:10px;padding:10px 13px;margin-top:10px;font-size:13px;line-height:1.8">'
     +'👤 <b>'+esc(SMY.name||'')+'</b> · '+esc(mphone(SMY.phone||''))
-    +'<br>🎖 보유 자격: <b>'+esc(MYLIC||'등록된 연맹 자격 없음')+'</b></div>'
+    +'<br>🎖 보유 자격: '+(MYLIC_DOCS.length?MYLIC_DOCS.map(l=>{const today=new Date().toISOString().slice(0,10);const valid=l.status!=='만료'&&(!l.expireAt||l.expireAt>=today);return '<b style="color:'+(valid?'#0f766e':'#C41E2F')+'">'+esc((l.type||'')+' '+(l.grade||''))+'</b><span style="font-size:11px;color:'+(valid?'#0f766e':'#C41E2F')+';margin-left:3px">'+(valid?'유효':'만료')+(l.expireAt?' ~'+l.expireAt:'')+'</span>';}).join(' &nbsp;'):'<span style="color:#C41E2F">등록된 연맹 자격 없음</span>')+'</div>'
     +'<div style="font-size:13px;font-weight:800;margin-top:14px">① 참여 가능한 날짜 선택 <span style="font-weight:600;color:#8a919d;font-size:11.5px">(복수 선택 가능)</span></div>'
     +dates.map((d2,i)=>{
       const checked=my&&(my.days||[]).indexOf(d2.date)>=0;
