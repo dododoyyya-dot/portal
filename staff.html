@@ -105,6 +105,7 @@
 <script src="site_config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 KFDF.initApp();
 const AUTH=firebase.auth(),DB=firebase.firestore();
@@ -361,8 +362,44 @@ async function delPost(id){
 }
 // ══════════════ 공고 등록/수정 폼 ══════════════
 let PF_POSTERS=[],PF_DATES=[],PF_CAL_Y=0,PF_CAL_M=0;
+// [v7] 상위 대회 불러오기 (competitions 컬렉션 연동)
+let PF_COMPS=[],PF_COMPID='';
+async function pfFillComps(ed){
+  try{
+    const snap=await DB.collection('competitions').orderBy('dateStart','desc').limit(20).get();
+    PF_COMPS=snap.docs.map(d=>({id:d.id,...d.data()}));
+    const sel=document.getElementById('pfCompSel');if(!sel)return;
+    sel.innerHTML='<option value="">선택 안 함 (직접 입력)</option>'
+      +PF_COMPS.map(c=>'<option value="'+c.id+'"'+((ed&&ed.compId===c.id)?' selected':'')+'>'+esc(c.title||'')+' ('+esc(c.dateStart||'')+')</option>').join('');
+  }catch(e){}
+}
+function pfLoadComp(){
+  const sel=document.getElementById('pfCompSel');if(!sel||!sel.value){alert('불러올 대회를 선택해주세요.');return}
+  const c=PF_COMPS.find(x=>x.id===sel.value);if(!c)return;
+  PF_COMPID=c.id;
+  const set=(id,val)=>{const e=document.getElementById(id);if(e&&val)e.value=val};
+  set('pfName',c.title||'');
+  set('pfLoc',c.place||'');
+  set('pfTime',c.time||'');
+  set('pfDL',c.deadline||'');
+  set('pfHost',c.organizer||c.host||'');
+  // 대회 일자 프리필 (달력 선택 상태로)
+  const ds=(c.dates&&c.dates.length)?c.dates.slice():(function(){
+    const out=[];if(!c.dateStart)return out;
+    let d0=new Date(c.dateStart+'T00:00:00');const d1e=new Date((c.dateEnd||c.dateStart)+'T00:00:00');
+    let n=0;while(d0<=d1e&&n<14){out.push(d0.toISOString().slice(0,10));d0.setDate(d0.getDate()+1);n++;}
+    return out;})();
+  if(ds.length){
+    PF_DATES=ds.slice(0,14);
+    const b0=new Date(PF_DATES[0]+'T00:00:00');
+    PF_CAL_Y=b0.getFullYear();PF_CAL_M=b0.getMonth();
+    if(typeof pfDates==='function')pfDates();
+  }
+  alert('✓ ['+(c.title||'')+'] 대회 정보를 불러왔습니다. 이어서 나머지 항목을 기입해주세요.');
+}
 function openPostForm(editId){
   const ed=editId?POSTS.find(x=>x.id===editId):null;
+  PF_COMPID=(ed&&ed.compId)||'';
   PF_POSTERS=(ed&&ed.posters)?ed.posters.slice():[];
   PF_DATES=(ed&&ed.dates)?ed.dates.map(d=>d.date).sort():[];
   const base=PF_DATES.length?new Date(PF_DATES[0]+'T00:00:00'):new Date();
@@ -375,6 +412,8 @@ function openPostForm(editId){
     +'<div style="font-size:12px;color:#8a919d;margin-top:3px">작성자: <b>'+esc(myOrg())+'</b>'+(SMY.phone?' · '+esc(mphone(SMY.phone)):'')+(SMY.email?' · '+esc(SMY.email):'')+' — 등록 후에도 목록·상세의 [✏️ 수정]으로 언제든 수정할 수 있습니다</div>'
     +'<label class="stlabel">주최 (표시명) * <span style="font-weight:600;color:#8a919d;font-size:11px">— 공고에 "주최: ○○"로 표시됩니다. 대행 등록 시 실제 주최 연맹·단체명을 입력하세요</span></label>'
     +'<input id="pfHost" class="stfield" value="'+esc(ed?((ed.author&&ed.author.organization)||''):myOrg())+'" placeholder="예: ○○연맹 / ○○교육청 / ○○대회 조직위">'
+    +'<label class="stlabel">🔗 상위 대회 불러오기 <span style="font-weight:600;color:#8a919d;font-size:11px">— 관리자 대회 등록의 대회를 선택하면 정보가 자동 기입되고 서로 연결됩니다</span></label>'
+    +'<div style="display:flex;gap:6px"><select id="pfCompSel" class="stfield" style="flex:1"><option value="">선택 안 함 (직접 입력)</option></select><button type="button" class="stbtn stbtn-soft" style="padding:8px 16px" onclick="pfLoadComp()">불러오기</button></div>'
     +'<label class="stlabel">대회명 *</label><input id="pfName" class="stfield" value="'+esc(ed?ed.competitionName:'')+'" placeholder="예: 2026 강원 유소년 플라잉디스크 대회">'
     +'<label class="stlabel">대회 일자 * <span style="font-weight:600;color:#8a919d;font-size:11px">— 달력에서 날짜를 클릭해 선택 (복수 선택 가능 · 7일, 14일처럼 떨어진 날도 OK · 다음 달로 넘겨도 선택 유지)</span></label>'
     +'<div id="pfCal" style="border:1.5px solid #dfe5ee;border-radius:12px;padding:12px 14px;margin-top:6px"></div>'
@@ -415,6 +454,7 @@ function openPostForm(editId){
   document.body.appendChild(div);
   window.PF_ED=ed||null;
   renderCal();pfDates();pfRenderPosters();
+  pfFillComps(ed);  // [v7] 상위 대회 목록 로드
 }
 // 심판복 라디오 — "미제공" 선택 시 준비물 [심판복] 자동 체크
 function pfUniformSync(radio){
@@ -607,6 +647,7 @@ async function savePost(editId){
       meal:(document.querySelector('input[name=pfMeal]:checked')||{}).value||'제공',
       uniform:uniform,lodging:lodging,
       supplies:supplies,posters:posters,description:v('pfDesc'),contactInfo:v('pfContact'),
+      compId:PF_COMPID||((editId&&(POSTS.find(x=>x.id===editId)||{}).compId)||''),  // [v7] 상위 대회 연결
       author:{uid:SME.uid,name:SMY.name||'',organization:(v('pfHost')||myOrg()),contact:SMY.phone||'',email:SMY.email||''},
       // [권한개선] 신규 공고에 sido 필드 기록 — canDecide() 범위 검증에 사용
       sido:SMY.sido||null,
@@ -737,7 +778,7 @@ async function _renderDetailInner(){
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">'
     // [권한개선] 공고 수정·복사 = canManage / 수당엑셀·자격확인·경력등록 = canDecide
     +(manage?'<button class="stbtn stbtn-soft" onclick="document.getElementById(\'dtModal\').remove();openPostForm(\''+p.id+'\')">✏️ 공고 수정</button><button class="stbtn stbtn-ghost" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button>':'')
-    +(_decide?'<button class="stbtn" style="background:#f0fdf4;color:#0f766e;border:1.5px solid #a7f3d0" onclick="exportPayExcel(\''+p.id+'\')">💰 수당지급 엑셀</button><button class="stbtn" style="background:#fffbeb;color:#8a5a00;border:1.5px solid #fde68a" onclick="exportPayReport(\''+p.id+'\')">📄 수당지급내역서 (서식·서명)</button><button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="openNotifyModal(\''+p.id+'\')">📣 확정자 단체 알림</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
+    +(_decide?'<button class="stbtn" style="background:#f0fdf4;color:#0f766e;border:1.5px solid #a7f3d0" onclick="exportPayExcel(\''+p.id+'\')">💰 수당지급 엑셀</button><button class="stbtn" style="background:#fffbeb;color:#8a5a00;border:1.5px solid #fde68a" onclick="exportPayReport(\''+p.id+'\')">📄 수당지급내역서 (서식·서명)</button><button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="openNotifyModal(\''+p.id+'\')">📣 확정자 단체 알림</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="exportLicZip(\''+p.id+'\')">📦 자격증 일괄 다운로드</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
     +'<button class="stbtn stbtn-main" style="padding:11px 26px" onclick="openApplyForm(\''+p.id+'\')">✍️ 신청하기 (날짜 선택)</button>'
     +'</div></div>';
   // div는 await 전에 이미 DOM에 추가됨 — innerHTML 설정만으로 내용 갱신
@@ -796,8 +837,8 @@ function openApplyForm(id){
     +'<div style="font-size:13px;font-weight:800;margin-top:18px">④ 수당지급 정보 · 동의 <span style="font-size:11.5px;font-weight:600;color:#8a919d">(수당을 지급받으려면 입력·동의·서명 필요)</span></div>'
     +'<div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:9px 12px;margin-top:6px;font-size:12px;color:#8a5a00;line-height:1.7">수당 지급 및 지급내역서 작성을 위한 정보입니다. 입력하지 않아도 신청은 가능하지만, 미입력 시 수당 지급이 어려울 수 있습니다.</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">'
-    +'<div><label class="stlabel">은행명</label><input id="apPayBank" class="stfield" placeholder="예: 국민은행" value="'+esc(pf.bank||'')+'"></div>'
-    +'<div><label class="stlabel">계좌번호</label><input id="apPayAcct" class="stfield" placeholder="숫자·하이픈" value="'+esc(pf.account||'')+'"></div>'
+    +'<div><label class="stlabel">은행명</label><input id="apPayBank" class="stfield" placeholder="예: 국민은행" value="'+esc(pf.bank||SMY.bank||'')+'"></div>'
+    +'<div><label class="stlabel">계좌번호</label><input id="apPayAcct" class="stfield" placeholder="숫자·하이픈" value="'+esc(pf.account||SMY.accountNum||'')+'"></div>'
     +'</div>'
     +'<div style="margin-top:6px"><label class="stlabel">주민등록번호 <span style="font-size:10.5px;color:#8a919d">(수당 원천징수·거래처 등록용)</span></label><input id="apPayRrn" class="stfield" placeholder="000000-0000000" value="'+esc(pf.rrn||'')+'"></div>'
     +'<details style="margin-top:8px;font-size:12px;background:#f8fafc;border:1.5px solid #e3e9f2;border-radius:10px;padding:9px 12px"><summary style="font-weight:800;cursor:pointer">📋 수당 지급을 위한 개인정보 수집·이용·제공 동의서 (전문 보기)</summary>'
@@ -1057,6 +1098,14 @@ async function exportPayReport(postId){
   if(typeof ExcelJS==='undefined'){alert('서식 엑셀 라이브러리 로딩 중입니다. 잠시 후 다시 눌러주세요.');return}
   const p=POSTS.find(x=>x.id===postId);if(!p)return;
   const apps=APPS[p.id]||[];
+  // [v7] payInfo 미입력자는 마이페이지(users) 은행·계좌로 자동 보완
+  const _uidSet=new Set();
+  (p.dates||[]).forEach(dd=>apps.filter(a=>a.status&&a.status[dd.date]==='확정').forEach(a=>_uidSet.add(a.uid)));
+  const _bankMap={};
+  await Promise.all([..._uidSet].map(async uid=>{
+    try{const d=await DB.collection('users').doc(uid).get();
+      if(d.exists){const u=d.data();_bankMap[uid]={bank:u.bank||'',account:u.accountNum||''};}}catch(e){}
+  }));
   const wb=new ExcelJS.Workbook();
   let made=0;
   (p.dates||[]).forEach(dd=>{
@@ -1100,8 +1149,9 @@ async function exportPayReport(postId){
       const base=_payNum(asg.pay);
       if(base!=='')row.getCell(7).value=base;
       row.getCell(10).value={formula:'SUM(G'+rIdx+':I'+rIdx+')'};
-      row.getCell(11).value=pi.bank||'';
-      row.getCell(12).value=pi.account||'';
+      const _fb=_bankMap[a.uid]||{};
+      row.getCell(11).value=pi.bank||_fb.bank||'';
+      row.getCell(12).value=pi.account||_fb.account||'';
       row.getCell(13).value=pi.rrn||'';
       for(let c=1;c<=14;c++){const cell=row.getCell(c);cell.border=bAll;cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};cell.font={size:10};}
       // 전자서명 이미지 (수당지급용 서명 우선, 없으면 신청 동의 서명)
@@ -1133,6 +1183,75 @@ async function exportPayReport(postId){
     a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href),5000);
   }catch(e){alert('내역서 생성 실패: '+e.message)}
+}
+// ══════════════ [v7] 확정자 자격증 일괄 다운로드 (공식 서식 이미지 → ZIP, 주최측 전달용) ══════════════
+async function _drawLicPng(name,birth,l,licNo){
+  const bgSrc='files/'+((String(l.type||'').indexOf('심판')>=0)?'cert_bg_referee.jpg':'cert_bg_leader.jpg');
+  const bg=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=bgSrc;});
+  const W=1240,H=1753;  // A4 150dpi
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  const ctx=cv.getContext('2d');
+  ctx.drawImage(bg,0,0,W,H);
+  ctx.fillStyle='#111';
+  const dot=s=>String(s||'').replace(/-/g,'.');
+  // mypage 인쇄 서식과 동일한 상대 좌표
+  let fs=Math.round(H*0.029);ctx.font='900 '+fs+'px "Pretendard","Noto Sans KR",sans-serif';
+  ctx.fillText(l.grade||'',W*0.397,H*0.336+fs);
+  fs=Math.round(H*0.031);ctx.font='800 '+fs+'px "Pretendard","Noto Sans KR",sans-serif';
+  ctx.fillText(name||'',W*0.318+W*0.008,H*0.405+fs);
+  const nw=ctx.measureText(name||'').width;
+  ctx.fillRect(W*0.318,H*0.405+fs+Math.round(H*0.006),nw+W*0.03,Math.round(H*0.002));
+  fs=Math.round(H*0.0165);ctx.font='600 '+fs+'px "Pretendard","Noto Sans KR",sans-serif';
+  ctx.fillText(licNo||'',W*0.682,H*0.3375+fs);
+  ctx.fillText(dot(l.expireAt),W*0.682,H*0.3585+fs);
+  ctx.fillText(dot(birth),W*0.682,H*0.3795+fs);
+  ctx.fillText(l.region||'',W*0.682,H*0.4005+fs);
+  fs=Math.round(H*0.021);ctx.font='700 '+fs+'px "Pretendard","Noto Sans KR",sans-serif';
+  ctx.fillText(dot(l.issuedAt),W*0.366,H*0.7065+fs);
+  return cv.toDataURL('image/jpeg',0.85);
+}
+async function exportLicZip(postId){
+  if(typeof JSZip==='undefined'){alert('압축 라이브러리 로딩 중입니다. 잠시 후 다시 시도해주세요.');return}
+  const p=POSTS.find(x=>x.id===postId);if(!p)return;
+  const apps=APPS[p.id]||[];
+  if(!apps.length){alert('신청자가 없습니다.');return}
+  const confSet=new Set();
+  (p.dates||[]).forEach(dd=>apps.filter(a=>a.status&&a.status[dd.date]==='확정').forEach(a=>confSet.add(a.uid)));
+  let list=apps.filter(a=>confSet.has(a.uid));
+  let label='확정자';
+  if(!list.length){
+    if(!confirm('확정자가 없습니다. 전체 신청자의 자격증으로 내려받을까요?'))return;
+    list=apps.slice();label='신청자';
+  }
+  const seen=new Set();list=list.filter(a=>{if(seen.has(a.uid))return false;seen.add(a.uid);return true});
+  const today=new Date().toISOString().slice(0,10);
+  const zip=new JSZip();
+  const missing=[];let cnt=0;
+  for(const a of list){
+    try{
+      const [ls,ud]=await Promise.all([
+        DB.collection('licenses').where('uid','==',a.uid).get(),
+        DB.collection('users').doc(a.uid).get()
+      ]);
+      const birth=(ud.exists&&ud.data().birth)||'';
+      const lics=ls.docs.map(d=>({id:d.id,...d.data()}))
+        .filter(l=>l.status!=='만료'&&(!l.expireAt||String(l.expireAt).slice(0,10)>=today));
+      if(!lics.length){missing.push(a.name||'무명');continue}
+      for(const l of lics){
+        const url=await _drawLicPng(a.name||l.name||'',birth,l,l.id);
+        zip.file((a.name||'무명')+'_'+String((l.type||'')+(l.grade||'')).replace(/\s+/g,'')+'_'+l.id+'.jpg',url.split(',')[1],{base64:true});
+        cnt++;
+      }
+    }catch(e){missing.push((a.name||'무명')+'(오류)')}
+  }
+  if(!cnt){alert('내려받을 유효 자격증이 없습니다.'+(missing.length?'\n자격 없음: '+missing.join(', '):''));return}
+  const blob=await zip.generateAsync({type:'blob'});
+  const el=document.createElement('a');
+  el.href=URL.createObjectURL(blob);
+  el.download=(p.competitionName||'대회')+'_'+label+'_자격증.zip';
+  el.click();
+  setTimeout(()=>URL.revokeObjectURL(el.href),5000);
+  alert('✓ 자격증 '+cnt+'건을 ZIP 파일로 내려받았습니다. (주최측 전달용)'+(missing.length?'\n\n⚠ 유효 자격증 없음: '+missing.join(', '):''));
 }
 // ══════════════ [v5] 확정자 단체 알림 (문자·이메일) ══════════════
 let NT_LIST=[];  // {uid,name,phone,email,dates[]}

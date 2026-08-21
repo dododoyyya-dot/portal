@@ -133,7 +133,7 @@
   <h3 class="sub" id="staff">심판 · 운영요원</h3>
   <div class="gbox">
     연맹 주관 대회의 심판·기록원·운영요원은 공개 모집하며, <b>연맹 리더(연수 이수자)는 우선 선발</b>됩니다.<br>
-    · 심판 수당: 1일 70,000원 이내 (4시간 이내 40,000원) · 운영요원 수당: 예산 기준 &nbsp;· 아동학대·성범죄 경력조회 결격사유가 없어야 합니다.<br>
+    · 심판·운영요원 수당과 처우(교통·식사·숙박 등)는 <b>대회별로 상이하며 각 대회 공고 기준</b>에 따릅니다 &nbsp;· 아동학대·성범죄 경력조회 결격사유가 없어야 합니다.<br>
     · 수당은 활동 종료 후 기재 계좌로 이체되며, 원천징수 관계 법령에 따라 처리됩니다.
   </div>
 
@@ -373,6 +373,33 @@ function compClaimList(s){
     return arr[arr.length-1];
   }).sort((a,b)=>String(a.at||'').localeCompare(String(b.at||'')));
 }
+// [입금관리] 참가 신청자 입금대기/입금확인 토글 (권한자 전용)
+function _payCell(slotId,c,td){
+  const ok=c.payStatus==='입금확인';
+  const args="'"+slotId+"','"+(c.uid||'')+"','"+String(c.pid||'').replace(/'/g,'')+"','"+(c.at||'')+"'";
+  return '<td '+td+' style="text-align:center;white-space:nowrap">'
+    +'<button onclick="togglePayStatus('+args+')" style="border:1.5px solid '+(ok?'#a7f3d0':'#fde68a')+';background:'+(ok?'#f0fdf4':'#fffbeb')+';color:'+(ok?'#0f766e':'#8a5a00')+';border-radius:8px;padding:4px 10px;font-size:11.5px;font-weight:800;cursor:pointer" title="'+(ok?('입금확인 '+String(c.payAt||'').slice(0,10)+(c.payBy?' · '+cesc(c.payBy):'')):'클릭하여 입금확인 처리')+'">'+(ok?'✅ 입금확인':'⏳ 입금대기')+'</button></td>';
+}
+async function togglePayStatus(slotId,uid,pid,at){
+  const ref=DB.collection('compSlots').doc(slotId);
+  try{
+    await DB.runTransaction(async tx=>{
+      const d=await tx.get(ref);
+      const s=d.data();
+      const claimed=(s.claimed||[]).slice();
+      const i=claimed.findIndex(c=>c.uid===uid&&String(c.pid||'')===String(pid||'')&&String(c.at||'')===String(at||''));
+      if(i<0)throw new Error('신청 기록을 찾을 수 없습니다');
+      const on=claimed[i].payStatus==='입금확인';
+      claimed[i]=Object.assign({},claimed[i],{payStatus:on?'입금대기':'입금확인',payAt:new Date().toISOString(),payBy:(CMY&&CMY.name)||''});
+      tx.update(ref,{claimed:claimed});
+    });
+    const nd=await ref.get();
+    const ci=CSLOTS.findIndex(x=>x.id===slotId);
+    if(ci>=0)CSLOTS[ci]=nd;
+    const old=document.getElementById('rosterModal');if(old)old.remove();
+    viewRoster(slotId);
+  }catch(e){alert('입금상태 변경 실패: '+e.message)}
+}
 function viewRoster(id){
   const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
   const s=doc.data();
@@ -398,13 +425,15 @@ function viewRoster(id){
           +'<details style="margin-top:4px"><summary style="cursor:pointer;font-size:12px;font-weight:800;color:#153A77">명단 '+(c.rosterN||0)+'명'+((c.consentFiles&&c.consentFiles.length)?' · 📎동의서 '+c.consentFiles.length:'')+'</summary>'
           +'<div style="font-size:12px;color:#4b5563;margin-top:4px">'+(c.roster||[]).map((r,j)=>(j+1)+'. '+cesc(r.name)+(r.birth?' ('+cesc(r.birth)+')':'')+(r.school?' · '+cesc(r.school):'')).join('<br>')+'</div></details></td>'
           +'<td '+td+'>'+cesc((c.prefs||[])[0]||'-')+'</td><td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
-          +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td></tr>';
+          +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td>'
+          +(entry?_payCell(id,c,td):'')+'</tr>';
       }
       return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b></td>'
       +(entry?'<td '+td+'>'+cesc(c.birth||'-')+'</td><td '+td+'>'+cesc(c.gender||'-')+'</td><td '+td+'>'+cesc(c.school||c.club||'-')+'</td>':'')
       +'<td '+td+'>'+cesc((c.prefs||[]).map((p,j)=>(j+1)+'지망 '+p).join(' · ')||'-')+'</td>'
       +'<td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
-      +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td></tr>';
+      +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td>'
+      +(entry?_payCell(id,c,td):'')+'</tr>';
     }).join('');
   }else{
     rows=list.map((c,i)=>{
@@ -419,7 +448,7 @@ function viewRoster(id){
     }).join('');
   }
   const head=staff
-    ?'<tr><th '+th+'>연번</th><th '+th+'>성명</th>'+(entry?'<th '+th+'>생년월일</th><th '+th+'>성별</th><th '+th+'>학교·클럽</th>':'')+'<th '+th+'>희망 '+(entry?'부문':'임무')+'</th><th '+th+'>신청일</th><th '+th+'>상태</th></tr>'
+    ?'<tr><th '+th+'>연번</th><th '+th+'>성명</th>'+(entry?'<th '+th+'>생년월일</th><th '+th+'>성별</th><th '+th+'>학교·클럽</th>':'')+'<th '+th+'>희망 '+(entry?'부문':'임무')+'</th><th '+th+'>신청일</th><th '+th+'>상태</th>'+(entry?'<th '+th+'>입금</th>':'')+'</tr>'
     :'<tr><th '+th+'>연번</th><th '+th+'>성명</th><th '+th+'>'+(entry?'부문':'임무')+'</th><th '+th+'>상태</th></tr>';
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:'+(staff?'720px':'480px')+';width:100%;max-height:90vh;overflow:auto;padding:24px">'
     +'<b style="font-size:16px">👥 신청 현황 — '+cesc(s.title)+'</b>'
@@ -773,12 +802,19 @@ function slotCard(d,today){
       return '<div class="cslot"><div class="chead"><span class="ctitle">'+cesc(s.title)+'</span><span class="rbadge" style="background:'+rc+'">'+cesc(s.role)+(entry?' (선수)':'요원')+'</span>'
         +(closed&&!mines.length?'<span class="rbadge" style="background:#8a919d">마감</span>':'')+'</div>'
         +'<div class="cmeta"><span>📍 <b>'+cesc(s.region)+'</b></span><span>📅 <b>'+cesc(s.date)+'</b></span><span>👥 신청 <b>'+act+'/'+s.quota+'</b></span>'+(s.deadline?'<span>⏳ 마감 <b>'+cesc(s.deadline)+'</b></span>':'')+(s.fee?'<span>💰 <b>'+cesc(s.fee)+'</b></span>':'')+'</div>'
-        +((s.eligRegion||s.eligNote)?'<div class="cnote" style="background:#fdf3f4;border-color:#f3c2c7;color:#8c1622">🎯 참가 자격'+(s.eligRegion?' · <b>'+cesc(s.eligRegion)+' 지역 대상</b>':'')+(s.eligNote?' — '+cesc(s.eligNote):'')+'</div>':'')
+        // [v3] 참가 지역제한 표기·제한 제거 (전국 누구나 신청 가능)
         // [대회v2] 주최·주관·후원·협찬 / 개회식·대회 시간장소 / 참가비 구분 / 특수 부문
         +((s.host||s.organizer||s.sponsor||s.partner)?'<div class="cnote" style="background:#f6f8fb;border-color:#dfe5ee;color:#374151">'+[s.host?'주최 <b>'+cesc(s.host)+'</b>':'',s.organizer?'주관 <b>'+cesc(s.organizer)+'</b>':'',s.sponsor?'후원 <b>'+cesc(s.sponsor)+'</b>':'',s.partner?'협찬 <b>'+cesc(s.partner)+'</b>':''].filter(Boolean).join(' · ')+'</div>':'')
         +(((s.opening&&(s.opening.time||s.opening.place))||s.time)?'<div class="cnote" style="background:#f6f8fb;border-color:#dfe5ee;color:#374151">'+((s.opening&&(s.opening.time||s.opening.place))?'🎪 개회식 <b>'+cesc(((s.opening.time||'')+(s.opening.place?' · '+s.opening.place:'')).trim())+'</b>':'')+(s.time?(((s.opening&&(s.opening.time||s.opening.place))?' &nbsp;·&nbsp; ':'')+'🏟 대회 <b>'+cesc(s.time)+'</b>'):'')+'</div>':'')
         +(s.entry&&s.entry.fees&&s.entry.fees.length?'<div class="cnote" style="background:#f0fdf4;border-color:#a7f3d0;color:#0f5132">💰 참가비: '+s.entry.fees.map(f=>cesc(f.label+(f.amount?' '+f.amount:''))).join(' · ')+'</div>':'')
         +(s.entry&&s.entry.special&&s.entry.special.length?'<div class="cnote" style="background:#f5f0ff;border-color:#ddd0fa;color:#5b21b6">🏷 선택 부문: '+s.entry.special.map(x=>cesc(x)).join(' · ')+' — 신청 시 선택</div>':'')
+        // [대회v3] 첨부자료(포스터·대진표·일정표) + 기타안내(시상품·기념품·보험)
+        +((s.attachments&&s.attachments.length)?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:7px">'+s.attachments.map(x=>{
+            const isImg=/\.(jpe?g|png|gif|webp)(\?|$)/i.test(x.url||'')||String(x.url||'').indexOf('image')>=0;
+            return isImg?'<a href="'+cesc(x.url)+'" target="_blank" style="text-align:center;text-decoration:none"><img src="'+cesc(x.url)+'" style="height:74px;border-radius:8px;border:1px solid #e2e7f0;display:block"><span style="font-size:10.5px;color:#6b7280;font-weight:700">'+cesc(x.kind||'첨부')+'</span></a>'
+              :'<a href="'+cesc(x.url)+'" target="_blank" style="font-size:12px;font-weight:800;color:#153A77;border:1.5px solid #c3d4ed;border-radius:9px;padding:7px 13px;text-decoration:none">📄 '+cesc(x.kind||'첨부')+' — '+cesc(x.name||'파일')+'</a>';
+          }).join('')+'</div>':'')
+        +((s.extras&&(s.extras.prize||s.extras.souvenir||s.extras.insurance||s.extras.prizeNote))?'<div class="cnote" style="background:#fffbeb;border-color:#fde68a;color:#8a5a00">'+[s.extras.prize?'🏆 시상품 지급':'',s.extras.souvenir?'🎁 기념품 지급':'',s.extras.insurance?'🛡 행사 보험 가입':''].filter(Boolean).join(' · ')+(s.extras.prizeNote?'<br>🎖 '+cesc(s.extras.prizeNote):'')+'</div>':'')
         +(s.note?'<div class="cnote">📌 '+cesc(s.note)+'</div>':'')
         +'<div class="ctags">'+slotDivs(s).map(dv=>{
             if(entry&&dv.cap){const c=divActiveCount(s,dv.name);
@@ -811,13 +847,49 @@ function consentPreviewSpans(s,i){
   return flds.map(f=>'<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:'+Math.min(f.fs||14,16)+'px;font-weight:800;color:#1230c4;background:rgba(80,110,255,.13);border:1px dashed #4c6ef5;border-radius:4px;padding:0 5px;white-space:nowrap;line-height:1.4">'+cesc(vals[f.f]||'')+'</span>').join('');
 }
 function consentBlockHtml(s,defHtml){
+  // [대회v3] 조직위원회 명의 표기 + 오프라인 제출용 다운로드 버튼
+  const _cmte=s.committee?('<div style="font-size:12px;font-weight:800;color:#153A77;background:#eef3fa;border-radius:8px;padding:7px 11px;margin-bottom:8px">📜 본 신청서·동의서는 <b>'+cesc(s.committee)+'</b> 명의로 접수됩니다.</div>'):'';
+  const _dl='<div style="text-align:right;margin-bottom:6px"><button type="button" class="cbtn cbtn-soft" style="padding:5px 13px;font-size:12px" onclick="openOfflineDocs()">📄 신청서·동의서 인쇄 (오프라인 제출용)</button></div>';
+  const defWrap=h=>_cmte+_dl+h;
   const imgs=consentImgsOf(s);
   const hasOvl=!!(s.consentOverlays&&Object.keys(s.consentOverlays).some(k=>(s.consentOverlays[k]||[]).length));
-  if(imgs.length)return imgs.map((x,i)=>'<div style="position:relative;margin-bottom:8px"><img src="'+x+'" alt="개인정보 동의서 '+(i+1)+'페이지" style="width:100%;display:block;border:1px solid #e2e7f0;border-radius:8px">'+consentPreviewSpans(s,i)+'</div>').join('')
+  if(imgs.length)return defWrap(imgs.map((x,i)=>'<div style="position:relative;margin-bottom:8px"><img src="'+x+'" alt="개인정보 동의서 '+(i+1)+'페이지" style="width:100%;display:block;border:1px solid #e2e7f0;border-radius:8px">'+consentPreviewSpans(s,i)+'</div>').join('')
     +(hasOvl?'<div style="font-size:11.5px;color:#1F4E9C;font-weight:700;margin-bottom:8px">💡 파란 표시 위치에 내 정보와 서명이 자동으로 기입되어 출력됩니다 (수기 작성 불필요)</div>':'')
-    +(imgs.length>1?'<div style="font-size:11.5px;color:#8a919d;font-weight:700;margin-bottom:8px">총 '+imgs.length+'페이지 — 전체 내용을 확인 후 동의해주세요</div>':'');
-  if(s.consentText)return consentPaperHtml(s);
-  return defHtml;
+    +(imgs.length>1?'<div style="font-size:11.5px;color:#8a919d;font-weight:700;margin-bottom:8px">총 '+imgs.length+'페이지 — 전체 내용을 확인 후 동의해주세요</div>':''));
+  if(s.consentText)return defWrap(consentPaperHtml(s));
+  return defWrap(defHtml);
+}
+// [대회v3] 신청서·동의서 인쇄 (오프라인 제출용 — 조직위 명의 + 서명란)
+function openOfflineDocs(){
+  const doc0=CSLOTS.find(d=>d.id===APPLY_ID);
+  const s=doc0?doc0.data():{};
+  const cmte=s.committee||((s.title||'대회')+' 조직위원회');
+  const imgs=consentImgsOf(s);
+  const w=window.open('','_blank');
+  if(!w){alert('팝업이 차단되어 인쇄 창을 열 수 없습니다. 주소창의 팝업 차단을 해제해주세요.');return}
+  const esc2=x=>String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let body='<h1 style="text-align:center;font-size:24px;letter-spacing:6px;margin:14mm 0 8mm">대 회 참 가 신 청 서</h1>'
+    +'<div style="font-size:13px;margin-bottom:6mm;text-align:center;color:#444">'+esc2(s.title||'')+(s.date?' · '+esc2(s.date):'')+(s.region?' · '+esc2(s.region):'')+'</div>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:13px" border="1" cellpadding="8">'
+    +'<tr><th style="background:#f4f4f4;width:110px">성 명</th><td></td><th style="background:#f4f4f4;width:110px">생년월일</th><td></td></tr>'
+    +'<tr><th style="background:#f4f4f4">성 별</th><td></td><th style="background:#f4f4f4">연락처</th><td></td></tr>'
+    +'<tr><th style="background:#f4f4f4">소속(학교·클럽)</th><td colspan="3"></td></tr>'
+    +'<tr><th style="background:#f4f4f4">참가 종목·부문</th><td colspan="3"></td></tr>'
+    +'</table>'
+    +'<div style="font-size:12.5px;line-height:1.9;margin-top:8mm">본인(또는 법정대리인)은 위 대회에 참가를 신청하며, 대회 규정과 안전 수칙을 준수할 것을 확약합니다.</div>'
+    +'<h2 style="font-size:18px;margin:12mm 0 5mm;text-align:center">개인정보 수집·이용 동의서</h2>';
+  if(imgs.length)body+=imgs.map(x=>'<img src="'+x+'" style="width:100%;margin-bottom:6mm">').join('');
+  else if(s.consentText)body+='<div style="font-size:12.5px;line-height:1.9;white-space:pre-wrap;border:1px solid #ccc;padding:6mm">'+esc2(s.consentText)+'</div>';
+  else body+='<div style="font-size:12.5px;line-height:1.9;border:1px solid #ccc;padding:6mm">□ 수집 항목: 성명·생년월일·성별·소속·연락처<br>□ 이용 목적: 대회 참가 관리, 행사 보험 가입, 기록 관리<br>□ 보유 기간: 대회 종료 후 1년<br>※ 동의를 거부할 권리가 있으며, 거부 시 참가에 제한이 있을 수 있습니다.</div>';
+  body+='<div style="margin-top:12mm;font-size:13.5px;text-align:right;line-height:2.4">'
+    +'20&nbsp;&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;&nbsp;일<br>'
+    +'신청인(참가자): ______________ (서명)<br>'
+    +'보호자(미성년 참가 시): ______________ (서명)</div>'
+    +'<div style="margin-top:10mm;text-align:center;font-size:16px;font-weight:900;letter-spacing:3px">'+esc2(cmte)+' 귀중</div>';
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>참가신청서·동의서</title>'
+    +'<style>@page{size:A4;margin:18mm}body{font-family:"Malgun Gothic","Noto Sans KR",sans-serif;color:#111}</style></head><body>'
+    +body+'<script>window.onload=function(){window.print()}<\/script></body></html>');
+  w.document.close();
 }
 // ── 종이 서식형 동의서: 인적사항 자동 기입 + 동의 항목별 예/아니오 직접 체크 (종이 작성과 동일) ──
 let CONSENT_GROUPS=0;
@@ -1098,14 +1170,7 @@ async function submitEntry(){
       alert('⛔ 이 대회는 ['+club+'] 소속의 참가 신청이 제한되어 있습니다.\n주최 측 참가 자격 안내를 확인해주세요.');return;
     }
   }
-  // 참가 제한 지역 확인 (부산시장배·구청장기 등 — 소속/거주 지역이 다르면 확인)
-  if(s0.eligRegion){
-    const key=s0.eligRegion.replace(/\s/g,'');
-    const hay=((CMY.baseCity||'')+' '+(CMY.address||'')+' '+(CMY.region||'')+' '+(p.school||'')+' '+(club||'')).replace(/\s/g,'');
-    if(hay.indexOf(key)<0){
-      if(!confirm('⚠ 이 대회는 ['+s0.eligRegion+'] 지역 대상입니다.'+(s0.eligNote?'\n· '+s0.eligNote:'')+'\n\n'+p.name+' 참가자가 해당 지역 소속이 맞습니까?\n(자격 미달 시 현장에서 참가가 제한될 수 있습니다)'))return;
-    }
-  }
+  // [v3] 참가 지역제한 검사 제거 — 전국 누구나 신청 가능
   const ref=DB.collection('compSlots').doc(APPLY_ID);
   try{
     await DB.runTransaction(async tx=>{
