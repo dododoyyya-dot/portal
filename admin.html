@@ -3057,8 +3057,9 @@ function openCompWizard(editId){
   CW_DATES=[];
   if(c.dates&&c.dates.length)CW_DATES=c.dates.slice();
   else if(c.dateStart){
+    const fL=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     let d0=new Date(c.dateStart+'T00:00:00');const d1e=new Date((c.dateEnd||c.dateStart)+'T00:00:00');
-    let n=0;while(d0<=d1e&&n<31){CW_DATES.push(d0.toISOString().slice(0,10));d0.setDate(d0.getDate()+1);n++;}
+    let n=0;while(d0<=d1e&&n<31){CW_DATES.push(fL(d0));d0.setDate(d0.getDate()+1);n++;}
   }
   const cbase=CW_DATES.length?new Date(CW_DATES[0]+'T00:00:00'):new Date();
   CW_CAL_Y=cbase.getFullYear();CW_CAL_M=cbase.getMonth();

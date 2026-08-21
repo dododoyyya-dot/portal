@@ -386,8 +386,9 @@ function pfLoadComp(){
   // 대회 일자 프리필 (달력 선택 상태로)
   const ds=(c.dates&&c.dates.length)?c.dates.slice():(function(){
     const out=[];if(!c.dateStart)return out;
+    const fL=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     let d0=new Date(c.dateStart+'T00:00:00');const d1e=new Date((c.dateEnd||c.dateStart)+'T00:00:00');
-    let n=0;while(d0<=d1e&&n<14){out.push(d0.toISOString().slice(0,10));d0.setDate(d0.getDate()+1);n++;}
+    let n=0;while(d0<=d1e&&n<14){out.push(fL(d0));d0.setDate(d0.getDate()+1);n++;}
     return out;})();
   if(ds.length){
     PF_DATES=ds.slice(0,14);
