@@ -87,7 +87,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
-<script src="kfdf.js?v=20260808"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+<script src="kfdf.js?v=20260821"></script>
 <script>
 KFDF.initApp();
 const AUTH = firebase.auth();
@@ -168,7 +169,63 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <button id="t3" onclick="tab(3)">강습 신청 관리</button>
       <button id="t4" onclick="tab(4)">대회 관리</button>
       <button id="t5" onclick="tab(5)">단체 메일</button>
+      <button id="t6" onclick="tab(6)">🪧 팝업 관리</button>
       <a href="perm.html" style="margin-left:auto;display:inline-flex;align-items:center;padding:10px 20px;border-radius:10px;background:linear-gradient(135deg,#1F4E9C,#153A77);color:#fff;font-weight:800;font-size:14px;text-decoration:none;box-shadow:0 3px 10px rgba(21,58,119,.25)">🛡 권한 관리 센터 →</a>
+    </div>
+    <!-- ══════════ [팝업] v6: 홈페이지 팝업 관리 (신규 탭) ══════════ -->
+    <div id="v6" style="display:none">
+      <div style="display:grid;grid-template-columns:minmax(320px,480px) 1fr;gap:18px;align-items:start">
+        <div class="authbox" style="max-width:none;margin:0">
+          <h3 id="ppFormTitle">🪧 새 팝업 만들기</h3>
+          <p style="font-size:12.5px;color:var(--gray)">홈페이지 첫 화면(index)에 설정한 기간 동안 팝업이 표시됩니다.</p>
+          <label>제목 *</label>
+          <input id="ppTitle" placeholder="예: 2026 부산교육감배 대회 안내">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div><label>게시 시작일 *</label><input type="date" id="ppStart"></div>
+            <div><label>게시 종료일 *</label><input type="date" id="ppEnd"></div>
+          </div>
+          <label>내용 (선택 — 줄바꿈 유지)</label>
+          <textarea id="ppContent" rows="4" placeholder="팝업에 표시할 안내 문구"></textarea>
+          <label>이미지 첨부 (선택)</label>
+          <input type="file" id="ppImgFile" accept="image/*" style="padding:8px">
+          <div id="ppImgPrev" style="display:none;margin-top:6px"><img id="ppImgPrevImg" style="max-width:100%;max-height:180px;border-radius:10px;border:1.5px solid #dfe5ee"><button type="button" class="btn-sub" style="background:#C41E2F;margin-top:5px;padding:5px 12px;font-size:12px" onclick="ppClearImg()">이미지 제거</button></div>
+          <label>연결 페이지 (선택 — 팝업 클릭 시 이동)</label>
+          <select id="ppLinkSel" onchange="document.getElementById('ppLinkEtc').style.display=this.value==='__etc'?'block':'none'">
+            <option value="">연결 안 함</option>
+            <option value="staff.html">심판·운영요원 모집 (staff)</option>
+            <option value="competition.html">대회·심판 (competition)</option>
+            <option value="notice.html">공지사항 (notice)</option>
+            <option value="calendar.html">일정 캘린더 (calendar)</option>
+            <option value="apply.html">강습 신청 (apply)</option>
+            <option value="certification.html">자격 연수 (certification)</option>
+            <option value="license.html">자격증 (license)</option>
+            <option value="club.html">클럽 (club)</option>
+            <option value="community.html">커뮤니티 (community)</option>
+            <option value="__etc">직접 입력 (외부 URL 등)</option>
+          </select>
+          <input id="ppLinkEtc" placeholder="https:// 또는 페이지.html" style="display:none;margin-top:6px">
+          <label>화면 위치</label>
+          <select id="ppPos">
+            <option value="center">중앙</option>
+            <option value="top-left">왼쪽 위</option>
+            <option value="top-right">오른쪽 위</option>
+            <option value="bottom-left">왼쪽 아래</option>
+            <option value="bottom-right">오른쪽 아래</option>
+          </select>
+          <label>팝업 너비 (px)</label>
+          <input type="number" id="ppWidth" value="360" min="240" max="640">
+          <label style="display:flex;gap:8px;align-items:center;margin-top:10px;cursor:pointer"><input type="checkbox" id="ppEnabled" checked style="width:auto">즉시 사용 (체크 해제 시 저장만 하고 비공개)</label>
+          <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+            <button class="btn-main" id="ppSaveBtn" onclick="savePopup()">💾 팝업 저장</button>
+            <button class="btn-sub" style="background:#7c3aed" onclick="previewPopup()">👁 미리보기</button>
+            <button class="btn-sub" id="ppCancelBtn" style="background:#8a919d;display:none" onclick="ppResetForm()">✕ 수정 취소</button>
+          </div>
+        </div>
+        <div>
+          <h3 style="margin:4px 0 10px">등록된 팝업</h3>
+          <div id="ppList" class="board"><div class="bempty">불러오는 중…</div></div>
+        </div>
+      </div>
     </div>
     <div id="v1">
       <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
@@ -428,14 +485,191 @@ async function loadExtClubMap(){
   }catch(e){console.warn('extClubMap',e);}
 }
 function tab(n){
-  [1,2,3,4,5].forEach(i=>{
+  [1,2,3,4,5,6].forEach(i=>{
     document.getElementById('t'+i).classList.toggle('on',i===n);
     document.getElementById('v'+i).style.display=i===n?'block':'none';
   });
   if(n===3){loadApps();if(!USERS.length)loadUsers();}
   if(n===4)loadCompsAdmin();
+  if(n===6)loadPopups();  // [팝업] 신규 탭
 }
 let APPS=[];let AFL='전체';let TRASH={apps:[],users:[]};
+// ══════════ [팝업] 홈페이지 팝업 관리 ══════════
+let PP_LIST=[],PP_EDIT=null,PP_IMGDATA=null,PP_IMGURL='';
+document.addEventListener('change',function(e){
+  if(e.target&&e.target.id==='ppImgFile'&&e.target.files&&e.target.files[0]){
+    const f=e.target.files[0];
+    if(f.size>3*1024*1024){alert('이미지는 3MB 이하로 올려주세요.');e.target.value='';return}
+    const rd=new FileReader();
+    rd.onload=function(ev){
+      PP_IMGDATA=ev.target.result;
+      document.getElementById('ppImgPrevImg').src=PP_IMGDATA;
+      document.getElementById('ppImgPrev').style.display='block';
+    };
+    rd.readAsDataURL(f);
+  }
+});
+function ppClearImg(){
+  PP_IMGDATA=null;PP_IMGURL='';
+  document.getElementById('ppImgFile').value='';
+  document.getElementById('ppImgPrev').style.display='none';
+}
+function ppGetLink(){
+  const sel=document.getElementById('ppLinkSel').value;
+  if(sel==='__etc')return (document.getElementById('ppLinkEtc').value||'').trim();
+  return sel;
+}
+function ppSetLink(link){
+  const sel=document.getElementById('ppLinkSel');
+  const opts=[...sel.options].map(o=>o.value);
+  if(!link){sel.value='';document.getElementById('ppLinkEtc').style.display='none';return}
+  if(opts.indexOf(link)>=0){sel.value=link;document.getElementById('ppLinkEtc').style.display='none';}
+  else{sel.value='__etc';const et=document.getElementById('ppLinkEtc');et.value=link;et.style.display='block';}
+}
+// [팝업] 저장 위치: siteContent/popups 단일 문서 (items 배열) — 기존 보안규칙(관리자 쓰기·공개 읽기) 그대로 사용
+async function loadPopups(){
+  const el=document.getElementById('ppList');
+  try{
+    const doc=await DB.collection('siteContent').doc('popups').get();
+    PP_LIST=((doc.exists&&doc.data().items)||[])
+      .slice().sort((a,b)=>String(b.startDate||'').localeCompare(String(a.startDate||'')));
+    if(!PP_LIST.length){el.innerHTML='<div class="bempty">등록된 팝업이 없습니다.</div>';return}
+    const today=new Date().toISOString().slice(0,10);
+    el.innerHTML=PP_LIST.map(p=>{
+      const live=p.enabled&&p.startDate<=today&&today<=p.endDate;
+      const stat=live?'<span style="font-size:11.5px;font-weight:900;color:#0f766e">🟢 게시중</span>'
+        :p.enabled?(p.startDate>today?'<span style="font-size:11.5px;font-weight:900;color:#b8860b">⏳ 대기 (시작 전)</span>':'<span style="font-size:11.5px;font-weight:900;color:#8a919d">⚫ 종료</span>')
+        :'<span style="font-size:11.5px;font-weight:900;color:#C41E2F">🔴 비공개</span>';
+      const posLb={'center':'중앙','top-left':'왼쪽 위','top-right':'오른쪽 위','bottom-left':'왼쪽 아래','bottom-right':'오른쪽 아래'}[p.position]||p.position;
+      return '<div style="background:#fff;border:1.5px solid #dfe5ee;border-radius:13px;padding:14px 17px;margin-bottom:10px">'
+        +'<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">'
+        +'<b style="font-size:14.5px">'+esc(p.title)+'</b>'+stat
+        +'<span style="flex:1"></span>'
+        +'<button class="btn-sub" style="background:'+(p.enabled?'#8a919d':'#0f766e')+';padding:5px 12px;font-size:12px" onclick="togglePopup(\''+p.id+'\','+(!p.enabled)+')">'+(p.enabled?'⏸ 비공개로':'▶ 공개로')+'</button>'
+        +'<button class="btn-sub" style="background:#1F4E9C;padding:5px 12px;font-size:12px" onclick="editPopup(\''+p.id+'\')">✏️ 수정</button>'
+        +'<button class="btn-sub" style="background:#C41E2F;padding:5px 12px;font-size:12px" onclick="delPopup(\''+p.id+'\')">삭제</button>'
+        +'</div>'
+        +'<div style="font-size:12.5px;color:#6b7280;margin-top:6px">📅 '+esc(p.startDate||'')+' ~ '+esc(p.endDate||'')+' · 📍 '+esc(posLb)+' · 너비 '+(p.width||360)+'px'+(p.link?' · 🔗 '+esc(p.link):'')+'</div>'
+        +(p.content?'<div style="font-size:12.5px;color:#374151;margin-top:5px;white-space:pre-wrap">'+esc(String(p.content).slice(0,120))+(String(p.content).length>120?'…':'')+'</div>':'')
+        +(p.imageUrl?'<img src="'+esc(p.imageUrl)+'" style="max-height:70px;border-radius:8px;margin-top:6px;border:1px solid #eef0f4">':'')
+        +'</div>';
+    }).join('');
+  }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+esc(e.message)+'</div>'}
+}
+function ppResetForm(){
+  PP_EDIT=null;PP_IMGDATA=null;PP_IMGURL='';
+  document.getElementById('ppFormTitle').textContent='🪧 새 팝업 만들기';
+  document.getElementById('ppTitle').value='';
+  document.getElementById('ppStart').value='';
+  document.getElementById('ppEnd').value='';
+  document.getElementById('ppContent').value='';
+  ppClearImg();ppSetLink('');
+  document.getElementById('ppPos').value='center';
+  document.getElementById('ppWidth').value=360;
+  document.getElementById('ppEnabled').checked=true;
+  document.getElementById('ppCancelBtn').style.display='none';
+  document.getElementById('ppSaveBtn').textContent='💾 팝업 저장';
+}
+function editPopup(id){
+  const p=PP_LIST.find(x=>x.id===id);if(!p)return;
+  PP_EDIT=id;PP_IMGDATA=null;PP_IMGURL=p.imageUrl||'';
+  document.getElementById('ppFormTitle').textContent='✏️ 팝업 수정';
+  document.getElementById('ppTitle').value=p.title||'';
+  document.getElementById('ppStart').value=p.startDate||'';
+  document.getElementById('ppEnd').value=p.endDate||'';
+  document.getElementById('ppContent').value=p.content||'';
+  if(p.imageUrl){document.getElementById('ppImgPrevImg').src=p.imageUrl;document.getElementById('ppImgPrev').style.display='block';}
+  else document.getElementById('ppImgPrev').style.display='none';
+  document.getElementById('ppImgFile').value='';
+  ppSetLink(p.link||'');
+  document.getElementById('ppPos').value=p.position||'center';
+  document.getElementById('ppWidth').value=p.width||360;
+  document.getElementById('ppEnabled').checked=p.enabled!==false;
+  document.getElementById('ppCancelBtn').style.display='inline-block';
+  document.getElementById('ppSaveBtn').textContent='💾 수정 저장';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+async function savePopup(){
+  const title=(document.getElementById('ppTitle').value||'').trim();
+  const start=document.getElementById('ppStart').value;
+  const end=document.getElementById('ppEnd').value;
+  if(!title){alert('제목을 입력하세요.');return}
+  if(!start||!end){alert('게시 시작일·종료일을 모두 선택하세요.');return}
+  if(start>end){alert('종료일이 시작일보다 빠릅니다.');return}
+  const btn=document.getElementById('ppSaveBtn');btn.disabled=true;btn.textContent='저장 중…';
+  try{
+    let imageUrl=PP_IMGURL||'';
+    if(PP_IMGDATA){  // 새 이미지 업로드 (기존 검증된 quals 경로 규칙 사용)
+      const uid=(firebase.auth().currentUser||{}).uid;
+      const blob=await (await fetch(PP_IMGDATA)).blob();
+      const ref=firebase.storage().ref('quals/'+uid+'/popup_'+Date.now()+'.jpg');
+      await ref.put(blob,{contentType:blob.type||'image/jpeg'});
+      imageUrl=await ref.getDownloadURL();
+    }
+    const data={
+      title:title,content:(document.getElementById('ppContent').value||'').trim(),
+      imageUrl:imageUrl,link:ppGetLink(),
+      startDate:start,endDate:end,
+      position:document.getElementById('ppPos').value,
+      width:Math.max(240,Math.min(640,parseInt(document.getElementById('ppWidth').value)||360)),
+      enabled:document.getElementById('ppEnabled').checked
+    };  // ※ 배열 안에는 serverTimestamp 사용 불가 — ISO 문자열 사용
+    // siteContent/popups 문서의 items 배열에 저장
+    const doc=await DB.collection('siteContent').doc('popups').get();
+    const items=(doc.exists&&doc.data().items)||[];
+    if(PP_EDIT){
+      const i=items.findIndex(x=>x.id===PP_EDIT);
+      if(i>=0)items[i]=Object.assign({},items[i],data,{updatedAt:new Date().toISOString()});
+      else{alert('수정할 팝업을 찾지 못했습니다. 새로고침 후 다시 시도해주세요.');btn.disabled=false;return}
+    }else{
+      data.id='pp'+Date.now();
+      data.createdAt=new Date().toISOString();data.updatedAt=data.createdAt;
+      items.push(data);
+    }
+    await DB.collection('siteContent').doc('popups').set({items:items,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:(firebase.auth().currentUser||{}).email||''});
+    alert('✓ 팝업이 저장되었습니다.'+(data.enabled?'\n게시 기간 중 홈페이지 첫 화면에 표시됩니다.':'\n(비공개 상태 — 공개로 전환 시 표시됩니다)'));
+    ppResetForm();loadPopups();
+  }catch(e){alert('저장 실패: '+e.message)}
+  btn.disabled=false;btn.textContent=PP_EDIT?'💾 수정 저장':'💾 팝업 저장';
+}
+async function _ppUpdateItems(fn){
+  const doc=await DB.collection('siteContent').doc('popups').get();
+  const items=(doc.exists&&doc.data().items)||[];
+  const out=fn(items);
+  await DB.collection('siteContent').doc('popups').set({items:out,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:(firebase.auth().currentUser||{}).email||''});
+}
+async function togglePopup(id,on){
+  try{await _ppUpdateItems(items=>items.map(x=>x.id===id?Object.assign({},x,{enabled:on,updatedAt:new Date().toISOString()}):x));loadPopups();}
+  catch(e){alert('변경 실패: '+e.message)}
+}
+async function delPopup(id){
+  const p=PP_LIST.find(x=>x.id===id);
+  if(!confirm('팝업 "'+(p?p.title:'')+'"을(를) 삭제할까요?\n삭제 후 되돌릴 수 없습니다.'))return;
+  try{await _ppUpdateItems(items=>items.filter(x=>x.id!==id));loadPopups();}
+  catch(e){alert('삭제 실패: '+e.message)}
+}
+function previewPopup(){
+  const old=document.getElementById('ppPrevWrap');if(old)old.remove();
+  const pos=document.getElementById('ppPos').value;
+  const w=Math.max(240,Math.min(640,parseInt(document.getElementById('ppWidth').value)||360));
+  const title=(document.getElementById('ppTitle').value||'(제목)');
+  const content=(document.getElementById('ppContent').value||'');
+  const img=PP_IMGDATA||PP_IMGURL||'';
+  const link=ppGetLink();
+  const posCss={'center':'top:50%;left:50%;transform:translate(-50%,-50%);',
+    'top-left':'top:80px;left:20px;','top-right':'top:80px;right:20px;',
+    'bottom-left':'bottom:20px;left:20px;','bottom-right':'bottom:20px;right:20px;'}[pos]||'top:50%;left:50%;transform:translate(-50%,-50%);';
+  const d=document.createElement('div');d.id='ppPrevWrap';
+  d.innerHTML='<div style="position:fixed;inset:0;background:rgba(10,15,30,.35);z-index:99998" onclick="document.getElementById(\'ppPrevWrap\').remove()"></div>'
+    +'<div style="position:fixed;'+posCss+'width:'+w+'px;max-width:92vw;background:#fff;border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.3);z-index:99999;overflow:hidden">'
+    +'<div style="display:flex;align-items:center;gap:8px;padding:12px 16px;background:#1F4E9C;color:#fff"><b style="flex:1;font-size:14.5px">'+esc(title)+'</b><span style="cursor:pointer;font-size:18px" onclick="document.getElementById(\'ppPrevWrap\').remove()">✕</span></div>'
+    +(img?'<img src="'+esc(img)+'" style="display:block;width:100%">':'')
+    +(content?'<div style="padding:13px 16px;font-size:13.5px;line-height:1.8;white-space:pre-wrap">'+esc(content)+'</div>':'')
+    +(link?'<div style="padding:0 16px 12px;font-size:12px;color:#1F4E9C;font-weight:800">🔗 클릭 시 이동: '+esc(link)+'</div>':'')
+    +'<div style="display:flex;border-top:1px solid #eef0f4"><span style="flex:1;text-align:center;padding:10px;font-size:12.5px;color:#6b7280">오늘 하루 열지 않기</span><span style="flex:1;text-align:center;padding:10px;font-size:12.5px;font-weight:800;color:#1F4E9C;border-left:1px solid #eef0f4">닫기</span></div>'
+    +'</div>';
+  document.body.appendChild(d);
+}
 function appFilter(f,btn){
   AFL=f;
   document.querySelectorAll('.afl').forEach(b=>{b.style.background=b.dataset.f===f?'':'#8a919d'});
