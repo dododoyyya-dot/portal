@@ -158,6 +158,16 @@
       </div>
       <div id="stEmbedList"><div class="bempty">불러오는 중…</div></div>
     </div>
+    <!-- [대회이전] 권한자 대회 참가모집 공고 등록·관리 (관리자 페이지 위저드 이전) -->
+    <div id="compAdminBox" style="display:none;background:#f0f5ff;border:2px solid #b9cdec;border-radius:16px;padding:14px 18px;margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <b style="font-size:14.5px;color:#153A77">🏆 대회 참가모집 공고 등록·관리</b>
+        <span style="font-size:12px;color:var(--gray)">종목·부문, 참가비, 첨부자료, 동의서까지 한 번에 — 등록 즉시 아래에 게시됩니다</span>
+        <span style="flex:1"></span>
+        <button class="cbtn cbtn-main" style="padding:8px 16px;font-size:13px" onclick="cc2Open()">+ 대회 공고 등록</button>
+      </div>
+      <div id="cc2MyList" style="margin-top:8px"></div>
+    </div>
     <div class="board" id="cSlotList"><div class="bempty">불러오는 중…</div></div>
     <div style="margin-top:14px;font-size:12.5px;color:var(--gray);line-height:1.7;background:var(--bg-soft);border-radius:10px;padding:12px 16px">
       <b>개인정보 수집·이용 안내</b> — 신청 시 소속·성명·연락처·계좌번호를 대회 수당(심판·운영·안전요원) 지급 목적으로 수집·이용하며(보유기간 2026. 12. 31.까지), 수당 원천징수 세액 납부를 위해 성명·지급총액·결정세액·주민등록번호가 국세청에 제공됩니다(「소득세법」 제21조·제37조·제129조, 「국세기본법 시행령」 제68조). 동의를 거부할 권리가 있으나, 거부 시 수당 지급에 제한이 있을 수 있습니다. 계좌·주민등록번호는 마이페이지에서 별도 보안 저장됩니다.
@@ -235,6 +245,9 @@ let SO_POSTS=[];
 function initSoAdmin(){
   if(!isSidoOfficer())return;
   const box=document.getElementById('soAdminBox');if(box)box.style.display='';
+  // [대회이전] 대회 공고 등록 박스도 함께 표시
+  const cb=document.getElementById('compAdminBox');if(cb)cb.style.display='';
+  cc2LoadMine();
 }
 // ══════════════ 심판·운영요원 모집 (새 양식 — competitionStaff 컬렉션) ══════════════
 async function loadStaffEmbed(){
@@ -704,6 +717,290 @@ async function openMinorReq(id){
   }catch(e){alert('요청 실패: '+e.message)}
 }
 let CCOMPS=[];
+// ══════════ [대회이전] 대회 참가모집 공고 등록·관리 (관리자 위저드 이전판, cc2 접두어) ══════════
+const CC2_SIDOS=['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
+let CC2_ENTRY=null,CC2_DATES=[],CC2_Y=0,CC2_M=0,CC2_ATTACH=[],CC2_CIMGS=[],CC2_EDIT=null,CC2_LIST=[];
+function _cc2Admin(){return !!(CMY&&(CMY.role==='admin'||CMY.owner))}
+async function cc2LoadMine(){
+  const el=document.getElementById('cc2MyList');if(!el)return;
+  try{
+    const snap=await DB.collection('competitions').orderBy('dateStart','desc').limit(30).get();
+    CC2_LIST=snap.docs.map(d=>({id:d.id,...d.data()}))
+      .filter(c=>_cc2Admin()||c.byUid===CME.uid||(CMY.role==='sidoOfficer'&&c.sido===CMY.sido));
+    el.innerHTML=CC2_LIST.length?CC2_LIST.map(c=>'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#fff;border:1.5px solid #d3e0f2;border-radius:10px;padding:8px 13px;margin-top:6px;font-size:13px">'
+      +'<b>'+cesc(c.title||'')+'</b><span style="color:#6b7280;font-size:12px">📅 '+cesc(c.dateStart||'')+(c.dateEnd&&c.dateEnd!==c.dateStart?'~'+cesc(c.dateEnd):'')+' · 📍 '+cesc(c.place||'')+'</span>'
+      +'<span style="flex:1"></span>'
+      +'<button class="cbtn cbtn-soft" style="padding:5px 12px;font-size:12px" onclick="cc2Open(\''+c.id+'\')">✏️ 수정</button>'
+      +'</div>').join('')
+    :'<div style="font-size:12.5px;color:#8a919d;margin-top:6px">등록한 대회가 없습니다. [+ 대회 공고 등록]으로 시작하세요.</div>';
+  }catch(e){el.innerHTML='<div style="font-size:12.5px;color:#C41E2F">목록 불러오기 실패: '+cesc(e.message)+'</div>'}
+}
+function cc2EntryInit(c){
+  const e=(c&&c.entry)||{};
+  CC2_ENTRY={
+    indiv:(e.indiv&&e.indiv.length?e.indiv:[{name:'디스크골프',divs:['남자부','여자부']}]).map(x=>({name:x.name||'',divs:(x.divs||[]).slice()})),
+    team:(e.team&&e.team.length?e.team:[
+      {name:'얼티미트',divs:['남자','여자','혼성']},
+      {name:'디스크골프',divs:['남자','여자','혼성']},
+      {name:'원반윷놀이',divs:['남자','여자','혼성']}]).map(x=>({name:x.name||'',divs:(x.divs||[]).slice()})),
+    special:(e.special&&e.special.length?e.special:['장애인부','강아지동반']).slice(),
+    fees:(e.fees&&e.fees.length?e.fees:[{label:'일반',amount:''}]).map(x=>({label:x.label||'',amount:x.amount||''})),
+    teamUnits:(e.teamUnits&&e.teamUnits.length?e.teamUnits:['시도연맹클럽','학교클럽','기타팀']).slice(),
+    teamGenders:(e.teamGenders&&e.teamGenders.length?e.teamGenders:['남자','여자','혼성']).slice()
+  };
+  cc2EntryRender();
+}
+function cc2EntryRender(){
+  const el=document.getElementById('cc2Build');if(!el||!CC2_ENTRY)return;
+  const bi='padding:7px 10px;border:1.5px solid #dfe5ee;border-radius:8px;font-size:12.5px;font-family:inherit';
+  const sportBlock=(kind,label,color)=>
+    '<div style="margin-top:10px"><b style="font-size:12.5px;color:'+color+'">'+label+'</b>'
+    +CC2_ENTRY[kind].map((sp,si)=>'<div style="border:1px solid #e6eaf2;border-radius:10px;padding:9px 11px;margin-top:6px">'
+      +'<div style="display:flex;gap:6px;align-items:center"><span style="font-size:11.5px;font-weight:800;color:#8a919d">종목</span>'
+      +'<input value="'+cesc(sp.name)+'" placeholder="종목명" style="'+bi+';width:150px" oninput="CC2_ENTRY.'+kind+'['+si+'].name=this.value">'
+      +'<span style="flex:1"></span>'
+      +'<button type="button" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:7px;padding:4px 10px;cursor:pointer;font-weight:800;font-size:11px" onclick="CC2_ENTRY.'+kind+'.splice('+si+',1);cc2EntryRender()">× 종목 삭제</button></div>'
+      +'<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:6px"><span style="font-size:11.5px;font-weight:800;color:#8a919d">부문</span>'
+      +sp.divs.map((dv,di)=>'<span style="display:inline-flex;align-items:center;gap:3px"><input value="'+cesc(dv)+'" placeholder="부문명" style="'+bi+';width:86px" oninput="CC2_ENTRY.'+kind+'['+si+'].divs['+di+']=this.value"><button type="button" onclick="CC2_ENTRY.'+kind+'['+si+'].divs.splice('+di+',1);cc2EntryRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:6px;width:20px;height:20px;cursor:pointer;font-weight:900">×</button></span>').join('')
+      +'<button type="button" style="border:none;background:#eef3fa;color:#153A77;border-radius:7px;padding:5px 11px;cursor:pointer;font-weight:800;font-size:11.5px" onclick="CC2_ENTRY.'+kind+'['+si+'].divs.push(\'\');cc2EntryRender()">+ 부문</button>'
+      +'</div></div>').join('')
+    +'<button type="button" style="border:none;background:'+color+';color:#fff;border-radius:8px;padding:6px 13px;cursor:pointer;font-weight:800;font-size:12px;margin-top:6px" onclick="CC2_ENTRY.'+kind+'.push({name:\'\',divs:[\'\']});cc2EntryRender()">+ 종목 추가</button></div>';
+  const listBlock=(key,label,ph)=>'<div style="margin-top:12px"><b style="font-size:12.5px;color:#153A77">'+label+'</b>'
+    +'<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:5px">'
+    +CC2_ENTRY[key].map((v2,i)=>'<span style="display:inline-flex;align-items:center;gap:3px"><input value="'+cesc(v2)+'" placeholder="'+ph+'" style="'+bi+';width:112px" oninput="CC2_ENTRY.'+key+'['+i+']=this.value"><button type="button" onclick="CC2_ENTRY.'+key+'.splice('+i+',1);cc2EntryRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:6px;width:20px;height:20px;cursor:pointer;font-weight:900">×</button></span>').join('')
+    +'<button type="button" style="border:none;background:#8a919d;color:#fff;border-radius:7px;padding:5px 11px;cursor:pointer;font-weight:800;font-size:11.5px" onclick="CC2_ENTRY.'+key+'.push(\'\');cc2EntryRender()">+ 추가</button></div></div>';
+  el.innerHTML=
+    sportBlock('indiv','🙋 개인전 종목','#1F4E9C')
+    +sportBlock('team','👥 단체전 종목','#7c3aed')
+    +listBlock('special','♿ 특수 부문 옵션 (장애인부·강아지동반 등)','부문명')
+    +'<div style="margin-top:12px"><b style="font-size:12.5px;color:#0f766e">💰 참가비 (구분별)</b>'
+    +CC2_ENTRY.fees.map((f,i)=>'<div style="display:flex;gap:6px;margin-top:5px;align-items:center">'
+      +'<input value="'+cesc(f.label)+'" placeholder="구분 (예: 성인 선수)" style="'+bi+';width:150px" oninput="CC2_ENTRY.fees['+i+'].label=this.value">'
+      +'<input value="'+cesc(f.amount)+'" placeholder="금액 (예: 30,000원 / 무료)" style="'+bi+';flex:1" oninput="CC2_ENTRY.fees['+i+'].amount=this.value">'
+      +'<button type="button" onclick="CC2_ENTRY.fees.splice('+i+',1);cc2EntryRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:6px;width:22px;height:22px;cursor:pointer;font-weight:900">×</button></div>').join('')
+    +'<button type="button" style="border:none;background:#0f766e;color:#fff;border-radius:7px;padding:5px 11px;cursor:pointer;font-weight:800;font-size:11.5px;margin-top:5px" onclick="CC2_ENTRY.fees.push({label:\'\',amount:\'\'});cc2EntryRender()">+ 참가비 구분 추가</button></div>'
+    +listBlock('teamUnits','🏷 단체 신청 단위','단위명')
+    +listBlock('teamGenders','🚻 단체(클럽) 구분','구분명');
+}
+function cc2Data(){
+  const trimArr=a=>a.map(t=>String(t||'').trim()).filter(Boolean);
+  return {
+    indiv:CC2_ENTRY.indiv.map(x=>({name:String(x.name||'').trim(),divs:trimArr(x.divs)})).filter(x=>x.name),
+    team:CC2_ENTRY.team.map(x=>({name:String(x.name||'').trim(),divs:trimArr(x.divs)})).filter(x=>x.name),
+    special:trimArr(CC2_ENTRY.special),
+    fees:CC2_ENTRY.fees.map(f=>({label:String(f.label||'').trim(),amount:String(f.amount||'').trim()})).filter(f=>f.label||f.amount),
+    teamUnits:trimArr(CC2_ENTRY.teamUnits),
+    teamGenders:trimArr(CC2_ENTRY.teamGenders)
+  };
+}
+function cc2CalRender(){
+  const box=document.getElementById('cc2CalBox');if(!box)return;
+  const y=CC2_Y,m=CC2_M;
+  const first=new Date(y,m,1),last=new Date(y,m+1,0);
+  let h='<div style="display:flex;align-items:center;margin-bottom:6px">'
+    +'<button type="button" onclick="CC2_M--;if(CC2_M<0){CC2_M=11;CC2_Y--}cc2CalRender()" style="border:1px solid #dfe5ee;background:#fff;border-radius:8px;padding:4px 12px;cursor:pointer;font-weight:900">‹</button>'
+    +'<b style="flex:1;text-align:center;font-size:14px">'+y+'년 '+(m+1)+'월</b>'
+    +'<button type="button" onclick="CC2_M++;if(CC2_M>11){CC2_M=0;CC2_Y++}cc2CalRender()" style="border:1px solid #dfe5ee;background:#fff;border-radius:8px;padding:4px 12px;cursor:pointer;font-weight:900">›</button></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center;font-size:12px">'
+    +['일','월','화','수','목','금','토'].map((d,i)=>'<b style="color:'+(i===0?'#C41E2F':i===6?'#1F4E9C':'#6b7280')+';padding:3px 0">'+d+'</b>').join('');
+  for(let i=0;i<first.getDay();i++)h+='<span></span>';
+  const today=new Date().toISOString().slice(0,10);
+  for(let d=1;d<=last.getDate();d++){
+    const ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const on=CC2_DATES.indexOf(ds)>=0;
+    h+='<button type="button" onclick="cc2Pick(\''+ds+'\')" style="border:1.5px solid '+(on?'#153A77':'#e8ecf3')+';background:'+(on?'#153A77':(ds<today?'#f7f8fa':'#fff'))+';color:'+(on?'#fff':(ds<today?'#b6bcc7':'#333'))+';border-radius:8px;padding:7px 0;cursor:pointer;font-weight:'+(on?'900':'600')+'">'+d+'</button>';
+  }
+  h+='</div>';
+  box.innerHTML=h;
+  const sum=document.getElementById('cc2DateSum');
+  if(sum){
+    const s=CC2_DATES.slice().sort();
+    sum.textContent=s.length?('선택 '+s.length+'일 — '+s[0].replace(/-/g,'.')+(s.length>1?' ~ '+s[s.length-1].replace(/-/g,'.'):'')):'날짜를 선택해주세요';
+  }
+}
+function cc2Pick(ds){
+  const i=CC2_DATES.indexOf(ds);
+  if(i>=0)CC2_DATES.splice(i,1);
+  else{if(CC2_DATES.length>=31){alert('최대 31일까지 선택할 수 있습니다.');return}CC2_DATES.push(ds);}
+  cc2CalRender();
+}
+function cc2PickFile(input,arr,renderFn){
+  [...(input.files||[])].forEach(f=>{
+    if(f.size>5*1024*1024){alert(f.name+' — 5MB 이하만 가능합니다.');return}
+    const rd=new FileReader();
+    rd.onload=ev=>{arr.push({name:f.name,kind:'포스터',dataUrl:ev.target.result});renderFn();};
+    rd.readAsDataURL(f);
+  });
+  input.value='';
+}
+function cc2AttachRender(){
+  const el=document.getElementById('cc2AttachList');if(!el)return;
+  el.innerHTML=CC2_ATTACH.length?CC2_ATTACH.map((x,i)=>'<div style="display:flex;gap:7px;align-items:center;margin-top:5px;font-size:12.5px">'
+    +'<select onchange="CC2_ATTACH['+i+'].kind=this.value" style="padding:5px 8px;border:1.5px solid #dfe5ee;border-radius:7px;font-size:12px">'
+    +['포스터','대진표','일정표','요강','기타'].map(k=>'<option'+(x.kind===k?' selected':'')+'>'+k+'</option>').join('')+'</select>'
+    +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+cesc(x.name)+(x.url?' <span style="color:#0f766e;font-size:11px">(업로드됨)</span>':'')+'</span>'
+    +'<button type="button" onclick="CC2_ATTACH.splice('+i+',1);cc2AttachRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:6px;width:22px;height:22px;cursor:pointer;font-weight:900">×</button></div>').join('')
+  :'<div style="font-size:12px;color:#8a919d;margin-top:4px">첨부 없음</div>';
+}
+function cc2CImgRender(){
+  const el=document.getElementById('cc2CImgList');if(!el)return;
+  el.innerHTML=CC2_CIMGS.length?CC2_CIMGS.map((x,i)=>'<span style="display:inline-flex;align-items:center;gap:4px;margin:4px 6px 0 0"><img src="'+cesc(x.url||x.dataUrl)+'" style="height:52px;border-radius:6px;border:1px solid #e2e7f0">'
+    +'<button type="button" onclick="CC2_CIMGS.splice('+i+',1);cc2CImgRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:6px;width:20px;height:20px;cursor:pointer;font-weight:900">×</button></span>').join('')
+  :'<span style="font-size:12px;color:#8a919d">이미지 없음 (문안만 사용)</span>';
+}
+function cc2Open(editId){
+  const c=editId?(CC2_LIST.find(x=>x.id===editId)||{}):{};
+  CC2_EDIT=editId||null;
+  const old=document.getElementById('cc2Modal');if(old)old.remove();
+  const div=document.createElement('div');div.id='cc2Modal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.55);z-index:999;display:flex;align-items:flex-start;justify-content:center;padding:14px;overflow:auto';
+  const inp='style="width:100%;padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;margin-top:4px;font-family:inherit;font-size:13.5px"';
+  const lb='style="font-size:12.5px;font-weight:800;display:block;margin-top:11px"';
+  const sec=(t,inner)=>'<div style="border:1px solid #e6eaf2;border-radius:12px;padding:13px 16px;margin-top:12px"><b style="font-size:13.5px;color:#153A77">'+t+'</b>'+inner+'</div>';
+  div.innerHTML='<div style="background:#fff;border-radius:18px;max-width:680px;width:100%;margin:8px 0;padding:24px 26px">'
+    +'<div style="display:flex;align-items:center;gap:8px"><b style="font-size:17px">🏆 '+(editId?'대회 공고 수정':'대회 참가모집 공고 등록')+'</b><span style="flex:1"></span><button class="cbtn cbtn-ghost" onclick="document.getElementById(\'cc2Modal\').remove()">닫기 ✕</button></div>'
+    +sec('① 기본 정보',
+      '<label '+lb+'>대회명 *</label><input id="cc2Title" '+inp+' value="'+cesc(c.title||'')+'" placeholder="예: 2026 전국 플라잉디스크대회">'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+      +'<div><label '+lb+'>주최</label><input id="cc2Host" '+inp+' value="'+cesc(c.host||'')+'"></div>'
+      +'<div><label '+lb+'>주관</label><input id="cc2Org" '+inp+' value="'+cesc(c.organizer||'')+'"></div>'
+      +'<div><label '+lb+'>후원</label><input id="cc2Spon" '+inp+' value="'+cesc(c.sponsor||'')+'"></div>'
+      +'<div><label '+lb+'>협찬</label><input id="cc2Part" '+inp+' value="'+cesc(c.partner||'')+'"></div>'
+      +'</div>'
+      +'<label '+lb+'>대회 일자 * <span style="font-weight:600;color:#8a919d;font-size:11px">— 달력 클릭 선택 (‹ › 다음 달 이동)</span></label>'
+      +'<div id="cc2CalBox" style="border:1.5px solid #dfe5ee;border-radius:11px;padding:10px;margin-top:5px"></div>'
+      +'<div id="cc2DateSum" style="font-size:12.5px;font-weight:800;color:#153A77;margin-top:5px;min-height:16px"></div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+      +'<div><label '+lb+'>개회식 시간 (선택)</label><input id="cc2OpT" '+inp+' value="'+cesc((c.opening&&c.opening.time)||'')+'" placeholder="예: 09:00"></div>'
+      +'<div><label '+lb+'>개회식 장소 (선택)</label><input id="cc2OpP" '+inp+' value="'+cesc((c.opening&&c.opening.place)||'')+'"></div>'
+      +'<div><label '+lb+'>대회 시간</label><input id="cc2Time" '+inp+' value="'+cesc(c.time||'')+'" placeholder="예: 10:00~17:00"></div>'
+      +'<div><label '+lb+'>대회 장소 *</label><input id="cc2Place" '+inp+' value="'+cesc(c.place||'')+'"></div>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+      +'<div><label '+lb+'>관할 시도 <span style="font-weight:600;color:#8a919d;font-size:11px">(내부 분류용)</span></label><select id="cc2Sido" '+inp+'>'+CC2_SIDOS.map(x=>'<option'+((c.sido||CMY.sido)===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div>'
+      +'<div><label '+lb+'>신청 마감일</label><input id="cc2DL" type="date" '+inp+' value="'+cesc(c.deadline||'')+'"></div>'
+      +'</div>'
+      +'<label '+lb+'>대회 안내문</label><textarea id="cc2Desc" rows="3" '+inp+'>'+cesc(c.desc||'')+'</textarea>')
+    +sec('② 참가 모집 구성 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 전부 버튼 추가형 · 지역 제한 없음(전국)</span>',
+      '<div id="cc2Build" style="margin-top:4px"></div>')
+    +sec('③ 첨부자료 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 포스터·대진표·일정표 (이미지·PDF)</span>',
+      '<input type="file" id="cc2Attach" accept="image/*,.pdf" multiple onchange="cc2PickFile(this,CC2_ATTACH,cc2AttachRender)" style="margin-top:8px">'
+      +'<div id="cc2AttachList" style="margin-top:6px"></div>')
+    +sec('④ 기타 안내',
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:13px">'
+      +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer"><input type="checkbox" id="cc2Prize" style="width:auto"'+((c.extras&&c.extras.prize)?' checked':'')+'> 🏆 시상품 지급</label>'
+      +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer"><input type="checkbox" id="cc2Souv" style="width:auto"'+((c.extras&&c.extras.souvenir)?' checked':'')+'> 🎁 기념품 지급</label>'
+      +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer"><input type="checkbox" id="cc2Ins" style="width:auto"'+((c.extras&&c.extras.insurance)?' checked':'')+'> 🛡 행사 보험 가입</label>'
+      +'</div>'
+      +'<label '+lb+'>시상 안내문 (선택)</label><textarea id="cc2PrizeNote" rows="2" '+inp+'>'+cesc((c.extras&&c.extras.prizeNote)||'')+'</textarea>')
+    +sec('⑤ 신청서·동의서 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 조직위원회 명의, 전자서명 또는 인쇄 제출</span>',
+      '<label '+lb+'>명의 (조직위원회)</label><input id="cc2Cmte" '+inp+' value="'+cesc(c.committee||'')+'" placeholder="비우면 「대회명 조직위원회」 자동">'
+      +'<label '+lb+'>동의서 문안</label><textarea id="cc2CText" rows="4" '+inp+' placeholder="비우면 기본 문안 사용">'+cesc(c.consentText||'')+'</textarea>'
+      +'<label '+lb+'>동의서 스캔 이미지 (선택 — 업로드 시 문안 대신 표시)</label>'
+      +'<input type="file" id="cc2CImg" accept="image/*" multiple onchange="cc2PickFile(this,CC2_CIMGS,cc2CImgRender)">'
+      +'<div id="cc2CImgList" style="margin-top:6px"></div>')
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
+    +'<button class="cbtn" style="background:#eceff4;color:#555" onclick="document.getElementById(\'cc2Modal\').remove()">닫기</button>'
+    +'<button class="cbtn cbtn-main" id="cc2SaveBtn" onclick="cc2Save()">'+(editId?'💾 수정 저장':'🏆 공고 등록')+'</button></div>'
+    +'</div>';
+  document.body.appendChild(div);
+  cc2EntryInit(c);
+  CC2_DATES=(c.dates&&c.dates.length)?c.dates.slice():[];
+  if(!CC2_DATES.length&&c.dateStart){
+    const fL=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    let d0=new Date(c.dateStart+'T00:00:00');const d1e=new Date((c.dateEnd||c.dateStart)+'T00:00:00');
+    let n=0;while(d0<=d1e&&n<31){CC2_DATES.push(fL(d0));d0.setDate(d0.getDate()+1);n++;}
+  }
+  const cb=CC2_DATES.length?new Date(CC2_DATES[0]+'T00:00:00'):new Date();
+  CC2_Y=cb.getFullYear();CC2_M=cb.getMonth();
+  cc2CalRender();
+  CC2_ATTACH=(c.attachments||[]).map(x=>({name:x.name||'',kind:x.kind||'기타',url:x.url||''}));
+  cc2AttachRender();
+  CC2_CIMGS=(c.consentImgs||[]).map(u=>({url:u}));
+  cc2CImgRender();
+}
+async function cc2Save(){
+  const v=id=>{const e=document.getElementById(id);return e?(e.value||'').trim():''};
+  const title=v('cc2Title'),place=v('cc2Place'),sido=v('cc2Sido');
+  const ds=CC2_DATES.slice().sort();
+  if(!title||!ds.length||!place){alert('대회명·대회 일자(달력)·대회 장소를 입력해주세요.');return}
+  if(!_cc2Admin()&&CMY.role==='sidoOfficer'&&sido!==CMY.sido){alert('자신의 관할 시도('+CMY.sido+')만 등록할 수 있습니다.');return}
+  const btn=document.getElementById('cc2SaveBtn');btn.disabled=true;btn.textContent='저장 중…';
+  try{
+    const entry=cc2Data();
+    const feeStr=entry.fees.map(f=>f.label+(f.amount?' '+f.amount:'')).join(' · ');
+    const uid=CME.uid;
+    const upFile=async(x,prefix)=>{
+      if(x.url)return x.url;
+      const blob=await (await fetch(x.dataUrl)).blob();
+      const ext=((x.name||'f.jpg').split('.').pop()||'jpg').toLowerCase();
+      const ref=firebase.storage().ref('quals/'+uid+'/'+prefix+'_'+Date.now()+'_'+Math.floor(Math.random()*1e4)+'.'+ext);
+      await ref.put(blob,{contentType:blob.type||'application/octet-stream'});
+      return await ref.getDownloadURL();
+    };
+    const attachments=[];
+    for(const x of CC2_ATTACH)attachments.push({name:x.name,kind:x.kind,url:await upFile(x,'compdoc')});
+    const consentImgs=[];
+    for(const x of CC2_CIMGS)consentImgs.push(await upFile(x,'compconsent'));
+    const extras={prize:document.getElementById('cc2Prize').checked,souvenir:document.getElementById('cc2Souv').checked,
+      insurance:document.getElementById('cc2Ins').checked,prizeNote:v('cc2PrizeNote')};
+    const committee=v('cc2Cmte')||(title+' 조직위원회');
+    const prev=CC2_EDIT?(CC2_LIST.find(x=>x.id===CC2_EDIT)||{}):{};
+    const sports=[...new Set(entry.indiv.concat(entry.team).map(x=>x.name))].map(n=>({name:n,mode:'일반'}));
+    const base={title:title,dateStart:ds[0],dateEnd:ds[ds.length-1],dates:ds,place:place,sido:sido,desc:v('cc2Desc'),
+      host:v('cc2Host'),organizer:v('cc2Org'),sponsor:v('cc2Spon'),partner:v('cc2Part'),
+      opening:{time:v('cc2OpT'),place:v('cc2OpP')},time:v('cc2Time'),
+      sports:sports,teamTypes:entry.teamUnits,fee:feeStr,deadline:v('cc2DL'),eligRegion:'',
+      entry:entry,attachments:attachments,extras:extras,committee:committee,
+      consentText:v('cc2CText'),consentImgs:consentImgs,
+      consentOverlays:prev.consentOverlays||{},status:'모집중'};
+    // 참가 슬롯 roles 생성
+    const roles=[],teamDivs=[];
+    entry.indiv.forEach(sp=>{if(sp.divs.length)sp.divs.forEach(d2=>roles.push(sp.name+' '+d2));else roles.push(sp.name);});
+    entry.team.forEach(sp=>{
+      if(sp.divs.length)sp.divs.forEach(d2=>{roles.push(sp.name+' '+d2);teamDivs.push(sp.name+' '+d2);});
+      else teamDivs.push(sp.name);
+    });
+    teamDivs.forEach(td=>{if(roles.indexOf(td)<0)roles.push(td);});
+    const slotBase={title:title,role:'참가',roles:roles,quota:999,date:base.dateStart,region:sido,
+      deadline:base.deadline||'',fee:feeStr,note:base.desc||'',eligRegion:'',
+      teamDivs:teamDivs,teamTypes:entry.teamUnits,teamGenders:entry.teamGenders,entry:entry,
+      host:base.host,organizer:base.organizer,sponsor:base.sponsor,partner:base.partner,
+      opening:base.opening,time:base.time,attachments:attachments,extras:extras,committee:committee,
+      consentText:base.consentText,consentImgs:consentImgs,consentOverlays:base.consentOverlays};
+    if(CC2_EDIT){
+      await DB.collection('competitions').doc(CC2_EDIT).update(base);
+      for(const sid of (prev.slotIds||[])){
+        try{
+          const sd=await DB.collection('compSlots').doc(sid).get();
+          if(!sd.exists)continue;
+          if(sd.data().role==='참가'){
+            const upd=Object.assign({},slotBase);delete upd.role;
+            await DB.collection('compSlots').doc(sid).update(upd);
+          }else{
+            // 심판·운영 슬롯은 공통 정보만 동기화
+            await DB.collection('compSlots').doc(sid).update({title:title,date:base.dateStart,region:sido,deadline:base.deadline||''});
+          }
+        }catch(e){}
+      }
+      if(prev.eventId)await DB.collection('events').doc(prev.eventId).update({title:'🏆 '+title,start:base.dateStart,end:base.dateEnd,sido:sido,place:place,desc:base.desc||'대회 페이지에서 신청'}).catch(()=>{});
+      alert('✓ 대회 공고가 수정되었습니다.');
+    }else{
+      const sref=await DB.collection('compSlots').add(Object.assign({bySido:sido,byUid:uid,
+        claimed:[],cancels:[],confirmed:[],createdAt:firebase.firestore.FieldValue.serverTimestamp()},slotBase));
+      const ev=await DB.collection('events').add({title:'🏆 '+title,type:'대회',start:base.dateStart,end:base.dateEnd,
+        sido:sido,place:place,desc:base.desc||'대회 페이지에서 신청',link:'competition.html',
+        byUid:uid,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+      const cref=await DB.collection('competitions').add(Object.assign({},base,{slotIds:[sref.id],eventId:ev.id,
+        byUid:uid,createdAt:firebase.firestore.FieldValue.serverTimestamp()}));
+      await DB.collection('compSlots').doc(sref.id).update({compId:cref.id}).catch(()=>{});
+      alert('🏆 대회 공고가 등록되었습니다!\n· 참가 모집 공고 게시 + 캘린더 등재 완료\n· 심판·운영요원 모집은 심판·운영 공고에서 「상위 대회 불러오기」로 등록하세요.');
+    }
+    document.getElementById('cc2Modal').remove();
+    loadSlots();loadLiveComps();cc2LoadMine();
+  }catch(e){alert('저장 실패: '+e.message)}
+  btn.disabled=false;btn.textContent=CC2_EDIT?'💾 수정 저장':'🏆 공고 등록';
+}
 // [대회v2] 실시간 대회 공고 피드 — 로그인 없이도 표시
 async function loadLiveComps(){
   const el=document.getElementById('liveComps');if(!el)return;
