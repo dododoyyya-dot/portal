@@ -751,7 +751,8 @@ async function loadSlots(){
     const today=new Date().toISOString().slice(0,10);
     // 대회(competitions) 묶음 먼저, 미연결 공고는 아래에 기존 방식대로
     const byComp={};CSLOTS.forEach(d=>{const cid=d.data().compId;if(cid)(byComp[cid]=byComp[cid]||[]).push(d);});
-    const linked=new Set();Object.values(byComp).forEach(a=>a.forEach(d=>linked.add(d.id)));
+    // [버그수정] 대회 묶음이 비공개(compEnabled 꺼짐)여도 연결 공고는 단독으로 표시 — 안내문·요강 미노출 문제 해결
+    const linked=new Set();CCOMPS.forEach(cd=>(byComp[cd.id]||[]).forEach(d=>linked.add(d.id)));
     let html='';
     CCOMPS.forEach(cd=>{
       const c=cd.data();
