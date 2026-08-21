@@ -84,7 +84,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="kfdf.js?v=20260808"></script>
+<script src="kfdf.js?v=20260821"></script>
 <script src="site_config.js"></script>
 <script>
 KFDF.initApp();
@@ -204,25 +204,31 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
 let RME=null,RMY=null,RAPPS=[],RUSERS=[],RFL='전체',RREG='전체',SEL=null;
 let RSCOPE=null; // 권역장 관할 권역 (admin은 null=전권역)
 
+// [겸직v3] 권역장 판정 헬퍼 — role 단일값 OR roles[] 겸직 배열 + 만료일 체크
+function rgHasRA(d){
+  if(!d)return false;
+  var isRA=(d.role==='regionAdmin')||(Array.isArray(d.roles)&&d.roles.indexOf('regionAdmin')>=0);
+  if(!isRA)return false;
+  var e=d.regionAdminExpiresAt;if(!e)return true;
+  try{var t=e.toDate?e.toDate():new Date(e);return new Date()<t;}catch(_){return true;}
+}
+
 AUTH.onAuthStateChanged(async u=>{
   const g=document.getElementById('rgGate');
   if(!u){g.style.display='block';g.innerHTML='🔒 권역 관리자 전용 페이지입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a>';return}
   RME=u;
   const d=await DB.collection('users').doc(u.uid).get();RMY=d.data();
-  if(!RMY||(RMY.role!=='regionAdmin'&&RMY.role!=='admin')){
+  // [겸직v3] admin OR 권역장(role/roles[] 어느 쪽이든) 허용
+  if(!RMY||(RMY.role!=='admin'&&!rgHasRA(RMY))){
     g.style.display='block';g.innerHTML='⛔ 권역 관리자 권한이 없습니다. 사무국(오너)의 지정이 필요합니다.';return;
   }
-  // 권역장 만료 확인: 사업 종료일이 지나면 자동 회수 (보안규칙도 동일하게 차단)
-  if(RMY.role==='regionAdmin'&&RMY.regionAdminExpiresAt){
-    let exp=false;try{const t=RMY.regionAdminExpiresAt.toDate?RMY.regionAdminExpiresAt.toDate():new Date(RMY.regionAdminExpiresAt);exp=new Date()>t;}catch(_){}
-    if(exp){g.style.display='block';g.innerHTML='⛔ 권역장 권한이 만료되었습니다 (만료일 경과). 재지정이 필요하면 사무국에 문의하세요.';return;}
-  }
+  // [겸직v3] 권역장 만료는 rgHasRA() 안에서 이미 처리됨 (만료 시 false → 위 게이트에서 차단)
   // 업무별 위임: duties 필드가 있고 'assign'이 빠져있으면 강습배정 권한 없음(자격관리만 위임된 경우)
-  if(RMY.role==='regionAdmin'&&Array.isArray(RMY.duties)&&RMY.duties.indexOf('assign')<0){
+  if(rgHasRA(RMY)&&Array.isArray(RMY.duties)&&RMY.duties.indexOf('assign')<0){
     g.style.display='block';g.innerHTML='⛔ 강습배정 권한이 없습니다 — 자격 업무만 위임되어 있습니다. <a href="license.html" style="font-weight:800;color:var(--red)">자격증 관리 페이지로 →</a>';return;
   }
   // ── 관할 권역 제한: 권역장은 부여받은 권역(managedRegion)만 열람·배정 (admin은 전권역) ──
-  if(RMY.role==='regionAdmin'&&RMY.managedRegion&&KFDF_REGIONS.indexOf(RMY.managedRegion)>=0){
+  if(rgHasRA(RMY)&&RMY.managedRegion&&KFDF_REGIONS.indexOf(RMY.managedRegion)>=0){
     RSCOPE=RMY.managedRegion;RREG=RSCOPE;
     document.getElementById('rgRegChips').style.display='none'; // 권역 선택 칩 숨김
     const t=document.getElementById('rgSchTitle');if(t)t.textContent='신청 학교 ('+RSCOPE+' 권역)';
@@ -231,6 +237,7 @@ AUTH.onAuthStateChanged(async u=>{
   document.getElementById('rgBody').style.display='block';
   await Promise.all([loadSchools(),loadInst()]);
 });
+
 
 function rgFilter(f,btn){
   RFL=f;

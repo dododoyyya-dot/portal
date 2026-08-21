@@ -33,23 +33,32 @@
     return true;
   }
 
-  /* ─── ① 관리 권한 등급 (role, 1인 1개) ─── */
+  /* ─── ① 관리 권한 등급 (role 단일값 + roles[] 겸직 배열 모두 지원) ─── */
   function roleOf(d) { return (d && d.role) || 'member'; }
   function isOwner(d) { return !!(d && d.owner === true); }
   function isAdmin(d) { return roleOf(d) === 'admin' || isOwner(d); }
-  function isSidoOfficer(d) { return roleOf(d) === 'sidoOfficer'; }
-  function isGugunOfficer(d) { return roleOf(d) === 'gugunOfficer'; }   // 구·군연맹 임원
-  // 권역장: 만료일(regionAdminExpiresAt)이 지나면 자동 무효
+  // [겸직v3] role 단일값 OR roles[] 배열 어느 쪽이든 인식
+  function isSidoOfficer(d) {
+    return roleOf(d) === 'sidoOfficer'
+      || !!(d && Array.isArray(d.roles) && d.roles.indexOf('sidoOfficer') >= 0);
+  }
+  function isGugunOfficer(d) {
+    return roleOf(d) === 'gugunOfficer'
+      || !!(d && Array.isArray(d.roles) && d.roles.indexOf('gugunOfficer') >= 0);
+  }
+  // [겸직v3] 권역장: role 단일값 OR roles[] 겸직 배열 + 만료일 자동 무효
   function regionActive(d) {
-    if (roleOf(d) !== 'regionAdmin') return false;
+    var isRA = roleOf(d) === 'regionAdmin'
+      || !!(d && Array.isArray(d.roles) && d.roles.indexOf('regionAdmin') >= 0);
+    if (!isRA) return false;
     var e = d && d.regionAdminExpiresAt;
     if (!e) return true;
     try { var t = e.toDate ? e.toDate() : new Date(e); return new Date() < t; } catch (_) { return true; }
   }
   function isRegionAdmin(d) { return regionActive(d); }
   function isApproved(d) { return !!(d && d.status === 'approved'); }
-  // 시도 단위 임원 권한 (시도임원 role 또는 하위호환 플래그)
-  function canCalendar(d) { return isAdmin(d) || isSidoOfficer(d) || !!(d && d.calendarEditor === true); }
+  // [겸직v3] canCalendar — 시도임원·권역장 모두 캘린더 편집 가능
+  function canCalendar(d) { return isAdmin(d) || isSidoOfficer(d) || isRegionAdmin(d) || !!(d && d.calendarEditor === true); }
   function canApproveClub(d, sido, gugun) {
     return isAdmin(d)
       || (isSidoOfficer(d) && d && d.sido === sido)

@@ -86,7 +86,7 @@ body{background:#f4f6fa}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="kfdf.js?v=20260808"></script>
+<script src="kfdf.js?v=20260821"></script>
 <script>
 KFDF.initApp();
 const AUTH=firebase.auth();
@@ -244,7 +244,8 @@ async function savePerm(uid){
       upd.role=r;
       if(r==='sidoOfficer'||r==='gugunOfficer'){
         const sido=document.getElementById('pmSido').value;
-        if(!sido){alert('관할 시도를 선택해주세요.');return}
+        // [권한개선] sido 필수 — 미설정 시 staff.html canDecide() 범위 검증이 작동 안 함
+        if(!sido){alert('⚠️ 관할 시도를 반드시 선택해주세요.\n\n시도 미설정 시 해당 임원이 모든 시도의 공고를 관리할 수 있게 됩니다.');return}
         upd.sido=sido;
         if(r==='gugunOfficer'){const g=document.getElementById('pmGugun').value;if(!g){alert('관할 시군구를 선택해주세요.');return}upd.gugun=g;}
         else upd.gugun=del();

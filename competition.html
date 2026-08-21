@@ -174,7 +174,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
-<script src="kfdf.js?v=20260808"></script>
+<script src="kfdf.js?v=20260821"></script>
 <script src="site_config.js"></script>
 <script>
 KFDF.initApp();
@@ -291,7 +291,10 @@ async function loadStaffEmbed(){
 }
 function cDateFmt(d){
   if(!d)return '';
-  const [y,m,dy]=d.split('-');
+  const p=String(d).split('-');
+  // [버그수정] "MM-DD" 2조각 입력(연도 생략형)도 처리 — 기존 "09년 6월 NaN일" 오류 방지
+  if(p.length===2)return Number(p[0])+'월 '+Number(p[1])+'일';
+  const [y,m,dy]=p;
   return (y?y+'년 ':'')+Number(m)+'월 '+Number(dy)+'일';
 }
 async function loadMySoPosts(){
@@ -719,7 +722,8 @@ function slotCard(d,today){
       const mines=myEntries(s);
       const mineConfirmed=(s.confirmed||[]).indexOf(CME.uid)>=0&&!entry;
       const f=CMY.instructorFor||{};
-      const eligible=entry?true:(s.role==='심판'?!!f.referee:!!f.staff);
+      // [v4] 모집자격 변경 — 운영요원: 자격 검증 없이 신청 가능 / 심판: 신청 시 유효 심판자격증 검사(openApply에서 확인)
+      const eligible=true;
       let action='';
       if(mineConfirmed)action='<span class="cpill" style="background:#b8860b;color:#fff">🏅 확정 — 개별 안내 예정</span>';
       else if(mines.length&&!entry){
@@ -834,9 +838,25 @@ function consentAnswers(){
   }
   return out;
 }
+// [v4] 유효 심판자격증 보유 여부 (licenses 컬렉션 기준, 1회 캐시)
+let __refLicOK=null;
+async function hasValidRefLicComp(){
+  if(__refLicOK!==null)return __refLicOK;
+  try{
+    const snap=await DB.collection('licenses').where('uid','==',CME.uid).get();
+    const today=new Date().toISOString().slice(0,10);
+    __refLicOK=snap.docs.some(d=>{const l=d.data();return String(l.type||'').indexOf('심판')>=0&&l.status!=='만료'&&(!l.expireAt||String(l.expireAt).slice(0,10)>=today)});
+  }catch(e){__refLicOK=false;}
+  return __refLicOK;
+}
 async function openApply(id){
   const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
   const s=doc.data();
+  // [v4] 심판요원 신청은 유효한 심판 자격증 보유자만 (운영요원은 자격 검증 없음)
+  if(s.role==='심판'){
+    const ok=await hasValidRefLicComp();
+    if(!ok){alert('❌ 유효한 심판 자격증 보유자만 심판요원으로 신청할 수 있습니다.\n만료되었거나 등록된 심판 자격이 없습니다.\n\n운영요원 모집에는 자격 없이 신청하실 수 있습니다.\n자격 안내: license.html · certification.html');return}
+  }
   if(s.role==='심판'&&CMY&&CMY.accountType==='teacher'){
     alert('🏁 국가공인자격증(교사 및 국가공인자격증) 회원은 대회 심판으로 신청하실 수 없습니다.\n먼저 KFDF공인 심판 자격을 취득하시면 심판 신청이 가능합니다.\n\n지금은 운영요원으로 신청하실 수 있습니다.\n자격 안내: license.html · certification.html');
     return;
@@ -937,8 +957,9 @@ async function openApply(id){
       +'</div>'
       +'<div class="docsec"><div class="dtitle">개인정보 수집·이용 및 제3자 제공 동의서</div>'
       +consentBlockHtml(s,'<div style="font-size:12px;color:#4b5563;line-height:1.8;margin-bottom:10px">'
-      +'<b>□ 수집·이용</b> — 항목: 소속·성명·연락처·계좌번호 / 목적: 대회 수당(심판·운영·안전요원) 지급 / 보유기간: 2026. 12. 31.까지<br>'
-      +'<b>□ 제3자 제공</b> — 제공받는 자: 국세청 / 목적: 수당 원천징수 세액 납부 / 항목: 성명·지급총액·결정세액·주민등록번호 (소득세법 제21조·제129조)<br>'
+      +'<b>□ 수집·이용</b> — 항목: 소속·성명·연락처·은행명·계좌번호·주민등록번호 / 목적: 대회 수당(심판·운영·안전요원) 지급 및 거래처 등록 / 보유기간: 수당지급 종료일로부터 5년<br>'
+      +'<b>□ 제3자 제공</b> — 제공받는 자: 대회 주최·주관 기관(시·도교육청 및 산하기관·학교 포함) / 목적: 수당 지급을 위한 거래처 등록·공유 / 항목: 성명·주민등록번호·은행명·계좌번호<br>'
+      +'<b>□ 제3자 제공 고지</b> — 제공받는 자: 국세청 / 목적: 수당 원천징수 세액 납부 / 항목: 성명·지급총액·결정세액·주민등록번호 (소득세법 제127조)<br>'
       +'<b>□ 고유식별정보</b> — 개인정보보호법 제24조의2 및 국세기본법 시행령 제68조에 따라 처리<br>'
       +'※ 동의를 거부할 권리가 있으며, 거부 시 수당 지급에 제한이 있을 수 있습니다.</div>')
       +'<label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:800;color:#153A77">'
