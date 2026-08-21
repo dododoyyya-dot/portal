@@ -102,6 +102,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260821"></script>
+<script src="site_config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script>
@@ -713,7 +714,7 @@ async function _renderDetailInner(){
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">'
     // [권한개선] 공고 수정·복사 = canManage / 수당엑셀·자격확인·경력등록 = canDecide
     +(manage?'<button class="stbtn stbtn-soft" onclick="document.getElementById(\'dtModal\').remove();openPostForm(\''+p.id+'\')">✏️ 공고 수정</button><button class="stbtn stbtn-ghost" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button>':'')
-    +(_decide?'<button class="stbtn" style="background:#f0fdf4;color:#0f766e;border:1.5px solid #a7f3d0" onclick="exportPayExcel(\''+p.id+'\')">💰 수당지급 엑셀</button><button class="stbtn" style="background:#fffbeb;color:#8a5a00;border:1.5px solid #fde68a" onclick="exportPayReport(\''+p.id+'\')">📄 수당지급내역서 (서식·서명)</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
+    +(_decide?'<button class="stbtn" style="background:#f0fdf4;color:#0f766e;border:1.5px solid #a7f3d0" onclick="exportPayExcel(\''+p.id+'\')">💰 수당지급 엑셀</button><button class="stbtn" style="background:#fffbeb;color:#8a5a00;border:1.5px solid #fde68a" onclick="exportPayReport(\''+p.id+'\')">📄 수당지급내역서 (서식·서명)</button><button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="openNotifyModal(\''+p.id+'\')">📣 확정자 단체 알림</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
     +'<button class="stbtn stbtn-main" style="padding:11px 26px" onclick="openApplyForm(\''+p.id+'\')">✍️ 신청하기 (날짜 선택)</button>'
     +'</div></div>';
   // div는 await 전에 이미 DOM에 추가됨 — innerHTML 설정만으로 내용 갱신
@@ -1108,6 +1109,117 @@ async function exportPayReport(postId){
     a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href),5000);
   }catch(e){alert('내역서 생성 실패: '+e.message)}
+}
+// ══════════════ [v5] 확정자 단체 알림 (문자·이메일) ══════════════
+let NT_LIST=[];  // {uid,name,phone,email,dates[]}
+async function openNotifyModal(postId){
+  const p=POSTS.find(x=>x.id===postId);if(!p)return;
+  const apps=APPS[p.id]||[];
+  // 날짜별 확정자 → uid 기준 통합
+  const byUid={};
+  (p.dates||[]).forEach(dd=>{
+    apps.filter(a=>a.status&&a.status[dd.date]==='확정').forEach(a=>{
+      if(!byUid[a.uid])byUid[a.uid]={uid:a.uid,name:a.name||'',phone:a.phone||'',email:'',dates:[]};
+      byUid[a.uid].dates.push(dd.date);
+    });
+  });
+  NT_LIST=Object.values(byUid);
+  if(!NT_LIST.length){alert('확정된 신청자가 없습니다. 먼저 신청자를 확정해주세요.');return}
+  // 이메일: users 문서에서 조회
+  await Promise.all(NT_LIST.map(async r=>{
+    try{const d=await DB.collection('users').doc(r.uid).get();if(d.exists){r.email=d.data().email||'';if(!r.phone)r.phone=d.data().phone||'';}}catch(e){}
+  }));
+  const old=document.getElementById('ntModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='ntModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.65);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
+  const defSubj='['+(p.competitionName||'대회')+'] 심판·운영요원 확정 안내';
+  const defBody='['+(p.competitionName||'대회')+'] 심판·운영요원 확정 안내\n\n'
+    +'일시: '+fmtD(p.startDate)+(p.endDate&&p.endDate!==p.startDate?' ~ '+fmtD(p.endDate):'')+(p.time?' '+p.time:'')+'\n'
+    +'장소: '+(p.location||'')+'\n'
+    +(p.uniform?'심판복: '+p.uniform+'\n':'')
+    +(p.supplies&&p.supplies.length?'준비물: '+p.supplies.join(', ')+'\n':'')
+    +'\n확정되셨습니다. 일정 확인 부탁드립니다.\n문의: '+(p.contactInfo||(p.author&&p.author.contact)||'사무국 031-984-3248');
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:640px;width:100%;padding:24px 26px;margin:10px 0">'
+    +'<div style="display:flex;align-items:center;gap:8px"><b style="font-size:16px">📣 확정자 단체 알림</b><span style="font-size:12px;color:#8a919d">'+esc(p.competitionName||'')+'</span><span style="flex:1"></span><button class="stbtn stbtn-ghost" onclick="document.getElementById(\'ntModal\').remove()">닫기 ✕</button></div>'
+    +'<div style="font-size:12.5px;color:#6b7280;margin-top:4px">받는 사람을 체크로 고르고, 아래에서 이메일 발송 또는 문자앱 연결·명단 복사를 이용하세요.</div>'
+    +'<div style="border:1.5px solid #e3e9f2;border-radius:11px;max-height:250px;overflow:auto;margin-top:10px">'
+    +NT_LIST.map((r,i)=>'<label style="display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;font-size:13px">'
+      +'<input type="checkbox" class="ntCk" data-i="'+i+'" checked style="width:auto" onchange="ntCount()">'
+      +'<b style="min-width:56px">'+esc(r.name)+'</b>'
+      +'<span style="color:#6b7280;font-size:12px">'+esc(r.phone||'전화 없음')+'</span>'
+      +'<span style="color:'+(r.email?'#6b7280':'#C41E2F')+';font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis">'+esc(r.email||'이메일 없음')+'</span>'
+      +'<span style="font-size:11px;color:#7c3aed;font-weight:700">'+r.dates.map(d=>fmtD(d.slice(5))).join('·')+'</span>'
+      +'</label>').join('')
+    +'</div>'
+    +'<div style="display:flex;gap:8px;align-items:center;margin-top:7px;font-size:12.5px">'
+    +'<b id="ntCnt"></b><span style="flex:1"></span>'
+    +'<button class="stbtn stbtn-ghost" style="padding:4px 11px;font-size:12px" onclick="[...document.querySelectorAll(\'.ntCk\')].forEach(c=>c.checked=true);ntCount()">전체 선택</button>'
+    +'<button class="stbtn stbtn-ghost" style="padding:4px 11px;font-size:12px" onclick="[...document.querySelectorAll(\'.ntCk\')].forEach(c=>c.checked=false);ntCount()">전체 해제</button>'
+    +'</div>'
+    +'<div style="font-size:13px;font-weight:800;margin-top:12px">제목 (이메일용)</div>'
+    +'<input id="ntSubj" class="stfield" style="margin-top:4px" value="'+esc(defSubj)+'">'
+    +'<div style="font-size:13px;font-weight:800;margin-top:10px">내용 (이메일·문자 공용)</div>'
+    +'<textarea id="ntBody" class="stfield" rows="8" style="margin-top:4px;line-height:1.7">'+esc(defBody)+'</textarea>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">'
+    +'<button class="stbtn stbtn-main" id="ntMailBtn" onclick="ntSendMail()">📧 이메일 발송</button>'
+    +'<button class="stbtn" style="background:#f0fdf4;color:#0f766e;border:1.5px solid #a7f3d0" onclick="ntOpenSms()">📱 문자앱 열기</button>'
+    +'<button class="stbtn stbtn-soft" onclick="ntCopy(\'phone\')">📋 이름·전화 복사</button>'
+    +'<button class="stbtn stbtn-soft" onclick="ntCopy(\'email\')">📋 이메일 복사</button>'
+    +'</div>'
+    +'<div id="ntMsg" style="font-size:12.5px;font-weight:700;margin-top:9px;min-height:16px"></div>'
+    +'<div style="font-size:11.5px;color:#8a919d;margin-top:5px">※ 문자는 홈페이지에서 직접 발송되지 않습니다 — 휴대폰 문자앱으로 연결되거나, 복사한 명단을 문자 발송 서비스에 붙여넣어 사용하세요.</div>'
+    +'</div>';
+  document.body.appendChild(div);
+  ntCount();
+}
+function ntSelected(){return [...document.querySelectorAll('.ntCk:checked')].map(c=>NT_LIST[+c.dataset.i]).filter(Boolean)}
+function ntCount(){const el=document.getElementById('ntCnt');if(el)el.textContent='선택 '+ntSelected().length+'/'+NT_LIST.length+'명'}
+async function ntSendMail(){
+  const sel=ntSelected().filter(r=>r.email);
+  const msg=document.getElementById('ntMsg'),btn=document.getElementById('ntMailBtn');
+  const subj=(document.getElementById('ntSubj').value||'').trim();
+  const body=document.getElementById('ntBody').value||'';
+  if(!sel.length){msg.textContent='이메일이 있는 선택 인원이 없습니다.';msg.style.color='#C41E2F';return}
+  if(!subj||!body.trim()){msg.textContent='제목과 내용을 입력하세요.';msg.style.color='#C41E2F';return}
+  if(!window.KFDF_CONFIG||!KFDF_CONFIG.emailjs||!KFDF_CONFIG.emailjs.publicKey){msg.textContent='EmailJS 설정이 없어 발송할 수 없습니다.';msg.style.color='#C41E2F';return}
+  if(!confirm(sel.length+'명에게 개별 이메일을 발송합니다. 진행할까요?'))return;
+  btn.disabled=true;
+  let ok=0;const fail=[];
+  for(let i=0;i<sel.length;i++){
+    msg.textContent='발송 중… '+(i+1)+'/'+sel.length;msg.style.color='#1F4E9C';
+    try{
+      const c=KFDF_CONFIG.emailjs;
+      if(!window.emailjs){await new Promise((r,j)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';sc.onload=r;sc.onerror=j;document.head.appendChild(sc)});window.emailjs.init({publicKey:c.publicKey});}
+      await window.emailjs.send(c.serviceId,c.templateId,{to_email:sel[i].email,subject:subj,message:body});
+      ok++;
+    }catch(e){fail.push(sel[i].name)}
+    await new Promise(r=>setTimeout(r,400));
+  }
+  btn.disabled=false;
+  msg.textContent='완료 — 성공 '+ok+'건'+(fail.length?' / 실패 '+fail.length+'건: '+fail.join(', '):'');
+  msg.style.color=fail.length?'#C41E2F':'#0f766e';
+}
+function ntOpenSms(){
+  const sel=ntSelected().filter(r=>r.phone);
+  const msg=document.getElementById('ntMsg');
+  if(!sel.length){msg.textContent='전화번호가 있는 선택 인원이 없습니다.';msg.style.color='#C41E2F';return}
+  const nums=sel.map(r=>String(r.phone).replace(/[^0-9]/g,'')).filter(Boolean);
+  const body=document.getElementById('ntBody').value||'';
+  const ios=/iPhone|iPad|iPod/.test(navigator.userAgent);
+  const href='sms:'+nums.join(ios?',':';')+(body?(ios?'&':'?')+'body='+encodeURIComponent(body):'');
+  location.href=href;
+  msg.textContent='문자앱 연결 시도 — 휴대폰에서 열리지 않으면 "이름·전화 복사"로 명단을 복사해 사용하세요.';msg.style.color='#1F4E9C';
+}
+function ntCopy(kind){
+  const sel=ntSelected();
+  const msg=document.getElementById('ntMsg');
+  let txt='';
+  if(kind==='phone')txt=sel.filter(r=>r.phone).map(r=>r.name+'\t'+r.phone).join('\n');
+  else txt=sel.filter(r=>r.email).map(r=>r.email).join('\n');
+  if(!txt){msg.textContent='복사할 항목이 없습니다.';msg.style.color='#C41E2F';return}
+  const done=()=>{msg.textContent='✓ 복사되었습니다 ('+txt.split('\n').length+'건) — 문자 서비스·메일 프로그램에 붙여넣으세요.';msg.style.color='#0f766e'};
+  if(navigator.clipboard)navigator.clipboard.writeText(txt).then(done).catch(()=>prompt('아래 내용을 복사하세요',txt));
+  else prompt('아래 내용을 복사하세요',txt);
 }
 // ══════════════ [신규] 자격증 일괄확인 ══════════════
 async function viewAllLicenses(postId){

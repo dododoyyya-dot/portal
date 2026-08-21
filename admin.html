@@ -280,7 +280,33 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <div id="schoolGroupBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:16px"></div>
       <div class="board" id="userList"><div class="bempty">불러오는 중…</div></div></div>
     <div id="v5" style="display:none">
-      <div class="authbox" style="max-width:720px;margin:0">
+      <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+      <!-- [신규] 회원 선택 — 검색·클릭으로 수신인 지정 -->
+      <div class="authbox" style="max-width:460px;margin:0;flex:1 1 340px">
+        <h3>📇 회원 선택</h3>
+        <p style="font-size:12.5px;color:var(--gray)">검색·클릭으로 회원을 고른 뒤, 아래 버튼으로 메일·문자 수신인에 추가하세요.</p>
+        <input id="mpSearch" placeholder="🔍 이름·이메일·전화·시군구 검색" oninput="mpRender()">
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn-sub mpf on" data-f="전체" onclick="mpFilter('전체',this)" style="padding:5px 11px;font-size:12px">전체</button>
+          <button class="btn-sub mpf" data-f="approved" onclick="mpFilter('approved',this)" style="padding:5px 11px;font-size:12px;background:#8a919d">승인회원</button>
+          <button class="btn-sub mpf" data-f="school" onclick="mpFilter('school',this)" style="padding:5px 11px;font-size:12px;background:#8a919d">강사지원</button>
+          <button class="btn-sub mpf" data-f="referee" onclick="mpFilter('referee',this)" style="padding:5px 11px;font-size:12px;background:#8a919d">심판지원</button>
+          <button class="btn-sub mpf" data-f="staff" onclick="mpFilter('staff',this)" style="padding:5px 11px;font-size:12px;background:#8a919d">운영지원</button>
+        </div>
+        <div id="mpList" style="border:1.5px solid #e3e9f2;border-radius:11px;max-height:330px;overflow:auto;margin-top:9px"><div class="bempty">불러오는 중…</div></div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:8px;font-size:12.5px;flex-wrap:wrap">
+          <b id="mpCnt">선택 0명</b><span style="flex:1"></span>
+          <button class="btn-sub" style="padding:5px 11px;font-size:12px;background:#8a919d" onclick="mpAll(true)">목록 전체선택</button>
+          <button class="btn-sub" style="padding:5px 11px;font-size:12px;background:#8a919d" onclick="mpAll(false)">비우기</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap">
+          <button class="btn-sub" style="background:#1F4E9C" onclick="mpToMail()">📧 메일 수신인에 추가</button>
+          <button class="btn-sub" style="background:#0f766e" onclick="mpToSms()">📱 문자 수신인에 추가</button>
+        </div>
+        <div class="msg" id="mpMsg"></div>
+      </div>
+      <!-- 기존 단체 메일 (그대로 유지) -->
+      <div class="authbox" style="max-width:720px;margin:0;flex:1 1 380px">
         <h3>단체 메일 발송</h3>
         <p style="font-size:13px;color:var(--gray)">받는 사람마다 개별 발송됩니다 (주소 상호 노출 없음). EmailJS 발송량이 차감되니 필요한 만큼만 보내세요.</p>
         <label>받는 사람 이메일 (한 줄에 하나씩, 쉼표도 가능)</label>
@@ -289,6 +315,21 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <label>내용</label><textarea id="bmBody" rows="12"></textarea>
         <button class="btn-main" onclick="bulkMail()" id="bmBtn">발송 시작</button>
         <div class="msg" id="bmMsg"></div>
+      </div>
+      <!-- [신규] 단체 문자 -->
+      <div class="authbox" style="max-width:460px;margin:0;flex:1 1 340px">
+        <h3>📱 단체 문자</h3>
+        <p style="font-size:12.5px;color:var(--gray)">홈페이지는 문자를 직접 발송하지 않습니다 — 휴대폰 문자앱으로 연결하거나, 명단을 복사해 문자 발송 서비스에 붙여넣으세요.</p>
+        <label>받는 사람 전화번호 (한 줄에 하나씩, 쉼표도 가능)</label>
+        <textarea id="bsTo" rows="6" placeholder="010-1234-5678&#10;010-2345-6789"></textarea>
+        <label>문자 내용</label>
+        <textarea id="bsBody" rows="7" placeholder="[대한민국플라잉디스크연맹] 안내 내용"></textarea>
+        <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
+          <button class="btn-main" onclick="bulkSmsOpen()">📨 문자앱 열기</button>
+          <button class="btn-sub" style="background:#8a919d" onclick="bulkSmsCopy()">📋 번호·내용 복사</button>
+        </div>
+        <div class="msg" id="bsMsg"></div>
+      </div>
       </div>
     </div>
     <div id="v4" style="display:none">
@@ -491,7 +532,92 @@ function tab(n){
   });
   if(n===3){loadApps();if(!USERS.length)loadUsers();}
   if(n===4)loadCompsAdmin();
+  if(n===5){if(!USERS.length){loadUsers().then(()=>mpRender()).catch(()=>{});}else mpRender();}  // [단체발송] 회원 선택 목록
   if(n===6)loadPopups();  // [팝업] 신규 탭
+}
+// ══════════ [단체발송] 회원 선택 + 단체 문자 ══════════
+let MP_SEL={},MP_F='전체';  // MP_SEL: uid → {name,email,phone}
+function mpFilter(f,btn){
+  MP_F=f;
+  document.querySelectorAll('.mpf').forEach(b=>{b.classList.toggle('on',b===btn);b.style.background=b===btn?'':'#8a919d'});
+  mpRender();
+}
+function mpRows(){
+  const q=(document.getElementById('mpSearch')?document.getElementById('mpSearch').value:'').trim().toLowerCase();
+  return USERS.map(d=>{const v=d.data();return{uid:d.id,name:v.name||'',email:v.email||'',phone:v.phone||'',sigungu:v.sigungu||v.sido||'',status:v.status,f:v.instructorFor||{}}})
+    .filter(r=>{
+      if(MP_F==='approved'&&r.status!=='approved')return false;
+      if(MP_F==='school'&&!(r.f.school||r.f.after))return false;
+      if(MP_F==='referee'&&!r.f.referee)return false;
+      if(MP_F==='staff'&&!r.f.staff)return false;
+      if(q&&!((r.name+' '+r.email+' '+r.phone+' '+r.sigungu).toLowerCase().includes(q)))return false;
+      return true;
+    });
+}
+function mpRender(){
+  const el=document.getElementById('mpList');if(!el)return;
+  if(!USERS.length){el.innerHTML='<div class="bempty">불러오는 중…</div>';return}
+  const rows=mpRows().slice(0,300);
+  el.innerHTML=rows.length?rows.map(r=>{
+    const on=!!MP_SEL[r.uid];
+    return '<div onclick="mpToggle(\''+r.uid+'\')" style="display:flex;gap:8px;align-items:center;padding:7px 11px;border-bottom:1px solid #f1f5f9;cursor:pointer;font-size:12.5px;background:'+(on?'#eef7f4':'#fff')+'">'
+      +'<span style="width:16px;text-align:center">'+(on?'✅':'⬜')+'</span>'
+      +'<b style="min-width:52px">'+esc(r.name||'(이름없음)')+'</b>'
+      +'<span style="color:#6b7280;font-size:11.5px">'+esc(r.phone||'-')+'</span>'
+      +'<span style="color:#6b7280;font-size:11.5px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.email||'-')+'</span>'
+      +'<span style="font-size:11px;color:#8a919d">'+esc(r.sigungu||'')+'</span>'
+      +'</div>';
+  }).join('')+(mpRows().length>300?'<div style="padding:7px 11px;font-size:11.5px;color:#8a919d">…'+(mpRows().length-300)+'명 더 있음 — 검색으로 좁혀주세요</div>':'')
+  :'<div class="bempty">검색 결과가 없습니다.</div>';
+  mpCnt();
+}
+function mpToggle(uid){
+  if(MP_SEL[uid])delete MP_SEL[uid];
+  else{
+    const d=USERS.find(x=>x.id===uid);if(!d)return;
+    const v=d.data();MP_SEL[uid]={name:v.name||'',email:v.email||'',phone:v.phone||''};
+  }
+  mpRender();
+}
+function mpAll(on){
+  if(!on){MP_SEL={};mpRender();return}
+  mpRows().slice(0,300).forEach(r=>{MP_SEL[r.uid]={name:r.name,email:r.email,phone:r.phone}});
+  mpRender();
+}
+function mpCnt(){const el=document.getElementById('mpCnt');if(el)el.textContent='선택 '+Object.keys(MP_SEL).length+'명'}
+function _mpAppend(taId,vals,label){
+  const ta=document.getElementById(taId),msg=document.getElementById('mpMsg');
+  if(!vals.length){msg.textContent='선택한 회원 중 '+label+' 정보가 있는 사람이 없습니다.';msg.className='msg err';return}
+  const cur=ta.value.split(/[\n,;]+/).map(x=>x.trim()).filter(Boolean);
+  const add=vals.filter(v=>cur.indexOf(v)<0);
+  ta.value=cur.concat(add).join('\n');
+  msg.textContent='✓ '+label+' '+add.length+'건 추가'+(vals.length-add.length?' (중복 '+(vals.length-add.length)+'건 제외)':'')+' — 총 '+ta.value.split('\n').filter(Boolean).length+'명';
+  msg.className='msg ok';
+}
+function mpToMail(){_mpAppend('bmTo',Object.values(MP_SEL).map(r=>r.email).filter(e=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)),'이메일')}
+function mpToSms(){_mpAppend('bsTo',Object.values(MP_SEL).map(r=>r.phone).filter(Boolean),'전화번호')}
+function _bsNums(){
+  return [...new Set((document.getElementById('bsTo').value||'').split(/[\n,;]+/).map(x=>x.replace(/[^0-9]/g,'')).filter(x=>x.length>=9))];
+}
+function bulkSmsOpen(){
+  const msg=document.getElementById('bsMsg');
+  const nums=_bsNums();
+  if(!nums.length){msg.textContent='유효한 전화번호가 없습니다';msg.className='msg err';return}
+  const body=document.getElementById('bsBody').value||'';
+  const ios=/iPhone|iPad|iPod/.test(navigator.userAgent);
+  location.href='sms:'+nums.join(ios?',':';')+(body?(ios?'&':'?')+'body='+encodeURIComponent(body):'');
+  msg.textContent=nums.length+'명 문자앱 연결 시도 — PC에서는 열리지 않을 수 있습니다. 그 경우 "번호·내용 복사"를 이용하세요.';
+  msg.className='msg';
+}
+function bulkSmsCopy(){
+  const msg=document.getElementById('bsMsg');
+  const nums=_bsNums();
+  if(!nums.length){msg.textContent='유효한 전화번호가 없습니다';msg.className='msg err';return}
+  const body=document.getElementById('bsBody').value||'';
+  const txt='[받는 사람 '+nums.length+'명]\n'+nums.join('\n')+(body?'\n\n[문자 내용]\n'+body:'');
+  const done=()=>{msg.textContent='✓ 번호 '+nums.length+'건과 내용이 복사되었습니다 — 문자 발송 서비스에 붙여넣으세요.';msg.className='msg ok'};
+  if(navigator.clipboard)navigator.clipboard.writeText(txt).then(done).catch(()=>prompt('아래 내용을 복사하세요',txt));
+  else prompt('아래 내용을 복사하세요',txt);
 }
 let APPS=[];let AFL='전체';let TRASH={apps:[],users:[]};
 // ══════════ [팝업] 홈페이지 팝업 관리 ══════════
