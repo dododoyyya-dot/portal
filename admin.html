@@ -394,6 +394,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
           <summary style="cursor:pointer;padding:9px 16px;background:#8a919d;color:#fff;border-radius:10px;font-weight:800;font-size:13.5px;list-style:none">🧰 관리 도구 더보기 ▾</summary>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;padding:10px;background:#f4f6f9;border-radius:10px">
         <button class="btn-sub" style="background:#7c3aed" onclick="autoAssign()">⚡ 권역별 자동배정 (미배정 선정교)</button>
+        <button class="btn-sub" style="background:#0e7490" onclick="resendSelMail()">📧 선정·배정 안내메일 일괄 재발송</button>
         <button class="btn-sub" style="background:#e6b422" onclick="fixCounters()">⚙ 접수 카운터 보정</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="syncLogPoints()">⚡ 일지 기준 포인트 반영</button>
         <button class="btn-sub" style="background:#153A77" onclick="reviewHist()">📋 이력 승인·포인트 전환</button>
@@ -806,7 +807,90 @@ async function loadApps(){
   TRASH.apps=snap.docs.filter(d=>{const s=d.data();return s.deleted&&sameSidoApp(s);});
   APPS=snap.docs.filter(d=>{const s=d.data();return !s.deleted&&sameSidoApp(s);});
   try{const g=await DB.collection('goodsConfirms').get();window.GOODS={};g.docs.forEach(x=>window.GOODS[x.id]=x.data());}catch(e){window.GOODS={};}
+  await loadMailLog();  // [메일로그] 발송 이력 → 학교 카드 📧 뱃지용
   renderApps();
+}
+// ══════════ [메일로그] 발송 이력 기록·조회 (siteContent/mailLog, 최근 800건) ══════════
+let MAILLOG={};        // 이메일 주소(소문자) → 최근 발송 기록
+let __mlq=Promise.resolve();  // 기록 쓰기 직렬화 (동시 발송 시 유실 방지)
+function _mailLogAdd(rec){
+  __mlq=__mlq.then(async()=>{
+    try{
+      const ref=DB.collection('siteContent').doc('mailLog');
+      const d=await ref.get();
+      let items=(d.exists&&d.data().items)||[];
+      items.push(rec);
+      if(items.length>800)items=items.slice(items.length-800);
+      await ref.set({items:items,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      if(rec.to)MAILLOG[String(rec.to).toLowerCase()]=rec;
+    }catch(e){console.warn('메일로그 기록 실패(발송에는 영향 없음)',e)}
+  });
+  return __mlq;
+}
+async function loadMailLog(){
+  try{
+    const d=await DB.collection('siteContent').doc('mailLog').get();
+    MAILLOG={};
+    ((d.exists&&d.data().items)||[]).forEach(r=>{if(r&&r.to)MAILLOG[String(r.to).toLowerCase()]=r});
+  }catch(e){MAILLOG={};}
+}
+function mailBadge(email){
+  const ml=email&&MAILLOG[String(email).toLowerCase()];
+  const tip=ml?((ml.ok?'발송 성공':'발송 실패')+' · '+String(ml.at||'').slice(0,16).replace('T',' ')+(ml.error?' · '+ml.error:'')+(ml.subject?' · '+ml.subject:'')):'발송 기록 없음 (로그 기능 도입 전 발송분 포함)';
+  return ' <span style="font-size:11px;font-weight:800;color:'+(ml?(ml.ok?'#0f766e':'#C41E2F'):'#8a919d')+'" title="'+esc(tip)+'">📧 '+(ml?(ml.ok?'✓':'✗'):'−')+'</span>';
+}
+// [메일로그] admin 페이지의 모든 kfdfMail 발송을 가로채 결과 기록 — 발송 동작·호출부는 그대로
+(function(){
+  const _orig=window.kfdfMail;
+  window.kfdfMail=async function(to,subject,message){
+    const rec={to:String(to||''),subject:String(subject||''),ok:false,error:'',at:new Date().toISOString(),by:''};
+    try{rec.by=(firebase.auth().currentUser||{}).email||''}catch(_){}
+    if(!to){rec.error='이메일 주소 없음';_mailLogAdd(rec);return;}
+    try{
+      const c=window.KFDF_CONFIG&&window.KFDF_CONFIG.emailjs;
+      if(!c||!c.publicKey){rec.error='EmailJS 미설정';}
+      else{
+        if(!window.emailjs){await new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';s.onload=ok;s.onerror=no;document.head.appendChild(s)});window.emailjs.init({publicKey:c.publicKey});}
+        await window.emailjs.send(c.serviceId,c.templateId,{to_email:to,subject:subject,message:message});
+        rec.ok=true;
+      }
+    }catch(e){rec.error=String((e&&e.message)||(e&&e.text)||e)}
+    _mailLogAdd(rec);
+    if(!rec.ok)console.warn('메일 발송 실패:',rec.to,rec.error);
+  };
+  window.kfdfMailOrig=_orig;  // 원본 보존
+})();
+// ══════════ [재발송] 선정·배정완료 학교 안내메일 일괄 재발송 ══════════
+async function resendSelMail(){
+  const sel=APPS.map(d=>({id:d.id,...d.data()})).filter(a=>a.status==='선정'||a.status==='배정완료');
+  if(!sel.length){alert('선정·배정완료 상태의 학교가 없습니다.');return}
+  const emailOK=e=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(e||''));
+  const noMail=sel.filter(a=>!emailOK(a.email));
+  const already=sel.filter(a=>emailOK(a.email)&&MAILLOG[String(a.email).toLowerCase()]&&MAILLOG[String(a.email).toLowerCase()].ok);
+  const targets=sel.filter(a=>emailOK(a.email)&&!(MAILLOG[String(a.email).toLowerCase()]&&MAILLOG[String(a.email).toLowerCase()].ok));
+  let intro='📧 선정·배정완료 학교 안내메일 일괄 재발송\n\n'
+    +'· 대상(발송): '+targets.length+'개 학교\n'
+    +'· 건너뜀(이미 발송 성공 기록 있음): '+already.length+'개\n'
+    +'· 발송 불가(이메일 미등록): '+noMail.length+'개'+(noMail.length?' — '+[...new Set(noMail.map(a=>a.school))].join(', '):'')+'\n\n'
+    +'※ 로그 기능 도입 전에 이미 메일을 받은 학교도 "기록 없음"으로 재발송 대상에 포함됩니다(중복 수신 가능).\n진행할까요?';
+  if(!targets.length){alert(intro.replace('진행할까요?','발송할 대상이 없습니다.'));return}
+  if(!confirm(intro))return;
+  let ok=0;const fail=[];
+  for(let i=0;i<targets.length;i++){
+    const a=targets[i];
+    const subj='[플라잉디스크연맹] 강습 '+(a.status==='배정완료'?'선정·강사 배정':'선정')+' 안내 — '+a.school;
+    const body=a.status==='배정완료'
+      ?(a.school+' ('+(a.type||'')+') 신청이 선정되었으며, 담당 강사('+(a.assignedName||'배정 완료')+') 배정까지 완료되었습니다.\n접수번호: '+(a.code||'')+'\n강사가 일정 협의차 연락드릴 예정입니다.\n문의: 031-984-3248')
+      :(a.school+' ('+(a.type||'')+') 신청이 선정되었습니다!\n접수번호: '+(a.code||'')+'\n강사 배정 후 확정 연락을 드립니다.\n문의: 031-984-3248');
+    await window.kfdfMail(a.email,subj,body);
+    await __mlq;  // 이 건의 기록 완료 후 결과 판독
+    const rec=MAILLOG[String(a.email).toLowerCase()];
+    if(rec&&rec.ok)ok++;else fail.push(a.school);
+    await new Promise(r=>setTimeout(r,400));
+  }
+  await __mlq;  // 기록 완료 대기
+  renderApps();
+  alert('재발송 완료\n· 성공: '+ok+'건\n'+(fail.length?'· 실패: '+fail.length+'건 — '+[...new Set(fail)].join(', ')+'\n':'')+(noMail.length?'· 이메일 미등록(문자·전화 통보 필요): '+[...new Set(noMail.map(a=>a.school))].join(', '):''));
 }
 const SIDO_ALIAS={'서울':['서울'],'인천':['인천'],'경기':['경기'],'강원':['강원'],'대전':['대전'],'세종':['세종'],'충북':['충북','충청북도'],'충남':['충남','충청남도'],'광주':['광주'],'전북':['전북','전라북도'],'전남':['전남','전라남도'],'부산':['부산'],'대구':['대구'],'울산':['울산'],'경북':['경북','경상북도'],'경남':['경남','경상남도'],'제주':['제주'],'전남광주':['광주','전남','전라남도','전남광주']};
 function inSido(str,sido){ const A=SIDO_ALIAS[sido]||[sido]; const s=String(str||''); return A.some(a=>s.indexOf(a)>=0); }
@@ -899,6 +983,7 @@ function renderApps(){
       +(s.support==='용품만'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">🎁 용품만</span>':'')
       +' <span style="font-size:11px;font-weight:800;color:#fff;background:'+(appTypeOf(s).indexOf('방과후')>=0?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+'</span>'
       +((st==='선정'||st==='배정완료')?' <span style="font-size:11px;font-weight:800;color:'+(gc&&gc.teacherConfirm?'#0f766e':'#C41E2F')+'" title="'+(gc&&gc.teacherConfirm?esc(gc.teacherConfirm.name)+' 수령확인':'용품 수령 미확인')+'">📦 용품보유 '+(gc&&gc.teacherConfirm?'O':'X')+'</span>':'')
+      +((st==='선정'||st==='배정완료')?mailBadge(s.email):'')  // [메일로그] 발송 성공✓/실패✗/기록없음−
       +'<div class="sub3">'+(s.code?'<b>'+esc(s.code)+'</b> · ':'')+esc(s.region)+(s.city?' · <b style="color:#1F4E9C">📍'+esc(s.city)+'</b>':' · <b style="color:#C41E2F">시군구 미입력</b>')+' · '+esc(s.students)+(s.start&&s.start.indexOf('8월')>=0?' · <b style="color:#C41E2F">⚡8월 방학 개강 희망</b>':'')+' · 희망 '+esc(s.d1)
       +'<br>담당 '+esc(s.teacher)+' '+esc(s.phone)+(s.assignedName?' · <b style="color:#0f766e">배정: '+esc(s.assignedName)+'</b>':'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
