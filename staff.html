@@ -229,25 +229,27 @@ function periodTxt(p){
 }
 function postStatus(p){
   const today=new Date().toISOString().slice(0,10);
+  if(p.manualClosed)return ['마감','#8a919d'];  // [v6] 관리자 수동 마감
   if(p.closed)return ['확정','#153A77'];
   if(p.deadline&&p.deadline<today)return ['마감','#8a919d'];
   if(p.endDate&&p.endDate<today)return ['종료','#8a919d'];
   return ['모집 중','#0f766e'];
 }
-function rowHtml(p){
+function rowHtml(p,expanded){
   const t=postTotals(p);
   const [stTxt,stCol]=postStatus(p);
   const period=periodTxt(p);
-  return '<div class="strowitem" id="row_'+p.id+'">'
+  // [v6] expanded=true 면 첫 화면부터 내용 펼침 (모집중 공고 원스텝)
+  return '<div class="strowitem'+(expanded?' open':'')+'" id="row_'+p.id+'">'
     +'<div class="strow" onclick="toggleRow(\''+p.id+'\')">'
     +'<span class="stpill" style="background:'+stCol+';font-size:11px;padding:2px 9px">'+stTxt+'</span>'
     +(!p.approved?'<span class="stpill" style="background:#C41E2F;font-size:11px;padding:2px 9px">승인대기</span>':'')
     +'<span class="strowname">'+esc(p.competitionName)+'</span>'
     +'<span class="strowmeta">'+esc((p.author&&p.author.organization)||'')+' · '+period+'</span>'
     +'<span class="strowend">마감 '+fmtD(p.deadline||'')+' · <b>'+t.applied+'/'+t.quota+'명</b></span>'
-    +'<span class="strowangl" id="angl_'+p.id+'">›</span>'
+    +'<span class="strowangl" id="angl_'+p.id+'"'+(expanded?' style="transform:rotate(90deg)"':'')+'>›</span>'
     +'</div>'
-    +'<div class="strowbody" id="body_'+p.id+'" style="display:none">'
+    +'<div class="strowbody" id="body_'+p.id+'" style="display:'+(expanded?'block':'none')+'">'
     +expandRowHtml(p)
     +'</div>'
     +'</div>';
@@ -284,6 +286,7 @@ function expandRowHtml(p){
     +(manage
       ?(!p.approved&&isAdminU()?'<button class="stbtn stbtn-teal" style="padding:5px 11px;font-size:12px" onclick="approvePost(\''+p.id+'\',1)">✓ 승인</button>'
         +'<button class="stbtn" style="padding:5px 11px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="approvePost(\''+p.id+'\',0)">반려</button>':'')
+        +'<button class="stbtn" style="padding:5px 11px;font-size:12px;background:'+(p.manualClosed?'#f0fdf4':'#fff8ed')+';color:'+(p.manualClosed?'#0f766e':'#8a5a00')+';border:1.5px solid '+(p.manualClosed?'#a7f3d0':'#fde68a')+'" onclick="event.stopPropagation();togglePostClosed(\''+p.id+'\')">'+(p.manualClosed?'▶ 마감해제':'⛔ 마감')+'</button>'
         +'<button class="stbtn stbtn-soft" style="padding:5px 11px;font-size:12px" onclick="event.stopPropagation();openPostForm(\''+p.id+'\')">✏️ 수정</button>'
         +'<button class="stbtn stbtn-ghost" style="padding:5px 11px;font-size:12px" onclick="copyRoster(\''+p.id+'\')">📋 명단복사</button>'
         +'<button class="stbtn" style="padding:5px 11px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="delPost(\''+p.id+'\')">삭제</button>'
@@ -305,21 +308,41 @@ function renderList(){
   const el=document.getElementById('stList');
   if(!POSTS.length){el.innerHTML='<div class="bempty">현재 등록된 모집 공고가 없습니다.</div>';return}
   const today=new Date().toISOString().slice(0,10);
-  const active=POSTS.filter(p=>!p.endDate||p.endDate>=today);
-  const past=POSTS.filter(p=>p.endDate&&p.endDate<today);
+  // [v6] 완료 = 수동 마감(closed) 또는 모집마감일 경과 또는 대회 종료
+  const isDone=p=>!!p.manualClosed||(p.deadline&&p.deadline<today)||(p.endDate&&p.endDate<today);
+  const active=POSTS.filter(p=>!isDone(p));
+  const past=POSTS.filter(isDone).slice()
+    .sort((a,b)=>String(b.endDate||b.startDate||'').localeCompare(String(a.endDate||a.startDate||'')));
   let html='<div class="strowlist">';
   if(active.length){
-    html+='<div class="strhead">📢 진행중 공고 <span style="font-weight:600;color:#8a919d">('+active.length+'건)</span></div>';
-    html+=active.map(rowHtml).join('');
+    html+='<div class="strhead">📢 모집중 공고 <span style="font-weight:600;color:#8a919d">('+active.length+'건)</span></div>';
+    html+=active.map(p=>rowHtml(p,true)).join('');  // [v6] 모집중은 첫 화면부터 펼침 (원스텝)
   }
   if(past.length){
     if(active.length)html+='<div style="height:8px;background:#f3f6fb;border-top:1px solid #e6eaf2;border-bottom:1px solid #e6eaf2"></div>';
-    html+='<div class="strhead" style="color:#8a919d">🗂 지난 공고 <span style="font-weight:600">('+past.length+'건)</span></div>';
-    html+=past.map(rowHtml).join('');
+    html+='<div class="strhead" style="color:#8a919d">✅ 완료된 공고 <span style="font-weight:600">('+past.length+'건)</span> <span style="font-weight:600;font-size:11.5px">— 이런 대회들이 진행되었습니다</span></div>';
+    html+=past.slice(0,5).map(p=>rowHtml(p,false)).join('');
+    if(past.length>5){
+      html+='<div id="pastMore" style="display:none">'+past.slice(5).map(p=>rowHtml(p,false)).join('')+'</div>';
+      html+='<div style="text-align:center;padding:11px"><button class="stbtn stbtn-ghost" style="padding:8px 22px;font-size:13px" onclick="var m=document.getElementById(\'pastMore\');var on=m.style.display===\'none\';m.style.display=on?\'block\':\'none\';this.textContent=on?\'접기 ▲\':\'완료된 공고 더보기 ('+(past.length-5)+'건) ▼\'">완료된 공고 더보기 ('+(past.length-5)+'건) ▼</button></div>';
+    }
   }
   if(!active.length&&!past.length)html+='<div class="bempty">현재 등록된 모집 공고가 없습니다.</div>';
   html+='</div>';
   el.innerHTML=html;
+}
+// [v6] 관리자 수동 마감/해제
+async function togglePostClosed(id){
+  const p=POSTS.find(x=>x.id===id);if(!p)return;
+  const to=!p.manualClosed;
+  if(!confirm(to?('['+(p.competitionName||'')+']\n이 공고를 지금 마감 처리할까요?\n\n· 목록의 「완료된 공고」로 이동합니다\n· 신규 신청이 차단됩니다 (기존 신청·확정 데이터는 유지)')
+              :('['+(p.competitionName||'')+']\n마감을 해제할까요? 다시 「모집중 공고」로 표시되고 신청이 가능해집니다.')))return;
+  try{
+    const upd={manualClosed:to};
+    if(to)upd.manualClosedAt=new Date().toISOString();
+    await DB.collection('competitionStaff').doc(id).update(upd);
+    loadPosts();
+  }catch(e){alert('마감 처리 실패: '+e.message)}
 }
 async function approvePost(id,ok){
   const p=POSTS.find(x=>x.id===id);if(!p)return;
@@ -726,6 +749,7 @@ function openApplyForm(id){
   if(SMY.sanction&&SMY.sanction.active){alert('🚫 현재 징계 기간 중이어서 심판·운영요원 신청이 제한됩니다.\n문의: 사무국 031-984-3248');return}
   // [v4] 자격 미보유자도 신청 진입 허용 — 운영요원 임무는 자격 검증 없이 신청 가능, 심판 임무만 유효 심판자격 검사
   const today=new Date().toISOString().slice(0,10);
+  if(p.manualClosed){alert('마감된 공고입니다. (관리자 마감 처리)');return}  // [v6]
   if(p.deadline&&p.deadline<today){alert('모집이 마감된 공고입니다.');return}
   const my=(APPS[p.id]||[]).find(a=>a.uid===SME.uid);
   const pf=(my&&my.payInfo)||{};  // [v4] 이전 신청의 수당지급 정보 프리필

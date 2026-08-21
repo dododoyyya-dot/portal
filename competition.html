@@ -127,14 +127,9 @@
 </div></div>
 <section><div class="wrap">
   <div class="sec-label">COMPETITION</div>
-  <h2 class="sec-title">2026 대회 일정</h2>
-  <p class="sec-desc">일정은 사정에 따라 변경될 수 있으며, 확정 공고는 알림마당에 게시됩니다.</p>
-  <table class="tbl">
-    <tr><th style="width:140px">시기</th><th>대회명</th><th style="width:200px">대상</th><th style="width:160px">장소</th></tr>
-    <tr><td>2026. 9.~11.</td><td class="l">권역별 유소년 올림피아드</td><td>강습 참여 학교</td><td>권역별 지정</td></tr>
-    <tr><td>2026. 하반기</td><td class="l">전국 얼티미트 · 거츠 대회</td><td>일반 · 동호인</td><td>추후 공고</td></tr>
-    <tr><td>연중</td><td class="l">연맹 주관 교류전 · 이벤트 대회</td><td>전 연령</td><td>추후 공고</td></tr>
-  </table>
+  <h2 class="sec-title">대회 공고 · 일정</h2>
+  <p class="sec-desc">등록된 참가·심판·운영요원 모집 공고가 실시간으로 게시됩니다. 공고를 누르면 신청 화면으로 이동합니다.</p>
+  <div id="liveComps"><div class="bempty">공고를 불러오는 중…</div></div>
   <h3 class="sub" id="staff">심판 · 운영요원</h3>
   <div class="gbox">
     연맹 주관 대회의 심판·기록원·운영요원은 공개 모집하며, <b>연맹 리더(연수 이수자)는 우선 선발</b>됩니다.<br>
@@ -174,7 +169,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
-<script src="kfdf.js?v=20260821"></script>
+<script src="kfdf.js?v=20260808"></script>
 <script src="site_config.js"></script>
 <script>
 KFDF.initApp();
@@ -217,6 +212,7 @@ function myEntries(s){
   });
 }
 AUTH.onAuthStateChanged(async u=>{
+  loadLiveComps();  // [대회v2] 실시간 공고 피드 (비로그인 포함)
   const g=document.getElementById('cGate');
   if(!u){g.style.display='block';g.innerHTML='🔒 승인 회원 전용입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a> 후 신청할 수 있습니다.';return}
   CME=u;
@@ -481,7 +477,8 @@ async function openTeamApply(id){
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
     +'<select id="taType" '+inp+' onchange="taTypeUI()">'+tts.map(t=>'<option>'+t+'</option>').join('')+'</select>'
     +'<input id="taName" '+inp+' placeholder="팀명 (예: 신남FC)" style="flex:1;min-width:150px">'
-    +'<select id="taDiv" '+inp+'>'+(s.teamDivs||[]).map(x=>'<option>'+cesc(x)+'</option>').join('')+'</select></div>'
+    +'<select id="taDiv" '+inp+'>'+(s.teamDivs||[]).map(x=>'<option>'+cesc(x)+'</option>').join('')+'</select>'
+    +((s.teamGenders&&s.teamGenders.length)?'<select id="taGender" '+inp+' title="클럽(팀) 구분">'+s.teamGenders.map(x=>'<option>'+cesc(x)+'</option>').join('')+'</select>':'')+'</div>'
     +'<div id="taOrgRow" style="margin-top:8px"></div>'
     +'<div style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;font-weight:700">인솔자: '+cesc(CMY.name||'')+' <select id="taRole" '+inp+'><option>지도교사</option><option>클럽장</option><option>학부모</option><option>성인 인솔자</option></select><span style="font-size:11.5px;color:#8a919d">'+cesc(CMY.phone||'')+'</span></div>'
     +'<div style="font-size:13px;font-weight:800;margin:14px 0 4px">② 팀원 명단 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 비회원 학생도 직접 입력 가능</span></div>'
@@ -615,6 +612,7 @@ async function submitTeam(){
       if(dv&&dv.cap&&divActiveCount(s,dv.name)>=dv.cap)throw new Error('['+dv.name+'] 부문 정원이 마감되었습니다');
       const claimed=(s.claimed||[]).slice();
       claimed.push({uid:CME.uid,pid:pid,team:true,name:teamName,teamType:teamType,teamOrg:teamOrg,teamOrgId:teamOrgId,
+        teamGender:(document.getElementById('taGender')?document.getElementById('taGender').value:''),
         leader:CMY.name||'',leaderRole:document.getElementById('taRole').value,leaderPhone:CMY.phone||'',
         roster:roster,rosterN:roster.length,prefs:[divName],consent:true,signed:true,
         consentFiles:files,at:new Date().toISOString()});
@@ -677,6 +675,38 @@ async function openMinorReq(id){
   }catch(e){alert('요청 실패: '+e.message)}
 }
 let CCOMPS=[];
+// [대회v2] 실시간 대회 공고 피드 — 로그인 없이도 표시
+async function loadLiveComps(){
+  const el=document.getElementById('liveComps');if(!el)return;
+  try{
+    const today=new Date().toISOString().slice(0,10);
+    const [sl,st]=await Promise.all([
+      DB.collection('compSlots').orderBy('date').limit(60).get(),
+      DB.collection('competitionStaff').where('approved','==',true).limit(30).get().catch(()=>null)
+    ]);
+    const rows=[];
+    sl.docs.forEach(d=>{const s=d.data();
+      if(s.compId&&s.role!=='참가')return;  // 대회 묶음의 심판·운영은 접힘 (참가 공고 대표 표기)
+      rows.push({date:s.date||'',end:s.date||'',title:s.title||'',kind:s.role==='참가'?'참가 모집':(s.role+'요원 모집'),
+        color:s.role==='참가'?'#153A77':(s.role==='심판'?'#7c3aed':'#b8860b'),
+        done:!!(s.deadline&&s.deadline<today),place:s.region||'',href:'#cSlotList'});});
+    if(st)st.docs.forEach(d=>{const s=d.data();
+      const ds=(s.dates||[]).map(x=>x.date).filter(Boolean).sort();
+      rows.push({date:ds[0]||s.startDate||'',end:ds[ds.length-1]||s.endDate||'',title:s.competitionName||'',kind:'심판·운영 모집',color:'#0f766e',
+        done:!!(s.manualClosed||(s.deadline&&s.deadline<today)),place:s.location||'',href:'staff.html'});});
+    rows.sort((x,y)=>String(x.date).localeCompare(String(y.date)));
+    const act=rows.filter(r=>!r.done&&(!r.end||r.end>=today));
+    const past=rows.filter(r=>r.done||(r.end&&r.end<today)).reverse();
+    const tr=r=>'<tr><td>'+cesc(r.date?(r.date.replace(/-/g,'.')+(r.end&&r.end!==r.date?' ~ '+r.end.slice(5).replace(/-/g,'.'):'')):'추후 공고')+'</td>'
+      +'<td class="l"><a href="'+r.href+'" style="color:inherit;text-decoration:none;font-weight:800">'+cesc(r.title)+'</a> <span style="font-size:11px;font-weight:800;color:#fff;background:'+r.color+';padding:2px 8px;border-radius:999px">'+r.kind+'</span>'+(r.done?' <span style="font-size:11px;color:#8a919d;font-weight:800">마감</span>':'')+'</td>'
+      +'<td>'+cesc(r.place||'-')+'</td></tr>';
+    el.innerHTML=(act.length||past.length)
+      ?('<table class="tbl"><tr><th style="width:180px">일정</th><th>공고</th><th style="width:150px">장소·지역</th></tr>'
+        +act.map(tr).join('')+past.slice(0,4).map(tr).join('')+'</table>'
+        +(past.length>4?'<div style="font-size:12px;color:#8a919d;margin-top:6px">지난 공고 '+(past.length-4)+'건 더 — 아래 목록·심판 페이지에서 확인</div>':''))
+      :'<div class="bempty">등록된 대회 공고가 없습니다. 공고가 올라오면 이곳에 실시간 게시됩니다.</div>';
+  }catch(e){el.innerHTML='<div class="bempty">공고를 불러오지 못했습니다.</div>'}
+}
 async function loadSlots(){
   const el=document.getElementById('cSlotList');
   try{
@@ -744,6 +774,11 @@ function slotCard(d,today){
         +(closed&&!mines.length?'<span class="rbadge" style="background:#8a919d">마감</span>':'')+'</div>'
         +'<div class="cmeta"><span>📍 <b>'+cesc(s.region)+'</b></span><span>📅 <b>'+cesc(s.date)+'</b></span><span>👥 신청 <b>'+act+'/'+s.quota+'</b></span>'+(s.deadline?'<span>⏳ 마감 <b>'+cesc(s.deadline)+'</b></span>':'')+(s.fee?'<span>💰 <b>'+cesc(s.fee)+'</b></span>':'')+'</div>'
         +((s.eligRegion||s.eligNote)?'<div class="cnote" style="background:#fdf3f4;border-color:#f3c2c7;color:#8c1622">🎯 참가 자격'+(s.eligRegion?' · <b>'+cesc(s.eligRegion)+' 지역 대상</b>':'')+(s.eligNote?' — '+cesc(s.eligNote):'')+'</div>':'')
+        // [대회v2] 주최·주관·후원·협찬 / 개회식·대회 시간장소 / 참가비 구분 / 특수 부문
+        +((s.host||s.organizer||s.sponsor||s.partner)?'<div class="cnote" style="background:#f6f8fb;border-color:#dfe5ee;color:#374151">'+[s.host?'주최 <b>'+cesc(s.host)+'</b>':'',s.organizer?'주관 <b>'+cesc(s.organizer)+'</b>':'',s.sponsor?'후원 <b>'+cesc(s.sponsor)+'</b>':'',s.partner?'협찬 <b>'+cesc(s.partner)+'</b>':''].filter(Boolean).join(' · ')+'</div>':'')
+        +(((s.opening&&(s.opening.time||s.opening.place))||s.time)?'<div class="cnote" style="background:#f6f8fb;border-color:#dfe5ee;color:#374151">'+((s.opening&&(s.opening.time||s.opening.place))?'🎪 개회식 <b>'+cesc(((s.opening.time||'')+(s.opening.place?' · '+s.opening.place:'')).trim())+'</b>':'')+(s.time?(((s.opening&&(s.opening.time||s.opening.place))?' &nbsp;·&nbsp; ':'')+'🏟 대회 <b>'+cesc(s.time)+'</b>'):'')+'</div>':'')
+        +(s.entry&&s.entry.fees&&s.entry.fees.length?'<div class="cnote" style="background:#f0fdf4;border-color:#a7f3d0;color:#0f5132">💰 참가비: '+s.entry.fees.map(f=>cesc(f.label+(f.amount?' '+f.amount:''))).join(' · ')+'</div>':'')
+        +(s.entry&&s.entry.special&&s.entry.special.length?'<div class="cnote" style="background:#f5f0ff;border-color:#ddd0fa;color:#5b21b6">🏷 선택 부문: '+s.entry.special.map(x=>cesc(x)).join(' · ')+' — 신청 시 선택</div>':'')
         +(s.note?'<div class="cnote">📌 '+cesc(s.note)+'</div>':'')
         +'<div class="ctags">'+slotDivs(s).map(dv=>{
             if(entry&&dv.cap){const c=divActiveCount(s,dv.name);
@@ -918,6 +953,8 @@ async function openApply(id){
           return '<button type="button" class="rolechip"'+(full?' disabled style="opacity:.4;cursor:not-allowed"':'')+' data-role="'+cesc(dv.name)+'" onclick="togRole(this)">'+cesc(dv.name)+(dv.cap?' <span style="font-size:11px;opacity:.75">'+(full?'마감':cnt+'/'+dv.cap)+'</span>':'')+'</button>';
         }).join('')
       +'</div><div id="cSelTxt" style="font-size:12.5px;color:#0f766e;font-weight:800;min-height:18px"></div>'
+      // [대회v2] 특수 부문 선택 (선택사항 — 장애인부·강아지동반 등)
+      +((s.entry&&s.entry.special&&s.entry.special.length)?'<div style="font-size:12.5px;font-weight:800;margin:8px 0 4px;color:#5b21b6">🏷 해당 시 선택 (선택사항)</div><div id="cSpecialBtns" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">'+s.entry.special.map(sp=>'<button type="button" class="rolechip" data-special="'+cesc(sp)+'" onclick="this.classList.toggle(\'on\')">'+cesc(sp)+'</button>').join('')+'</div>':'')
       +'<div class="clause">① 참가자는 대회 규정과 안전 수칙을 준수하며, 주최 측의 경기 운영에 따릅니다.<br>'
       +'② 대회 중 촬영된 기록·사진·영상은 연맹 홍보 자료로 활용될 수 있음에 동의합니다.<br>'
       +'③ 미성년 참가자의 경우 아래 서명은 <b>법정대리인(보호자)의 참가 동의</b>로서 효력을 가집니다.</div>'
@@ -1079,7 +1116,9 @@ async function submitEntry(){
       const dv=slotDivs(s).find(d=>d.name===APPLY_SEL[0]);
       if(dv&&dv.cap&&divActiveCount(s,dv.name)>=dv.cap)throw new Error('['+dv.name+'] 부문 정원이 마감되었습니다');
       const claimed=(s.claimed||[]).slice();
+      const _specials=[...document.querySelectorAll('#cSpecialBtns .rolechip.on')].map(x=>x.dataset.special);
       claimed.push({uid:CME.uid,pid:APPLY_PID,name:p.name,birth:p.birth||'',gender:p.gender||'',school:p.school||'',club:club||'',kid:!!p.kid,
+        special:_specials,
         guardian:p.kid?(CMY.name||''):'',guardianPhone:p.kid?(CMY.phone||''):'',
         prefs:APPLY_SEL.slice(),consent:true,signed:true,at:new Date().toISOString()});
       tx.update(ref,{claimed:claimed});

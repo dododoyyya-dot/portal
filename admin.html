@@ -2967,6 +2967,7 @@ async function loadCompMasters(){
 function openCompWizard(editId){
   const ed=editId?CMASTERS.find(d=>d.id===editId):null;
   const c=ed?ed.data():{};
+  const useB=!ed||!!c.entry;  // [대회v2] 신규·신형식은 종목/부문 빌더, 구형식 수정은 기존 텍스트 방식 유지
   const old=document.getElementById('cwModal');if(old)old.remove();
   const div=document.createElement('div');div.id='cwModal';
   div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto';
@@ -2979,8 +2980,22 @@ function openCompWizard(editId){
     +'<b style="font-size:17px">🏆 '+(ed?'대회 수정':'새 대회 등록')+'</b>'
     +sec('① 기본 정보',
       '<label '+lb+'>대회명 *</label><input id="cwTitle" '+inp+' value="'+esc(c.title||'')+'" placeholder="예: 2026 전국 플라잉디스크대회">'
+      // [대회v2] 주최·주관·후원·협찬 (타이핑 입력)
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+      +'<div><label '+lb+'>주최</label><input id="cwHost" '+inp+' value="'+esc(c.host||'')+'" placeholder="예: 대한민국플라잉디스크연맹"></div>'
+      +'<div><label '+lb+'>주관</label><input id="cwOrganizer" '+inp+' value="'+esc(c.organizer||'')+'" placeholder="예: 부산플라잉디스크연맹"></div>'
+      +'<div><label '+lb+'>후원</label><input id="cwSponsor" '+inp+' value="'+esc(c.sponsor||'')+'" placeholder="예: 부산광역시교육청"></div>'
+      +'<div><label '+lb+'>협찬</label><input id="cwPartner" '+inp+' value="'+esc(c.partner||'')+'" placeholder="예: ○○스포츠"></div>'
+      +'</div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label '+lb+'>시작일 *</label><input id="cwD1" type="date" '+inp+' value="'+esc(c.dateStart||'')+'"></div><div><label '+lb+'>종료일</label><input id="cwD2" type="date" '+inp+' value="'+esc(c.dateEnd||'')+'"></div></div>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label '+lb+'>장소 *</label><input id="cwPlace" '+inp+' value="'+esc(c.place||'')+'"></div><div><label '+lb+'>관할 시도 *</label><select id="cwSido" '+inp+'>'+PM_SIDOS.map(x=>'<option'+(c.sido===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div></div>'
+      // [대회v2] 개회식·대회 시간/장소 분리 기입 (상이할 수 있음)
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+      +'<div><label '+lb+'>개회식 시간 (선택)</label><input id="cwOpenTime" '+inp+' value="'+esc((c.opening&&c.opening.time)||'')+'" placeholder="예: 09:00"></div>'
+      +'<div><label '+lb+'>개회식 장소 (선택)</label><input id="cwOpenPlace" '+inp+' value="'+esc((c.opening&&c.opening.place)||'')+'" placeholder="예: 시민회관 대강당"></div>'
+      +'<div><label '+lb+'>대회 시간</label><input id="cwTime" '+inp+' value="'+esc(c.time||'')+'" placeholder="예: 10:00~17:00"></div>'
+      +'<div><label '+lb+'>대회 장소 *</label><input id="cwPlace" '+inp+' value="'+esc(c.place||'')+'" placeholder="예: 부경대학교 축구장"></div>'
+      +'</div>'
+      +'<label '+lb+'>관할 시도 <span style="font-weight:600;color:#8a919d;font-size:11px">(내부 관리·캘린더 분류용 — 참가 지역제한 아님)</span></label><select id="cwSido" '+inp+'>'+PM_SIDOS.map(x=>'<option'+(c.sido===x?' selected':'')+'>'+x+'</option>').join('')+'</select>'
       +'<label '+lb+'>대회 안내 (선택)</label><textarea id="cwDesc" rows="2" '+inp+'>'+esc(c.desc||'')+'</textarea>')
     +sec('② 종목·운영방식 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 종목별로 일반 운영(정식 경기) 또는 체험부스(현장 자유참여) 선택</span>',
       COMP_SPORTS.map(sp=>'<div style="display:flex;gap:10px;align-items:center;margin-top:8px;font-size:13.5px">'
@@ -2989,10 +3004,15 @@ function openCompWizard(editId){
         +'</div>').join(''))
     +sec('③ 참가자 모집 '+(ed?'<span style="font-size:11px;color:#8a919d">(수정 시 공고 내용은 공고 카드에서 개별 수정)</span>':''),
       '<label style="display:flex;gap:7px;align-items:center;font-size:13px;font-weight:800;margin-top:8px"><input type="checkbox" id="cwHasEntry" style="width:auto"'+(ed?'':' checked')+(ed?' disabled':'')+'> 참가자 모집 공고 생성</label>'
-      +'<label '+lb+'>부문·정원 <span style="font-weight:600;color:#8a919d;font-size:11px">— 한 줄에 하나, 「부문명:정원」. 팀 단위 부문은 [팀] 붙이기</span></label>'
-      +'<textarea id="cwDivs" rows="3" '+inp+' placeholder="얼티미트 초등부[팀]:16&#10;디스크골프 오픈부:32&#10;원반윷놀이 체험:0">'+esc(c.divsRaw||'')+'</textarea>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px"><div><label '+lb+'>참가비</label><input id="cwFee" '+inp+' value="'+esc(c.fee||'')+'" placeholder="예: 무료 / 10,000원"></div><div><label '+lb+'>신청 마감일</label><input id="cwDL" type="date" '+inp+' value="'+esc(c.deadline||'')+'"></div><div><label '+lb+'>지역 제한(선택)</label><input id="cwElig" '+inp+' value="'+esc(c.eligRegion||'')+'" placeholder="예: 서울 / 대전"></div></div>'
-      +'<label '+lb+'>허용 팀 단위</label><div style="display:flex;gap:14px;margin-top:5px;font-size:13px">'+['클럽팀','학교팀','자유팀'].map(t=>'<label style="display:flex;gap:5px;align-items:center;font-weight:700"><input type="checkbox" class="cwTT" value="'+t+'" style="width:auto"'+(tt.indexOf(t)>=0?' checked':'')+'> '+t+'</label>').join('')+'</div>')
+      +(useB
+        // [대회v2] 개인전·단체전 종목/부문·특수부문·참가비·신청단위 빌더 (버튼 추가형)
+        ?('<div id="cwEntryBuild" style="margin-top:4px"></div>'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label '+lb+'>신청 마감일</label><input id="cwDL" type="date" '+inp+' value="'+esc(c.deadline||'')+'"></div><div><label '+lb+'>참가 지역 제한</label><div style="font-size:12px;color:#0f766e;font-weight:800;padding:10px 2px">🌏 제한 없음 — 전국 누구나 신청 가능</div></div></div>')
+        // 구형식(divsRaw) 대회 수정 — 기존 방식 그대로
+        :('<label '+lb+'>부문·정원 <span style="font-weight:600;color:#8a919d;font-size:11px">— 한 줄에 하나, 「부문명:정원」. 팀 단위 부문은 [팀] 붙이기</span></label>'
+          +'<textarea id="cwDivs" rows="3" '+inp+' placeholder="얼티미트 초등부[팀]:16&#10;디스크골프 오픈부:32&#10;원반윷놀이 체험:0">'+esc(c.divsRaw||'')+'</textarea>'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px"><div><label '+lb+'>참가비</label><input id="cwFee" '+inp+' value="'+esc(c.fee||'')+'" placeholder="예: 무료 / 10,000원"></div><div><label '+lb+'>신청 마감일</label><input id="cwDL" type="date" '+inp+' value="'+esc(c.deadline||'')+'"></div><div><label '+lb+'>지역 제한(선택)</label><input id="cwElig" '+inp+' value="'+esc(c.eligRegion||'')+'" placeholder="예: 서울 / 대전"></div></div>'
+          +'<label '+lb+'>허용 팀 단위</label><div style="display:flex;gap:14px;margin-top:5px;font-size:13px">'+['클럽팀','학교팀','자유팀'].map(t=>'<label style="display:flex;gap:5px;align-items:center;font-weight:700"><input type="checkbox" class="cwTT" value="'+t+'" style="width:auto"'+(tt.indexOf(t)>=0?' checked':'')+'> '+t+'</label>').join('')+'</div>')))
     +sec('④ 심판 모집','<label style="display:flex;gap:7px;align-items:center;font-size:13px;font-weight:800;margin-top:8px"><input type="checkbox" id="cwHasRef" style="width:auto"'+(ed?' disabled':' checked')+'> 심판 모집 공고 생성</label>'
       +'<div style="display:grid;grid-template-columns:110px 1fr;gap:10px"><div><label '+lb+'>정원</label><input id="cwRefN" type="number" '+inp+' value="17"></div><div><label '+lb+'>임무 (쉼표 구분)</label><input id="cwRefRoles" '+inp+' value="심판장,주심,부심,점수심,기록심,선심"></div></div>')
     +sec('⑤ 운영요원 모집','<label style="display:flex;gap:7px;align-items:center;font-size:13px;font-weight:800;margin-top:8px"><input type="checkbox" id="cwHasStaff" style="width:auto"'+(ed?' disabled':' checked')+'> 운영요원 모집 공고 생성 <span style="font-weight:600;color:#8a919d;font-size:11px">(체험부스 종목이 있으면 부스 운영 임무 자동 추가)</span></label>'
@@ -3019,6 +3039,68 @@ function openCompWizard(editId){
   CONSENT_OVL.cw=ovlUnpack({consentImgs:c.consentImgs||[],consentOverlays:c.consentOverlays||{}});
   renderImgStrip('cw');
   fillTplSel(true);
+  if(useB)cwEntryInit(c);  // [대회v2] 종목·부문 빌더 초기화
+}
+// ══════════ [대회v2] 참가 모집 빌더 (개인전·단체전 종목/부문·특수부문·참가비·신청단위 — 전부 버튼 추가형) ══════════
+let CW_ENTRY=null;
+function cwEntryInit(c){
+  const e=(c&&c.entry)||{};
+  CW_ENTRY={
+    indiv:(e.indiv&&e.indiv.length?e.indiv:[{name:'디스크골프',divs:['남자부','여자부']}]).map(x=>({name:x.name||'',divs:(x.divs||[]).slice()})),
+    team:(e.team&&e.team.length?e.team:[
+      {name:'얼티미트',divs:['남자','여자','혼성']},
+      {name:'디스크골프',divs:['남자','여자','혼성']},
+      {name:'원반윷놀이',divs:['남자','여자','혼성']}]).map(x=>({name:x.name||'',divs:(x.divs||[]).slice()})),
+    special:(e.special&&e.special.length?e.special:['장애인부','강아지동반']).slice(),
+    fees:(e.fees&&e.fees.length?e.fees:[{label:'일반',amount:''}]).map(x=>({label:x.label||'',amount:x.amount||''})),
+    teamUnits:(e.teamUnits&&e.teamUnits.length?e.teamUnits:['시도연맹클럽','학교클럽','기타팀']).slice(),
+    teamGenders:(e.teamGenders&&e.teamGenders.length?e.teamGenders:['남자','여자','혼성']).slice()
+  };
+  cwEntryRender();
+}
+function cwEntryRender(){
+  const el=document.getElementById('cwEntryBuild');if(!el||!CW_ENTRY)return;
+  const bi='padding:7px 10px;border:1.5px solid #dfe5ee;border-radius:8px;font-size:12.5px;font-family:inherit';
+  const sportBlock=(kind,label,color)=>
+    '<div style="margin-top:10px"><b style="font-size:12.5px;color:'+color+'">'+label+'</b>'
+    +CW_ENTRY[kind].map((sp,si)=>'<div style="border:1px solid #e6eaf2;border-radius:10px;padding:9px 11px;margin-top:6px">'
+      +'<div style="display:flex;gap:6px;align-items:center"><span style="font-size:11.5px;font-weight:800;color:#8a919d">종목</span>'
+      +'<input value="'+esc(sp.name)+'" placeholder="종목명" style="'+bi+';width:150px" oninput="CW_ENTRY.'+kind+'['+si+'].name=this.value">'
+      +'<span style="flex:1"></span>'
+      +'<button type="button" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:7px;padding:4px 10px;cursor:pointer;font-weight:800;font-size:11px" onclick="CW_ENTRY.'+kind+'.splice('+si+',1);cwEntryRender()">× 종목 삭제</button></div>'
+      +'<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:6px"><span style="font-size:11.5px;font-weight:800;color:#8a919d">부문</span>'
+      +sp.divs.map((dv,di)=>'<span style="display:inline-flex;align-items:center;gap:3px"><input value="'+esc(dv)+'" placeholder="부문명" style="'+bi+';width:86px" oninput="CW_ENTRY.'+kind+'['+si+'].divs['+di+']=this.value"><button type="button" onclick="CW_ENTRY.'+kind+'['+si+'].divs.splice('+di+',1);cwEntryRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:6px;width:20px;height:20px;cursor:pointer;font-weight:900">×</button></span>').join('')
+      +'<button type="button" style="border:none;background:#eef3fa;color:#153A77;border-radius:7px;padding:5px 11px;cursor:pointer;font-weight:800;font-size:11.5px" onclick="CW_ENTRY.'+kind+'['+si+'].divs.push(\'\');cwEntryRender()">+ 부문</button>'
+      +'</div></div>').join('')
+    +'<button type="button" style="border:none;background:'+color+';color:#fff;border-radius:8px;padding:6px 13px;cursor:pointer;font-weight:800;font-size:12px;margin-top:6px" onclick="CW_ENTRY.'+kind+'.push({name:\'\',divs:[\'\']});cwEntryRender()">+ 종목 추가</button></div>';
+  const listBlock=(key,label,ph)=>'<div style="margin-top:12px"><b style="font-size:12.5px;color:#153A77">'+label+'</b>'
+    +'<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:5px">'
+    +CW_ENTRY[key].map((v2,i)=>'<span style="display:inline-flex;align-items:center;gap:3px"><input value="'+esc(v2)+'" placeholder="'+ph+'" style="'+bi+';width:112px" oninput="CW_ENTRY.'+key+'['+i+']=this.value"><button type="button" onclick="CW_ENTRY.'+key+'.splice('+i+',1);cwEntryRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:6px;width:20px;height:20px;cursor:pointer;font-weight:900">×</button></span>').join('')
+    +'<button type="button" style="border:none;background:#8a919d;color:#fff;border-radius:7px;padding:5px 11px;cursor:pointer;font-weight:800;font-size:11.5px" onclick="CW_ENTRY.'+key+'.push(\'\');cwEntryRender()">+ 추가</button></div></div>';
+  el.innerHTML=
+    sportBlock('indiv','🙋 개인전 종목','#1F4E9C')
+    +sportBlock('team','👥 단체전 종목','#7c3aed')
+    +listBlock('special','♿ 특수 부문 옵션 (예: 장애인부, 강아지동반 — 신청 시 선택 가능)','부문명')
+    +'<div style="margin-top:12px"><b style="font-size:12.5px;color:#0f766e">💰 참가비 (구분별 책정 — 연령·선수/비선수 등)</b>'
+    +CW_ENTRY.fees.map((f,i)=>'<div style="display:flex;gap:6px;margin-top:5px;align-items:center">'
+      +'<input value="'+esc(f.label)+'" placeholder="구분 (예: 성인 선수)" style="'+bi+';width:150px" oninput="CW_ENTRY.fees['+i+'].label=this.value">'
+      +'<input value="'+esc(f.amount)+'" placeholder="금액 (예: 30,000원 / 무료)" style="'+bi+';flex:1" oninput="CW_ENTRY.fees['+i+'].amount=this.value">'
+      +'<button type="button" onclick="CW_ENTRY.fees.splice('+i+',1);cwEntryRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:6px;width:22px;height:22px;cursor:pointer;font-weight:900">×</button></div>').join('')
+    +'<button type="button" style="border:none;background:#0f766e;color:#fff;border-radius:7px;padding:5px 11px;cursor:pointer;font-weight:800;font-size:11.5px;margin-top:5px" onclick="CW_ENTRY.fees.push({label:\'\',amount:\'\'});cwEntryRender()">+ 참가비 구분 추가</button></div>'
+    +listBlock('teamUnits','🏷 단체 신청 단위','단위명')
+    +listBlock('teamGenders','🚻 단체(클럽) 구분','구분명');
+}
+function cwEntryData(){
+  if(!CW_ENTRY)return null;
+  const trimArr=a=>a.map(t=>String(t||'').trim()).filter(Boolean);
+  return {
+    indiv:CW_ENTRY.indiv.map(x=>({name:String(x.name||'').trim(),divs:trimArr(x.divs)})).filter(x=>x.name),
+    team:CW_ENTRY.team.map(x=>({name:String(x.name||'').trim(),divs:trimArr(x.divs)})).filter(x=>x.name),
+    special:trimArr(CW_ENTRY.special),
+    fees:CW_ENTRY.fees.map(f=>({label:String(f.label||'').trim(),amount:String(f.amount||'').trim()})).filter(f=>f.label||f.amount),
+    teamUnits:trimArr(CW_ENTRY.teamUnits),
+    teamGenders:trimArr(CW_ENTRY.teamGenders)
+  };
 }
 function cwSports(){
   return [...document.querySelectorAll('.cwSport:checked')].map(ch=>{
@@ -3033,12 +3115,23 @@ async function saveCompMaster(editId){
   if(IS_SIDO && sido!==CMY.sido){alert('자신의 관할 시도('+CMY.sido+')만 등록할 수 있습니다.');return}
   const sports=cwSports();
   if(!sports.length){alert('종목을 1개 이상 선택해주세요.');return}
-  const teamTypes=[...document.querySelectorAll('.cwTT:checked')].map(x=>x.value);
+  // [대회v2] 빌더 데이터 (신규·신형식) — 구형식 수정 시 null
+  const entry=document.getElementById('cwEntryBuild')?cwEntryData():null;
+  let teamTypes=[...document.querySelectorAll('.cwTT:checked')].map(x=>x.value);
+  let feeStr=v('cwFee');
+  if(entry){
+    teamTypes=entry.teamUnits.slice();
+    feeStr=entry.fees.map(f=>f.label+(f.amount?' '+f.amount:'')).join(' · ');
+  }
   const consentText=v('cwConsentText');
   const consentImgs=CONSENT_IMGS.cw.slice();
   const consentOverlays=ovlPack('cw');
   const base={title:title,dateStart:d1,dateEnd:v('cwD2')||d1,place:place,sido:sido,desc:v('cwDesc'),
-    sports:sports,teamTypes:teamTypes,divsRaw:v('cwDivs'),fee:v('cwFee'),deadline:v('cwDL'),eligRegion:v('cwElig'),
+    sports:sports,teamTypes:teamTypes,divsRaw:v('cwDivs'),fee:feeStr,deadline:v('cwDL'),eligRegion:v('cwElig'),
+    // [대회v2] 주최·주관·후원·협찬 / 개회식·대회 시간장소 / 구조화 참가정보
+    host:v('cwHost'),organizer:v('cwOrganizer'),sponsor:v('cwSponsor'),partner:v('cwPartner'),
+    opening:{time:v('cwOpenTime'),place:v('cwOpenPlace')},time:v('cwTime'),
+    entry:entry,
     consentText:consentText,consentImgs:consentImgs,consentOverlays:consentOverlays,status:'모집중'};
   try{
     if(editId){
@@ -3046,7 +3139,10 @@ async function saveCompMaster(editId){
       await DB.collection('competitions').doc(editId).update(base);
       const cm=CMASTERS.find(d=>d.id===editId);const prev=cm?cm.data():{};
       for(const sid of (prev.slotIds||[])){
-        const upd={date:base.dateStart,region:base.sido};
+        const upd={date:base.dateStart,region:base.sido,
+          host:base.host,organizer:base.organizer,sponsor:base.sponsor,partner:base.partner,
+          opening:base.opening,time:base.time};
+        if(base.entry){upd.entry=base.entry;upd.teamTypes=base.entry.teamUnits;upd.teamGenders=base.entry.teamGenders;upd.fee=base.fee;}
         if(base.deadline)upd.deadline=base.deadline;
         if(consentText||consentImgs.length){upd.consentText=consentText;upd.consentImgs=consentImgs;upd.consentOverlays=consentOverlays;}
         await DB.collection('compSlots').doc(sid).update(upd).catch(()=>{});
@@ -3070,11 +3166,24 @@ async function saveCompMaster(editId){
     // 참가 공고 — 일반 운영 종목이 있을 때만 (전부 체험부스면 생성 안 함)
     const hasGeneral=sports.some(x=>x.mode!=='체험부스');
     if(document.getElementById('cwHasEntry').checked&&hasGeneral){
-      const lines=v('cwDivs').split('\n').map(x=>x.trim()).filter(Boolean);
-      const roles=lines.map(x=>x.replace('[팀]',''));
-      const teamDivs=lines.filter(x=>x.indexOf('[팀]')>=0).map(x=>x.replace('[팀]','').split(':')[0].trim());
-      let quota=0;lines.forEach(x=>{const m=x.match(/:(\d+)$/);quota+=m?parseInt(m[1]):0;});
-      await mkSlot('참가',roles.length?roles:sports.filter(x=>x.mode!=='체험부스').map(x=>x.name),quota||999,{fee:base.fee,eligRegion:base.eligRegion,teamDivs:teamDivs,teamTypes:teamTypes});
+      if(entry){
+        // [대회v2] 개인전·단체전 종목/부문 → 부문 목록 자동 생성 (지역 제한 없음)
+        const roles=[],teamDivs=[];
+        entry.indiv.forEach(sp=>{if(sp.divs.length)sp.divs.forEach(d2=>roles.push(sp.name+' '+d2));else roles.push(sp.name);});
+        entry.team.forEach(sp=>{
+          if(sp.divs.length)sp.divs.forEach(d2=>{roles.push(sp.name+' '+d2+'[팀]'.replace('[팀]',''));teamDivs.push(sp.name+' '+d2);});
+          else teamDivs.push(sp.name);
+        });
+        teamDivs.forEach(td=>{if(roles.indexOf(td)<0)roles.push(td);});
+        await mkSlot('참가',roles,999,{fee:base.fee,eligRegion:'',teamDivs:teamDivs,teamTypes:entry.teamUnits,teamGenders:entry.teamGenders,entry:entry,
+          host:base.host,organizer:base.organizer,sponsor:base.sponsor,partner:base.partner,opening:base.opening,time:base.time});
+      }else{
+        const lines=v('cwDivs').split('\n').map(x=>x.trim()).filter(Boolean);
+        const roles=lines.map(x=>x.replace('[팀]',''));
+        const teamDivs=lines.filter(x=>x.indexOf('[팀]')>=0).map(x=>x.replace('[팀]','').split(':')[0].trim());
+        let quota=0;lines.forEach(x=>{const m=x.match(/:(\d+)$/);quota+=m?parseInt(m[1]):0;});
+        await mkSlot('참가',roles.length?roles:sports.filter(x=>x.mode!=='체험부스').map(x=>x.name),quota||999,{fee:base.fee,eligRegion:base.eligRegion,teamDivs:teamDivs,teamTypes:teamTypes});
+      }
     }
     if(document.getElementById('cwHasRef').checked)
       await mkSlot('심판',v('cwRefRoles').split(',').map(x=>x.trim()).filter(Boolean),parseInt(v('cwRefN'))||17);
