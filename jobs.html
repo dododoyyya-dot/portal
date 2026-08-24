@@ -149,6 +149,7 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
     </style>
     <div class="subtabs" id="jTabs">
       <button class="st on" data-s="1" onclick="showJTab('1')">🎓 강사 · 대회요원 활동 지원</button>
+      <button class="st" data-s="3" onclick="showJTab('3')">📢 선정학교 강사 공고 <span id="slotCntBadge" style="display:none;background:#C41E2F;color:#fff;font-size:11px;font-weight:900;border-radius:999px;padding:1px 8px;margin-left:4px"></span></button>
       <button class="st" data-s="2" onclick="showJTab('2')">🔎 단기 강사 구인 게시판</button>
     </div>
     <div id="jPane1">
@@ -194,6 +195,23 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
     <div class="note" style="margin-bottom:0"><b>대회 메뉴로 이동했습니다</b> — 권역별대회 심판·운영요원 모집 확인과 신청(희망 임무 1~3순위 선택·신청 취소)은 <a href="competition.html#staff" style="color:var(--red);font-weight:900">대회 페이지 →</a>에서 진행합니다. 심판·운영 분야 지원(STEP 1)을 먼저 완료해야 신청할 수 있습니다.</div>
 
     </div>
+    <!-- [강사 공고] 선정학교 강사 모집 공고 (지명 게시판 복원 2026-08-24 — openSlots 기반) -->
+    <div id="jPane3" style="display:none">
+    <div class="sec-label">공식 공고</div>
+    <h2 class="sec-title" style="font-size:24px">📢 선정학교 강사 모집 공고</h2>
+    <p class="sec-desc" style="margin-bottom:14px">2026 유소년 스포츠 기반구축사업 <b>선정학교 중 강사가 배정되지 않은 학교</b>의 공식 모집 공고입니다. <b>자격증을 보유한 승인 회원</b>이 신청하면 사무국이 자격 확인 후 배정을 확정합니다.</p>
+    <div class="note" style="margin-bottom:16px"><b>신청 안내</b> — ① 위 <b>[강사 · 대회요원 활동 지원]</b>에서 해당 분야(학교체육/방과후) <b>지원하기</b>를 먼저 완료 → ② 아래 공고에서 <b>[강사 신청]</b> (학교당 1명 선착순 접수) → ③ 사무국이 자격·경력 확인 후 <b>배정 확정</b> → ④ 확정 시 개별 연락과 함께 마이페이지에서 <b>안전교육 이수·위촉계약 전자서명</b>을 진행합니다. 신청 취소는 확정 전까지 가능합니다.<br><b>수당</b> — 시간당 5만원 (2시간 기준 1일 10만원) · 학교당 24회차 · 강습 전체 종료 후 운영일지 확인을 거쳐 일괄 지급<br><b>자격</b> — 체육지도자(전문·생활·유소년) 또는 연맹 지도자 자격 보유자 (신청 시 자동 확인)</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <select id="slotRegF" onchange="renderSlots()" style="padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;font-family:inherit;font-size:13.5px;font-weight:700">
+        <option value="">전체 권역</option><option>서울·경기</option><option>강원</option><option>충청</option><option>전라</option><option>경상</option><option>제주</option>
+      </select>
+      <select id="slotTypeF" onchange="renderSlots()" style="padding:9px 12px;border:1.5px solid #dfe5ee;border-radius:9px;font-family:inherit;font-size:13.5px;font-weight:700">
+        <option value="">전체 유형</option><option value="school">학교체육 강습</option><option value="after">방과후·늘봄·돌봄</option>
+      </select>
+      <span style="font-size:12.5px;color:var(--gray)" id="slotSummary"></span>
+    </div>
+    <div id="slotList" class="board"><div class="bempty">불러오는 중…</div></div>
+    </div>
     <div id="jPane2" style="display:none">
     <div class="sec-label">단기 구인</div>
     <h2 class="sec-title" style="font-size:24px">🔎 단기 강사 구인 게시판</h2>
@@ -234,10 +252,11 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
 function showJTab(k){
   document.getElementById('jPane1').style.display=(k==='1'?'':'none');
   document.getElementById('jPane2').style.display=(k==='2'?'':'none');
+  var p3=document.getElementById('jPane3');if(p3)p3.style.display=(k==='3'?'':'none');
   document.querySelectorAll('#jTabs .st').forEach(b=>b.classList.toggle('on',b.dataset.s===k));
   window.scrollTo({top:0});
 }
-function jHash(){if((location.hash||'').indexOf('gig')>=0)showJTab('2');}
+function jHash(){if((location.hash||'').indexOf('gig')>=0)showJTab('2');else if((location.hash||'').indexOf('slot')>=0)showJTab('3');}
 window.addEventListener('hashchange',jHash);
 document.addEventListener('DOMContentLoaded',jHash);
 let JME=null,JMY=null,JR='전체';
@@ -246,8 +265,117 @@ AUTH.onAuthStateChanged(async u=>{
   if(!u){g.style.display='block';g.innerHTML='🔒 승인 회원 전용입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a>';return}
   JME=u;const d=await DB.collection('users').doc(u.uid).get();JMY=d.data();
   if(!JMY||JMY.status!=='approved'){g.style.display='block';g.innerHTML='⏳ 사무국 승인 후 이용 가능합니다.';return}
-  document.getElementById('jBody').style.display='block';renderApply();showMyRegions();loadMyRegion();loadGigs();
+  document.getElementById('jBody').style.display='block';renderApply();showMyRegions();loadMyRegion();loadGigs();loadSlots();
 });
+// ── [강사 공고] 선정학교 강사 모집 공고 (지명 게시판 복원 2026-08-24) ──
+// openSlots: 선정·미배정 학교 슬롯 (관리자 선정 시 자동 생성 · 배정 확정 시 삭제 — 기존 admin/region 로직 그대로 사용)
+let SLOTS=[];
+async function loadSlots(){
+  const el=document.getElementById('slotList');if(!el)return;
+  try{
+    const snap=await DB.collection('openSlots').get();
+    SLOTS=snap.docs.map(d=>Object.assign({_id:d.id},d.data()));
+    SLOTS.sort((a,b)=>{
+      const mr=myRegions();
+      const ra=mr.indexOf(a.region)>=0?0:1, rb=mr.indexOf(b.region)>=0?0:1;
+      if(ra!==rb)return ra-rb;
+      return String(a.region||'').localeCompare(String(b.region||''))||String(a.school||'').localeCompare(String(b.school||''));
+    });
+    const open=SLOTS.filter(s=>!s.claimedBy).length;
+    const bd=document.getElementById('slotCntBadge');
+    if(bd){bd.textContent=open;bd.style.display=open?'inline-block':'none'}
+    renderSlots();
+  }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+esc(e.message)+'</div>'}
+}
+function renderSlots(){
+  const el=document.getElementById('slotList');if(!el)return;
+  const rf=(document.getElementById('slotRegF')||{}).value||'';
+  const tf=(document.getElementById('slotTypeF')||{}).value||'';
+  const list=SLOTS.filter(s=>{
+    if(rf&&s.region!==rf)return false;
+    const isAfter=String(s.type||'').indexOf('방과후')>=0;
+    if(tf==='school'&&isAfter)return false;
+    if(tf==='after'&&!isAfter)return false;
+    return true;
+  });
+  const sm=document.getElementById('slotSummary');
+  if(sm)sm.textContent='모집 중 '+list.filter(s=>!s.claimedBy).length+'개교 · 심사 중 '+list.filter(s=>s.claimedBy).length+'개교';
+  if(!list.length){el.innerHTML='<div class="bempty">현재 조건에 해당하는 모집 공고가 없습니다.</div>';return}
+  const mr=myRegions();
+  el.innerHTML=list.map(s=>{
+    const isAfter=String(s.type||'').indexOf('방과후')>=0;
+    const mine=s.claimedBy===((JME||{}).uid||'');
+    const taken=!!s.claimedBy&&!mine;
+    const myReg=mr.indexOf(s.region)>=0;
+    return '<div class="brow" style="display:block;padding:14px 16px;border-left:4px solid '+(mine?'#0f766e':(taken?'#c9ced8':(isAfter?'#0f766e':'#1F4E9C')))+'">'
+      +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+      +'<b style="font-size:15.5px">'+esc(s.school)+'</b>'
+      +'<span style="font-size:11px;font-weight:900;color:#fff;background:'+(isAfter?'#0f766e':'#1F4E9C')+';padding:2px 9px;border-radius:999px">'+(isAfter?'방과후·늘봄':'학교체육')+'</span>'
+      +'<span style="font-size:12px;font-weight:800;color:'+(myReg?'#0f766e':'#8a919d')+'">📍 '+esc(s.region||'')+(s.city?' · '+esc(s.city):'')+(myReg?' ★내 권역':'')+'</span>'
+      +'<span style="flex:1"></span>'
+      +(mine?'<span style="font-size:12px;font-weight:900;color:#0f766e">✓ 신청 완료 — 사무국 확인 중</span>'
+        :(taken?'<span style="font-size:12px;font-weight:800;color:#8a919d">⏳ 다른 강사 심사 중</span>'
+          :'<span style="font-size:12px;font-weight:900;color:#C41E2F">● 모집 중</span>'))
+      +'</div>'
+      +'<div style="font-size:12.5px;color:#4b5563;margin-top:5px;line-height:1.65">24회차 · 시간당 5만원 (2시간 기준 1일 10만원) · 회차당 10P'+(s.d1?' · 개강 희망: '+esc(s.d1):'')+'</div>'
+      +'<div style="margin-top:9px">'
+      +(mine?'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F;padding:6px 16px;font-size:12.5px" onclick="unclaimSlot(\''+s._id+'\')">신청 취소</button>'
+        :(taken?'':'<button class="btn-sub" style="background:#0f766e;padding:7px 18px" onclick="claimSlot(\''+s._id+'\')">✋ 강사 신청</button>'))
+      +'</div></div>';
+  }).join('');
+}
+// 지도자 자격 확인: 사무국 검증 강사 또는 연맹 지도자 자격번호(licenses 대조) 보유
+async function leaderQualOK(){
+  if(JMY.instructorVerified)return {ok:true};
+  const no=String(JMY.qualNoLeader||'').trim();
+  if(!no)return {ok:false,why:'등록된 지도자 자격번호가 없습니다.'};
+  try{
+    const d=await DB.collection('licenses').doc(no).get();
+    if(!d.exists)return {ok:false,why:'자격번호 ['+no+']가 연맹에 등록되어 있지 않습니다.'};
+    const l=d.data();
+    if(String(l.type||'').indexOf('지도자')<0)return {ok:false,why:'['+no+']는 지도자 자격번호가 아닙니다.'};
+    if(l.name&&String(l.name).replace(/\s/g,'')!==String(JMY.name||'').replace(/\s/g,''))return {ok:false,why:'자격증 성명이 회원 성명과 일치하지 않습니다.'};
+    if(l.uid&&l.uid!==JME.uid)return {ok:false,why:'다른 계정에 연결된 자격번호입니다.'};
+    return {ok:true};
+  }catch(e){return {ok:true}} // 일시 조회 오류 시 통과 — 확정 전 사무국이 재확인
+}
+async function claimSlot(id){
+  const s=SLOTS.find(x=>x._id===id);if(!s)return;
+  const isAfter=String(s.type||'').indexOf('방과후')>=0;
+  const f=JMY.instructorFor||{};
+  if(isAfter&&!f.after){alert('먼저 [강사 · 대회요원 활동 지원] 탭에서 「방과후 · 늘봄학교 강사」 지원하기를 완료해주세요.');showJTab('1');return}
+  if(!isAfter&&!f.school){alert('먼저 [강사 · 대회요원 활동 지원] 탭에서 「학교체육 강습 강사」 지원하기를 완료해주세요.');showJTab('1');return}
+  const q=await leaderQualOK();
+  if(!q.ok){
+    alert('🎖 자격 확인이 필요합니다.\n\n'+q.why+'\n\n체육지도자(국가자격) 소지자는 마이페이지에서 자격증 서류를 등록하시면 사무국 검증(✔ 검증강사) 후 신청할 수 있습니다.\n연맹 지도자 자격 소지자는 마이페이지 › 마이 프로필에 자격번호를 등록해주세요.\n문의: 031-984-3248');
+    return;
+  }
+  if(!confirm('['+s.school+'] '+(isAfter?'방과후·늘봄':'학교체육')+' 강사로 신청할까요?\n\n· 학교당 1명 선착순 접수되며, 사무국이 자격·경력 확인 후 배정을 확정합니다\n· 확정 시 개별 연락 후 마이페이지에서 안전교육 이수·위촉계약 서명을 진행합니다\n· 확정 전까지 [신청 취소]가 가능합니다'))return;
+  try{
+    await DB.runTransaction(async tx=>{
+      const ref=DB.collection('openSlots').doc(id);
+      const doc=await tx.get(ref);
+      if(!doc.exists)throw new Error('마감된 공고입니다 (배정 완료).');
+      if(doc.data().claimedBy)throw new Error('이미 다른 강사가 신청하여 심사 중입니다.');
+      tx.update(ref,{claimedBy:JME.uid,claimedName:JMY.name||'',claimedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    });
+    alert('✓ 신청이 접수되었습니다.\n사무국 확인 후 배정이 확정되면 개별 연락드립니다.');
+    loadSlots();
+  }catch(e){alert('신청 실패: '+e.message);loadSlots();}
+}
+async function unclaimSlot(id){
+  if(!confirm('이 학교 강사 신청을 취소할까요?'))return;
+  try{
+    await DB.runTransaction(async tx=>{
+      const ref=DB.collection('openSlots').doc(id);
+      const doc=await tx.get(ref);
+      if(!doc.exists)throw new Error('공고를 찾을 수 없습니다.');
+      if(doc.data().claimedBy!==JME.uid)throw new Error('본인 신청 건이 아닙니다.');
+      tx.update(ref,{claimedBy:null,claimedName:'',claimedAt:null});
+    });
+    loadSlots();
+  }catch(e){alert('취소 실패: '+e.message);loadSlots();}
+}
 let JMAP=null;
 function myRegions(){
   const a=JMY.activityRegions;
