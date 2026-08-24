@@ -435,6 +435,8 @@ function viewRoster(id){
   const cnt={};
   list.forEach(c=>{const p=(c.prefs||[])[0]||'미지정';cnt[p]=(cnt[p]||0)+1});
   const sumTxt=Object.keys(cnt).map(k=>cesc(k)+' '+cnt[k]+'명').join(' · ');
+  const tmap=(entry?_tbAssignedMap(s):{}); // [팀구성] 개인 참가자 → 배정팀 표시
+  const tbadge=c=>(entry&&!c.team&&tmap[ckey(c)])?' <span style="font-size:10.5px;font-weight:900;color:#fff;background:#0f766e;border-radius:999px;padding:1px 8px;vertical-align:1px">🧩 '+cesc(tmap[ckey(c)])+'</span>':'';
   let rows;
   if(!list.length)rows='<tr><td '+td+' colspan="9" style="text-align:center;color:#8a919d">아직 신청자가 없습니다</td></tr>';
   else if(staff){
@@ -447,7 +449,7 @@ function viewRoster(id){
           +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td>'
           +(entry?_payCell(id,c,td):'')+'</tr>';
       }
-      return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b></td>'
+      return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b>'+tbadge(c)+'</td>'
       +(entry?'<td '+td+'>'+cesc(c.birth||'-')+'</td><td '+td+'>'+cesc(c.gender||'-')+'</td><td '+td+'>'+cesc(c.school||c.club||'-')+'</td>':'')
       +'<td '+td+'>'+cesc((c.prefs||[]).map((p,j)=>(j+1)+'지망 '+p).join(' · ')||'-')+'</td>'
       +'<td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
@@ -461,7 +463,7 @@ function viewRoster(id){
           +'<td '+td+'>'+cesc((c.prefs||[])[0]||'-')+'</td>'
           +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td></tr>';
       }
-      return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(mname(c.name))+'</b></td>'
+      return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(mname(c.name))+'</b>'+tbadge(c)+'</td>'
       +'<td '+td+'>'+cesc((c.prefs||[])[0]||'-')+'</td>'
       +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td></tr>';
     }).join('');
@@ -475,7 +477,8 @@ function viewRoster(id){
     +(staff?'<div style="font-size:12px;color:#0f766e;font-weight:700;margin-bottom:8px">🔓 권한자 보기 — 세부정보가 표시됩니다. <a href="admin.html" style="color:#153A77;font-weight:800">관리자 페이지에서 수정 →</a></div>'
            :'<div style="font-size:12px;color:#8a919d;margin-bottom:8px">개인정보 보호를 위해 성명은 일부 가려서 표시됩니다.</div>')
     +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">'+head+rows+'</table></div>'
-    +'<div style="display:flex;justify-content:flex-end;margin-top:14px">'
+    +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">'
+    +(staff&&entry?'<button class="cbtn" style="background:#0f766e;color:#fff" onclick="document.getElementById(\'rosterModal\').remove();openTeamBuilder(\''+id+'\')">🧩 팀 구성 (개인 참가자)</button>':'')
     +'<button class="cbtn cbtn-ghost" onclick="document.getElementById(\'rosterModal\').remove()">닫기</button></div></div>';
   document.body.appendChild(div);
 }
@@ -1188,6 +1191,7 @@ function slotCard(d,today){
         action='<span class="cpill" style="background:#0f766e;color:#fff">✓ '+mines.map(m=>cesc(m.name)).join(' · ')+' 신청됨</span>'
           +(!closed?'<button class="cbtn cbtn-main" onclick="openApply(\''+d.id+'\')">+ 추가 참가 신청</button>':'')
           +'<button class="cbtn cbtn-soft" onclick="printMyDocs(\''+d.id+'\')">📄 내 신청서</button>'
+          +(!closed?'<button class="cbtn cbtn-soft" style="background:#fffbeb;color:#8a5a00;border-color:#f0e2b6" onclick="editEntry(\''+d.id+'\')">✏️ 신청 수정</button>':'')
           +'<button class="cbtn cbtn-ghost" onclick="cancelClaim(\''+d.id+'\')">신청 취소</button>';
       }
       else if(closed)action='<span class="cpill" style="background:#8a919d;color:#fff">마감</span>';
@@ -1221,7 +1225,7 @@ function slotCard(d,today){
         +'<button class="cbtn cbtn-ghost" onclick="viewRoster(\''+d.id+'\')">👥 신청 현황</button></div></div>';
   }
 }
-let APPLY_ID=null,APPLY_SEL=[],APPLY_PID=null,APPLY_MAX=3,APPLY_PARTS=[],MY_CLUBS=null;
+let APPLY_ID=null,APPLY_SEL=[],APPLY_PID=null,APPLY_MAX=3,APPLY_PARTS=[],MY_CLUBS=null,EDIT_KEY=null; // [신청수정] EDIT_KEY = 수정 중인 참가자 pid
 let RRN_OK=false;
 // 부문별 정원: 임무 목록에 "오픈부:16" 형식이면 부문 정원 16 (없으면 무제한)
 function parseDiv(r){const m=String(r).match(/^(.+?):(\d+)$/);return m?{name:m[1].trim(),cap:parseInt(m[2])}:{name:String(r).trim(),cap:0}}
@@ -1353,6 +1357,8 @@ async function hasValidRefLicComp(){
 async function openApply(id){
   const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
   const s=doc.data();
+  // [신청수정] editEntry에서 예약한 경우에만 수정 모드 — 일반 열기에서는 항상 해제
+  EDIT_KEY=window.__EDIT_NEXT||null;window.__EDIT_NEXT=null;
   // [v4] 심판요원 신청은 유효한 심판 자격증 보유자만 (운영요원은 자격 검증 없음)
   if(s.role==='심판'){
     const ok=await hasValidRefLicComp();
@@ -1395,7 +1401,7 @@ async function openApply(id){
     const parts=(FAMREQ?[{pid:FAMREQ.childUid,name:FAMREQ.childName||'',label:(FAMREQ.childName||'자녀')+' · 자녀(승인 진행)',birth:FAMREQ.childBirth||'',gender:FAMREQ.childGender||'',school:FAMREQ.childSchool||'',kid:true}]
       :(selfMinor?[]:[{pid:CME.uid+'#self',name:CMY.name||'',label:(CMY.name||'본인')+' · 본인',birth:CMY.birth||'',gender:CMY.gender||'',school:'',kid:false}]))
       .concat(FAMREQ?[]:(CMY.children||[]).map((k,i)=>({pid:CME.uid+'#k'+i,name:k.name,label:k.name+' · 자녀',birth:k.birth||'',gender:k.gender||'',school:k.school||'',kid:true})));
-    APPLY_PARTS=parts.filter(p=>!activeOfKey(s,p.pid));
+    APPLY_PARTS=parts.filter(p=>!activeOfKey(s,p.pid)||p.pid===EDIT_KEY); // [신청수정] 수정 대상 참가자는 목록에 포함
     const clubOpts=(MY_CLUBS||[]).map(n=>'<option>'+cesc(n)+'</option>').join('');
     inner='<div class="cmodal">'
       +'<div class="mhead"><div class="mt">🏃 대회 참가 신청서</div><div class="ms">'+cesc(s.title)+' · '+cesc(s.region)+' · '+cesc(s.date)+(s.note?' · 📌 '+cesc(s.note):'')+'</div></div>'
@@ -1548,6 +1554,11 @@ async function submitEntry(){
     alert('🎓 '+p.name+' 님은 만 18세 이상으로 성인 전환 대상입니다.\n본인 명의 계정으로 가입한 뒤 직접 신청해주세요.');return;
   }
   if(!APPLY_SEL.length){alert('참가 부문을 선택해주세요.');return}
+  // [보호자동의 가드] 미성년 참가자는 보호자(법정대리인) 동의·서명 경로로만 접수 — 대리 신청(자녀 프로필=보호자 서명)·본인 신청(보호자 승인 요청) 외 차단
+  if(p.birth&&ageOf(p.birth)<18&&!p.kid&&!FAMREQ){
+    alert('👨‍👧 만 18세 미만 참가자는 보호자(법정대리인)의 동의가 있어야 접수됩니다.\n보호자 승인 절차로 전환합니다.');
+    document.getElementById('cApplyModal').remove();openMinorReq(APPLY_ID);return;
+  }
   if(!consentGate())return;
   if(!document.getElementById('cConsent').checked){alert('개인정보 수집·이용 동의가 필요합니다.');return}
   if(!SIG_DRAWN){alert((p.kid?'보호자(법정대리인)':'본인')+' 서명이 필요합니다. 서명란에 서명해주세요.');return}
@@ -1567,20 +1578,38 @@ async function submitEntry(){
   // [v3] 참가 지역제한 검사 제거 — 전국 누구나 신청 가능
   const ref=DB.collection('compSlots').doc(APPLY_ID);
   try{
+    const isEdit=(EDIT_KEY&&EDIT_KEY===APPLY_PID); // [신청수정] 기존 신청 교체 모드
     await DB.runTransaction(async tx=>{
       const doc=await tx.get(ref);
       const s=doc.data();
-      if(activeOfKey(s,APPLY_PID))throw new Error('이미 신청한 참가자입니다');
-      if(activeCount(s)>=s.quota)throw new Error('정원이 마감되었습니다');
+      if(isEdit){
+        if(!activeOfKey(s,APPLY_PID))throw new Error('수정할 신청 내역이 없습니다 (이미 취소됨)');
+      }else{
+        if(activeOfKey(s,APPLY_PID))throw new Error('이미 신청한 참가자입니다');
+        if(activeCount(s)>=s.quota)throw new Error('정원이 마감되었습니다');
+      }
       const dv=slotDivs(s).find(d=>d.name===APPLY_SEL[0]);
-      if(dv&&dv.cap&&divActiveCount(s,dv.name)>=dv.cap)throw new Error('['+dv.name+'] 부문 정원이 마감되었습니다');
+      if(dv&&dv.cap){
+        // [신청수정] 같은 부문으로의 수정은 본인 몫 제외 판정
+        const oldArr=(s.claimed||[]).filter(c=>ckey(c)===APPLY_PID);
+        const oldFirst=oldArr.length?((oldArr[oldArr.length-1].prefs||[])[0]||''):'';
+        const already=divActiveCount(s,dv.name);
+        const effective=isEdit&&oldFirst===dv.name?already-1:already;
+        if(effective>=dv.cap)throw new Error('['+dv.name+'] 부문 정원이 마감되었습니다');
+      }
       const claimed=(s.claimed||[]).slice();
+      const cancels=(s.cancels||[]).slice();
+      if(isEdit){
+        const cm={uid:CME.uid,at:new Date().toISOString(),reason:'수정 재제출'};
+        if(APPLY_PID!==CME.uid)cm.pid=APPLY_PID;
+        cancels.push(cm); // 기존 신청은 취소 처리 후 새 내용으로 재접수 (이력 보존)
+      }
       const _specials=[...document.querySelectorAll('#cSpecialBtns .rolechip.on')].map(x=>x.dataset.special);
       claimed.push({uid:CME.uid,pid:APPLY_PID,name:p.name,birth:p.birth||'',gender:p.gender||'',school:p.school||'',club:club||'',kid:!!p.kid,
         special:_specials,
         guardian:p.kid?(CMY.name||''):'',guardianPhone:p.kid?(CMY.phone||''):'',
-        prefs:APPLY_SEL.slice(),consent:true,signed:true,at:new Date().toISOString()});
-      tx.update(ref,{claimed:claimed});
+        prefs:APPLY_SEL.slice(),consent:true,signed:true,at:new Date().toISOString(),edited:isEdit||undefined});
+      tx.update(ref,isEdit?{claimed:claimed,cancels:cancels}:{claimed:claimed});
     });
     const now=new Date().toISOString();
     const sfx=APPLY_PID.split('#')[1]||'self';
@@ -1600,7 +1629,9 @@ async function submitEntry(){
       history.replaceState(null,'',location.pathname);
     }
     document.getElementById('cApplyModal').remove();
-    alert('🏃 '+p.name+' 참가 신청 완료!'+(p.kid?'\n보호자(법정대리인) 동의·서명이 함께 저장되었습니다.':'')+'\n[📄 내 신청서] 버튼으로 언제든 확인·인쇄할 수 있습니다.');
+    const wasEdit=(EDIT_KEY&&EDIT_KEY===APPLY_PID);EDIT_KEY=null;
+    alert(wasEdit?('✏️ '+p.name+' 참가 신청이 수정되었습니다!\n(부문·클럽 등 변경 내용으로 재접수 — 이전 내역은 취소 처리)')
+      :('🏃 '+p.name+' 참가 신청 완료!'+(p.kid?'\n보호자(법정대리인) 동의·서명이 함께 저장되었습니다.':'')+'\n[📄 내 신청서] 버튼으로 언제든 확인·인쇄할 수 있습니다.'));
   }catch(e){alert(e.message)}
   loadSlots();
 }
@@ -1784,6 +1815,175 @@ async function cancelClaim(id){
     alert('신청이 취소되었습니다.');
   }catch(e){alert(e.message)}
   loadSlots();
+}
+// ══ [신청수정] 기존 참가 신청 내용 수정 — 신청 모달을 기존 내용으로 미리 채워 열고, 제출 시 교체 접수 ══
+async function editEntry(id){
+  const doc0=CSLOTS.find(d=>d.id===id);if(!doc0)return;
+  const s0=doc0.data();
+  const today=new Date().toISOString().slice(0,10);
+  if(s0.deadline&&today>s0.deadline){alert('마감된 대회는 수정할 수 없습니다. 사무국(031-984-3248)으로 문의해주세요.');return}
+  const mines=myEntries(s0).filter(m=>!m.team);
+  if(!mines.length){alert('수정할 개인 참가 신청이 없습니다. (팀 신청은 취소 후 다시 신청해주세요)');return}
+  let old=null;
+  if(mines.length>1){
+    const names=mines.map((m,i)=>(i+1)+'. '+m.name+' ('+((m.prefs||[])[0]||'')+')').join('\n');
+    const pick=prompt('수정할 참가자 번호를 입력하세요:\n\n'+names,'1');
+    if(pick===null)return;
+    old=mines[parseInt(pick.trim())-1];
+    if(!old){alert('잘못된 번호입니다.');return}
+  }else old=mines[0];
+  window.__EDIT_NEXT=ckey(old);
+  await openApply(id);
+  // 모달 렌더 후 기존 내용 프리필
+  setTimeout(function(){
+    try{
+      const i=APPLY_PARTS.findIndex(p=>p.pid===ckey(old));
+      if(i>=0)selPart(i);
+      (old.prefs||[]).forEach(function(pr){const b=document.querySelector('#cRoleBtns .rolechip[data-role="'+CSS.escape(pr)+'"]');if(b&&!b.classList.contains('on'))togRole(b);});
+      (old.special||[]).forEach(function(sp){const b=document.querySelector('#cSpecialBtns .rolechip[data-special="'+CSS.escape(sp)+'"]');if(b)b.classList.add('on');});
+      const cs=document.getElementById('epClub');
+      if(cs&&old.club){
+        if([...cs.options].some(o=>o.value===old.club))cs.value=old.club;
+        else{cs.value='__etc';const e2=document.getElementById('epClubEtc');if(e2){e2.style.display='inline-block';e2.value=old.club;}}
+      }
+      const mt=document.querySelector('#cApplyModal .mt');if(mt)mt.textContent='✏️ 참가 신청 수정';
+      const sb=[...document.querySelectorAll('#cApplyModal .cbtn-main')].pop();if(sb)sb.textContent='서명하고 수정 저장';
+    }catch(e){console.warn('edit prefill',e)}
+  },80);
+}
+// ══ [팀구성] 단체전 개인 참가자 팀 묶기 — 권한자 수동 구성 + 🎲 랜덤 자동 구성 (부문·성별·나이 참조) ══
+let TB_ID=null,TB_SEL={};
+function _tbTeams(s){return (s.adminTeams||[]).slice()}
+function _tbAssignedMap(s){const m={};(s.adminTeams||[]).forEach(t=>(t.members||[]).forEach(x=>m[x.pid]=t.name));return m}
+function _tbSolos(s){return compClaimList(s).filter(c=>!c.team)}
+function openTeamBuilder(id){
+  TB_ID=id;TB_SEL={};
+  renderTeamBuilder();
+}
+function renderTeamBuilder(){
+  const doc=CSLOTS.find(d=>d.id===TB_ID);if(!doc)return;
+  const s=doc.data();
+  const solos=_tbSolos(s);
+  const amap=_tbAssignedMap(s);
+  const divs=[...new Set(solos.map(c=>(c.prefs||[])[0]||'미지정'))];
+  const fSel=document.getElementById('tbDivSel');
+  const curDiv=fSel?fSel.value:'';
+  const old=document.getElementById('tbModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='tbModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.62);z-index:1001;display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto';
+  const list=solos.filter(c=>!curDiv||((c.prefs||[])[0]||'미지정')===curDiv);
+  const rows=list.map(function(c){
+    const k=ckey(c);const asg=amap[k];
+    return '<label style="display:flex;gap:8px;align-items:center;padding:7px 10px;border:1px solid #e5e9f2;border-radius:9px;margin-bottom:5px;font-size:12.5px;'+(asg?'background:#f6f8fb;opacity:.75':'background:#fff')+'">'
+      +'<input type="checkbox" data-k="'+cesc(k)+'" '+(TB_SEL[k]?'checked':'')+(asg?' disabled':'')+' onchange="TB_SEL[this.dataset.k]=this.checked" style="width:auto">'
+      +'<b>'+cesc(c.name)+'</b><span style="color:#6b7280">'+cesc(c.gender||'-')+' · '+(c.birth?(ageOf(c.birth)+'세'):'-')+' · '+cesc((c.prefs||[])[0]||'미지정')+(c.school||c.club?' · '+cesc(c.school||c.club):'')+'</span>'
+      +'<span style="flex:1"></span>'+(asg?'<span style="font-size:11px;font-weight:900;color:#fff;background:#0f766e;border-radius:999px;padding:2px 9px">'+cesc(asg)+'</span>':'<span style="font-size:11px;color:#b8860b;font-weight:800">미배정</span>')
+      +'</label>';
+  }).join('')||'<div style="font-size:12.5px;color:#8a919d;padding:10px">해당 부문 개인 참가자가 없습니다.</div>';
+  const teams=_tbTeams(s);
+  const tRows=teams.map(function(t,ti){
+    return '<div style="border:1.5px solid #cfe0d8;border-radius:11px;padding:10px 13px;margin-bottom:7px;background:#f7fbf9">'
+      +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:13.5px">🧩 '+cesc(t.name)+'</b><span style="font-size:11.5px;color:#6b7280">'+cesc(t.div||'')+' · '+(t.members||[]).length+'명'+(t.random?' · 랜덤':'')+'</span>'
+      +'<span style="flex:1"></span><button class="cbtn cbtn-ghost" style="padding:4px 12px;font-size:11.5px" onclick="tbDisband('+ti+')">해체</button></div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+(t.members||[]).map(function(m,mi){
+        return '<span style="font-size:12px;font-weight:700;background:#fff;border:1px solid #d7e3dc;border-radius:999px;padding:3px 10px">'+cesc(m.name)+' <a href="javascript:void(0)" onclick="tbRemoveMember('+ti+','+mi+')" style="color:#C41E2F;font-weight:900;text-decoration:none">✕</a></span>';
+      }).join('')+'</div></div>';
+  }).join('')||'<div style="font-size:12.5px;color:#8a919d;padding:6px 0">구성된 팀이 없습니다.</div>';
+  div.innerHTML='<div style="background:#fff;border-radius:18px;max-width:680px;width:100%;max-height:92vh;overflow:auto;padding:22px 24px">'
+    +'<b style="font-size:16px">🧩 팀 구성 — '+cesc(s.title)+'</b>'
+    +'<div style="font-size:12px;color:#666;margin:4px 0 12px">단체전에 개인으로 신청한 참가자를 팀으로 묶습니다. 체크 후 [팀 만들기] 또는 [🎲 랜덤 자동 구성]을 사용하세요. (부문·성별·나이 기준 균형 배정)</div>'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:9px">'
+    +'<select id="tbDivSel" onchange="renderTeamBuilder()" style="padding:8px 11px;border:1.5px solid #d5dce8;border-radius:9px;font-size:12.5px;font-family:inherit"><option value="">전체 부문</option>'+divs.map(d=>'<option'+(d===curDiv?' selected':'')+'>'+cesc(d)+'</option>').join('')+'</select>'
+    +'<span style="font-size:12px;color:#6b7280">개인 참가 '+solos.length+'명 · 미배정 '+solos.filter(c=>!amap[ckey(c)]).length+'명</span></div>'
+    +'<div style="max-height:34vh;overflow:auto;border:1px solid #eef1f6;border-radius:11px;padding:8px">'+rows+'</div>'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:11px 0">'
+    +'<input id="tbTeamName" placeholder="팀명 (비우면 자동)" style="flex:1;min-width:130px;padding:9px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-size:13px;font-family:inherit">'
+    +'<button class="cbtn cbtn-main" style="padding:9px 16px" onclick="tbMakeTeam()">✚ 선택 인원으로 팀 만들기</button>'
+    +'<span style="font-size:12px;color:#6b7280">팀당</span><input id="tbSize" type="number" min="2" value="'+(s.teamSize||5)+'" style="width:58px;padding:8px;border:1.5px solid #d5dce8;border-radius:9px;font-size:13px;text-align:center">'
+    +'<button class="cbtn" style="background:#7c3aed;color:#fff;padding:9px 16px" onclick="tbRandom()">🎲 랜덤 자동 구성</button></div>'
+    +'<div style="font-size:13px;font-weight:800;margin:6px 0">구성된 팀 ('+teams.length+')</div>'+tRows
+    +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button class="cbtn cbtn-ghost" onclick="document.getElementById(\'tbModal\').remove()">닫기</button></div></div>';
+  document.body.appendChild(div);
+}
+async function _tbSave(teams,msg){
+  try{
+    await DB.collection('compSlots').doc(TB_ID).update({adminTeams:teams});
+    const doc=CSLOTS.find(d=>d.id===TB_ID);
+    if(doc){const s=doc.data();s.adminTeams=teams;} // 로컬 캐시 갱신
+    await loadSlots();
+    renderTeamBuilder();
+    if(msg)alert(msg);
+  }catch(e){alert('저장 실패: '+e.message)}
+}
+function tbMakeTeam(){
+  const doc=CSLOTS.find(d=>d.id===TB_ID);if(!doc)return;
+  const s=doc.data();
+  const solos=_tbSolos(s);const amap=_tbAssignedMap(s);
+  const picked=solos.filter(c=>TB_SEL[ckey(c)]&&!amap[ckey(c)]);
+  if(picked.length<2){alert('팀원 2명 이상을 체크해주세요. (이미 배정된 인원은 제외)');return}
+  const dv=(picked[0].prefs||[])[0]||'미지정';
+  if(picked.some(c=>((c.prefs||[])[0]||'미지정')!==dv)&&!confirm('⚠ 선택 인원의 부문이 서로 다릅니다 ('+[...new Set(picked.map(c=>(c.prefs||[])[0]||'미지정'))].join(', ')+').\n같은 팀으로 묶을까요?'))return;
+  const teams=_tbTeams(s);
+  const name=(document.getElementById('tbTeamName').value||'').trim()||(dv+' '+String.fromCharCode(65+teams.filter(t=>t.div===dv).length)+'팀');
+  teams.push({name:name,div:dv,random:false,at:new Date().toISOString(),by:(CMY&&CMY.name)||'',
+    members:picked.map(c=>({pid:ckey(c),uid:c.uid,name:c.name,gender:c.gender||'',birth:c.birth||''}))});
+  TB_SEL={};
+  _tbSave(teams,'✚ ['+name+'] 팀이 구성되었습니다 ('+picked.length+'명)');
+  picked.forEach(c=>{try{KFDF.notify(c.uid,'🧩 ['+s.title+'] '+c.name+' 님이 「'+name+'」 팀으로 배정되었습니다','competition.html')}catch(e){}});
+}
+function tbRandom(){
+  const doc=CSLOTS.find(d=>d.id===TB_ID);if(!doc)return;
+  const s=doc.data();
+  const size=Math.max(2,parseInt(document.getElementById('tbSize').value,10)||5);
+  const curDiv=(document.getElementById('tbDivSel')||{}).value||'';
+  const amap=_tbAssignedMap(s);
+  const pool=_tbSolos(s).filter(c=>!amap[ckey(c)]).filter(c=>!curDiv||((c.prefs||[])[0]||'미지정')===curDiv);
+  if(pool.length<2){alert('미배정 개인 참가자가 2명 미만입니다.');return}
+  if(!confirm('🎲 미배정 개인 참가자 '+pool.length+'명을 부문별로, 팀당 약 '+size+'명씩 랜덤 구성합니다.\n(같은 부문끼리 묶고, 성별·나이가 고르게 섞이도록 배정)\n계속할까요?'))return;
+  const teams=_tbTeams(s);
+  const byDiv={};pool.forEach(c=>{const d=(c.prefs||[])[0]||'미지정';(byDiv[d]=byDiv[d]||[]).push(c)});
+  let made=0,assigned=0;
+  Object.keys(byDiv).forEach(function(dv){
+    const arr=byDiv[dv];
+    // 성별 그룹 → 그룹 내 나이순 → 교차 결합 → 스네이크 배정 = 팀별 성별·나이 균형
+    const g1=arr.filter(c=>String(c.gender||'').indexOf('여')>=0).sort((a,b)=>ageOf(a.birth)-ageOf(b.birth));
+    const g2=arr.filter(c=>String(c.gender||'').indexOf('여')<0).sort((a,b)=>ageOf(a.birth)-ageOf(b.birth));
+    const mixed=[];const L=Math.max(g1.length,g2.length);
+    for(let i=0;i<L;i++){if(g2[i])mixed.push(g2[i]);if(g1[i])mixed.push(g1[i]);}
+    const nT=Math.max(1,Math.round(mixed.length/size));
+    const buckets=Array.from({length:nT},()=>[]);
+    mixed.forEach(function(c,i){
+      const round=Math.floor(i/nT);const pos=i%nT;
+      buckets[round%2===0?pos:(nT-1-pos)].push(c); // 스네이크
+    });
+    buckets.forEach(function(b){
+      if(!b.length)return;
+      const name=dv+' '+String.fromCharCode(65+teams.filter(t=>t.div===dv).length)+'팀';
+      teams.push({name:name,div:dv,random:true,at:new Date().toISOString(),by:(CMY&&CMY.name)||'',
+        members:b.map(c=>({pid:ckey(c),uid:c.uid,name:c.name,gender:c.gender||'',birth:c.birth||''}))});
+      made++;assigned+=b.length;
+      b.forEach(c=>{try{KFDF.notify(c.uid,'🧩 ['+s.title+'] '+c.name+' 님이 「'+name+'」 팀으로 배정되었습니다 (랜덤 구성)','competition.html')}catch(e){}});
+    });
+  });
+  _tbSave(teams,'🎲 랜덤 구성 완료 — '+made+'개 팀 · '+assigned+'명 배정');
+}
+function tbDisband(ti){
+  const doc=CSLOTS.find(d=>d.id===TB_ID);if(!doc)return;
+  const s=doc.data();const teams=_tbTeams(s);
+  const t=teams[ti];if(!t)return;
+  if(!confirm('['+t.name+'] 팀을 해체할까요? ('+(t.members||[]).length+'명 미배정으로 복귀)'))return;
+  teams.splice(ti,1);
+  _tbSave(teams,'['+t.name+'] 해체 완료');
+}
+function tbRemoveMember(ti,mi){
+  const doc=CSLOTS.find(d=>d.id===TB_ID);if(!doc)return;
+  const s=doc.data();const teams=_tbTeams(s);
+  const t=teams[ti];if(!t||!t.members[mi])return;
+  const nm=t.members[mi].name;
+  if(!confirm(nm+' 님을 ['+t.name+'] 팀에서 제외할까요?'))return;
+  t.members.splice(mi,1);
+  if(!t.members.length)teams.splice(ti,1);
+  _tbSave(teams,nm+' 제외 완료'+(t.members.length?'':' — 팀 인원이 없어 팀도 해체됨'));
 }
 </script>
 

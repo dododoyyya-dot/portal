@@ -2047,7 +2047,7 @@ function showMemberModal(uid){
   const quals=[q.leader,q.referee,q.youth?'유소년지도사':''].filter(Boolean).join(' · ')||'-';
   const hire=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc);
   const rows=[
-    ['회원 유형',esc({instructor:'지도자·강사',teacher:'교사',general:'일반회원',student:'학생회원'}[v.accountType]||v.accountType||'-')+(v.memberClass?' <b style="font-size:11px;color:#8a5a00">· '+esc(v.memberClass)+'</b>':'')+(v.typeConvertedFrom?' <span style="font-size:11px;color:#8a919d">(전환 전: '+esc(v.typeConvertedFrom)+')</span>':'')],
+    ['회원 유형',esc({instructor:'지도자·강사',teacher:'교사',athlete:'선수회원',general:'일반회원',student:'학생회원'}[v.accountType]||v.accountType||'-')+(v.memberClass?' <b style="font-size:11px;color:#8a5a00">· '+esc(v.memberClass)+'</b>':'')+(v.typeConvertedFrom?' <span style="font-size:11px;color:#8a919d">(전환 전: '+esc(v.typeConvertedFrom)+')</span>':'')],
     ['안전교육',(function(){if(!v.safetyEdu)return '<span style="color:#C41E2F;font-weight:800">미이수</span>';try{var t=v.safetyEduAt&&v.safetyEduAt.toDate?v.safetyEduAt.toDate():(v.safetyEduAt?new Date(v.safetyEduAt):null);if(!t)return '<b style="color:#0f766e">이수</b>';var ok=(Date.now()-t.getTime())<365*86400000;return (ok?'<b style="color:#0f766e">이수 ✓</b>':'<span style="color:#C41E2F;font-weight:800">만료</span>')+' <span style="font-size:11px;color:#8a919d">'+t.toISOString().slice(0,10)+'</span>';}catch(e){return '<b style="color:#0f766e">이수</b>'}})()],
     ['이메일',esc(v.email||'-')],
     ['성별·생년월일',esc(v.gender||'-')+' · '+esc(v.birth||'-')],
@@ -4540,10 +4540,10 @@ async function convertUserType(uid){
   try{
     const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
     const cur=d.accountType||'?';
-    const t=prompt('['+(d.name||'')+'] 현재 유형: '+cur+'\n\n전환할 유형 번호를 입력하세요:\n1 = 일반회원 (general)\n2 = 지도자·강사 (instructor)\n3 = 교사 (teacher)\n4 = 학생회원 (student)');
+    const t=prompt('['+(d.name||'')+'] 현재 유형: '+cur+'\n\n전환할 유형 번호를 입력하세요:\n1 = 일반회원 (general)\n2 = 지도자·강사 (instructor)\n3 = 교사 (teacher)\n4 = 학생회원 (student)\n5 = 선수회원 (athlete)');
     if(t===null)return;
-    const map={'1':['general','general'],'2':['instructor','active'],'3':['teacher','active'],'4':['student','student']};
-    if(!map[t.trim()]){alert('1~4 중에서 입력해주세요.');return}
+    const map={'1':['general','general'],'2':['instructor','active'],'3':['teacher','active'],'4':['student','student'],'5':['athlete','general']};
+    if(!map[t.trim()]){alert('1~5 중에서 입력해주세요.');return}
     const [at,mg]=map[t.trim()];
     if(at===cur){alert('이미 해당 유형입니다.');return}
     if(!confirm((d.name||'')+' 님을 ['+cur+'] → ['+at+'] 유형으로 전환할까요?'))return;

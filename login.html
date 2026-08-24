@@ -147,7 +147,8 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
       <div id="typeBtns" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px">
         <button type="button" class="mtypebtn on" data-t="instructor" onclick="setSignupType('instructor')">🧑‍🏫 KFDF공인 심판·지도자<span>연맹 자격증 보유·취득 예정</span></button>
         <button type="button" class="mtypebtn" data-t="teacher" onclick="setSignupType('teacher')">🎓 교사 및 국가공인자격증<span>학교 교원·국가자격 보유 (지도자군)</span></button>
-        <button type="button" class="mtypebtn" data-t="general" onclick="setSignupType('general')">👥 일반회원<span>동호인·학부모·서포터즈·협력기관</span></button>
+        <button type="button" class="mtypebtn" data-t="athlete" onclick="setSignupType('athlete')">🏃 선수회원<span>성인 선수 · 연맹/타소속 동호인</span></button>
+        <button type="button" class="mtypebtn" data-t="general" onclick="setSignupType('general')">👥 일반회원<span>학부모·서포터즈·협력기관</span></button>
         <button type="button" class="mtypebtn" data-t="student" onclick="setSignupType('student')">🧒 학생회원<span>만 18세 미만 본인</span></button>
       </div>
       <style>
@@ -162,9 +163,8 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
       <div id="sGenSubBlock" style="display:none;margin-bottom:8px;padding:12px 14px;background:#fbf7f0;border:1.5px solid #e8dcc8;border-radius:12px">
         <label style="margin:0;font-size:13px;font-weight:800;color:#8a5a00">일반회원 구분 <span style="color:#C41E2F">*</span></label>
         <div id="genSubBtns" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-          <button type="button" class="gsbtn on" data-v="연맹동호인" onclick="setGenSub('연맹동호인')">연맹동호인</button>
-          <button type="button" class="gsbtn" data-v="타소속" onclick="setGenSub('타소속')">타소속</button>
-          <button type="button" class="gsbtn" data-v="학부모" onclick="setGenSub('학부모')">학부모</button>
+          <!-- [5부문 개편] 연맹동호인·타소속 동호인은 [🏃 선수회원] 유형으로 분리 (2026-08-24) -->
+          <button type="button" class="gsbtn on" data-v="학부모" onclick="setGenSub('학부모')">학부모</button>
           <button type="button" class="gsbtn" data-v="서포터즈" onclick="setGenSub('서포터즈')">서포터즈</button>
           <button type="button" class="gsbtn" data-v="협력기관" onclick="setGenSub('협력기관')">협력기관</button>
         </div>
@@ -192,7 +192,7 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
       </div>
 
       <div id="sRrnBlock" style="margin-top:16px;padding:14px 16px;background:#fdf1f1;border:1.5px solid #f1c7cc;border-radius:12px">
-        <label style="margin:0;font-size:13.5px;font-weight:800;color:#8c1622">🪪 주민등록번호 <span style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 강사비 등 원천징수·자격증 발급·단체보험 가입에 사용됩니다</span></label>
+        <label style="margin:0;font-size:13.5px;font-weight:800;color:#8c1622">🪪 주민등록번호 <span style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 강사비 등 원천징수·자격증 발급·대회 접수·단체보험 가입에 사용됩니다</span></label>
         <input id="sRrn" inputmode="numeric" maxlength="14" placeholder="000000-0000000" style="margin-top:6px">
         <div style="font-size:11.5px;color:#8c1622;margin-top:5px">🔒 일반 회원정보와 분리된 별도 보안 저장소에 저장되며, 본인과 사무국(중앙관리자)만 열람할 수 있습니다.</div>
         <label style="display:flex;gap:7px;align-items:center;margin-top:8px;font-weight:700;font-size:12.5px;color:#153A77"><input type="checkbox" id="sRrnAgree" style="width:auto"> (필수) 고유식별정보(주민등록번호) 수집·이용에 동의합니다.</label>
@@ -210,7 +210,7 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
       </div>
 
       <div id="sAreaBlock" style="margin-top:16px;padding:14px 16px;background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:12px">
-        <label style="margin:0;font-size:13.5px;font-weight:800;color:#0f766e">📍 활동 가능 범위 <span id="reqArea" style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 강습(수업) 배정에 사용됩니다</span></label>
+        <label style="margin:0;font-size:13.5px;font-weight:800;color:#0f766e">📍 활동 가능 범위 <span id="reqArea" style="color:#C41E2F">*</span> <span id="areaUseHint" style="font-weight:600;color:var(--gray);font-size:11.5px">— 강습(수업)·심판 배정에 사용됩니다</span></label>
         <div style="font-size:12px;color:var(--gray);margin-top:4px">실제로 이동해서 수업·활동이 가능한 지역을 선택하세요. <b>시도를 누르면 시군구가 열립니다.</b> 시군구 복수 선택 가능, 최대 4개 시도까지. 먼저 선택한 지역이 우선 배정 검토됩니다.</div>
         <div id="aaSidoRow" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:10px"></div>
         <div id="aaSggRow" style="display:none;flex-wrap:wrap;gap:5px;margin-top:8px;padding:10px;background:#fff;border:1px solid #dbe8e0;border-radius:9px"></div>
@@ -278,7 +278,7 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
           <input id="sSchool" readonly placeholder="[학교 검색]을 눌러 선택하세요" style="flex:1;background:#f7f7f8;cursor:pointer">
           <button type="button" class="btn-sub" style="background:#153A77;white-space:nowrap;padding:10px 16px" onclick="pickSchoolInto('sSchool')">🔍 학교 검색</button>
         </div>
-        <div style="font-size:11.5px;color:var(--gray);margin-top:4px">주소 검색처럼 전국 초·중·고 목록에서 검색해 정확한 학교를 선택합니다.</div>
+        <div style="font-size:11.5px;color:var(--gray);margin-top:4px">주소 검색처럼 전국 초·중·고 및 대학교 목록에서 검색해 정확한 학교를 선택합니다. (목록에 없으면 직접 입력 가능)</div>
       </div>
 
       <div id="sStudentAffBlock" style="display:none;margin-top:16px;padding:14px 16px;background:#f4f6ff;border:1.5px solid #c7d2f0;border-radius:12px">
@@ -384,7 +384,7 @@ function mode(m){
 //            "심판은 가입 유형이 아니라 보유 자격", "일반회원(학부모·동호인·타단체)은 계좌·주민번호 불필요"
 let SIGNUP_TYPE='instructor';
 // [일반회원 세분류] 연맹동호인·타소속 = 기존 일반회원 폼 / 학부모·서포터즈·협력기관 = 간략 가입(이름·성별·전화·주소·생년월일)
-let GEN_SUB='연맹동호인';
+let GEN_SUB='학부모'; // [5부문 개편] 동호인(연맹·타소속)은 선수회원 유형으로 분리 — 일반회원은 학부모·서포터즈·협력기관 간략가입만
 const GEN_SIMPLE=['학부모','서포터즈','협력기관'];
 function isGenSimple(){return SIGNUP_TYPE==='general'&&GEN_SIMPLE.indexOf(GEN_SUB)>=0}
 function setGenSub(v){
@@ -408,8 +408,10 @@ const MTYPE_INFO={
     html:'🧑‍🏫 <b>KFDF공인 심판·지도자</b> — 연맹(KFDF) 자격증을 보유했거나 취득 예정인 지도자·심판입니다. 강습 배정·위촉·수당 정산·물품 발송에 필요한 정보를 받습니다. 수당 지급 계좌·피복 사이즈·학력은 <b>필수</b>입니다.'},
   teacher:{bg:'#f0f7f4',bd:'1.5px solid #cfe3d8',fg:'#0f766e',
     html:'🎓 <b>교사 및 국가공인자격증</b> — 학교 교원, 또는 체육지도자 등 국가공인자격을 보유한 회원입니다. 지도자군으로 관리되어 강습·대회 운영에 함께 배정됩니다. <b>근무(소속)·수당 계좌·피복 사이즈·학력</b>이 필수입니다.<br><span style="font-weight:700">※ 대회 심판은 KFDF공인 자격 보유자만 신청 가능합니다 — 이 유형은 대회 운영요원으로 신청하실 수 있습니다.</span>'},
+  athlete:{bg:'#f0f5ff',bd:'1.5px solid #c7d7f5',fg:'#1e3a8a',
+    html:'🏃 <b>선수회원</b> — 대회에 선수로 참가하거나 클럽에서 활동하는 <b>성인 동호인</b>(연맹 소속·타 단체·무소속)입니다. 대회 접수·보험 처리를 위해 <b>주민등록번호</b>가 필요하며(암호화 분리 보관), 자격증 정보는 받지 않습니다.<br>지도자 자격을 보유하셨다면 [🧑‍🏫 KFDF공인 심판·지도자] 유형으로 가입해주세요.'},
   general:{bg:'#fbf7f0',bd:'1.5px solid #e8dcc8',fg:'#8a5a00',
-    html:'👥 <b>일반회원</b> — 학부모·동호인·타 단체 소속 등 지도자가 아닌 회원입니다. <b>꼭 필요한 정보만</b> 받습니다(계좌·피복·학력 미입력). 자녀 연동, 대회 참가, 클럽 활동에 바로 이용하실 수 있습니다.<br>나중에 강사로 활동하시려면 <b>마이페이지 → 강사 활동 지원</b>에서 추가 정보를 입력하시면 됩니다.'},
+    html:'👥 <b>일반회원</b> — 학부모·서포터즈·협력기관(기관장) 등 활동을 응원·지원하는 회원입니다. <b>기본 정보만 간소하게</b> 받습니다(주민등록번호·자격증·소속 미입력). 자녀 연동과 소식 안내에 바로 이용하실 수 있습니다.<br>대회에 선수로 참가하시려면 [🏃 선수회원], 강사로 활동하시려면 지도자 유형으로 가입해주세요.'},
   student:{bg:'#fff8ed',bd:'1.5px solid #ecd9b0',fg:'#8a5a00',
     html:'🧒 <b>학생회원</b> — 만 18세 미만 학생 본인이 가입합니다. 본인 명의 휴대폰 인증이 필요하며, 가입 후 <b>보호자 연동 코드</b>를 입력하면 보호자와 연결됩니다.<br>본인 휴대폰이 없다면 <b>보호자가 먼저 가입</b>한 뒤 마이페이지 → 자녀 관리에서 계정을 만들어 주세요.'}
 };
@@ -417,7 +419,8 @@ const MTYPE_INFO={
 const MTYPE_CFG={
   instructor:{show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
   teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:true,bank:true,size:true,degree:true,rrn:true}},
-  general:   {show:['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sPledgeBox','sPrivacyBox'],req:{addr:false,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}},
+  athlete:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:true}}, // [5부문] 선수군 — 자격증란 없음·주민번호 필수
+  general:   {show:['sAddrBlock','sAreaBlock','sPledgeBox','sPrivacyBox'],req:{addr:false,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}, // [5부문] 일반 — 소속·자격증 블록 제거(간소화)
   student:   {show:['sSchoolBlock','sAddrBlock','sAreaBlock','sStudentAffBlock','sPrivacyBox'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}
 };
 const MTYPE_ALL=['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sSchoolBlock','sStudentAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'];
@@ -451,6 +454,15 @@ function setSignupType(t){
   box.style.background=inf.bg;box.style.border=inf.bd;box.style.color=inf.fg;box.innerHTML=inf.html;
   const ph=document.getElementById('sAddr2');
   if(ph)ph.placeholder=cfg.req.addr?'상세주소 (필수) — 예: 101동 1203호 / 2층':'상세주소 (선택)';
+  // [5부문 개편] 활동 가능 범위 안내 문구 — 회원 유형별 맞춤
+  const ah=document.getElementById('areaUseHint');
+  if(ah)ah.textContent={
+    instructor:'— 강습(수업)·심판 배정에 사용됩니다',
+    teacher:'— 강습(수업)·대회 운영 배정에 사용됩니다',
+    athlete:'— 권역별 대회 참가·클럽 활동 안내에 사용됩니다',
+    general:'— 지역 대회·행사 소식 안내에 사용됩니다',
+    student:'— 권역별 대회 참가·클럽 활동 안내에 사용됩니다'
+  }[t]||'— 강습(수업)·심판 배정에 사용됩니다';
 }
 document.addEventListener('change',function(e){
   if(e.target&&e.target.name==='sOrgType'){
@@ -737,14 +749,14 @@ async function go(){
       if(!birth)return say('생년월일을 입력해주세요');
       const ageNow=ageOf(birth);
       const CFG=MTYPE_CFG[SIGNUP_TYPE]||MTYPE_CFG.instructor;
-      // 주민등록번호 — 강사·교사 유형만 가입 시 필수 (가입 시 바로 privateInfo에 분리 저장). 일반·학생회원은 마이페이지에서 나중에 입력 가능.
+      // 주민등록번호 — 지도자군(강사·교사)·선수회원 유형은 가입 시 필수 (가입 시 바로 privateInfo에 분리 저장). 일반·학생회원은 마이페이지에서 나중에 입력 가능.
       let rrnRaw='';
       if(CFG.req.rrn){
         rrnRaw=(document.getElementById('sRrn').value||'').replace(/[^0-9]/g,'');
         if(rrnRaw.length!==13)return say('주민등록번호 13자리를 입력해주세요 (000000-0000000)');
         if(!document.getElementById('sRrnAgree').checked)return say('고유식별정보(주민등록번호) 수집·이용 동의에 체크해주세요');
       }
-      if(SIGNUP_TYPE==='student'&&ageNow>=18)return say('입력하신 생년월일은 만 18세 이상입니다. 위에서 성인 유형(지도자·강사 / 교사 / 일반회원)을 선택해주세요.');
+      if(SIGNUP_TYPE==='student'&&ageNow>=18)return say('입력하신 생년월일은 만 18세 이상입니다. 위에서 성인 유형(지도자·강사 / 교사 / 선수회원 / 일반회원)을 선택해주세요.');
       if(SIGNUP_TYPE!=='student'&&ageNow<18)return say('입력하신 생년월일은 만 18세 미만입니다. 위에서 [🧒 학생회원]를 선택해주세요.');
       // KFDF공인 심판·지도자는 자격번호 또는 증빙 서류가 있어야 함. 없으면 일반회원 가입 유도.
       if(SIGNUP_TYPE==='instructor'||SIGNUP_TYPE==='teacher'){
@@ -884,7 +896,7 @@ async function go(){
         activityAreas:aaSave(), activityRegions:aaRegions(), baseCity:aaBase(),
         region:(aaRegions()[0]||'서울·경기'),
         accountType:SIGNUP_TYPE,
-        memberClass:(SIGNUP_TYPE==='general'?GEN_SUB:''),  // [세분류] 연맹동호인·타소속·학부모·서포터즈·협력기관
+        memberClass:(SIGNUP_TYPE==='general'?GEN_SUB:(SIGNUP_TYPE==='athlete'?('선수·'+({'연맹소속':'연맹동호인','타단체':'타소속','무소속':'무소속'}[orgType]||'동호인')):'')),  // [세분류] 선수·연맹동호인/타소속/무소속 · 학부모·서포터즈·협력기관
         memberGroup:(SIGNUP_TYPE==='instructor'||SIGNUP_TYPE==='teacher')?'active':(SIGNUP_TYPE==='student'?'student':'general'),
         orgType:orgType||'', orgEtc:orgEtc||'',
         qualNoLeader:(document.getElementById('sQualLeader')?document.getElementById('sQualLeader').value.trim():''),
@@ -901,6 +913,9 @@ async function go(){
       }else if(SIGNUP_TYPE==='general'){
         // 일반회원(학부모·동호인·타단체) — 계좌·주민번호·피복·학력 미수집
         typeDoc={address:addr?((zip?('['+zip+'] '):'')+addr+' '+addr2):''};
+      }else if(SIGNUP_TYPE==='athlete'){
+        // [5부문] 선수군 — 대회 참가·클럽 활동용 (주소·활동지역·소속·주민번호 필수, 자격증·계좌·피복·학력 없음)
+        typeDoc={address:(zip?('['+zip+'] '):'')+addr+' '+addr2};
       }else{
         // 지도자군(강사·교사) — 배정·위촉·정산에 필요한 전체 정보
         typeDoc={
@@ -983,13 +998,15 @@ function sCompressImg(file){
 }
 // ── 학교 검색·선택 모달 (도로명주소 검색 방식 — 전국 초·중·고 표준 DB에서 선택) ──
 var SCH_SIDO={S01:'서울',S02:'부산',S03:'대구',S04:'인천',S05:'광주',S06:'대전',S07:'울산',S08:'세종',S09:'경기',S10:'강원',S11:'충북',S12:'충남',S13:'전북',S14:'전남',S15:'경북',S16:'경남',S17:'제주'};function schSido(code){return SCH_SIDO[String(code||'').slice(0,3)]||''}
+// [학생회원 학교검색 확장] 대학교 목록 — 초·중·고 표준 DB(schools_min.json)에 없는 대학·전문대 검색 보완 (직접 입력도 계속 가능)
+var UNIS=['서울대학교','연세대학교','고려대학교','서강대학교','성균관대학교','한양대학교','중앙대학교','경희대학교','한국외국어대학교','서울시립대학교','건국대학교','동국대학교','홍익대학교','숙명여자대학교','이화여자대학교','국민대학교','숭실대학교','세종대학교','단국대학교','광운대학교','명지대학교','상명대학교','가톨릭대학교','서울과학기술대학교','서울교육대학교','한국체육대학교','육군사관학교','경인교육대학교','인천대학교','인하대학교','가천대학교','아주대학교','경기대학교','수원대학교','한신대학교','안양대학교','성결대학교','평택대학교','용인대학교','강남대학교','한국항공대학교','대진대학교','신한대학교','차의과학대학교','을지대학교','루터대학교','칼빈대학교','협성대학교','중부대학교','청강문화산업대학교','연성대학교','부천대학교','유한대학교','동양미래대학교','인하공업전문대학','경복대학교','동남보건대학교','수원과학대학교','오산대학교','장안대학교','한국관광대학교','강원대학교','강릉원주대학교','한림대학교','춘천교육대학교','상지대학교','가톨릭관동대학교','한라대학교','경동대학교','충남대학교','충북대학교','한밭대학교','공주대학교','공주교육대학교','청주교육대학교','한국교원대학교','교통대학교','한국교통대학교','건양대학교','대전대학교','목원대학교','배재대학교','우송대학교','한남대학교','청주대학교','서원대학교','세명대학교','순천향대학교','호서대학교','남서울대학교','백석대학교','선문대학교','한서대학교','나사렛대학교','금강대학교','건국대학교 글로컬캠퍼스','고려대학교 세종캠퍼스','홍익대학교 세종캠퍼스','전북대학교','전주대학교','전주교육대학교','원광대학교','군산대학교','우석대학교','호원대학교','예수대학교','전남대학교','조선대학교','광주교육대학교','호남대학교','광주대학교','남부대학교','송원대학교','목포대학교','목포해양대학교','순천대학교','동신대학교','세한대학교','초당대학교','경북대학교','대구교육대학교','영남대학교','계명대학교','대구대학교','대구가톨릭대학교','경일대학교','금오공과대학교','안동대학교','국립안동대학교','포항공과대학교','한동대학교','위덕대학교','동국대학교 WISE캠퍼스','대구한의대학교','경운대학교','구미대학교','영진전문대학교','계명문화대학교','부산대학교','부산교육대학교','부경대학교','한국해양대학교','동아대학교','동의대학교','경성대학교','신라대학교','고신대학교','부산외국어대학교','동서대학교','동명대학교','영산대학교','경남대학교','창원대학교','인제대학교','울산대학교','UNIST','울산과학기술원','진주교육대학교','경상국립대학교','제주대학교','제주교육대학교','한국방송통신대학교','사이버한국외국어대학교'];
 function openSchoolPicker(cb){
   var old=document.getElementById('schPickOv');if(old)old.remove();
   var ov=document.createElement('div');ov.id='schPickOv';
   ov.style.cssText='position:fixed;inset:0;background:rgba(15,20,30,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
   ov.innerHTML='<div style="background:#fff;border-radius:16px;max-width:430px;width:100%;max-height:80vh;display:flex;flex-direction:column;padding:20px 20px 16px">'
     +'<b style="font-size:16px">🏫 학교 검색</b>'
-    +'<div style="font-size:12px;color:#8a919d;margin:4px 0 10px">학교명을 입력하고 목록에서 선택하세요 (전국 초·중·고 표준 DB)</div>'
+    +'<div style="font-size:12px;color:#8a919d;margin:4px 0 10px">학교명을 입력하고 목록에서 선택하세요 (전국 초·중·고 표준 DB + 대학교)</div>'
     +'<input id="schPickIn" placeholder="예: 완산초" style="padding:11px 13px;border:1.5px solid #dfe5ee;border-radius:10px;font-size:14px">'
     +'<div id="schPickList" style="overflow:auto;margin-top:8px;flex:1;border:1px solid #f1f5f9;border-radius:10px;min-height:140px;max-height:46vh"></div>'
     +'<div style="display:flex;gap:8px;margin-top:10px">'
@@ -1000,6 +1017,13 @@ function openSchoolPicker(cb){
   function rend(){
     KFDF.loadSchools(function(){
       var rs=KFDF.schoolSearch(inp.value,40);
+      // [학생회원 학교검색 확장] 대학교 목록 병합 검색
+      var q=(inp.value||'').replace(/\s+/g,'');
+      if(q){
+        var uh=UNIS.filter(function(u){return u.replace(/\s+/g,'').indexOf(q)>=0}).slice(0,10)
+          .map(function(u){return {name:u,code:'',kind:'대학'}});
+        rs=rs.concat(uh).slice(0,40);
+      }
       list.innerHTML=rs.length
         ?rs.map(function(s){var rg=schSido(s.code);return '<div class="schpi" data-n="'+s.name.replace(/"/g,'&quot;')+'" data-c="'+(s.code||'')+'" style="padding:10px 14px;cursor:pointer;font-size:13.5px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px">'+(rg?'<span style="font-size:11px;font-weight:900;color:#153A77;background:#eef3fa;border:1px solid #d4e0f2;border-radius:6px;padding:1px 7px;white-space:nowrap">'+rg+'</span>':'')+'<span>'+s.name+'</span> <span style="font-size:11px;color:#8a919d">('+(s.kind||'')+')</span></div>'}).join('')
         :'<div style="padding:14px;font-size:12.5px;color:#8a919d">'+(inp.value?'검색 결과가 없습니다 — [직접 입력]을 이용하세요':'학교명을 입력하세요')+'</div>';
