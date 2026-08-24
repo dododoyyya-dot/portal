@@ -1326,6 +1326,52 @@ async function unlinkLic(id){
     loadLics();
   }catch(e){alert('실패: '+e.message)}
 }
+// ── [신규] 발급 대장에서 회원 검색·직접 연동 — 가입 시 자격번호 누락·오류 건 소급 처리용 ──
+let LUSERS=null;
+async function _lusers(){
+  if(LUSERS)return LUSERS;
+  const s=await DB.collection('users').get();
+  LUSERS=s.docs.map(d=>Object.assign({id:d.id},d.data()));
+  return LUSERS;
+}
+async function linkLic(id){
+  const doc=LICS.find(d=>d.id===id);if(!doc)return;
+  const l=doc.data();
+  if(l.uid)return alert('이미 회원이 연결되어 있습니다. 먼저 [🔗 연결 해제] 후 진행하세요.');
+  const kw=prompt('['+id+' · '+(l.name||l.maskName||'')+' · '+(l.type||'')+' '+(l.grade||'')+']\n연동할 회원을 검색합니다 — 이름 또는 전화번호 일부를 입력하세요', l.name||'');
+  if(kw===null)return;const q=kw.trim();if(!q)return alert('검색어를 입력해주세요.');
+  const us=await _lusers();
+  const qq=q.replace(/-/g,'');
+  const hits=us.filter(v=>!v.deleted&&(((v.name||'').indexOf(q)>=0)||(qq&&(v.phone||'').replace(/-/g,'').indexOf(qq)>=0))).slice(0,15);
+  if(!hits.length)return alert('「'+q+'」 검색 결과가 없습니다. (탈퇴 회원 제외)');
+  const pick=prompt(hits.map((v,i)=>(i+1)+'. '+(v.name||'(이름없음)')+' ('+(v.phone||'전화없음')+' · '+(v.status==='approved'?'승인':'대기')+')').join('\n')+'\n\n연동할 회원의 번호를 입력하세요','1');
+  if(pick===null)return;
+  const u=hits[parseInt(pick,10)-1];if(!u)return alert('번호를 다시 확인해주세요.');
+  const nameMatch=String(l.name||'').replace(/\s/g,'')===String(u.name||'').replace(/\s/g,'');
+  if(!confirm('['+id+'] '+(l.type||'')+' '+(l.grade||'')+' — 대장 성명 「'+(l.name||l.maskName||'')+'」\n→ 회원 「'+(u.name||'')+'」 ('+(u.phone||'')+') 계정에 연동합니다.'+(nameMatch?'':'\n\n⚠️ 대장 성명과 회원 성명이 다릅니다. 본인 확인(유선 등)을 완료한 경우에만 진행하세요.')+'\n\n계속할까요?'))return;
+  try{
+    await DB.collection('licenses').doc(id).update({uid:u.id});
+    // 회원 문서의 자격번호 칸이 비어 있으면 함께 채움 (기존 입력값은 덮어쓰지 않음)
+    const t=String(l.type||'');const uu={};
+    if(t.indexOf('지도자')>=0&&!u.qualNoLeader)uu.qualNoLeader=id;
+    if(t.indexOf('심판')>=0&&!u.qualNoReferee)uu.qualNoReferee=id;
+    if(Object.keys(uu).length){await DB.collection('users').doc(u.id).update(uu);Object.assign(u,uu);}
+    try{await addHist(u.id,'[자격] 관리자 직접 연동 — '+(l.type||'')+' '+(l.grade||'')+' ('+id+')')}catch(e){}
+    let mine=[];try{const ms=await DB.collection('licenses').where('uid','==',u.id).get();mine=ms.docs.map(x=>x.id+' ('+(x.data().type||'')+' '+(x.data().grade||'')+')');}catch(e){}
+    alert('✓ 연동 완료 — '+(u.name||'')+' 님 마이페이지에 자격증이 표시됩니다.'+(mine.length?'\n\n이 회원에게 연결된 자격 '+mine.length+'건:\n· '+mine.join('\n· '):''));
+    loadLics();
+  }catch(e){alert('실패: '+e.message)}
+}
+async function showLicMember(id){
+  const doc=LICS.find(d=>d.id===id);if(!doc)return;
+  const l=doc.data();if(!l.uid)return alert('연결된 회원이 없습니다.');
+  try{
+    const u=await DB.collection('users').doc(l.uid).get();
+    const v=u.exists?u.data():{};
+    let mine=[];try{const ms=await DB.collection('licenses').where('uid','==',l.uid).get();mine=ms.docs.map(x=>x.id+' ('+(x.data().type||'')+' '+(x.data().grade||'')+')');}catch(e){}
+    alert('['+id+'] 연결 회원 정보\n\n이름: '+(v.name||'(탈퇴 또는 삭제된 계정)')+'\n전화: '+(v.phone||'-')+'\n상태: '+(v.status==='approved'?'승인':'대기')+'\n\n이 회원에게 연결된 자격 '+mine.length+'건:\n· '+(mine.join('\n· ')||'없음'));
+  }catch(e){alert('조회 실패: '+e.message)}
+}
 function renderLics(){
   const el=document.getElementById('licList');if(!el)return;
   const q=(document.getElementById('lsSearch').value||'').trim().toLowerCase();
@@ -1361,6 +1407,7 @@ function renderLics(){
       +(l.regionMovedFrom?' · 이관: '+esc(l.regionMovedFrom)+'→'+esc(l.region):'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
       +'<button class="lcbtn b" onclick="renameLic(\''+d.id+'\')">✏️ 성명 수정</button>'
+      +(l.uid?'<button class="lcbtn ghost" onclick="showLicMember(\''+d.id+'\')">👤 연결회원</button>':'<button class="lcbtn s" onclick="linkLic(\''+d.id+'\')">🔗 회원 연동</button>')
       +(l.uid?'<button class="lcbtn d" onclick="unlinkLic(\''+d.id+'\')">🔗 연결 해제</button>':'')
       +'<button class="lcbtn g" onclick="moveLic(\''+d.id+'\')">↪ 소속 이관</button>'
       +(CENTRAL?'<button class="lcbtn ghost" onclick="delLic(\''+d.id+'\')">🗑 삭제</button>':'')
