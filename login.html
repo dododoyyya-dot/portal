@@ -413,10 +413,10 @@ const MTYPE_INFO={
 };
 // 유형별 표시·필수 설정 —  show: 노출 블록 / req: 필수 항목
 const MTYPE_CFG={
-  instructor:{show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
-  teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:true,bank:true,size:true,degree:true,rrn:true}},
-  general:   {show:['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sPledgeBox','sPrivacyBox'],req:{addr:false,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}},
-  student:   {show:['sSchoolBlock','sAddrBlock','sAreaBlock','sStudentAffBlock','sPrivacyBox'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}
+  instructor:{show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
+  teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock'],req:{addr:true,area:true,aff:true,work:true,bank:true,size:true,degree:true,rrn:true}},
+  general:   {show:['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock'],req:{addr:false,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}},
+  student:   {show:['sSchoolBlock','sAddrBlock','sAreaBlock','sStudentAffBlock'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}
 };
 const MTYPE_ALL=['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sSchoolBlock','sStudentAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'];
 function setSignupType(t){
@@ -812,8 +812,7 @@ async function go(){
         if(CFG.req.degree&&!document.getElementById('sDegree').value)
           return say('학력 확인 항목을 선택해주세요. (체육 전공이 아니면 「해당 없음」을 선택하시면 됩니다)');
         // 허위 기재 확인 서약
-        const pl=document.getElementById('sPledge');
-        if(pl&&!pl.checked)return say('기재 사항 확인란에 체크해주세요.');
+        // [간소화] 기재사항 확인 체크란 제거 — 검증 생략
       }
       // 국가공인 체육지도사 자격 — 강사·교사 유형에서 체크 시 종류·등급 입력 + 사본 첨부 (가입 단계에서 진행)
       let natCertName='';
@@ -824,8 +823,7 @@ async function go(){
         if(!ncFile&&!confirm('📎 자격증 사본이 첨부되지 않았습니다.\n\n사본 확인 전까지 회원가입 승인이 보류됩니다.\n(가입 후 마이페이지에서도 첨부 가능)\n\n첨부 없이 계속할까요?'))return say('자격증 사본을 첨부한 뒤 다시 시도해주세요');
       }
       if(CFG.req.area&&!AA.length&&!isGenSimple())return say('활동 가능 범위를 최소 1곳 이상 선택해주세요');
-      // 개인정보 동의 — 전 유형 필수
-      if(!document.getElementById('sPrivacyAgree').checked)return say('개인정보 수집·이용 동의에 체크해주세요.');
+      // [간소화] 개인정보 수집·이용 동의 체크란 제거 — 가입 절차에서 생략 (고유식별정보 동의는 지도자군 주민번호 입력 시 유지)
       const pnorm=phone.replace(/[^0-9]/g,'');
       if(pnorm.length<10){say('휴대전화 번호를 정확히 입력해주세요');return}
       // 휴대폰 본인인증 필수 — 인증 완료된 번호와 입력 번호가 일치해야 가입 진행 (미인증이면 계정 생성 안 됨)
