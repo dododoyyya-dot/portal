@@ -839,13 +839,31 @@ async function go(){
       }catch(e){}
       // [자격검증] 입력된 자격번호는 연맹 licenses DB와 즉시 대조 — 존재하지 않거나 본인 것이 아니면 가입 차단
       {
-        const _ql=(document.getElementById('sQualLeader')?document.getElementById('sQualLeader').value.trim():'');
-        const _qr=(document.getElementById('sQualRef')?document.getElementById('sQualRef').value.trim():'');
+        const _qlRaw=(document.getElementById('sQualLeader')?document.getElementById('sQualLeader').value.trim():'');
+        const _qrRaw=(document.getElementById('sQualRef')?document.getElementById('sQualRef').value.trim():'');
+        // [자격검증 개선] ① 번호 내부 공백 제거 (붙여넣기 시 공백 섞임 흡수)
+        let _ql=_qlRaw.replace(/\s+/g,''), _qr=_qrRaw.replace(/\s+/g,'');
+        // [자격검증 개선] ② 지도자·심판 칸을 바꿔 넣은 경우 자동 교정 (대장 조회로 실제 종류 확인)
+        const _typeOf=async no=>{if(!no)return null;try{const d=await DB.collection('licenses').doc(no).get();return d.exists?String(d.data().type||''):null}catch(e){return null}};
+        const _tL=_ql?await _typeOf(_ql):null, _tR=_qr?await _typeOf(_qr):null;
+        const _isRef=t=>t&&t.indexOf('심판')>=0&&t.indexOf('지도자')<0;
+        const _isLead=t=>t&&t.indexOf('지도자')>=0&&t.indexOf('심판')<0;
+        if(_ql&&!_qr&&_isRef(_tL)){_qr=_ql;_ql='';}
+        else if(_qr&&!_ql&&_isLead(_tR)){_ql=_qr;_qr='';}
+        else if(_ql&&_qr&&_isRef(_tL)&&_isLead(_tR)){const _t=_ql;_ql=_qr;_qr=_t;}
+        // 교정 결과를 입력칸에 반영 → 아래 저장(baseDoc)도 교정된 값으로 저장됨
+        if(document.getElementById('sQualLeader'))document.getElementById('sQualLeader').value=_ql;
+        if(document.getElementById('sQualRef'))document.getElementById('sQualRef').value=_qr;
         const _licCheck=async(no,kind)=>{
           if(!no)return '';
           try{
             const d=await DB.collection('licenses').doc(no).get();
-            if(!d.exists)return '· ['+no+'] 연맹에 등록되지 않은 '+kind+' 자격번호입니다.';
+            if(!d.exists){
+              // [자격검증 개선] ③ 한 칸에 번호 여러 개를 넣은 경우 명확히 안내
+              if(/\d[\s,/]+\S*\d/.test(_qlRaw+' '+_qrRaw)&&no.length>16)
+                return '· ['+no+'] 한 칸에는 자격번호 1개만 입력해주세요. 지도자 번호는 지도자 칸에, 심판 번호는 심판 칸에 각각 입력합니다.';
+              return '· ['+no+'] 연맹에 등록되지 않은 '+kind+' 자격번호입니다.';
+            }
             const l=d.data();
             if(kind==='심판'&&String(l.type||'').indexOf('심판')<0)return '· ['+no+'] 심판 자격번호가 아닙니다 (등록 종류: '+(l.type||'?')+').';
             if(kind==='지도자'&&String(l.type||'').indexOf('지도자')<0)return '· ['+no+'] 지도자 자격번호가 아닙니다 (등록 종류: '+(l.type||'?')+').';
