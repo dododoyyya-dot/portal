@@ -147,7 +147,7 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
       <div id="typeBtns" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px">
         <button type="button" class="mtypebtn on" data-t="instructor" onclick="setSignupType('instructor')">🧑‍🏫 KFDF공인 심판·지도자<span>연맹 자격증 보유·취득 예정</span></button>
         <button type="button" class="mtypebtn" data-t="teacher" onclick="setSignupType('teacher')">🎓 교사 및 국가공인자격증<span>학교 교원·국가자격 보유 (지도자군)</span></button>
-        <button type="button" class="mtypebtn" data-t="general" onclick="setSignupType('general')">👥 일반회원<span>학부모·동호인·타 단체</span></button>
+        <button type="button" class="mtypebtn" data-t="general" onclick="setSignupType('general')">👥 일반회원<span>동호인·학부모·서포터즈·협력기관</span></button>
         <button type="button" class="mtypebtn" data-t="student" onclick="setSignupType('student')">🧒 학생회원<span>만 18세 미만 본인</span></button>
       </div>
       <style>
@@ -158,6 +158,20 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
       .mtypebtn.on span{color:#4472b5}
       </style>
       <div id="typeInfoBox" style="border-radius:10px;padding:11px 14px;font-size:12.5px;font-weight:700;margin-bottom:4px"></div>
+      <!-- [일반회원 세분류] 연맹동호인·타소속 / 간략가입: 학부모·서포터즈·협력기관 -->
+      <div id="sGenSubBlock" style="display:none;margin-bottom:8px;padding:12px 14px;background:#fbf7f0;border:1.5px solid #e8dcc8;border-radius:12px">
+        <label style="margin:0;font-size:13px;font-weight:800;color:#8a5a00">일반회원 구분 <span style="color:#C41E2F">*</span></label>
+        <div id="genSubBtns" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+          <button type="button" class="gsbtn on" data-v="연맹동호인" onclick="setGenSub('연맹동호인')">연맹동호인</button>
+          <button type="button" class="gsbtn" data-v="타소속" onclick="setGenSub('타소속')">타소속</button>
+          <button type="button" class="gsbtn" data-v="학부모" onclick="setGenSub('학부모')">학부모</button>
+          <button type="button" class="gsbtn" data-v="서포터즈" onclick="setGenSub('서포터즈')">서포터즈</button>
+          <button type="button" class="gsbtn" data-v="협력기관" onclick="setGenSub('협력기관')">협력기관</button>
+        </div>
+        <style>.gsbtn{border:1.5px solid #e0d3ba;background:#fff;color:#6b5a34;font-weight:800;font-size:12.5px;padding:8px 15px;border-radius:999px;cursor:pointer;font-family:inherit;transition:.15s}
+        .gsbtn.on{border-color:#8a5a00;background:#8a5a00;color:#fff}</style>
+        <div id="genSubInfo" style="font-size:12px;font-weight:700;margin-top:8px;color:#8a5a00"></div>
+      </div>
       <label>이름 (실명) <span style="color:#C41E2F">*</span></label><input id="sName" placeholder="홍길동">
       <label>휴대전화 (배정·위촉 연락용) <span style="color:#C41E2F">*</span> <span style="font-weight:700;color:#0f766e;font-size:12px">— 본인 휴대폰 인증 필수</span></label>
       <input id="sPhone" placeholder="010-0000-0000" oninput="resetPhoneVerify()">
@@ -367,6 +381,26 @@ function mode(m){
 // 통화 반영: "강사냐 교사냐 일반회원이냐 3분류 + 학생은 별도", "교사는 강사와 묶어 관리",
 //            "심판은 가입 유형이 아니라 보유 자격", "일반회원(학부모·동호인·타단체)은 계좌·주민번호 불필요"
 let SIGNUP_TYPE='instructor';
+// [일반회원 세분류] 연맹동호인·타소속 = 기존 일반회원 폼 / 학부모·서포터즈·협력기관 = 간략 가입(이름·성별·전화·주소·생년월일)
+let GEN_SUB='연맹동호인';
+const GEN_SIMPLE=['학부모','서포터즈','협력기관'];
+function isGenSimple(){return SIGNUP_TYPE==='general'&&GEN_SIMPLE.indexOf(GEN_SUB)>=0}
+function setGenSub(v){
+  GEN_SUB=v;
+  [...document.querySelectorAll('#genSubBtns .gsbtn')].forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  const simple=GEN_SIMPLE.indexOf(v)>=0;
+  // 간략 가입: 활동범위·소속구분·자격 블록 숨김 (주소 블록은 유지 — 간략 가입도 주소 필수)
+  ['sAreaBlock','sOrgTypeBlock','sQualBlock'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display=simple?'none':'';});
+  const info=document.getElementById('genSubInfo');
+  if(info)info.textContent=simple
+    ?('「'+v+'」 회원은 간략 가입입니다 — 이름·성별·전화번호·주소·생년월일만 입력하면 됩니다.')
+    :(v==='타소속'?'타 단체·무소속 동호인입니다. 아래 소속 구분에서 단체명을 입력해주세요.':'시도·구군연맹 소속 동호인 회원입니다.');
+  // 소속 구분 라디오 자동 동기화
+  try{
+    if(v==='타소속'){const r=document.querySelector('input[name="sOrgType"][value="타단체"]');if(r){r.checked=true;const e2=document.getElementById('sOrgEtc');if(e2)e2.style.display='';}}
+    if(v==='연맹동호인'){const r=document.querySelector('input[name="sOrgType"][value="연맹소속"]');if(r){r.checked=true;const e2=document.getElementById('sOrgEtc');if(e2)e2.style.display='none';}}
+  }catch(_){}
+}
 const MTYPE_INFO={
   instructor:{bg:'#eef3fa',bd:'1.5px solid #d4e0f2',fg:'#153A77',
     html:'🧑‍🏫 <b>KFDF공인 심판·지도자</b> — 연맹(KFDF) 자격증을 보유했거나 취득 예정인 지도자·심판입니다. 강습 배정·위촉·수당 정산·물품 발송에 필요한 정보를 받습니다. 수당 지급 계좌·피복 사이즈·학력은 <b>필수</b>입니다.'},
@@ -406,6 +440,10 @@ function setSignupType(t){
     const af2=document.getElementById('sAf2');
     if(af2&&!af2.checked){af2.checked=true;syncAffS();}
   }
+  // [일반회원 세분류] general일 때만 하위 구분 표시 + 현재 선택 재적용
+  const gs=document.getElementById('sGenSubBlock');
+  if(gs)gs.style.display=(t==='general')?'':'none';
+  if(t==='general')setGenSub(GEN_SUB);
   const box=document.getElementById('typeInfoBox');
   const inf=MTYPE_INFO[t]||MTYPE_INFO.instructor;
   box.style.background=inf.bg;box.style.border=inf.bd;box.style.color=inf.fg;box.innerHTML=inf.html;
@@ -736,15 +774,17 @@ async function go(){
         zip=document.getElementById('sZip').value.trim();
         addr=document.getElementById('sAddr').value.trim();
         addr2=document.getElementById('sAddr2').value.trim();
-        if(CFG.req.addr){
+        if(CFG.req.addr||isGenSimple()){  // [세분류] 간략 가입(학부모·서포터즈·협력기관)도 주소 필수
           if(!addr)return say('집 주소를 [주소 검색]으로 입력해주세요');
           if(!addr2)return say('상세주소(동·호수)를 입력해주세요 — 해당 없으면 「해당없음」이라고 적어주세요');
         }
-        // 소속 구분 (연맹소속/타단체/무소속) — 전 유형 공통 필수
-        orgType=orgTypeVal();
-        if(!orgType)return say('소속 구분(연맹 소속 / 타 단체 / 무소속)을 선택해주세요');
-        orgEtc=(document.getElementById('sOrgEtc').value||'').trim();
-        if(orgType==='타단체'&&!orgEtc)return say('타 단체명을 입력해주세요');
+        // 소속 구분 (연맹소속/타단체/무소속) — 간략 가입은 생략
+        if(!isGenSimple()){
+          orgType=orgTypeVal();
+          if(!orgType)return say('소속 구분(연맹 소속 / 타 단체 / 무소속)을 선택해주세요');
+          orgEtc=(document.getElementById('sOrgEtc').value||'').trim();
+          if(orgType==='타단체'&&!orgEtc)return say('타 단체명을 입력해주세요');
+        }
         // 소속 체크 — 지도자군만 필수
         if(CFG.req.aff){
           if(document.getElementById('sAf1').checked)af.push('시도연맹');
@@ -783,7 +823,7 @@ async function go(){
         const ncFile=document.getElementById('sNatCertFile')&&document.getElementById('sNatCertFile').files[0];
         if(!ncFile&&!confirm('📎 자격증 사본이 첨부되지 않았습니다.\n\n사본 확인 전까지 회원가입 승인이 보류됩니다.\n(가입 후 마이페이지에서도 첨부 가능)\n\n첨부 없이 계속할까요?'))return say('자격증 사본을 첨부한 뒤 다시 시도해주세요');
       }
-      if(CFG.req.area&&!AA.length)return say('활동 가능 범위를 최소 1곳 이상 선택해주세요');
+      if(CFG.req.area&&!AA.length&&!isGenSimple())return say('활동 가능 범위를 최소 1곳 이상 선택해주세요');
       // 개인정보 동의 — 전 유형 필수
       if(!document.getElementById('sPrivacyAgree').checked)return say('개인정보 수집·이용 동의에 체크해주세요.');
       const pnorm=phone.replace(/[^0-9]/g,'');
@@ -794,6 +834,26 @@ async function go(){
         const dup=await DB.collection('phoneIndex').doc(pnorm).get();
         if(dup.exists){say('이미 이 전화번호로 가입된 회원이 있습니다.\n기존 계정으로 로그인하시거나, 계정을 잊으셨으면 사무국(031-984-3248)으로 문의해주세요.');return}
       }catch(e){}
+      // [자격검증] 입력된 자격번호는 연맹 licenses DB와 즉시 대조 — 존재하지 않거나 본인 것이 아니면 가입 차단
+      {
+        const _ql=(document.getElementById('sQualLeader')?document.getElementById('sQualLeader').value.trim():'');
+        const _qr=(document.getElementById('sQualRef')?document.getElementById('sQualRef').value.trim():'');
+        const _licCheck=async(no,kind)=>{
+          if(!no)return '';
+          try{
+            const d=await DB.collection('licenses').doc(no).get();
+            if(!d.exists)return '· ['+no+'] 연맹에 등록되지 않은 '+kind+' 자격번호입니다.';
+            const l=d.data();
+            if(kind==='심판'&&String(l.type||'').indexOf('심판')<0)return '· ['+no+'] 심판 자격번호가 아닙니다 (등록 종류: '+(l.type||'?')+').';
+            if(kind==='지도자'&&String(l.type||'').indexOf('지도자')<0)return '· ['+no+'] 지도자 자격번호가 아닙니다 (등록 종류: '+(l.type||'?')+').';
+            if(l.name&&String(l.name).replace(/\s/g,'')!==name.replace(/\s/g,''))return '· ['+no+'] 자격증 성명('+(l.maskName||'')+')이 가입 성명과 일치하지 않습니다.';
+            if(l.uid)return '· ['+no+'] 이미 다른 계정에 연결된 자격번호입니다. 사무국(031-984-3248)에 문의해주세요.';
+            return '';
+          }catch(e){return ''}  // 조회 실패(일시 오류) 시에는 기존 동작 유지 — 가입은 허용, 마이페이지 대조로 검증
+        };
+        const _errs=[await _licCheck(_ql,'지도자'),await _licCheck(_qr,'심판')].filter(Boolean);
+        if(_errs.length)return say('🎖 자격번호를 확인해주세요\n'+_errs.join('\n')+'\n\n번호를 정확히 입력하시거나, 자격번호 칸을 비우고 가입한 뒤 마이페이지에서 등록해주세요.');
+      }
       // 인증된 전화계정에 이메일/비밀번호 연결 = 계정 생성. (본인인증을 통과해야만 여기 도달)
       const cred=await AUTH.currentUser.linkWithCredential(firebase.auth.EmailAuthProvider.credential(email,pw));
       const baseDoc={
@@ -803,6 +863,7 @@ async function go(){
         activityAreas:aaSave(), activityRegions:aaRegions(), baseCity:aaBase(),
         region:(aaRegions()[0]||'서울·경기'),
         accountType:SIGNUP_TYPE,
+        memberClass:(SIGNUP_TYPE==='general'?GEN_SUB:''),  // [세분류] 연맹동호인·타소속·학부모·서포터즈·협력기관
         memberGroup:(SIGNUP_TYPE==='instructor'||SIGNUP_TYPE==='teacher')?'active':(SIGNUP_TYPE==='student'?'student':'general'),
         orgType:orgType||'', orgEtc:orgEtc||'',
         qualNoLeader:(document.getElementById('sQualLeader')?document.getElementById('sQualLeader').value.trim():''),
