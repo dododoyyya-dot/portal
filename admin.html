@@ -2048,6 +2048,7 @@ function showMemberModal(uid){
   const hire=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc);
   const rows=[
     ['회원 유형',esc({instructor:'지도자·강사',teacher:'교사',general:'일반회원',student:'학생회원'}[v.accountType]||v.accountType||'-')+(v.memberClass?' <b style="font-size:11px;color:#8a5a00">· '+esc(v.memberClass)+'</b>':'')+(v.typeConvertedFrom?' <span style="font-size:11px;color:#8a919d">(전환 전: '+esc(v.typeConvertedFrom)+')</span>':'')],
+    ['안전교육',(function(){if(!v.safetyEdu)return '<span style="color:#C41E2F;font-weight:800">미이수</span>';try{var t=v.safetyEduAt&&v.safetyEduAt.toDate?v.safetyEduAt.toDate():(v.safetyEduAt?new Date(v.safetyEduAt):null);if(!t)return '<b style="color:#0f766e">이수</b>';var ok=(Date.now()-t.getTime())<365*86400000;return (ok?'<b style="color:#0f766e">이수 ✓</b>':'<span style="color:#C41E2F;font-weight:800">만료</span>')+' <span style="font-size:11px;color:#8a919d">'+t.toISOString().slice(0,10)+'</span>';}catch(e){return '<b style="color:#0f766e">이수</b>'}})()],
     ['이메일',esc(v.email||'-')],
     ['성별·생년월일',esc(v.gender||'-')+' · '+esc(v.birth||'-')],
     ['KFDF 자격번호',[v.qualNoLeader?'지도자 '+esc(v.qualNoLeader):'',v.qualNoReferee?'심판 '+esc(v.qualNoReferee):''].filter(Boolean).join(' · ')||'-'],

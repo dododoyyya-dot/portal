@@ -154,19 +154,47 @@ function fmtDate(ts){if(!ts)return'';try{const d=ts.toDate?ts.toDate():new Date(
 //  안전교육 영상 — 아래 각 url 에 영상 주소만 넣으면 작동합니다. (2편)
 //  예) 'files/안전교육_1.mp4'  또는 Firebase Storage 다운로드 URL
 //  둘 다 끝까지 시청해야 이수 완료됩니다. (스포츠안전재단 협조 영상 업로드 후 주소 입력)
+// [v2] 영상 주소는 siteContent/safetyEdu 문서에서 관리 (관리자가 업로드하면 코드 수정 없이 반영)
 const SAFETY_VIDEOS = [
-  { url:'', title:'안전교육 1편' },
-  { url:'', title:'안전교육 2편' }
+  { url:'', title:'실내 스포츠 안전교육' },
+  { url:'', title:'실외 스포츠 안전교육' }
 ];
+const EDU_VALID_DAYS=365;  // [v2] 이수 유효기간 1년
 // ══════════════════════════════════════════════════════════════
 
 let MEU=null, MYD=null, vid=null, maxWatched=0, dur=0, saving=false, cur=-1, DONE=[];
 
+// [v2] 이수 유효 여부 (1년) — 다른 페이지에서도 동일 로직 사용
+function eduValid(myd){
+  if(!myd||!myd.safetyEdu)return false;
+  const at=myd.safetyEduAt;
+  if(!at)return true;  // 이수 기록만 있고 일자 없으면 유효 취급 (하위호환)
+  try{
+    const t=at.toDate?at.toDate():new Date(at);
+    return (Date.now()-t.getTime())<EDU_VALID_DAYS*86400000;
+  }catch(e){return true}
+}
 AUTH.onAuthStateChanged(async u=>{
   if(!u){document.getElementById('loginGate').style.display='block';return}
   MEU=u;
+  // [v2] 영상 주소 설정 로드 (siteContent/safetyEdu: {indoorUrl, outdoorUrl})
+  try{
+    const cfg=await DB.collection('siteContent').doc('safetyEdu').get();
+    if(cfg.exists){
+      const c=cfg.data();
+      if(c.indoorUrl)SAFETY_VIDEOS[0].url=c.indoorUrl;
+      if(c.outdoorUrl)SAFETY_VIDEOS[1].url=c.outdoorUrl;
+    }
+  }catch(e){}
   const d=await DB.collection('users').doc(u.uid).get();MYD=d.data()||{};
-  if(MYD.safetyEdu){showDone(MYD.safetyEduAt);return}
+  if(eduValid(MYD)){showDone(MYD.safetyEduAt);return}
+  if(MYD.safetyEdu&&!eduValid(MYD)){
+    // [v2] 1년 경과 — 재이수 안내
+    const note=document.createElement('div');
+    note.className='pending-banner';
+    note.innerHTML='⏳ 이전 이수(1년 유효)가 <b>만료</b>되었습니다. 안전교육을 다시 이수해 주세요.';
+    document.getElementById('playWrap').parentNode.insertBefore(note,document.getElementById('playWrap'));
+  }
   try{DONE=JSON.parse(localStorage.getItem('safe_'+u.uid)||'[]')||[];}catch(e){DONE=[];}
   setup();
 });
@@ -174,7 +202,15 @@ AUTH.onAuthStateChanged(async u=>{
 function showDone(at){
   document.getElementById('playWrap').style.display='none';
   document.getElementById('doneBox').style.display='block';
-  const s=fmtDate(at);document.getElementById('doneMeta').textContent=s?('이수일: '+s):'';
+  let txt='';
+  try{
+    const t=at&&at.toDate?at.toDate():(at?new Date(at):null);
+    if(t){
+      const ex=new Date(t.getTime()+EDU_VALID_DAYS*86400000);
+      txt='이수일: '+t.toISOString().slice(0,10)+' · 유효기간: '+ex.toISOString().slice(0,10)+'까지 (1년)';
+    }
+  }catch(e){}
+  document.getElementById('doneMeta').textContent=txt;
 }
 
 function setup(){
@@ -189,6 +225,16 @@ function setup(){
   vid.addEventListener('pause',()=>{document.getElementById('playBtn').textContent='▶ 재생';});
   vid.addEventListener('ended',onEnded);
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&vid&&!vid.paused)vid.pause();});
+  // [v2] 자리비움 방지 — 재생 중 4~7분 간격 무작위 '시청 확인' (30초 내 미클릭 시 일시정지)
+  setInterval(()=>{
+    if(!vid||vid.paused||document.getElementById('attnBox'))return;
+    if(Math.random()>0.28)return;  // 1분 주기 추첨 → 평균 3~4분 간격
+    const bx=document.createElement('div');bx.id='attnBox';
+    bx.style.cssText='position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#153A77;color:#fff;border-radius:14px;padding:14px 22px;z-index:9999;box-shadow:0 10px 30px rgba(0,0,0,.35);text-align:center';
+    bx.innerHTML='<div style="font-size:13.5px;font-weight:800">👀 시청 확인 — 계속 보고 계신가요?</div><button onclick="this.parentNode.remove()" style="margin-top:8px;background:#fff;color:#153A77;border:none;border-radius:9px;padding:8px 22px;font-weight:900;cursor:pointer;font-family:inherit">네, 시청 중입니다</button>';
+    document.body.appendChild(bx);
+    setTimeout(()=>{const b2=document.getElementById('attnBox');if(b2){b2.remove();if(vid&&!vid.paused){vid.pause();alert('시청 확인이 되지 않아 일시정지했습니다. 이어서 시청해 주세요.');}}},30000);
+  },60000);
   renderList();
   const need=SAFETY_VIDEOS.map((v,i)=>i).filter(i=>SAFETY_VIDEOS[i].url);
   if(!need.length){document.getElementById('vidMsg').innerHTML='📼 안전교육 영상 준비 중입니다.<br>사무국에서 영상 등록 후 이용 가능합니다. (문의 031-984-3248)';document.getElementById('playBtn').disabled=true;return;}

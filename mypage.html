@@ -1766,7 +1766,19 @@ function renderContracts(){
 let SIGAPPID=null,SIGTYPE='school',sigCanvas,sigCtx,sigDrawing=false,sigLast=null,SIGGED2=false;
 function openSigModal(id){openSig('school',id)}
 function openCompSigModal(id){openSig('comp',id)}
+// [안전교육] 이수 유효 여부 (1년) — safety.html과 동일 기준
+function safetyEduValid(){
+  if(!MYD||!MYD.safetyEdu)return false;
+  const at=MYD.safetyEduAt;
+  if(!at)return true;
+  try{const t=at.toDate?at.toDate():new Date(at);return (Date.now()-t.getTime())<365*86400000;}catch(e){return true}
+}
 function openSig(type,id){
+  // [안전교육] 학교강습 강사 위촉은 안전교육 이수(1년 유효) 필수
+  if(type==='school'&&!safetyEduValid()){
+    if(confirm('🦺 안전교육 미이수 (또는 1년 유효기간 만료)\n\n유소년 스포츠 기반구축사업 지도강사는 위촉 전 안전교육(실내·실외 2편)을 이수해야 합니다.\n\n지금 안전교육 페이지로 이동할까요?'))location.href='safety.html';
+    return;
+  }
   SIGTYPE=type;SIGAPPID=id;
   let label;
   if(type==='school'){
