@@ -572,13 +572,17 @@ async function taFindTeams(focusMembers){
     own.docs.concat(mem.docs||[]).forEach(d=>{const c=d.data();if(!c.status||['승인','임시'].indexOf(c.status)>=0)map[d.id]=Object.assign({id:d.id},c);});
     TA_TEAMS=Object.values(map);
   }catch(e){TA_TEAMS=[];}
+  taRenderPanel();
+  if(focusMembers&&TA_TEAM)taRenderMembers();
+}
+function taRenderPanel(){
+  const p=document.getElementById('taSide');if(!p)return;
   p.innerHTML='<div style="display:flex;align-items:center;margin-bottom:8px"><b style="flex:1;font-size:14px">🔍 내 팀 선택</b><span style="cursor:pointer;font-weight:900;font-size:16px;padding:2px 6px" onclick="document.getElementById(\'taSide\').remove()">✕</span></div>'
     +(TA_TEAMS.length?TA_TEAMS.map((c,i)=>'<div onclick="taPickTeam('+i+')" style="border:1.5px solid '+(TA_TEAM&&TA_TEAM.id===c.id?'#0f766e':'#dfe5ee')+';border-radius:10px;padding:9px 12px;margin-top:6px;cursor:pointer;background:'+(TA_TEAM&&TA_TEAM.id===c.id?'#f0fdf4':'#fff')+'">'
       +'<b style="font-size:13.5px">'+cesc(c.name||'')+'</b>'
       +'<div style="font-size:11.5px;color:#6b7280;margin-top:2px">'+(c.ownerUid===CME.uid?'👑 클럽장':'회원')+' · 구성원 '+(((c.members||[]).length)+((c.childMembers||[]).length))+'명'+(c.region?' · '+cesc(c.region):'')+'</div></div>').join('')
     :'<div style="font-size:12.5px;color:#8a919d;padding:8px 0">소속된 클럽이 없습니다.<br>클럽 페이지에서 클럽을 만들거나 가입한 뒤 이용할 수 있습니다.<br>지금은 왼쪽에서 직접 입력해주세요.</div>')
     +'<div id="taSideMembers"></div>';
-  if(focusMembers&&TA_TEAM)taRenderMembers();
 }
 function taPickTeam(i){
   const c=TA_TEAMS[i];if(!c)return;
@@ -595,8 +599,8 @@ function taPickTeam(i){
     if(org.tagName==='SELECT'){const o2=[...org.options].find(o=>o.value===c.id);if(o2)org.value=c.id;}
     else org.value=c.name||'';
   }
-  taFindTeams();  // 패널 갱신(선택 표시) 후 명단 렌더
-  setTimeout(taRenderMembers,50);
+  taRenderPanel();   // 캐시로 동기 갱신 (재조회 없음 — 명단 렌더 경합 방지)
+  taRenderMembers();
 }
 function taRenderMembers(){
   const box=document.getElementById('taSideMembers');if(!box||!TA_TEAM)return;
