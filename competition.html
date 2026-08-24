@@ -521,7 +521,7 @@ async function openTeamApply(id){
   const inp='style="padding:9px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-family:inherit;font-size:13.5px"';
   div.innerHTML='<div class="cmodal"><div class="mhead"><div class="mt">👥 팀 단위 참가 신청</div><div class="ms">'+cesc(s.title)+' · '+cesc(s.date)+'</div></div>'
     +'<div class="mbody">'
-    +'<div style="font-size:13px;font-weight:800;margin-bottom:6px">① 팀 정보</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:13px;font-weight:800">① 팀 정보</span><button type="button" class="cbtn cbtn-soft" style="padding:5px 13px;font-size:12px" onclick="taFindTeams()">🔍 팀 찾기 — 내 클럽에서 선택</button></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
     +'<select id="taType" '+inp+' onchange="taTypeUI()">'+tts.map(t=>'<option>'+t+'</option>').join('')+'</select>'
     +'<input id="taName" '+inp+' placeholder="팀명 (예: 신남FC)" style="flex:1;min-width:150px">'
@@ -531,7 +531,8 @@ async function openTeamApply(id){
     +'<div style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;font-weight:700">인솔자: '+cesc(CMY.name||'')+' <select id="taRole" '+inp+'><option>지도교사</option><option>클럽장</option><option>학부모</option><option>성인 인솔자</option></select><span style="font-size:11.5px;color:#8a919d">'+cesc(CMY.phone||'')+'</span></div>'
     +'<div style="font-size:13px;font-weight:800;margin:14px 0 4px">② 팀원 명단 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 비회원 학생도 직접 입력 가능</span></div>'
     +'<div id="taRosterBox" style="border:1px solid #e2e7f0;border-radius:10px;padding:8px"></div>'
-    +'<div style="display:flex;gap:8px;margin-top:7px"><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px" onclick="taAddRow()">+ 팀원 추가</button>'
+    +'<div style="display:flex;gap:8px;margin-top:7px;flex-wrap:wrap"><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px" onclick="taAddRow()">+ 팀원 추가</button>'
+    +'<button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#eef7f4;color:#0f766e" onclick="taFindTeams(true)">👥 명단에서 클릭 선택</button>'
     +'<button type="button" class="cbtn cbtn-soft" id="taLoadClub" style="padding:6px 14px;font-size:12.5px;display:none" onclick="taLoadClubRoster()">📋 클럽 명단 불러오기</button></div>'
     +'<div style="font-size:13px;font-weight:800;margin:14px 0 4px">③ 보호자 동의 (미성년 팀원)</div>'
     +'<div style="background:#fff8ed;border:1.5px solid #ecd9b0;border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.8">'
@@ -549,6 +550,85 @@ async function openTeamApply(id){
   document.body.appendChild(div);
   taAddRow();taAddRow();taAddRow();
   taTypeUI();taInitSig();
+}
+// ══════════ [팀찾기] 우측 패널 — 내 클럽·명단 클릭 선택 (기존 직접입력 방식은 그대로 유지) ══════════
+let TA_TEAMS=[],TA_TEAM=null,TA_MEMROWS=[];
+async function taFindTeams(focusMembers){
+  const wrap=document.getElementById('taModal');if(!wrap)return;
+  let p=document.getElementById('taSide');
+  if(!p){
+    p=document.createElement('div');p.id='taSide';
+    p.style.cssText='background:#fff;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.25);width:300px;max-height:88vh;overflow:auto;padding:16px 18px;margin-left:12px;flex-shrink:0;align-self:flex-start';
+    wrap.style.alignItems='flex-start';
+    wrap.appendChild(p);
+  }
+  p.innerHTML='<div style="font-size:13px;color:#8a919d">내 클럽·명단 불러오는 중…</div>';
+  try{
+    const [own,mem]=await Promise.all([
+      DB.collection('clubs').where('ownerUid','==',CME.uid).limit(10).get(),
+      DB.collection('clubs').where('memberUids','array-contains',CME.uid).limit(10).get().catch(()=>({docs:[]}))
+    ]);
+    const map={};
+    own.docs.concat(mem.docs||[]).forEach(d=>{const c=d.data();if(!c.status||['승인','임시'].indexOf(c.status)>=0)map[d.id]=Object.assign({id:d.id},c);});
+    TA_TEAMS=Object.values(map);
+  }catch(e){TA_TEAMS=[];}
+  p.innerHTML='<div style="display:flex;align-items:center;margin-bottom:8px"><b style="flex:1;font-size:14px">🔍 내 팀 선택</b><span style="cursor:pointer;font-weight:900;font-size:16px;padding:2px 6px" onclick="document.getElementById(\'taSide\').remove()">✕</span></div>'
+    +(TA_TEAMS.length?TA_TEAMS.map((c,i)=>'<div onclick="taPickTeam('+i+')" style="border:1.5px solid '+(TA_TEAM&&TA_TEAM.id===c.id?'#0f766e':'#dfe5ee')+';border-radius:10px;padding:9px 12px;margin-top:6px;cursor:pointer;background:'+(TA_TEAM&&TA_TEAM.id===c.id?'#f0fdf4':'#fff')+'">'
+      +'<b style="font-size:13.5px">'+cesc(c.name||'')+'</b>'
+      +'<div style="font-size:11.5px;color:#6b7280;margin-top:2px">'+(c.ownerUid===CME.uid?'👑 클럽장':'회원')+' · 구성원 '+(((c.members||[]).length)+((c.childMembers||[]).length))+'명'+(c.region?' · '+cesc(c.region):'')+'</div></div>').join('')
+    :'<div style="font-size:12.5px;color:#8a919d;padding:8px 0">소속된 클럽이 없습니다.<br>클럽 페이지에서 클럽을 만들거나 가입한 뒤 이용할 수 있습니다.<br>지금은 왼쪽에서 직접 입력해주세요.</div>')
+    +'<div id="taSideMembers"></div>';
+  if(focusMembers&&TA_TEAM)taRenderMembers();
+}
+function taPickTeam(i){
+  const c=TA_TEAMS[i];if(!c)return;
+  TA_TEAM=c;
+  // 팀명·유형·소속 자동 기입 (기존 입력값은 덮어씀 — 사용자가 클릭으로 선택한 것)
+  const nameEl=document.getElementById('taName');if(nameEl)nameEl.value=c.name||'';
+  const sel=document.getElementById('taType');
+  if(sel){
+    const opt=[...sel.options].find(o=>o.value.indexOf('클럽')>=0)||sel.options[0];
+    if(opt){sel.value=opt.value;taTypeUI();}
+  }
+  const org=document.getElementById('taOrg');
+  if(org){
+    if(org.tagName==='SELECT'){const o2=[...org.options].find(o=>o.value===c.id);if(o2)org.value=c.id;}
+    else org.value=c.name||'';
+  }
+  taFindTeams();  // 패널 갱신(선택 표시) 후 명단 렌더
+  setTimeout(taRenderMembers,50);
+}
+function taRenderMembers(){
+  const box=document.getElementById('taSideMembers');if(!box||!TA_TEAM)return;
+  const c=TA_TEAM;
+  const rows=[];
+  (c.childMembers||[]).forEach(k=>rows.push({name:k.name||'',birth:k.birth||'',gender:k.gender||'',school:k.school||'',tag:'유소년'}));
+  (c.members||[]).forEach(m=>{if(m&&m.uid!==CME.uid)rows.push({name:m.name||'',birth:m.birth||'',gender:m.gender||'',school:m.school||'',tag:'회원'})});
+  TA_MEMROWS=rows;
+  box.innerHTML='<div style="font-weight:800;font-size:12.5px;margin-top:14px;color:#0f766e">👥 '+cesc(c.name||'')+' 명단 — 클릭하면 왼쪽 팀원 표에 담깁니다</div>'
+    +(rows.length?rows.map((r,j)=>'<div onclick="taPickMember('+j+')" style="display:flex;gap:7px;align-items:center;border:1px solid #e3e9f2;border-radius:9px;padding:7px 11px;margin-top:5px;cursor:pointer;font-size:12.5px" onmouseover="this.style.background=\'#f0fdf4\'" onmouseout="this.style.background=\'#fff\'">'
+      +'<b>'+cesc(r.name)+'</b><span style="color:#8a919d;font-size:11px">'+r.tag+(r.birth?' · '+cesc(r.birth):'')+(r.school?' · '+cesc(r.school):'')+'</span><span style="flex:1"></span><span style="color:#0f766e;font-weight:900">＋</span></div>').join('')
+      +'<button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12px;margin-top:8px;width:100%" onclick="taPickAll()">전원 담기</button>'
+    :'<div style="font-size:12px;color:#8a919d;margin-top:5px">등록된 구성원이 없습니다. 왼쪽에서 직접 입력해주세요.</div>');
+}
+function taPickMember(j){
+  const r=TA_MEMROWS[j];if(!r||!r.name)return;
+  const names=[...document.querySelectorAll('#taRosterBox .taR-name')].map(x=>x.value.trim());
+  if(names.indexOf(r.name)>=0){alert(r.name+' 님은 이미 팀원 명단에 있습니다.');return}
+  const rows=[...document.querySelectorAll('#taRosterBox > div')];
+  const empty=rows.find(x=>{const n=x.querySelector('.taR-name');return n&&!n.value.trim()});
+  if(empty){
+    empty.querySelector('.taR-name').value=r.name;
+    const b=empty.querySelector('.taR-birth');if(b&&r.birth)b.value=r.birth;
+    const g=empty.querySelector('.taR-g');if(g&&r.gender)g.value=r.gender;
+    const s=empty.querySelector('.taR-school');if(s)s.value=r.school||'';
+  }else taAddRow(r);
+}
+function taPickAll(){
+  (TA_MEMROWS||[]).forEach((r,j)=>{
+    const names=[...document.querySelectorAll('#taRosterBox .taR-name')].map(x=>x.value.trim());
+    if(r.name&&names.indexOf(r.name)<0)taPickMember(j);
+  });
 }
 function taTypeUI(){
   const t=document.getElementById('taType').value;

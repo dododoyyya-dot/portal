@@ -328,7 +328,7 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
         </div>
       </div>
 
-    </div>
+    <!-- [위치이동] 기재사항 확인·개인정보 동의 — 가입 폼(fS) 안으로 이동해 로그인 탭에서는 보이지 않음 -->
     <div id="sPledgeBox" style="display:none;margin-top:14px;padding:12px 15px;background:#fdf1f1;border:1.5px solid #f1c7cc;border-radius:11px;font-size:12.5px;line-height:1.75;color:#8c1622">
       <b>⚠ 기재 사항 확인</b><br>
       입력하신 소속·자격·근무지는 연맹 자료 및 발급기관 정보와 대조됩니다. <b>허위로 기재한 경우</b> 승인 취소, 배정·위촉 제한, 자격 정지 등의 조치가 있을 수 있으며, 그로 인한 불이익은 본인에게 있습니다.
@@ -338,6 +338,7 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
       📋 <b>개인정보 수집·이용 동의 (필수)</b> &nbsp;<a href="privacy.html" target="_blank" style="font-size:11px;color:#1F4E9C;font-weight:700">전문 보기 →</a><br>
       <span style="color:#555;font-size:12px">이름·연락처·주소 등 수집 정보는 연맹 회원 관리, 사업 운영, 물품 발송 목적으로 수집·이용되며, 법령에 따라 보관됩니다. 동의 철회 시 사무국(031-984-3248)으로 문의하시면 됩니다.</span>
       <label style="display:flex;gap:7px;align-items:center;margin-top:8px;font-weight:800;color:#0f766e"><input type="checkbox" id="sPrivacyAgree" style="width:auto"> (필수) 개인정보 수집·이용에 동의합니다.</label>
+    </div>
     </div>
     <label>이메일 <span id="emailHint" style="font-weight:600;color:#8a919d;font-size:12px">· 자녀 계정은 아이디만 입력</span></label><input id="aEmail" type="text" placeholder="example@email.com">
     <label>비밀번호</label><input id="aPw" type="password" placeholder="6자 이상">
@@ -413,10 +414,10 @@ const MTYPE_INFO={
 };
 // 유형별 표시·필수 설정 —  show: 노출 블록 / req: 필수 항목
 const MTYPE_CFG={
-  instructor:{show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
-  teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock'],req:{addr:true,area:true,aff:true,work:true,bank:true,size:true,degree:true,rrn:true}},
-  general:   {show:['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock'],req:{addr:false,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}},
-  student:   {show:['sSchoolBlock','sAddrBlock','sAreaBlock','sStudentAffBlock'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}
+  instructor:{show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
+  teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:true,bank:true,size:true,degree:true,rrn:true}},
+  general:   {show:['sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sPledgeBox','sPrivacyBox'],req:{addr:false,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}},
+  student:   {show:['sSchoolBlock','sAddrBlock','sAreaBlock','sStudentAffBlock','sPrivacyBox'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}
 };
 const MTYPE_ALL=['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sSchoolBlock','sStudentAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'];
 function setSignupType(t){
@@ -812,7 +813,9 @@ async function go(){
         if(CFG.req.degree&&!document.getElementById('sDegree').value)
           return say('학력 확인 항목을 선택해주세요. (체육 전공이 아니면 「해당 없음」을 선택하시면 됩니다)');
         // 허위 기재 확인 서약
-        // [간소화] 기재사항 확인 체크란 제거 — 검증 생략
+        // 허위 기재 확인 서약 (가입 폼 내)
+        const pl=document.getElementById('sPledge');
+        if(pl&&!pl.checked)return say('기재 사항 확인란에 체크해주세요.');
       }
       // 국가공인 체육지도사 자격 — 강사·교사 유형에서 체크 시 종류·등급 입력 + 사본 첨부 (가입 단계에서 진행)
       let natCertName='';
@@ -823,7 +826,8 @@ async function go(){
         if(!ncFile&&!confirm('📎 자격증 사본이 첨부되지 않았습니다.\n\n사본 확인 전까지 회원가입 승인이 보류됩니다.\n(가입 후 마이페이지에서도 첨부 가능)\n\n첨부 없이 계속할까요?'))return say('자격증 사본을 첨부한 뒤 다시 시도해주세요');
       }
       if(CFG.req.area&&!AA.length&&!isGenSimple())return say('활동 가능 범위를 최소 1곳 이상 선택해주세요');
-      // [간소화] 개인정보 수집·이용 동의 체크란 제거 — 가입 절차에서 생략 (고유식별정보 동의는 지도자군 주민번호 입력 시 유지)
+      // 개인정보 동의 — 전 유형 필수 (가입 폼 내에서만 표시)
+      if(!document.getElementById('sPrivacyAgree').checked)return say('개인정보 수집·이용 동의에 체크해주세요.');
       const pnorm=phone.replace(/[^0-9]/g,'');
       if(pnorm.length<10){say('휴대전화 번호를 정확히 입력해주세요');return}
       // 휴대폰 본인인증 필수 — 인증 완료된 번호와 입력 번호가 일치해야 가입 진행 (미인증이면 계정 생성 안 됨)
