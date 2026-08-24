@@ -294,7 +294,8 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
 
       <div id="sDegreeBlock" style="margin-top:14px;max-width:340px">
         <label style="font-size:13px;font-weight:800">학력 확인 (체육 전공) <span id="reqDegree" style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 해당 없으면 「해당 없음」 선택 · 증빙 첨부는 가입 후 마이페이지에서</span></label>
-        <select id="sDegree"><option value="">해당 없음</option><option>체육 전문학사</option><option>체육학사</option><option>체육석사</option><option>체육박사</option></select>
+        <!-- [학력버그수정] '해당 없음'이 value=""라 필수검사(req.degree)를 통과 못 해 지도자·교사 가입이 차단되던 문제 — 선택 placeholder 분리, 해당 없음에 실제 값 부여 (저장 시엔 ''로 변환해 기존 DB·표시 로직 유지) -->
+        <select id="sDegree"><option value="">— 선택 —</option><option value="해당 없음">해당 없음 (체육 전공 아님)</option><option>체육 전문학사</option><option>체육학사</option><option>체육석사</option><option>체육박사</option></select>
       </div>
 
       <div id="sSizeBlock" style="margin-top:16px;padding:14px 16px;background:#fbf7f0;border:1.5px solid #e8dcc8;border-radius:12px">
@@ -890,7 +891,7 @@ async function go(){
           fedName:gv('sAfFed'),
           teacherLevel:(document.getElementById('sAf2').checked?gv('sTeachLv'):''),
           workSchool:work,
-          degree:gv('sDegree'),
+          degree:(gv('sDegree')==='해당 없음'?'':gv('sDegree')), // [학력버그수정] '해당 없음'은 기존과 동일하게 빈값으로 저장 (admin·mypage 표시 로직 호환)
           clothingSize:gv('sSize'),
           sizePants:gv('sSizePants'),
           sizeShoe:gv('sSizeShoe'),
