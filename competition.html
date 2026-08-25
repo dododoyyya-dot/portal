@@ -1363,19 +1363,31 @@ function slotCard(d,today){
         +(s.entry&&s.entry.fees&&s.entry.fees.length?'<div class="cnote" style="background:#f0fdf4;border-color:#a7f3d0;color:#0f5132">💰 참가비: '+s.entry.fees.map(f=>cesc(f.label+(f.amount?' '+f.amount:''))).join(' · ')+'</div>':'')
         /* [특수부문 제거] 🏷 선택 부문 안내 상자 미표시 (기존 데이터는 보존, 표출만 중단) */
         // [대회v3] 첨부자료(포스터·대진표·일정표) + 기타안내(시상품·기념품·보험)
-        +((s.attachments&&s.attachments.length)?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:7px">'+s.attachments.map(x=>{
-            const isImg=/\.(jpe?g|png|gif|webp)(\?|$)/i.test(x.url||'')||String(x.url||'').indexOf('image')>=0;
-            return isImg?'<a href="'+cesc(x.url)+'" target="_blank" style="text-align:center;text-decoration:none"><img src="'+cesc(x.url)+'" style="height:74px;border-radius:8px;border:1px solid #e2e7f0;display:block"><span style="font-size:10.5px;color:#6b7280;font-weight:700">'+cesc(x.kind||'첨부')+'</span></a>'
-              :'<a href="'+cesc(x.url)+'" target="_blank" style="font-size:12px;font-weight:800;color:#153A77;border:1.5px solid #c3d4ed;border-radius:9px;padding:7px 13px;text-decoration:none">📄 '+cesc(x.kind||'첨부')+' — '+cesc(x.name||'파일')+'</a>';
-          }).join('')+'</div>':'')
-        // [배치 개선] 📌 안내문은 좌측(넓게), 🏆 시상품·기념품·보험은 우측 상자로 — 좁은 화면에선 자동으로 세로 배치
+        // [배치 개편 v2] 좌: 📌 안내문(넓게) / 우: 포스터 크게 + (여러 장이면 ◀▶ 슬라이드) + 그 아래 🏆 시상품 박스 — 좁은 화면 자동 세로
         +(function(){
+            const att=(s.attachments||[]);
+            const isImg=x=>/\.(jpe?g|png|gif|webp)(\?|$)/i.test(x.url||'')||String(x.url||'').indexOf('image')>=0;
+            const imgs=att.filter(isImg);
+            const docsA=att.filter(x=>!isImg(x));
             const hasEx=!!(s.extras&&(s.extras.prize||s.extras.souvenir||s.extras.insurance||s.extras.prizeNote));
-            const noteHtml=s.note?'<div class="cnote" style="flex:2 1 320px;margin-top:0;display:block">📌 '+cesc(s.note)+'</div>':'';
-            const exHtml=hasEx?'<div class="cnote" style="flex:1 1 240px;min-width:240px;max-width:100%;margin-top:0;display:block;background:#fffbeb;border:1.5px solid #fde68a;color:#8a5a00">'+[s.extras.prize?'🏆 시상품 지급':'',s.extras.souvenir?'🎁 기념품 지급':'',s.extras.insurance?'🛡 행사 보험 가입':''].filter(Boolean).join(' · ')+(s.extras.prizeNote?'<br>🎖 '+cesc(s.extras.prizeNote):'')+'</div>':'';
-            if(!noteHtml&&!exHtml)return '';
-            if(noteHtml&&exHtml)return '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:stretch;margin-top:8px">'+noteHtml+exHtml+'</div>';
-            return '<div style="margin-top:8px">'+(noteHtml||exHtml)+'</div>';
+            const exHtml=hasEx?'<div class="cnote" style="display:block;box-sizing:border-box;width:100%;margin-top:8px;background:#fffbeb;border:1.5px solid #fde68a;color:#8a5a00">'+[s.extras.prize?'🏆 시상품 지급':'',s.extras.souvenir?'🎁 기념품 지급':'',s.extras.insurance?'🛡 행사 보험 가입':''].filter(Boolean).join(' · ')+(s.extras.prizeNote?'<br>🎖 '+cesc(s.extras.prizeNote):'')+'</div>':'';
+            const noteHtml=s.note?'<div class="cnote" style="flex:1 1 300px;margin-top:0;display:block;min-width:min(280px,100%)">📌 '+cesc(s.note)+'</div>':'';
+            let posterHtml='';
+            if(imgs.length){
+              window.__PST=window.__PST||{};window.__PST[d.id]=imgs.map(x=>x.url);
+              const nav=imgs.length>1;
+              const bst='position:absolute;top:50%;transform:translateY(-50%);border:none;background:rgba(17,24,39,.55);color:#fff;width:34px;height:34px;border-radius:50%;font-size:15px;font-weight:900;cursor:pointer;z-index:3';
+              posterHtml='<div style="position:relative;background:#fff;border:1px solid #e2e7f0;border-radius:12px;overflow:hidden">'
+                +'<a id="pstA_'+d.id+'" href="'+cesc(imgs[0].url)+'" target="_blank"><img id="pstImg_'+d.id+'" src="'+cesc(imgs[0].url)+'" alt="포스터" style="display:block;width:100%;max-height:430px;object-fit:contain;background:#fff"></a>'
+                +(nav?'<button type="button" onclick="pstNav(\''+d.id+'\',-1)" style="'+bst+';left:8px">◀</button><button type="button" onclick="pstNav(\''+d.id+'\',1)" style="'+bst+';right:8px">▶</button><span id="pstCnt_'+d.id+'" style="position:absolute;right:10px;bottom:8px;background:rgba(17,24,39,.6);color:#fff;font-size:11.5px;font-weight:800;border-radius:999px;padding:3px 10px;z-index:3">1 / '+imgs.length+'</span>':'')
+                +'</div>'
+                +'<div style="font-size:11px;color:#8a919d;font-weight:700;text-align:center;margin-top:4px">'+cesc(imgs[0].kind||'포스터')+' — 클릭하면 원본 크게 보기'+(nav?' · ◀ ▶ 로 넘겨보기':'')+'</div>';
+            }
+            const rightCol=(posterHtml||exHtml)?'<div style="flex:0 1 340px;min-width:min(280px,100%);max-width:100%">'+posterHtml+exHtml+'</div>':'';
+            const docChips=docsA.length?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+docsA.map(x=>'<a href="'+cesc(x.url)+'" target="_blank" style="font-size:12px;font-weight:800;color:#153A77;border:1.5px solid #c3d4ed;border-radius:9px;padding:7px 13px;text-decoration:none">📄 '+cesc(x.kind||'첨부')+' — '+cesc(x.name||'파일')+'</a>').join('')+'</div>':'';
+            if(!noteHtml&&!rightCol)return docChips;
+            if(noteHtml&&rightCol)return '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;margin-top:8px">'+noteHtml+rightCol+'</div>'+docChips;
+            return '<div style="margin-top:8px">'+(noteHtml||rightCol)+'</div>'+docChips;
           })()
         +divGroupsHtml(s,entry)
         +'<div class="cact">'+action
@@ -1415,6 +1427,16 @@ function divGroupsHtml(s,entry){
 // 부문별 정원: 임무 목록에 "오픈부:16" 형식이면 부문 정원 16 (없으면 무제한)
 function parseDiv(r){const m=String(r).match(/^(.+?):(\d+)$/);return m?{name:m[1].trim(),cap:parseInt(m[2])}:{name:String(r).trim(),cap:0}}
 function slotDivs(s){const roles=(s.roles&&s.roles.length)?s.roles:(DEFAULT_ROLES[s.role]||[]);return roles.map(parseDiv)}
+// [포스터 슬라이드] 공고 카드 포스터 여러 장 ◀▶ 넘기기
+function pstNav(id,dir){
+  const list=(window.__PST||{})[id]||[];if(!list.length)return;
+  window.__PSTI=window.__PSTI||{};
+  const n=(((window.__PSTI[id]||0)+dir)%list.length+list.length)%list.length;
+  window.__PSTI[id]=n;
+  const im=document.getElementById('pstImg_'+id);if(im)im.src=list[n];
+  const a=document.getElementById('pstA_'+id);if(a)a.href=list[n];
+  const c=document.getElementById('pstCnt_'+id);if(c)c.textContent=(n+1)+' / '+list.length;
+}
 function divActiveCount(s,name){
   const keys={};
   (s.claimed||[]).forEach(c=>{if((c.prefs||[]).indexOf(name)>=0)keys[ckey(c)]=1}); // [복수부문] 어느 순번이든 해당 부문 포함 시 집계
