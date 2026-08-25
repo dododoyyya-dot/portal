@@ -20,6 +20,22 @@
 .cnote{margin-top:8px;font-size:12.5px;font-weight:700;color:#153A77;background:#f0f5ff;border-radius:8px;padding:7px 11px;display:inline-block}
 .ctags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .ctag{font-size:11.5px;font-weight:700;color:#4b5563;background:#f3f4f6;border-radius:999px;padding:3px 10px}
+/* ── [개인전·단체전 구분 표시] 참가 공고 부문을 그룹 패널로 시인성 있게 (기존 .ctag는 심판·운영·구형 공고에서 그대로 사용) ── */
+.dgwrap{display:flex;flex-direction:column;gap:7px;margin-top:11px}
+.dgrow{display:flex;gap:10px;align-items:flex-start;border-radius:13px;padding:10px 13px;border:1.5px solid}
+.dgrow.dgind{background:linear-gradient(135deg,#f4f8ff,#edf3fc);border-color:#cdddf3}
+.dgrow.dgteam{background:linear-gradient(135deg,#f0faf7,#e8f6f0);border-color:#c5e5d8}
+.dglab{flex-shrink:0;display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:900;padding:5px 12px;border-radius:999px;color:#fff;letter-spacing:-.2px;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.dgind .dglab{background:linear-gradient(135deg,#1F4E9C,#153A77)}
+.dgteam .dglab{background:linear-gradient(135deg,#0f766e,#0b5d57)}
+.dgtags{display:flex;gap:6px;flex-wrap:wrap;padding-top:1px}
+.dgtags .ctag{margin:0;background:#fff;box-shadow:0 1px 3px rgba(15,30,60,.07)}
+.dgind .dgtags .ctag{border:1px solid #c9d8ef;color:#1e3a8a}
+.dgteam .dgtags .ctag{border:1px solid #b9ddcf;color:#0f5132}
+.dgtags .ctag b{font-weight:900}
+.dgtags .ctag.full{color:#C41E2F;background:#fdf0f1;border-color:#f1c7cc}
+.dgnote{font-size:11px;font-weight:700;color:#64748b;margin-top:2px}
+@media(max-width:560px){.dgrow{flex-direction:column;gap:6px;padding:9px 11px}}
 .cact{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px dashed #eceff4}
 .cbtn{border:none;cursor:pointer;font-family:inherit;font-weight:800;font-size:13px;padding:9px 18px;border-radius:10px;transition:filter .15s}
 .cbtn:hover{filter:brightness(1.08)}
@@ -1106,8 +1122,10 @@ async function loadLiveComps(){
     const rows=[];
     sl.docs.forEach(d=>{const s=d.data();
       if(s.compId&&s.role!=='참가')return;  // 대회 묶음의 심판·운영은 접힘 (참가 공고 대표 표기)
+      const _tn=(s.teamDivs||[]).length; // [개인·단체 표시]
       rows.push({date:s.date||'',end:s.date||'',title:s.title||'',kind:s.role==='참가'?'참가 모집':(s.role+'요원 모집'),
         color:s.role==='참가'?'#153A77':(s.role==='심판'?'#7c3aed':'#b8860b'),
+        ind:s.role==='참가'&&((s.roles||[]).length>_tn),team:s.role==='참가'&&_tn>0,
         done:!!(s.deadline&&s.deadline<today),place:s.region||'',href:'#cSlotList'});});
     if(st)st.docs.forEach(d=>{const s=d.data();
       const ds=(s.dates||[]).map(x=>x.date).filter(Boolean).sort();
@@ -1117,7 +1135,10 @@ async function loadLiveComps(){
     const act=rows.filter(r=>!r.done&&(!r.end||r.end>=today));
     const past=rows.filter(r=>r.done||(r.end&&r.end<today)).reverse();
     const tr=r=>'<tr><td>'+cesc(r.date?(r.date.replace(/-/g,'.')+(r.end&&r.end!==r.date?' ~ '+r.end.slice(5).replace(/-/g,'.'):'')):'추후 공고')+'</td>'
-      +'<td class="l"><a href="'+r.href+'" style="color:inherit;text-decoration:none;font-weight:800">'+cesc(r.title)+'</a> <span style="font-size:11px;font-weight:800;color:#fff;background:'+r.color+';padding:2px 8px;border-radius:999px">'+r.kind+'</span>'+(r.done?' <span style="font-size:11px;color:#8a919d;font-weight:800">마감</span>':'')+'</td>'
+      +'<td class="l"><a href="'+r.href+'" style="color:inherit;text-decoration:none;font-weight:800">'+cesc(r.title)+'</a> <span style="font-size:11px;font-weight:800;color:#fff;background:'+r.color+';padding:2px 8px;border-radius:999px">'+r.kind+'</span>'
+      +(r.ind?' <span style="font-size:10.5px;font-weight:900;color:#1e3a8a;background:#e8effc;border:1px solid #c9d8ef;padding:1px 7px;border-radius:999px">🙋 개인전</span>':'')
+      +(r.team?' <span style="font-size:10.5px;font-weight:900;color:#0f5132;background:#e6f6ef;border:1px solid #b9ddcf;padding:1px 7px;border-radius:999px">👥 단체전</span>':'')
+      +(r.done?' <span style="font-size:11px;color:#8a919d;font-weight:800">마감</span>':'')+'</td>'
       +'<td>'+cesc(r.place||'-')+'</td></tr>';
     el.innerHTML=(act.length||past.length)
       ?('<table class="tbl"><tr><th style="width:180px">일정</th><th>공고</th><th style="width:150px">장소·지역</th></tr>'
@@ -1214,11 +1235,7 @@ function slotCard(d,today){
           }).join('')+'</div>':'')
         +((s.extras&&(s.extras.prize||s.extras.souvenir||s.extras.insurance||s.extras.prizeNote))?'<div class="cnote" style="background:#fffbeb;border-color:#fde68a;color:#8a5a00">'+[s.extras.prize?'🏆 시상품 지급':'',s.extras.souvenir?'🎁 기념품 지급':'',s.extras.insurance?'🛡 행사 보험 가입':''].filter(Boolean).join(' · ')+(s.extras.prizeNote?'<br>🎖 '+cesc(s.extras.prizeNote):'')+'</div>':'')
         +(s.note?'<div class="cnote">📌 '+cesc(s.note)+'</div>':'')
-        +'<div class="ctags">'+slotDivs(s).map(dv=>{
-            if(entry&&dv.cap){const c=divActiveCount(s,dv.name);
-              return '<span class="ctag'+(c>=dv.cap?'" style="color:#C41E2F;background:#fdf0f1':'')+'">'+cesc(dv.name)+' '+c+'/'+dv.cap+(c>=dv.cap?' 마감':'')+'</span>';}
-            return '<span class="ctag">'+cesc(dv.name)+'</span>';
-          }).join('')+'</div>'
+        +divGroupsHtml(s,entry)
         +'<div class="cact">'+action
         +((s.teamDivs&&s.teamDivs.length&&s.role==='참가'&&!closed)?'<button class="cbtn cbtn-soft" onclick="openTeamApply(\''+d.id+'\')">👥 팀 단위 신청</button>':'')
         +(myTeamEntries(s).length?'<button class="cbtn cbtn-ghost" onclick="teamConsentUpload(\''+d.id+'\')">📎 동의서 업로드</button>':'')
@@ -1227,6 +1244,32 @@ function slotCard(d,today){
 }
 let APPLY_ID=null,APPLY_SEL=[],APPLY_PID=null,APPLY_MAX=3,APPLY_PARTS=[],MY_CLUBS=null,EDIT_KEY=null; // [신청수정] EDIT_KEY = 수정 중인 참가자 pid
 let RRN_OK=false;
+// ── [개인전·단체전 구분 표시] 부문 태그 렌더 — 참가 공고는 개인전/단체전 그룹 패널, 그 외(심판·운영·구형)는 기존 플랫 태그 유지 ──
+function divTagHtml(s,dv,entry){
+  if(entry&&dv.cap){const c=divActiveCount(s,dv.name);
+    return '<span class="ctag'+(c>=dv.cap?' full':'')+'">'+cesc(dv.name)+' <b>'+c+'/'+dv.cap+'</b>'+(c>=dv.cap?' 마감':'')+'</span>';}
+  return '<span class="ctag">'+cesc(dv.name)+'</span>';
+}
+function divGroupsHtml(s,entry){
+  const divs=slotDivs(s);
+  const tset={};(s.teamDivs||[]).forEach(n=>tset[String(n).trim()]=1);
+  const hasTeam=Object.keys(tset).length>0;
+  if(!entry||!hasTeam){
+    // 기존 방식 그대로 (심판·운영 공고, 단체전 구분 없는 구형 참가 공고)
+    return '<div class="ctags">'+divs.map(dv=>{
+      if(entry&&dv.cap){const c=divActiveCount(s,dv.name);
+        return '<span class="ctag'+(c>=dv.cap?'" style="color:#C41E2F;background:#fdf0f1':'')+'">'+cesc(dv.name)+' '+c+'/'+dv.cap+(c>=dv.cap?' 마감':'')+'</span>';}
+      return '<span class="ctag">'+cesc(dv.name)+'</span>';
+    }).join('')+'</div>';
+  }
+  const ind=divs.filter(d=>!tset[d.name]);
+  const team=divs.filter(d=>tset[d.name]);
+  let h='<div class="dgwrap">';
+  if(ind.length)h+='<div class="dgrow dgind"><span class="dglab">🙋 개인전</span><span class="dgtags">'+ind.map(dv=>divTagHtml(s,dv,entry)).join('')+'</span></div>';
+  if(team.length)h+='<div class="dgrow dgteam"><span class="dglab">👥 단체전</span><span class="dgtags">'+team.map(dv=>divTagHtml(s,dv,entry)).join('')
+    +'</span></div>'+(entry?'<div class="dgnote">단체전은 개인 신청 후 팀 배정(사무국 구성) 또는 [👥 팀 단위 신청]으로 참가할 수 있습니다.</div>':'');
+  return h+'</div>';
+}
 // 부문별 정원: 임무 목록에 "오픈부:16" 형식이면 부문 정원 16 (없으면 무제한)
 function parseDiv(r){const m=String(r).match(/^(.+?):(\d+)$/);return m?{name:m[1].trim(),cap:parseInt(m[2])}:{name:String(r).trim(),cap:0}}
 function slotDivs(s){const roles=(s.roles&&s.roles.length)?s.roles:(DEFAULT_ROLES[s.role]||[]);return roles.map(parseDiv)}
