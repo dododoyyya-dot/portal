@@ -17,7 +17,7 @@
 .rbadge{font-size:11px;font-weight:900;color:#fff;padding:3px 11px;border-radius:999px;letter-spacing:.5px}
 .cmeta{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:12.5px;color:#6b7280}
 .cmeta b{color:#374151}
-.cnote{margin-top:8px;font-size:12.5px;font-weight:700;color:#153A77;background:#f0f5ff;border-radius:8px;padding:7px 11px;display:inline-block}
+.cnote{margin-top:8px;font-size:12.5px;font-weight:700;color:#153A77;background:#f0f5ff;border-radius:8px;padding:7px 11px;display:inline-block;white-space:pre-line;word-break:keep-all;line-height:1.7} /* [안내문 줄바꿈] 작성한 줄바꿈·띄어쓰기 유지 */
 .ctags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .ctag{font-size:11.5px;font-weight:700;color:#4b5563;background:#f3f4f6;border-radius:999px;padding:3px 10px}
 /* ── [개인전·단체전 구분 표시] 참가 공고 부문을 그룹 패널로 시인성 있게 (기존 .ctag는 심판·운영·구형 공고에서 그대로 사용) ── */
@@ -1173,7 +1173,7 @@ async function loadSlots(){
         +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 4px 8px">'
         +'<b style="font-size:17px">🏆 '+cesc(c.title)+'</b>'+sports
         +'<span style="font-size:12.5px;color:#5b6472;font-weight:700">📅 '+cesc(c.dateStart)+(c.dateEnd&&c.dateEnd!==c.dateStart?' ~ '+cesc(c.dateEnd):'')+' · 📍 '+cesc(c.place||'')+'</span></div>'
-        +(c.desc?'<div style="font-size:12.5px;color:#4b5563;padding:0 4px 8px">'+cesc(c.desc)+'</div>':'')
+        +(c.desc?'<div style="font-size:12.5px;color:#4b5563;padding:0 4px 8px;white-space:pre-line;word-break:keep-all;line-height:1.75">'+cesc(c.desc)+'</div>':'')
         +((c.sports||[]).some(x=>x.mode==='체험부스')?'<div style="font-size:12.5px;font-weight:800;color:#8a5a00;background:#fff8ed;border:1px solid #ecd9b0;border-radius:9px;padding:8px 12px;margin:0 4px 8px">🎪 체험부스 종목은 신청 없이 현장에서 자유롭게 참여하실 수 있습니다.</div>':'')
         +(slots.filter(d=>d.data().role==='참가').length?slots.filter(d=>d.data().role==='참가').map(d=>slotCard(d,today)).join(''):'<div class="bempty" style="margin:4px">참가 모집 공고 준비 중</div>')
         +'</div>';
@@ -1447,7 +1447,7 @@ async function openApply(id){
     APPLY_PARTS=parts.filter(p=>!activeOfKey(s,p.pid)||p.pid===EDIT_KEY); // [신청수정] 수정 대상 참가자는 목록에 포함
     const clubOpts=(MY_CLUBS||[]).map(n=>'<option>'+cesc(n)+'</option>').join('');
     inner='<div class="cmodal">'
-      +'<div class="mhead"><div class="mt">🏃 대회 참가 신청서</div><div class="ms">'+cesc(s.title)+' · '+cesc(s.region)+' · '+cesc(s.date)+(s.note?' · 📌 '+cesc(s.note):'')+'</div></div>'
+      +'<div class="mhead"><div class="mt">🏃 대회 참가 신청서</div><div class="ms">'+cesc(s.title)+' · '+cesc(s.region)+' · '+cesc(s.date)+(s.note?' · 📌 '+cesc(String(s.note).replace(/\s+/g,' ').slice(0,80)):'')+'</div></div>'
       +'<div class="mbody">'
       +'<div style="font-size:11.5px;color:#8a919d;text-align:right;margin-bottom:8px">작성일 '+today+' · 자녀는 <a href="mypage.html" style="color:var(--red);font-weight:800">마이페이지 자녀 프로필</a>에서 등록</div>'
       +'<div style="font-size:13px;font-weight:800;margin-bottom:7px">① 참가자 선택</div>'
@@ -1462,12 +1462,22 @@ async function openApply(id){
       +'<tr id="guardRow" style="display:none"><th>보호자</th><td>'+cesc(CMY.name||'')+' (법정대리인)</td><th>보호자 연락처</th><td>'+cesc(CMY.phone||'미입력 — 마이페이지에서 입력')+'</td></tr>'
       +'</table>'
       +'<div style="font-size:13px;font-weight:800;margin:13px 0 7px">② 참가 부문 선택'+(s.fee?' <span style="font-weight:700;color:#b8860b;font-size:12px">💰 참가비: '+cesc(s.fee)+'</span>':'')+'</div>'
-      +'<div id="cRoleBtns" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">'
-      +slotDivs(s).map(dv=>{
-          const cnt=dv.cap?divActiveCount(s,dv.name):0;const full=dv.cap&&cnt>=dv.cap;
-          return '<button type="button" class="rolechip"'+(full?' disabled style="opacity:.4;cursor:not-allowed"':'')+' data-role="'+cesc(dv.name)+'" onclick="togRole(this)">'+cesc(dv.name)+(dv.cap?' <span style="font-size:11px;opacity:.75">'+(full?'마감':cnt+'/'+dv.cap)+'</span>':'')+'</button>';
-        }).join('')
-      +'</div><div id="cSelTxt" style="font-size:12.5px;color:#0f766e;font-weight:800;min-height:18px"></div>'
+      // [개인전·단체전 구분 표시] 신청서 부문 선택도 그룹 패널로 — 버튼 동작(togRole·#cRoleBtns 셀렉터)은 그대로 유지
+      +(function(){
+          const mk=dv=>{const cnt=dv.cap?divActiveCount(s,dv.name):0;const full=dv.cap&&cnt>=dv.cap;
+            return '<button type="button" class="rolechip"'+(full?' disabled style="opacity:.4;cursor:not-allowed"':'')+' data-role="'+cesc(dv.name)+'" onclick="togRole(this)">'+cesc(dv.name)+(dv.cap?' <span style="font-size:11px;opacity:.75">'+(full?'마감':cnt+'/'+dv.cap)+'</span>':'')+'</button>';};
+          const divsAll=slotDivs(s);
+          const tset={};(s.teamDivs||[]).forEach(n=>tset[String(n).trim()]=1);
+          if(!Object.keys(tset).length){
+            return '<div id="cRoleBtns" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">'+divsAll.map(mk).join('')+'</div>';
+          }
+          const ind=divsAll.filter(d2=>!tset[d2.name]),team=divsAll.filter(d2=>tset[d2.name]);
+          return '<div id="cRoleBtns" class="dgwrap" style="margin-top:0;margin-bottom:4px">'
+            +(ind.length?'<div class="dgrow dgind"><span class="dglab">🙋 개인전</span><span class="dgtags" style="gap:8px">'+ind.map(mk).join('')+'</span></div>':'')
+            +(team.length?'<div class="dgrow dgteam"><span class="dglab">👥 단체전</span><span class="dgtags" style="gap:8px">'+team.map(mk).join('')+'</span></div>':'')
+            +'</div>';
+        })()
+      +'<div id="cSelTxt" style="font-size:12.5px;color:#0f766e;font-weight:800;min-height:18px"></div>'
       // [대회v2] 특수 부문 선택 (선택사항 — 장애인부·강아지동반 등)
       +((s.entry&&s.entry.special&&s.entry.special.length)?'<div style="font-size:12.5px;font-weight:800;margin:8px 0 4px;color:#5b21b6">🏷 해당 시 선택 (선택사항)</div><div id="cSpecialBtns" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">'+s.entry.special.map(sp=>'<button type="button" class="rolechip" data-special="'+cesc(sp)+'" onclick="this.classList.toggle(\'on\')">'+cesc(sp)+'</button>').join('')+'</div>':'')
       +'<div class="clause">① 참가자는 대회 규정과 안전 수칙을 준수하며, 주최 측의 경기 운영에 따릅니다.<br>'
@@ -1490,7 +1500,7 @@ async function openApply(id){
       +'</div></div>';
   }else{
     inner='<div class="cmodal">'
-      +'<div class="mhead"><div class="mt">✍ 대회 '+cesc(s.role)+'요원 위촉 신청서</div><div class="ms">'+cesc(s.title)+' · '+cesc(s.region)+' · '+cesc(s.date)+(s.note?' · 📌 '+cesc(s.note):'')+'</div></div>'
+      +'<div class="mhead"><div class="mt">✍ 대회 '+cesc(s.role)+'요원 위촉 신청서</div><div class="ms">'+cesc(s.title)+' · '+cesc(s.region)+' · '+cesc(s.date)+(s.note?' · 📌 '+cesc(String(s.note).replace(/\s+/g,' ').slice(0,80)):'')+'</div></div>'
       +'<div class="mbody">'
       +'<div style="font-size:11.5px;color:#8a919d;text-align:right;margin-bottom:8px">작성일 '+today+' · 마이페이지 정보 자동 기입 <a href="mypage.html#profileBox" style="color:var(--red);font-weight:800">수정 →</a></div>'
       +'<div class="docsec"><div class="dtitle">위 촉 신 청 서</div>'
