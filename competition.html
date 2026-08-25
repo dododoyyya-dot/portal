@@ -453,6 +453,15 @@ function viewRoster(id){
   const sumTxt=Object.keys(cnt).map(k=>cesc(k)+' '+cnt[k]+'명').join(' · ');
   const tmap=(entry?_tbAssignedMap(s):{}); // [팀구성] 개인 참가자 → 배정팀 표시
   const tbadge=c=>(entry&&!c.team&&tmap[ckey(c)])?' <span style="font-size:10.5px;font-weight:900;color:#fff;background:#0f766e;border-radius:999px;padding:1px 8px;vertical-align:1px">🧩 '+cesc(tmap[ckey(c)])+'</span>':'';
+  // [수기동의] 미성년 보호자 동의 상태 뱃지 (전자서명 kid / 수기동의서 확인 / 미확인+확인 버튼)
+  const paper=s.paperConsents||{};
+  const consentBadge=(c,key)=>{
+    if(!entry||!c.birth||!(ageOf(c.birth)<18&&ageOf(c.birth)>0))return '';
+    if(c.kid)return ' <span style="font-size:10.5px;font-weight:900;color:#0f766e">👨‍👧 보호자서명✓</span>';
+    if(paper[key])return ' <span style="font-size:10.5px;font-weight:900;color:#0f766e" title="'+cesc((paper[key].by||'')+' 확인 '+String(paper[key].at||'').slice(0,10))+'">📄 수기동의✓</span>';
+    return ' <span style="font-size:10.5px;font-weight:900;color:#C41E2F">⚠ 보호자동의 필요</span>'
+      +(staff?' <button onclick="markPaper(\''+id+'\',\''+key+'\',\''+cesc(c.name||'')+'\')" style="border:1.5px solid #e6b422;background:#fffbeb;color:#8a5a00;border-radius:8px;padding:2px 8px;font-size:10.5px;font-weight:800;cursor:pointer" title="담당자가 서면(수기) 동의서를 수령한 경우 클릭">📄 수기동의서 확인완료</button>':'');
+  };
   let rows;
   if(!list.length)rows='<tr><td '+td+' colspan="9" style="text-align:center;color:#8a919d">아직 신청자가 없습니다</td></tr>';
   else if(staff){
@@ -460,12 +469,14 @@ function viewRoster(id){
       if(c.team){
         return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+' colspan="'+(entry?'4':'1')+'"><b>👥 '+cesc(c.name)+'</b> <span style="font-size:11.5px;color:#8a919d">'+cesc(c.teamType||'팀')+(c.teamOrg?' · '+cesc(c.teamOrg):'')+' · 인솔 '+cesc(c.leader||'')+'('+cesc(c.leaderRole||'')+')'+(c.leaderPhone?' '+cesc(c.leaderPhone):'')+'</span>'
           +'<details style="margin-top:4px"><summary style="cursor:pointer;font-size:12px;font-weight:800;color:#153A77">명단 '+(c.rosterN||0)+'명'+((c.consentFiles&&c.consentFiles.length)?' · 📎동의서 '+c.consentFiles.length:'')+'</summary>'
-          +'<div style="font-size:12px;color:#4b5563;margin-top:4px">'+(c.roster||[]).map((r,j)=>(j+1)+'. '+cesc(r.name)+(r.birth?' ('+cesc(r.birth)+')':'')+(r.school?' · '+cesc(r.school):'')).join('<br>')+'</div></details></td>'
+          +'<div style="font-size:12px;color:#4b5563;margin-top:4px">'+(c.roster||[]).map((r,j)=>(j+1)+'. '+cesc(r.name)+(r.birth?' ('+cesc(r.birth)+')':'')+(r.school?' · '+cesc(r.school):'')
+            +(r.birth&&ageOf(r.birth)>0&&ageOf(r.birth)<18?(paper[ckey(c)+'_'+j]?' <b style="color:#0f766e" title="'+cesc((paper[ckey(c)+'_'+j].by||'')+' 확인 '+String(paper[ckey(c)+'_'+j].at||'').slice(0,10))+'">📄 수기동의✓</b>':' <b style="color:#C41E2F">⚠미성년</b> <button onclick="markPaper(\''+id+'\',\''+ckey(c)+'_'+j+'\',\''+cesc(r.name)+'\')" style="border:1.5px solid #e6b422;background:#fffbeb;color:#8a5a00;border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:800;cursor:pointer">📄 수기동의서 확인완료</button>'):'')).join('<br>')+'</div></details>'
+          +'<div style="margin-top:6px"><button onclick="openRosterEdit(\''+id+'\',\''+ckey(c)+'\')" style="border:1.5px solid #153A77;background:#fff;color:#153A77;border-radius:8px;padding:3px 10px;font-size:11.5px;font-weight:800;cursor:pointer">✏️ 명단 수정 (추가·제거)</button></div></td>'
           +'<td '+td+'>'+cesc((c.prefs||[])[0]||'-')+'</td><td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
           +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td>'
           +(entry?_payCell(id,c,td):'')+'</tr>';
       }
-      return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b>'+tbadge(c)+'</td>'
+      return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b>'+tbadge(c)+consentBadge(c,ckey(c))+'</td>'
       +(entry?'<td '+td+'>'+cesc(c.birth||'-')+'</td><td '+td+'>'+cesc(c.gender||'-')+'</td><td '+td+'>'+cesc(c.school||c.club||'-')+'</td>':'')
       +'<td '+td+'>'+cesc((c.prefs||[]).map((p,j)=>(j+1)+'지망 '+p).join(' · ')||'-')+'</td>'
       +'<td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
@@ -497,6 +508,90 @@ function viewRoster(id){
     +(staff&&entry?'<button class="cbtn" style="background:#0f766e;color:#fff" onclick="document.getElementById(\'rosterModal\').remove();openTeamBuilder(\''+id+'\')">🧩 팀 구성 (개인 참가자)</button>':'')
     +'<button class="cbtn cbtn-ghost" onclick="document.getElementById(\'rosterModal\').remove()">닫기</button></div></div>';
   document.body.appendChild(div);
+}
+// ── [수기동의] 보호자 서면(수기) 동의서 수령 확인 — 담당자 클릭 시 동의완료 처리 (compSlots.paperConsents) ──
+async function _refreshSlot(id){
+  const d=await DB.collection('compSlots').doc(id).get();
+  const i=CSLOTS.findIndex(x=>x.id===id);
+  if(i>=0&&d.exists){const v=d.data();CSLOTS[i]={id:id,data:function(){return v}};}
+  return d.exists?d.data():null;
+}
+async function markPaper(slotId,key,name){
+  if(!isCompStaff()){alert('권한자만 확인 처리할 수 있습니다');return}
+  if(!confirm('['+(name||'참가자')+'] 보호자 서면(수기) 동의서를 실제로 수령·확인하셨습니까?\n확인 시 이 참가자는 보호자 동의 완료로 처리됩니다.'))return;
+  try{
+    await DB.collection('compSlots').doc(slotId).update(
+      new firebase.firestore.FieldPath('paperConsents',key),
+      {name:name||'',by:(CMY&&CMY.name)||'관리자',at:new Date().toISOString()});
+    await _refreshSlot(slotId);
+    viewRoster(slotId);
+  }catch(e){alert('처리 실패: '+e.message+'\n(중앙 관리자 권한이 필요할 수 있습니다)')}
+}
+// ── [단체 명단 수정] 팀 신청 명단 인원 추가·제거 (권한자 — 좌측 명단 ✕제거 / 우측 패널 추가) ──
+let _RED={roster:[]};
+async function openRosterEdit(slotId,key){
+  const s=await _refreshSlot(slotId);
+  if(!s){alert('공고를 찾을 수 없습니다');return}
+  const arr=(s.claimed||[]).filter(c=>c.team&&ckey(c)===key);
+  const c=arr[arr.length-1];
+  if(!c){alert('팀 신청을 찾을 수 없습니다');return}
+  _RED={slotId:slotId,key:key,teamName:c.name,roster:(c.roster||[]).map(r=>Object.assign({},r))};
+  const old=document.getElementById('reModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='reModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.6);z-index:1200;display:flex;align-items:center;justify-content:center;padding:16px';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:680px;width:100%;max-height:92vh;overflow:auto;padding:22px">'
+    +'<b style="font-size:16px">✏️ 단체 명단 수정 — '+cesc(c.name||'')+'</b>'
+    +'<div style="font-size:12px;color:#8a919d;margin:4px 0 10px">왼쪽 명단에서 ✕로 빼고, 오른쪽 패널에서 추가해 넣을 수 있습니다. <b>[저장]을 눌러야 최종 반영</b>됩니다.</div>'
+    +'<div style="display:flex;gap:14px;flex-wrap:wrap">'
+    +'<div style="flex:1.4;min-width:250px"><div style="font-size:12.5px;font-weight:900;color:#153A77;margin-bottom:6px">현재 명단 <span id="reCnt"></span></div><div id="reList"></div></div>'
+    +'<div style="flex:1;min-width:210px;background:#f6f8fb;border-radius:12px;padding:14px;align-self:flex-start">'
+      +'<div style="font-size:12.5px;font-weight:900;color:#153A77;margin-bottom:6px">➕ 인원 추가</div>'
+      +'<input id="reName" placeholder="성명 *" style="width:100%;padding:9px 11px;border:1.5px solid #dfe5ee;border-radius:9px;margin-bottom:6px;font-family:inherit">'
+      +'<input id="reBirth" placeholder="생년월일 (예: 2013-05-01)" style="width:100%;padding:9px 11px;border:1.5px solid #dfe5ee;border-radius:9px;margin-bottom:6px;font-family:inherit">'
+      +'<input id="reSchool" placeholder="학교·소속 (선택)" style="width:100%;padding:9px 11px;border:1.5px solid #dfe5ee;border-radius:9px;margin-bottom:8px;font-family:inherit">'
+      +'<button class="cbtn" style="background:#153A77;color:#fff;width:100%" onclick="reAdd()">➕ 명단에 추가</button>'
+      +'<div style="font-size:11.5px;color:#8a919d;margin-top:8px;line-height:1.5">미성년 추가 인원은 보호자 동의(전자 승인 또는 수기 동의서 확인)가 필요합니다.</div></div>'
+    +'</div>'
+    +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">'
+    +'<button class="cbtn" style="background:#0f766e;color:#fff" onclick="reSave()">💾 저장</button>'
+    +'<button class="cbtn cbtn-ghost" onclick="document.getElementById(\'reModal\').remove()">취소</button></div></div>';
+  document.body.appendChild(div);
+  reRender();
+}
+function reRender(){
+  const el=document.getElementById('reList');if(!el)return;
+  document.getElementById('reCnt').textContent='('+_RED.roster.length+'명)';
+  el.innerHTML=_RED.roster.length?_RED.roster.map(function(r,i){
+    return '<div style="display:flex;align-items:center;gap:8px;border:1px solid #e5e9f0;border-radius:9px;padding:7px 10px;margin-bottom:5px;font-size:13px"><b style="min-width:52px">'+cesc(r.name)+'</b><span style="color:#6b7280;font-size:12px;flex:1">'+cesc(r.birth||'')+(r.school?' · '+cesc(r.school):'')+(r.birth&&ageOf(r.birth)>0&&ageOf(r.birth)<18?' <b style="color:#b8860b">미성년</b>':'')+'</span><button onclick="reDel('+i+')" title="명단에서 제거" style="border:none;background:#fee2e2;color:#C41E2F;border-radius:7px;width:26px;height:26px;font-weight:900;cursor:pointer">✕</button></div>';
+  }).join(''):'<div style="font-size:12.5px;color:#8a919d;padding:10px;border:1.5px dashed #dfe5ee;border-radius:9px">명단이 비어 있습니다 — 오른쪽에서 추가하세요</div>';
+}
+function reDel(i){_RED.roster.splice(i,1);reRender()}
+function reAdd(){
+  const v=function(id){return (document.getElementById(id).value||'').trim()};
+  const n=v('reName');if(!n){alert('성명을 입력해주세요');return}
+  const b=v('reBirth');
+  if(b&&!/^\d{4}-\d{2}-\d{2}$/.test(b)){alert('생년월일은 2013-05-01 형식으로 입력해주세요 (모르면 비워두세요)');return}
+  _RED.roster.push({name:n,birth:b,school:v('reSchool')});
+  document.getElementById('reName').value='';document.getElementById('reBirth').value='';document.getElementById('reSchool').value='';
+  document.getElementById('reName').focus();
+  reRender();
+}
+async function reSave(){
+  if(!_RED.roster.length&&!confirm('명단이 0명입니다. 그래도 저장할까요?'))return;
+  try{
+    const ref=DB.collection('compSlots').doc(_RED.slotId);
+    await DB.runTransaction(async function(tx){
+      const doc=await tx.get(ref);const s=doc.data();
+      const claimed=(s.claimed||[]).map(function(c){
+        return (c.team&&ckey(c)===_RED.key)?Object.assign({},c,{roster:_RED.roster,rosterN:_RED.roster.length,rosterEditedAt:new Date().toISOString(),rosterEditedBy:(CMY&&CMY.name)||'관리자'}):c;
+      });
+      tx.update(ref,{claimed:claimed});
+    });
+    await _refreshSlot(_RED.slotId);
+    const m=document.getElementById('reModal');if(m)m.remove();
+    alert('✓ 명단이 저장되었습니다 ('+_RED.roster.length+'명)');
+    viewRoster(_RED.slotId);
+  }catch(e){alert('저장 실패: '+e.message+'\n(중앙 관리자 권한이 필요할 수 있습니다)')}
 }
 // ── 미성년 참가: 자녀 요청 → 보호자 승인(신청서 작성·서명) ──
 let FAMREQ=null;
@@ -538,7 +633,7 @@ async function openTeamApply(id){
   const div=document.createElement('div');div.id='taModal';
   div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.6);z-index:999;display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto';
   const inp='style="padding:9px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-family:inherit;font-size:13.5px"';
-  div.innerHTML='<div class="cmodal"><div class="mhead"><div class="mt">👥 팀 단위 참가 신청</div><div class="ms">'+cesc(s.title)+' · '+cesc(s.date)+'</div></div>'
+  div.innerHTML='<div class="cmodal"><div class="mhead"><div class="mt">👥 단체 참가 신청</div><div class="ms">'+cesc(s.title)+' · '+cesc(s.date)+'</div></div>'
     +'<div class="mbody">'
     +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:13px;font-weight:800">① 팀 정보</span><button type="button" class="cbtn cbtn-soft" style="padding:5px 13px;font-size:12px" onclick="taFindTeams()">🔍 팀 찾기 — 내 클럽에서 선택</button></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
@@ -1210,7 +1305,7 @@ async function loadSlots(){
       html+='<div style="border:2px solid #b9cdec;border-radius:18px;padding:4px 16px 14px;margin-bottom:22px;background:#f8fbff">'
         +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 4px 8px">'
         +'<b style="font-size:17px">🏆 '+cesc(c.title)+'</b>'+sports
-        +'<span style="font-size:12.5px;color:#5b6472;font-weight:700">📅 '+cesc(c.dateStart)+(c.dateEnd&&c.dateEnd!==c.dateStart?' ~ '+cesc(c.dateEnd):'')+' · 📍 '+cesc(c.place||'')+'</span></div>'
+        +'<span style="font-size:12.5px;color:#5b6472;font-weight:700">📅 '+cesc(c.dateStart)+(c.dateEnd&&c.dateEnd!==c.dateStart?' ~ '+cesc(c.dateEnd):'')+' · <span style="font-size:14px;font-weight:800;color:#374151">📍 '+cesc(c.place||'')+'</span></span></div>'
         +(c.desc?'<div style="font-size:12.5px;color:#4b5563;padding:0 4px 8px;white-space:pre-line;word-break:keep-all;line-height:1.75">'+cesc(c.desc)+'</div>':'')
         +((c.sports||[]).some(x=>x.mode==='체험부스')?'<div style="font-size:12.5px;font-weight:800;color:#8a5a00;background:#fff8ed;border:1px solid #ecd9b0;border-radius:9px;padding:8px 12px;margin:0 4px 8px">🎪 체험부스 종목은 신청 없이 현장에서 자유롭게 참여하실 수 있습니다.</div>':'')
         +(slots.filter(d=>d.data().role==='참가').length?slots.filter(d=>d.data().role==='참가').map(d=>slotCard(d,today)).join(''):'<div class="bempty" style="margin:4px">참가 모집 공고 준비 중</div>')
@@ -1255,16 +1350,16 @@ function slotCard(d,today){
       }
       else if(closed)action='<span class="cpill" style="background:#8a919d;color:#fff">마감</span>';
       else if(!eligible)action='<span style="color:#8a919d;font-size:12.5px;font-weight:700">'+(s.role==='심판'?'심판':'운영')+'요원 분야 지원 후 신청 가능 — <a href="jobs.html" style="color:var(--blue);font-weight:800">강사 활동 지원 →</a></span>';
-      else action='<button class="cbtn cbtn-main" onclick="openApply(\''+d.id+'\')">'+(entry?'🏃 참가 신청':'✍ 신청하기')+'</button>';
+      else action='<button class="cbtn cbtn-main" onclick="openApply(\''+d.id+'\')">'+(entry?'🏃 개인 신청':'✍ 신청하기')+'</button>';
       return '<div class="cslot"><div class="chead"><span class="ctitle">'+cesc(s.title)+'</span><span class="rbadge" style="background:'+rc+'">'+cesc(s.role)+(entry?' (선수)':'요원')+'</span>'
         +(closed&&!mines.length?'<span class="rbadge" style="background:#8a919d">마감</span>':'')+'</div>'
-        +'<div class="cmeta"><span>📍 <b>'+cesc(s.region)+(s.place?' · '+cesc(s.place):'')+'</b></span><span>📅 <b>'+cesc(s.date)+'</b></span><span>👥 신청 <b>'+act+'/'+s.quota+'</b></span>'+(s.deadline?'<span>⏳ 마감 <b>'+cesc(s.deadline)+'</b></span>':'')+(s.fee?'<span>💰 <b>'+cesc(s.fee)+'</b></span>':'')+'</div>'
+        +'<div class="cmeta"><span style="font-size:14.5px;font-weight:800">📍 <b>'+cesc(s.region)+(s.place?' · '+cesc(s.place):'')+'</b></span><span>📅 <b>'+cesc(s.date)+'</b></span><span>👥 신청 <b>'+act+'/'+s.quota+'</b></span>'+(s.deadline?'<span>⏳ 마감 <b>'+cesc(s.deadline)+'</b></span>':'')+(s.fee?'<span>💰 <b>'+cesc(s.fee)+'</b></span>':'')+'</div>'
         // [v3] 참가 지역제한 표기·제한 제거 (전국 누구나 신청 가능)
         // [대회v2] 주최·주관·후원·협찬 / 개회식·대회 시간장소 / 참가비 구분 / 특수 부문
         // [모바일 줄바꿈] 주최·주관·후원·협찬은 항목 단위로 묶어 줄바꿈 (라벨과 기관명이 분리되지 않게)
         +((s.host||s.organizer||s.sponsor||s.partner)?'<div class="cnote" style="background:#f6f8fb;border-color:#dfe5ee;color:#374151">'+[s.host?'<span style="display:inline-block">주최 <b>'+cesc(s.host)+'</b></span>':'',s.organizer?'<span style="display:inline-block">주관 <b>'+cesc(s.organizer)+'</b></span>':'',s.sponsor?'<span style="display:inline-block">후원 <b>'+cesc(s.sponsor)+'</b></span>':'',s.partner?'<span style="display:inline-block">협찬 <b>'+cesc(s.partner)+'</b></span>':''].filter(Boolean).join('<span style="color:#9aa5b5">&nbsp;·&nbsp;</span>')+'</div>':'')
         // [모바일 줄바꿈] 개회식·대회 시간도 항목 단위로 묶어 줄바꿈
-        +(((s.opening&&(s.opening.time||s.opening.place))||s.time)?'<div class="cnote" style="background:#f6f8fb;border-color:#dfe5ee;color:#374151">'+((s.opening&&(s.opening.time||s.opening.place))?'<span style="display:inline-block">🎪 개회식 <b>'+cesc(((s.opening.time||'')+(s.opening.place?' · '+s.opening.place:'')).trim())+'</b></span>':'')+(s.time?(((s.opening&&(s.opening.time||s.opening.place))?'<span style="color:#9aa5b5">&nbsp;·&nbsp;</span>':'')+'<span style="display:inline-block">🏟 대회 <b>'+cesc(s.time)+'</b></span>'):'')+'</div>':'')
+        +(((s.opening&&(s.opening.time||s.opening.place))||s.time)?'<div class="cnote" style="background:#f6f8fb;border-color:#dfe5ee;color:#374151">'+((s.opening&&(s.opening.time||s.opening.place))?'<span style="display:inline-block">🎪 개회식 <b>'+cesc(((s.opening.time||'')+(s.opening.place?' · '+s.opening.place:'')).trim())+'</b></span>':'')+(s.time?(((s.opening&&(s.opening.time||s.opening.place))?'<span style="color:#9aa5b5">&nbsp;·&nbsp;</span>':'')+'<span style="display:inline-block">🏟 대회시간 <b>'+cesc(s.time)+'</b></span>'):'')+'</div>':'')
         +(s.entry&&s.entry.fees&&s.entry.fees.length?'<div class="cnote" style="background:#f0fdf4;border-color:#a7f3d0;color:#0f5132">💰 참가비: '+s.entry.fees.map(f=>cesc(f.label+(f.amount?' '+f.amount:''))).join(' · ')+'</div>':'')
         /* [특수부문 제거] 🏷 선택 부문 안내 상자 미표시 (기존 데이터는 보존, 표출만 중단) */
         // [대회v3] 첨부자료(포스터·대진표·일정표) + 기타안내(시상품·기념품·보험)
@@ -1284,7 +1379,7 @@ function slotCard(d,today){
           })()
         +divGroupsHtml(s,entry)
         +'<div class="cact">'+action
-        +((s.teamDivs&&s.teamDivs.length&&s.role==='참가'&&!closed)?'<button class="cbtn cbtn-soft" onclick="openTeamApply(\''+d.id+'\')">👥 팀 단위 신청</button>':'')
+        +((s.teamDivs&&s.teamDivs.length&&s.role==='참가'&&!closed)?'<button class="cbtn cbtn-soft" onclick="openTeamApply(\''+d.id+'\')">👥 단체 신청</button>':'')
         +(myTeamEntries(s).length?'<button class="cbtn cbtn-ghost" onclick="teamConsentUpload(\''+d.id+'\')">📎 동의서 업로드</button>':'')
         +'<button class="cbtn cbtn-ghost" onclick="viewRoster(\''+d.id+'\')">👥 신청 현황</button></div></div>';
   }
@@ -1314,7 +1409,7 @@ function divGroupsHtml(s,entry){
   let h='<div class="dgwrap">';
   if(ind.length)h+='<div class="dgrow dgind"><span class="dglab">🙋 개인전</span><span class="dgtags">'+ind.map(dv=>divTagHtml(s,dv,entry)).join('')+'</span></div>';
   if(team.length)h+='<div class="dgrow dgteam"><span class="dglab">👥 단체전</span><span class="dgtags">'+team.map(dv=>divTagHtml(s,dv,entry)).join('')
-    +'</span></div>'+(entry?'<div class="dgnote">단체전은 개인 신청 후 팀 배정(사무국 구성) 또는 [👥 팀 단위 신청]으로 참가할 수 있습니다.</div>':'');
+    +'</span></div>'+(entry?'<div class="dgnote">단체전은 개인 신청 후 팀 배정(사무국 구성) 또는 [👥 단체 신청]으로 참가할 수 있습니다.</div>':'');
   return h+'</div>';
 }
 // 부문별 정원: 임무 목록에 "오픈부:16" 형식이면 부문 정원 16 (없으면 무제한)
