@@ -1223,8 +1223,10 @@ function slotCard(d,today){
         +'<div class="cmeta"><span>📍 <b>'+cesc(s.region)+'</b></span><span>📅 <b>'+cesc(s.date)+'</b></span><span>👥 신청 <b>'+act+'/'+s.quota+'</b></span>'+(s.deadline?'<span>⏳ 마감 <b>'+cesc(s.deadline)+'</b></span>':'')+(s.fee?'<span>💰 <b>'+cesc(s.fee)+'</b></span>':'')+'</div>'
         // [v3] 참가 지역제한 표기·제한 제거 (전국 누구나 신청 가능)
         // [대회v2] 주최·주관·후원·협찬 / 개회식·대회 시간장소 / 참가비 구분 / 특수 부문
-        +((s.host||s.organizer||s.sponsor||s.partner)?'<div class="cnote" style="background:#f6f8fb;border-color:#dfe5ee;color:#374151">'+[s.host?'주최 <b>'+cesc(s.host)+'</b>':'',s.organizer?'주관 <b>'+cesc(s.organizer)+'</b>':'',s.sponsor?'후원 <b>'+cesc(s.sponsor)+'</b>':'',s.partner?'협찬 <b>'+cesc(s.partner)+'</b>':''].filter(Boolean).join(' · ')+'</div>':'')
-        +(((s.opening&&(s.opening.time||s.opening.place))||s.time)?'<div class="cnote" style="background:#f6f8fb;border-color:#dfe5ee;color:#374151">'+((s.opening&&(s.opening.time||s.opening.place))?'🎪 개회식 <b>'+cesc(((s.opening.time||'')+(s.opening.place?' · '+s.opening.place:'')).trim())+'</b>':'')+(s.time?(((s.opening&&(s.opening.time||s.opening.place))?' &nbsp;·&nbsp; ':'')+'🏟 대회 <b>'+cesc(s.time)+'</b>'):'')+'</div>':'')
+        // [모바일 줄바꿈] 주최·주관·후원·협찬은 항목 단위로 묶어 줄바꿈 (라벨과 기관명이 분리되지 않게)
+        +((s.host||s.organizer||s.sponsor||s.partner)?'<div class="cnote" style="background:#f6f8fb;border-color:#dfe5ee;color:#374151">'+[s.host?'<span style="display:inline-block">주최 <b>'+cesc(s.host)+'</b></span>':'',s.organizer?'<span style="display:inline-block">주관 <b>'+cesc(s.organizer)+'</b></span>':'',s.sponsor?'<span style="display:inline-block">후원 <b>'+cesc(s.sponsor)+'</b></span>':'',s.partner?'<span style="display:inline-block">협찬 <b>'+cesc(s.partner)+'</b></span>':''].filter(Boolean).join('<span style="color:#9aa5b5">&nbsp;·&nbsp;</span>')+'</div>':'')
+        // [모바일 줄바꿈] 개회식·대회 시간도 항목 단위로 묶어 줄바꿈
+        +(((s.opening&&(s.opening.time||s.opening.place))||s.time)?'<div class="cnote" style="background:#f6f8fb;border-color:#dfe5ee;color:#374151">'+((s.opening&&(s.opening.time||s.opening.place))?'<span style="display:inline-block">🎪 개회식 <b>'+cesc(((s.opening.time||'')+(s.opening.place?' · '+s.opening.place:'')).trim())+'</b></span>':'')+(s.time?(((s.opening&&(s.opening.time||s.opening.place))?'<span style="color:#9aa5b5">&nbsp;·&nbsp;</span>':'')+'<span style="display:inline-block">🏟 대회 <b>'+cesc(s.time)+'</b></span>'):'')+'</div>':'')
         +(s.entry&&s.entry.fees&&s.entry.fees.length?'<div class="cnote" style="background:#f0fdf4;border-color:#a7f3d0;color:#0f5132">💰 참가비: '+s.entry.fees.map(f=>cesc(f.label+(f.amount?' '+f.amount:''))).join(' · ')+'</div>':'')
         +(s.entry&&s.entry.special&&s.entry.special.length?'<div class="cnote" style="background:#f5f0ff;border-color:#ddd0fa;color:#5b21b6">🏷 선택 부문: '+s.entry.special.map(x=>cesc(x)).join(' · ')+' — 신청 시 선택</div>':'')
         // [대회v3] 첨부자료(포스터·대진표·일정표) + 기타안내(시상품·기념품·보험)
@@ -1233,8 +1235,15 @@ function slotCard(d,today){
             return isImg?'<a href="'+cesc(x.url)+'" target="_blank" style="text-align:center;text-decoration:none"><img src="'+cesc(x.url)+'" style="height:74px;border-radius:8px;border:1px solid #e2e7f0;display:block"><span style="font-size:10.5px;color:#6b7280;font-weight:700">'+cesc(x.kind||'첨부')+'</span></a>'
               :'<a href="'+cesc(x.url)+'" target="_blank" style="font-size:12px;font-weight:800;color:#153A77;border:1.5px solid #c3d4ed;border-radius:9px;padding:7px 13px;text-decoration:none">📄 '+cesc(x.kind||'첨부')+' — '+cesc(x.name||'파일')+'</a>';
           }).join('')+'</div>':'')
-        +((s.extras&&(s.extras.prize||s.extras.souvenir||s.extras.insurance||s.extras.prizeNote))?'<div class="cnote" style="background:#fffbeb;border-color:#fde68a;color:#8a5a00">'+[s.extras.prize?'🏆 시상품 지급':'',s.extras.souvenir?'🎁 기념품 지급':'',s.extras.insurance?'🛡 행사 보험 가입':''].filter(Boolean).join(' · ')+(s.extras.prizeNote?'<br>🎖 '+cesc(s.extras.prizeNote):'')+'</div>':'')
-        +(s.note?'<div class="cnote">📌 '+cesc(s.note)+'</div>':'')
+        // [배치 개선] 📌 안내문은 좌측(넓게), 🏆 시상품·기념품·보험은 우측 상자로 — 좁은 화면에선 자동으로 세로 배치
+        +(function(){
+            const hasEx=!!(s.extras&&(s.extras.prize||s.extras.souvenir||s.extras.insurance||s.extras.prizeNote));
+            const noteHtml=s.note?'<div class="cnote" style="flex:1 1 300px;margin-top:0;display:block">📌 '+cesc(s.note)+'</div>':'';
+            const exHtml=hasEx?'<div class="cnote" style="flex:0 1 300px;margin-top:0;display:block;align-self:flex-start;background:#fffbeb;border:1.5px solid #fde68a;color:#8a5a00">'+[s.extras.prize?'🏆 시상품 지급':'',s.extras.souvenir?'🎁 기념품 지급':'',s.extras.insurance?'🛡 행사 보험 가입':''].filter(Boolean).join(' · ')+(s.extras.prizeNote?'<br>🎖 '+cesc(s.extras.prizeNote):'')+'</div>':'';
+            if(!noteHtml&&!exHtml)return '';
+            if(noteHtml&&exHtml)return '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:stretch;margin-top:8px">'+noteHtml+exHtml+'</div>';
+            return '<div style="margin-top:8px">'+(noteHtml||exHtml)+'</div>';
+          })()
         +divGroupsHtml(s,entry)
         +'<div class="cact">'+action
         +((s.teamDivs&&s.teamDivs.length&&s.role==='참가'&&!closed)?'<button class="cbtn cbtn-soft" onclick="openTeamApply(\''+d.id+'\')">👥 팀 단위 신청</button>':'')
