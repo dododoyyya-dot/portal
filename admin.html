@@ -386,6 +386,8 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#0e7490" onclick="window.open('sim.html','_blank')">🧪 가선정 시뮬레이션 (새 창)</button>
         <button class="btn-sub" style="background:#153A77" onclick="window.open('tally.html','_blank')">📊 총집계 현황</button>
         <button class="btn-sub" style="background:#0f766e" onclick="exportCSV()">⬇ 전체 CSV</button>
+        <button class="btn-sub" style="background:#b8860b" onclick="dlDeliveryCsv()">🚚 배송명단 CSV</button>
+        <button class="btn-sub" style="background:#153A77" onclick="dlGoodsCerts()">🧾 수령확인증 일괄 다운로드</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="showGigs()">🔎 단기공고 승인<span id="gigCntBadge" style="display:none;background:#C41E2F;border-radius:999px;padding:1px 7px;font-size:11px;margin-left:5px"></span></button>
         <button class="btn-sub" style="background:#0e7490" onclick="showInspections()">📋 점검 제출현황</button>
         <button class="btn-sub" style="background:#0f766e" onclick="backfillPhoneIndex()">📇 전화번호 중복확인 보정</button>
@@ -982,7 +984,8 @@ function renderApps(){
       +((dupKey[(s.school||'').replace(/\s/g,'')+'|'+(s.type||'')]>1)?' <span style="font-size:11px;font-weight:800;color:#fff;background:#e6b422;padding:2px 8px;border-radius:999px">⚠ 중복의심</span>':'')
       +(s.support==='용품만'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">🎁 용품만</span>':'')
       +' <span style="font-size:11px;font-weight:800;color:#fff;background:'+(appTypeOf(s).indexOf('방과후')>=0?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+'</span>'
-      +((st==='선정'||st==='배정완료')?' <span style="font-size:11px;font-weight:800;color:'+(gc&&gc.teacherConfirm?'#0f766e':'#C41E2F')+'" title="'+(gc&&gc.teacherConfirm?esc(gc.teacherConfirm.name)+' 수령확인':'용품 수령 미확인')+'">📦 용품보유 '+(gc&&gc.teacherConfirm?'O':'X')+'</span>':'')
+      +((st==='선정'||st==='배정완료')?' <span style="font-size:11px;font-weight:800;color:'+(gc&&gc.delivery?'#0f766e':'#C41E2F')+'" title="'+(gc&&gc.delivery?esc(((gc.delivery.addr||'')+' '+(gc.delivery.addr2||'')).trim())+' · '+esc(gc.delivery.receiver||'')+' '+esc(gc.delivery.phone||''):'배송지 미입력 — 📦 버튼으로 링크를 교사에게 전달하세요')+'">🚚 배송지 '+(gc&&gc.delivery?'O':'X')+'</span>':'')
+      +((st==='선정'||st==='배정완료')?' <span style="font-size:11px;font-weight:800;color:'+(gc&&gc.teacherConfirm?'#0f766e':'#C41E2F')+'" title="'+(gc&&gc.teacherConfirm?esc(gc.teacherConfirm.name)+' 수령확인'+(gc.teacherConfirm.photo?' · 사진첨부':' · 사진없음(구양식)'):'용품 수령 미확인')+'">📦 수령 '+(gc&&gc.teacherConfirm?'O':'X')+'</span>':'')
       +((st==='선정'||st==='배정완료')?mailBadge(s.email):'')  // [메일로그] 발송 성공✓/실패✗/기록없음−
       +'<div class="sub3">'+(s.code?'<b>'+esc(s.code)+'</b> · ':'')+esc(s.region)+(s.city?' · <b style="color:#1F4E9C">📍'+esc(s.city)+'</b>':' · <b style="color:#C41E2F">시군구 미입력</b>')+' · '+esc(s.students)+(s.start&&s.start.indexOf('8월')>=0?' · <b style="color:#C41E2F">⚡8월 방학 개강 희망</b>':'')+' · 희망 '+esc(s.d1)
       +'<br>담당 '+esc(s.teacher)+' '+esc(s.phone)+(s.assignedName?' · <b style="color:#0f766e">배정: '+esc(s.assignedName)+'</b>':'')+'</div></div>'
@@ -997,7 +1000,7 @@ function renderApps(){
       +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:#0f766e;color:#fff" title="회원을 검색해 이 학교의 강사로 직접 배정 (본인지도 신청자가 비로그인으로 제출한 경우 등)" onclick="assignInstructor(\''+d.id+'\')">🎯 강사 직접 배정</button>':'')
       +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:#fff;color:#8a919d;border:1.5px solid #8a919d" onclick="cancelSchool(\''+d.id+'\')">학교취소</button>':'')
       +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:#1F4E9C" onclick="copyNotice(\''+d.id+'\')">📋 통보문</button>':'')
-      +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:'+(gc&&gc.teacherConfirm?'#0f766e':'#b8860b')+'" onclick="reqGoods(\''+d.id+'\')">📦 '+(gc&&gc.teacherConfirm?'수령확인✓':'용품수령 확인요청')+'</button>':'')
+      +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:'+(gc&&gc.teacherConfirm?'#0f766e':(gc&&gc.delivery?'#b8860b':'#C41E2F'))+'" title="배송지 입력과 수령 확인을 같은 링크 하나로 처리합니다" onclick="reqGoods(\''+d.id+'\')">📦 '+(gc&&gc.teacherConfirm?'수령완료✓':(gc&&gc.delivery?'배송지O · 수령대기':'용품 링크 전달'))+'</button>':'')
       +'<button class="btn-sub" style="background:'+(s.start&&s.start.indexOf('8월')>=0?'#C41E2F':'#8a919d')+'" onclick="setStart(\''+d.id+'\')">'+(s.start&&s.start.indexOf('8월')>=0?'⚡긴급(방학)':s.start?'일반(9월)':'개강시기?')+'</button>'
       +'<button class="btn-sub" style="background:'+(s.city?'#8a919d':'#C41E2F')+'" onclick="setCity(\''+d.id+'\')">📍시군구</button>'
       +'<button class="btn-sub" style="background:#fff;color:#7c3aed;border:1.5px solid #7c3aed" title="학교체육 ↔ 방과후 유형 전환" onclick="chgType(\''+d.id+'\')">🔁 유형</button>'
@@ -4629,9 +4632,9 @@ async function givePt(){
 <!-- 용품 수령 확인 요청 QR 모달 -->
 <div id="agqModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:20px">
   <div style="background:#fff;border-radius:18px;max-width:360px;width:100%;padding:26px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.25)">
-    <h3 style="margin:0 0 4px;font-size:18px;font-weight:900">📦 용품 수령 확인 요청</h3>
+    <h3 style="margin:0 0 4px;font-size:18px;font-weight:900">📦 용품 수령 링크</h3>
     <div id="agqSub" style="font-size:13px;font-weight:800;color:#153A77;margin-bottom:6px"></div>
-    <p style="font-size:13px;color:#6b7280;margin:0 0 16px;line-height:1.6">학교 담당교사에게 아래 <b>QR을 보여주거나 링크를 전달</b>하세요. 교사가 수령 품목 확인 후 서명하면 자동 반영됩니다.</p>
+    <p style="font-size:13px;color:#6b7280;margin:0 0 16px;line-height:1.6">학교 담당교사에게 아래 <b>QR 또는 링크를 전달</b>하세요.<br>같은 링크 하나로 <b>① 배송지 입력</b> → 용품 도착 후 <b>② 사진·서명 수령 확인</b>까지 처리되며, 완료 시 자동 반영됩니다.</p>
     <div id="agqQr" style="display:flex;justify-content:center;margin-bottom:14px;min-height:190px;align-items:center"></div>
     <input id="agqLink" readonly onclick="this.select()" style="width:100%;padding:10px;border:1.5px solid #e3e6ea;border-radius:9px;font-size:12px;text-align:center;color:#153A77">
     <div style="display:flex;gap:8px;margin-top:12px">
@@ -4658,7 +4661,8 @@ async function reqGoods(appId){
   }catch(e){alert('생성 실패: '+e.message);return}
   const url=new URL('confirm.html?goods='+appId,location.href).href;
   document.getElementById('agqLink').value=url;
-  document.getElementById('agqSub').textContent=s.school+' · 용품 수령 확인';
+  const _gc=window.GOODS[appId]||{};
+  document.getElementById('agqSub').textContent=s.school+' · '+(_gc.teacherConfirm?'✅ 수령 확인 완료':(_gc.delivery?'🚚 배송지 입력됨 · 수령 확인 대기':'배송지 입력 전'));
   const qr=document.getElementById('agqQr');qr.innerHTML='';
   if(window.QRCode){try{new QRCode(qr,{text:url,width:190,height:190,correctLevel:QRCode.CorrectLevel.M})}catch(e){qr.textContent='링크를 이용해주세요'}}
   else qr.innerHTML='<span style="font-size:12px;color:#999">QR 로딩 중 — 링크를 복사해 전달하세요</span>';
@@ -4669,6 +4673,123 @@ function copyAgq(){var t=document.getElementById('agqLink').value;
   function fb(){var i=document.getElementById('agqLink');i.select();try{document.execCommand('copy');alert('✓ 복사되었습니다.')}catch(e){alert('링크를 길게 눌러 복사해주세요.')}}
 }
 document.getElementById('agqModal').addEventListener('click',function(e){if(e.target===this)this.style.display='none'});
+// ══════════ 용품 배송명단 CSV · 수령확인증 일괄 다운로드 (체육회 보고용) ══════════
+function gfmt(iso){if(!iso)return'';try{var d=new Date(iso);if(isNaN(d))return String(iso).slice(0,16).replace('T',' ');
+  return d.getFullYear()+'. '+(d.getMonth()+1)+'. '+d.getDate()+'. '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}catch(e){return String(iso).slice(0,16).replace('T',' ')}}
+function gfmtD(iso){if(!iso)return'';try{var d=new Date(iso);if(isNaN(d))return String(iso).slice(0,10);
+  return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일'}catch(e){return String(iso).slice(0,10)}}
+function dlDeliveryCsv(){
+  const list=[];
+  APPS.forEach(d=>{const s=d.data();const gc=(window.GOODS||{})[d.id];
+    if(!gc)return;
+    const del=gc.delivery||null,tc=gc.teacherConfirm||null;
+    if(!del&&!tc)return;
+    list.push([s.code||'',s.school||'',appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄(유형5)':'학교체육(유형3)',gc.items||'',
+      del?(del.zip||''):'',del?(((del.addr||'')+' '+(del.addr2||'')).trim()):'(미입력)',
+      del?(del.receiver||''):(tc?tc.name||'':''),del?(del.phone||''):(s.phone||''),del?(del.note||''):'',
+      del?gfmt(del.at):'',tc?((tc.name||'')+' / '+gfmt(tc.at)):'(수령 확인 전)']);
+  });
+  if(!list.length){alert('배송지 입력 또는 수령 확인된 학교가 아직 없습니다.\n학교 카드의 [📦 용품 링크 전달] 버튼으로 링크를 교사에게 보내면 배송지가 입력됩니다.');return}
+  const rows=[['접수번호','학교명','유형','품목','우편번호','배송 주소','수령 담당자','연락처','요청사항','배송지 입력일','수령 확인(성명/일시)']].concat(list);
+  const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='용품_배송명단_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+function gimg(src){return new Promise(function(res,rej){var im=new Image();im.onload=function(){res(im)};im.onerror=function(){rej(new Error('img'))};im.src=src})}
+function gfit(ctx,text,maxW,px,minPx){text=String(text||'');let f=px;
+  while(f>minPx){ctx.font='700 '+f+'px "Malgun Gothic",sans-serif';if(ctx.measureText(text).width<=maxW)break;f-=2}
+  return f}
+async function goodsCertPng(t,seal){
+  const s=t.s,gc=t.gc,tc=gc.teacherConfirm||{},del=gc.delivery||{};
+  const W=1240,H=1753,c=document.createElement('canvas');c.width=W;c.height=H;
+  const x=c.getContext('2d');
+  x.fillStyle='#fff';x.fillRect(0,0,W,H);
+  x.strokeStyle='#1F4E9C';x.lineWidth=4;x.strokeRect(36,36,W-72,H-72);
+  x.strokeStyle='#c9d4e8';x.lineWidth=1.5;x.strokeRect(46,46,W-92,H-92);
+  x.textAlign='center';x.fillStyle='#6b7280';x.font='600 24px "Malgun Gothic",sans-serif';
+  x.fillText('2026년 유소년 스포츠 기반구축사업 (플라잉디스크 종목)',W/2,128);
+  x.fillStyle='#111';x.font='900 60px "Malgun Gothic",sans-serif';
+  x.fillText('강습용품 수령확인증',W/2,215);
+  x.strokeStyle='#1F4E9C';x.lineWidth=3;x.beginPath();x.moveTo(120,252);x.lineTo(W-120,252);x.stroke();
+  // 정보 표
+  const rows=[
+    ['학교명',(s.school||'')+(s.region?'  ('+s.region+')':'')],
+    ['프로그램 유형',appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄 (유형5)':'학교체육 강습·보급 (유형3)'],
+    ['지원 품목',gc.items||'강습용 플라잉디스크 용품 세트'],
+    ['배송지',del.addr?(((del.zip?'('+del.zip+') ':'')+del.addr+' '+(del.addr2||'')).trim()):'(배송지 별도 협의)'],
+    ['수령 담당자',(del.receiver||tc.name||'')+(del.phone?'  ('+del.phone+')':'')],
+    ['수령 확인 일시',gfmt(tc.at)]];
+  const tx=110,tw=W-220,lw=280,rh=66;let ty=300;
+  x.textAlign='left';
+  rows.forEach(function(r){
+    x.fillStyle='#f2f5fa';x.fillRect(tx,ty,lw,rh);
+    x.strokeStyle='#9aa5b5';x.lineWidth=1.2;x.strokeRect(tx,ty,lw,rh);x.strokeRect(tx+lw,ty,tw-lw,rh);
+    x.fillStyle='#153A77';x.font='800 26px "Malgun Gothic",sans-serif';
+    x.fillText(r[0],tx+24,ty+rh/2+9);
+    x.fillStyle='#222';
+    const f=gfit(x,r[1],tw-lw-48,28,17);x.font='700 '+f+'px "Malgun Gothic",sans-serif';
+    x.fillText(String(r[1]||''),tx+lw+24,ty+rh/2+9);
+    ty+=rh;
+  });
+  // 수령 사진
+  ty+=34;
+  x.fillStyle='#153A77';x.font='800 26px "Malgun Gothic",sans-serif';x.fillText('수령 확인 사진',tx,ty+8);
+  const pb={x:tx,y:ty+26,w:tw,h:520};
+  x.strokeStyle='#9aa5b5';x.lineWidth=1.2;x.strokeRect(pb.x,pb.y,pb.w,pb.h);
+  if(tc.photo){
+    try{const im=await gimg(tc.photo);
+      const sc=Math.min((pb.w-20)/im.width,(pb.h-20)/im.height);
+      const dw=im.width*sc,dh=im.height*sc;
+      x.drawImage(im,pb.x+(pb.w-dw)/2,pb.y+(pb.h-dh)/2,dw,dh);
+    }catch(e){x.fillStyle='#8a919d';x.font='600 24px "Malgun Gothic",sans-serif';x.textAlign='center';x.fillText('사진을 불러오지 못했습니다',W/2,pb.y+pb.h/2);x.textAlign='left'}
+  }else{
+    x.fillStyle='#8a919d';x.font='600 24px "Malgun Gothic",sans-serif';x.textAlign='center';
+    x.fillText('사진 미첨부 (사진 도입 전 구 양식으로 확인된 건)',W/2,pb.y+pb.h/2);x.textAlign='left';
+  }
+  // 확인 문구·서명
+  let sy=pb.y+pb.h+86;
+  x.textAlign='center';x.fillStyle='#111';x.font='700 30px "Malgun Gothic",sans-serif';
+  x.fillText('위와 같이 강습용품을 정상 수령하였음을 확인합니다.',W/2,sy);
+  sy+=64;x.font='700 27px "Malgun Gothic",sans-serif';x.fillText(gfmtD(tc.at),W/2,sy);
+  sy+=78;
+  x.font='800 29px "Malgun Gothic",sans-serif';
+  const nm='수령인 (담당교사) :  '+(tc.name||'')+'   (서명)';
+  x.fillText(nm,W/2,sy);
+  if(tc.sign){try{const sg=await gimg(tc.sign);
+    const sgw=200,sgh=sgw*sg.height/sg.width;
+    x.drawImage(sg,W/2+x.measureText(nm).width/2-118,sy-sgh+16,sgw,Math.min(sgh,96));
+  }catch(e){}}
+  sy+=104;
+  x.font='900 34px "Malgun Gothic",sans-serif';x.fillStyle='#111';
+  x.fillText('사단법인 대한민국플라잉디스크연맹',W/2,sy);
+  if(seal){try{x.globalAlpha=.9;x.drawImage(seal,W/2+270,sy-62,110,110);x.globalAlpha=1}catch(e){}}
+  // footer
+  x.fillStyle='#8a919d';x.font='600 19px "Malgun Gothic",sans-serif';
+  x.fillText('본 사업은 문화체육관광부·국민체육진흥공단·대한체육회가 후원하며 국민체육진흥기금을 지원받아 운영됩니다.',W/2,H-78);
+  x.textAlign='left';
+  return c.toDataURL('image/png');
+}
+async function dlGoodsCerts(){
+  const targets=[];
+  APPS.forEach(d=>{const s=d.data();const gc=(window.GOODS||{})[d.id];
+    if(gc&&gc.teacherConfirm)targets.push({id:d.id,s:s,gc:gc});
+  });
+  if(!targets.length){alert('수령 확인이 완료된 학교가 아직 없습니다.\n(교사가 링크에서 ② 수령 확인까지 마친 학교만 확인증이 생성됩니다)');return}
+  if(!window.JSZip){alert('압축 라이브러리 로딩 중입니다. 잠시 후 다시 시도해주세요.');return}
+  let seal=null;try{seal=await gimg(new URL('직인.png',location.href).href)}catch(e){}
+  const zip=new JSZip();let n=0;
+  for(const t of targets){
+    try{
+      const png=await goodsCertPng(t,seal);
+      const fn='수령확인증_'+String(t.s.school||t.id).replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,'')+'.png';
+      zip.file(fn,png.split(',')[1],{base64:true});n++;
+    }catch(e){console.warn('확인증 생성 실패',t.s.school,e)}
+  }
+  if(!n){alert('확인증 생성에 실패했습니다.');return}
+  const blob=await zip.generateAsync({type:'blob'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='용품수령확인증_'+n+'개교_'+new Date().toISOString().slice(0,10)+'.zip';a.click();
+}
 </script>
 <script src="auth_ui.js?v=20260726d"></script>
 </body>
