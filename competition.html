@@ -1426,7 +1426,7 @@ function divGroupsHtml(s,entry){
 }
 // 부문별 정원: 임무 목록에 "오픈부:16" 형식이면 부문 정원 16 (없으면 무제한)
 function parseDiv(r){const m=String(r).match(/^(.+?):(\d+)$/);return m?{name:m[1].trim(),cap:parseInt(m[2])}:{name:String(r).trim(),cap:0}}
-function slotDivs(s){const roles=(s.roles&&s.roles.length)?s.roles:(DEFAULT_ROLES[s.role]||[]);return roles.map(parseDiv)}
+function slotDivs(s){const roles=(s.roles&&s.roles.length)?s.roles:(DEFAULT_ROLES[s.role]||[]);const seen={};return roles.map(parseDiv).filter(d=>seen[d.name]?false:(seen[d.name]=1,true))} // [중복부문 방지] 같은 이름 부문은 첫 항목만 표시
 // [포스터 슬라이드] 공고 카드 포스터 여러 장 ◀▶ 넘기기
 function pstNav(id,dir){
   const list=(window.__PST||{})[id]||[];if(!list.length)return;
