@@ -852,7 +852,7 @@ function cc2EntryInit(c){
       {name:'얼티미트',divs:['남자','여자','혼성']},
       {name:'디스크골프',divs:['남자','여자','혼성']},
       {name:'원반윷놀이',divs:['남자','여자','혼성']}]).map(x=>({name:x.name||'',divs:(x.divs||[]).slice()})),
-    special:(e.special&&e.special.length?e.special:['장애인부','강아지동반']).slice(),
+    special:(e.special||[]).slice(), // [특수부문 제거] 기본값 자동 재생성 중단 — 이런 부문은 종목·부문 빌더에 직접 추가
     fees:(e.fees&&e.fees.length?e.fees:[{label:'일반',amount:''}]).map(x=>({label:x.label||'',amount:x.amount||''})),
     teamUnits:(e.teamUnits&&e.teamUnits.length?e.teamUnits:['시도연맹클럽','학교클럽','기타팀']).slice(),
     teamGenders:(e.teamGenders&&e.teamGenders.length?e.teamGenders:['남자','여자','혼성']).slice()
@@ -881,7 +881,7 @@ function cc2EntryRender(){
   el.innerHTML=
     sportBlock('indiv','🙋 개인전 종목','#1F4E9C')
     +sportBlock('team','👥 단체전 종목','#7c3aed')
-    +listBlock('special','♿ 특수 부문 옵션 (장애인부·강아지동반 등)','부문명')
+    /* [특수부문 제거] 별도 특수 부문 옵션 UI 삭제 — 장애인부 등은 위 종목·부문 빌더에 일반 부문으로 추가 */
     +'<div style="margin-top:12px"><b style="font-size:12.5px;color:#0f766e">💰 참가비 (구분별)</b>'
     +CC2_ENTRY.fees.map((f,i)=>'<div style="display:flex;gap:6px;margin-top:5px;align-items:center">'
       +'<input value="'+cesc(f.label)+'" placeholder="구분 (예: 성인 선수)" style="'+bi+';width:150px" oninput="CC2_ENTRY.fees['+i+'].label=this.value">'
@@ -1228,7 +1228,7 @@ function slotCard(d,today){
         // [모바일 줄바꿈] 개회식·대회 시간도 항목 단위로 묶어 줄바꿈
         +(((s.opening&&(s.opening.time||s.opening.place))||s.time)?'<div class="cnote" style="background:#f6f8fb;border-color:#dfe5ee;color:#374151">'+((s.opening&&(s.opening.time||s.opening.place))?'<span style="display:inline-block">🎪 개회식 <b>'+cesc(((s.opening.time||'')+(s.opening.place?' · '+s.opening.place:'')).trim())+'</b></span>':'')+(s.time?(((s.opening&&(s.opening.time||s.opening.place))?'<span style="color:#9aa5b5">&nbsp;·&nbsp;</span>':'')+'<span style="display:inline-block">🏟 대회 <b>'+cesc(s.time)+'</b></span>'):'')+'</div>':'')
         +(s.entry&&s.entry.fees&&s.entry.fees.length?'<div class="cnote" style="background:#f0fdf4;border-color:#a7f3d0;color:#0f5132">💰 참가비: '+s.entry.fees.map(f=>cesc(f.label+(f.amount?' '+f.amount:''))).join(' · ')+'</div>':'')
-        +(s.entry&&s.entry.special&&s.entry.special.length?'<div class="cnote" style="background:#f5f0ff;border-color:#ddd0fa;color:#5b21b6">🏷 선택 부문: '+s.entry.special.map(x=>cesc(x)).join(' · ')+' — 신청 시 선택</div>':'')
+        /* [특수부문 제거] 🏷 선택 부문 안내 상자 미표시 (기존 데이터는 보존, 표출만 중단) */
         // [대회v3] 첨부자료(포스터·대진표·일정표) + 기타안내(시상품·기념품·보험)
         +((s.attachments&&s.attachments.length)?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:7px">'+s.attachments.map(x=>{
             const isImg=/\.(jpe?g|png|gif|webp)(\?|$)/i.test(x.url||'')||String(x.url||'').indexOf('image')>=0;
@@ -1487,8 +1487,7 @@ async function openApply(id){
             +'</div>';
         })()
       +'<div id="cSelTxt" style="font-size:12.5px;color:#0f766e;font-weight:800;min-height:18px"></div>'
-      // [대회v2] 특수 부문 선택 (선택사항 — 장애인부·강아지동반 등)
-      +((s.entry&&s.entry.special&&s.entry.special.length)?'<div style="font-size:12.5px;font-weight:800;margin:8px 0 4px;color:#5b21b6">🏷 해당 시 선택 (선택사항)</div><div id="cSpecialBtns" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">'+s.entry.special.map(sp=>'<button type="button" class="rolechip" data-special="'+cesc(sp)+'" onclick="this.classList.toggle(\'on\')">'+cesc(sp)+'</button>').join('')+'</div>':'')
+      // [특수부문 제거] 신청서의 특수 부문 선택 버튼 미표시 — submitEntry의 수집 코드(cSpecialBtns)는 빈 배열로 안전 동작
       +'<div class="clause">① 참가자는 대회 규정과 안전 수칙을 준수하며, 주최 측의 경기 운영에 따릅니다.<br>'
       +'② 대회 중 촬영된 기록·사진·영상은 연맹 홍보 자료로 활용될 수 있음에 동의합니다.<br>'
       +'③ 미성년 참가자의 경우 아래 서명은 <b>법정대리인(보호자)의 참가 동의</b>로서 효력을 가집니다.</div>'
