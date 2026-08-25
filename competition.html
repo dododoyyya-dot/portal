@@ -1802,10 +1802,12 @@ async function submitEntry(){
         cancels.push(cm); // 기존 신청은 취소 처리 후 새 내용으로 재접수 (이력 보존)
       }
       const _specials=[...document.querySelectorAll('#cSpecialBtns .rolechip.on')].map(x=>x.dataset.special);
-      claimed.push({uid:CME.uid,pid:APPLY_PID,name:p.name,birth:p.birth||'',gender:p.gender||'',school:p.school||'',club:club||'',kid:!!p.kid,
+      const _newClaim={uid:CME.uid,pid:APPLY_PID,name:p.name,birth:p.birth||'',gender:p.gender||'',school:p.school||'',club:club||'',kid:!!p.kid,
         special:_specials,
         guardian:p.kid?(CMY.name||''):'',guardianPhone:p.kid?(CMY.phone||''):'',
-        prefs:APPLY_SEL.slice(),consent:true,signed:true,at:new Date().toISOString(),edited:isEdit||undefined});
+        prefs:APPLY_SEL.slice(),consent:true,signed:true,at:new Date().toISOString()};
+      if(isEdit)_newClaim.edited=true; // [버그수정] undefined 필드값은 Firestore가 거부 → 수정건에만 표기
+      claimed.push(_newClaim);
       tx.update(ref,isEdit?{claimed:claimed,cancels:cancels}:{claimed:claimed});
     });
     const now=new Date().toISOString();
