@@ -201,6 +201,7 @@ function renderDeliveryForm(){
     +'<div style="margin-top:16px"><label class="fl">학교 주소 (배송지)</label>'
     +'<div style="display:flex;gap:8px"><input type="text" id="dZip" placeholder="우편번호" readonly style="flex:0 0 110px;background:#f7f9fc">'
     +'<button type="button" class="btn" style="width:auto;margin:0;padding:12px 18px;font-size:14px;background:var(--blue)" onclick="openPostcode()">🔍 주소 검색</button></div>'
+    +'<div id="pcWrap" style="display:none;margin-top:8px;border:1.5px solid var(--line);border-radius:12px;overflow:hidden;position:relative;height:440px"><button type="button" onclick="closePostcode()" style="position:absolute;top:6px;right:6px;z-index:5;width:30px;height:30px;border:none;border-radius:50%;background:#333;color:#fff;font-size:15px;font-weight:800;cursor:pointer">×</button><div id="pcBox" style="width:100%;height:100%"></div></div>'
     +'<input type="text" id="dAddr" placeholder="[주소 검색]을 눌러 선택해주세요" readonly style="margin-top:8px;background:#f7f9fc">'
     +'<input type="text" id="dAddr2" placeholder="상세 주소 (예: 본관 교무실 / 체육관 앞)" style="margin-top:8px"></div>'
     +'<div style="margin-top:14px"><label class="fl">수령 담당자 성명</label><input type="text" id="dName" maxlength="20" placeholder="예: '+esc(GOODS.school?'홍길동':'홍길동')+'" value="'+esc(d.receiver||'')+'"></div>'
@@ -214,12 +215,20 @@ function renderDeliveryForm(){
   if(d.addr2)document.getElementById('dAddr2').value=d.addr2;
 }
 // 다음(카카오) 우편번호 검색 — 필요할 때만 로드, 실패 시 직접 입력으로 전환
+function closePostcode(){const w=document.getElementById('pcWrap');if(w){w.style.display='none';document.getElementById('pcBox').innerHTML=''}}
 function openPostcode(){
-  const go=()=>{new daum.Postcode({oncomplete:function(data){
-    document.getElementById('dZip').value=data.zonecode||'';
-    document.getElementById('dAddr').value=(data.roadAddress||data.jibunAddress||'');
-    const a2=document.getElementById('dAddr2');if(a2)a2.focus();
-  }}).open();};
+  const go=()=>{
+    const wrap=document.getElementById('pcWrap'),box=document.getElementById('pcBox');
+    if(!wrap||!box)return;
+    box.innerHTML='';wrap.style.display='block';
+    new daum.Postcode({width:'100%',height:'100%',oncomplete:function(data){
+      document.getElementById('dZip').value=data.zonecode||'';
+      document.getElementById('dAddr').value=(data.roadAddress||data.jibunAddress||'');
+      closePostcode();
+      const a2=document.getElementById('dAddr2');if(a2)a2.focus();
+    }}).embed(box);
+    try{wrap.scrollIntoView({behavior:'smooth',block:'nearest'})}catch(e){}
+  };
   if(window.daum&&window.daum.Postcode)return go();
   const s=document.createElement('script');
   s.src='https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
