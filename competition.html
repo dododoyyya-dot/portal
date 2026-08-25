@@ -933,11 +933,40 @@ function cc2Pick(ds){
   else{if(CC2_DATES.length>=31){alert('최대 31일까지 선택할 수 있습니다.');return}CC2_DATES.push(ds);}
   cc2CalRender();
 }
+// [첨부 업로드 수정] 스토리지 규칙(이미지 2MB 이하만 허용)에 맞춰 이미지는 자동 압축(최대 1800px·JPEG) 후 첨부
+function cc2CompressImg(dataUrl,cb){
+  const img=new Image();
+  img.onload=function(){
+    let w=img.width,h=img.height;const MAX=1800;
+    if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+    const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+    const cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,w,h);cx.drawImage(img,0,0,w,h);
+    let q=0.86,out=cv.toDataURL('image/jpeg',q);
+    while(out.length*0.75>1.9*1024*1024&&q>0.5){q-=0.1;out=cv.toDataURL('image/jpeg',q);}
+    cb(out);
+  };
+  img.onerror=function(){cb(dataUrl)}; // 압축 실패 시 원본 유지
+  img.src=dataUrl;
+}
 function cc2PickFile(input,arr,renderFn){
   [...(input.files||[])].forEach(f=>{
-    if(f.size>5*1024*1024){alert(f.name+' — 5MB 이하만 가능합니다.');return}
+    const isImg=/^image\//.test(f.type);
+    const isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name);
+    if(!isImg&&!isPdf){alert(f.name+' — 이미지 또는 PDF만 첨부할 수 있습니다.');return}
+    if(isPdf&&f.size>1.9*1024*1024){alert(f.name+' — PDF는 2MB 이하만 가능합니다. 용량을 줄이거나 이미지로 변환해 첨부해주세요.');return}
+    if(isImg&&f.size>25*1024*1024){alert(f.name+' — 25MB 이하 이미지만 가능합니다.');return}
     const rd=new FileReader();
-    rd.onload=ev=>{arr.push({name:f.name,kind:'포스터',dataUrl:ev.target.result});renderFn();};
+    rd.onload=ev=>{
+      if(isImg){
+        // 큰 이미지는 자동 압축해 규칙(2MB) 안으로 — 화질 저하 최소화(최대 1800px)
+        cc2CompressImg(ev.target.result,function(out){
+          const nm=f.name.replace(/\.(png|jpeg|jpg|webp|gif|bmp)$/i,'')+'.jpg';
+          arr.push({name:nm,kind:'포스터',dataUrl:out});renderFn();
+        });
+      }else{
+        arr.push({name:f.name,kind:'포스터',dataUrl:ev.target.result});renderFn();
+      }
+    };
     rd.readAsDataURL(f);
   });
   input.value='';
@@ -1043,8 +1072,16 @@ async function cc2Save(){
       if(x.url)return x.url;
       const blob=await (await fetch(x.dataUrl)).blob();
       const ext=((x.name||'f.jpg').split('.').pop()||'jpg').toLowerCase();
-      const ref=firebase.storage().ref('quals/'+uid+'/'+prefix+'_'+Date.now()+'_'+Math.floor(Math.random()*1e4)+'.'+ext);
-      await ref.put(blob,{contentType:blob.type||'application/octet-stream'});
+      const isPdf=ext==='pdf'||blob.type==='application/pdf';
+      // [첨부 업로드 수정] 이미지는 기존 quals 경로(이미지 2MB 규칙), PDF는 compdocs 전용 경로 사용
+      const path=(isPdf?'compdocs/':'quals/')+uid+'/'+prefix+'_'+Date.now()+'_'+Math.floor(Math.random()*1e4)+'.'+ext;
+      const ref=firebase.storage().ref(path);
+      try{
+        await ref.put(blob,{contentType:blob.type||'application/octet-stream'});
+      }catch(e){
+        if(isPdf)throw new Error('['+(x.name||'PDF')+'] PDF 첨부에는 스토리지 규칙(compdocs) 추가가 필요합니다. 사무국에 문의하거나 이미지로 변환해 첨부해주세요.');
+        throw new Error('['+(x.name||'파일')+'] 업로드 실패: '+(e.code||e.message));
+      }
       return await ref.getDownloadURL();
     };
     const attachments=[];
@@ -1072,6 +1109,7 @@ async function cc2Save(){
     });
     teamDivs.forEach(td=>{if(roles.indexOf(td)<0)roles.push(td);});
     const slotBase={title:title,role:'참가',roles:roles,quota:999,date:base.dateStart,region:sido,
+      place:place, // [장소표시] 대회 장소를 공고 슬롯에도 저장 — 카드·피드에 표시
       deadline:base.deadline||'',fee:feeStr,note:base.desc||'',eligRegion:'',
       teamDivs:teamDivs,teamTypes:entry.teamUnits,teamGenders:entry.teamGenders,entry:entry,
       host:base.host,organizer:base.organizer,sponsor:base.sponsor,partner:base.partner,
@@ -1126,7 +1164,7 @@ async function loadLiveComps(){
       rows.push({date:s.date||'',end:s.date||'',title:s.title||'',kind:s.role==='참가'?'참가 모집':(s.role+'요원 모집'),
         color:s.role==='참가'?'#153A77':(s.role==='심판'?'#7c3aed':'#b8860b'),
         ind:s.role==='참가'&&((s.roles||[]).length>_tn),team:s.role==='참가'&&_tn>0,
-        done:!!(s.deadline&&s.deadline<today),place:s.region||'',href:'#cSlotList'});});
+        done:!!(s.deadline&&s.deadline<today),place:(s.place?s.place+(s.region?' ('+s.region+')':''):(s.region||'')),href:'#cSlotList'});});
     if(st)st.docs.forEach(d=>{const s=d.data();
       const ds=(s.dates||[]).map(x=>x.date).filter(Boolean).sort();
       rows.push({date:ds[0]||s.startDate||'',end:ds[ds.length-1]||s.endDate||'',title:s.competitionName||'',kind:'심판·운영 모집',color:'#0f766e',
@@ -1220,7 +1258,7 @@ function slotCard(d,today){
       else action='<button class="cbtn cbtn-main" onclick="openApply(\''+d.id+'\')">'+(entry?'🏃 참가 신청':'✍ 신청하기')+'</button>';
       return '<div class="cslot"><div class="chead"><span class="ctitle">'+cesc(s.title)+'</span><span class="rbadge" style="background:'+rc+'">'+cesc(s.role)+(entry?' (선수)':'요원')+'</span>'
         +(closed&&!mines.length?'<span class="rbadge" style="background:#8a919d">마감</span>':'')+'</div>'
-        +'<div class="cmeta"><span>📍 <b>'+cesc(s.region)+'</b></span><span>📅 <b>'+cesc(s.date)+'</b></span><span>👥 신청 <b>'+act+'/'+s.quota+'</b></span>'+(s.deadline?'<span>⏳ 마감 <b>'+cesc(s.deadline)+'</b></span>':'')+(s.fee?'<span>💰 <b>'+cesc(s.fee)+'</b></span>':'')+'</div>'
+        +'<div class="cmeta"><span>📍 <b>'+cesc(s.region)+(s.place?' · '+cesc(s.place):'')+'</b></span><span>📅 <b>'+cesc(s.date)+'</b></span><span>👥 신청 <b>'+act+'/'+s.quota+'</b></span>'+(s.deadline?'<span>⏳ 마감 <b>'+cesc(s.deadline)+'</b></span>':'')+(s.fee?'<span>💰 <b>'+cesc(s.fee)+'</b></span>':'')+'</div>'
         // [v3] 참가 지역제한 표기·제한 제거 (전국 누구나 신청 가능)
         // [대회v2] 주최·주관·후원·협찬 / 개회식·대회 시간장소 / 참가비 구분 / 특수 부문
         // [모바일 줄바꿈] 주최·주관·후원·협찬은 항목 단위로 묶어 줄바꿈 (라벨과 기관명이 분리되지 않게)
