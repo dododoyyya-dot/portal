@@ -443,6 +443,15 @@ async function postWall(){
     loadWall();
   }catch(e){m.style.color='#C41E2F';m.textContent='실패: '+(e.code==='permission-denied'?'권한 오류 — 소속 회원만 남길 수 있습니다':e.message)}
 }
+// [버그수정] 담벼락 ✕ 삭제 — 함수 미정의로 동작하지 않던 것 구현 (작성자 본인·클럽장·관리자만, 규칙과 동일)
+async function deleteWall(id){
+  if(!confirm('이 한마디를 삭제할까요?'))return;
+  try{
+    await DB.collection('clubWalls').doc(id).delete();
+    CH_WALL=CH_WALL.filter(w=>w.id!==id);
+    renderWall();
+  }catch(e){alert('삭제 실패: '+(e.code==='permission-denied'?'권한이 없습니다 (작성자·클럽장만 삭제 가능)':e.message))}
+}
 
 // ── 모달 ──
 function showModal(title,html){
