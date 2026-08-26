@@ -276,19 +276,23 @@ function expandRowHtml(p){
   const rolesHtml=roles.length?'<div style="margin-bottom:6px"><span style="font-weight:800">모집 임무:</span> '+esc(roles.join(' · '))+'</div>':'';
   // [배치개편] 안내사항 좌 / 포스터 우(여러 장이면 ◀▶ 슬라이드) — 대회 페이지(competition.html slotCard)와 동일 배치.
   // 포스터 하단에는 대회 페이지의 시상품 박스 같은 추가 요소를 두지 않음(요청사항).
-  const noteHtml=p.description?'<div style="flex:1 1 300px;min-width:min(280px,100%);color:#374151;white-space:pre-wrap;border-left:3px solid #d3e0f2;padding-left:10px">📌 '+esc(p.description)+'</div>':'';
+  // [크기조정] 포스터 박스 높이를 240px로 고정 — 사진마다 비율이 달라도(가로형 시간표·세로형 포스터 등)
+  // 테두리 UI 크기가 슬라이드마다 변하지 않도록 함(object-fit:contain으로 안쪽 이미지만 비율 유지).
+  // 포스터가 있을 때만 안내문 카드에도 같은 최소높이를 줘서 좌우 비율이 맞게(왼쪽이 휑해 보이지 않게) 조정.
+  const PST_H=240;
   let posterHtml='';
   if(posterList.length){
     window.__STPST=window.__STPST||{};window.__STPST[p.id]=posterList.map(x=>x.url);
     const nav=posterList.length>1;
-    const bst='position:absolute;top:50%;transform:translateY(-50%);border:none;background:rgba(17,24,39,.55);color:#fff;width:34px;height:34px;border-radius:50%;font-size:15px;font-weight:900;cursor:pointer;z-index:3';
-    posterHtml='<div style="position:relative;background:#fff;border:1px solid #e2e7f0;border-radius:12px;overflow:hidden">'
-      +'<a id="stpA_'+p.id+'" href="'+esc(posterList[0].url)+'" target="_blank"><img id="stpImg_'+p.id+'" src="'+esc(posterList[0].url)+'" alt="포스터" style="display:block;width:100%;max-height:430px;object-fit:contain;background:#fff"></a>'
+    const bst='position:absolute;top:50%;transform:translateY(-50%);border:none;background:rgba(17,24,39,.55);color:#fff;width:30px;height:30px;border-radius:50%;font-size:14px;font-weight:900;cursor:pointer;z-index:3';
+    posterHtml='<div style="position:relative;background:#fff;border:1px solid #e2e7f0;border-radius:12px;overflow:hidden;height:'+PST_H+'px">'
+      +'<a id="stpA_'+p.id+'" href="'+esc(posterList[0].url)+'" target="_blank"><img id="stpImg_'+p.id+'" src="'+esc(posterList[0].url)+'" alt="포스터" style="display:block;width:100%;height:100%;object-fit:contain;background:#fff"></a>'
       +(nav?'<button type="button" onclick="event.stopPropagation();stPstNav(\''+p.id+'\',-1)" style="'+bst+';left:8px">◀</button><button type="button" onclick="event.stopPropagation();stPstNav(\''+p.id+'\',1)" style="'+bst+';right:8px">▶</button><span id="stpCnt_'+p.id+'" style="position:absolute;right:10px;bottom:8px;background:rgba(17,24,39,.6);color:#fff;font-size:11.5px;font-weight:800;border-radius:999px;padding:3px 10px;z-index:3">1 / '+posterList.length+'</span>':'')
       +'</div>'
       +'<div style="font-size:11px;color:#8a919d;font-weight:700;text-align:center;margin-top:4px">'+esc(posterList[0].name||'포스터')+' — 클릭하면 원본 크게 보기'+(nav?' · ◀ ▶ 로 넘겨보기':'')+'</div>';
   }
-  const rightCol=posterHtml?'<div style="flex:0 1 340px;min-width:min(280px,100%);max-width:100%">'+posterHtml+'</div>':'';
+  const rightCol=posterHtml?'<div style="flex:0 1 260px;min-width:min(220px,100%);max-width:100%">'+posterHtml+'</div>':'';
+  const noteHtml=p.description?'<div style="flex:1 1 300px;min-width:min(280px,100%);'+(rightCol?'min-height:'+PST_H+'px;box-sizing:border-box;':'')+'color:#374151;white-space:pre-wrap;background:#f6f8fb;border-radius:12px;padding:14px 16px">📌 '+esc(p.description)+'</div>':'';
   const noteRow=!noteHtml&&!rightCol?'':(noteHtml&&rightCol
       ?'<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;margin-bottom:8px">'+noteHtml+rightCol+'</div>'
       :'<div style="margin-bottom:8px">'+(noteHtml||rightCol)+'</div>');
