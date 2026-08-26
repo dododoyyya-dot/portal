@@ -397,7 +397,9 @@ function pfLoadComp(){
   set('pfTime',c.time||'');
   set('pfDL',c.deadline||'');
   set('pfHost',c.organizer||c.host||'');
-  const _de=document.getElementById('pfDesc');if(_de&&!_de.value&&c.desc)_de.value=c.desc; // [연동] 대회 안내문도 프리필 (수정 가능)
+  // [모집유형 라벨 개선] 안내사항(pfDesc)은 더 이상 대회 desc로 자동 채우지 않음 — 대회 안내문은
+  // 참가 선수 대상(점심·간식·경기규정 등)이라 심판·운영진에게 필요한 내용(집결시간·담당구역 등)과
+  // 성격이 달라, 연동 여부와 무관하게 항상 직접 작성하도록 유도 (아래 textarea placeholder 참고)
   // 대회 일자 프리필 (달력 선택 상태로)
   const ds=(c.dates&&c.dates.length)?c.dates.slice():(function(){
     const out=[];if(!c.dateStart)return out;
@@ -461,8 +463,8 @@ function openPostForm(editId){
     +'<label class="stlabel">대회 안내 포스터·자료 첨부 <span style="font-weight:600;color:#8a919d;font-size:11px">(최대 10개 — 대진표·시간표 필수 포함 권장, 썸네일로 표시됩니다)</span></label>'
     +'<input type="file" id="pfPoster" accept="image/*" multiple style="display:block;margin-top:5px;font-size:13px" onchange="pfAddPosters(this)">'
     +'<div id="pfPosterList" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>'
-    +'<label class="stlabel">안내사항 <span style="font-weight:600;color:#8a919d;font-size:11px">— 세부 안내·주의사항·집합 시간 등</span></label>'
-    +'<textarea id="pfDesc" rows="4" class="stfield">'+esc(ed?ed.description:'')+'</textarea>'
+    +'<label class="stlabel">안내사항 <span style="font-weight:600;color:#8a919d;font-size:11px">— 세부 안내·주의사항·집합 시간 등 (대회 연동 여부와 무관하게 항상 직접 작성해주세요)</span></label>'
+    +'<textarea id="pfDesc" rows="4" class="stfield" placeholder="심판·운영진에게 필요한 내용을 적어주세요 (집결시간·담당구역·특이사항 등) — 대회 자체 안내문(참가 선수 대상)과는 별개입니다">'+esc(ed?ed.description:'')+'</textarea>'
     +'<label class="stlabel">문의처 <span style="font-weight:600;color:#8a919d;font-size:11px">— 담당자·연락처·이메일 등 (공고 하단에 표시)</span></label>'
     +'<input id="pfContact" class="stfield" value="'+esc(ed?(ed.contactInfo||''):'')+'" placeholder="예: 사무국 031-984-3248 / kfdf60@hanmail.net">'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
