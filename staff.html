@@ -195,6 +195,7 @@ async function loadMyLic(){
   }catch(e){MYLIC_DOCS._valid=[];}
 }
 // ══════════════ 목록 ══════════════
+let COMPMAP={}; // [연동공고 보강] compId → 대회 데이터 (연동 공고의 빈 안내문·포스터·장소 폴백용)
 async function loadPosts(){
   const el=document.getElementById('stList');
   try{
@@ -202,6 +203,13 @@ async function loadPosts(){
     POSTS=snap.docs.map(x=>({id:x.id,...x.data()}))
       .filter(p=>p.approved||canManage(p))
       .sort((a,b)=>String(b.startDate||'').localeCompare(String(a.startDate||'')));
+    // 연동 대회 정보 로드 (연동 공고가 있을 때만)
+    try{
+      if(POSTS.some(p=>p.compId)){
+        const cs=await DB.collection('competitions').limit(50).get();
+        COMPMAP={};cs.docs.forEach(d=>COMPMAP[d.id]=d.data());
+      }
+    }catch(e){}
     // 신청 현황 일괄 로드
     APPS={};
     try{
@@ -245,6 +253,7 @@ function rowHtml(p,expanded){
     +'<div class="strow" onclick="toggleRow(\''+p.id+'\')">'
     +'<span class="stpill" style="background:'+stCol+';font-size:11px;padding:2px 9px">'+stTxt+'</span>'
     +(!p.approved?'<span class="stpill" style="background:#C41E2F;font-size:11px;padding:2px 9px">승인대기</span>':'')
+    +(p.compId?'<span class="stpill" style="background:#7c3aed;font-size:11px;padding:2px 9px" title="대회 등록과 연동된 공고 — 안내문·포스터는 대회 정보를 함께 표시">🏆 대회 연동</span>':'')
     +'<span class="strowname">'+esc(p.competitionName)+'</span>'
     +'<span class="strowmeta">'+esc((p.author&&p.author.organization)||'')+' · '+period+'</span>'
     +'<span class="strowend">마감 '+fmtD(p.deadline||'')+' · <b>'+t.applied+'/'+t.quota+'명</b></span>'
@@ -259,13 +268,17 @@ function expandRowHtml(p){
   const manage=canManage(p);
   const t=postTotals(p);
   const pct=t.quota?Math.min(100,Math.round(t.applied/t.quota*100)):0;
-  const posters=p.posters&&p.posters.length
-    ?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+p.posters.map(img=>'<img src="'+img.url+'" class="stthumb" onclick="window.open(this.src)" alt="포스터">').join('')+'</div>':'';
+  // [연동공고 보강] 공고에 비어 있는 항목(포스터·안내문·장소)은 연동된 대회 정보로 자동 표시 — 비연동 공고와 동일한 정보량 보장
+  const comp=(p.compId&&COMPMAP[p.compId])||null;
+  const _isImg=x=>/\.(jpe?g|png|gif|webp)(\?|$)/i.test(x.url||'')||String(x.url||'').indexOf('image')>=0;
+  const posterList=(p.posters&&p.posters.length)?p.posters:((comp&&comp.attachments&&comp.attachments.length)?comp.attachments.filter(_isImg).map(x=>({url:x.url,name:x.kind||x.name||'포스터'})):[]);
+  const posters=posterList.length
+    ?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+posterList.map(img=>'<img src="'+img.url+'" class="stthumb" onclick="window.open(this.src)" alt="포스터">').join('')+'</div>':'';
   const roles=(p.dates&&p.dates[0]&&p.dates[0].roles)||[];
   const rolesHtml=roles.length?'<div style="margin-bottom:6px"><span style="font-weight:800">모집 임무:</span> '+esc(roles.join(' · '))+'</div>':'';
   return posters
     +'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px">'
-    +'<span>📍 <b>장소:</b> '+esc(p.location||'')+'</span>'
+    +'<span>📍 <b>장소:</b> '+esc(p.location||(comp&&comp.place)||'')+'</span>'
     +'<span>🕐 <b>집합시간:</b> '+esc(p.time||'')+'</span>'
     +'<span>🏅 <b>종목:</b> '+esc(p.sport||'')+'</span>'
     +'</div>'
@@ -277,7 +290,8 @@ function expandRowHtml(p){
     +' &nbsp;·&nbsp; <span style="font-weight:800">심판복</span> '+esc(p.uniform||'미정')
     +'</div>'
     +(p.supplies&&p.supplies.length?'<div style="margin-bottom:6px"><span style="font-weight:800">준비물:</span> '+esc(p.supplies.join(', '))+'</div>':'')
-    +(p.description?'<div style="margin-bottom:8px;color:#374151;white-space:pre-wrap;border-left:3px solid #d3e0f2;padding-left:10px">'+esc(p.description)+'</div>':'')
+    +(p.description?'<div style="margin-bottom:8px;color:#374151;white-space:pre-wrap;border-left:3px solid #d3e0f2;padding-left:10px">'+esc(p.description)+'</div>'
+      :(comp&&comp.desc?'<div style="margin-bottom:8px;color:#374151;white-space:pre-wrap;border-left:3px solid #d9c9ec;padding-left:10px"><b style="color:#7c3aed;font-size:12px">🏆 연동 대회 안내</b><br>'+esc(comp.desc)+'</div>':''))
     +(p.contactInfo?'<div style="margin-bottom:10px;color:#6b7280">📞 '+esc(p.contactInfo)+'</div>':'')
     +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
     +'<div class="stprog" style="max-width:140px"><div style="width:'+pct+'%"></div></div>'
@@ -383,6 +397,7 @@ function pfLoadComp(){
   set('pfTime',c.time||'');
   set('pfDL',c.deadline||'');
   set('pfHost',c.organizer||c.host||'');
+  const _de=document.getElementById('pfDesc');if(_de&&!_de.value&&c.desc)_de.value=c.desc; // [연동] 대회 안내문도 프리필 (수정 가능)
   // 대회 일자 프리필 (달력 선택 상태로)
   const ds=(c.dates&&c.dates.length)?c.dates.slice():(function(){
     const out=[];if(!c.dateStart)return out;

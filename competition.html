@@ -1283,11 +1283,10 @@ async function loadLiveComps(){
 async function loadSlots(){
   const el=document.getElementById('cSlotList');
   try{
-    const [snap,comps,cfg,staffSnap]=await Promise.all([
+    const [snap,comps,cfg]=await Promise.all([
       DB.collection('compSlots').orderBy('date').limit(50).get(),
       DB.collection('competitions').orderBy('dateStart','desc').limit(30).get().catch(()=>null),
-      DB.collection('settings').doc('global').get().catch(()=>null),
-      DB.collection('competitionStaff').where('approved','==',true).limit(30).get().catch(()=>null) // [연동공고] 대회에 연결된 심판·운영 모집 요약용
+      DB.collection('settings').doc('global').get().catch(()=>null)
     ]);
     CSLOTS=snap.docs;
     const compEnabled=!!(cfg&&cfg.exists&&cfg.data().compEnabled);
@@ -1296,32 +1295,6 @@ async function loadSlots(){
     const today=new Date().toISOString().slice(0,10);
     // 대회(competitions) 묶음 먼저, 미연결 공고는 아래에 기존 방식대로
     const byComp={};CSLOTS.forEach(d=>{const cid=d.data().compId;if(cid)(byComp[cid]=byComp[cid]||[]).push(d);});
-    // [연동공고] 대회에 연결된 심판·운영 모집(staff) 공고 — 대회 카드 안에 요약 표시
-    const byCompStaff={};
-    if(staffSnap)staffSnap.docs.forEach(d=>{const p=d.data();if(p.compId)(byCompStaff[p.compId]=byCompStaff[p.compId]||[]).push(p);});
-    const staffSum=p=>{
-      const ds=(p.dates||[]).map(x=>x.date).filter(Boolean).sort();
-      let quota=0,got=0;
-      (p.dates||[]).forEach(dd=>{const q=dd.quota||{};Object.keys(q).forEach(k=>quota+=(parseInt(q[k])||0))});
-      const today2=new Date().toISOString().slice(0,10);
-      const done=p.manualClosed||(p.deadline&&p.deadline<today2);
-      const period=ds.length?(ds[0].replace(/-/g,'.')+(ds.length>1?' ~ '+ds[ds.length-1].slice(5).replace(/-/g,'.')+' ('+ds.length+'일)':'')):'';
-      return '<div style="border:1.5px solid #d9c9ec;background:#faf7ff;border-radius:12px;padding:12px 15px;margin:8px 0">'
-        +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
-        +'<span class="rbadge" style="background:#7c3aed">⚖️ 심판·운영요원 모집</span>'
-        +'<b style="font-size:14.5px">'+cesc(p.competitionName||'')+'</b>'
-        +(done?'<span style="font-size:11px;font-weight:900;color:#fff;background:#8a919d;border-radius:999px;padding:2px 9px">마감</span>':'<span style="font-size:11px;font-weight:900;color:#fff;background:#0f766e;border-radius:999px;padding:2px 9px">모집 중</span>')
-        +'</div>'
-        +'<div style="font-size:12.5px;color:#4b5563;margin-top:5px;line-height:1.7">'
-        +(period?'<span style="display:inline-block">📅 '+cesc(period)+'</span> · ':'')
-        +(p.location?'<span style="display:inline-block;font-weight:800;color:#374151">📍 '+cesc(p.location)+'</span> · ':'')
-        +(quota?'<span style="display:inline-block">모집 '+quota+'명</span> · ':'')
-        +(p.deadline?'<span style="display:inline-block">⏳ 마감 '+cesc(p.deadline)+'</span>':'')
-        +((p.supplies&&p.supplies.length)?'<br>🎒 준비물: '+cesc(p.supplies.join(', ')):'')
-        +'</div>'
-        +'<div style="margin-top:8px"><button class="cbtn" style="background:#7c3aed;color:#fff;padding:7px 16px;font-size:13px" onclick="location.href=\'staff.html\'">✍ 상세 보기·신청 (심판 페이지) →</button></div>'
-        +'</div>';
-    };
     // [버그수정] 대회 묶음이 비공개(compEnabled 꺼짐)여도 연결 공고는 단독으로 표시 — 안내문·요강 미노출 문제 해결
     const linked=new Set();CCOMPS.forEach(cd=>(byComp[cd.id]||[]).forEach(d=>linked.add(d.id)));
     let html='';
@@ -1336,7 +1309,6 @@ async function loadSlots(){
         +(c.desc?'<div style="font-size:12.5px;color:#4b5563;padding:0 4px 8px;white-space:pre-line;word-break:keep-all;line-height:1.75">'+cesc(c.desc)+'</div>':'')
         +((c.sports||[]).some(x=>x.mode==='체험부스')?'<div style="font-size:12.5px;font-weight:800;color:#8a5a00;background:#fff8ed;border:1px solid #ecd9b0;border-radius:9px;padding:8px 12px;margin:0 4px 8px">🎪 체험부스 종목은 신청 없이 현장에서 자유롭게 참여하실 수 있습니다.</div>':'')
         +(slots.filter(d=>d.data().role==='참가').length?slots.filter(d=>d.data().role==='참가').map(d=>slotCard(d,today)).join(''):'<div class="bempty" style="margin:4px">참가 모집 공고 준비 중</div>')
-        +(byCompStaff[cd.id]||[]).map(staffSum).join('') // [연동공고] 이 대회의 심판·운영 모집 요약
         +'</div>';
     });
     html+=snap.docs.filter(d=>!linked.has(d.id)&&d.data().role==='참가').map(d=>slotCard(d,today)).join('');
@@ -1344,10 +1316,7 @@ async function loadSlots(){
     // [구조개편] 심판·운영 위촉 공고(compSlots)는 별도 섹션에 렌더 — 참가 모집과 분리
     const refEl=document.getElementById('cRefSlotList');
     if(refEl){
-      // [연동공고] 대회 카드가 표시되지 않는 경우(묶음 비공개 등)에도 연동 심판 모집 요약이 보이도록 이 섹션에 표시
-      const shownComp=new Set(CCOMPS.map(c=>c.id));
-      const extraStaff=Object.keys(byCompStaff).filter(cid=>!shownComp.has(cid)).map(cid=>byCompStaff[cid].map(staffSum).join('')).join('');
-      const rf=extraStaff+snap.docs.filter(d=>d.data().role!=='참가').map(d=>slotCard(d,today)).join('');
+      const rf=snap.docs.filter(d=>d.data().role!=='참가').map(d=>slotCard(d,today)).join('');
       refEl.innerHTML=rf||'<div class="bempty">진행 중인 심판·운영 위촉 공고가 없습니다. (신규 공고는 위 「심판·운영요원 모집공고」에 게시됩니다)</div>';
     }
   }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+cesc(e.message)+'</div>'}
