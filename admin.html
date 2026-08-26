@@ -1958,6 +1958,7 @@ async function autoAssign(){
       await d.ref.update({assignedUid:slot.data().claimedBy,assignedName:slot.data().claimedName,status:'배정완료'});
       await adHist(slot.data().claimedBy,'[위촉] '+s.school+' 강사 배정 ('+(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' · '+(s.region||'')+')');
       await syncStatus(s,'배정완료',{assignedName:slot.data().claimedName});
+      await DB.collection('openSlots').doc(d.id).delete().catch(()=>{}); // [구멍 보완] 지명자 우선 확정 시에도 공고 내림 (다른 배정 경로와 동일)
       done++;continue;
     }
     const wantAfter=(s.type||'').indexOf('방과후')>=0;
