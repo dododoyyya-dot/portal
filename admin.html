@@ -388,7 +388,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#0f766e" onclick="exportCSV()">⬇ 전체 CSV</button>
         <button class="btn-sub" style="background:#0e7490" onclick="showSlotAdmin()">📢 학교 공고 관리</button>
         <button class="btn-sub" style="background:#b8860b" onclick="dlDeliveryCsv()">🚚 배송명단 CSV</button>
-        <button class="btn-sub" style="background:#7c3aed" onclick="dlSizesCsv()">👕 강사복 사이즈 CSV</button>
+        <button class="btn-sub" style="background:#7c3aed" onclick="dlSizesXlsx()">👕 강사복 사이즈 (엑셀·집계·그래프)</button>
         <button class="btn-sub" style="background:#153A77" onclick="dlGoodsCerts()">🧾 수령확인증 일괄 다운로드</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="showGigs()">🔎 단기공고 승인<span id="gigCntBadge" style="display:none;background:#C41E2F;border-radius:999px;padding:1px 7px;font-size:11px;margin-left:5px"></span></button>
         <button class="btn-sub" style="background:#0e7490" onclick="showInspections()">📋 점검 제출현황</button>
@@ -4757,6 +4757,7 @@ async function givePt(){
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script>
 async function reqGoods(appId){
   const doc=APPS.find(x=>x.id===appId);if(!doc)return;
@@ -4805,8 +4806,71 @@ function dlDeliveryCsv(){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   a.download='용품_배송명단_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
-// [강사복] 배정 강사 사이즈 명단 CSV — 배정완료 학교의 강사(본인지도 포함)별 상의·하의·신발·모자
-async function dlSizesCsv(){
+// [강사복] 배정 강사 사이즈 명단 + 집계표 + 원형그래프 (ExcelJS, 다중 시트) — 배정완료 학교의 강사(본인지도 포함)별 상의·하의·신발·모자
+function pieChartPng(title,data){
+  const items=data.filter(d=>d.count>0);
+  const total=items.reduce((s,d)=>s+d.count,0);
+  const W=520,H=320,cx=145,cy=165,R=110;
+  const c=document.createElement('canvas');c.width=W;c.height=H;
+  const x=c.getContext('2d');
+  x.fillStyle='#fff';x.fillRect(0,0,W,H);
+  x.fillStyle='#111';x.font='700 17px "Malgun Gothic",sans-serif';
+  x.fillText(title,14,26);
+  if(!total){
+    x.fillStyle='#888';x.font='400 13px "Malgun Gothic",sans-serif';
+    x.fillText('데이터 없음',14,54);
+    return c.toDataURL('image/png');
+  }
+  const colors=['#4F46E5','#059669','#DC2626','#D97706','#0891B2','#7C3AED','#DB2777','#65A30D','#9CA3AF'];
+  let a0=-Math.PI/2;
+  items.forEach((d,i)=>{
+    const frac=d.count/total,a1=a0+frac*Math.PI*2;
+    x.beginPath();x.moveTo(cx,cy);x.arc(cx,cy,R,a0,a1);x.closePath();
+    x.fillStyle=colors[i%colors.length];x.fill();
+    x.strokeStyle='#fff';x.lineWidth=2;x.stroke();
+    a0=a1;
+  });
+  let ly=58;
+  items.forEach((d,i)=>{
+    const pct=Math.round(d.count/total*1000)/10;
+    x.fillStyle=colors[i%colors.length];x.fillRect(320,ly-11,13,13);
+    x.fillStyle='#222';x.font='400 12.5px "Malgun Gothic",sans-serif';
+    x.fillText(d.label+'  '+d.count+'명 ('+pct+'%)',340,ly);
+    ly+=21;
+  });
+  x.fillStyle='#555';x.font='600 12px "Malgun Gothic",sans-serif';
+  x.fillText('전체 '+total+'명',14,H-14);
+  return c.toDataURL('image/png');
+}
+function sizeTally(uids,map,field,order){
+  const cnt={};let miss=0;
+  uids.forEach(uid=>{const v=map[uid][field];if(v)cnt[v]=(cnt[v]||0)+1;else miss++;});
+  const data=order.map(v=>({label:v,count:cnt[v]||0}));
+  Object.keys(cnt).forEach(k=>{if(order.indexOf(k)<0)data.push({label:k,count:cnt[k]})});
+  if(miss)data.push({label:'미입력',count:miss});
+  return data;
+}
+function writeTallyBlock(ws,startRow,title,data){
+  const thin={style:'thin'};
+  ws.getCell('A'+startRow).value=title;
+  ws.getCell('A'+startRow).font={bold:true,size:12};
+  ws.mergeCells('A'+startRow+':B'+startRow);
+  let r=startRow+1;
+  ws.getCell('A'+r).value='사이즈';ws.getCell('B'+r).value='인원수';
+  ['A','B'].forEach(col=>{const c=ws.getCell(col+r);c.font={bold:true,size:10};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF2F4F8'}};c.border={top:thin,left:thin,bottom:thin,right:thin};c.alignment={horizontal:'center'};});
+  r++;
+  data.forEach(d=>{
+    ws.getCell('A'+r).value=d.label;
+    ws.getCell('B'+r).value=d.count;
+    ws.getCell('A'+r).border={top:thin,left:thin,bottom:thin,right:thin};
+    ws.getCell('B'+r).border={top:thin,left:thin,bottom:thin,right:thin};
+    ws.getCell('B'+r).alignment={horizontal:'center'};
+    r++;
+  });
+  return r+1;
+}
+async function dlSizesXlsx(){
+  if(typeof ExcelJS==='undefined'){alert('엑셀 라이브러리 로딩 중입니다. 잠시 후 다시 눌러주세요.');return}
   if(!APPS.length)await loadApps();
   const map={}; // uid → {name, schools:[], region}
   APPS.forEach(d=>{const s=d.data();
@@ -4830,18 +4894,57 @@ async function dlSizesCsv(){
     m.cap=(v&&v.sizeCap)||'';
     if(v&&v.name)m.name=v.name;
   }
-  const rows=[['강사명','연락처','권역','담당 학교','상의','하의(허리)','신발','모자','미입력 항목']];
   uids.sort((a,b)=>String(map[a].region).localeCompare(String(map[b].region))||String(map[a].name).localeCompare(String(map[b].name)));
   let missing=0;
+  const wb=new ExcelJS.Workbook();
+  const thin={style:'thin'};
+  // ── 시트1: 사이즈 명단 (기존 CSV와 동일 데이터·로직) ──
+  const ws1=wb.addWorksheet('사이즈 명단');
+  ws1.columns=[{width:12},{width:14},{width:10},{width:34},{width:11},{width:11},{width:9},{width:9},{width:14}];
+  ws1.addRow(['강사명','연락처','권역','담당 학교','상의','하의(허리)','신발','모자','미입력 항목']);
+  ws1.getRow(1).eachCell(c=>{c.font={bold:true,size:10.5};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF2F4F8'}};c.alignment={horizontal:'center',vertical:'middle'};c.border={top:thin,left:thin,bottom:thin,right:thin};});
   uids.forEach(uid=>{const m=map[uid];
     const miss=[!m.top&&'상의',!m.pants&&'하의',!m.shoe&&'신발',!m.cap&&'모자'].filter(Boolean);
     if(miss.length)missing++;
-    rows.push([m.name,m.phone,m.region,m.schools.join(' · '),m.top||'미입력',m.pants||'미입력',m.shoe||'미입력',m.cap||'미입력',miss.join('/')||'-']);
+    const row=ws1.addRow([m.name,m.phone,m.region,m.schools.join(' · '),m.top||'미입력',m.pants||'미입력',m.shoe||'미입력',m.cap||'미입력',miss.join('/')||'-']);
+    row.eachCell(c=>{c.font={size:10};c.alignment={vertical:'middle',wrapText:true};c.border={top:thin,left:thin,bottom:thin,right:thin};});
   });
-  const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download='강사복_사이즈_명단_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
-  if(missing)alert('⚠ 사이즈 미입력 강사가 '+missing+'명 있습니다. (CSV의 [미입력 항목] 열 참고 — 마이페이지 → 내 정보에서 입력하도록 안내해주세요)');
+  // ── 시트2: 사이즈 집계표 + 원형그래프 ──
+  const ws2=wb.addWorksheet('사이즈 집계');
+  ws2.columns=[{width:14},{width:10}];
+  const TOP_ORDER=['S (90)','M (95)','L (100)','XL (105)','2XL (110)','3XL (115)'];
+  const PANTS_ORDER=['26','28','30','32','34','36','38','40'];
+  const SHOE_ORDER=['220','230','240','250','260','270','280','290'];
+  const CAP_ORDER=['성인','아동'];
+  const topData=sizeTally(uids,map,'top',TOP_ORDER);
+  const pantsData=sizeTally(uids,map,'pants',PANTS_ORDER);
+  const shoeData=sizeTally(uids,map,'shoe',SHOE_ORDER);
+  const capData=sizeTally(uids,map,'cap',CAP_ORDER);
+  let nr=1;
+  nr=writeTallyBlock(ws2,nr,'상의 사이즈 집계',topData);
+  nr=writeTallyBlock(ws2,nr,'하의(허리) 사이즈 집계',pantsData);
+  nr=writeTallyBlock(ws2,nr,'신발 사이즈 집계',shoeData);
+  nr=writeTallyBlock(ws2,nr,'모자 사이즈 집계',capData);
+  const chartDefs=[['상의 사이즈 분포',topData],['하의(허리) 사이즈 분포',pantsData],['신발 사이즈 분포',shoeData],['모자 사이즈 분포',capData]];
+  let rowOff=0;
+  chartDefs.forEach(cd=>{
+    try{
+      const png=pieChartPng(cd[0],cd[1]);
+      const imgId=wb.addImage({base64:png.split(',')[1],extension:'png'});
+      ws2.addImage(imgId,{tl:{col:3.3,row:rowOff},ext:{width:480,height:296},editAs:'oneCell'});
+    }catch(e){}
+    rowOff+=15.3;
+  });
+  try{
+    const buf=await wb.xlsx.writeBuffer();
+    const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='강사복_사이즈_명단_'+new Date().toISOString().slice(0,10)+'.xlsx';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  }catch(e){alert('엑셀 생성 실패: '+e.message);return}
+  if(missing)alert('⚠ 사이즈 미입력 강사가 '+missing+'명 있습니다. ([사이즈 명단] 시트의 [미입력 항목] 열 참고 — 마이페이지 → 내 정보에서 입력하도록 안내해주세요)');
 }
 function gimg(src){return new Promise(function(res,rej){var im=new Image();im.onload=function(){res(im)};im.onerror=function(){rej(new Error('img'))};im.src=src})}
 function gfit(ctx,text,maxW,px,minPx){text=String(text||'');let f=px;
