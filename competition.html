@@ -1344,7 +1344,10 @@ async function loadSlots(){
     // [구조개편] 심판·운영 위촉 공고(compSlots)는 별도 섹션에 렌더 — 참가 모집과 분리
     const refEl=document.getElementById('cRefSlotList');
     if(refEl){
-      const rf=snap.docs.filter(d=>d.data().role!=='참가').map(d=>slotCard(d,today)).join('');
+      // [연동공고] 대회 카드가 표시되지 않는 경우(묶음 비공개 등)에도 연동 심판 모집 요약이 보이도록 이 섹션에 표시
+      const shownComp=new Set(CCOMPS.map(c=>c.id));
+      const extraStaff=Object.keys(byCompStaff).filter(cid=>!shownComp.has(cid)).map(cid=>byCompStaff[cid].map(staffSum).join('')).join('');
+      const rf=extraStaff+snap.docs.filter(d=>d.data().role!=='참가').map(d=>slotCard(d,today)).join('');
       refEl.innerHTML=rf||'<div class="bempty">진행 중인 심판·운영 위촉 공고가 없습니다. (신규 공고는 위 「심판·운영요원 모집공고」에 게시됩니다)</div>';
     }
   }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+cesc(e.message)+'</div>'}
