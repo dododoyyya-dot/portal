@@ -388,6 +388,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#0f766e" onclick="exportCSV()">⬇ 전체 CSV</button>
         <button class="btn-sub" style="background:#0e7490" onclick="showSlotAdmin()">📢 학교 공고 관리</button>
         <button class="btn-sub" style="background:#b8860b" onclick="dlDeliveryCsv()">🚚 배송명단 CSV</button>
+        <button class="btn-sub" style="background:#7c3aed" onclick="dlSizesCsv()">👕 강사복 사이즈 CSV</button>
         <button class="btn-sub" style="background:#153A77" onclick="dlGoodsCerts()">🧾 수령확인증 일괄 다운로드</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="showGigs()">🔎 단기공고 승인<span id="gigCntBadge" style="display:none;background:#C41E2F;border-radius:999px;padding:1px 7px;font-size:11px;margin-left:5px"></span></button>
         <button class="btn-sub" style="background:#0e7490" onclick="showInspections()">📋 점검 제출현황</button>
@@ -4798,6 +4799,44 @@ function dlDeliveryCsv(){
   const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   a.download='용품_배송명단_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+// [강사복] 배정 강사 사이즈 명단 CSV — 배정완료 학교의 강사(본인지도 포함)별 상의·하의·신발·모자
+async function dlSizesCsv(){
+  if(!APPS.length)await loadApps();
+  const map={}; // uid → {name, schools:[], region}
+  APPS.forEach(d=>{const s=d.data();
+    if(s.status!=='배정완료'||!s.assignedUid)return;
+    const m=map[s.assignedUid]=map[s.assignedUid]||{name:s.assignedName||'',schools:[],region:s.region||''};
+    m.schools.push(s.school+(appTypeOf(s).indexOf('방과후')>=0?'(방과후)':'(학교체육)'));
+  });
+  const uids=Object.keys(map);
+  if(!uids.length){alert('배정완료된 강사가 없습니다.');return}
+  // 회원 정보 로드 (USERS 전역이 있으면 활용, 없으면 개별 조회)
+  for(const uid of uids){
+    let v=null;
+    const u=(window.USERS||[]).find(x=>x.id===uid);
+    if(u)v=u.data();
+    else{try{const g=await DB.collection('users').doc(uid).get();if(g.exists)v=g.data()}catch(e){}}
+    const m=map[uid];
+    m.phone=(v&&v.phone)||'';
+    m.top=(v&&v.clothingSize)||'';
+    m.pants=(v&&v.sizePants)||'';
+    m.shoe=(v&&v.sizeShoe)||'';
+    m.cap=(v&&v.sizeCap)||'';
+    if(v&&v.name)m.name=v.name;
+  }
+  const rows=[['강사명','연락처','권역','담당 학교','상의','하의(허리)','신발','모자','미입력 항목']];
+  uids.sort((a,b)=>String(map[a].region).localeCompare(String(map[b].region))||String(map[a].name).localeCompare(String(map[b].name)));
+  let missing=0;
+  uids.forEach(uid=>{const m=map[uid];
+    const miss=[!m.top&&'상의',!m.pants&&'하의',!m.shoe&&'신발',!m.cap&&'모자'].filter(Boolean);
+    if(miss.length)missing++;
+    rows.push([m.name,m.phone,m.region,m.schools.join(' · '),m.top||'미입력',m.pants||'미입력',m.shoe||'미입력',m.cap||'미입력',miss.join('/')||'-']);
+  });
+  const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='강사복_사이즈_명단_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  if(missing)alert('⚠ 사이즈 미입력 강사가 '+missing+'명 있습니다. (CSV의 [미입력 항목] 열 참고 — 마이페이지 → 내 정보에서 입력하도록 안내해주세요)');
 }
 function gimg(src){return new Promise(function(res,rej){var im=new Image();im.onload=function(){res(im)};im.onerror=function(){rej(new Error('img'))};im.src=src})}
 function gfit(ctx,text,maxW,px,minPx){text=String(text||'');let f=px;
