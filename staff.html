@@ -101,8 +101,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
-<script src="kfdf.js?v=20260808"></script>
+<script src="kfdf.js?v=20260821"></script>
+<script src="site_config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 KFDF.initApp();
 const AUTH=firebase.auth(),DB=firebase.firestore();
@@ -122,11 +125,42 @@ const QUOTA_KEYS=[['manager','관리위원'],['referee','심판'],['staff','운�
 const DEFAULT_PAY=[['주심','150,000원'],['부심','120,000원'],['기록원','100,000원'],['운영요원','100,000원']];
 const DEFAULT_SUPPLIES=['필기구','텀블러 (물병 지참)','운동화','심판복','호각'];
 const DEFAULT_CHECKED=['필기구','텀블러 (물병 지참)','운동화'];
+// [v4] 심판 전용 임무 판별 — 심판 임무는 유효한 심판 자격증 보유자만 신청 가능 (운영요원은 자격 검증 없음)
+const REF_ONLY_DUTIES=['주심','부심 (선심)','기록원','점수원'];
+function isRefDuty(r){r=String(r||'');return REF_ONLY_DUTIES.indexOf(r)>=0||r.indexOf('심판')>=0;}
+function hasValidRefLic(){return Array.isArray(MYLIC_DOCS._valid)&&MYLIC_DOCS._valid.some(l=>String(l.type||'').indexOf('심판')>=0);}
 
 let SME=null,SMY=null,POSTS=[],APPS={},MYLIC='',MYLIC_DOCS=[],LIC_CACHE={};
 function isAdminU(){return !!(SMY&&(SMY.role==='admin'||SMY.owner))}
 function isSidoU(){return !!(SMY&&(SMY.role==='sidoOfficer'||(SMY.roles&&SMY.roles.indexOf('sidoOfficer')>=0)))}
+// [겸직v3] 권역장 여부 (role 단일값 OR roles[] 겸직 배열 + 만료일 체크)
+function isRegionActiveU(){
+  if(!SMY)return false;
+  var isRA=(SMY.role==='regionAdmin')||(Array.isArray(SMY.roles)&&SMY.roles.indexOf('regionAdmin')>=0);
+  if(!isRA)return false;
+  var e=SMY.regionAdminExpiresAt;if(!e)return true;
+  try{var t=e.toDate?e.toDate():new Date(e);return new Date()<t;}catch(_){return true;}
+}
+// ── canManage: 신청현황 열람 + 공고 수정·복사 (기존 동작 유지) ──
 function canManage(p){return isAdminU()||isSidoU()||(SME&&p.author&&p.author.uid===SME.uid)}
+// ── canDecide: 확정·보류·거절·수당엑셀·경력등록 ──
+// admin=전체 / 시도임원=본인 시도 공고만 / 권역장=담당 권역 공고만
+// 하위호환: sido·region 필드 없는 구 공고·구 계정은 기존처럼 허용
+function canDecide(p){
+  if(isAdminU())return true;
+  if(isSidoU()){
+    if(!SMY.sido)return true;     // sido 미설정 기존 계정 — 하위호환
+    if(!p.sido)return true;       // sido 필드 없는 구 공고 — 하위호환
+    return p.sido===SMY.sido;     // 신규: 본인 시도 공고만
+  }
+  // [겸직v3] 권역장: 담당 권역 공고만 결정권
+  if(isRegionActiveU()){
+    if(!SMY.managedRegion)return false;  // 관할 권역 미설정이면 차단
+    if(!p.region)return true;            // 하위호환: region 없는 구 공고
+    return p.region===SMY.managedRegion; // 신규: 본인 관할 권역 공고만
+  }
+  return false;
+}
 function myOrg(){
   if(isAdminU())return '중앙연맹';
   if(isSidoU()&&SMY.sido)return SMY.sido+'연맹';
@@ -196,25 +230,27 @@ function periodTxt(p){
 }
 function postStatus(p){
   const today=new Date().toISOString().slice(0,10);
+  if(p.manualClosed)return ['마감','#8a919d'];  // [v6] 관리자 수동 마감
   if(p.closed)return ['확정','#153A77'];
   if(p.deadline&&p.deadline<today)return ['마감','#8a919d'];
   if(p.endDate&&p.endDate<today)return ['종료','#8a919d'];
   return ['모집 중','#0f766e'];
 }
-function rowHtml(p){
+function rowHtml(p,expanded){
   const t=postTotals(p);
   const [stTxt,stCol]=postStatus(p);
   const period=periodTxt(p);
-  return '<div class="strowitem" id="row_'+p.id+'">'
+  // [v6] expanded=true 면 첫 화면부터 내용 펼침 (모집중 공고 원스텝)
+  return '<div class="strowitem'+(expanded?' open':'')+'" id="row_'+p.id+'">'
     +'<div class="strow" onclick="toggleRow(\''+p.id+'\')">'
     +'<span class="stpill" style="background:'+stCol+';font-size:11px;padding:2px 9px">'+stTxt+'</span>'
     +(!p.approved?'<span class="stpill" style="background:#C41E2F;font-size:11px;padding:2px 9px">승인대기</span>':'')
     +'<span class="strowname">'+esc(p.competitionName)+'</span>'
     +'<span class="strowmeta">'+esc((p.author&&p.author.organization)||'')+' · '+period+'</span>'
     +'<span class="strowend">마감 '+fmtD(p.deadline||'')+' · <b>'+t.applied+'/'+t.quota+'명</b></span>'
-    +'<span class="strowangl" id="angl_'+p.id+'">›</span>'
+    +'<span class="strowangl" id="angl_'+p.id+'"'+(expanded?' style="transform:rotate(90deg)"':'')+'>›</span>'
     +'</div>'
-    +'<div class="strowbody" id="body_'+p.id+'" style="display:none">'
+    +'<div class="strowbody" id="body_'+p.id+'" style="display:'+(expanded?'block':'none')+'">'
     +expandRowHtml(p)
     +'</div>'
     +'</div>';
@@ -251,6 +287,7 @@ function expandRowHtml(p){
     +(manage
       ?(!p.approved&&isAdminU()?'<button class="stbtn stbtn-teal" style="padding:5px 11px;font-size:12px" onclick="approvePost(\''+p.id+'\',1)">✓ 승인</button>'
         +'<button class="stbtn" style="padding:5px 11px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="approvePost(\''+p.id+'\',0)">반려</button>':'')
+        +'<button class="stbtn" style="padding:5px 11px;font-size:12px;background:'+(p.manualClosed?'#f0fdf4':'#fff8ed')+';color:'+(p.manualClosed?'#0f766e':'#8a5a00')+';border:1.5px solid '+(p.manualClosed?'#a7f3d0':'#fde68a')+'" onclick="event.stopPropagation();togglePostClosed(\''+p.id+'\')">'+(p.manualClosed?'▶ 마감해제':'⛔ 마감')+'</button>'
         +'<button class="stbtn stbtn-soft" style="padding:5px 11px;font-size:12px" onclick="event.stopPropagation();openPostForm(\''+p.id+'\')">✏️ 수정</button>'
         +'<button class="stbtn stbtn-ghost" style="padding:5px 11px;font-size:12px" onclick="copyRoster(\''+p.id+'\')">📋 명단복사</button>'
         +'<button class="stbtn" style="padding:5px 11px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="delPost(\''+p.id+'\')">삭제</button>'
@@ -272,21 +309,41 @@ function renderList(){
   const el=document.getElementById('stList');
   if(!POSTS.length){el.innerHTML='<div class="bempty">현재 등록된 모집 공고가 없습니다.</div>';return}
   const today=new Date().toISOString().slice(0,10);
-  const active=POSTS.filter(p=>!p.endDate||p.endDate>=today);
-  const past=POSTS.filter(p=>p.endDate&&p.endDate<today);
+  // [v6] 완료 = 수동 마감(closed) 또는 모집마감일 경과 또는 대회 종료
+  const isDone=p=>!!p.manualClosed||(p.deadline&&p.deadline<today)||(p.endDate&&p.endDate<today);
+  const active=POSTS.filter(p=>!isDone(p));
+  const past=POSTS.filter(isDone).slice()
+    .sort((a,b)=>String(b.endDate||b.startDate||'').localeCompare(String(a.endDate||a.startDate||'')));
   let html='<div class="strowlist">';
   if(active.length){
-    html+='<div class="strhead">📢 진행중 공고 <span style="font-weight:600;color:#8a919d">('+active.length+'건)</span></div>';
-    html+=active.map(rowHtml).join('');
+    html+='<div class="strhead">📢 모집중 공고 <span style="font-weight:600;color:#8a919d">('+active.length+'건)</span></div>';
+    html+=active.map(p=>rowHtml(p,true)).join('');  // [v6] 모집중은 첫 화면부터 펼침 (원스텝)
   }
   if(past.length){
     if(active.length)html+='<div style="height:8px;background:#f3f6fb;border-top:1px solid #e6eaf2;border-bottom:1px solid #e6eaf2"></div>';
-    html+='<div class="strhead" style="color:#8a919d">🗂 지난 공고 <span style="font-weight:600">('+past.length+'건)</span></div>';
-    html+=past.map(rowHtml).join('');
+    html+='<div class="strhead" style="color:#8a919d">✅ 완료된 공고 <span style="font-weight:600">('+past.length+'건)</span> <span style="font-weight:600;font-size:11.5px">— 이런 대회들이 진행되었습니다</span></div>';
+    html+=past.slice(0,5).map(p=>rowHtml(p,false)).join('');
+    if(past.length>5){
+      html+='<div id="pastMore" style="display:none">'+past.slice(5).map(p=>rowHtml(p,false)).join('')+'</div>';
+      html+='<div style="text-align:center;padding:11px"><button class="stbtn stbtn-ghost" style="padding:8px 22px;font-size:13px" onclick="var m=document.getElementById(\'pastMore\');var on=m.style.display===\'none\';m.style.display=on?\'block\':\'none\';this.textContent=on?\'접기 ▲\':\'완료된 공고 더보기 ('+(past.length-5)+'건) ▼\'">완료된 공고 더보기 ('+(past.length-5)+'건) ▼</button></div>';
+    }
   }
   if(!active.length&&!past.length)html+='<div class="bempty">현재 등록된 모집 공고가 없습니다.</div>';
   html+='</div>';
   el.innerHTML=html;
+}
+// [v6] 관리자 수동 마감/해제
+async function togglePostClosed(id){
+  const p=POSTS.find(x=>x.id===id);if(!p)return;
+  const to=!p.manualClosed;
+  if(!confirm(to?('['+(p.competitionName||'')+']\n이 공고를 지금 마감 처리할까요?\n\n· 목록의 「완료된 공고」로 이동합니다\n· 신규 신청이 차단됩니다 (기존 신청·확정 데이터는 유지)')
+              :('['+(p.competitionName||'')+']\n마감을 해제할까요? 다시 「모집중 공고」로 표시되고 신청이 가능해집니다.')))return;
+  try{
+    const upd={manualClosed:to};
+    if(to)upd.manualClosedAt=new Date().toISOString();
+    await DB.collection('competitionStaff').doc(id).update(upd);
+    loadPosts();
+  }catch(e){alert('마감 처리 실패: '+e.message)}
 }
 async function approvePost(id,ok){
   const p=POSTS.find(x=>x.id===id);if(!p)return;
@@ -305,8 +362,45 @@ async function delPost(id){
 }
 // ══════════════ 공고 등록/수정 폼 ══════════════
 let PF_POSTERS=[],PF_DATES=[],PF_CAL_Y=0,PF_CAL_M=0;
+// [v7] 상위 대회 불러오기 (competitions 컬렉션 연동)
+let PF_COMPS=[],PF_COMPID='';
+async function pfFillComps(ed){
+  try{
+    const snap=await DB.collection('competitions').orderBy('dateStart','desc').limit(20).get();
+    PF_COMPS=snap.docs.map(d=>({id:d.id,...d.data()}));
+    const sel=document.getElementById('pfCompSel');if(!sel)return;
+    sel.innerHTML='<option value="">선택 안 함 (직접 입력)</option>'
+      +PF_COMPS.map(c=>'<option value="'+c.id+'"'+((ed&&ed.compId===c.id)?' selected':'')+'>'+esc(c.title||'')+' ('+esc(c.dateStart||'')+')</option>').join('');
+  }catch(e){}
+}
+function pfLoadComp(){
+  const sel=document.getElementById('pfCompSel');if(!sel||!sel.value){alert('불러올 대회를 선택해주세요.');return}
+  const c=PF_COMPS.find(x=>x.id===sel.value);if(!c)return;
+  PF_COMPID=c.id;
+  const set=(id,val)=>{const e=document.getElementById(id);if(e&&val)e.value=val};
+  set('pfName',c.title||'');
+  set('pfLoc',c.place||'');
+  set('pfTime',c.time||'');
+  set('pfDL',c.deadline||'');
+  set('pfHost',c.organizer||c.host||'');
+  // 대회 일자 프리필 (달력 선택 상태로)
+  const ds=(c.dates&&c.dates.length)?c.dates.slice():(function(){
+    const out=[];if(!c.dateStart)return out;
+    const fL=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    let d0=new Date(c.dateStart+'T00:00:00');const d1e=new Date((c.dateEnd||c.dateStart)+'T00:00:00');
+    let n=0;while(d0<=d1e&&n<14){out.push(fL(d0));d0.setDate(d0.getDate()+1);n++;}
+    return out;})();
+  if(ds.length){
+    PF_DATES=ds.slice(0,14);
+    const b0=new Date(PF_DATES[0]+'T00:00:00');
+    PF_CAL_Y=b0.getFullYear();PF_CAL_M=b0.getMonth();
+    if(typeof pfDates==='function')pfDates();
+  }
+  alert('✓ ['+(c.title||'')+'] 대회 정보를 불러왔습니다. 이어서 나머지 항목을 기입해주세요.');
+}
 function openPostForm(editId){
   const ed=editId?POSTS.find(x=>x.id===editId):null;
+  PF_COMPID=(ed&&ed.compId)||'';
   PF_POSTERS=(ed&&ed.posters)?ed.posters.slice():[];
   PF_DATES=(ed&&ed.dates)?ed.dates.map(d=>d.date).sort():[];
   const base=PF_DATES.length?new Date(PF_DATES[0]+'T00:00:00'):new Date();
@@ -319,6 +413,8 @@ function openPostForm(editId){
     +'<div style="font-size:12px;color:#8a919d;margin-top:3px">작성자: <b>'+esc(myOrg())+'</b>'+(SMY.phone?' · '+esc(mphone(SMY.phone)):'')+(SMY.email?' · '+esc(SMY.email):'')+' — 등록 후에도 목록·상세의 [✏️ 수정]으로 언제든 수정할 수 있습니다</div>'
     +'<label class="stlabel">주최 (표시명) * <span style="font-weight:600;color:#8a919d;font-size:11px">— 공고에 "주최: ○○"로 표시됩니다. 대행 등록 시 실제 주최 연맹·단체명을 입력하세요</span></label>'
     +'<input id="pfHost" class="stfield" value="'+esc(ed?((ed.author&&ed.author.organization)||''):myOrg())+'" placeholder="예: ○○연맹 / ○○교육청 / ○○대회 조직위">'
+    +'<label class="stlabel">🔗 상위 대회 불러오기 <span style="font-weight:600;color:#8a919d;font-size:11px">— 관리자 대회 등록의 대회를 선택하면 정보가 자동 기입되고 서로 연결됩니다</span></label>'
+    +'<div style="display:flex;gap:6px"><select id="pfCompSel" class="stfield" style="flex:1"><option value="">선택 안 함 (직접 입력)</option></select><button type="button" class="stbtn stbtn-soft" style="padding:8px 16px" onclick="pfLoadComp()">불러오기</button></div>'
     +'<label class="stlabel">대회명 *</label><input id="pfName" class="stfield" value="'+esc(ed?ed.competitionName:'')+'" placeholder="예: 2026 강원 유소년 플라잉디스크 대회">'
     +'<label class="stlabel">대회 일자 * <span style="font-weight:600;color:#8a919d;font-size:11px">— 달력에서 날짜를 클릭해 선택 (복수 선택 가능 · 7일, 14일처럼 떨어진 날도 OK · 다음 달로 넘겨도 선택 유지)</span></label>'
     +'<div id="pfCal" style="border:1.5px solid #dfe5ee;border-radius:12px;padding:12px 14px;margin-top:6px"></div>'
@@ -359,6 +455,7 @@ function openPostForm(editId){
   document.body.appendChild(div);
   window.PF_ED=ed||null;
   renderCal();pfDates();pfRenderPosters();
+  pfFillComps(ed);  // [v7] 상위 대회 목록 로드
 }
 // 심판복 라디오 — "미제공" 선택 시 준비물 [심판복] 자동 체크
 function pfUniformSync(radio){
@@ -551,7 +648,10 @@ async function savePost(editId){
       meal:(document.querySelector('input[name=pfMeal]:checked')||{}).value||'제공',
       uniform:uniform,lodging:lodging,
       supplies:supplies,posters:posters,description:v('pfDesc'),contactInfo:v('pfContact'),
+      compId:PF_COMPID||((editId&&(POSTS.find(x=>x.id===editId)||{}).compId)||''),  // [v7] 상위 대회 연결
       author:{uid:SME.uid,name:SMY.name||'',organization:(v('pfHost')||myOrg()),contact:SMY.phone||'',email:SMY.email||''},
+      // [권한개선] 신규 공고에 sido 필드 기록 — canDecide() 범위 검증에 사용
+      sido:SMY.sido||null,
       status:'모집중',
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()
     };
@@ -586,6 +686,8 @@ async function _renderDetailInner(){
   const old=document.getElementById('dtModal');if(old)old.remove();
   const div=document.createElement('div');div.id='dtModal';
   div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.6);z-index:9998;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
+  // [권한개선] 열람권(신청현황·공고수정) vs 결정권(확정·경력등록) 분리
+  const _decide=canDecide(p);
   // BUG-2 fix: await 전에 DOM에 추가해야 동시 호출 시 중복 모달 방지
   document.body.appendChild(div);
   const dates=p.dates||[];
@@ -639,11 +741,12 @@ async function _renderDetailInner(){
           +'<td style="font-size:12px">'+esc(((a.prefs||{})[dd.date]||[]).join(', ')||'-')+'</td>'
           +'<td style="text-align:center;white-space:nowrap">'+stHtml+'</td>'
           +(manage?'<td style="text-align:center">'+sigCell(a)+'</td>':'')
-          +(manage?'<td style="white-space:nowrap;text-align:center">'
+          // [권한개선] 확정·보류·거절은 canDecide(_decide)만 — canManage(열람)와 분리
+          +(_decide?'<td style="white-space:nowrap;text-align:center">'
             +'<button class="stbtn stbtn-teal" style="padding:4px 9px;font-size:11.5px;font-weight:800" title="확정" onclick="decideApp(\''+a.id+'\',\''+dd.date+'\',\'확정\')">✅ 확정</button><br>'
             +'<button class="stbtn" style="padding:3px 7px;font-size:11px;background:#fdf6e3;color:#8a5a00;margin-top:3px" title="보류" onclick="decideApp(\''+a.id+'\',\''+dd.date+'\',\'보류\')">⏳ 보류</button> '
             +'<button class="stbtn" style="padding:3px 7px;font-size:11px;background:#fff;color:#C41E2F;border:1px solid #f1c7cc;margin-top:3px" title="거절" onclick="decideApp(\''+a.id+'\',\''+dd.date+'\',\'거절\')">❌ 거절</button>'
-            +'</td>':'')
+            +'</td>':(manage?'<td style="text-align:center;color:#8a919d;font-size:11.5px">열람만</td>':''))
           +'</tr>';
       }).join('')+'</table>';
   }
@@ -674,7 +777,9 @@ async function _renderDetailInner(){
     +'<div style="font-size:13px;margin-top:12px"><b>👥 신청 현황 ('+dayApps.length+'명)</b></div>'+appsHtml
     +'</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">'
-    +(manage?'<button class="stbtn stbtn-soft" onclick="document.getElementById(\'dtModal\').remove();openPostForm(\''+p.id+'\')">✏️ 공고 수정</button><button class="stbtn stbtn-ghost" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button><button class="stbtn" style="background:#f0fdf4;color:#0f766e;border:1.5px solid #a7f3d0" onclick="exportPayExcel(\''+p.id+'\')">💰 수당지급 엑셀</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
+    // [권한개선] 공고 수정·복사 = canManage / 수당엑셀·자격확인·경력등록 = canDecide
+    +(manage?'<button class="stbtn stbtn-soft" onclick="document.getElementById(\'dtModal\').remove();openPostForm(\''+p.id+'\')">✏️ 공고 수정</button><button class="stbtn stbtn-ghost" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button>':'')
+    +(_decide?'<button class="stbtn" style="background:#f0fdf4;color:#0f766e;border:1.5px solid #a7f3d0" onclick="exportPayExcel(\''+p.id+'\')">💰 수당지급 엑셀</button><button class="stbtn" style="background:#fffbeb;color:#8a5a00;border:1.5px solid #fde68a" onclick="exportPayReport(\''+p.id+'\')">📄 수당지급내역서 (서식·서명)</button><button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="openNotifyModal(\''+p.id+'\')">📣 확정자 단체 알림</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="exportLicZip(\''+p.id+'\')">📦 자격증 일괄 다운로드</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
     +'<button class="stbtn stbtn-main" style="padding:11px 26px" onclick="openApplyForm(\''+p.id+'\')">✍️ 신청하기 (날짜 선택)</button>'
     +'</div></div>';
   // div는 await 전에 이미 DOM에 추가됨 — innerHTML 설정만으로 내용 갱신
@@ -684,10 +789,12 @@ function openApplyForm(id){
   const p=POSTS.find(x=>x.id===id);if(!p)return;
   if(!SMY||SMY.status!=='approved'){alert('사무국 승인 후 신청할 수 있습니다.');return}
   if(SMY.sanction&&SMY.sanction.active){alert('🚫 현재 징계 기간 중이어서 심판·운영요원 신청이 제한됩니다.\n문의: 사무국 031-984-3248');return}
-  if(Array.isArray(MYLIC_DOCS._valid)&&MYLIC_DOCS._valid.length===0){alert('❌ 유효한 연맹 자격증이 없어 신청할 수 없습니다.\n만료된 자격증만 있거나 등록된 자격이 없습니다.\n자격증 갱신·등록 후 신청해주세요.');return}
+  // [v4] 자격 미보유자도 신청 진입 허용 — 운영요원 임무는 자격 검증 없이 신청 가능, 심판 임무만 유효 심판자격 검사
   const today=new Date().toISOString().slice(0,10);
+  if(p.manualClosed){alert('마감된 공고입니다. (관리자 마감 처리)');return}  // [v6]
   if(p.deadline&&p.deadline<today){alert('모집이 마감된 공고입니다.');return}
   const my=(APPS[p.id]||[]).find(a=>a.uid===SME.uid);
+  const pf=(my&&my.payInfo)||{};  // [v4] 이전 신청의 수당지급 정보 프리필
   const old=document.getElementById('apModal');if(old)old.remove();
   const div=document.createElement('div');div.id='apModal';
   div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.65);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
@@ -698,7 +805,8 @@ function openApplyForm(id){
     +(my?'<div style="font-size:12px;font-weight:800;color:#b8860b;background:#fff8ed;border-radius:8px;padding:7px 11px;margin-top:8px">⏳ 이미 신청한 공고입니다 — 다시 제출하면 이전 신청 내용을 덮어씁니다.</div>':'')
     +'<div style="background:#f6f8fb;border-radius:10px;padding:10px 13px;margin-top:10px;font-size:13px;line-height:1.8">'
     +'👤 <b>'+esc(SMY.name||'')+'</b> · '+esc(mphone(SMY.phone||''))
-    +'<br>🎖 보유 자격: '+(MYLIC_DOCS&&MYLIC_DOCS.length?MYLIC_DOCS.map(l=>{const today=new Date().toISOString().slice(0,10);const valid=l.status!=='만료'&&(!l.expireAt||l.expireAt>=today);return '<b style="color:'+(valid?'#0f766e':'#C41E2F')+'">'+esc((l.type||'')+' '+(l.grade||''))+'</b><span style="font-size:11px;color:'+(valid?'#0f766e':'#C41E2F')+';margin-left:3px">'+(valid?'유효':'만료')+(l.expireAt?' ~'+l.expireAt:'')+'</span>';}).join(' &nbsp;'):'<b>'+esc(MYLIC||'등록된 연맹 자격 없음')+'</b>')+'</div>'
+    +'<br>🎖 보유 자격: '+(MYLIC_DOCS&&MYLIC_DOCS.length?MYLIC_DOCS.map(l=>{const today=new Date().toISOString().slice(0,10);const valid=l.status!=='만료'&&(!l.expireAt||l.expireAt>=today);return '<b style="color:'+(valid?'#0f766e':'#C41E2F')+'">'+esc((l.type||'')+' '+(l.grade||''))+'</b><span style="font-size:11px;color:'+(valid?'#0f766e':'#C41E2F')+';margin-left:3px">'+(valid?'유효':'만료')+(l.expireAt?' ~'+l.expireAt:'')+'</span>';}).join(' &nbsp;'):'<b>'+esc(MYLIC||'등록된 연맹 자격 없음')+'</b>')
+    +(hasValidRefLic()?'':'<br><span style="font-size:11.5px;font-weight:800;color:#b8860b">※ 심판 임무는 유효한 심판 자격증 보유자만 신청 가능 — 운영요원 임무는 자격 없이 신청할 수 있습니다.</span>')+'</div>'
     +'<div style="font-size:13px;font-weight:800;margin-top:14px">① 참여 가능한 날짜 선택 <span style="font-weight:600;color:#8a919d;font-size:11.5px">(복수 선택 가능)</span></div>'
     +dates.map((d2,i)=>{
       const checked=my&&(my.days||[]).indexOf(d2.date)>=0;
@@ -707,7 +815,11 @@ function openApplyForm(id){
       +'<label style="display:flex;gap:7px;align-items:center;font-weight:800;font-size:13.5px;cursor:pointer"><input type="checkbox" class="apDay" value="'+d2.date+'"'+(checked?' checked':'')+' onchange="this.closest(\'div\').querySelector(\'.apPrefWrap\').style.display=this.checked?\'block\':\'none\'" style="width:auto"> '+fmtD(d2.date)+' ('+(d2.dayOfWeek||dowOf(d2.date))+')</label>'
       +'<div class="apPrefWrap" style="display:'+(checked?'block':'none')+';margin-top:7px">'
       +'<div style="font-size:11.5px;color:#8a919d;margin-bottom:3px">이 날짜 희망 임무 (복수 선택)</div>'
-      +(d2.roles||[]).map(r=>'<label class="chipck'+(myPrefs.indexOf(r)>=0?' on':'')+'"><input type="checkbox" class="apPref" data-date="'+d2.date+'" value="'+esc(r)+'"'+(myPrefs.indexOf(r)>=0?' checked':'')+' onchange="this.parentElement.classList.toggle(\'on\',this.checked)"> '+esc(r)+'</label>').join('')
+      +(d2.roles||[]).map(r=>{
+        // [v4] 심판 임무는 유효 심판자격 보유자만 선택 가능 (잠금 표시)
+        if(isRefDuty(r)&&!hasValidRefLic())return '<label class="chipck" style="opacity:.45;cursor:not-allowed" title="유효한 심판 자격증 보유자만 선택할 수 있습니다">🔒 '+esc(r)+'</label>';
+        return '<label class="chipck'+(myPrefs.indexOf(r)>=0?' on':'')+'"><input type="checkbox" class="apPref" data-date="'+d2.date+'" value="'+esc(r)+'"'+(myPrefs.indexOf(r)>=0?' checked':'')+' onchange="this.parentElement.classList.toggle(\'on\',this.checked)"> '+esc(r)+'</label>';
+      }).join('')
       +'<input class="stfield apPrefEtc" data-date="'+d2.date+'" style="margin-top:5px" placeholder="기타 희망 임무 (직접 입력)" value="'+esc(myPrefs.filter(x=>(d2.roles||[]).indexOf(x)<0).join(', '))+'">'
       +'</div></div>';
     }).join('')
@@ -722,12 +834,39 @@ function openApplyForm(id){
     +'<canvas id="sigCanvas" width="480" height="110" style="display:block;width:100%;height:110px;touch-action:none;cursor:crosshair;border-radius:10px"></canvas>'
     +'<button type="button" onclick="_sigClear()" style="position:absolute;top:6px;right:6px;font-size:11px;padding:3px 9px;border:1px solid #dfe5ee;border-radius:6px;background:#fff;cursor:pointer;z-index:1">지우기</button>'
     +'</div>'
+    // ── [v4] ④ 수당지급 정보·동의 (선택 입력 — 입력 시 동의·서명 필수) ──
+    +'<div style="font-size:13px;font-weight:800;margin-top:18px">④ 수당지급 정보 · 동의 <span style="font-size:11.5px;font-weight:600;color:#8a919d">(수당을 지급받으려면 입력·동의·서명 필요)</span></div>'
+    +'<div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:9px 12px;margin-top:6px;font-size:12px;color:#8a5a00;line-height:1.7">수당 지급 및 지급내역서 작성을 위한 정보입니다. 입력하지 않아도 신청은 가능하지만, 미입력 시 수당 지급이 어려울 수 있습니다.</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">'
+    +'<div><label class="stlabel">은행명</label><input id="apPayBank" class="stfield" placeholder="예: 국민은행" value="'+esc(pf.bank||SMY.bank||'')+'"></div>'
+    +'<div><label class="stlabel">계좌번호</label><input id="apPayAcct" class="stfield" placeholder="숫자·하이픈" value="'+esc(pf.account||SMY.accountNum||'')+'"></div>'
+    +'</div>'
+    +'<div style="margin-top:6px"><label class="stlabel">주민등록번호 <span style="font-size:10.5px;color:#8a919d">(수당 원천징수·거래처 등록용)</span></label><input id="apPayRrn" class="stfield" placeholder="000000-0000000" value="'+esc(pf.rrn||'')+'"></div>'
+    +'<details style="margin-top:8px;font-size:12px;background:#f8fafc;border:1.5px solid #e3e9f2;border-radius:10px;padding:9px 12px"><summary style="font-weight:800;cursor:pointer">📋 수당 지급을 위한 개인정보 수집·이용·제공 동의서 (전문 보기)</summary>'
+    +'<div style="line-height:1.8;margin-top:7px;color:#374151">'
+    +'<b>□ 개인정보 수집·이용 동의</b><br>1. 수집·이용 목적: 대회 관련 수당 지급<br>2. 수집 항목: 성명, 주민등록번호, 은행명, 계좌번호<br>3. 이용·보유 기간: 수당지급 종료일로부터 5년<br>4. 동의를 거부할 수 있으나, 거부 시 거래처 등록 및 수당 등 각종 지급이 불가합니다.<br>'
+    +'<b style="display:block;margin-top:6px">□ 개인정보 제3자 제공 동의</b>1. 제공받는 기관: 대회 주최·주관 기관(시·도교육청 및 산하기관·학교 포함)<br>2. 이용 목적: 수당 지급을 위한 거래처 등록·공유<br>3. 이용·보유 기간: 종료일로부터 5년<br>4. 제공 항목: 성명, 주민등록번호, 은행명, 계좌번호<br>5. 동의를 거부할 수 있으며, 거부 시 해당 기관에서 거래처 정보를 이용할 수 없습니다.<br>'
+    +'<b style="display:block;margin-top:6px">□ 개인정보 제3자 제공 고지</b>제공받는 기관: 국세청 · 이용 목적: 소득세 징수 · 제공 항목: 성명, 주민등록번호 · 근거: 「소득세법」 제127조<br>'
+    +'<b style="display:block;margin-top:6px">□ 주민등록번호 수집·제공 고지</b>「개인정보보호법」 제24조의2제1항제1호에 따라 정보주체의 동의 없이 주민등록번호를 수집·제공할 수 있습니다.<br>'
+    +'<span style="color:#6b7280">※ 수집된 개인정보는 동의한 목적 외로는 활용하지 않으며, 개인정보처리자에게 정정·삭제 등을 요구할 수 있습니다.</span>'
+    +'</div></details>'
+    +'<div style="font-size:12.5px;line-height:2.1;margin-top:6px">'
+    +'<label style="display:flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="apPayAg1" style="width:auto"'+(pf.agreePrivacy?' checked':'')+'> 개인정보 수집·이용에 동의합니다 (수당 지급용)</label>'
+    +'<label style="display:flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="apPayAg2" style="width:auto"'+(pf.agreeThird?' checked':'')+'> 개인정보 제3자 제공에 동의합니다 (수당 지급용)</label>'
+    +'</div>'
+    +'<div style="font-size:13px;font-weight:800;margin-top:14px">⑤ 수당지급내역서용 전자서명 <span style="font-size:11.5px;font-weight:600;color:#8a919d">(지급내역서 서명란에 자동 삽입됩니다)</span></div>'
+    +'<div style="position:relative;border:1.5px solid #dfe5ee;border-radius:10px;background:#f9fafb;margin:7px 0 4px">'
+    +'<canvas id="sigCanvasPay" width="480" height="110" style="display:block;width:100%;height:110px;touch-action:none;cursor:crosshair;border-radius:10px"></canvas>'
+    +'<button type="button" onclick="_sigClearPay()" style="position:absolute;top:6px;right:6px;font-size:11px;padding:3px 9px;border:1px solid #dfe5ee;border-radius:6px;background:#fff;cursor:pointer;z-index:1">지우기</button>'
+    +'</div>'
+    +(pf.signature?'<div style="font-size:11.5px;color:#0f766e;font-weight:700">✓ 이전에 등록한 수당지급용 서명이 있습니다 — 새로 서명하지 않으면 기존 서명이 유지됩니다.</div>':'')
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
     +'<button class="stbtn stbtn-ghost" onclick="document.getElementById(\'apModal\').remove()">닫기</button>'
     +'<button class="stbtn stbtn-main" style="padding:11px 26px" onclick="submitApply(\''+p.id+'\')">신청 완료</button></div>'
     +'</div>';
   document.body.appendChild(div);
   _initSigCanvas();
+  _initSigCanvasPay();  // [v4] 수당지급내역서용 서명 캔버스
 }
 async function submitApply(postId){
   const p=POSTS.find(x=>x.id===postId);if(!p)return;
@@ -744,13 +883,39 @@ async function submitApply(postId){
   }
   if(!document.getElementById('apAg1').checked||!document.getElementById('apAg2').checked||!document.getElementById('apAg3').checked){
     alert('필수 동의 3건에 모두 체크해주세요.');return}
+  // [v4] 심판 임무 자격 검증 — 유효 심판자격 미보유 시 심판 임무 신청 차단 (운영요원 임무는 통과)
+  if(!hasValidRefLic()){
+    for(const d of days){
+      const bad=(prefs[d]||[]).filter(isRefDuty);
+      if(bad.length){alert('🔒 심판 임무('+bad.join(', ')+')는 유효한 심판 자격증 보유자만 신청할 수 있습니다.\n운영요원 임무만 선택해주세요.');return}
+    }
+  }
+  // [v4] 수당지급 정보 검증 — 일부라도 입력/서명하면 은행·계좌·동의 2건·서명 모두 필요
+  const _e=id=>document.getElementById(id);
+  const pfBank=(_e('apPayBank')&&_e('apPayBank').value||'').trim();
+  const pfAcct=(_e('apPayAcct')&&_e('apPayAcct').value||'').trim();
+  const pfRrn=(_e('apPayRrn')&&_e('apPayRrn').value||'').trim();
+  const pfAg1=!!(_e('apPayAg1')&&_e('apPayAg1').checked);
+  const pfAg2=!!(_e('apPayAg2')&&_e('apPayAg2').checked);
+  const pfSigNew=_getSigDataPay();
+  const anyPay=!!(pfBank||pfAcct||pfRrn||pfSigNew||pfAg1||pfAg2);
+  if(anyPay){
+    if(!pfBank||!pfAcct){alert('수당지급 정보를 제출하려면 은행명과 계좌번호를 모두 입력해주세요.');return}
+    if(!pfAg1||!pfAg2){alert('수당지급 정보를 제출하려면 개인정보 수집·이용 및 제3자 제공에 모두 동의해주세요.');return}
+    if(pfRrn&&!/^\d{6}-?\d{7}$/.test(pfRrn)){alert('주민등록번호 형식을 확인해주세요. (예: 000000-0000000)');return}
+  }
   try{
     const my=(APPS[postId]||[]).find(a=>a.uid===SME.uid);
+    // [v4] 수당지급용 서명: 새 서명 우선, 없으면 이전 서명 유지
+    const pfSig=pfSigNew||(my&&my.payInfo&&my.payInfo.signature)||null;
+    if(anyPay&&!pfSig){alert('수당지급내역서용 전자서명을 해주세요. (⑤번 서명란)');return}
     const status={};days.forEach(d=>{status[d]=(my&&my.status&&my.status[d])||'대기'});
     const data={postId:postId,competitionName:p.competitionName||'',
       uid:SME.uid,name:SMY.name||'',phone:SMY.phone||'',lic:MYLIC||'',
       days:days,prefs:prefs,status:status,
       agree:{privacy:true,rules:true,safety:true,signature:_getSigData()||null,signed:!!_getSigData(),at:new Date().toISOString()},
+      // [v4] 수당지급 정보 (미입력 시 이전 값 유지)
+      payInfo:anyPay?{bank:pfBank,account:pfAcct,rrn:pfRrn,agreePrivacy:pfAg1,agreeThird:pfAg2,signature:pfSig,at:new Date().toISOString()}:((my&&my.payInfo)||null),
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
     if(my)await DB.collection('staffApplications').doc(my.id).update(data);
     else{data.createdAt=firebase.firestore.FieldValue.serverTimestamp();await DB.collection('staffApplications').add(data);}
@@ -842,11 +1007,37 @@ function topLic(str){
 }
 // ── 동의서 서명 셀 ──
 function sigCell(a){
+  let h;
   if(a.agree&&a.agree.signature)
-    return '<button class="stbtn" style="padding:3px 9px;font-size:11px;background:#f0fdf4;color:#0f766e;border:1px solid #a7f3d0" onclick="viewSig(\''+a.id+'\')">✍️ 서명</button>';
-  if(a.agree&&a.agree.privacy)
-    return '<span style="color:#b8860b;font-size:11.5px;font-weight:700">☑ 체크</span>';
-  return '<span style="color:#8a919d;font-size:11.5px">—</span>';
+    h='<button class="stbtn" style="padding:3px 9px;font-size:11px;background:#f0fdf4;color:#0f766e;border:1px solid #a7f3d0" onclick="viewSig(\''+a.id+'\')">✍️ 서명</button>';
+  else if(a.agree&&a.agree.privacy)
+    h='<span style="color:#b8860b;font-size:11.5px;font-weight:700">☑ 체크</span>';
+  else h='<span style="color:#8a919d;font-size:11.5px">—</span>';
+  // [v4] 수당지급용 서명·정보 뱃지
+  if(a.payInfo&&a.payInfo.signature)
+    h+='<br><button class="stbtn" style="padding:3px 9px;font-size:11px;background:#fffbeb;color:#8a5a00;border:1px solid #fde68a;margin-top:3px" title="수당지급내역서용 서명·계좌정보 등록됨" onclick="viewPaySig(\''+a.id+'\')">💰 수당서명</button>';
+  return h;
+}
+// [v4] 수당지급용 서명 보기
+function viewPaySig(appId){
+  const app=Object.values(APPS).flat().find(a=>a.id===appId);
+  if(!app||!app.payInfo||!app.payInfo.signature){alert('수당지급용 서명 데이터가 없습니다.');return}
+  const pi=app.payInfo;
+  const old=document.getElementById('sigViewModal');if(old)old.remove();
+  const d=document.createElement('div');d.id='sigViewModal';
+  d.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.6);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px';
+  d.innerHTML='<div style="background:#fff;border-radius:14px;padding:22px 24px;text-align:center;max-width:520px;width:100%">'
+    +'<b style="font-size:14px">💰 수당지급내역서용 서명 확인</b><br>'
+    +'<div style="font-size:12px;color:#6b7280;margin:3px 0 8px">'+esc(app.name||'')+' · 동의일시: '+esc((pi.at||'').slice(0,16).replace('T',' '))+'</div>'
+    +'<div style="font-size:12.5px;background:#f8fafc;border-radius:9px;padding:8px 12px;margin-bottom:10px;text-align:left;line-height:1.8">'
+    +'🏦 '+esc(pi.bank||'-')+' '+esc(pi.account||'-')
+    +'<br>🆔 '+esc(pi.rrn?String(pi.rrn).slice(0,8)+'******':'-')
+    +'<br>☑ 수집·이용 동의: '+(pi.agreePrivacy?'예':'아니오')+' · 제3자 제공 동의: '+(pi.agreeThird?'예':'아니오')+'</div>'
+    +'<img src="'+pi.signature+'" style="border:1.5px solid #dfe5ee;border-radius:10px;max-width:100%;background:#fff;display:block;margin:0 auto">'
+    +'<div style="display:flex;gap:8px;justify-content:center;margin-top:14px">'
+    +'<button class="stbtn stbtn-ghost" onclick="document.getElementById(\'sigViewModal\').remove()">닫기</button>'
+    +'</div></div>';
+  document.body.appendChild(d);
 }
 // ── 서명 보기 ──
 function viewSig(appId){
@@ -901,6 +1092,278 @@ function exportPayExcel(postId){
   ws['!cols']=cols;
   XLSX.utils.book_append_sheet(wb,ws,'수당지급명단');
   XLSX.writeFile(wb,(p.competitionName||'대회')+'_수당지급명단.xlsx');
+}
+// ══════════════ [v4] 수당지급내역서 — 공문 서식 + 전자서명 이미지 삽입 (ExcelJS) ══════════════
+function _payNum(s){const n=parseInt(String(s||'').replace(/[^0-9]/g,''),10);return isNaN(n)?'':n}
+async function exportPayReport(postId){
+  if(typeof ExcelJS==='undefined'){alert('서식 엑셀 라이브러리 로딩 중입니다. 잠시 후 다시 눌러주세요.');return}
+  const p=POSTS.find(x=>x.id===postId);if(!p)return;
+  const apps=APPS[p.id]||[];
+  // [v7] payInfo 미입력자는 마이페이지(users) 은행·계좌로 자동 보완
+  const _uidSet=new Set();
+  (p.dates||[]).forEach(dd=>apps.filter(a=>a.status&&a.status[dd.date]==='확정').forEach(a=>_uidSet.add(a.uid)));
+  const _bankMap={};
+  await Promise.all([..._uidSet].map(async uid=>{
+    try{const d=await DB.collection('users').doc(uid).get();
+      if(d.exists){const u=d.data();_bankMap[uid]={bank:u.bank||'',account:u.accountNum||''};}}catch(e){}
+  }));
+  const wb=new ExcelJS.Workbook();
+  let made=0;
+  (p.dates||[]).forEach(dd=>{
+    const conf=apps.filter(a=>a.status&&a.status[dd.date]==='확정');
+    if(!conf.length)return;
+    made++;
+    let shName=fmtD(dd.date)||('일자'+made);
+    shName=shName.replace(/[\\\/\?\*\[\]:]/g,'.').slice(0,28);
+    const ws=wb.addWorksheet(shName);
+    ws.columns=[{width:5},{width:24},{width:18},{width:9},{width:12},{width:5},{width:9},{width:9},{width:9},{width:10},{width:11},{width:17},{width:16},{width:14}];
+    const thin={style:'thin'};const bAll={top:thin,left:thin,bottom:thin,right:thin};
+    // 제목
+    ws.mergeCells('A1:N1');
+    const t=ws.getCell('A1');
+    t.value=(p.competitionName||'대회')+' 심판 및 운영요원 수당 지급 내역';
+    t.font={bold:true,size:14};t.alignment={horizontal:'center',vertical:'middle'};
+    ws.getRow(1).height=30;
+    // 대회일자
+    ws.getCell('L2').value='대회일자';ws.getCell('L2').font={bold:true,size:10};
+    ws.getCell('M2').value=fmtD(dd.date)+' ('+dowOf(dd.date)+')';ws.getCell('M2').font={size:10};
+    ws.getCell('N2').value='(단위: 원)';ws.getCell('N2').font={size:9};ws.getCell('N2').alignment={horizontal:'right'};
+    // 헤더 (3~4행)
+    [['A3','연번'],['B3','일시'],['C3','소  속'],['D3','성명'],['E3','수당종류'],['F3','횟수'],['G3','수당(A)'],['K3','은행명'],['L3','계좌번호'],['M3','주민등록번호'],['N3','서명']].forEach(([c,v])=>{ws.getCell(c).value=v});
+    ws.mergeCells('G3:J3');
+    ['A','B','C','D','E','F','K','L','M','N'].forEach(c=>ws.mergeCells(c+'3:'+c+'4'));
+    [['G4','기본'],['H4','초과'],['I4','가산'],['J4','계']].forEach(([c,v])=>{ws.getCell(c).value=v});
+    for(let r=3;r<=4;r++)for(let c=1;c<=14;c++){const cell=ws.getRow(r).getCell(c);cell.border=bAll;cell.alignment={horizontal:'center',vertical:'middle'};cell.font={bold:true,size:10};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF2F4F8'}};}
+    // 데이터 행
+    let rIdx=5;
+    conf.forEach((a,i)=>{
+      const asg=(a.assign&&a.assign[dd.date])||{};
+      const pi=a.payInfo||{};
+      const row=ws.getRow(rIdx);
+      row.height=30;
+      row.getCell(1).value=i+1;
+      row.getCell(2).value=fmtD(dd.date)+' '+(p.time||'');
+      row.getCell(3).value='';  // 소속 — 관리자 수기 기입
+      row.getCell(4).value=a.name||'';
+      row.getCell(5).value=asg.duty||(((a.prefs||{})[dd.date]||[]).join(', '))||'';
+      row.getCell(6).value=1;
+      const base=_payNum(asg.pay);
+      if(base!=='')row.getCell(7).value=base;
+      row.getCell(10).value={formula:'SUM(G'+rIdx+':I'+rIdx+')'};
+      const _fb=_bankMap[a.uid]||{};
+      row.getCell(11).value=pi.bank||_fb.bank||'';
+      row.getCell(12).value=pi.account||_fb.account||'';
+      row.getCell(13).value=pi.rrn||'';
+      for(let c=1;c<=14;c++){const cell=row.getCell(c);cell.border=bAll;cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};cell.font={size:10};}
+      // 전자서명 이미지 (수당지급용 서명 우선, 없으면 신청 동의 서명)
+      const sig=pi.signature||(a.agree&&a.agree.signature)||null;
+      if(sig&&sig.indexOf('data:image')===0){
+        try{
+          const b64=sig.split(',')[1];
+          const ext=sig.indexOf('image/jpeg')>=0?'jpeg':'png';
+          const imgId=wb.addImage({base64:b64,extension:ext});
+          ws.addImage(imgId,{tl:{col:13.12,row:rIdx-1+0.12},ext:{width:82,height:28},editAs:'oneCell'});
+        }catch(e){}
+      }
+      rIdx++;
+    });
+    // 합계 행
+    ws.mergeCells('A'+rIdx+':F'+rIdx);
+    const sr=ws.getRow(rIdx);
+    sr.getCell(1).value='합계';
+    ['G','H','I','J'].forEach(c=>{sr.getCell(c.charCodeAt(0)-64).value={formula:'SUM('+c+'5:'+c+(rIdx-1)+')'}});
+    for(let c=1;c<=14;c++){const cell=sr.getCell(c);cell.border=bAll;cell.alignment={horizontal:'center',vertical:'middle'};cell.font={bold:true,size:10};}
+  });
+  if(!made){alert('확정된 신청자가 없습니다. 먼저 신청자를 확정해주세요.');return}
+  try{
+    const buf=await wb.xlsx.writeBuffer();
+    const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=(p.competitionName||'대회')+'_수당지급내역서.xlsx';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  }catch(e){alert('내역서 생성 실패: '+e.message)}
+}
+// ══════════════ [v7] 확정자 자격증 일괄 다운로드 (공식 서식 이미지 → ZIP, 주최측 전달용) ══════════════
+async function _drawLicPng(name,birth,l,licNo){
+  const bgSrc='files/'+((String(l.type||'').indexOf('심판')>=0)?'cert_bg_referee.jpg':'cert_bg_leader.jpg');
+  const bg=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=bgSrc;});
+  const W=1240,H=1753;  // A4 150dpi
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  const ctx=cv.getContext('2d');
+  ctx.drawImage(bg,0,0,W,H);
+  ctx.fillStyle='#111';
+  const dot=s=>String(s||'').replace(/-/g,'.');
+  // mypage 인쇄 서식과 동일한 상대 좌표
+  let fs=Math.round(H*0.029);ctx.font='900 '+fs+'px "Pretendard","Noto Sans KR",sans-serif';
+  ctx.fillText(l.grade||'',W*0.397,H*0.336+fs);
+  fs=Math.round(H*0.031);ctx.font='800 '+fs+'px "Pretendard","Noto Sans KR",sans-serif';
+  ctx.fillText(name||'',W*0.318+W*0.008,H*0.405+fs);
+  const nw=ctx.measureText(name||'').width;
+  ctx.fillRect(W*0.318,H*0.405+fs+Math.round(H*0.006),nw+W*0.03,Math.round(H*0.002));
+  fs=Math.round(H*0.0165);ctx.font='600 '+fs+'px "Pretendard","Noto Sans KR",sans-serif';
+  ctx.fillText(licNo||'',W*0.682,H*0.3375+fs);
+  ctx.fillText(dot(l.expireAt),W*0.682,H*0.3585+fs);
+  ctx.fillText(dot(birth),W*0.682,H*0.3795+fs);
+  ctx.fillText(l.region||'',W*0.682,H*0.4005+fs);
+  fs=Math.round(H*0.021);ctx.font='700 '+fs+'px "Pretendard","Noto Sans KR",sans-serif';
+  ctx.fillText(dot(l.issuedAt),W*0.366,H*0.7065+fs);
+  return cv.toDataURL('image/jpeg',0.85);
+}
+async function exportLicZip(postId){
+  if(typeof JSZip==='undefined'){alert('압축 라이브러리 로딩 중입니다. 잠시 후 다시 시도해주세요.');return}
+  const p=POSTS.find(x=>x.id===postId);if(!p)return;
+  const apps=APPS[p.id]||[];
+  if(!apps.length){alert('신청자가 없습니다.');return}
+  const confSet=new Set();
+  (p.dates||[]).forEach(dd=>apps.filter(a=>a.status&&a.status[dd.date]==='확정').forEach(a=>confSet.add(a.uid)));
+  let list=apps.filter(a=>confSet.has(a.uid));
+  let label='확정자';
+  if(!list.length){
+    if(!confirm('확정자가 없습니다. 전체 신청자의 자격증으로 내려받을까요?'))return;
+    list=apps.slice();label='신청자';
+  }
+  const seen=new Set();list=list.filter(a=>{if(seen.has(a.uid))return false;seen.add(a.uid);return true});
+  const today=new Date().toISOString().slice(0,10);
+  const zip=new JSZip();
+  const missing=[];let cnt=0;
+  for(const a of list){
+    try{
+      const [ls,ud]=await Promise.all([
+        DB.collection('licenses').where('uid','==',a.uid).get(),
+        DB.collection('users').doc(a.uid).get()
+      ]);
+      const birth=(ud.exists&&ud.data().birth)||'';
+      const lics=ls.docs.map(d=>({id:d.id,...d.data()}))
+        .filter(l=>l.status!=='만료'&&(!l.expireAt||String(l.expireAt).slice(0,10)>=today));
+      if(!lics.length){missing.push(a.name||'무명');continue}
+      for(const l of lics){
+        const url=await _drawLicPng(a.name||l.name||'',birth,l,l.id);
+        zip.file((a.name||'무명')+'_'+String((l.type||'')+(l.grade||'')).replace(/\s+/g,'')+'_'+l.id+'.jpg',url.split(',')[1],{base64:true});
+        cnt++;
+      }
+    }catch(e){missing.push((a.name||'무명')+'(오류)')}
+  }
+  if(!cnt){alert('내려받을 유효 자격증이 없습니다.'+(missing.length?'\n자격 없음: '+missing.join(', '):''));return}
+  const blob=await zip.generateAsync({type:'blob'});
+  const el=document.createElement('a');
+  el.href=URL.createObjectURL(blob);
+  el.download=(p.competitionName||'대회')+'_'+label+'_자격증.zip';
+  el.click();
+  setTimeout(()=>URL.revokeObjectURL(el.href),5000);
+  alert('✓ 자격증 '+cnt+'건을 ZIP 파일로 내려받았습니다. (주최측 전달용)'+(missing.length?'\n\n⚠ 유효 자격증 없음: '+missing.join(', '):''));
+}
+// ══════════════ [v5] 확정자 단체 알림 (문자·이메일) ══════════════
+let NT_LIST=[];  // {uid,name,phone,email,dates[]}
+async function openNotifyModal(postId){
+  const p=POSTS.find(x=>x.id===postId);if(!p)return;
+  const apps=APPS[p.id]||[];
+  // 날짜별 확정자 → uid 기준 통합
+  const byUid={};
+  (p.dates||[]).forEach(dd=>{
+    apps.filter(a=>a.status&&a.status[dd.date]==='확정').forEach(a=>{
+      if(!byUid[a.uid])byUid[a.uid]={uid:a.uid,name:a.name||'',phone:a.phone||'',email:'',dates:[]};
+      byUid[a.uid].dates.push(dd.date);
+    });
+  });
+  NT_LIST=Object.values(byUid);
+  if(!NT_LIST.length){alert('확정된 신청자가 없습니다. 먼저 신청자를 확정해주세요.');return}
+  // 이메일: users 문서에서 조회
+  await Promise.all(NT_LIST.map(async r=>{
+    try{const d=await DB.collection('users').doc(r.uid).get();if(d.exists){r.email=d.data().email||'';if(!r.phone)r.phone=d.data().phone||'';}}catch(e){}
+  }));
+  const old=document.getElementById('ntModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='ntModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.65);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
+  const defSubj='['+(p.competitionName||'대회')+'] 심판·운영요원 확정 안내';
+  const defBody='['+(p.competitionName||'대회')+'] 심판·운영요원 확정 안내\n\n'
+    +'일시: '+fmtD(p.startDate)+(p.endDate&&p.endDate!==p.startDate?' ~ '+fmtD(p.endDate):'')+(p.time?' '+p.time:'')+'\n'
+    +'장소: '+(p.location||'')+'\n'
+    +(p.uniform?'심판복: '+p.uniform+'\n':'')
+    +(p.supplies&&p.supplies.length?'준비물: '+p.supplies.join(', ')+'\n':'')
+    +'\n확정되셨습니다. 일정 확인 부탁드립니다.\n문의: '+(p.contactInfo||(p.author&&p.author.contact)||'사무국 031-984-3248');
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:640px;width:100%;padding:24px 26px;margin:10px 0">'
+    +'<div style="display:flex;align-items:center;gap:8px"><b style="font-size:16px">📣 확정자 단체 알림</b><span style="font-size:12px;color:#8a919d">'+esc(p.competitionName||'')+'</span><span style="flex:1"></span><button class="stbtn stbtn-ghost" onclick="document.getElementById(\'ntModal\').remove()">닫기 ✕</button></div>'
+    +'<div style="font-size:12.5px;color:#6b7280;margin-top:4px">받는 사람을 체크로 고르고, 아래에서 이메일 발송 또는 문자앱 연결·명단 복사를 이용하세요.</div>'
+    +'<div style="border:1.5px solid #e3e9f2;border-radius:11px;max-height:250px;overflow:auto;margin-top:10px">'
+    +NT_LIST.map((r,i)=>'<label style="display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;font-size:13px">'
+      +'<input type="checkbox" class="ntCk" data-i="'+i+'" checked style="width:auto" onchange="ntCount()">'
+      +'<b style="min-width:56px">'+esc(r.name)+'</b>'
+      +'<span style="color:#6b7280;font-size:12px">'+esc(r.phone||'전화 없음')+'</span>'
+      +'<span style="color:'+(r.email?'#6b7280':'#C41E2F')+';font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis">'+esc(r.email||'이메일 없음')+'</span>'
+      +'<span style="font-size:11px;color:#7c3aed;font-weight:700">'+r.dates.map(d=>fmtD(d.slice(5))).join('·')+'</span>'
+      +'</label>').join('')
+    +'</div>'
+    +'<div style="display:flex;gap:8px;align-items:center;margin-top:7px;font-size:12.5px">'
+    +'<b id="ntCnt"></b><span style="flex:1"></span>'
+    +'<button class="stbtn stbtn-ghost" style="padding:4px 11px;font-size:12px" onclick="[...document.querySelectorAll(\'.ntCk\')].forEach(c=>c.checked=true);ntCount()">전체 선택</button>'
+    +'<button class="stbtn stbtn-ghost" style="padding:4px 11px;font-size:12px" onclick="[...document.querySelectorAll(\'.ntCk\')].forEach(c=>c.checked=false);ntCount()">전체 해제</button>'
+    +'</div>'
+    +'<div style="font-size:13px;font-weight:800;margin-top:12px">제목 (이메일용)</div>'
+    +'<input id="ntSubj" class="stfield" style="margin-top:4px" value="'+esc(defSubj)+'">'
+    +'<div style="font-size:13px;font-weight:800;margin-top:10px">내용 (이메일·문자 공용)</div>'
+    +'<textarea id="ntBody" class="stfield" rows="8" style="margin-top:4px;line-height:1.7">'+esc(defBody)+'</textarea>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">'
+    +'<button class="stbtn stbtn-main" id="ntMailBtn" onclick="ntSendMail()">📧 이메일 발송</button>'
+    +'<button class="stbtn" style="background:#f0fdf4;color:#0f766e;border:1.5px solid #a7f3d0" onclick="ntOpenSms()">📱 문자앱 열기</button>'
+    +'<button class="stbtn stbtn-soft" onclick="ntCopy(\'phone\')">📋 이름·전화 복사</button>'
+    +'<button class="stbtn stbtn-soft" onclick="ntCopy(\'email\')">📋 이메일 복사</button>'
+    +'</div>'
+    +'<div id="ntMsg" style="font-size:12.5px;font-weight:700;margin-top:9px;min-height:16px"></div>'
+    +'<div style="font-size:11.5px;color:#8a919d;margin-top:5px">※ 문자는 홈페이지에서 직접 발송되지 않습니다 — 휴대폰 문자앱으로 연결되거나, 복사한 명단을 문자 발송 서비스에 붙여넣어 사용하세요.</div>'
+    +'</div>';
+  document.body.appendChild(div);
+  ntCount();
+}
+function ntSelected(){return [...document.querySelectorAll('.ntCk:checked')].map(c=>NT_LIST[+c.dataset.i]).filter(Boolean)}
+function ntCount(){const el=document.getElementById('ntCnt');if(el)el.textContent='선택 '+ntSelected().length+'/'+NT_LIST.length+'명'}
+async function ntSendMail(){
+  const sel=ntSelected().filter(r=>r.email);
+  const msg=document.getElementById('ntMsg'),btn=document.getElementById('ntMailBtn');
+  const subj=(document.getElementById('ntSubj').value||'').trim();
+  const body=document.getElementById('ntBody').value||'';
+  if(!sel.length){msg.textContent='이메일이 있는 선택 인원이 없습니다.';msg.style.color='#C41E2F';return}
+  if(!subj||!body.trim()){msg.textContent='제목과 내용을 입력하세요.';msg.style.color='#C41E2F';return}
+  if(!window.KFDF_CONFIG||!KFDF_CONFIG.emailjs||!KFDF_CONFIG.emailjs.publicKey){msg.textContent='EmailJS 설정이 없어 발송할 수 없습니다.';msg.style.color='#C41E2F';return}
+  if(!confirm(sel.length+'명에게 개별 이메일을 발송합니다. 진행할까요?'))return;
+  btn.disabled=true;
+  let ok=0;const fail=[];
+  for(let i=0;i<sel.length;i++){
+    msg.textContent='발송 중… '+(i+1)+'/'+sel.length;msg.style.color='#1F4E9C';
+    try{
+      const c=KFDF_CONFIG.emailjs;
+      if(!window.emailjs){await new Promise((r,j)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';sc.onload=r;sc.onerror=j;document.head.appendChild(sc)});window.emailjs.init({publicKey:c.publicKey});}
+      await window.emailjs.send(c.serviceId,c.templateId,{to_email:sel[i].email,subject:subj,message:body});
+      ok++;
+    }catch(e){fail.push(sel[i].name)}
+    await new Promise(r=>setTimeout(r,400));
+  }
+  btn.disabled=false;
+  msg.textContent='완료 — 성공 '+ok+'건'+(fail.length?' / 실패 '+fail.length+'건: '+fail.join(', '):'');
+  msg.style.color=fail.length?'#C41E2F':'#0f766e';
+}
+function ntOpenSms(){
+  const sel=ntSelected().filter(r=>r.phone);
+  const msg=document.getElementById('ntMsg');
+  if(!sel.length){msg.textContent='전화번호가 있는 선택 인원이 없습니다.';msg.style.color='#C41E2F';return}
+  const nums=sel.map(r=>String(r.phone).replace(/[^0-9]/g,'')).filter(Boolean);
+  const body=document.getElementById('ntBody').value||'';
+  const ios=/iPhone|iPad|iPod/.test(navigator.userAgent);
+  const href='sms:'+nums.join(ios?',':';')+(body?(ios?'&':'?')+'body='+encodeURIComponent(body):'');
+  location.href=href;
+  msg.textContent='문자앱 연결 시도 — 휴대폰에서 열리지 않으면 "이름·전화 복사"로 명단을 복사해 사용하세요.';msg.style.color='#1F4E9C';
+}
+function ntCopy(kind){
+  const sel=ntSelected();
+  const msg=document.getElementById('ntMsg');
+  let txt='';
+  if(kind==='phone')txt=sel.filter(r=>r.phone).map(r=>r.name+'\t'+r.phone).join('\n');
+  else txt=sel.filter(r=>r.email).map(r=>r.email).join('\n');
+  if(!txt){msg.textContent='복사할 항목이 없습니다.';msg.style.color='#C41E2F';return}
+  const done=()=>{msg.textContent='✓ 복사되었습니다 ('+txt.split('\n').length+'건) — 문자 서비스·메일 프로그램에 붙여넣으세요.';msg.style.color='#0f766e'};
+  if(navigator.clipboard)navigator.clipboard.writeText(txt).then(done).catch(()=>prompt('아래 내용을 복사하세요',txt));
+  else prompt('아래 내용을 복사하세요',txt);
 }
 // ══════════════ [신규] 자격증 일괄확인 ══════════════
 async function viewAllLicenses(postId){
@@ -997,6 +1460,35 @@ function _sigClear(){
 }
 function _getSigData(){
   const c=document.getElementById('sigCanvas');if(!c)return null;
+  const ctx=c.getContext('2d');
+  const d=ctx.getImageData(0,0,c.width,c.height).data;
+  const hasData=Array.from(d).some((v,i)=>i%4===3&&v>0);
+  return hasData?c.toDataURL('image/png'):null;
+}
+// ══════════════ [v4] 수당지급내역서용 서명 캔버스 (별도) ══════════════
+function _initSigCanvasPay(){
+  const canvas=document.getElementById('sigCanvasPay');if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  ctx.strokeStyle='#1a1a2e';ctx.lineWidth=2.2;ctx.lineCap='round';ctx.lineJoin='round';
+  let drawing=false,lx=0,ly=0;
+  function pos(e){
+    const r=canvas.getBoundingClientRect();
+    const scaleX=canvas.width/r.width,scaleY=canvas.height/r.height;
+    const src=e.touches?e.touches[0]:e;
+    return{x:(src.clientX-r.left)*scaleX,y:(src.clientY-r.top)*scaleY};
+  }
+  function start(e){e.preventDefault();drawing=true;const p=pos(e);lx=p.x;ly=p.y;ctx.beginPath();ctx.arc(lx,ly,1,0,Math.PI*2);ctx.fillStyle='#1a1a2e';ctx.fill();}
+  function move(e){e.preventDefault();if(!drawing)return;const p=pos(e);ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(p.x,p.y);ctx.stroke();lx=p.x;ly=p.y;}
+  function end(e){e.preventDefault();drawing=false;}
+  canvas.addEventListener('mousedown',start);canvas.addEventListener('mousemove',move);canvas.addEventListener('mouseup',end);canvas.addEventListener('mouseleave',end);
+  canvas.addEventListener('touchstart',start,{passive:false});canvas.addEventListener('touchmove',move,{passive:false});canvas.addEventListener('touchend',end,{passive:false});
+}
+function _sigClearPay(){
+  const c=document.getElementById('sigCanvasPay');if(!c)return;
+  c.getContext('2d').clearRect(0,0,c.width,c.height);
+}
+function _getSigDataPay(){
+  const c=document.getElementById('sigCanvasPay');if(!c)return null;
   const ctx=c.getContext('2d');
   const d=ctx.getImageData(0,0,c.width,c.height).data;
   const hasData=Array.from(d).some((v,i)=>i%4===3&&v>0);
