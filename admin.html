@@ -1927,9 +1927,9 @@ async function setStatus(id,st){
   }
   await DB.collection('schoolApplications').doc(id).update({status:st});
   await syncStatus(s,st);
-  if(st==='선정')kfdfMail(s.email,'[플라잉디스크연맹] 강습 선정 안내 — '+s.school,s.school+' ('+s.type+') 신청이 선정되었습니다!\n접수번호: '+(s.code||'')+'\n강사 배정 후 확정 연락을 드립니다.');
+  if(st==='선정')kfdfMail(s.email,'[플라잉디스크연맹] 강습 선정 안내 — '+s.school,s.school+' ('+s.type+') 신청이 선정되었습니다!\n접수번호: '+(s.code||'')+'\n'+(s.support==='용품만'?'50만원 상당 강습용품 세트를 학교로 배송해 드립니다. (강사 파견 없음)':'강사 배정 후 확정 연락을 드립니다.'));
   if(st==='미선정')kfdfMail(s.email,'[플라잉디스크연맹] 강습 심사 결과 안내 — '+s.school,'아쉽게도 이번에는 선정되지 못했습니다. 추가 모집 시 우선 안내드리겠습니다.\n접수번호: '+(s.code||''));
-  if(st==='선정'){
+  if(st==='선정'&&s.support!=='용품만'){ // [용품만 제외] 용품만 학교는 강사 모집 공고를 올리지 않음 (일지·강사 흐름 없음)
     await DB.collection('openSlots').doc(id).set({
       school:s.school,region:s.region,type:s.type,d1:s.d1||'',
       claimedBy:null,claimedName:'',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
