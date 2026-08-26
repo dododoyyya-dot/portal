@@ -272,12 +272,27 @@ function expandRowHtml(p){
   const comp=(p.compId&&COMPMAP[p.compId])||null;
   const _isImg=x=>/\.(jpe?g|png|gif|webp)(\?|$)/i.test(x.url||'')||String(x.url||'').indexOf('image')>=0;
   const posterList=(p.posters&&p.posters.length)?p.posters:((comp&&comp.attachments&&comp.attachments.length)?comp.attachments.filter(_isImg).map(x=>({url:x.url,name:x.kind||x.name||'포스터'})):[]);
-  const posters=posterList.length
-    ?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+posterList.map(img=>'<img src="'+img.url+'" class="stthumb" onclick="window.open(this.src)" alt="포스터">').join('')+'</div>':'';
   const roles=(p.dates&&p.dates[0]&&p.dates[0].roles)||[];
   const rolesHtml=roles.length?'<div style="margin-bottom:6px"><span style="font-weight:800">모집 임무:</span> '+esc(roles.join(' · '))+'</div>':'';
-  return posters
-    +'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px">'
+  // [배치개편] 안내사항 좌 / 포스터 우(여러 장이면 ◀▶ 슬라이드) — 대회 페이지(competition.html slotCard)와 동일 배치.
+  // 포스터 하단에는 대회 페이지의 시상품 박스 같은 추가 요소를 두지 않음(요청사항).
+  const noteHtml=p.description?'<div style="flex:1 1 300px;min-width:min(280px,100%);color:#374151;white-space:pre-wrap;border-left:3px solid #d3e0f2;padding-left:10px">📌 '+esc(p.description)+'</div>':'';
+  let posterHtml='';
+  if(posterList.length){
+    window.__STPST=window.__STPST||{};window.__STPST[p.id]=posterList.map(x=>x.url);
+    const nav=posterList.length>1;
+    const bst='position:absolute;top:50%;transform:translateY(-50%);border:none;background:rgba(17,24,39,.55);color:#fff;width:34px;height:34px;border-radius:50%;font-size:15px;font-weight:900;cursor:pointer;z-index:3';
+    posterHtml='<div style="position:relative;background:#fff;border:1px solid #e2e7f0;border-radius:12px;overflow:hidden">'
+      +'<a id="stpA_'+p.id+'" href="'+esc(posterList[0].url)+'" target="_blank"><img id="stpImg_'+p.id+'" src="'+esc(posterList[0].url)+'" alt="포스터" style="display:block;width:100%;max-height:430px;object-fit:contain;background:#fff"></a>'
+      +(nav?'<button type="button" onclick="event.stopPropagation();stPstNav(\''+p.id+'\',-1)" style="'+bst+';left:8px">◀</button><button type="button" onclick="event.stopPropagation();stPstNav(\''+p.id+'\',1)" style="'+bst+';right:8px">▶</button><span id="stpCnt_'+p.id+'" style="position:absolute;right:10px;bottom:8px;background:rgba(17,24,39,.6);color:#fff;font-size:11.5px;font-weight:800;border-radius:999px;padding:3px 10px;z-index:3">1 / '+posterList.length+'</span>':'')
+      +'</div>'
+      +'<div style="font-size:11px;color:#8a919d;font-weight:700;text-align:center;margin-top:4px">'+esc(posterList[0].name||'포스터')+' — 클릭하면 원본 크게 보기'+(nav?' · ◀ ▶ 로 넘겨보기':'')+'</div>';
+  }
+  const rightCol=posterHtml?'<div style="flex:0 1 340px;min-width:min(280px,100%);max-width:100%">'+posterHtml+'</div>':'';
+  const noteRow=!noteHtml&&!rightCol?'':(noteHtml&&rightCol
+      ?'<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;margin-bottom:8px">'+noteHtml+rightCol+'</div>'
+      :'<div style="margin-bottom:8px">'+(noteHtml||rightCol)+'</div>');
+  return '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px">'
     +'<span>📍 <b>장소:</b> '+esc(p.location||(comp&&comp.place)||'')+'</span>'
     +'<span>🕐 <b>집합시간:</b> '+esc(p.time||'')+'</span>'
     +'<span>🏅 <b>종목:</b> '+esc(p.sport||'')+'</span>'
@@ -290,7 +305,7 @@ function expandRowHtml(p){
     +' &nbsp;·&nbsp; <span style="font-weight:800">심판복</span> '+esc(p.uniform||'미정')
     +'</div>'
     +(p.supplies&&p.supplies.length?'<div style="margin-bottom:6px"><span style="font-weight:800">준비물:</span> '+esc(p.supplies.join(', '))+'</div>':'')
-    +(p.description?'<div style="margin-bottom:8px;color:#374151;white-space:pre-wrap;border-left:3px solid #d3e0f2;padding-left:10px">'+esc(p.description)+'</div>':'')
+    +noteRow
     +(comp?'<div style="margin-bottom:10px;font-size:12px;color:#7c3aed">🔗 연동된 대회: <b>'+esc(comp.title||p.competitionName||'')+'</b> — 대회 참가자 대상 상세 안내(식사·경기 규정 등)는 대회 페이지에서 확인하세요.</div>':'')
     +(p.contactInfo?'<div style="margin-bottom:10px;color:#6b7280">📞 '+esc(p.contactInfo)+'</div>':'')
     +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
@@ -308,6 +323,16 @@ function expandRowHtml(p){
       :'')
     +'<button class="stbtn stbtn-main" style="padding:8px 20px" onclick="openApplyForm(\''+p.id+'\')">✍️ 신청하기</button>'
     +'</div>';
+}
+// [배치개편] 공고 상세 포스터 여러 장 ◀▶ 넘기기 (대회 페이지 pstNav와 동일한 방식)
+function stPstNav(id,dir){
+  const list=(window.__STPST||{})[id]||[];if(!list.length)return;
+  window.__STPSTI=window.__STPSTI||{};
+  const n=(((window.__STPSTI[id]||0)+dir)%list.length+list.length)%list.length;
+  window.__STPSTI[id]=n;
+  const im=document.getElementById('stpImg_'+id);if(im)im.src=list[n];
+  const a=document.getElementById('stpA_'+id);if(a)a.href=list[n];
+  const c=document.getElementById('stpCnt_'+id);if(c)c.textContent=(n+1)+' / '+list.length;
 }
 function toggleRow(id){
   const body=document.getElementById('body_'+id);
