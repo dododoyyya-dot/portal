@@ -386,6 +386,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#0e7490" onclick="window.open('sim.html','_blank')">🧪 가선정 시뮬레이션 (새 창)</button>
         <button class="btn-sub" style="background:#153A77" onclick="window.open('tally.html','_blank')">📊 총집계 현황</button>
         <button class="btn-sub" style="background:#0f766e" onclick="exportCSV()">⬇ 전체 CSV</button>
+        <button class="btn-sub" style="background:#0e7490" onclick="showSlotAdmin()">📢 학교 공고 관리</button>
         <button class="btn-sub" style="background:#b8860b" onclick="dlDeliveryCsv()">🚚 배송명단 CSV</button>
         <button class="btn-sub" style="background:#153A77" onclick="dlGoodsCerts()">🧾 수령확인증 일괄 다운로드</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="showGigs()">🔎 단기공고 승인<span id="gigCntBadge" style="display:none;background:#C41E2F;border-radius:999px;padding:1px 7px;font-size:11px;margin-left:5px"></span></button>
@@ -1972,6 +1973,108 @@ async function autoAssign(){
   }
   alert('자동배정 완료: '+done+'건 / 건너뜀: '+skip+'건');
   loadApps();loadDash();
+}
+// ══════════ [학교 공고 관리] 강사 모집 공고(openSlots) 열람·올리기·수정·내리기·지명 처리 ══════════
+let SLADM={slots:[]};
+async function showSlotAdmin(){
+  if(!APPS.length)await loadApps();
+  const snap=await DB.collection('openSlots').get();
+  SLADM.slots=snap.docs.map(d=>({_id:d.id,...d.data()}));
+  slotAdmRender();
+}
+function slotAdmRender(){
+  const old=document.getElementById('slotAdmModal');if(old)old.remove();
+  const slots=SLADM.slots;
+  const appOf=id=>APPS.find(d=>d.id===id);
+  const slotIds=new Set(slots.map(s=>s._id));
+  // 비매칭: 선정 + 미배정 + 용품만 아님 + 공고 없음
+  const unposted=APPS.filter(d=>{const s=d.data();return s.status==='선정'&&!s.assignedName&&s.support!=='용품만'&&!slotIds.has(d.id)});
+  const matched=APPS.filter(d=>d.data().status==='배정완료');
+  const tb='style="font-size:11.5px;font-weight:800;color:#fff;padding:2px 8px;border-radius:999px"';
+  const typeBadge=t=>'<span '+tb+' style="font-size:11px;font-weight:800;color:#fff;background:'+(String(t||'').indexOf('방과후')>=0?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(String(t||'').indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+'</span>';
+  const row=h=>'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:1px solid #e5e9f0;border-radius:10px;padding:9px 12px;margin-bottom:6px;font-size:13px">'+h+'</div>';
+  const div=document.createElement('div');div.id='slotAdmModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:860px;width:100%;max-height:92vh;overflow:auto;padding:24px">'
+    +'<b style="font-size:17px">📢 학교 공고 관리</b> <span style="font-size:12px;color:#8a919d">— 강사 모집 지명 게시판(jobs)에 노출되는 공고를 올리고·수정하고·내릴 수 있습니다</span>'
+    +'<div style="font-size:13.5px;font-weight:900;color:#153A77;margin:16px 0 8px">① 현재 공고 '+slots.length+'건 <span style="font-weight:700;color:#8a919d;font-size:12px">(모집 중 '+slots.filter(s=>!s.claimedBy).length+' · 지명 신청 들어옴 '+slots.filter(s=>!!s.claimedBy).length+')</span></div>'
+    +(slots.length?slots.map(s=>{
+      const app=appOf(s._id);const st=app?app.data().status:null;
+      return row('<b>'+esc(s.school)+'</b>'+typeBadge(s.type)
+        +'<span style="color:#6b7280">📍 '+esc(s.region||'')+(s.d1?' · 희망 '+esc(s.d1):'')+(s.note?' · 📝 '+esc(s.note):'')+'</span>'
+        +(s.claimedBy?'<span style="font-weight:900;color:#b8860b">✋ '+esc(s.claimedName||'강사')+' 지명 신청</span>':'<span style="font-weight:900;color:#C41E2F">● 모집 중</span>')
+        +(app?'':' <span style="font-weight:800;color:#C41E2F">⚠ 연결된 신청 없음(고아 공고)</span>')
+        +(st==='배정완료'?' <span style="font-weight:800;color:#C41E2F">⚠ 이미 배정완료된 학교</span>':'')
+        +'<span style="flex:1"></span>'
+        +(s.claimedBy?'<button class="btn-sub" style="background:#0f766e;padding:5px 12px;font-size:12px" onclick="slotConfirmClaim(\''+s._id+'\')">✅ 지명 확정(배정)</button><button class="btn-sub" style="background:#8a919d;padding:5px 12px;font-size:12px" onclick="slotUnclaim(\''+s._id+'\')">↩ 지명 해제</button>':'')
+        +'<button class="btn-sub" style="background:#1F4E9C;padding:5px 12px;font-size:12px" onclick="slotEdit(\''+s._id+'\')">✏️ 수정</button>'
+        +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F;padding:5px 12px;font-size:12px" onclick="slotPull(\''+s._id+'\')">⬇ 내리기</button>');
+    }).join(''):'<div class="bempty">올라가 있는 공고가 없습니다</div>')
+    +'<div style="font-size:13.5px;font-weight:900;color:#153A77;margin:18px 0 8px">② 공고 없는 선정교 (비매칭 · 강사 미배정) '+unposted.length+'건</div>'
+    +(unposted.length?unposted.map(d=>{const s=d.data();
+      return row('<b>'+esc(s.school)+'</b>'+typeBadge(appTypeOf(s))
+        +'<span style="color:#6b7280">📍 '+esc(s.region||'')+(s.city?' · '+esc(s.city):'')+(s.d1?' · 희망 '+esc(s.d1):'')+'</span>'
+        +((s.selfTeach&&s.support!=='용품만')?'<span style="font-weight:800;color:#0f766e">◉ 본인지도 희망'+(s.selfName?'('+esc(s.selfName)+')':'')+'</span>':'')
+        +'<span style="flex:1"></span>'
+        +'<button class="btn-sub" style="background:#0e7490;padding:5px 14px;font-size:12px" onclick="slotPost(\''+d.id+'\')">📢 공고 올리기</button>');
+    }).join(''):'<div class="bempty">비매칭 선정교가 모두 공고에 올라가 있습니다</div>')
+    +'<div style="font-size:13.5px;font-weight:900;color:#153A77;margin:18px 0 8px">③ 매칭 완료 학교 (배정완료) '+matched.length+'건 <span style="font-weight:700;color:#8a919d;font-size:12px">— 조치 필요 시 배정해제하면 공고가 자동으로 다시 열립니다</span></div>'
+    +'<div style="max-height:260px;overflow:auto">'
+    +(matched.length?matched.map(d=>{const s=d.data();
+      return row('<b>'+esc(s.school)+'</b>'+typeBadge(appTypeOf(s))
+        +'<span style="color:#6b7280">📍 '+esc(s.region||'')+' · 배정: <b style="color:#0f766e">'+esc(s.assignedName||'')+'</b></span>'
+        +'<span style="flex:1"></span>'
+        +'<button class="btn-sub" style="background:#e6b422;padding:5px 12px;font-size:12px" onclick="document.getElementById(\'slotAdmModal\').remove();unassign(\''+d.id+'\')">👤 배정해제 + 재공고</button>');
+    }).join(''):'<div class="bempty">배정완료 학교가 없습니다</div>')+'</div>'
+    +'<div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'slotAdmModal\').remove()">닫기</button></div></div>';
+  div.addEventListener('click',function(e){if(e.target===this)this.remove()});
+  document.body.appendChild(div);
+}
+async function slotPost(appId){
+  const d=APPS.find(x=>x.id===appId);if(!d)return;const s=d.data();
+  try{
+    await DB.collection('openSlots').doc(appId).set({
+      school:s.school,region:appRegion(s),type:s.type||'',d1:s.d1||'',
+      claimedBy:null,claimedName:'',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  }catch(e){alert('공고 등록 실패: '+e.message);return}
+  await showSlotAdmin();
+}
+async function slotPull(slotId){
+  const s=SLADM.slots.find(x=>x._id===slotId);
+  if(!confirm('['+(s?s.school:slotId)+'] 공고를 게시판에서 내립니다.'+(s&&s.claimedBy?'\n⚠ 이미 '+(s.claimedName||'강사')+' 님이 지명 신청한 상태입니다 — 내리면 신청도 함께 사라집니다.':'')+'\n계속할까요?'))return;
+  try{await DB.collection('openSlots').doc(slotId).delete()}catch(e){alert('실패: '+e.message);return}
+  await showSlotAdmin();
+}
+async function slotEdit(slotId){
+  const s=SLADM.slots.find(x=>x._id===slotId);if(!s)return;
+  const region=prompt('권역(지역) — 강사 매칭 기준입니다',s.region||'');if(region===null)return;
+  const d1=prompt('개강 희망 표기 (공고에 노출)',s.d1||'');if(d1===null)return;
+  const note=prompt('공고 메모 (선택 — 예: 주 2회 희망 / 오전 수업)',s.note||'');if(note===null)return;
+  try{
+    await DB.collection('openSlots').doc(slotId).set({region:region.trim(),d1:d1.trim(),note:note.trim()},{merge:true});
+  }catch(e){alert('수정 실패: '+e.message);return}
+  await showSlotAdmin();
+}
+async function slotUnclaim(slotId){
+  const s=SLADM.slots.find(x=>x._id===slotId);
+  if(!confirm('['+(s?s.school:'')+'] '+(s&&s.claimedName?s.claimedName+' 님의 ':'')+'지명 신청을 해제하고 다시 「모집 중」으로 돌립니다. 계속할까요?'))return;
+  try{await DB.collection('openSlots').doc(slotId).update({claimedBy:null,claimedName:'',claimedAt:null})}catch(e){alert('실패: '+e.message);return}
+  await showSlotAdmin();
+}
+async function slotConfirmClaim(slotId){
+  const s=SLADM.slots.find(x=>x._id===slotId);if(!s||!s.claimedBy)return;
+  const d=APPS.find(x=>x.id===slotId);
+  if(!d){alert('연결된 학교 신청을 찾을 수 없습니다 (고아 공고). [내리기]로 정리해주세요.');return}
+  const app=d.data();
+  if(!confirm('['+s.school+'] 지명 신청자 '+(s.claimedName||'')+' 님을 강사로 확정 배정합니다.\n(학교 상태 → 배정완료, 공고는 자동으로 내려갑니다)'))return;
+  try{
+    await DB.collection('schoolApplications').doc(slotId).update({assignedUid:s.claimedBy,assignedName:s.claimedName||'',status:'배정완료'});
+    await adHist(s.claimedBy,'[위촉] '+s.school+' 강사 배정 ('+(appTypeOf(app).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' · '+(app.region||'')+')');
+    await syncStatus(app,'배정완료',{assignedName:s.claimedName||''});
+    await DB.collection('openSlots').doc(slotId).delete().catch(()=>{});
+  }catch(e){alert('확정 실패: '+e.message);return}
+  loadApps();loadDash();
+  await showSlotAdmin();
 }
 async function recordSessions(id){
   const s=APPS.find(d=>d.id===id).data();
