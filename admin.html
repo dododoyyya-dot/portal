@@ -2177,7 +2177,7 @@ function showMemberModal(uid){
     ['보유자격',quals],
     ['학위',v.degree?esc(v.degree)+(v.degreeDoc?' <a href="'+v.degreeDoc+'" target="_blank" style="color:#153A77;font-weight:800">📎증빙</a>':' (증빙없음)')+(v.degreeApproved?' <b style="color:#0f766e">✓승인</b>':''):'-'],
     // [유형분리] 교사(교원) — 재직 확인
-    ['재직 확인',(v.accountType==='teacher')
+    ['재직 확인',(v.accountType==='teacher'||v.priorType==='teacher'||v.employDoc)
       ?((v.employDoc?'<a href="'+v.employDoc+'" target="_blank" style="color:#153A77;font-weight:800">📎 재직증명서 보기</a>':'<b style="color:#C41E2F">증빙 미첨부</b>')
         +(v.employApproved?' <b style="color:#0f766e">✓확인완료</b>':(v.employDoc?' <button class="btn-sub" style="background:#0f766e;padding:3px 9px;font-size:11px" onclick="approveEmploy(\''+uid+'\')">재직 확인</button>':''))
         +(v.peMajor?' <span style="font-size:11.5px;font-weight:900;color:#fff;background:#153A77;padding:2px 8px;border-radius:999px">체육 전공</span>':'')
@@ -2721,7 +2721,7 @@ function renderUsers(){
       +(v.status==='approved'
         ?'<span style="font-size:13px;font-weight:800;color:#0f766e">승인됨</span>'
         // [유형분리] 교사(교원)는 재직증명서 확인이 끝나야 승인 가능
-        :(v.accountType==='teacher'&&!v.employApproved
+        :((v.accountType==='teacher'||v.priorType==='teacher')&&!v.employApproved
           ?'<span style="font-size:12px;font-weight:800;color:#C41E2F">🏫 재직증명서 확인 후 승인 가능</span> <button class="btn-sub" style="background:#0f766e;padding:4px 10px;font-size:11.5px" onclick="showMemberModal(\''+d.id+'\')">📄 증빙 확인</button>'
           :(v.natCertName&&!v.natCertApproved
             ?'<span style="font-size:12px;font-weight:800;color:#C41E2F">🏅 국가자격증 확인 후 승인 가능</span> <button class="btn-sub" style="background:#6b7280;padding:4px 10px;font-size:11.5px" onclick="convertUserType(\''+d.id+'\')" title="자격 미보유 회원을 일반회원 등으로 전환 후 승인">🔄 유형 전환</button>'
