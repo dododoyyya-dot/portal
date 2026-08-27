@@ -547,7 +547,8 @@ function say(t,ok){const e=document.getElementById('aMsg');e.textContent=t;e.cla
 function syncAffS(){
   document.getElementById('sAfFed').style.display=document.getElementById('sAf1').checked?'block':'none';
   document.getElementById('sTeachLv').style.display=document.getElementById('sAf2').checked?'block':'none';
-  document.getElementById('sWorkWrap').style.display=(document.getElementById('sAf2').checked||document.getElementById('sAf3').checked)?'block':'none';
+  // [가입폼 다이어트] 근무지는 재직학교와 중복이라 가입 단계에서 받지 않습니다 (마이페이지 › 근무지에서 입력)
+  document.getElementById('sWorkWrap').style.display='none';
 }
 // ══════════ [소속] 기타 소속 표준화 — 선택형 + 직접입력 ══════════
 function sAfEtcSync(){
@@ -874,9 +875,7 @@ async function go(){
           if(afEtc)af.push(afEtc);
           if(document.getElementById('sAf0').checked&&!af.length)af.push('소속 없음');
           if(!af.length)return say('소속을 선택해주세요 (해당 없으면 「소속 없음」 체크)');
-          work=document.getElementById('sWork').value.trim();
-          const needWork=CFG.req.work||document.getElementById('sAf2').checked||document.getElementById('sAf3').checked;
-          if(needWork&&!work)return say('근무지(학교·기관명)를 입력해주세요');
+          // [가입폼 다이어트] 근무지는 가입 단계에서 받지 않습니다 — 마이페이지 저장 시 교원·초등스포츠강사에게 필수로 검사합니다
         }
         // 지도자군(강사·교사): 수당 계좌·피복 사이즈·학력 필수
         if(CFG.req.bank){
@@ -1004,7 +1003,7 @@ async function go(){
           fedName:gv('sAfFed'),
           teacherLevel:(document.getElementById('sAf2').checked?gv('sTeachLv'):''),
           // [유형분리] 교사(교원)는 학교 검색으로 고른 재직 학교를 근무지로 저장
-          workSchool:(SIGNUP_TYPE==='teacher'?(gv('sSchool')||work):work),
+          workSchool:(SIGNUP_TYPE==='teacher'?gv('sSchool'):''),
           schoolNorm:(SIGNUP_TYPE==='teacher'&&gv('sSchool'))?normSchool(gv('sSchool')):'',
           schoolCode:(SIGNUP_TYPE==='teacher'&&document.getElementById('sSchool'))?(document.getElementById('sSchool').dataset.code||''):'',
           peMajor:(SIGNUP_TYPE==='teacher'&&document.getElementById('sPeMajor'))?!!document.getElementById('sPeMajor').checked:false,
