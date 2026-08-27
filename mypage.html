@@ -289,6 +289,7 @@ function orgChip(o,region,title,fed){
     </div>
 
     <!-- ③ 자격 -->
+    <div id="qualDbNote" style="display:none;margin-top:14px;border-radius:12px;padding:12px 14px;font-size:12.5px;font-weight:700;line-height:1.7"></div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:14px">
       <div>
         <label style="font-size:13px;font-weight:800">KFDF 지도자 자격</label>
@@ -1988,13 +1989,58 @@ async function loadMyClaims(){
     }).join('<br>');
   }catch(e){}
 }
+// ── [자격 DB연동] '③ 자격' 표시를 연맹 공식 자격증 DB(licenses) 기준으로 동기화 ──
+// 기존 자기신고 select(pfLeader/pfRef/pfYouth)와 저장 로직은 그대로 두되,
+// DB에 실제 자격이 있으면 그 값으로 자동 반영하고 임의 수정을 막습니다.
+function syncQualFromDB(){
+  try{
+    const box=document.getElementById('qualDbNote');
+    const elL=document.getElementById('pfLeader'), elR=document.getElementById('pfRef');
+    if(!box||!elL||!elR)return;
+    const today=new Date().toISOString().slice(0,10);
+    const valid={},expired={};
+    (MYLICS||[]).forEach(d=>{
+      const l=d.data()||{};
+      if(l.status==='이관')return;                                  // 이관된 구번호 제외
+      const label=String(l.type||'')+' '+String(l.grade||'');
+      const isExp=(l.status==='만료')||(l.expireAt?l.expireAt<today:false);
+      (isExp?expired:valid)[l.type]=label;
+    });
+    const lock=(el,val)=>{
+      if(val&&![].slice.call(el.options).some(o=>o.value===val||o.text===val)){
+        el.insertAdjacentHTML('beforeend','<option>'+val.replace(/[<>&"]/g,'')+'</option>');
+      }
+      el.value=val||'';
+      el.disabled=!!val;                                            // DB 확인분은 임의 수정 불가
+      el.style.background=val?'#f2f7f2':'';
+      el.title=val?'연맹 자격증 DB에서 자동 반영된 값입니다 (임의 수정 불가)':'';
+    };
+    lock(elL, valid['지도자']||'');
+    lock(elR, valid['심판']||'');
+    const okList=Object.keys(valid).map(k=>valid[k]);
+    const expList=Object.keys(expired).filter(k=>!valid[k]).map(k=>expired[k]);
+    if(okList.length||expList.length){
+      box.style.display='block';
+      box.style.background='#f0f7f2';box.style.border='1.5px solid #cfe3d8';box.style.color='#0f766e';
+      box.innerHTML='✅ <b>연맹 자격증 DB 확인됨</b> — '+esc(okList.join(' · ')||'유효 자격 없음')
+        +(expList.length?' <span style="color:#C41E2F">(만료: '+esc(expList.join(' · '))+')</span>':'')
+        +'<div style="font-weight:600;color:var(--gray);margin-top:4px">아래 지도자·심판 자격은 연맹 공식 자격증 DB의 값이며 임의 수정할 수 없습니다. 정정이 필요하면 사무국(031-984-3248)으로 문의해 주세요.</div>';
+    }else{
+      box.style.display='block';
+      box.style.background='#fffdf5';box.style.border='1.5px solid #e6d9a8';box.style.color='#8a6d1f';
+      box.innerHTML='⚠️ <b>연맹 자격증 DB에 등록된 지도자·심판 자격이 없습니다</b>'
+        +'<div style="font-weight:600;color:var(--gray);margin-top:4px">아래 항목은 <b>본인이 직접 입력한 값(미검증)</b>입니다. 실제 자격을 보유하고 계시면 아래 [연맹 자격증 번호 입력]에 자격번호를 입력해 주세요. 저장 시 자동으로 대조·연결됩니다.</div>';
+    }
+  }catch(e){}
+}
 // ── 연맹 자격증 (지도자·심판) ──
 let MYLICS=[];
 async function loadMyLics(uid){
   try{
     const snap=await DB.collection('licenses').where('uid','==',uid).get();
-    if(snap.empty)return;
+    if(snap.empty){MYLICS=[];syncQualFromDB();return;}
     MYLICS=snap.docs;
+    syncQualFromDB();
     const today=new Date().toISOString().slice(0,10);
     document.getElementById('licBox').style.display='block';
     document.getElementById('licCards').innerHTML=MYLICS.map(d=>{
