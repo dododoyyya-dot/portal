@@ -1285,8 +1285,8 @@ async function loadLiveComps(){
       +(r.done?' <span style="font-size:11px;color:#8a919d;font-weight:800">마감</span>':'')+'</td>'
       +'<td style="font-size:13.5px;font-weight:800;color:#374151">📍 '+cesc(r.place||'-')+'</td></tr>';
     el.innerHTML=(act.length||past.length)
-      ?('<table class="tbl"><tr><th style="width:180px">일정</th><th>공고</th><th style="width:150px">장소·지역</th></tr>'
-        +act.map(tr).join('')+past.slice(0,4).map(tr).join('')+'</table>'
+      ?('<div class="tblwrap"><table class="tbl"><tr><th style="width:24%">일정</th><th>공고</th><th style="width:22%">장소·지역</th></tr>'
+        +act.map(tr).join('')+past.slice(0,4).map(tr).join('')+'</table></div>'
         +(past.length>4?'<div style="font-size:12px;color:#8a919d;margin-top:6px">지난 공고 '+(past.length-4)+'건 더 — 아래 목록·심판 페이지에서 확인</div>':''))
       :'<div class="bempty">등록된 대회 공고가 없습니다. 공고가 올라오면 이곳에 실시간 게시됩니다.</div>';
   }catch(e){el.innerHTML='<div class="bempty">공고를 불러오지 못했습니다.</div>'}
@@ -1631,12 +1631,12 @@ async function openApply(id){
       +(APPLY_PARTS.length?APPLY_PARTS.map((p,i)=>'<button type="button" class="rolechip" data-pid="'+cesc(p.pid)+'" onclick="selPart('+i+')">'+cesc(p.label)+'</button>').join(''):'<span style="font-size:12.5px;color:#C41E2F;font-weight:700">'+(selfMinor?'👨‍👧 만 18세 미만은 본인이 직접 신청할 수 없습니다. 보호자 계정에서 자녀 프로필을 등록해 신청해 주세요.':'신청 가능한 참가자가 없습니다 (전원 신청 완료)')+'</span>')
       +'</div>'
       +'<div class="docsec"><div class="dtitle">대 회 참 가 신 청 서</div>'
-      +'<table class="itable">'
+      +'<div class="tblwrap"><table class="itable">'
       +'<tr><th>참가자</th><td id="epName">—</td><th>생년월일</th><td id="epBirth">—</td></tr>'
       +'<tr><th>성 별</th><td id="epGender">—</td><th>소속(학교)</th><td id="epSchool">—</td></tr>'
       +'<tr><th>소속 클럽</th><td colspan="3"><select id="epClub" style="padding:7px 10px;border:1px solid #d5dce8;border-radius:8px;font-family:inherit;font-size:13px"><option value="">선택 안 함</option>'+clubOpts+'<option value="__etc">직접 입력</option></select> <input id="epClubEtc" placeholder="클럽·팀명 직접 입력" style="display:none;padding:7px 10px;border:1px solid #d5dce8;border-radius:8px;font-family:inherit;font-size:13px;width:180px" onclick="event.stopPropagation()"></td></tr>'
       +'<tr id="guardRow" style="display:none"><th>보호자</th><td>'+cesc(CMY.name||'')+' (법정대리인)</td><th>보호자 연락처</th><td>'+cesc(CMY.phone||'미입력 — 마이페이지에서 입력')+'</td></tr>'
-      +'</table>'
+      +'</table></div>'
       +'<div style="font-size:13px;font-weight:800;margin:13px 0 7px">② 참가 부문 선택'+(s.fee?' <span style="font-weight:700;color:#b8860b;font-size:12px">💰 참가비: '+cesc(s.fee)+'</span>':'')+'</div>'
       // [개인전·단체전 구분 표시] 신청서 부문 선택도 그룹 패널로 — 버튼 동작(togRole·#cRoleBtns 셀렉터)은 그대로 유지
       +(function(){
@@ -1679,11 +1679,11 @@ async function openApply(id){
       +'<div class="mbody">'
       +'<div style="font-size:11.5px;color:#8a919d;text-align:right;margin-bottom:8px">작성일 '+today+' · 마이페이지 정보 자동 기입 <a href="mypage.html#profileBox" style="color:var(--red);font-weight:800">수정 →</a></div>'
       +'<div class="docsec"><div class="dtitle">위 촉 신 청 서</div>'
-      +'<table class="itable">'
+      +'<div class="tblwrap"><table class="itable">'
       +'<tr><th>성 명</th><td>'+cesc(CMY.name||'-')+'</td><th>생년월일</th><td>'+cesc(CMY.birth||'-')+'</td></tr>'
       +'<tr><th>소 속</th><td>'+cesc(aff)+'</td><th>연락처</th><td'+(CMY.phone?'':' class="miss"')+'>'+cesc(CMY.phone||'미입력')+'</td></tr>'
       +'<tr><th>입금계좌</th><td'+(acct?'':' class="miss"')+'>'+(acct?cesc(acct):'미등록 — 수당 지급에 필요')+'</td><th>주민번호</th><td'+(RRN_OK?'':' class="miss"')+'>'+(RRN_OK?'등록 완료 (보안 저장)':'미등록 — 원천징수에 필요')+'</td></tr>'
-      +'</table>'
+      +'</table></div>'
       +'<div style="font-size:13px;font-weight:800;margin:13px 0 7px">희망 임무 <span style="font-weight:600;color:#888;font-size:11.5px">(누르는 순서 = 1→2→3지망, 최대 3개)</span></div>'
       +'<div id="cRoleBtns" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">'
       +slotDivs(s).map(dv=>'<button type="button" class="rolechip" data-role="'+cesc(dv.name)+'" onclick="togRole(this)">'+cesc(dv.name)+'</button>').join('')
