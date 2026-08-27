@@ -2131,7 +2131,7 @@ function renderRoster(docs){
     if(f.after)fld.push('<span class="bdg" style="background:#0f766e">방과후</span>');
     if(f.referee)fld.push('<span class="bdg" style="background:#7c3aed">심판</span>');
     if(f.staff)fld.push('<span class="bdg" style="background:#b8860b">운영</span>');
-    const quals=[q.leader,q.referee,q.youth?'유소년':''].filter(Boolean).join('·');
+    const quals=licLabel(d.id,q,{sep:'·',dash:''});   // [보유자격] 연맹 자격증 DB 기준
     const hire=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc);
     return '<tr>'
       +'<td class="nm" style="cursor:pointer;color:#153A77;text-decoration:underline" onclick="showMemberModal(\''+d.id+'\')">'+esc(v.name)+(v.withdrawReq?' <span title="탈퇴요청">🚪</span>':'')+'</td>'
@@ -2139,7 +2139,7 @@ function renderRoster(docs){
       +'<td>'+(v.baseCity?esc(v.baseCity):'<span style="color:#C41E2F">미입력</span>')+'</td>'
       +'<td>'+(v.phone?esc(v.phone):'<span class="mut">-</span>')+'</td>'
       +'<td>'+(fld.length?fld.join(''):'<span class="mut">-</span>')+'</td>'
-      +'<td>'+(quals?esc(quals):'<span class="mut">-</span>')+'</td>'
+      +'<td>'+(quals||'<span class="mut">-</span>')+'</td>'   // licLabel이 이미 이스케이프 처리함
       +'<td>'+(v.edu2026?'<b style="color:#0f766e">✓</b>':'<span class="mut">-</span>')+'</td>'
       +'<td>'+(v.safetyEdu?'<b style="color:#0f766e">✓</b>':'<span class="mut">-</span>')+'</td>'
       +'<td>Lv.'+lv+' · '+(v.points||0)+'P</td>'
@@ -2157,7 +2157,7 @@ function showMemberModal(uid){
   const d=USERS.find(x=>x.id===uid);if(!d){alert('회원 정보를 찾을 수 없습니다.');return}
   const v=d.data(),lv=lvOf(v.points||0),f=v.instructorFor||{},q=v.quals||{};
   const fldTags=['school','after','referee','staff'].filter(k=>f[k]).map(k=>({school:'학교체육',after:'방과후·늘봄',referee:'심판요원',staff:'운영요원'}[k])).join(' · ')||'-';
-  const quals=[q.leader,q.referee,q.youth?'유소년지도사':''].filter(Boolean).join(' · ')||'-';
+  const quals=licLabel(uid,q);   // [보유자격] 연맹 자격증 DB 기준 (없으면 자기신고값을 '미검증'으로)
   const hire=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc);
   const rows=[
     ['회원 유형',esc({instructor:'지도자·강사',teacher:'교사',athlete:'선수회원',general:'일반회원',student:'학생회원'}[v.accountType]||v.accountType||'-')+(v.memberClass?' <b style="font-size:11px;color:#8a5a00">· '+esc(v.memberClass)+'</b>':'')+(v.typeConvertedFrom?' <span style="font-size:11px;color:#8a919d">(전환 전: '+esc(v.typeConvertedFrom)+')</span>':'')],
@@ -2188,7 +2188,11 @@ function showMemberModal(uid){
     ['위촉 가능 여부',hire?'<span style="background:#0f766e;color:#fff;font-weight:900;font-size:11px;padding:2px 10px;border-radius:999px">위촉 가능</span>':'-'],
     ['가입 상태',v.status==='approved'?'<b style="color:#0f766e">승인됨</b>':(v.status==='거절'?'<b style="color:#C41E2F">거절됨</b>':'<b style="color:#e6b422">대기중</b>')]
   ];
-  if(v.accountType==='student'||v.memberGroup==='student')
+  // [연령] 생년월일 기준으로 현재 미성년 여부를 다시 계산 — 가입 당시 값이 그대로 남아 성인이 된 뒤에도
+  //        학생회원으로 표시되던 문제를 화면에서 바로잡습니다. (저장된 accountType은 건드리지 않음)
+  if(isMinorNow(v.birth)===false&&(v.accountType==='student'||v.memberGroup==='student'))
+    rows.push(['연령 확인','<b style="color:#0f766e">✓ 만 '+ageNow(v.birth)+'세 — 성인</b> <span style="font-size:11.5px;color:#8a919d">(가입 시에는 학생회원이었습니다. 필요 시 아래 [회원유형 변경]으로 전환하세요)</span>']);
+  if((v.accountType==='student'||v.memberGroup==='student')&&isMinorNow(v.birth)!==false)
     rows.push(['보호자 연동',v.guardianUid?'<b style="color:#0f766e">🔗 연동됨'+(v.guardianName?' — '+esc(v.guardianName):'')+'</b>':'<b style="color:#C41E2F">⚠️ 미연동 (임시회원)</b>']);
   if(v.rejectReason)
     rows.push(['거절 사유',esc(v.rejectReason)+(v.reviewReqAt?' · <b style="color:#b8860b">⏳ 보완 후 재검토 요청됨</b>':'')]);
@@ -2256,10 +2260,62 @@ function uMatch(v){
   }
   return true;
 }
+// ══════════ [보유자격] 연맹 자격증 대장(licenses)을 한 번에 불러와 uid별로 정리 ══════════
+// 회원 목록에서 한 명씩 조회하면 느려지므로, 대장 전체를 1회만 읽어 캐시합니다.
+let LICMAP={};
+async function loadLicenses(){
+  try{
+    const snap=await DB.collection('licenses').get();
+    const m={};
+    snap.docs.forEach(d=>{
+      const l=d.data()||{};
+      if(!l.uid||l.status==='이관')return;          // 미연결·이관(구번호) 제외
+      (m[l.uid]=m[l.uid]||[]).push({id:d.id,type:l.type||'',grade:l.grade||'',status:l.status||'',expireAt:l.expireAt||''});
+    });
+    LICMAP=m;
+  }catch(e){ LICMAP={}; }                            // 실패 시 기존 표시 방식으로 자동 대체
+}
+// 자격 표기 — 연맹 자격증 DB가 우선, 없으면 자기신고값을 '미검증'으로 표시
+function licLabel(uid,q,opt){
+  opt=opt||{};
+  const today=new Date().toISOString().slice(0,10);
+  const lics=LICMAP[uid]||[];
+  if(lics.length){
+    const parts=lics.map(l=>{
+      const valid=l.status!=='만료'&&(!l.expireAt||String(l.expireAt).slice(0,10)>=today);
+      const txt=esc((l.type+' '+l.grade).trim());
+      return valid
+        ? '<b style="color:#0f766e">'+txt+'</b>'
+        : '<b style="color:#C41E2F" title="만료">'+txt+' (만료)</b>';
+    });
+    return parts.join(opt.sep||' · ');
+  }
+  const self=[(q&&q.leader)||'',(q&&q.referee)||'',(q&&q.youth)?'유소년지도사':''].filter(Boolean).join(opt.sep||' · ');
+  if(!self)return (opt.dash!==undefined)?opt.dash:'-';   // 빈 문자열('')도 유효한 값으로 취급
+  return '<span style="color:#8a919d" title="연맹 자격증 DB에 등록되지 않은 자기신고 값입니다">'+esc(self)+' <span style="font-size:10.5px;font-weight:800">미검증</span></span>';
+}
+// 엑셀·CSV용 순수 텍스트 자격 표기 (지도자/심판 각각)
+function licPlain(uid,q){
+  const today=new Date().toISOString().slice(0,10);
+  const lics=LICMAP[uid]||[];
+  const pick=kind=>{
+    const hit=lics.filter(l=>String(l.type||'').indexOf(kind)>=0);
+    if(!hit.length){
+      const self=kind==='지도자'?((q&&q.leader)||''):((q&&q.referee)||'');
+      return self?self+' (미검증)':'';
+    }
+    return hit.map(l=>{
+      const valid=l.status!=='만료'&&(!l.expireAt||String(l.expireAt).slice(0,10)>=today);
+      return (l.type+' '+l.grade).trim()+(valid?'':' (만료)');
+    }).join(' / ');
+  };
+  return {leader:pick('지도자'),referee:pick('심판')};
+}
 async function loadUsers(){
   const snap=await DB.collection('users').orderBy('createdAt','desc').get();
   TRASH.users=snap.docs.filter(d=>{const v=d.data();return v.deleted&&sameSidoUser(v);});
   USERS=snap.docs.filter(d=>{const v=d.data();return !v.deleted&&sameSidoUser(v);});
+  await loadLicenses();   // [보유자격] 자격 대장 1회 로드
   renderUsers();
 }
 function renderInstTable(docs){
@@ -2591,6 +2647,17 @@ function viewCompContractAdmin(uid,compId){
 // ── 🏫 학교별 회원 (동호회 자동분류) ──
 function normSchool(s){return String(s||'').trim().replace(/\s+/g,'').replace(/(초등학교|초교)$/,'초').replace(/(중학교)$/,'중').replace(/(고등학교|고교)$/,'고');}
 function schoolAge(b){const by=new Date(b);if(isNaN(by))return'';const age=Math.floor((Date.now()-by.getTime())/(365.25*86400000));return age>=18?'성인':age+'세';}
+// ══════════ [연령] 생년월일 기준 현재 나이 — 저장된 값이 아니라 오늘 날짜로 매번 계산 ══════════
+function ageNow(birth){
+  const b=String(birth||'').trim(); if(!b)return null;
+  const d=new Date(b.replace(/\./g,'-')); if(isNaN(d))return null;
+  const t=new Date();
+  let a=t.getFullYear()-d.getFullYear();
+  const m=t.getMonth()-d.getMonth();
+  if(m<0||(m===0&&t.getDate()<d.getDate()))a--;   // 생일 안 지났으면 -1
+  return (a>=0&&a<130)?a:null;
+}
+function isMinorNow(birth){ const a=ageNow(birth); return a===null?null:(a<18); }  // 생년월일 없으면 null(판단 불가)
 function toggleSchoolGroups(){const b=document.getElementById('schoolGroupBox');if(b.style.display==='none'){renderSchoolGroups();b.style.display='block';}else b.style.display='none';}
 function renderSchoolGroups(){
   const groups={};
@@ -2625,10 +2692,10 @@ function renderUsers(){
       +(v.org?' '+orgChip(v.org,v.region,v.orgTitle,v.fedName):'')+(v.withdrawReq?' <span style="font-size:11px;font-weight:900;color:#fff;background:'+(v.withdrawStatus==='보류'?'#b8860b':'#C41E2F')+';padding:2px 8px;border-radius:999px">🚪 탈퇴 요청'+(v.withdrawStatus==='보류'?' · 보류중':'')+'</span>':'')
       +(EXTCLUB_MAP[d.id]?' <span style="font-size:11px;font-weight:900;color:#fff;background:#7c3aed;padding:2px 8px;border-radius:999px" title="흡수 전략 추적용 — 클럽 승인관리에서 연맹 클럽으로 전환할 수 있습니다">🔗 타단체클럽: '+esc(EXTCLUB_MAP[d.id].join(', '))+'</span>':'')
       +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+(v.gender?' · '+esc(v.gender):'')+(v.birth?' · '+esc(v.birth):'')+(v.baseCity?' · <b style="color:#1F4E9C">📍'+esc(v.baseCity)+'</b>':' · <span style="font-size:11px;color:#C41E2F;font-weight:800">시군구 미입력</span>')+((v.activityRegions&&v.activityRegions.length)?' <span style="font-size:11px;font-weight:800;color:#0f766e">🗺활동가능: '+esc(v.activityRegions.length>=6?'전국 (전 권역)':v.activityRegions.join('·'))+'</span>':'')+(v.phone?' · '+esc(v.phone):'')+(v.bank?' · <b style="color:#b8860b">💳'+esc(v.bank)+' '+esc(v.accountNum||'')+' ('+esc(v.accountHolder||'')+')</b>':'')+' · '+(v.edu2026?('연수이수 '+(inRoster(v.name)?'<b style="color:#0f766e">✓명단확인</b>':'<b style="color:#C41E2F">⚠명단에없음</b>')):'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+((v.instructorFor&&v.instructorFor.referee)?' · <b style="color:#7c3aed">심판요원 지원</b>':'')+((v.instructorFor&&v.instructorFor.staff)?' · <b style="color:#b8860b">운영요원 지원</b>':'')+'</div>'
-      +((v.affiliation&&v.affiliation.length)||(v.quals&&(v.quals.leader||v.quals.referee||v.quals.youth))||(v.qualDocs&&v.qualDocs.length)||v.degree
+      +((v.affiliation&&v.affiliation.length)||(LICMAP[d.id]&&LICMAP[d.id].length)||(v.quals&&(v.quals.leader||v.quals.referee||v.quals.youth))||(v.qualDocs&&v.qualDocs.length)||v.degree
         ?'<div class="sub3" style="margin-top:3px">프로필: '
           +((v.affiliation&&v.affiliation.length)?'🏷 '+esc(v.affiliation.join('·')):'')
-          +((v.quals&&(v.quals.leader||v.quals.referee||v.quals.youth))?' · 🎖 '+esc([v.quals.leader,v.quals.referee,v.quals.youth?'유소년지도사':''].filter(Boolean).join('·')):'')
+          +((LICMAP[d.id]&&LICMAP[d.id].length)||(v.quals&&(v.quals.leader||v.quals.referee||v.quals.youth))?' · 🎖 '+licLabel(d.id,v.quals,{sep:'·',dash:''}):'')
           +(v.degree?' · 🎓 '+esc(v.degree)
             +(v.degreeDoc?' <a href="'+v.degreeDoc+'" target="_blank" style="color:#153A77;font-weight:800">📎증빙</a>':' <b style="color:#C41E2F">(증빙 없음)</b>')
             +' '+(v.degreeApproved?'<b style="color:#0f766e">✓학위승인</b> <button class="btn-sub" style="background:#8a919d;padding:2px 8px;font-size:11px" onclick="approveDegree(\''+d.id+'\',0)">승인취소</button>':'<button class="btn-sub" style="background:#b8860b;padding:2px 8px;font-size:11px" onclick="approveDegree(\''+d.id+'\',1)">학위 승인</button>'):'')
@@ -2681,8 +2748,10 @@ function exportInstructors(){
   USERS.forEach(d=>{const v=d.data();const f=v.instructorFor||{};
     if(!(f.school||f.after||f.referee||f.staff))return;
     const q=v.quals||{};
+    // [보유자격] 자격 컬럼은 연맹 자격증 DB 기준 (없으면 자기신고값 + '(미검증)' 표기) — 컬럼 구성은 그대로
+    const _lp=licPlain(d.id,q);
     rows.push([v.name,v.gender||'',v.birth||'',v.region||'',v.baseCity||'',(v.activityRegions||[]).join('·')||v.region||'',
-      (v.affiliation||[]).join('·'),q.leader||'',q.referee||'',q.youth?'O':'',v.degree||'',(v.degree&&v.degreeApproved)?'승인':'',v.clothingSize||'',v.career||'',(v.qualDocs||[]).length?(v.qualDocs.length+'장'):'',
+      (v.affiliation||[]).join('·'),_lp.leader,_lp.referee,q.youth?'O':'',v.degree||'',(v.degree&&v.degreeApproved)?'승인':'',v.clothingSize||'',v.career||'',(v.qualDocs||[]).length?(v.qualDocs.length+'장'):'',
       v.phone||'',v.email||'',v.status||'',v.points||0,
       f.school?'O':'',f.after?'O':'',f.referee?'O':'',f.staff?'O':'',
       v.edu2026?'O':'',(v.edu2026&&inRoster(v.name))?'O':'',v.certDoc?'O':'',v.crimDoc?'O':'',(v.consents&&v.consents.agreedAt)?'O':'']);
@@ -3576,7 +3645,14 @@ function renderClubsAdmin(){
 async function approveClub(id){
   const c=(await DB.collection('clubs').doc(id).get()).data();
   if(IS_SIDO && !sameSidoClub(c)){alert('관할 시도가 아닌 클럽입니다.');return;}
-  await DB.collection('clubs').doc(id).update({status:'승인'});loadClubsAdmin();
+  const upd={status:'승인'};
+  // [연령] 승인해도 temp가 남아 '🧒학생(임시)' 배지가 계속 붙던 문제 —
+  //        클럽장이 성인임이 확인된(성인 전환 신청) 경우 임시 표시를 함께 해제합니다.
+  if(c&&(c.ownerAdult||c.adultConvertReq)){
+    upd.temp=false;
+    upd.adultConvertReq=firebase.firestore.FieldValue.delete();
+  }
+  await DB.collection('clubs').doc(id).update(upd);loadClubsAdmin();
   loadExtClubMap().then(renderUsers).catch(()=>{});
 }
 // 흡수 전략: 타단체 클럽을 연맹 정식 클럽으로 전환(clubType만 변경, 회원·역사 유지)

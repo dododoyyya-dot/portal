@@ -631,6 +631,15 @@ async function loadMyClubs(){
           +'</div></details>';
         if(c.status==='임시'){
           const cands=(c.members||[]).filter(mm=>mm.uid!==KME.uid);
+          // [연령] 클럽 개설 당시엔 미성년이었지만 지금은 만 18세 이상인 클럽장 —
+          //        다른 성인 회원을 지명할 필요 없이 본인이 바로 정식 전환을 신청할 수 있게 합니다.
+          if(!isMinorSelf()&&KMY&&KMY.birth){
+            ownerUI+='<div style="margin-top:10px;background:#f0f7f2;border:1.5px solid #cfe3d8;border-radius:10px;padding:12px 14px">'
+              +'<b style="font-size:12.5px;color:#0f766e">🎉 이제 만 '+ageOf(KMY.birth)+'세 — 성인이 되셨습니다</b>'
+              +'<div style="font-size:12px;color:#6b7280;margin:4px 0 8px;line-height:1.6">클럽 개설 당시에는 미성년이어서 임시클럽으로 등록되었습니다. 이제 <b>다른 분에게 회장을 넘기지 않고</b> 직접 정식 전환을 신청하실 수 있습니다.</div>'
+              +'<button class="cbtn cbtn-teal" style="padding:6px 16px;font-size:12.5px" onclick="requestAdultConvert(\''+d.id+'\',\''+kesc(c.name)+'\')">정식 클럽 전환 신청</button>'
+              +'</div>';
+          }
           ownerUI+='<div style="margin-top:10px;background:#fff8ed;border:1.5px solid #ecd9b0;border-radius:10px;padding:12px 14px">'
             +'<b style="font-size:12.5px;color:#8a5a00">👑 회장 인수인계 (정식 클럽 전환)</b>'
             +'<div style="font-size:12px;color:#6b7280;margin:4px 0 8px;line-height:1.6">성인 회원(보호자·지도자)을 지명하면 그분이 <b>직접 수락</b>한 뒤 <b>연맹 승인</b>까지 거쳐야 정식 클럽이 됩니다. 지명만으로 회장이 넘어가지 않아요.</div>'
@@ -1014,6 +1023,24 @@ async function setHandover(id){
 async function cancelHandover(id){
   try{await DB.collection('clubs').doc(id).update({handoverTo:firebase.firestore.FieldValue.delete(),handoverToName:firebase.firestore.FieldValue.delete()});loadMyClubs();}
   catch(e){alert('취소 실패: '+e.message)}
+}
+// ══════════ [연령] 성인이 된 클럽장의 정식 전환 신청 ══════════
+// 기존에는 '다른 성인 회원 지명 → 수락 → 승인'만 가능해서, 혼자 만든 클럽은 성인이 되어도
+// 임시클럽에서 벗어날 방법이 없었습니다. 본인이 성인이 되면 직접 신청할 수 있게 합니다.
+async function requestAdultConvert(id,name){
+  if(isMinorSelf()){alert('🔞 만 18세 이상부터 신청할 수 있습니다.');return}
+  if(!KMY||!KMY.birth){alert('마이페이지에서 생년월일을 먼저 등록해 주세요.');return}
+  if(!confirm('['+name+'] 클럽의 정식 전환을 신청할까요?\n클럽장이 성인임이 확인되어 연맹(사무국) 승인 절차로 넘어갑니다.'))return;
+  try{
+    await DB.collection('clubs').doc(id).update({
+      adultConvertReq:true,
+      adultConvertAt:firebase.firestore.FieldValue.serverTimestamp(),
+      adultConvertAge:ageOf(KMY.birth),
+      ownerAdult:true                      // 클럽장이 현재 성인임을 기록
+    });
+    alert('✓ 정식 전환을 신청했습니다.\n사무국 승인 후 임시클럽 표시가 해제됩니다.');
+    loadMyClubs();
+  }catch(e){alert('신청 실패: '+e.message)}
 }
 async function acceptHandover(id,name){
   if(isMinorSelf()){alert('🔞 클럽장(회장)은 만 18세 이상 성인만 맡을 수 있습니다.');return}

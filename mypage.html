@@ -99,6 +99,17 @@ function lvName(p){return LVS[lvOf(p)-1][1]}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')}
 function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getTime()))return 0;const now=new Date();let age=now.getFullYear()-t.getFullYear();if(now.getMonth()<t.getMonth()||(now.getMonth()===t.getMonth()&&now.getDate()<t.getDate()))age--;return age;}
+// [연령] 생년월일 기준 현재 나이 — 생년월일이 없거나 잘못된 경우 null(판단 불가)을 돌려줍니다.
+function ageNow(birth){
+  const b=String(birth||'').trim(); if(!b)return null;
+  const d=new Date(b.replace(/\./g,'-')); if(isNaN(d))return null;
+  const t=new Date();
+  let a=t.getFullYear()-d.getFullYear();
+  const m=t.getMonth()-d.getMonth();
+  if(m<0||(m===0&&t.getDate()<d.getDate()))a--;
+  return (a>=0&&a<130)?a:null;
+}
+function isMinorNow(birth){ const a=ageNow(birth); return a===null?null:(a<18); }
 function normSchool(s){return String(s||'').trim().replace(/\s+/g,'').replace(/(초등학교|중학교|고등학교|초교|중교|고교|학교)$/,'');}
 function orgChip(o,region,title,fed){
   if(o==='central')return '<span style="background:linear-gradient(120deg,#111114,#3a3a44);color:#e6b422;font-size:11px;font-weight:900;padding:3px 10px;border-radius:999px;white-space:nowrap">\ud83c\udfdb \uc911\uc559\uc5f0\ub9f9'+(title?' \u00b7 '+esc(title):'')+'</span>';
@@ -1041,7 +1052,12 @@ function loadMyGuardian(){
   const el=document.getElementById('myGuardianBox');if(!el)return;
   if(MYD&&MYD.guardianUid){el.innerHTML='<b style="color:#0f766e">🔗 보호자 연동 완료</b> — '+esc(MYD.guardianName||'')+' 님 (연동 해제는 사무국에 문의)';}
   else if(MYD&&(MYD.accountType==='student'||MYD.memberGroup==='student')){
-    el.innerHTML='<b style="color:#C41E2F">⚠️ 보호자 미연동 (임시회원)</b> — 보호자가 발급한 6자리 연동 코드를 위에 입력하면 정회원으로 전환됩니다.';
+    // [연령] 가입 당시 미성년이었더라도 지금 만 18세 이상이면 보호자 연동 안내를 띄우지 않습니다.
+    if(isMinorNow(MYD.birth)===false){
+      el.innerHTML='<b style="color:#0f766e">✓ 만 '+ageNow(MYD.birth)+'세 — 성인 회원</b> <span style="color:var(--gray);font-size:12.5px">가입 시에는 학생회원이었으나 현재는 보호자 연동이 필요하지 않습니다.</span>';
+    }else{
+      el.innerHTML='<b style="color:#C41E2F">⚠️ 보호자 미연동 (임시회원)</b> — 보호자가 발급한 6자리 연동 코드를 위에 입력하면 정회원으로 전환됩니다.';
+    }
   }
   else el.textContent='';
 }
