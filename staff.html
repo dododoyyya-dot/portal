@@ -26,6 +26,14 @@
 .sttbl{width:100%;border-collapse:collapse;font-size:12.5px}
 .sttbl th{border:1px solid #dfe5ee;padding:7px 9px;background:#f6f8fb;white-space:nowrap}
 .sttbl td{border:1px solid #dfe5ee;padding:7px 9px}
+/* [확정현황] 상세 모달 2단 레이아웃 — 좁은 화면에서는 자동으로 아래로 쌓임 */
+.dtcols{display:flex;gap:12px;align-items:flex-start}
+.dtcols .dtmain{flex:1 1 auto;min-width:0}
+.dtcols .dtside{flex:0 0 232px;max-height:420px;overflow-y:auto}
+@media (max-width:760px){
+  .dtcols{display:block}
+  .dtcols .dtside{width:100%;max-height:none}
+}
 /* [모바일] 신청현황 표는 가로 스크롤로 — 좁은 화면에서 칸이 뭉개지지 않도록 */
 .sttbl-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
 @media (max-width:820px){
@@ -810,7 +818,7 @@ async function _renderDetailInner(isStale){
           +'</tr>';
       }).join('')+'</table></div>';
   }
-  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:760px;width:100%;padding:24px 26px;margin:10px 0">'
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:1020px;width:100%;padding:24px 26px;margin:10px 0">'
     +'<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">'
     +'<span class="stpill" style="background:#7c3aed">모집 기관: '+esc((p.author&&p.author.organization)||'')+'</span>'
     +'<b style="font-size:17px">'+esc(p.competitionName)+'</b>'
@@ -830,11 +838,14 @@ async function _renderDetailInner(isStale){
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:16px">'
     +dates.map((d2,i)=>'<button class="daytab'+(i===DT_DAY?' on':'')+'" onclick="DT_DAY='+i+';renderDetail()">'+fmtD((d2.date||'').slice(5))+' ('+(d2.dayOfWeek||dowOf(d2.date))+')</button>').join('')
     +'</div>'
-    +'<div style="border:1.5px solid #d3e0f2;border-radius:12px;padding:14px 16px;margin-top:10px;background:#fbfdff">'
+    +'<div class="dtcols">'
+    +'<div class="dtmain" style="border:1.5px solid #d3e0f2;border-radius:12px;padding:14px 16px;margin-top:10px;background:#fbfdff">'
     +'<div style="font-size:13px"><b>모집 정원:</b> '+qTxt+'</div>'
     +'<div style="font-size:13px;margin-top:5px"><b>임무:</b> '+esc((dd.roles||[]).join(' · ')||'-')+'</div>'
     +'<div style="font-size:13px;margin-top:5px"><b>수당:</b> '+payHtml+'</div>'
     +'<div style="font-size:13px;margin-top:12px"><b>👥 신청 현황 ('+dayApps.length+'명)</b></div>'+appsHtml
+    +'</div>'
+    +confirmPanelHtml(dd,dayApps,_decide)   // [확정현황] 역할별 인원수·명단 패널
     +'</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">'
     // [권한개선] 공고 수정·복사 = canManage / 수당엑셀·자격확인·경력등록 = canDecide
@@ -903,7 +914,9 @@ function openApplyForm(id){
     +'<div><label class="stlabel">은행명</label><input id="apPayBank" class="stfield" placeholder="예: 국민은행" value="'+esc(pf.bank||SMY.bank||'')+'"></div>'
     +'<div><label class="stlabel">계좌번호</label><input id="apPayAcct" class="stfield" placeholder="숫자·하이픈" value="'+esc(pf.account||SMY.accountNum||'')+'"></div>'
     +'</div>'
-    +'<div style="margin-top:6px"><label class="stlabel">주민등록번호 <span style="font-size:10.5px;color:#8a919d">(수당 원천징수·거래처 등록용)</span></label><input id="apPayRrn" class="stfield" placeholder="000000-0000000" value="'+esc(pf.rrn||'')+'"></div>'
+    +'<div style="margin-top:6px"><label class="stlabel">주민등록번호 <span style="font-size:10.5px;color:#8a919d">(수당 원천징수·거래처 등록용)</span></label>'
+    +'<input id="apPayRrn" class="stfield" placeholder="000000-0000000" value="'+esc(pf.rrn||'')+'">'
+    +'<div id="apRrnNote" style="font-size:11.5px;font-weight:700;margin-top:4px;color:#8a919d">회원정보를 확인하는 중…</div></div>'
     +'<details style="margin-top:8px;font-size:12px;background:#f8fafc;border:1.5px solid #e3e9f2;border-radius:10px;padding:9px 12px"><summary style="font-weight:800;cursor:pointer">📋 수당 지급을 위한 개인정보 수집·이용·제공 동의서 (전문 보기)</summary>'
     +'<div style="line-height:1.8;margin-top:7px;color:#374151">'
     +'<b>□ 개인정보 수집·이용 동의</b><br>1. 수집·이용 목적: 대회 관련 수당 지급<br>2. 수집 항목: 성명, 주민등록번호, 은행명, 계좌번호<br>3. 이용·보유 기간: 수당지급 종료일로부터 5년<br>4. 동의를 거부할 수 있으나, 거부 시 거래처 등록 및 수당 등 각종 지급이 불가합니다.<br>'
@@ -929,6 +942,44 @@ function openApplyForm(id){
   document.body.appendChild(div);
   _initSigCanvas();
   _initSigCanvasPay();  // [v4] 수당지급내역서용 서명 캔버스
+  _fillRrnFromProfile();  // [수당폼] 이미 등록된 주민등록번호 자동 연동
+}
+// ══════════ [수당폼] 주민등록번호 자동 연동 ══════════
+// 가입·마이페이지에서 이미 등록한 privateInfo/{uid}.rrn 을 불러와 자동 입력합니다.
+// (competition.html·admin.html이 이미 같은 저장소를 사용 중 — 동일한 값을 재사용)
+let _RRN_CACHE=null;
+async function _fillRrnFromProfile(){
+  const el=document.getElementById('apPayRrn'), note=document.getElementById('apRrnNote');
+  if(!el||!note)return;
+  const show=(html,color)=>{note.innerHTML=html;note.style.color=color||'#8a919d';};
+  try{
+    const uid=(SME&&SME.uid)||((AUTH&&AUTH.currentUser)?AUTH.currentUser.uid:'');
+    if(!uid){show('');return;}
+    if(_RRN_CACHE===null){
+      const d=await DB.collection('privateInfo').doc(uid).get();
+      _RRN_CACHE=(d.exists&&d.data().rrn)||'';
+    }
+    if(_RRN_CACHE){
+      // 이전 신청값보다 회원정보의 값을 우선 (사무국이 관리하는 최신 값)
+      el.value=_RRN_CACHE;
+      el.readOnly=true;
+      el.style.background='#f2f7f2';
+      el.dataset.locked='1';
+      show('✅ <b>회원정보에 등록된 주민등록번호를 불러왔습니다</b> — 다시 입력하지 않으셔도 됩니다. '
+        +'<a href="#" onclick="_rrnUnlock();return false" style="color:#153A77;font-weight:800">직접 수정</a>','#0f766e');
+    }else{
+      show('ⓘ 회원정보에 등록된 주민등록번호가 없습니다. 여기에 입력하시거나, 마이페이지 → 내 정보에서 미리 등록해두시면 다음부터 자동 입력됩니다.','#8a5a00');
+    }
+  }catch(e){
+    // 조회 실패해도 수기 입력은 그대로 가능 — 기존 동작 유지
+    show('ⓘ 회원정보를 불러오지 못했습니다. 직접 입력해 주세요.','#8a5a00');
+  }
+}
+function _rrnUnlock(){
+  const el=document.getElementById('apPayRrn'), note=document.getElementById('apRrnNote');
+  if(!el)return;
+  el.readOnly=false;el.style.background='';el.dataset.locked='';el.focus();
+  if(note){note.innerHTML='✏️ 직접 입력 모드입니다. 입력한 값으로 이번 신청서가 작성됩니다.';note.style.color='#8a5a00';}
 }
 async function submitApply(postId){
   const p=POSTS.find(x=>x.id===postId);if(!p)return;
@@ -988,31 +1039,157 @@ async function submitApply(postId){
     loadPosts();
   }catch(e){alert('신청 실패: '+e.message)}
 }
+// ══════════════ [확정현황] 역할별 확정 인원수·명단 패널 ══════════════
+// copyRoster()가 쓰는 것과 동일한 방식으로 확정자를 임무별로 묶습니다.
+function confirmPanelHtml(dd,dayApps,canDecideNow){
+  const conf=(dayApps||[]).filter(a=>(a.status||{})[dd.date]==='확정');
+  const byDuty={};
+  conf.forEach(a=>{const duty=(a.assign&&a.assign[dd.date]&&a.assign[dd.date].duty)||'미지정';(byDuty[duty]=byDuty[duty]||[]).push(a)});
+  // 공고에 등록된 임무를 먼저, 그 밖의 임무는 뒤에
+  const order=(dd.roles||[]).filter(r=>byDuty[r]);
+  Object.keys(byDuty).forEach(d=>{if(order.indexOf(d)<0)order.push(d)});
+  const quota=dd.quota||{};
+  let rows='';
+  if(!order.length){
+    rows='<div style="font-size:12px;color:#8a919d;padding:8px 0">아직 확정된 인원이 없습니다.</div>';
+  }else{
+    rows=order.map(duty=>{
+      const list=byDuty[duty];
+      return '<div style="border-top:1px solid #e8eef7;padding:9px 0">'
+        +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+        +'<b style="font-size:12.5px;color:#153A77">'+esc(duty)+'</b>'
+        +'<span style="background:#153A77;color:#fff;font-size:11px;font-weight:900;border-radius:999px;padding:1px 8px">'+list.length+'명</span>'
+        +'</div>'
+        +'<div style="margin-top:5px;display:flex;flex-direction:column;gap:3px">'
+        +list.map(a=>'<div style="display:flex;align-items:center;gap:5px;font-size:12px">'
+            +'<span style="flex:1">'+esc(a.name||'')+(a.lic?' <span style="color:#8a919d;font-size:11px">'+esc(a.lic)+'</span>':'')
+            +((a.assign&&a.assign[dd.date]&&a.assign[dd.date].pay)?' <span style="color:#b8860b;font-size:11px;font-weight:800">'+esc(a.assign[dd.date].pay)+'</span>':'')+'</span>'
+            +(canDecideNow?'<button class="stbtn" title="확정 취소" onclick="unconfirmApp(\''+a.id+'\',\''+dd.date+'\')" style="padding:2px 7px;font-size:10.5px;background:#fff;color:#C41E2F;border:1px solid #f1c7cc">취소</button>':'')
+          +'</div>').join('')
+        +'</div></div>';
+    }).join('');
+  }
+  const totalQuota=Object.keys(quota).reduce((s,k)=>s+(+quota[k]||0),0);
+  return '<div class="dtside" style="border:1.5px solid #cfe3d8;border-radius:12px;padding:12px 14px;margin-top:10px;background:#f7fbf9">'
+    +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+    +'<b style="font-size:13px;color:#0f766e">✅ 확정 현황</b>'
+    +'<span style="font-size:11.5px;color:#6b7280">'+fmtD((dd.date||'').slice(5))+'</span>'
+    +'<span style="flex:1"></span>'
+    +'<b style="font-size:13px;color:#0f766e">'+conf.length+'명'+(totalQuota?' <span style="font-weight:600;color:#8a919d;font-size:11.5px">/ 정원 '+totalQuota+'</span>':'')+'</b>'
+    +'</div>'+rows+'</div>';
+}
+// ══════════════ [임무배정] 버튼형 선택 모달 ══════════════
+// 기존에는 prompt()로 임무·수당을 두 번 직접 타이핑해야 했습니다.
+// 이제 공고에 등록된 임무를 버튼으로 눌러 고르고, 수당은 공고 기준값이 자동 채워집니다.
+function _payFor(dd,duty){
+  if(dd&&dd.allowance&&dd.allowance.mode==='직접입력'){
+    const f=(dd.allowance.items||[]).find(i2=>duty.indexOf(i2.role)>=0||i2.role.indexOf(duty)>=0);
+    if(f)return f.amount||'';
+  }
+  const g=DEFAULT_PAY.find(x=>duty.indexOf(x[0])>=0||x[0].indexOf(duty)>=0);
+  return g?g[1]:'';
+}
+function openDutyPicker(appId,date){
+  const app=Object.values(APPS).flat().find(a=>a.id===appId);if(!app)return;
+  const p=POSTS.find(x=>x.id===app.postId);
+  const dd=((p&&p.dates)||[]).find(x=>x.date===date)||{};
+  const wanted=(app.prefs||{})[date]||[];
+  const cur=(app.assign&&app.assign[date])||{};
+  // 공고에 등록된 임무를 우선 노출, 없으면 전체 역할 목록
+  const listed=(dd.roles||[]).filter(Boolean);
+  const extra=[];
+  Object.keys(ROLE_TREE).forEach(g=>ROLE_TREE[g].forEach(r=>{if(listed.indexOf(r)<0)extra.push(r)}));
+  const chip=(r,grp)=>{
+    const isWant=wanted.indexOf(r)>=0, isCur=(cur.duty||'')===r;
+    return '<button type="button" class="dutychip'+(isCur?' on':'')+'" data-duty="'+esc(r)+'"'
+      +' onclick="_dutyPick(this)" style="border:1.5px solid '+(isCur?'#153A77':(isWant?'#0f766e':'#d5dce8'))+';'
+      +'background:'+(isCur?'#153A77':'#fff')+';color:'+(isCur?'#fff':(isWant?'#0f766e':'#374151'))+';'
+      +'font-weight:800;font-size:13px;padding:8px 14px;border-radius:999px;cursor:pointer;font-family:inherit">'
+      +esc(r)+(isWant?' <span style="font-size:10.5px">희망</span>':'')+'</button>';
+  };
+  const old=document.getElementById('dpModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='dpModal';div.dataset.appId=appId;
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.65);z-index:10000;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:520px;width:100%;padding:22px 24px;margin:20px 0">'
+    +'<b style="font-size:16px">🏅 임무 배정</b>'
+    +'<div style="font-size:12.5px;color:#6b7280;margin-top:3px">'+esc(app.name||'')+' · '+fmtD(date)+'</div>'
+    +(wanted.length?'<div style="font-size:12px;color:#0f766e;font-weight:800;margin-top:8px">희망 임무: '+esc(wanted.join(' → '))+'</div>':'')
+    +'<div style="font-size:12.5px;font-weight:800;margin-top:14px">① 확정 임무 선택</div>'
+    +(listed.length?'<div style="font-size:11.5px;color:#8a919d;margin-top:4px">이 공고에 등록된 임무</div><div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:6px">'+listed.map(r=>chip(r)).join('')+'</div>':'')
+    +'<details style="margin-top:10px"><summary style="font-size:12px;font-weight:800;cursor:pointer;color:#153A77">그 밖의 임무에서 고르기</summary>'
+    +'<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:8px">'+extra.map(r=>chip(r)).join('')+'</div></details>'
+    +'<div style="margin-top:12px"><label class="stlabel">직접 입력 (위에 없는 임무)</label>'
+    +'<input id="dpDutyEtc" class="stfield" placeholder="예: 기록 보조" value="'+esc(listed.concat(extra).indexOf(cur.duty||'')<0?(cur.duty||''):'')+'" oninput="_dutyClearChips()"></div>'
+    +'<div style="font-size:12.5px;font-weight:800;margin-top:14px">② 수당 금액</div>'
+    +'<input id="dpPay" class="stfield" style="margin-top:6px" placeholder="비우면 공고 기준 적용" value="'+esc(cur.pay||'')+'">'
+    +'<div style="font-size:11.5px;color:#8a919d;margin-top:4px">임무를 고르면 공고에 등록된 금액이 자동으로 채워집니다.</div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
+    +'<button class="stbtn stbtn-ghost" onclick="document.getElementById(\'dpModal\').remove()">취소</button>'
+    +'<button class="stbtn stbtn-teal" style="padding:10px 22px" onclick="_dutyConfirm(\''+appId+'\',\''+date+'\')">✅ 확정하기</button>'
+    +'</div></div>';
+  document.body.appendChild(div);
+  div.dataset.date=date;
+}
+function _dutyPick(btn){
+  const box=document.getElementById('dpModal');if(!box)return;
+  box.querySelectorAll('.dutychip').forEach(b=>{b.classList.remove('on');b.style.background='#fff';b.style.color='#374151';b.style.borderColor='#d5dce8';});
+  btn.classList.add('on');btn.style.background='#153A77';btn.style.color='#fff';btn.style.borderColor='#153A77';
+  const etc=document.getElementById('dpDutyEtc');if(etc)etc.value='';
+  // 공고 기준 수당 자동 채움
+  const app=Object.values(APPS).flat().find(a=>a.id===(box.dataset.appId||''));
+  const pay=document.getElementById('dpPay');
+  if(pay&&!pay.dataset.touched){
+    const date=box.dataset.date;
+    const p=POSTS.find(x=>(x.dates||[]).some(d=>d.date===date));
+    const dd=((p&&p.dates)||[]).find(x=>x.date===date)||{};
+    pay.value=_payFor(dd,btn.dataset.duty)||pay.value;
+  }
+}
+function _dutyClearChips(){
+  const box=document.getElementById('dpModal');if(!box)return;
+  box.querySelectorAll('.dutychip').forEach(b=>{b.classList.remove('on');b.style.background='#fff';b.style.color='#374151';b.style.borderColor='#d5dce8';});
+}
+async function _dutyConfirm(appId,date){
+  const box=document.getElementById('dpModal');if(!box)return;
+  const sel=box.querySelector('.dutychip.on');
+  const etc=(document.getElementById('dpDutyEtc')||{}).value||'';
+  const duty=(sel?sel.dataset.duty:etc).trim();
+  if(!duty){alert('확정할 임무를 선택하거나 직접 입력해주세요.');return}
+  const pay=((document.getElementById('dpPay')||{}).value||'').trim();
+  box.remove();
+  await _applyDecision(appId,date,'확정',{duty:duty,pay:pay});
+}
+// ══════════════ [확정 취소] 확정된 인원을 다시 제외 ══════════════
+async function unconfirmApp(appId,date){
+  const app=Object.values(APPS).flat().find(a=>a.id===appId);if(!app)return;
+  if(!confirm('['+(app.name||'')+'] '+fmtD(date)+' 확정을 취소하고 대기 상태로 되돌릴까요?\n배정된 임무·수당 정보도 함께 삭제됩니다.'))return;
+  try{
+    await DB.collection('staffApplications').doc(appId).update({
+      ['status.'+date]:'대기',
+      ['assign.'+date]:firebase.firestore.FieldValue.delete()   // 남아있던 임무·수당 정보 정리
+    });
+    KFDF.notify(app.uid,'['+(app.competitionName||'대회')+'] '+fmtD(date)+' 심판·운영요원 확정이 취소되었습니다.','staff.html');
+    await loadPosts();renderDetail();
+  }catch(e){alert('취소 실패: '+e.message)}
+}
 // ══════════════ 확정 처리 ══════════════
-async function decideApp(appId,date,decision){
+async function _applyDecision(appId,date,decision,assign){
   const app=Object.values(APPS).flat().find(a=>a.id===appId);if(!app)return;
   const upd={};
-  if(decision==='확정'){
-    const p=POSTS.find(x=>x.id===app.postId);
-    const dd=(p&&p.dates||[]).find(x=>x.date===date)||{};
-    const wanted=((app.prefs||{})[date]||[]).join(', ');
-    const duty=prompt('최종 배정 임무를 입력하세요.\n(희망: '+wanted+')',((app.prefs||{})[date]||[])[0]||'');
-    if(duty===null)return;
-    let payDefault='';
-    if(dd.allowance&&dd.allowance.mode==='직접입력'){const f=(dd.allowance.items||[]).find(i2=>duty.indexOf(i2.role)>=0||i2.role.indexOf(duty)>=0);if(f)payDefault=f.amount;}
-    const pay=prompt('수당 금액 확인/수정 (예: 100,000원 · 비우면 공고 기준)',payDefault);
-    if(pay===null)return;
-    upd['status.'+date]='확정';
-    upd['assign.'+date]={duty:duty.trim(),pay:(pay||'').trim()};
-  }else{
-    upd['status.'+date]=decision;
-  }
+  upd['status.'+date]=decision;
+  if(decision==='확정'&&assign)upd['assign.'+date]={duty:assign.duty,pay:assign.pay||''};
+  // 보류·거절로 되돌릴 때 예전 배정정보가 남아 명단에 잘못 집계되던 문제 정리
+  if(decision!=='확정'&&app.assign&&app.assign[date])upd['assign.'+date]=firebase.firestore.FieldValue.delete();
   try{
     await DB.collection('staffApplications').doc(appId).update(upd);
     const msg=decision==='확정'?'🏅 확정되었습니다':(decision==='보류'?'⏳ 보류 처리되었습니다':'거절되었습니다');
     KFDF.notify(app.uid,'['+(app.competitionName||'대회')+'] '+fmtD(date)+' 심판·운영요원 신청이 '+msg,'staff.html');
     await loadPosts();renderDetail();
   }catch(e){alert('처리 실패: '+e.message)}
+}
+async function decideApp(appId,date,decision){
+  if(decision==='확정'){ openDutyPicker(appId,date); return; }   // 버튼형 선택 모달로 대체
+  await _applyDecision(appId,date,decision);
 }
 // ══════════════ 경력 일괄등록 ══════════════
 async function registerCareer(postId,date){
