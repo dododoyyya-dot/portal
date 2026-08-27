@@ -265,7 +265,17 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
         </select>
         <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="sAf3" style="width:auto" onchange="syncAffS()">초등스포츠강사 (교육청 소속)</label>
         <label style="display:flex;gap:6px;align-items:center;font-weight:600;color:#6b7280"><input type="checkbox" id="sAf0" style="width:auto">소속 없음</label>
-        <input id="sAfEtc" placeholder="기타 소속 직접 입력 (예: 클럽, 협회, 프리랜서)" style="flex:1;min-width:160px;padding:7px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px">
+        <select id="sAfEtcSel" onchange="sAfEtcSync()" style="padding:7px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px">
+          <option value="">기타 소속 선택 (선택 사항)</option>
+          <option>클럽 (동호회)</option>
+          <option>학교스포츠클럽</option>
+          <option>협회·단체</option>
+          <option>대학교</option>
+          <option>기업·기관</option>
+          <option>프리랜서</option>
+          <option value="__etc">직접 입력…</option>
+        </select>
+        <input id="sAfEtc" placeholder="기타 소속 직접 입력" style="display:none;flex:1;min-width:160px;padding:7px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px">
       </div>
       <div id="sWorkWrap" style="display:none;margin-top:8px">
         <label style="font-size:12.5px;font-weight:800">근무지 (학교·기관명) <span id="reqWork" style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 배정·매칭 검토에 사용됩니다</span></label>
@@ -498,6 +508,19 @@ function syncAffS(){
   document.getElementById('sAfFed').style.display=document.getElementById('sAf1').checked?'block':'none';
   document.getElementById('sTeachLv').style.display=document.getElementById('sAf2').checked?'block':'none';
   document.getElementById('sWorkWrap').style.display=(document.getElementById('sAf2').checked||document.getElementById('sAf3').checked)?'block':'none';
+}
+// ══════════ [소속] 기타 소속 표준화 — 선택형 + 직접입력 ══════════
+function sAfEtcSync(){
+  const sel=document.getElementById('sAfEtcSel'), inp=document.getElementById('sAfEtc');
+  if(!sel||!inp)return;
+  if(sel.value==='__etc'){inp.style.display='';inp.focus();}
+  else{inp.style.display='none';inp.value='';}
+}
+function sAfEtcValue(){
+  const sel=document.getElementById('sAfEtcSel'), inp=document.getElementById('sAfEtc');
+  if(!sel)return (inp&&inp.value.trim())||'';
+  if(sel.value==='__etc')return (inp&&inp.value.trim())||'';
+  return sel.value||'';
 }
 function openPostcodeS(){
   function launch(){
@@ -804,7 +827,7 @@ async function go(){
           if(document.getElementById('sAf1').checked)af.push('시도연맹');
           if(document.getElementById('sAf2').checked)af.push('초·중·고 교사');
           if(document.getElementById('sAf3').checked)af.push('초등스포츠강사');
-          const afEtc=document.getElementById('sAfEtc').value.trim();
+          const afEtc=sAfEtcValue();
           if(afEtc)af.push(afEtc);
           if(document.getElementById('sAf0').checked&&!af.length)af.push('소속 없음');
           if(!af.length)return say('소속을 선택해주세요 (해당 없으면 「소속 없음」 체크)');

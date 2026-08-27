@@ -267,8 +267,22 @@ function orgChip(o,region,title,fed){
       <div style="font-size:11.5px;color:#8c1622;font-weight:700;margin-top:5px">※ 상세주소(동·호수)가 없으면 우편물이 반송됩니다. 단독주택 등 해당 없으면 「해당없음」이라고 적어주세요.</div>
     </div>
 
-    <!-- ② 소속 -->
-    <div style="margin-top:14px">
+    <!-- ②-S 소속 (학생회원 전용) — 가입 때와 같은 항목으로 수정할 수 있게 합니다.
+         기존에는 이 화면에 성인용 항목만 있어서, 학생이 프로필을 저장하면
+         학생용 소속값이 성인용 값으로 덮어써지는 문제가 있었습니다. -->
+    <div id="pfStudentAffBox" style="display:none;margin-top:14px;padding:14px 16px;background:#f4f6ff;border:1.5px solid #c7d2f0;border-radius:12px">
+      <label style="margin:0;font-size:13px;font-weight:800;color:#3730a3">🏷 소속 구분 <span style="color:#8c1622">*</span> <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 중복 선택 가능</span></label>
+      <div style="font-size:12px;color:var(--gray);margin:4px 0 8px">해당하는 소속을 모두 선택해 주세요. 없으면 「소속없음」을 선택하세요.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px"><input type="checkbox" id="pfSaf1" style="width:auto"> KFDF 소속</label>
+        <label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px"><input type="checkbox" id="pfSaf2" style="width:auto"> 학교스포츠클럽 소속</label>
+        <label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px"><input type="checkbox" id="pfSaf3" style="width:auto"> 타단체 소속</label>
+        <label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px;color:#6b7280"><input type="checkbox" id="pfSaf0" style="width:auto"> 소속없음</label>
+      </div>
+    </div>
+
+    <!-- ② 소속 (성인회원) -->
+    <div id="pfAdultAffBox" style="margin-top:14px">
       <label style="font-size:13px;font-weight:800">소속 (중복 선택 가능) <span style="font-weight:700;color:#8c1622;font-size:11.5px">*필수 — 해당 없으면 "소속 없음"</span></label>
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:13.5px;align-items:center">
         <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="pfAf1" style="width:auto">시도연맹 (KFDF)</label>
@@ -283,7 +297,17 @@ function orgChip(o,region,title,fed){
         </select>
         <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="pfAf3" style="width:auto">초등스포츠강사 (교육청 소속)</label>
         <label style="display:flex;gap:6px;align-items:center;font-weight:600;color:#6b7280"><input type="checkbox" id="pfAf0" style="width:auto">소속 없음</label>
-        <input id="pfAfEtc" placeholder="기타 소속 직접 입력 (예: 클럽, 협회, 프리랜서)" style="flex:1;min-width:160px;padding:7px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px">
+        <select id="pfAfEtcSel" onchange="pfAfEtcSync()" style="padding:7px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px">
+          <option value="">기타 소속 선택 (선택 사항)</option>
+          <option>클럽 (동호회)</option>
+          <option>학교스포츠클럽</option>
+          <option>협회·단체</option>
+          <option>대학교</option>
+          <option>기업·기관</option>
+          <option>프리랜서</option>
+          <option value="__etc">직접 입력…</option>
+        </select>
+        <input id="pfAfEtc" placeholder="기타 소속 직접 입력" style="display:none;flex:1;min-width:160px;padding:7px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px">
       </div>
       <div id="pfWorkWrap" style="display:none;margin-top:8px">
         <label style="font-size:12.5px;font-weight:800">근무지 (학교·기관명) <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 배정·매칭 검토에 사용됩니다</span></label>
@@ -790,6 +814,45 @@ function aaLoad(d){
   window._AA_LEGACY=(!AA.length&&d.activityRegions&&d.activityRegions.length)?d.activityRegions:null;
   AA_CUR='';aaRender();
 }
+// ══════════ [소속] 표준화 select ↔ 직접입력 동기화 ══════════
+const PF_AFF_STD=['클럽 (동호회)','학교스포츠클럽','협회·단체','대학교','기업·기관','프리랜서'];
+const PF_STU_AFF=['KFDF 소속','학교스포츠클럽 소속','타단체 소속','소속없음'];
+function pfAfEtcSync(){
+  const sel=document.getElementById('pfAfEtcSel'), inp=document.getElementById('pfAfEtc');
+  if(!sel||!inp)return;
+  if(sel.value==='__etc'){inp.style.display='';inp.focus();}
+  else{inp.style.display='none';inp.value='';}
+}
+// 저장된 기타 소속값을 select/직접입력 중 알맞은 쪽에 표시 (기존 자유 입력값도 그대로 보존)
+function pfAfEtcLoad(v){
+  const sel=document.getElementById('pfAfEtcSel'), inp=document.getElementById('pfAfEtc');
+  if(!sel||!inp)return;
+  if(!v){sel.value='';inp.value='';inp.style.display='none';return}
+  if(PF_AFF_STD.indexOf(v)>=0){sel.value=v;inp.value='';inp.style.display='none';}
+  else{sel.value='__etc';inp.value=v;inp.style.display='';}
+}
+// 기타 소속 최종값 (select 또는 직접입력)
+function pfAfEtcValue(){
+  const sel=document.getElementById('pfAfEtcSel'), inp=document.getElementById('pfAfEtc');
+  if(!sel)return (inp&&inp.value.trim())||'';
+  if(sel.value==='__etc')return (inp&&inp.value.trim())||'';
+  return sel.value||'';
+}
+// 학생회원이면 학생용 소속 블록, 아니면 기존 성인용 블록을 노출
+function pfIsStudent(d){ return !!(d&&(d.accountType==='student'||d.memberGroup==='student')); }
+function pfAffModeSync(d){
+  const sBox=document.getElementById('pfStudentAffBox'), aBox=document.getElementById('pfAdultAffBox');
+  if(!sBox||!aBox)return;
+  const stu=pfIsStudent(d);
+  sBox.style.display=stu?'block':'none';
+  aBox.style.display=stu?'none':'block';
+  if(stu){
+    const af=(d&&d.affiliation)||[];
+    const set=(id,val)=>{const e=document.getElementById(id);if(e)e.checked=af.indexOf(val)>=0};
+    set('pfSaf1','KFDF 소속'); set('pfSaf2','학교스포츠클럽 소속');
+    set('pfSaf3','타단체 소속'); set('pfSaf0','소속없음');
+  }
+}
 function fillProfile(d){
   document.getElementById('pfDegree').value=d.degree||'';
   document.getElementById('pfNatCertName').value=d.natCertName||'';
@@ -799,11 +862,13 @@ function fillProfile(d){
   document.getElementById('pfAf3').checked=af.indexOf('초등스포츠강사')>=0;
   document.getElementById('pfAf0').checked=af.indexOf('소속 없음')>=0;
   const etc=af.find(x=>['시도연맹','초·중·고 교사','초등스포츠강사','소속 없음'].indexOf(x)<0);
-  document.getElementById('pfAfEtc').value=etc||'';
+  pfAfEtcLoad(etc||'');
+  // [소속] 학생회원이면 학생용 소속 항목을 보여줍니다 (가입 때와 동일한 항목)
+  pfAffModeSync(d);
   // '소속 없음' 체크 시 다른 소속 항목 해제 (상호배타)
   document.getElementById('pfAf0').addEventListener('change',function(e){
     if(e.target.checked){['pfAf1','pfAf2','pfAf3'].forEach(function(id){document.getElementById(id).checked=false});
-      document.getElementById('pfAfEtc').value='';
+      pfAfEtcLoad('');   // 기타 소속(select·직접입력)도 함께 초기화
       document.getElementById('pfAfFed').style.display='none';
       document.getElementById('pfTeachLv').style.display='none';
       document.getElementById('pfWorkWrap').style.display='none';}
@@ -1269,20 +1334,33 @@ async function saveProfile(){
       PFBUSY=false;return;
     }
   }
-  if(document.getElementById('pfAf2').checked&&req('pfTeachLv','학교급 (교원)'))return;
-  if((document.getElementById('pfAf2').checked||document.getElementById('pfAf3').checked)&&req('pfWork','근무지 (학교·기관명)'))return;
+  // [소속] 학생회원은 성인용(교원·근무지) 검증을 적용하지 않습니다
+  if(!pfIsStudent(MYD)){
+    if(document.getElementById('pfAf2').checked&&req('pfTeachLv','학교급 (교원)'))return;
+    if((document.getElementById('pfAf2').checked||document.getElementById('pfAf3').checked)&&req('pfWork','근무지 (학교·기관명)'))return;
+  }
   if(req('pfSize','피복 사이즈(상의)'))return;
   if(req('pfSizePants','피복 사이즈(하의)'))return;
   if(req('pfSizeShoe','피복 사이즈(신발)'))return;
   if(req('pfSizeCap','피복 사이즈(모자)'))return;
   try{
-    const af=[];
-    if(document.getElementById('pfAf1').checked)af.push('시도연맹');
-    if(document.getElementById('pfAf2').checked)af.push('초·중·고 교사');
-    if(document.getElementById('pfAf3').checked)af.push('초등스포츠강사');
-    const etc=document.getElementById('pfAfEtc').value.trim();
-    if(etc)af.push(etc);
-    if(document.getElementById('pfAf0').checked&&!af.length)af.push('소속 없음');
+    let af=[];
+    if(pfIsStudent(MYD)){
+      // [소속] 학생회원은 학생용 항목으로 저장 — 성인용 값으로 덮어쓰지 않습니다.
+      const ck=id=>{const e=document.getElementById(id);return !!(e&&e.checked)};
+      if(ck('pfSaf1'))af.push('KFDF 소속');
+      if(ck('pfSaf2'))af.push('학교스포츠클럽 소속');
+      if(ck('pfSaf3'))af.push('타단체 소속');
+      if(ck('pfSaf0'))af.push('소속없음');
+      if(!af.length)af=(MYD&&MYD.affiliation)||[];   // 아무것도 안 고르면 기존 값 유지 (유실 방지)
+    }else{
+      if(document.getElementById('pfAf1').checked)af.push('시도연맹');
+      if(document.getElementById('pfAf2').checked)af.push('초·중·고 교사');
+      if(document.getElementById('pfAf3').checked)af.push('초등스포츠강사');
+      const etc=pfAfEtcValue();
+      if(etc)af.push(etc);
+      if(document.getElementById('pfAf0').checked&&!af.length)af.push('소속 없음');
+    }
     // 연맹 자격증 번호 입력 (DB 자동 매칭 - 저장 시 처리)
     const qualLeader=(document.getElementById('pfQualLeader')?document.getElementById('pfQualLeader').value.trim().toUpperCase():'');
     const qualRef=(document.getElementById('pfQualRef')?document.getElementById('pfQualRef').value.trim().toUpperCase():'');
