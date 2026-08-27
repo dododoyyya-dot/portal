@@ -444,7 +444,7 @@ const MTYPE_INFO={
 const MTYPE_CFG={
   instructor:{show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
   // [유형분리] 교사(교원) — 재직증명서·재직학교 검색·체육전공 체크 추가
-  teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sSchoolBlock','sEmployBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
+  teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sSchoolBlock','sEmployBlock','sQualBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
   // [유형분리] 국가공인자격증 — 연맹 DB에 없는 자격이라 사본을 첨부해 신청 (그 외 항목은 기존 교사 탭과 동일)
   natcert:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
   athlete:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:true}}, // [5부문] 선수군 — 자격증란 없음·주민번호 필수
@@ -898,7 +898,7 @@ async function go(){
       }
       // 국가공인 체육지도사 자격 — 강사·교사 유형에서 체크 시 종류·등급 입력 + 사본 첨부 (가입 단계에서 진행)
       let natCertName='';
-      if((SIGNUP_TYPE==='teacher'||SIGNUP_TYPE==='instructor'||SIGNUP_TYPE==='natcert')&&document.getElementById('sHasNatCert')&&document.getElementById('sHasNatCert').checked){
+      if((SIGNUP_TYPE==='instructor'||SIGNUP_TYPE==='natcert')&&document.getElementById('sHasNatCert')&&document.getElementById('sHasNatCert').checked){
         natCertName=document.getElementById('sNatCertName').value.trim();
         if(!natCertName)return say('보유하신 국가공인 자격의 종류·등급을 입력해주세요');
         const ncFile=document.getElementById('sNatCertFile')&&document.getElementById('sNatCertFile').files[0];
