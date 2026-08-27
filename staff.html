@@ -26,6 +26,13 @@
 .sttbl{width:100%;border-collapse:collapse;font-size:12.5px}
 .sttbl th{border:1px solid #dfe5ee;padding:7px 9px;background:#f6f8fb;white-space:nowrap}
 .sttbl td{border:1px solid #dfe5ee;padding:7px 9px}
+/* [모바일] 신청현황 표는 가로 스크롤로 — 좁은 화면에서 칸이 뭉개지지 않도록 */
+.sttbl-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media (max-width:820px){
+  .sttbl{font-size:12px;min-width:640px}
+  .sttbl th,.sttbl td{padding:6px 7px}
+  .sttbl td{white-space:nowrap}
+}
 .chipck{display:inline-flex;gap:5px;align-items:center;font-weight:700;font-size:12.5px;background:#f6f8fb;border:1.5px solid #e3e9f2;border-radius:999px;padding:6px 12px;cursor:pointer;margin:3px 4px 0 0}
 .chipck input{width:auto}
 .chipck.on{background:#eef3fa;border-color:#1F4E9C;color:#153A77}
@@ -457,8 +464,8 @@ function openPostForm(editId){
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:660px;width:100%;padding:24px 26px;margin:10px 0">'
     +'<b style="font-size:17px">🛠 '+(ed?'공고 수정':'심판·운영요원 모집 공고 등록')+'</b>'
     +'<div style="font-size:12px;color:#8a919d;margin-top:3px">작성자: <b>'+esc(myOrg())+'</b>'+(SMY.phone?' · '+esc(mphone(SMY.phone)):'')+(SMY.email?' · '+esc(SMY.email):'')+' — 등록 후에도 목록·상세의 [✏️ 수정]으로 언제든 수정할 수 있습니다</div>'
-    +'<label class="stlabel">주최 (표시명) * <span style="font-weight:600;color:#8a919d;font-size:11px">— 공고에 "주최: ○○"로 표시됩니다. 대행 등록 시 실제 주최 연맹·단체명을 입력하세요</span></label>'
-    +'<input id="pfHost" class="stfield" value="'+esc(ed?((ed.author&&ed.author.organization)||''):myOrg())+'" placeholder="예: ○○연맹 / ○○교육청 / ○○대회 조직위">'
+    +'<label class="stlabel">모집 기관 (표시명) * <span style="font-weight:600;color:#8a919d;font-size:11px">— 공고에 "모집 기관: ○○"로 표시됩니다. 교육청·시도연맹·조직위 등 이번 모집을 주관하는 기관명을 그대로 입력하세요</span></label>'
+    +'<input id="pfHost" class="stfield" value="'+esc(ed?((ed.author&&ed.author.organization)||''):myOrg())+'" placeholder="예: ○○교육청 / ○○시연맹 / ○○대회 조직위">'
     +'<label class="stlabel">🔗 상위 대회 불러오기 <span style="font-weight:600;color:#8a919d;font-size:11px">— 관리자 대회 등록의 대회를 선택하면 정보가 자동 기입되고 서로 연결됩니다</span></label>'
     +'<div style="display:flex;gap:6px"><select id="pfCompSel" class="stfield" style="flex:1"><option value="">선택 안 함 (직접 입력)</option></select><button type="button" class="stbtn stbtn-soft" style="padding:8px 16px" onclick="pfLoadComp()">불러오기</button></div>'
     +'<label class="stlabel">공고 유형 <span style="font-weight:600;color:#8a919d;font-size:11px">— 공고 제목 앞에 항상 표시되어 "대회 참가자 모집"과 혼동되지 않도록 합니다</span></label>'
@@ -657,7 +664,7 @@ function readDaySec(sec){
 async function savePost(editId){
   const v=id=>{const e=document.getElementById(id);return e?(e.value||'').trim():''};
   const name=v('pfName'),loc=v('pfLoc'),time=v('pfTime'),dl=v('pfDL');
-  if(!v('pfHost')){alert('주최 (표시명)을 입력해주세요.');return}
+  if(!v('pfHost')){alert('모집 기관 (표시명)을 입력해주세요.');return}
   if(!name||!loc||!time||!dl){alert('대회명·장소·시간·모집 마감일을 입력해주세요.');return}
   if(!PF_DATES.length){alert('달력에서 대회 일자를 1일 이상 클릭해 선택해주세요.');return}
   const dates=PF_DATES.slice().sort();
@@ -719,17 +726,19 @@ async function savePost(editId){
   }catch(err){alert('저장 실패: '+err.message);btn.disabled=false;btn.textContent='등록'}
 }
 // ══════════════ 상세 (날짜별 탭) ══════════════
-let DT_ID=null,DT_DAY=0,_rdRunning=false;
+let DT_ID=null,DT_DAY=0,_rdToken=0;
 function openDetail(id){
   DT_ID=id;DT_DAY=0;LIC_CACHE={};renderDetail();
 }
 async function renderDetail(){
-  // BUG-2/3 fix: 동시 호출 방지 — 이미 실행 중이면 무시
-  if(_rdRunning)return;
-  _rdRunning=true;
-  try{ await _renderDetailInner(); }finally{ _rdRunning=false; }
+  // [렌더링 버그 수정] 이전에는 실행 중이면 새 클릭을 '무시'해서, 다른 공고를 눌러도
+  // 아무 것도 안 열리고 목록만 그대로 보이는 문제가 있었습니다.
+  // → 나중에 들어온 요청이 항상 이깁니다. 진행 중이던 이전 렌더는 완료 시 스스로 폐기됩니다.
+  const my=++_rdToken;
+  await _renderDetailInner(()=>my!==_rdToken);
 }
-async function _renderDetailInner(){
+async function _renderDetailInner(isStale){
+  isStale=isStale||function(){return false};
   const p=POSTS.find(x=>x.id===DT_ID);if(!p)return;
   const apps=APPS[p.id]||[];
   const old=document.getElementById('dtModal');if(old)old.remove();
@@ -765,6 +774,8 @@ async function _renderDetailInner(){
       }));
     }
   }
+  // 자격 조회를 기다리는 사이 사용자가 다른 공고를 눌렀다면, 이 렌더는 폐기하고 화면을 건드리지 않음
+  if(isStale()){const s=document.getElementById('dtModal');if(s===div)s.remove();return;}
   const licBadge=(l,today)=>{
     if(!l)return '<span style="color:#d1d5db;font-size:11px">없음</span>';
     const valid=l.status!=='만료'&&(!l.expireAt||l.expireAt>=today);
@@ -776,7 +787,7 @@ async function _renderDetailInner(){
   if(!dayApps.length)appsHtml='<div style="font-size:12.5px;color:#8a919d;padding:8px 0">이 날짜 신청자가 아직 없습니다.</div>';
   else{
     const today=new Date().toISOString().slice(0,10);
-    appsHtml='<table class="sttbl" style="margin-top:6px"><tr><th>번호</th><th>성명</th>'+(manage?'<th>연락처</th>':'')+(manage?'<th>심판 자격</th><th>지도자 자격</th>':'<th>자격증</th>')+'<th>희망 임무</th><th>상태</th>'+(manage?'<th>동의서</th>':'')+(manage?'<th>선정</th>':'')+'</tr>'
+    appsHtml='<div class="sttbl-wrap"><table class="sttbl" style="margin-top:6px"><tr><th>번호</th><th>성명</th>'+(manage?'<th>연락처</th>':'')+(manage?'<th>심판 자격</th><th>지도자 자격</th>':'<th>자격증</th>')+'<th>희망 임무</th><th>상태</th>'+(manage?'<th>동의서</th>':'')+(manage?'<th>선정</th>':'')+'</tr>'
       +dayApps.map((a,i)=>{
         const st=(a.status&&a.status[dd.date])||'대기';
         const asg=a.assign&&a.assign[dd.date];
@@ -797,11 +808,11 @@ async function _renderDetailInner(){
             +'<button class="stbtn" style="padding:3px 7px;font-size:11px;background:#fff;color:#C41E2F;border:1px solid #f1c7cc;margin-top:3px" title="거절" onclick="decideApp(\''+a.id+'\',\''+dd.date+'\',\'거절\')">❌ 거절</button>'
             +'</td>':(manage?'<td style="text-align:center;color:#8a919d;font-size:11.5px">열람만</td>':''))
           +'</tr>';
-      }).join('')+'</table>';
+      }).join('')+'</table></div>';
   }
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:760px;width:100%;padding:24px 26px;margin:10px 0">'
     +'<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">'
-    +'<span class="stpill" style="background:#7c3aed">주최: '+esc((p.author&&p.author.organization)||'')+'</span>'
+    +'<span class="stpill" style="background:#7c3aed">모집 기관: '+esc((p.author&&p.author.organization)||'')+'</span>'
     +'<b style="font-size:17px">'+esc(p.competitionName)+'</b>'
     +'<span style="flex:1"></span><button class="stbtn stbtn-ghost" onclick="document.getElementById(\'dtModal\').remove()">닫기 ✕</button></div>'
     +'<div style="font-size:13px;color:#4b5563;margin-top:8px;line-height:1.9">'
@@ -828,7 +839,9 @@ async function _renderDetailInner(){
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">'
     // [권한개선] 공고 수정·복사 = canManage / 수당엑셀·자격확인·경력등록 = canDecide
     +(manage?'<button class="stbtn stbtn-soft" onclick="document.getElementById(\'dtModal\').remove();openPostForm(\''+p.id+'\')">✏️ 공고 수정</button><button class="stbtn stbtn-ghost" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button>':'')
-    +(_decide?'<button class="stbtn" style="background:#f0fdf4;color:#0f766e;border:1.5px solid #a7f3d0" onclick="exportPayExcel(\''+p.id+'\')">💰 수당지급 엑셀</button><button class="stbtn" style="background:#fffbeb;color:#8a5a00;border:1.5px solid #fde68a" onclick="exportPayReport(\''+p.id+'\')">📄 수당지급내역서 (서식·서명)</button><button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="openNotifyModal(\''+p.id+'\')">📣 확정자 단체 알림</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="exportLicZip(\''+p.id+'\')">📦 자격증 일괄 다운로드</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
+    // [UI 정리] '수당지급 엑셀'은 아래 '수당지급내역서(서식·서명)'와 내용이 중복되어 숨김 처리.
+    //           함수(exportPayExcel)는 그대로 두어 필요 시 되살릴 수 있습니다.
+    +(_decide?'<button class="stbtn" style="background:#fffbeb;color:#8a5a00;border:1.5px solid #fde68a" onclick="exportPayReport(\''+p.id+'\')">📄 수당지급내역서 (서식·서명)</button><button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="openNotifyModal(\''+p.id+'\')">📣 확정자 단체 알림</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="exportLicZip(\''+p.id+'\')">📦 자격증 일괄 다운로드</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
     +'<button class="stbtn stbtn-main" style="padding:11px 26px" onclick="openApplyForm(\''+p.id+'\')">✍️ 신청하기 (날짜 선택)</button>'
     +'</div></div>';
   // div는 await 전에 이미 DOM에 추가됨 — innerHTML 설정만으로 내용 갱신
