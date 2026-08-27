@@ -415,7 +415,8 @@ function setGenSub(v){
   [...document.querySelectorAll('#genSubBtns .gsbtn')].forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   const simple=GEN_SIMPLE.indexOf(v)>=0;
   // 간략 가입: 활동범위·소속구분·자격 블록 숨김 (주소 블록은 유지 — 간략 가입도 주소 필수)
-  ['sAreaBlock','sOrgTypeBlock','sQualBlock'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display=simple?'none':'';});
+  // [가입폼 다이어트] '소속 구분' 항목은 폐지되어 토글 대상에서 제외합니다
+  ['sAreaBlock','sQualBlock'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display=simple?'none':'';});
   const info=document.getElementById('genSubInfo');
   if(info)info.textContent=simple
     ?('「'+v+'」 회원은 간략 가입입니다 — 이름·성별·전화번호·주소·생년월일만 입력하면 됩니다.')
@@ -442,12 +443,12 @@ const MTYPE_INFO={
 };
 // 유형별 표시·필수 설정 —  show: 노출 블록 / req: 필수 항목
 const MTYPE_CFG={
-  instructor:{show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
+  instructor:{show:['sRrnBlock','sAddrBlock','sAreaBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
   // [유형분리] 교사(교원) — 재직증명서·재직학교 검색·체육전공 체크 추가
-  teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sSchoolBlock','sEmployBlock','sQualBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
+  teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sSchoolBlock','sEmployBlock','sQualBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
   // [유형분리] 국가공인자격증 — 연맹 DB에 없는 자격이라 사본을 첨부해 신청 (그 외 항목은 기존 교사 탭과 동일)
-  natcert:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
-  athlete:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:true}}, // [5부문] 선수군 — 자격증란 없음·주민번호 필수
+  natcert:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
+  athlete:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sAffBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:false,size:false,degree:false,rrn:true}}, // [5부문] 선수군 — 자격증란 없음·주민번호 필수
   general:   {show:['sAddrBlock','sAreaBlock','sPledgeBox','sPrivacyBox'],req:{addr:false,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}, // [5부문] 일반 — 소속·자격증 블록 제거(간소화)
   student:   {show:['sSchoolBlock','sAddrBlock','sAreaBlock','sStudentAffBlock','sPrivacyBox'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}
 };
@@ -859,13 +860,7 @@ async function go(){
           if(!addr)return say('집 주소를 [주소 검색]으로 입력해주세요');
           if(!addr2)return say('상세주소(동·호수)를 입력해주세요 — 해당 없으면 「해당없음」이라고 적어주세요');
         }
-        // 소속 구분 (연맹소속/타단체/무소속) — 간략 가입은 생략
-        if(!isGenSimple()){
-          orgType=orgTypeVal();
-          if(!orgType)return say('소속 구분(연맹 소속 / 타 단체 / 무소속)을 선택해주세요');
-          orgEtc=(document.getElementById('sOrgEtc').value||'').trim();
-          if(orgType==='타단체'&&!orgEtc)return say('타 단체명을 입력해주세요');
-        }
+        // [가입폼 다이어트] '소속 구분(연맹/타단체/무소속)'은 아래 '소속' 항목과 중복이라 폐지했습니다
         // 소속 체크 — 지도자군만 필수
         if(CFG.req.aff){
           if(document.getElementById('sAf1').checked)af.push('시도연맹');
@@ -975,7 +970,8 @@ async function go(){
         activityAreas:aaSave(), activityRegions:aaRegions(), baseCity:aaBase(),
         region:(aaRegions()[0]||'서울·경기'),
         accountType:SIGNUP_TYPE,
-        memberClass:(SIGNUP_TYPE==='general'?GEN_SUB:(SIGNUP_TYPE==='athlete'?('선수·'+({'연맹소속':'연맹동호인','타단체':'타소속','무소속':'무소속'}[orgType]||'동호인')):'')),  // [세분류] 선수·연맹동호인/타소속/무소속 · 학부모·서포터즈·협력기관
+        // [가입폼 다이어트] 선수 소분류는 '소속 구분' 대신 '소속' 선택값에서 유도합니다 (시도연맹→연맹동호인 / 소속없음·미선택→무소속 / 그 외→타소속)
+        memberClass:(SIGNUP_TYPE==='general'?GEN_SUB:(SIGNUP_TYPE==='athlete'?('선수·'+((af.indexOf('시도연맹')>=0)?'연맹동호인':((!af.length||af.indexOf('소속 없음')>=0)?'무소속':'타소속'))):'')),  // [세분류] 선수·연맹동호인/타소속/무소속 · 학부모·서포터즈·협력기관
         memberGroup:(SIGNUP_TYPE==='instructor'||SIGNUP_TYPE==='teacher'||SIGNUP_TYPE==='natcert')?'active':(SIGNUP_TYPE==='student'?'student':'general'),
         orgType:orgType||'', orgEtc:orgEtc||'',
         qualNoLeader:(document.getElementById('sQualLeader')?document.getElementById('sQualLeader').value.trim():''),
