@@ -1011,7 +1011,8 @@ function pfMissing(d){
   if(!d.address)miss.push('집 주소(상세주소 포함)');
   if(!(d.activityRegions&&d.activityRegions.length))miss.push('활동 가능 범위');
   if(!(d.affiliation&&d.affiliation.length))miss.push('소속');
-  if(!d.clothingSize||!d.sizePants||!d.sizeShoe||!d.sizeCap)miss.push('피복 사이즈');
+  // [피복·학생] 학생회원은 강사복 대상이 아니므로 미작성 항목에서 제외
+  if(!pfIsStudent(d)&&(!d.clothingSize||!d.sizePants||!d.sizeShoe||!d.sizeCap))miss.push('피복 사이즈');
   return miss;
 }
 window.pfMissing=pfMissing;
@@ -1326,10 +1327,15 @@ async function saveProfile(){
     PFBUSY=false;return;
   }
   {
-    const hasAf=document.getElementById('pfAf1').checked||document.getElementById('pfAf2').checked||document.getElementById('pfAf3').checked||document.getElementById('pfAf0').checked||document.getElementById('pfAfEtc').value.trim()!=='';
+    // [소속·학생] 학생회원은 학생용 소속 항목(pfSaf*)으로 검사 — 성인용 체크박스는 학생에게 숨겨져 있음
+    const _ck=id=>{const e=document.getElementById(id);return !!(e&&e.checked)};
+    const _stu=pfIsStudent(MYD);
+    const hasAf=_stu
+      ?(_ck('pfSaf1')||_ck('pfSaf2')||_ck('pfSaf3')||_ck('pfSaf0'))
+      :(document.getElementById('pfAf1').checked||document.getElementById('pfAf2').checked||document.getElementById('pfAf3').checked||document.getElementById('pfAf0').checked||document.getElementById('pfAfEtc').value.trim()!=='');
     if(!hasAf){
       m.textContent='⚠ 「소속」을 최소 1개 선택해주세요 (해당 없으면 "소속 없음"을 선택)';m.style.color='#8c1622';
-      const box=document.getElementById('pfAf1').closest('div');
+      const box=_stu?document.getElementById('pfStudentAffBox'):document.getElementById('pfAf1').closest('div');
       if(box){box.scrollIntoView({behavior:'smooth',block:'center'});box.style.outline='2px solid #C41E2F';setTimeout(()=>{box.style.outline=''},4000);}
       PFBUSY=false;return;
     }
@@ -1339,10 +1345,13 @@ async function saveProfile(){
     if(document.getElementById('pfAf2').checked&&req('pfTeachLv','학교급 (교원)'))return;
     if((document.getElementById('pfAf2').checked||document.getElementById('pfAf3').checked)&&req('pfWork','근무지 (학교·기관명)'))return;
   }
-  if(req('pfSize','피복 사이즈(상의)'))return;
-  if(req('pfSizePants','피복 사이즈(하의)'))return;
-  if(req('pfSizeShoe','피복 사이즈(신발)'))return;
-  if(req('pfSizeCap','피복 사이즈(모자)'))return;
+  // [피복·학생] 학생회원은 강사복 지급 대상이 아니므로 사이즈 필수에서 제외 (다른 유형은 기존과 동일)
+  if(!pfIsStudent(MYD)){
+    if(req('pfSize','피복 사이즈(상의)'))return;
+    if(req('pfSizePants','피복 사이즈(하의)'))return;
+    if(req('pfSizeShoe','피복 사이즈(신발)'))return;
+    if(req('pfSizeCap','피복 사이즈(모자)'))return;
+  }
   try{
     let af=[];
     if(pfIsStudent(MYD)){
