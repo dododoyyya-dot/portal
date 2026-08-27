@@ -337,6 +337,14 @@ function orgChip(o,region,title,fed){
       <div id="pfNatCertLink" style="font-size:12px;margin-top:4px"></div>
     </div>
 
+    <!-- ④-2 서명·도장 이미지 (수당 신청서 등에 자동 삽입) -->
+    <div style="margin-top:14px;max-width:400px">
+      <label style="font-size:13px;font-weight:800">✍️ 서명·도장 이미지 <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 등록해두면 수당 신청서에서 [저장된 서명 사용]으로 바로 넣을 수 있습니다</span></label>
+      <input type="file" id="pfSigImg" accept="image/*" style="display:block;margin-top:6px;font-size:12px">
+      <div style="font-size:11.5px;color:var(--gray);margin-top:4px">흰 종이에 서명·날인한 뒤 촬영하거나 스캔한 이미지를 올려주세요. 매번 마우스로 서명하지 않아도 됩니다.</div>
+      <div id="pfSigImgBox" style="margin-top:6px"></div>
+    </div>
+
     <!-- ⑤ 경력 -->
     <div style="margin-top:14px">
       <label style="font-size:13px;font-weight:800">경력 사항 <span style="font-weight:600;color:var(--gray);font-size:12px">— 입상·선수 경력, KFDF 주최대회 참가 등 자유 기재</span></label>
@@ -875,6 +883,13 @@ function fillProfile(d){
   else if(d.natCertName){ncs.textContent='📎 사본 첨부 필요 — 첨부 전까지 승인 보류';ncs.style.color='#C41E2F';}
   else{ncs.textContent='';ncs.style.color='';}
   document.getElementById('pfNatCertLink').innerHTML=(d.natCertName&&d.natCertDoc)?'<a href="'+d.natCertDoc+'" target="_blank" style="font-weight:800;color:#153A77;background:#eef3fa;border:1px solid #d4e0f2;border-radius:8px;padding:4px 10px">📎 첨부한 자격증 사본 보기</a>':'';
+  // [서명이미지] 등록된 서명 미리보기
+  const sb=document.getElementById('pfSigImgBox');
+  if(sb)sb.innerHTML=d.signatureImg
+    ?'<div style="display:inline-flex;align-items:center;gap:8px;border:1.5px solid #cfe3d8;background:#f7fbf9;border-radius:10px;padding:6px 10px">'
+      +'<img src="'+d.signatureImg+'" alt="등록된 서명" style="height:42px;background:#fff;border-radius:4px">'
+      +'<span style="font-size:11.5px;font-weight:800;color:#0f766e">✓ 등록됨</span></div>'
+    :'<span style="font-size:11.5px;color:#8a919d">아직 등록된 서명 이미지가 없습니다.</span>';
 }
 function openPostcode(){
   function launch(){
@@ -1275,6 +1290,16 @@ async function saveProfile(){
       await ref.put(blob,{contentType:'image/jpeg'});
       ncDoc=await ref.getDownloadURL();
     }
+    // [서명이미지] 서명·도장 사본 업로드 (새 파일 선택 시)
+    let sigImg=MYD.signatureImg||'';
+    const sgf=(document.getElementById('pfSigImg')||{files:[]}).files[0];
+    if(sgf){
+      m.textContent='서명 이미지 업로드 중…';m.style.color='#153A77';
+      const blob=await compressImg(sgf);
+      const ref=firebase.storage().ref('signatures/'+AUTH.currentUser.uid+'/sig_'+Date.now()+'.jpg');
+      await ref.put(blob,{contentType:'image/jpeg'});
+      sigImg=await ref.getDownloadURL();
+    }
     const upd={
       region:(function(){
         const addr=document.getElementById('pfAddr').value.trim();
@@ -1291,6 +1316,7 @@ async function saveProfile(){
       degreeDoc:degDoc,
       natCertName:document.getElementById('pfNatCertName').value.trim(),
       natCertDoc:ncDoc,
+      signatureImg:sigImg,   // [서명이미지] 수당 신청서 등에서 재사용
       affiliation:af,
       quals:{leader:document.getElementById('pfLeader').value,referee:document.getElementById('pfRef').value,youth:document.getElementById('pfYouth').checked},
       career:document.getElementById('pfCareer').value.trim(),

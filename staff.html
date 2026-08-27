@@ -907,6 +907,10 @@ function openApplyForm(id){
     +'<canvas id="sigCanvas" width="480" height="110" style="display:block;width:100%;height:110px;touch-action:none;cursor:crosshair;border-radius:10px"></canvas>'
     +'<button type="button" onclick="_sigClear()" style="position:absolute;top:6px;right:6px;font-size:11px;padding:3px 9px;border:1px solid #dfe5ee;border-radius:6px;background:#fff;cursor:pointer;z-index:1">지우기</button>'
     +'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">'
+    +'<button type="button" class="stbtn stbtn-soft" style="padding:5px 12px;font-size:11.5px" onclick="useSavedSig(\'agree\')">🖊 저장된 서명 사용하기</button>'
+    +'<span id="apSigMsg" style="font-size:11.5px;font-weight:700;color:#8a919d">'+(SMY&&SMY.signatureImg?'마이페이지에 등록된 서명이 있습니다.':'마이페이지 → 내 정보에서 서명 이미지를 등록하면 매번 그리지 않아도 됩니다.')+'</span>'
+    +'</div>'
     // ── [v4] ④ 수당지급 정보·동의 (선택 입력 — 입력 시 동의·서명 필수) ──
     +'<div style="font-size:13px;font-weight:800;margin-top:18px">④ 수당지급 정보 · 동의 <span style="font-size:11.5px;font-weight:600;color:#8a919d">(수당을 지급받으려면 입력·동의·서명 필요)</span></div>'
     +'<div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:9px 12px;margin-top:6px;font-size:12px;color:#8a5a00;line-height:1.7">수당 지급 및 지급내역서 작성을 위한 정보입니다. 입력하지 않아도 신청은 가능하지만, 미입력 시 수당 지급이 어려울 수 있습니다.</div>'
@@ -933,6 +937,10 @@ function openApplyForm(id){
     +'<div style="position:relative;border:1.5px solid #dfe5ee;border-radius:10px;background:#f9fafb;margin:7px 0 4px">'
     +'<canvas id="sigCanvasPay" width="480" height="110" style="display:block;width:100%;height:110px;touch-action:none;cursor:crosshair;border-radius:10px"></canvas>'
     +'<button type="button" onclick="_sigClearPay()" style="position:absolute;top:6px;right:6px;font-size:11px;padding:3px 9px;border:1px solid #dfe5ee;border-radius:6px;background:#fff;cursor:pointer;z-index:1">지우기</button>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">'
+    +'<button type="button" class="stbtn stbtn-soft" style="padding:5px 12px;font-size:11.5px" onclick="useSavedSig(\'pay\')">🖊 저장된 서명 사용하기</button>'
+    +'<span id="apSigMsgPay" style="font-size:11.5px;font-weight:700;color:#8a919d">'+(SMY&&SMY.signatureImg?'마이페이지에 등록된 서명이 있습니다.':'마이페이지에서 서명 이미지를 등록하면 매번 그리지 않아도 됩니다.')+'</span>'
     +'</div>'
     +(pf.signature?'<div style="font-size:11.5px;color:#0f766e;font-weight:700">✓ 이전에 등록한 수당지급용 서명이 있습니다 — 새로 서명하지 않으면 기존 서명이 유지됩니다.</div>':'')
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
@@ -1703,6 +1711,39 @@ function _getSigData(){
   const d=ctx.getImageData(0,0,c.width,c.height).data;
   const hasData=Array.from(d).some((v,i)=>i%4===3&&v>0);
   return hasData?c.toDataURL('image/png'):null;
+}
+// ══════════════ [저장된 서명] 마이페이지에 등록한 서명 이미지를 캔버스에 그려넣기 ══════════════
+// 캔버스에 직접 그리므로 기존 저장·삽입 로직(_getSigData 등)은 전혀 손대지 않아도 됩니다.
+// 마우스 서명 기능도 그대로 유지되며, 불러온 뒤 덧그리거나 [지우기]로 지울 수 있습니다.
+function _sigImgUrl(){ return (SMY&&SMY.signatureImg)||''; }
+async function useSavedSig(which){
+  const url=_sigImgUrl();
+  const msg=document.getElementById(which==='pay'?'apSigMsgPay':'apSigMsg');
+  const say=(t,c)=>{if(msg){msg.textContent=t;msg.style.color=c||'#8a919d';}};
+  if(!url){say('마이페이지 → 내 정보에서 서명·도장 이미지를 먼저 등록해 주세요.','#C41E2F');return}
+  const c=document.getElementById(which==='pay'?'sigCanvasPay':'sigCanvas');
+  if(!c)return;
+  say('불러오는 중…','#153A77');
+  try{
+    const img=await new Promise((ok,no)=>{
+      const im=new Image();
+      im.crossOrigin='anonymous';          // toDataURL 가능하도록 (Storage는 CORS 허용)
+      im.onload=()=>ok(im); im.onerror=()=>no(new Error('이미지 로드 실패'));
+      im.src=url+(url.indexOf('?')>=0?'&':'?')+'cb='+Date.now();
+    });
+    const ctx=c.getContext('2d');
+    ctx.clearRect(0,0,c.width,c.height);
+    // 비율 유지하며 캔버스 안에 맞춰 그리기
+    const r=Math.min(c.width/img.width, c.height/img.height);
+    const w=img.width*r, h=img.height*r;
+    ctx.drawImage(img,(c.width-w)/2,(c.height-h)/2,w,h);
+    // 캔버스가 오염(taint)되지 않았는지 즉시 확인 — 오염 시 저장 단계에서 실패하므로 미리 되돌림
+    try{ c.toDataURL('image/png'); }
+    catch(err){ ctx.clearRect(0,0,c.width,c.height); say('브라우저 보안 정책으로 불러오지 못했습니다. 직접 서명해 주세요.','#C41E2F'); return; }
+    say('✓ 저장된 서명을 불러왔습니다. 필요하면 위에 덧그리거나 [지우기]로 지울 수 있습니다.','#0f766e');
+  }catch(e){
+    say('불러오지 못했습니다. 직접 서명해 주세요.','#C41E2F');
+  }
 }
 // ══════════════ [v4] 수당지급내역서용 서명 캔버스 (별도) ══════════════
 function _initSigCanvasPay(){
