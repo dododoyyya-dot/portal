@@ -235,8 +235,8 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
         <div style="font-size:12px;color:var(--gray);margin:4px 0 8px">자격증 사본은 올리지 않아도 됩니다. 번호를 입력하면 가입 후 마이페이지에서 자동으로 연결·검증됩니다.</div>
         <div style="font-size:12px;color:#C41E2F;font-weight:800;margin:0 0 10px;padding:8px 10px;background:#fff5f5;border:1px solid #f3c9c9;border-radius:8px">⚠️ 대한민국플라잉디스크연맹(KFDF) 발급 자격증 번호만 기입하세요. 타 단체에서 발급받은 자격증 번호는 연맹 대장에 없어 등록되지 않습니다.</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
-          <div><label style="font-size:12px;font-weight:800">지도자(강사) 자격번호</label><input id="sQualLeader" placeholder="예: KFDF-L-2024-0123"></div>
-          <div><label style="font-size:12px;font-weight:800">심판 자격번호</label><input id="sQualRef" placeholder="예: KFDF-R-2024-0456"></div>
+          <div><label style="font-size:12px;font-weight:800">지도자(강사) 자격번호</label><input id="sQualLeader" placeholder="예: KFDF-L-2024-0123" onblur="checkQualLive('sQualLeader','sQualLeaderMsg','지도자')"><div id="sQualLeaderMsg" style="font-size:11.5px;margin-top:3px;min-height:14px"></div></div>
+          <div><label style="font-size:12px;font-weight:800">심판 자격번호</label><input id="sQualRef" placeholder="예: KFDF-R-2024-0456" onblur="checkQualLive('sQualRef','sQualRefMsg','심판')"><div id="sQualRefMsg" style="font-size:11.5px;margin-top:3px;min-height:14px"></div></div>
         </div>
         <div style="font-size:11.5px;color:#8a5a00;font-weight:700;margin-top:7px">※ 심판·지도자 자격은 <b>가입 유형과 별개</b>입니다. 교사·일반회원도 자격번호를 등록하면 심판·강사로 활동 신청할 수 있습니다.</div>
       </div>
@@ -770,6 +770,40 @@ function resetPhoneVerify(){
   const sc=document.getElementById('sCode');if(sc){sc.value='';sc.disabled=false;}
   const b=document.getElementById('sendCodeBtn');if(b){b.disabled=false;b.textContent='📱 인증번호 받기';}
   const m=document.getElementById('phoneVerifyMsg');if(m){m.innerHTML='가입하려면 본인 휴대폰 번호로 인증해야 합니다.';m.style.color='var(--gray)';}
+}
+// [자격검증-실시간] 자격번호 입력란에서 포커스가 벗어나면(onblur) 연맹 licenses DB와 즉시 대조하여
+//   등록 여부·구분(심판/지도자) 일치·본인 명의 일치·중복 연결 여부를 미리 안내합니다.
+//   ※ 최종 가입 차단은 기존 제출 시점 검증(go() 내부 _licCheck)이 그대로 담당하며,
+//     이 함수는 제출 전에 미리 알려주는 보조 안내용입니다 (조회 실패 시에도 가입은 막지 않음).
+let _qualLiveSeq=0;
+async function checkQualLive(inputId,msgId,kind){
+  const inp=document.getElementById(inputId), msgEl=document.getElementById(msgId);
+  if(!inp||!msgEl)return;
+  const no=inp.value.trim().replace(/\s+/g,'');
+  inp.value=no;
+  if(!no){msgEl.textContent='';return}
+  const seq=++_qualLiveSeq;
+  msgEl.style.color='var(--gray)';msgEl.textContent='확인 중…';
+  let l=null, notFound=false;
+  try{
+    const d=await DB.collection('licenses').doc(no).get();
+    if(d.exists)l=d.data();else notFound=true;
+  }catch(e){
+    if(seq===_qualLiveSeq)msgEl.textContent='';
+    return;
+  }
+  if(seq!==_qualLiveSeq)return;
+  if(notFound){msgEl.style.color='#C41E2F';msgEl.textContent='✗ 연맹에 등록되지 않은 '+kind+' 자격번호입니다.';return}
+  if(kind==='심판'&&String(l.type||'').indexOf('심판')<0){msgEl.style.color='#C41E2F';msgEl.textContent='✗ 심판 자격번호가 아닙니다 (등록 종류: '+(l.type||'?')+').';return}
+  if(kind==='지도자'&&String(l.type||'').indexOf('지도자')<0){msgEl.style.color='#C41E2F';msgEl.textContent='✗ 지도자 자격번호가 아닙니다 (등록 종류: '+(l.type||'?')+').';return}
+  const nameEl=document.getElementById('sName');
+  const nameVal=nameEl?nameEl.value.trim():'';
+  if(nameVal&&l.name&&String(l.name).replace(/\s/g,'')!==nameVal.replace(/\s/g,'')){
+    msgEl.style.color='#C41E2F';msgEl.textContent='✗ 자격증 성명('+(l.maskName||'')+')이 입력하신 이름과 일치하지 않습니다.';return
+  }
+  if(l.uid){msgEl.style.color='#C41E2F';msgEl.textContent='✗ 이미 다른 계정에 연결된 자격번호입니다. 사무국(031-984-3248)에 문의해주세요.';return}
+  msgEl.style.color='#0f766e';
+  msgEl.textContent=nameVal?'✅ 확인됨 — 본인 명의 '+kind+' 자격증입니다.':'✅ 확인됨 — 연맹에 등록된 '+kind+' 자격번호입니다. (이름 입력 후 본인 확인까지 완료됩니다)';
 }
 async function sendPhoneCode(){
   const msg=document.getElementById('phoneVerifyMsg');
