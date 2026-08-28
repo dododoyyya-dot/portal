@@ -404,6 +404,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#0e7490" onclick="showInspections()">📋 점검 제출현황</button>
         <button class="btn-sub" style="background:#0f766e" onclick="backfillPhoneIndex()">📇 전화번호 중복확인 보정</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="ageMigScan()">🎓 만 18세 도달 학생 → 성인 전환</button>
+        <button class="btn-sub" style="background:#0e7490" onclick="ncWaiveScan()">🏅 국가자격 승인차단 해제</button>
         <button class="btn-sub" style="background:#8a919d" onclick="showTrash()">🗑 휴지통</button>
         <details style="display:inline-block">
           <summary style="cursor:pointer;padding:9px 16px;background:#8a919d;color:#fff;border-radius:10px;font-weight:800;font-size:13.5px;list-style:none">🧰 관리 도구 더보기 ▾</summary>
@@ -425,6 +426,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <div id="gigBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px"></div>
       <div id="phoneIdxBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;white-space:pre-line;font-size:13px;line-height:1.8"></div>
       <div id="ageMigBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
+      <div id="ncWaiveBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="trashBox" style="display:none;background:#faf8f4;border:1.5px solid #e5e0d8;border-radius:14px;padding:14px 18px;margin-bottom:14px"></div>
       <div id="instLinkBox" style="background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:14px;padding:14px 18px;margin-bottom:14px">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -1306,6 +1308,79 @@ async function loadConsentBox(){
     }).join('');
     b.innerHTML='<div style="padding:12px 16px;background:#f4f6f9;border-radius:10px;margin-bottom:10px;font-size:13px;font-weight:700">공고 '+ids.length+'건 · 첨부 스캔본 '+nFile+'건 · 수기 확인 '+nPaper+'건</div>'+html;
   }catch(e){ b.innerHTML='<div class="bempty" style="color:#C41E2F">불러오기 실패: '+esc(e.message)+'</div>'; }
+}
+// ══════════ [국가자격 게이트] 교사 유형에서 국가자격 입력란을 없애기 전에 신고된 건 해제 ══════════
+//  가입 화면에서 교사(교원)의 국가자격 입력란을 숨긴 뒤에도, 그 전에 신고한 회원은
+//  natCertName 이 남아 승인이 계속 막힙니다. 이 도구로 목록을 확인한 뒤 게이트만 풀어 줍니다.
+//  · 신고 내용(natCertName·natCertDoc)은 지우지 않습니다 — 승인 차단만 면제합니다
+//  · 언제든 되돌릴 수 있습니다
+const NCW_LABEL={instructor:'KFDF공인 심판·지도자',teacher:'교사(교원)',natcert:'국가공인자격증',athlete:'선수회원',general:'일반회원',student:'학생회원'};
+let NCWAIVE=[];
+function ncWaiveBoxEl(){const b=document.getElementById('ncWaiveBox');b.style.display='block';return b}
+async function ncWaiveScan(){
+  const b=ncWaiveBoxEl(); b.innerHTML='회원 목록을 불러오는 중…';
+  try{
+    if(!USERS.length)await loadUsers();
+    NCWAIVE=USERS.filter(d=>{const v=d.data()||{};
+      return v.natCertName&&!v.natCertApproved&&!v.natCertGateWaived;
+    }).map(d=>({id:d.id,v:d.data()}));
+    if(!NCWAIVE.length){b.innerHTML='<b style="color:#0f766e">✅ 승인이 막혀 있는 회원이 없습니다.</b>';return}
+    const rows=NCWAIVE.map((x,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+esc(x.v.name||'')+'</b></td><td>'+esc(NCW_LABEL[x.v.accountType]||x.v.accountType||'-')+'</td><td>'+esc(x.v.natCertName||'')+'</td><td>'+(x.v.natCertDoc?'<a href="'+esc(x.v.natCertDoc)+'" target="_blank" style="color:#153A77;font-weight:800">📎 사본</a>':'<span style="color:#C41E2F">사본 없음</span>')+'</td><td>'+esc(x.v.status||'')+'</td><td style="text-align:center"><button class="btn-sub" style="background:#0f766e;padding:3px 9px;font-size:11px" onclick="ncWaiveOne(\''+x.id+'\')">게이트 해제</button></td></tr>').join('');
+    b.innerHTML='<div style="font-weight:900;font-size:15.5px;margin-bottom:6px">🏅 국가자격 확인 대기로 승인이 막힌 회원 '+NCWAIVE.length+'명 <span style="color:#C41E2F;font-size:13px">— 아직 아무것도 변경하지 않았습니다</span></div>'
+      +'<div style="font-size:12.5px;color:#6b7280;margin-bottom:10px;line-height:1.7">신고 내용(자격명·사본)은 그대로 두고 <b>승인 차단만 면제</b>합니다. 사본이 있어 정식 확인이 가능하면 회원 상세에서 [국가자격 승인]을 쓰세요.</div>'
+      +'<div style="overflow-x:auto"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:640px"><thead><tr><th>#</th><th>이름</th><th>유형</th><th>신고 자격</th><th>사본</th><th>가입상태</th><th>개별</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'
+      +'<button class="btn-sub" style="background:#0f766e" onclick="ncWaiveAll()">✅ 전체 게이트 해제</button>'
+      +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="ncWaiveUndo()">↩ 되돌리기</button>'
+      +'</div>';
+  }catch(e){ b.innerHTML='<b style="color:#C41E2F">조회 실패: '+esc(e.message)+'</b>'; }
+}
+async function ncWaiveOne(uid){
+  const x=NCWAIVE.find(y=>y.id===uid); if(!x)return;
+  if(!confirm('['+(x.v.name||'')+'] 국가자격 확인 대기로 인한 승인 차단을 해제할까요?\n신고 내용은 그대로 보관됩니다.'))return;
+  try{
+    await DB.collection('users').doc(uid).update({natCertGateWaived:true,natCertGateWaivedAt:firebase.firestore.FieldValue.serverTimestamp(),natCertGateWaivedBy:((typeof CMY!=='undefined'&&CMY&&CMY.name)||'관리자')});
+    await loadUsers(); ncWaiveScan();
+  }catch(e){alert('실패: '+e.message)}
+}
+async function ncWaiveAll(){
+  if(!NCWAIVE.length){alert('먼저 조회해주세요.');return}
+  if(!confirm(NCWAIVE.length+'명의 국가자격 승인 차단을 한 번에 해제합니다.\n\n· 신고한 자격명·사본은 그대로 보관됩니다\n· 되돌리기 버튼으로 언제든 복구할 수 있습니다\n\n진행할까요?'))return;
+  const b=ncWaiveBoxEl(); let done=0;
+  const by=((typeof CMY!=='undefined'&&CMY&&CMY.name)||'관리자');
+  for(let i=0;i<NCWAIVE.length;i+=400){
+    const chunk=NCWAIVE.slice(i,i+400);
+    const batch=DB.batch();
+    chunk.forEach(x=>batch.update(DB.collection('users').doc(x.id),{natCertGateWaived:true,natCertGateWaivedAt:firebase.firestore.FieldValue.serverTimestamp(),natCertGateWaivedBy:by}));
+    try{ await batch.commit(); done+=chunk.length; }catch(e){}
+    b.innerHTML='처리 중… '+done+' / '+NCWAIVE.length;
+  }
+  try{
+    const ref=DB.collection('siteContent').doc('migrationLog');
+    const cur=await ref.get();
+    const arr=(((cur.exists&&cur.data())||{}).items||[]).slice(-199);
+    arr.push({job:'natCertWaive',at:new Date().toISOString(),by:by,ok:done});
+    await ref.set({items:arr},{merge:true});
+  }catch(e){}
+  await loadUsers();
+  b.innerHTML='<b style="color:#0f766e">✅ 해제 완료 — '+done+'명</b><div style="margin-top:8px"><button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="ncWaiveUndo()">↩ 되돌리기</button> <button class="btn-sub" style="background:#1F4E9C" onclick="ncWaiveScan()">🔄 다시 조회</button></div>';
+}
+async function ncWaiveUndo(){
+  if(!confirm('되돌리기 — 해제했던 회원을 다시 [국가자격 확인 후 승인] 상태로 돌립니다.\n\n진행할까요?'))return;
+  const b=ncWaiveBoxEl(); b.innerHTML='복원 대상 조회 중…';
+  try{
+    const snap=await DB.collection('users').where('natCertGateWaived','==',true).get();
+    if(snap.empty){b.innerHTML='복원할 대상이 없습니다.';return}
+    const docs=snap.docs; let n=0;
+    for(let i=0;i<docs.length;i+=400){
+      const chunk=docs.slice(i,i+400);
+      const batch=DB.batch();
+      chunk.forEach(d=>batch.update(d.ref,{natCertGateWaived:firebase.firestore.FieldValue.delete()}));
+      await batch.commit(); n+=chunk.length;
+    }
+    await loadUsers();
+    b.innerHTML='<b style="color:#0f766e">↩ 복원 완료 — '+n+'명</b>';
+  }catch(e){ b.innerHTML='<b style="color:#C41E2F">복원 실패: '+esc(e.message)+'</b>'; }
 }
 // ── 단기 구인 공고 승인 (gigs) ──
 let GIGS=[];
@@ -2933,7 +3008,7 @@ function renderUsers(){
         // [유형분리] 교사(교원)는 재직증명서 확인이 끝나야 승인 가능
         :((v.accountType==='teacher'||v.priorType==='teacher')&&!v.employApproved
           ?'<span style="font-size:12px;font-weight:800;color:#C41E2F">🏫 재직증명서 확인 후 승인 가능</span> <button class="btn-sub" style="background:#0f766e;padding:4px 10px;font-size:11.5px" onclick="showMemberModal(\''+d.id+'\')">📄 증빙 확인</button>'
-          :(v.natCertName&&!v.natCertApproved
+          :(v.natCertName&&!v.natCertApproved&&!v.natCertGateWaived
             ?'<span style="font-size:12px;font-weight:800;color:#C41E2F">🏅 국가자격증 확인 후 승인 가능</span> <button class="btn-sub" style="background:#6b7280;padding:4px 10px;font-size:11.5px" onclick="convertUserType(\''+d.id+'\')" title="자격 미보유 회원을 일반회원 등으로 전환 후 승인">🔄 유형 전환</button>'
             :'<button class="btn-sub" onclick="approve(\''+d.id+'\')">승인하기</button>')))
       +(v.status!=='approved'?'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="rejectUser(\''+d.id+'\',\''+esc(v.name)+'\')">🚫 거절</button><button class="btn-sub" style="background:#b8860b" onclick="editUserBasic(\''+d.id+'\')">✏️ 수정</button>':'')
@@ -5004,7 +5079,7 @@ async function approve(uid){
   const d=doc.data();
   if(IS_SIDO && !sameSidoUser(d)){alert('관할 시도가 아닌 회원입니다.');return;}
   // 국가공인 체육지도사 자격을 신고했는데 아직 사본 미확인이면 승인 보류(사무국이 직접 확인해야 함)
-  if(d.natCertName&&!d.natCertApproved){
+  if(d.natCertName&&!d.natCertApproved&&!d.natCertGateWaived){
     alert('🏅 ['+(d.name||'')+'] 국가공인 체육지도사 자격("'+d.natCertName+'")을 신고했으나 아직 확인되지 않았습니다.\n회원목록에서 첨부된 자격증 사본을 먼저 확인·승인해주세요.'+(d.natCertDoc?'':'\n(아직 사본이 첨부되지 않았습니다 — 회원이 마이페이지에서 첨부할 때까지 기다려야 합니다)'));
     return;
   }
