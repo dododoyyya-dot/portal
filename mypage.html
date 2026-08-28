@@ -1653,10 +1653,11 @@ async function pfAutoAdult(uid,d){
   return true;
 }
 AUTH.onAuthStateChanged(async u=>{
-  if(!u){location.href='login.html';return}
+  // [뒤로가기] location.href는 히스토리에 새 항목을 남겨 인증게이트 리다이렉트가 "돌아가기 함정"이 됨 — replace로 항목 자체를 대체
+  if(!u){location.replace('login.html');return}
   const doc=await DB.collection('users').doc(u.uid).get();
   // 회원 문서가 없는 계정(가입 중단 등) — 로그아웃 후 이동해 무한 리다이렉트 방지
-  if(!doc.exists){await AUTH.signOut().catch(()=>{});location.href='login.html';return}
+  if(!doc.exists){await AUTH.signOut().catch(()=>{});location.replace('login.html');return}
   const d=doc.data();MYD=d;
   // [연령] 만 18세 도달 학생회원 자동 전환 — 실패해도 페이지는 그대로 동작합니다
   try{ await pfAutoAdult(u.uid,d); }catch(e){ console.warn('adult convert',e); }
