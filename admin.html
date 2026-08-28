@@ -2457,7 +2457,7 @@ function renderRoster(docs){
     const quals=licLabel(d.id,q,{sep:'·',dash:''});   // [보유자격] 연맹 자격증 DB 기준
     const hire=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc);
     return '<tr>'
-      +'<td class="nm" style="cursor:pointer;color:#153A77;text-decoration:underline" onclick="showMemberModal(\''+d.id+'\')">'+esc(v.name)+(v.withdrawReq?' <span title="탈퇴요청">🚪</span>':'')+'</td>'
+      +'<td class="nm" style="cursor:pointer;color:#153A77;text-decoration:underline" onclick="showMemberModal(\''+d.id+'\')">'+esc(v.name)+(v.withdrawReq?' <span title="탈퇴요청">🚪</span>':'')+((v.children&&v.children.length)?' <span title="가족연동 자녀 '+v.children.length+'명">👨‍👩‍👧</span>':'')+(v.guardianUid?' <span title="보호자 연동됨">🔗</span>':'')+'</td>'
       +'<td>'+esc(v.gender||'-')+'</td>'
       +'<td>'+(v.baseCity?esc(v.baseCity):'<span style="color:#C41E2F">미입력</span>')+'</td>'
       +'<td>'+(v.phone?esc(v.phone):'<span class="mut">-</span>')+'</td>'
@@ -2525,6 +2525,20 @@ function showMemberModal(uid){
       +'<div style="margin-top:6px;padding:8px 11px;background:#fdf6e7;border:1.5px solid #e8d3a0;border-radius:8px;color:#8a5a00;font-size:12px;font-weight:700;line-height:1.6">⏳ <b>성인 전환 대기</b> — 회원유형이 아직 학생회원으로 남아 있습니다. 사무국에서 전환해 주세요.<br><span style="font-weight:600;color:#7a6636">회원 목록 상단의 「🎓 만 18세 도달 학생 → 성인 전환」 (미리보기·되돌리기 지원) 또는 이 창의 [회원유형 변경]</span></div>']);
   if((v.accountType==='student'||v.memberGroup==='student')&&isMinorNow(v.birth)!==false)
     rows.push(['보호자 연동',v.guardianUid?'<b style="color:#0f766e">🔗 연동됨'+(v.guardianName?' — '+esc(v.guardianName):'')+'</b>':'<b style="color:#C41E2F">⚠️ 미연동 (임시회원)</b>']);
+  // ▶ [자녀연동] 이 회원이 부모로서 등록한 자녀 목록 — ID(cid)·기본정보 텍스트 노출 + 정보수정 버튼 (2026-08-28)
+  if(v.children&&v.children.length)
+    rows.push(['👨‍👩‍👧 가족연동 (자녀 '+v.children.length+'명)',
+      v.children.map((k,ci)=>{
+        const kage=k.birth?ageNow(k.birth):null;
+        return '<div style="background:#f6f8fb;border-radius:8px;padding:8px 11px;margin-bottom:6px;font-size:12.5px;line-height:1.6">'
+          +'<b>'+esc(k.name||'-')+'</b> <span style="color:#8a919d;font-size:11px">ID '+esc(k.cid||'-')+'</span>'
+          +'<div style="color:#555">'+esc(k.birth||'생년월일 미입력')+(kage!==null?' (만 '+kage+'세)':'')+' · '+esc(k.gender||'-')+(k.school?' · '+esc(k.school):'')+'</div>'
+          +(k.childUid?'<div style="color:#0f766e;font-weight:700">🔑 본인 계정 연결됨'+(k.loginId?' — 로그인ID '+esc(k.loginId):'')+'</div>'
+            :'<div style="color:#8a919d">계정 없음 (보호자가 입력한 정보만 등록)</div>')
+          +'<button class="btn-sub" style="padding:2px 10px;font-size:11px;margin-top:4px;background:#153A77" onclick="editChildAdmin(\''+uid+'\','+ci+')">✏️ 자녀 정보 수정</button>'
+        +'</div>';
+      }).join('')
+    ]);
   if(v.rejectReason)
     rows.push(['거절 사유',esc(v.rejectReason)+(v.reviewReqAt?' · <b style="color:#b8860b">⏳ 보완 후 재검토 요청됨</b>':'')]);
   const tbl='<table style="width:100%;border-collapse:collapse;font-size:13.5px">'
@@ -3022,6 +3036,9 @@ function renderUsers(){
     return '<div class="urow"><div class="grow"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span>'
       +(v.org?' '+orgChip(v.org,v.region,v.orgTitle,v.fedName):'')+(v.withdrawReq?' <span style="font-size:11px;font-weight:900;color:#fff;background:'+(v.withdrawStatus==='보류'?'#b8860b':'#C41E2F')+';padding:2px 8px;border-radius:999px">🚪 탈퇴 요청'+(v.withdrawStatus==='보류'?' · 보류중':'')+'</span>':'')
       +(EXTCLUB_MAP[d.id]?' <span style="font-size:11px;font-weight:900;color:#fff;background:#7c3aed;padding:2px 8px;border-radius:999px" title="흡수 전략 추적용 — 클럽 승인관리에서 연맹 클럽으로 전환할 수 있습니다">🔗 타단체클럽: '+esc(EXTCLUB_MAP[d.id].join(', '))+'</span>':'')
+      // ▶ [자녀연동] 가족연동 배지 — 부모(children[] 보유) / 자녀(guardianUid 보유) 양방향 (2026-08-28)
+      +((v.children&&v.children.length)?' <span style="font-size:11px;font-weight:900;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px" title="상세보기에서 자녀 목록·정보수정">👨‍👩‍👧 가족연동 자녀 '+v.children.length+'명</span>':'')
+      +(v.guardianUid?' <span style="font-size:11px;font-weight:900;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px" title="보호자: '+esc(v.guardianName||'')+'">🔗 보호자연동</span>':'')
       +'<div class="sub3">'+esc(v.email)+' · '+esc(v.region)+(v.gender?' · '+esc(v.gender):'')+(v.birth?' · '+esc(v.birth):'')+(v.baseCity?' · <b style="color:#1F4E9C">📍'+esc(v.baseCity)+'</b>':' · <span style="font-size:11px;color:#C41E2F;font-weight:800">시군구 미입력</span>')+((v.activityRegions&&v.activityRegions.length)?' <span style="font-size:11px;font-weight:800;color:#0f766e">🗺활동가능: '+esc(v.activityRegions.length>=6?'전국 (전 권역)':v.activityRegions.join('·'))+'</span>':'')+(v.phone?' · '+esc(v.phone):'')+(v.bank?' · <b style="color:#b8860b">💳'+esc(v.bank)+' '+esc(v.accountNum||'')+' ('+esc(v.accountHolder||'')+')</b>':'')+' · '+(v.edu2026?('연수이수 '+(inRoster(v.name)?'<b style="color:#0f766e">✓명단확인</b>':'<b style="color:#C41E2F">⚠명단에없음</b>')):'미이수')+' · '+(v.points||0)+'P'+((v.instructorFor&&v.instructorFor.school)?' · <b style="color:#1F4E9C">학교체육 지원</b>':'')+((v.instructorFor&&v.instructorFor.after)?' · <b style="color:#0f766e">방과후·늘봄 지원</b>':'')+((v.instructorFor&&v.instructorFor.referee)?' · <b style="color:#7c3aed">심판요원 지원</b>':'')+((v.instructorFor&&v.instructorFor.staff)?' · <b style="color:#b8860b">운영요원 지원</b>':'')+'</div>'
       +((v.affiliation&&v.affiliation.length)||(LICMAP[d.id]&&LICMAP[d.id].length)||(v.quals&&(v.quals.leader||v.quals.referee||v.quals.youth))||(v.qualDocs&&v.qualDocs.length)||v.degree
         ?'<div class="sub3" style="margin-top:3px">프로필: '
@@ -5097,6 +5114,39 @@ async function editUserBasic(uid){
     await DB.collection('users').doc(uid).update(upd);
     alert('✓ 수정 완료: '+Object.keys(upd).join(', '));
     loadUsers();
+  }catch(e){alert('수정 실패: '+e.message)}
+}
+// ── [자녀연동] 관리자가 보호자의 자녀 프로필을 직접 수정 (children[idx]) ──
+// mypage.html의 editKid()(학교만 수정)와 editUserBasic()(이름·생년월일·연락처 수정)을
+// 합친 범위로, 관리자 지원 시나리오(가입 시 오탈자 정정 등)를 커버합니다.
+async function editChildAdmin(uid,idx){
+  try{
+    const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
+    const kids=(d.children||[]).slice();
+    const k=kids[idx];
+    if(!k){alert('자녀 정보를 찾을 수 없습니다 (목록이 변경되었을 수 있어요 — 새로고침 후 다시 시도해주세요).');return}
+    const name=prompt('자녀 이름',k.name||'');if(name===null)return;
+    const birth=prompt('자녀 생년월일 (YYYY-MM-DD)',k.birth||'');if(birth===null)return;
+    const gender=prompt('자녀 성별 (남/여)',k.gender||'');if(gender===null)return;
+    const school=prompt('자녀 학교 (진학·전학 시 변경 — 이전 학교는 이력에 자동 보관됩니다)',k.school||'');if(school===null)return;
+    const oldSchool=k.school||'';
+    const newSchool=school.trim();
+    const hist=(k.schoolHistory||[]).slice();
+    if(newSchool!==oldSchool&&oldSchool)hist.push({school:oldSchool,at:new Date().toISOString()});
+    const nk=Object.assign({},k,{
+      name:name.trim()||k.name,
+      birth:birth.trim(),
+      gender:gender.trim(),
+      school:newSchool,
+      schoolNorm:normSchool(newSchool),
+      schoolHistory:hist,
+      updatedAt:new Date().toISOString(),
+      updatedBy:'admin'
+    });
+    kids[idx]=nk;
+    await DB.collection('users').doc(uid).update({children:kids});
+    alert('✓ 자녀 정보를 수정했습니다.');
+    showMemberModal(uid);
   }catch(e){alert('수정 실패: '+e.message)}
 }
 // ── 회원 유형 전환 (자격 미보유 교사/강사 → 일반회원 등) ──
