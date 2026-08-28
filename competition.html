@@ -577,7 +577,7 @@ function viewRoster(id){
       if(c.team){
         return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+' colspan="'+(entry?'4':'1')+'"><b>👥 '+cesc(c.name)+'</b> <span style="font-size:11.5px;color:#8a919d">'+cesc(c.teamType||'팀')+(c.teamOrg?' · '+cesc(c.teamOrg):'')+' · 인솔 '+cesc(c.leader||'')+'('+cesc(c.leaderRole||'')+')'+(c.leaderPhone?' '+cesc(c.leaderPhone):'')+'</span>'
           +'<details style="margin-top:4px"><summary style="cursor:pointer;font-size:12px;font-weight:800;color:#153A77">명단 '+(c.rosterN||0)+'명'+((c.consentFiles&&c.consentFiles.length)?' · 📎동의서 '+c.consentFiles.length:'')+'</summary>'
-          +'<div style="font-size:12px;color:#4b5563;margin-top:4px">'+(c.roster||[]).map((r,j)=>(j+1)+'. '+cesc(r.name)+(r.birth?' ('+cesc(r.birth)+')':'')+(r.school?' · '+cesc(r.school):'')
+          +'<div style="font-size:12px;color:#4b5563;margin-top:4px">'+(c.roster||[]).map((r,j)=>(j+1)+'. '+cesc(r.name)+(r.birth?' ('+cesc(r.birth)+')':'')+(r.school?' · '+cesc(r.school):'')+(r.nonMember?' <b style="color:#8a5a00;font-size:10.5px">🧾 비회원 참가자</b>':'')
             +(r.birth&&ageOf(r.birth)>0&&ageOf(r.birth)<18?(paper[ckey(c)+'_'+j]?' <b style="color:#0f766e" title="'+cesc((paper[ckey(c)+'_'+j].by||'')+' 확인 '+String(paper[ckey(c)+'_'+j].at||'').slice(0,10))+'">📄 수기동의✓</b>'+((paper[ckey(c)+'_'+j].files||[]).map((u,fi)=>' <a href="'+cesc(u)+'" target="_blank" style="font-size:10.5px;font-weight:900;color:#153A77">📎'+(fi+1)+'</a>').join('')):' <b style="color:#C41E2F">⚠미성년</b> <button onclick="markPaper(\''+id+'\',\''+ckey(c)+'_'+j+'\',\''+cesc(r.name)+'\')" style="border:1.5px solid #e6b422;background:#fffbeb;color:#8a5a00;border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:800;cursor:pointer">📄 수기동의서 확인완료</button>'):'')).join('<br>')+'</div></details>'
           +'<div style="margin-top:6px"><button onclick="openRosterEdit(\''+id+'\',\''+ckey(c)+'\')" style="border:1.5px solid #153A77;background:#fff;color:#153A77;border-radius:8px;padding:3px 10px;font-size:11.5px;font-weight:800;cursor:pointer">✏️ 명단 수정 (추가·제거)</button></div></td>'
           +'<td '+td+'>'+cesc((c.prefs||[])[0]||'-')+'</td><td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
@@ -594,7 +594,10 @@ function viewRoster(id){
   }else{
     rows=list.map((c,i)=>{
       if(c.team){
-        return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>👥 '+cesc(c.name)+'</b> <span style="font-size:11.5px;color:#8a919d">'+cesc(c.teamType||'팀')+(c.teamOrg?' · '+cesc(c.teamOrg):'')+' · '+(c.rosterN||0)+'명</span></td>'
+        const mine=(c.uid===CME.uid); // [비회원뱃지] 본인이 신청한 팀만 개인 명단·뱃지를 볼 수 있게 (타 클럽 개인정보 보호 유지)
+        return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>👥 '+cesc(c.name)+'</b> <span style="font-size:11.5px;color:#8a919d">'+cesc(c.teamType||'팀')+(c.teamOrg?' · '+cesc(c.teamOrg):'')+' · '+(c.rosterN||0)+'명</span>'
+          +(mine?'<details style="margin-top:4px"><summary style="cursor:pointer;font-size:12px;font-weight:800;color:#153A77">명단 보기</summary><div style="font-size:12px;color:#4b5563;margin-top:4px">'+(c.roster||[]).map((r,j)=>(j+1)+'. '+cesc(r.name)+(r.birth?' ('+cesc(r.birth)+')':'')+(r.school?' · '+cesc(r.school):'')+(r.nonMember?' <b style="color:#8a5a00;font-size:10.5px">🧾 비회원 참가자</b>':'')).join('<br>')+'</div></details>':'')
+          +'</td>'
           +'<td '+td+'>'+cesc((c.prefs||[])[0]||'-')+'</td>'
           +'<td '+td+' style="text-align:center">'+stCell(c)+'</td></tr>';
       }
@@ -743,7 +746,7 @@ function reRender(){
   const el=document.getElementById('reList');if(!el)return;
   document.getElementById('reCnt').textContent='('+_RED.roster.length+'명)';
   el.innerHTML=_RED.roster.length?_RED.roster.map(function(r,i){
-    return '<div style="display:flex;align-items:center;gap:8px;border:1px solid #e5e9f0;border-radius:9px;padding:7px 10px;margin-bottom:5px;font-size:13px"><b style="min-width:52px">'+cesc(r.name)+'</b><span style="color:#6b7280;font-size:12px;flex:1">'+cesc(r.birth||'')+(r.school?' · '+cesc(r.school):'')+(r.birth&&ageOf(r.birth)>0&&ageOf(r.birth)<18?(((_RED.paper||{})[_RED.key+'_'+i])?' <b style="color:#0f766e">미성년 · 📄동의✓</b>':' <b style="color:#C41E2F">미성년 · ⚠동의 필요</b>'):'')+'</span><button onclick="reDel('+i+')" title="명단에서 제거" style="border:none;background:#fee2e2;color:#C41E2F;border-radius:7px;width:26px;height:26px;font-weight:900;cursor:pointer">✕</button></div>';
+    return '<div style="display:flex;align-items:center;gap:8px;border:1px solid #e5e9f0;border-radius:9px;padding:7px 10px;margin-bottom:5px;font-size:13px"><b style="min-width:52px">'+cesc(r.name)+'</b><span style="color:#6b7280;font-size:12px;flex:1">'+cesc(r.birth||'')+(r.school?' · '+cesc(r.school):'')+(r.nonMember?' <b style="color:#8a5a00">🧾 비회원 참가자</b>':'')+(r.birth&&ageOf(r.birth)>0&&ageOf(r.birth)<18?(((_RED.paper||{})[_RED.key+'_'+i])?' <b style="color:#0f766e">미성년 · 📄동의✓</b>':' <b style="color:#C41E2F">미성년 · ⚠동의 필요</b>'):'')+'</span><button onclick="reDel('+i+')" title="명단에서 제거" style="border:none;background:#fee2e2;color:#C41E2F;border-radius:7px;width:26px;height:26px;font-weight:900;cursor:pointer">✕</button></div>';
   }).join(''):'<div style="font-size:12.5px;color:#8a919d;padding:10px;border:1.5px dashed #dfe5ee;border-radius:9px">명단이 비어 있습니다 — 오른쪽에서 추가하세요</div>';
 }
 function reDel(i){_RED.roster.splice(i,1);reRender()}
@@ -752,7 +755,7 @@ function reAdd(){
   const n=v('reName');if(!n){alert('성명을 입력해주세요');return}
   const b=v('reBirth');
   if(b&&!/^\d{4}-\d{2}-\d{2}$/.test(b)){alert('생년월일은 2013-05-01 형식으로 입력해주세요 (모르면 비워두세요)');return}
-  _RED.roster.push({name:n,birth:b,school:v('reSchool')});
+  _RED.roster.push({name:n,birth:b,school:v('reSchool'),nonMember:true}); // [비회원뱃지] 명단수정에서 추가되는 인원은 회원계정 확인이 없으므로 항상 비회원으로 표시
   document.getElementById('reName').value='';document.getElementById('reBirth').value='';document.getElementById('reSchool').value='';
   document.getElementById('reName').focus();
   reRender();
@@ -934,6 +937,7 @@ function taPickMember(j){
     const b=empty.querySelector('.taR-birth');if(b&&r.birth)b.value=r.birth;
     const g=empty.querySelector('.taR-g');if(g&&r.gender)g.value=r.gender;
     const s=empty.querySelector('.taR-school');if(s)s.value=r.school||'';
+    empty.dataset.src='member'; // [비회원뱃지] 클럽 명단에서 선택된 회원임을 표시
   }else taAddRow(r);
 }
 function taPickAll(){
@@ -964,6 +968,7 @@ function taAddRow(v){
   const box=document.getElementById('taRosterBox');
   const i=box.children.length;
   const row=document.createElement('div');
+  row.dataset.src=v.name?'member':'manual'; // [비회원뱃지] 클럽 명단에서 불러온 값이면 member, 직접입력이면 manual
   row.style.cssText='display:flex;gap:6px;margin-top:'+(i?'6px':'0')+';flex-wrap:wrap;align-items:center';
   row.innerHTML='<span style="font-size:11.5px;color:#8a919d;width:18px">'+(i+1)+'</span>'
     +'<input class="taR-name" placeholder="이름" value="'+cesc(v.name||'')+'" style="width:90px;padding:7px 9px;border:1px solid #d5dce8;border-radius:8px;font-size:13px">'
@@ -1040,7 +1045,8 @@ async function submitTeam(){
     name:r.querySelector('.taR-name').value.trim(),
     birth:r.querySelector('.taR-birth').value,
     gender:r.querySelector('.taR-g').value,
-    school:r.querySelector('.taR-school').value.trim()
+    school:r.querySelector('.taR-school').value.trim(),
+    nonMember:r.dataset.src!=='member' // [비회원뱃지] 클럽 명단에서 선택하지 않고 직접 입력한 참가자
   })).filter(x=>x.name);
   if(!roster.length)return alert('팀원을 1명 이상 입력해주세요.');
   if(!document.getElementById('taPledge').checked)return alert('보호자 동의 수합 확인란에 체크해주세요.');
