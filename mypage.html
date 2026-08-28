@@ -1582,12 +1582,53 @@ async function toggleAthlete(){
     const box=document.getElementById('identBox');if(box)box.outerHTML=renderIdentity(MYD);
   }catch(e){alert('변경 실패: '+e.message)}
 }
+// ══════════ [연령] 만 18세 도달 학생회원 → 성인(일반) 자동 전환 ══════════
+//  관리자 일괄 도구(ageMig)와 같은 규칙·같은 소속 매핑을 사용합니다.
+//  보호자 연동(guardianUid)은 지우지 않습니다 — 보호자 관련 진입점은 모두 생년월일로 이미 차단됩니다.
+const PF_AGE_AFF_MAP={'KFDF 소속':'시도연맹','학교스포츠클럽 소속':'학교스포츠클럽','타단체 소속':'협회·단체','소속없음':'소속 없음','소속 없음':'소속 없음'};
+function pfMapAdultAff(af){
+  const out=[];
+  (Array.isArray(af)?af:[]).forEach(v=>{const k=String(v||'').trim();if(!k)return;const val=PF_AGE_AFF_MAP[k]||k;if(out.indexOf(val)<0)out.push(val)});
+  return out.length?out:['소속 없음'];
+}
+function pfAdultDue(d){
+  if(!d||d.ageMigV===1)return false;
+  if(!(d.accountType==='student'||d.memberGroup==='student'))return false;
+  const a=ageNow(d.birth);
+  return (a!==null&&a>=18);
+}
+async function pfAutoAdult(uid,d){
+  if(!pfAdultDue(d))return false;
+  const a=ageNow(d.birth);
+  const upd={
+    accountType:'general', memberGroup:'general',
+    affiliation:pfMapAdultAff(d.affiliation),
+    affiliationPrev:(d.affiliation||[]),
+    typeConvertedFrom:(d.accountType||'student'),
+    typeConvertedAt:firebase.firestore.FieldValue.serverTimestamp(),
+    adultConvertedAt:firebase.firestore.FieldValue.serverTimestamp(),
+    ageMigV:1,
+    ageMigBak:{accountType:(d.accountType||''),memberGroup:(d.memberGroup||''),affiliation:(d.affiliation||[])}
+  };
+  await DB.collection('users').doc(uid).update(upd);
+  Object.assign(d,upd,{typeConvertedAt:new Date(),adultConvertedAt:new Date()});
+  MYD=d;
+  const box=document.createElement('div');
+  box.id='adultConvertNotice';
+  box.style.cssText='margin:14px 0;padding:14px 16px;background:#e4f2ef;border:1.5px solid #9ecfc6;border-radius:12px;color:#0f766e;line-height:1.7;font-size:14px';
+  box.innerHTML='🎓 <b>만 '+a+'세가 되어 회원 유형이 [일반회원]으로 전환되었습니다.</b><br><span style="color:#3f5d58;font-size:13px">보호자 연동 정보와 전환 전 소속은 그대로 보관되며, 소속 표기만 성인용으로 바뀌었습니다. 지도자·강사 활동을 원하시면 마이 프로필에서 연맹 자격번호를 등록해 주세요.</span>';
+  const anchor=document.getElementById('myCard');
+  if(anchor&&anchor.parentNode)anchor.parentNode.insertBefore(box,anchor);
+  return true;
+}
 AUTH.onAuthStateChanged(async u=>{
   if(!u){location.href='login.html';return}
   const doc=await DB.collection('users').doc(u.uid).get();
   // 회원 문서가 없는 계정(가입 중단 등) — 로그아웃 후 이동해 무한 리다이렉트 방지
   if(!doc.exists){await AUTH.signOut().catch(()=>{});location.href='login.html';return}
   const d=doc.data();MYD=d;
+  // [연령] 만 18세 도달 학생회원 자동 전환 — 실패해도 페이지는 그대로 동작합니다
+  try{ await pfAutoAdult(u.uid,d); }catch(e){ console.warn('adult convert',e); }
   document.getElementById('myCard').style.display='block';
   document.getElementById('myName').textContent=d.name;
   document.getElementById('mySub').textContent=d.region+' 권역 · '+(d.edu2026?'2026 자율연수 이수':'연수 미이수')+' · '+d.email;
