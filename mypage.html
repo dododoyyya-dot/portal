@@ -1131,7 +1131,11 @@ function loadMyGuardian(){
   else if(MYD&&(MYD.accountType==='student'||MYD.memberGroup==='student')){
     // [연령] 가입 당시 미성년이었더라도 지금 만 18세 이상이면 보호자 연동 안내를 띄우지 않습니다.
     if(isMinorNow(MYD.birth)===false){
-      el.innerHTML='<b style="color:#0f766e">✓ 만 '+ageNow(MYD.birth)+'세 — 성인 회원</b> <span style="color:var(--gray);font-size:12.5px">가입 시에는 학생회원이었으나 현재는 보호자 연동이 필요하지 않습니다.</span>';
+      // [전환대기] 나이는 성인인데 회원유형이 아직 학생회원이면, '성인'이라고만 적어 오해를 주지 않도록
+      //   전환이 아직 반영되지 않았음을 그대로 알려줍니다.
+      const _pend=(MYD.accountType==='student'||MYD.memberGroup==='student');
+      el.innerHTML='<b style="color:#0f766e">✓ 만 '+ageNow(MYD.birth)+'세 — 성인</b> <span style="color:var(--gray);font-size:12.5px">보호자 연동은 더 이상 필요하지 않습니다.</span>'
+        +(_pend?'<div style="margin-top:6px;padding:9px 12px;background:#fdf6e7;border:1.5px solid #e8d3a0;border-radius:9px;color:#8a5a00;font-weight:700;font-size:12.5px;line-height:1.65">⏳ 회원유형이 아직 <b>학생회원</b>으로 남아 있습니다 — 사무국에서 <b>일반회원</b>으로 전환 처리 중입니다.<br><span style="font-weight:600;color:#7a6636">전환 전 소속·보호자 연동 정보는 그대로 보관되며, 이용에는 제한이 없습니다.</span></div>':'');
     }else{
       el.innerHTML='<b style="color:#C41E2F">⚠️ 보호자 미연동 (임시회원)</b> — 보호자가 발급한 6자리 연동 코드를 위에 입력하면 정회원으로 전환됩니다.';
     }
@@ -1605,6 +1609,8 @@ function pfMapAdultAff(af){
   (Array.isArray(af)?af:[]).forEach(v=>{const k=String(v||'').trim();if(!k)return;const val=PF_AGE_AFF_MAP[k]||k;if(out.indexOf(val)<0)out.push(val)});
   return out.length?out:['소속 없음'];
 }
+// [전환실패 표면화] 자동 전환이 막혔을 때의 상태 — 화면 안내에 사용합니다
+let PF_ADULT_FAIL=null;
 function pfAdultDue(d){
   if(!d||d.ageMigV===1)return false;
   if(!(d.accountType==='student'||d.memberGroup==='student'))return false;
@@ -1624,7 +1630,15 @@ async function pfAutoAdult(uid,d){
     ageMigV:1,
     ageMigBak:{accountType:(d.accountType||''),memberGroup:(d.memberGroup||''),affiliation:(d.affiliation||[])}
   };
-  await DB.collection('users').doc(uid).update(upd);
+  // [전환실패 표면화] 보안 규칙 등으로 쓰기가 막히면 조용히 넘어가지 않고 사유를 남깁니다.
+  //   (예전에는 실패해도 아무 표시가 없어, 화면에는 '성인'이라 뜨는데 회원유형은 학생회원으로 남았습니다)
+  try{
+    await DB.collection('users').doc(uid).update(upd);
+  }catch(e){
+    PF_ADULT_FAIL={age:a, code:(e&&e.code)||'', msg:(e&&e.message)||''};
+    console.warn('adult convert blocked',e);
+    return false;
+  }
   Object.assign(d,upd,{typeConvertedAt:new Date(),adultConvertedAt:new Date()});
   MYD=d;
   const box=document.createElement('div');
