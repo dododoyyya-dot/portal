@@ -1321,47 +1321,38 @@ async function saveProfile(){
     setTimeout(()=>el.focus(),250);setTimeout(()=>{el.style.border=''},4000);
     PFBUSY=false;return true;
   }
-  if(req('pfBirth','생년월일'))return;
-  if(req('pfGender','성별'))return;
-  if(req('pfAddr','집 주소'))return;
-  if(req('pfAddr2','상세주소 (동·호수)'))return;
-  if(!aaSave().length){
-    m.textContent='⚠ 「활동 지역(활동 가능 범위)」은 모든 회원 필수입니다 — 지도에서 최소 1곳 이상 선택해주세요';m.style.color='#8c1622';
-    const box=document.getElementById('aaSidoRow');
-    if(box){box.scrollIntoView({behavior:'smooth',block:'center'});box.style.outline='2px solid #C41E2F';setTimeout(()=>{box.style.outline=''},4000);}
-    PFBUSY=false;return;
-  }
-  if(!(aaBase()||(typeof MYD!=='undefined'&&MYD&&MYD.baseCity))){
-    m.textContent='⚠ 「거점 시·군·구」는 모든 회원 필수입니다 — 활동 지역에서 첫 번째로 선택한 시·군·구가 거점이 됩니다';m.style.color='#8c1622';
-    const box=document.getElementById('aaSidoRow');
-    if(box){box.scrollIntoView({behavior:'smooth',block:'center'});box.style.outline='2px solid #C41E2F';setTimeout(()=>{box.style.outline=''},4000);}
-    PFBUSY=false;return;
-  }
+  // ══════════ [저장 정책] 기입한 내용은 일단 그대로 저장합니다 ══════════
+  //  예전에는 필수 항목이 하나라도 비면 저장 자체가 막혔습니다.
+  //  세 개를 채우고 하나(예: 피복 모자)를 놓친 회원이 "입력했는데 저장이 안 된다"고 느끼는 원인이었습니다.
+  //  이제는 저장을 먼저 하고, 비어 있는 항목은 저장 후 한 번에 안내합니다.
+  const PF_MISS=[];
   {
-    // [소속·학생] 학생회원은 학생용 소속 항목(pfSaf*)으로 검사 — 성인용 체크박스는 학생에게 숨겨져 있음
-    const _ck=id=>{const e=document.getElementById(id);return !!(e&&e.checked)};
-    const _stu=pfIsStudent(MYD);
-    const hasAf=_stu
-      ?(_ck('pfSaf1')||_ck('pfSaf2')||_ck('pfSaf3')||_ck('pfSaf0'))
-      :(document.getElementById('pfAf1').checked||document.getElementById('pfAf2').checked||document.getElementById('pfAf3').checked||document.getElementById('pfAf0').checked||document.getElementById('pfAfEtc').value.trim()!=='');
-    if(!hasAf){
-      m.textContent='⚠ 「소속」을 최소 1개 선택해주세요 (해당 없으면 "소속 없음"을 선택)';m.style.color='#8c1622';
-      const box=_stu?document.getElementById('pfStudentAffBox'):document.getElementById('pfAf1').closest('div');
-      if(box){box.scrollIntoView({behavior:'smooth',block:'center'});box.style.outline='2px solid #C41E2F';setTimeout(()=>{box.style.outline=''},4000);}
-      PFBUSY=false;return;
+    const blank=id=>{const e=document.getElementById(id);return !e||String(e.value||'').trim()===''};
+    const ck=id=>{const e=document.getElementById(id);return !!(e&&e.checked)};
+    if(blank('pfBirth'))PF_MISS.push('생년월일');
+    if(blank('pfGender'))PF_MISS.push('성별');
+    if(blank('pfAddr'))PF_MISS.push('집 주소');
+    if(blank('pfAddr2'))PF_MISS.push('상세주소 (동·호수)');
+    if(!aaSave().length)PF_MISS.push('활동 가능 범위');
+    if(!(aaBase()||(typeof MYD!=='undefined'&&MYD&&MYD.baseCity)))PF_MISS.push('거점 시·군·구');
+    const stu=pfIsStudent(MYD);
+    const hasAf=stu
+      ?(ck('pfSaf1')||ck('pfSaf2')||ck('pfSaf3')||ck('pfSaf0'))
+      :(ck('pfAf1')||ck('pfAf2')||ck('pfAf3')||ck('pfAf0')||!blank('pfAfEtc'));
+    if(!hasAf)PF_MISS.push('소속');
+    if(!stu){
+      if(ck('pfAf2')&&blank('pfTeachLv'))PF_MISS.push('학교급 (교원)');
+      if((ck('pfAf2')||ck('pfAf3'))&&blank('pfWork'))PF_MISS.push('근무지 (학교·기관명)');
     }
-  }
-  // [소속] 학생회원은 성인용(교원·근무지) 검증을 적용하지 않습니다
-  if(!pfIsStudent(MYD)){
-    if(document.getElementById('pfAf2').checked&&req('pfTeachLv','학교급 (교원)'))return;
-    if((document.getElementById('pfAf2').checked||document.getElementById('pfAf3').checked)&&req('pfWork','근무지 (학교·기관명)'))return;
-  }
-  // [피복] 강사복 지급 대상(지도자·교사·국가공인자격)에게만 필수 — 학생·일반·선수는 제외
-  if(pfNeedsPay(MYD)){
-    if(req('pfSize','피복 사이즈(상의)'))return;
-    if(req('pfSizePants','피복 사이즈(하의)'))return;
-    if(req('pfSizeShoe','피복 사이즈(신발)'))return;
-    if(req('pfSizeCap','피복 사이즈(모자)'))return;
+    // 피복 사이즈 — 강사복 지급 대상에게만 안내 (4종을 한 번에 알려줍니다)
+    if(pfNeedsPay(MYD)){
+      const sz=[];
+      if(blank('pfSize'))sz.push('상의');
+      if(blank('pfSizePants'))sz.push('하의');
+      if(blank('pfSizeShoe'))sz.push('신발');
+      if(blank('pfSizeCap'))sz.push('모자');
+      if(sz.length)PF_MISS.push('피복 사이즈 ('+sz.join('·')+')');
+    }
   }
   try{
     let af=[];
@@ -1431,7 +1422,7 @@ async function saveProfile(){
       natCertName:document.getElementById('pfNatCertName').value.trim(),
       natCertDoc:ncDoc,
       signatureImg:sigImg,   // [서명이미지] 수당 신청서 등에서 재사용
-      affiliation:af,
+      affiliation:(af.length?af:((MYD&&MYD.affiliation)||[])),   // [저장 정책] 하나도 고르지 않았으면 기존 소속을 지우지 않습니다
       quals:{leader:document.getElementById('pfLeader').value,referee:document.getElementById('pfRef').value,youth:document.getElementById('pfYouth').checked},
       career:document.getElementById('pfCareer').value.trim(),
       clothingSize:document.getElementById('pfSize').value,
@@ -1500,7 +1491,10 @@ async function saveProfile(){
     // 주민등록번호 — 별도 보안 컬렉션 저장 (입력했을 때만)
     const rrnRaw=document.getElementById('pfRrn').value.replace(/[^0-9]/g,'');
     if(rrnRaw){
-      if(rrnRaw.length!==13){m.textContent='⚠ 주민등록번호는 13자리입니다 (000000-0000000)';m.style.color='#8c1622';PFBUSY=false;return}
+      // [저장 정책] 자릿수가 맞지 않으면 주민번호만 건너뛰고, 나머지 저장 결과는 그대로 안내합니다.
+      //   (예전에는 여기서 함수가 끝나 회원 정보는 이미 저장됐는데도 '저장되었습니다'가 뜨지 않았습니다)
+      if(rrnRaw.length!==13){ PF_MISS.push('주민등록번호 (13자리가 아니라 저장하지 않았습니다)'); }
+      else{
       await DB.collection('privateInfo').doc(AUTH.currentUser.uid).set({
         rrn:rrnRaw.slice(0,6)+'-'+rrnRaw.slice(6),name:MYD.name||'',
         updatedAt:firebase.firestore.FieldValue.serverTimestamp()
@@ -1508,12 +1502,22 @@ async function saveProfile(){
       document.getElementById('pfRrn').value='';
       document.getElementById('pfRrn').placeholder='●●●●●●-●●●●●●●  (등록 완료 — 변경할 때만 다시 입력)';
       document.getElementById('pfRrnState').innerHTML='✅ <b style="color:#0f766e">주민등록번호 등록 완료.</b> 🔒 본인과 중앙 사무국만 열람 가능합니다.';
+      }
     }
     Object.assign(MYD,upd);
     document.getElementById('pfDegDoc').value='';document.getElementById('pfNatCertDoc').value='';
     fillProfile(MYD);
-    m.textContent='✓ 저장되었습니다';m.style.color='#0f766e';
-    pfCollapse(MYD);window.scrollTo({top:0,behavior:'smooth'});alert('프로필이 저장되었습니다.');
+    if(PF_MISS.length){
+      m.innerHTML='✓ 저장되었습니다 &nbsp;<span style="color:#8a5a00">— 아직 비어 있는 항목: '+PF_MISS.map(esc).join(' · ')+'</span>';
+      m.style.color='#0f766e';
+    }else{
+      m.textContent='✓ 저장되었습니다';m.style.color='#0f766e';
+    }
+    pfCollapse(MYD);window.scrollTo({top:0,behavior:'smooth'});
+    alert(PF_MISS.length
+      ? ('프로필이 저장되었습니다.\n\n다만 아래 항목이 아직 비어 있습니다:\n· '+PF_MISS.join('\n· ')
+         +'\n\n강습 배정·물품 발송·수당 지급에 필요한 항목입니다. 시간 되실 때 채워 주세요.')
+      : '프로필이 저장되었습니다.');
   }catch(e){
     let msg=e&&e.message||String(e);
     if(/permission|insufficient/i.test(msg))msg='저장 권한 오류가 발생했습니다. 새로고침 후 다시 시도해 주시고, 계속되면 사무국(031-984-3248)으로 알려주세요.';
