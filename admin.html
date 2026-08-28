@@ -1325,7 +1325,7 @@ async function loadConsentBox(){
 //  natCertName 이 남아 승인이 계속 막힙니다. 이 도구로 목록을 확인한 뒤 게이트만 풀어 줍니다.
 //  · 신고 내용(natCertName·natCertDoc)은 지우지 않습니다 — 승인 차단만 면제합니다
 //  · 언제든 되돌릴 수 있습니다
-const NCW_LABEL={instructor:'KFDF공인 심판·지도자',teacher:'교사(교원)',natcert:'국가공인자격증',athlete:'선수회원',general:'일반회원',student:'학생회원'};
+const NCW_LABEL={instructor:'KFDF공인 심판·지도자',teacher:'교사(교원)',natcert:'국가공인자격증 취득회원',athlete:'선수회원',general:'일반회원',student:'학생회원'};
 let NCWAIVE=[];
 function ncWaiveBoxEl(){const b=document.getElementById('ncWaiveBox');b.style.display='block';return b}
 async function ncWaiveScan(){
@@ -2483,7 +2483,7 @@ function showMemberModal(uid){
   const quals=licLabel(uid,q);   // [보유자격] 연맹 자격증 DB 기준 (없으면 자기신고값을 '미검증'으로)
   const hire=(v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc);
   const rows=[
-    ['회원 유형',esc({instructor:'지도자·강사',teacher:'교사(교원)',natcert:'국가공인자격증',athlete:'선수회원',general:'일반회원',student:'학생회원'}[v.accountType]||v.accountType||'-')+(v.memberClass?' <b style="font-size:11px;color:#8a5a00">· '+esc(v.memberClass)+'</b>':'')+(v.typeConvertedFrom?' <span style="font-size:11px;color:#8a919d">(전환 전: '+esc(v.typeConvertedFrom)+')</span>':'')],
+    ['회원 유형',esc({instructor:'지도자·강사',teacher:'교사(교원)',natcert:'국가공인자격증 취득회원',athlete:'선수회원',general:'일반회원',student:'학생회원'}[v.accountType]||v.accountType||'-')+(v.memberClass?' <b style="font-size:11px;color:#8a5a00">· '+esc(v.memberClass)+'</b>':'')+(v.typeConvertedFrom?' <span style="font-size:11px;color:#8a919d">(전환 전: '+esc(v.typeConvertedFrom)+')</span>':'')],
     ['안전교육',(function(){if(!v.safetyEdu)return '<span style="color:#C41E2F;font-weight:800">미이수</span>';try{var t=v.safetyEduAt&&v.safetyEduAt.toDate?v.safetyEduAt.toDate():(v.safetyEduAt?new Date(v.safetyEduAt):null);if(!t)return '<b style="color:#0f766e">이수</b>';var ok=(Date.now()-t.getTime())<365*86400000;return (ok?'<b style="color:#0f766e">이수 ✓</b>':'<span style="color:#C41E2F;font-weight:800">만료</span>')+' <span style="font-size:11px;color:#8a919d">'+t.toISOString().slice(0,10)+'</span>';}catch(e){return '<b style="color:#0f766e">이수</b>'}})()],
     ['이메일',esc(v.email||'-')],
     ['성별·생년월일',esc(v.gender||'-')+' · '+esc(v.birth||'-')],
@@ -5100,7 +5100,7 @@ async function convertUserType(uid){
   try{
     const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
     const cur=d.accountType||'?';
-    const t=prompt('['+(d.name||'')+'] 현재 유형: '+cur+'\n\n전환할 유형 번호를 입력하세요:\n1 = 일반회원 (general)\n2 = 지도자·강사 (instructor)\n3 = 교사(교원) (teacher)\n4 = 학생회원 (student)\n5 = 선수회원 (athlete)\n6 = 국가공인자격증 (natcert)');
+    const t=prompt('['+(d.name||'')+'] 현재 유형: '+cur+'\n\n전환할 유형 번호를 입력하세요:\n1 = 일반회원 (general)\n2 = 지도자·강사 (instructor)\n3 = 교사(교원) (teacher)\n4 = 학생회원 (student)\n5 = 선수회원 (athlete)\n6 = 국가공인자격증 취득회원 (natcert)');
     if(t===null)return;
     const map={'1':['general','general'],'2':['instructor','active'],'3':['teacher','active'],'4':['student','student'],'5':['athlete','general'],'6':['natcert','active']};
     if(!map[t.trim()]){alert('1~6 중에서 입력해주세요.');return}
