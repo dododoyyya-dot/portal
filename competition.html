@@ -463,6 +463,46 @@ async function togglePayStatus(slotId,uid,pid,at){
     viewRoster(slotId);
   }catch(e){alert('입금상태 변경 실패: '+e.message)}
 }
+// ══════════ [참가자 상태] 신청대기 / 입금대기 / 완료 · 승인·반려 ══════════
+//  배열(claimed)을 통째로 다시 쓰지 않고, 공고 문서의 맵 필드(reviewStatus.{키})만 갱신합니다.
+//  → 담당자 두 명이 동시에 처리해도 서로의 변경이 사라지지 않습니다. (수기동의 확인과 같은 방식)
+function claimState(s,c){
+  const key=ckey(c);
+  const rv=((s.reviewStatus||{})[key])||{};
+  if((s.confirmed||[]).indexOf(c.uid)>=0)return {t:'🏅 확정',col:'#b8860b',reason:''};
+  if(rv.st==='반려')return {t:'❌ 반려',col:'#C41E2F',reason:rv.reason||''};
+  if(rv.st==='승인'){
+    const needPay=!!(s.extras&&s.extras.needPay);
+    if(needPay&&c.payStatus!=='입금확인')return {t:'💳 입금대기',col:'#8a5a00',reason:''};
+    return {t:'✅ 완료',col:'#0f766e',reason:''};
+  }
+  return {t:'⏳ 신청대기',col:'#6b7280',reason:''};
+}
+async function setClaimReview(slotId,key,st,name){
+  let reason='';
+  if(st==='반려'){
+    reason=prompt('반려 사유를 입력해주세요 — 신청자에게 그대로 안내됩니다.\n(예: 참가 자격 미충족, 정원 초과)','')||'';
+    if(!reason.trim())return;
+  }else if(!confirm((name?'['+name+'] ':'')+'신청을 승인 처리할까요?'))return;
+  try{
+    await DB.collection('compSlots').doc(slotId).update(
+      new firebase.firestore.FieldPath('reviewStatus',key),
+      {st:st,by:(CMY&&CMY.name)||'담당자',at:new Date().toISOString(),reason:reason.trim()});
+    await _refreshSlot(slotId);
+    const m=document.getElementById('rosterModal'); if(m)m.remove();
+    viewRoster(slotId);
+  }catch(e){ alert('처리 실패: '+e.message+'\n(중앙 관리자 권한이 필요할 수 있습니다)'); }
+}
+async function clearClaimReview(slotId,key){
+  if(!confirm('심사 결과를 지우고 [신청대기] 상태로 되돌릴까요?'))return;
+  try{
+    await DB.collection('compSlots').doc(slotId).update(
+      new firebase.firestore.FieldPath('reviewStatus',key), firebase.firestore.FieldValue.delete());
+    await _refreshSlot(slotId);
+    const m=document.getElementById('rosterModal'); if(m)m.remove();
+    viewRoster(slotId);
+  }catch(e){ alert('처리 실패: '+e.message); }
+}
 function viewRoster(id){
   const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
   const s=doc.data();
@@ -490,8 +530,17 @@ function viewRoster(id){
     return ' <span style="font-size:10.5px;font-weight:900;color:#C41E2F">⚠ 보호자동의 필요</span>'
       +(staff?' <button onclick="markPaper(\''+id+'\',\''+key+'\',\''+cesc(c.name||'')+'\')" style="border:1.5px solid #e6b422;background:#fffbeb;color:#8a5a00;border-radius:8px;padding:2px 8px;font-size:10.5px;font-weight:800;cursor:pointer" title="담당자가 서면(수기) 동의서를 수령한 경우 클릭">📄 수기동의서 확인완료</button>':'');
   };
+  // [참가자 상태] 상태 표시 + 담당자용 승인·반려 버튼
+  const stCell=c=>{const q=claimState(s,c);return '<b style="color:'+q.col+'">'+q.t+'</b>'+(q.reason?'<div style="font-size:10.5px;color:#8a919d;margin-top:2px">'+cesc(q.reason)+'</div>':'')};
+  const _rvb='border-radius:8px;padding:2px 8px;font-size:10.5px;font-weight:800;cursor:pointer;white-space:nowrap';
+  const revCell=c=>{const key=ckey(c);const q=claimState(s,c);
+    return '<td '+td+' style="text-align:center;white-space:nowrap">'
+      +'<button onclick="setClaimReview(\''+id+'\',\''+key+'\',\'승인\',\''+cesc(c.name||'')+'\')" style="border:1.5px solid #0f766e;background:#e4f2ef;color:#0f766e;'+_rvb+'">✅ 승인</button> '
+      +'<button onclick="setClaimReview(\''+id+'\',\''+key+'\',\'반려\',\''+cesc(c.name||'')+'\')" style="border:1.5px solid #C41E2F;background:#fff;color:#C41E2F;'+_rvb+'">❌ 반려</button>'
+      +(q.t==='⏳ 신청대기'?'':'<br><button onclick="clearClaimReview(\''+id+'\',\''+key+'\')" style="border:1px solid #dfe5ee;background:#fff;color:#8a919d;'+_rvb+';margin-top:3px">↩ 되돌리기</button>')
+      +'</td>';};
   let rows;
-  if(!list.length)rows='<tr><td '+td+' colspan="9" style="text-align:center;color:#8a919d">아직 신청자가 없습니다</td></tr>';
+  if(!list.length)rows='<tr><td '+td+' colspan="10" style="text-align:center;color:#8a919d">아직 신청자가 없습니다</td></tr>';
   else if(staff){
     rows=list.map((c,i)=>{
       if(c.team){
@@ -501,30 +550,30 @@ function viewRoster(id){
             +(r.birth&&ageOf(r.birth)>0&&ageOf(r.birth)<18?(paper[ckey(c)+'_'+j]?' <b style="color:#0f766e" title="'+cesc((paper[ckey(c)+'_'+j].by||'')+' 확인 '+String(paper[ckey(c)+'_'+j].at||'').slice(0,10))+'">📄 수기동의✓</b>':' <b style="color:#C41E2F">⚠미성년</b> <button onclick="markPaper(\''+id+'\',\''+ckey(c)+'_'+j+'\',\''+cesc(r.name)+'\')" style="border:1.5px solid #e6b422;background:#fffbeb;color:#8a5a00;border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:800;cursor:pointer">📄 수기동의서 확인완료</button>'):'')).join('<br>')+'</div></details>'
           +'<div style="margin-top:6px"><button onclick="openRosterEdit(\''+id+'\',\''+ckey(c)+'\')" style="border:1.5px solid #153A77;background:#fff;color:#153A77;border-radius:8px;padding:3px 10px;font-size:11.5px;font-weight:800;cursor:pointer">✏️ 명단 수정 (추가·제거)</button></div></td>'
           +'<td '+td+'>'+cesc((c.prefs||[])[0]||'-')+'</td><td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
-          +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td>'
-          +(entry?_payCell(id,c,td):'')+'</tr>';
+          +'<td '+td+' style="text-align:center">'+stCell(c)+'</td>'
+          +(entry?_payCell(id,c,td):'')+revCell(c)+'</tr>';
       }
       return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b>'+tbadge(c)+consentBadge(c,ckey(c))+'</td>'
       +(entry?'<td '+td+'>'+cesc(c.birth||'-')+'</td><td '+td+'>'+cesc(c.gender||'-')+'</td><td '+td+'>'+cesc(c.school||c.club||'-')+'</td>':'')
       +'<td '+td+'>'+cesc(entry?((c.prefs||[]).join(' · ')||'-'):((c.prefs||[]).map((p,j)=>(j+1)+'지망 '+p).join(' · ')||'-'))+'</td>'
       +'<td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
-      +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td>'
-      +(entry?_payCell(id,c,td):'')+'</tr>';
+      +'<td '+td+' style="text-align:center">'+stCell(c)+'</td>'
+      +(entry?_payCell(id,c,td):'')+revCell(c)+'</tr>';
     }).join('');
   }else{
     rows=list.map((c,i)=>{
       if(c.team){
         return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>👥 '+cesc(c.name)+'</b> <span style="font-size:11.5px;color:#8a919d">'+cesc(c.teamType||'팀')+(c.teamOrg?' · '+cesc(c.teamOrg):'')+' · '+(c.rosterN||0)+'명</span></td>'
           +'<td '+td+'>'+cesc((c.prefs||[])[0]||'-')+'</td>'
-          +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td></tr>';
+          +'<td '+td+' style="text-align:center">'+stCell(c)+'</td></tr>';
       }
       return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(mname(c.name))+'</b>'+tbadge(c)+'</td>'
       +'<td '+td+'>'+cesc((c.prefs||[])[0]||'-')+'</td>'
-      +'<td '+td+' style="text-align:center">'+(confirmed.indexOf(c.uid)>=0?'<b style="color:#b8860b">🏅 확정</b>':'대기')+'</td></tr>';
+      +'<td '+td+' style="text-align:center">'+stCell(c)+'</td></tr>';
     }).join('');
   }
   const head=staff
-    ?'<tr><th '+th+'>연번</th><th '+th+'>성명</th>'+(entry?'<th '+th+'>생년월일</th><th '+th+'>성별</th><th '+th+'>학교·클럽</th>':'')+'<th '+th+'>희망 '+(entry?'부문':'임무')+'</th><th '+th+'>신청일</th><th '+th+'>상태</th>'+(entry?'<th '+th+'>입금</th>':'')+'</tr>'
+    ?'<tr><th '+th+'>연번</th><th '+th+'>성명</th>'+(entry?'<th '+th+'>생년월일</th><th '+th+'>성별</th><th '+th+'>학교·클럽</th>':'')+'<th '+th+'>희망 '+(entry?'부문':'임무')+'</th><th '+th+'>신청일</th><th '+th+'>상태</th>'+(entry?'<th '+th+'>입금</th>':'')+'<th '+th+'>심사</th></tr>'
     :'<tr><th '+th+'>연번</th><th '+th+'>성명</th><th '+th+'>'+(entry?'부문':'임무')+'</th><th '+th+'>상태</th></tr>';
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:'+(staff?'720px':'480px')+';width:100%;max-height:90vh;overflow:auto;padding:24px">'
     +'<b style="font-size:16px">👥 신청 현황 — '+cesc(s.title)+'</b>'
