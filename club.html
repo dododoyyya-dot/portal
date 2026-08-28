@@ -127,6 +127,12 @@
 
     <div id="clPane1">
     <h3 class="sub">🏠 내 클럽</h3>
+    <div style="background:#f6f8fb;border:1.5px solid #dfe5ee;border-radius:12px;padding:14px 16px;margin-bottom:14px">
+      <b style="font-size:13px">🔑 내 초대 코드 받기</b>
+      <span style="color:#6b7280;font-size:12.5px"> — 클럽장에게 알려주면 클럽원으로 초대받을 수 있습니다 (48시간 유효 · 1회용)</span>
+      <div style="margin-top:6px"><button class="cbtn cbtn-soft" style="padding:5px 12px;font-size:12px" onclick="issueClubInviteCode()">코드 발급</button>
+      <span id="myInviteCodeBox" style="margin-left:8px;font-size:13px;font-weight:700"></span></div>
+    </div>
     <div id="myClubList" class="board"><div class="bempty">불러오는 중…</div></div>
 
     </div>
@@ -586,13 +592,15 @@ async function joinByCode(){
 async function loadMyClubs(){
   const el=document.getElementById('myClubList');
   try{
-    const [own,mem,pend]=await Promise.all([
+    const [own,mem,pend,inv]=await Promise.all([
       DB.collection('clubs').where('ownerUid','==',KME.uid).limit(10).get(),
       DB.collection('clubs').where('memberUids','array-contains',KME.uid).limit(10).get(),
-      DB.collection('clubs').where('pendingUids','array-contains',KME.uid).limit(10).get()
+      DB.collection('clubs').where('pendingUids','array-contains',KME.uid).limit(10).get(),
+      // [비회원추가-A] 6자리 초대코드로 내가 초대받은 클럽 — 아직 회원이 아니므로 위 3개 쿼리엔 안 잡힘
+      DB.collection('clubs').where('clubInviteUids','array-contains',KME.uid).limit(10).get()
     ]);
     const seen={};const items=[];
-    own.docs.concat(mem.docs).concat(pend.docs).forEach(d=>{if(seen[d.id])return;seen[d.id]=1;items.push(d)});
+    own.docs.concat(mem.docs).concat(pend.docs).concat(inv.docs).forEach(d=>{if(seen[d.id])return;seen[d.id]=1;items.push(d)});
     MYCLUB_CACHE=items;
     if(!items.length){el.innerHTML='<div class="bempty">소속된 클럽이 없습니다. 아래에서 클럽을 찾거나 직접 만들어 보세요.</div>';return}
     el.innerHTML=items.map(d=>{
@@ -623,7 +631,7 @@ async function loadMyClubs(){
             +' <button class="cbtn cbtn-teal" style="padding:3px 10px;font-size:11.5px" onclick="approveChild(\''+d.id+'\',\''+p.cid+'\')">승인</button>'
             +' <button class="cbtn" style="padding:3px 10px;font-size:11.5px;background:#eceff4;color:#666" onclick="rejectChild(\''+d.id+'\',\''+p.cid+'\')">거절</button></span>').join(''):' <span style="font-size:12px;color:#8a919d">없음</span>')
           +'</div>'
-          +'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">회원 관리 (본인 '+((c.members||[]).length)+' · 자녀 '+cMem.length+'명)</summary>'
+          +'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">회원 관리 (본인 '+((c.members||[]).length)+' · 자녀 '+cMem.length+'명'+((c.guestMembers||[]).length?' · 비회원 '+(c.guestMembers||[]).length+'명':'')+')</summary>'
           +'<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'
           +(c.members||[]).map(mm=>'<span style="font-size:12.5px;background:#f6f8fb;border-radius:8px;padding:5px 10px">'+kesc(mm.name||'')
             +((c.tempUids||[]).indexOf(mm.uid)>=0?' <b style="color:#b8860b;font-size:11px">🕓 임시</b>':'')
@@ -632,7 +640,18 @@ async function loadMyClubs(){
             +'</span>').join('')
           +cMem.map(mm=>'<span style="font-size:12.5px;background:#eef7f2;border-radius:8px;padding:5px 10px">👧 '+kesc(mm.name||'')
             +' <button class="cbtn" style="padding:2px 8px;font-size:11px;background:#fff;color:#C41E2F;border:1px solid #f1c7cc" onclick="removeChildMember(\''+d.id+'\',\''+mm.cid+'\',\''+kesc(mm.name||'')+'\')">제외</button></span>').join('')
-          +'</div></details>';
+          // [비회원추가-B] 계정 없이 수기로만 등록된 클럽원 — members/memberUids와 완전히 분리된 guestMembers 배열
+          +(c.guestMembers||[]).map(mm=>'<span style="font-size:12.5px;background:#fbf3e7;border-radius:8px;padding:5px 10px">🧾 '+kesc(mm.name||'')+' <b style="color:#8a5a00;font-size:11px">비회원</b>'
+            +(mm.note?' <span style="color:#8a919d;font-size:11px">('+kesc(mm.note)+')</span>':'')
+            +' <button class="cbtn" style="padding:2px 8px;font-size:11px;background:#fff;color:#C41E2F;border:1px solid #f1c7cc" onclick="removeGuestMember(\''+d.id+'\',\''+mm.gid+'\',\''+kesc(mm.name||'')+'\')">제외</button></span>').join('')
+          +'</div>'
+          +'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+          +'<input id="inv6_'+d.id+'" maxlength="6" placeholder="6자리 초대코드" style="width:112px;padding:5px 8px;border:1.5px solid #dfe5ee;border-radius:8px;font-size:12.5px">'
+          +'<button class="cbtn cbtn-teal" style="padding:4px 10px;font-size:11.5px" onclick="inviteByCode(\''+d.id+'\')">코드로 초대</button>'
+          +'<button class="cbtn cbtn-soft" style="padding:4px 10px;font-size:11.5px" onclick="openGuestAdd(\''+d.id+'\')">+ 비회원(수기) 추가</button>'
+          +'</div>'
+          +((c.clubInviteUids||[]).length?'<div style="margin-top:6px;font-size:11.5px;color:#8a919d">초대 대기: '+(c.clubInviteUids||[]).map(uid=>{const iv=(c.clubInvites||{})[uid]||{};return kesc(iv.name||'')+' <button class="cbtn" style="padding:1px 6px;font-size:10.5px;background:#fff;color:#666;border:1px solid #e5e9f0" onclick="cancelClubInvite(\''+d.id+'\',\''+uid+'\')">취소</button>';}).join(', ')+'</div>':'')
+          +'</details>';
         if(c.status==='임시'){
           const cands=(c.members||[]).filter(mm=>mm.uid!==KME.uid);
           // [연령] 클럽 개설 당시엔 미성년이었지만 지금은 만 18세 이상인 클럽장 —
@@ -661,6 +680,15 @@ async function loadMyClubs(){
           +'<button class="cbtn cbtn-main" style="padding:6px 16px;font-size:12.5px" onclick="acceptHandover(\''+d.id+'\',\''+kesc(c.name)+'\')">수락 — 회장 맡기</button> '
           +'<button class="cbtn" style="padding:6px 16px;font-size:12.5px;background:#eceff4;color:#666" onclick="declineHandover(\''+d.id+'\')">거절</button></div>';
       }
+      // [비회원추가-A] 클럽장이 6자리 코드로 나를 초대한 경우 — 수락 전엔 members에 반영되지 않습니다
+      let inviteUI='';
+      if((c.clubInviteUids||[]).indexOf(KME.uid)>=0){
+        inviteUI='<div style="margin-top:10px;background:#eef7f2;border:1.5px solid #cfe3d8;border-radius:10px;padding:12px 14px">'
+          +'<b style="font-size:13px;color:#0f766e">👥 클럽 가입 초대가 도착했습니다!</b>'
+          +'<div style="font-size:12px;color:#6b7280;margin:4px 0 8px;line-height:1.6">수락하면 이 클럽의 회원으로 등록됩니다.</div>'
+          +'<button class="cbtn cbtn-main" style="padding:6px 16px;font-size:12.5px" onclick="acceptClubInvite(\''+d.id+'\',\''+kesc(c.name)+'\')">수락 — 가입하기</button> '
+          +'<button class="cbtn" style="padding:6px 16px;font-size:12.5px;background:#eceff4;color:#666" onclick="declineClubInvite(\''+d.id+'\')">거절</button></div>';
+      }
       const leaveBtn=(isMember&&!isOwner)?'<button class="cbtn" style="padding:4px 12px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="leaveClub(\''+d.id+'\',\''+kesc(c.name)+'\')">클럽 탈퇴</button>':'';
       const homeBtn=(isOwner||isMember)?'<a class="cbtn cbtn-teal" style="padding:4px 12px;font-size:12px;text-decoration:none;display:inline-block" href="clubhome.html?id='+d.id+'">🏠 클럽 홈</a>':'';
       const ownerBtns=isOwner?'<button class="cbtn cbtn-soft" style="padding:4px 12px;font-size:12px" onclick="editMyClub(\''+d.id+'\')">✏️ 수정</button>'
@@ -675,7 +703,7 @@ async function loadMyClubs(){
         +(c.intro?'<div class="cmeta2">'+kesc(c.intro)+'</div>':'')
         +'<div class="cmeta2" style="color:#8a94a6">소속: KFDF › '+kesc(c.sido)+' 연맹 › '+kesc(c.gugun||'')+'</div>'
         +(c.rulesText?'<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">클럽 내규 보기</summary><div style="font-size:12.5px;color:#4b5563;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:10px 13px;margin-top:6px">'+kesc(c.rulesText)+'</div></details>':'')
-        +ownerUI+hoUI+'</div>';
+        +ownerUI+hoUI+inviteUI+'</div>';
     }).join('');
     fillJoinInfos(items);
     clearTempFlags(items);
@@ -1065,6 +1093,129 @@ async function declineHandover(id){
   if(!confirm('회장 인수 요청을 거절할까요?'))return;
   try{await DB.collection('clubs').doc(id).update({handoverTo:firebase.firestore.FieldValue.delete(),handoverToName:firebase.firestore.FieldValue.delete()});loadMyClubs();}
   catch(e){alert('거절 실패: '+e.message)}
+}
+// ══════════ [비회원 클럽원 추가] (B) 수기 직접입력 ══════════
+// 계정이 없는 사람을 이름만으로 클럽 명단에 추가합니다. members/memberUids는 절대 건드리지 않는
+// 완전히 별도의 guestMembers 배열에만 저장하므로, 회원 수를 세거나 members를 순회하는 기존 코드
+// (정원 통계·대회 팀신청 명단 불러오기 등) 전부 이 배열의 존재 자체를 모릅니다 — 영향 없음.
+async function openGuestAdd(id){
+  const name=(prompt('추가할 분의 이름을 입력하세요 (계정이 없는 비회원)')||'').trim();
+  if(!name)return;
+  const note=(prompt('참고사항 (선택 — 학년·학교·연락처 등 자유롭게, 비워두어도 됩니다)')||'').trim();
+  try{
+    await DB.runTransaction(async tx=>{
+      const ref=DB.collection('clubs').doc(id);
+      const doc=await tx.get(ref);const c=doc.data();
+      const gm=(c.guestMembers||[]).slice();
+      gm.push({gid:'g'+Date.now()+Math.floor(Math.random()*1000),name:name,note:note,addedBy:KME.uid,addedByName:(KMY&&KMY.name)||'',at:new Date().toISOString()});
+      tx.update(ref,{guestMembers:gm});
+    });
+    loadMyClubs();
+  }catch(e){alert('추가 실패: '+e.message)}
+}
+async function removeGuestMember(id,gid,name){
+  if(!confirm('['+name+']을(를) 명단에서 제외할까요? (비회원 항목 삭제)'))return;
+  try{
+    await DB.runTransaction(async tx=>{
+      const ref=DB.collection('clubs').doc(id);
+      const doc=await tx.get(ref);const c=doc.data();
+      tx.update(ref,{guestMembers:(c.guestMembers||[]).filter(x=>x.gid!==gid)});
+    });
+    loadMyClubs();
+  }catch(e){alert('제외 실패: '+e.message)}
+}
+// ══════════ [비회원 클럽원 추가] (A) 6자리 초대코드 검색 + 알림/수락 ══════════
+// 1) 초대받을 사람이 자기 화면('내 클럽' 탭 상단)에서 코드를 발급(48시간 유효·1회용) → 클럽장에게 전달
+// 2) 클럽장이 그 코드를 입력해 대상자를 확인 후 초대 발송 — 이 시점엔 아직 clubInvites(map)에만 기록되고
+//    members/memberUids는 그대로입니다 (정식 가입 아님)
+// 3) 초대받은 사람이 '내 클럽' 화면에서 수락해야만 members/memberUids에 반영됩니다(approveJoin과 동일한 형태)
+async function issueClubInviteCode(){
+  if(!KME||!KMY){alert('로그인이 필요합니다.');return}
+  let code='',exists=true,tries=0;
+  while(exists&&tries<5){
+    code=String(Math.floor(100000+Math.random()*900000));
+    const chk=await DB.collection('clubInviteCodes').doc(code).get();
+    exists=chk.exists;tries++;
+  }
+  await DB.collection('clubInviteCodes').doc(code).set({
+    uid:KME.uid,name:(KMY&&KMY.name)||'',gender:(KMY&&KMY.gender)||'',birth:(KMY&&KMY.birth)||'',
+    createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+    expAt:Date.now()+48*3600*1000
+  });
+  const box=document.getElementById('myInviteCodeBox');
+  if(box)box.innerHTML='발급된 코드: <b style="font-size:16px;letter-spacing:2px">'+code+'</b> <span style="color:#8a919d;font-size:11.5px">(48시간 유효 · 클럽장에게 알려주세요)</span>';
+}
+async function inviteByCode(id){
+  const inp=document.getElementById('inv6_'+id);
+  const code=(inp&&inp.value||'').trim();
+  if(!/^\d{6}$/.test(code)){alert('6자리 숫자 코드를 입력해주세요.');return}
+  try{
+    const cref=DB.collection('clubInviteCodes').doc(code);
+    const cdoc=await cref.get();
+    if(!cdoc.exists){alert('유효하지 않은 코드입니다.');return}
+    const info=cdoc.data();
+    if(info.expAt&&info.expAt<Date.now()){alert('만료된 코드입니다.');return}
+    if(info.uid===KME.uid){alert('본인에게는 초대를 보낼 수 없습니다.');return}
+    if(!confirm((info.name||'해당 회원')+' 님을 이 클럽에 초대할까요?'))return;
+    await DB.runTransaction(async tx=>{
+      const ref=DB.collection('clubs').doc(id);
+      const doc=await tx.get(ref);const c=doc.data();
+      if((c.memberUids||[]).indexOf(info.uid)>=0)throw new Error('이미 클럽 회원입니다.');
+      const iv=Object.assign({},c.clubInvites||{});
+      iv[info.uid]={name:info.name||'',byUid:KME.uid,byName:(KMY&&KMY.name)||'',at:new Date().toISOString()};
+      const iu=(c.clubInviteUids||[]).slice();
+      if(iu.indexOf(info.uid)<0)iu.push(info.uid);
+      tx.update(ref,{clubInvites:iv,clubInviteUids:iu});
+    });
+    cref.delete().catch(()=>{});
+    try{KFDF.notify(info.uid,'👥 클럽에서 가입 초대가 도착했습니다 — 내 클럽 화면에서 수락/거절해주세요','club.html');}catch(e){}
+    if(inp)inp.value='';
+    alert('✓ 초대를 보냈습니다.');
+    loadMyClubs();
+  }catch(e){alert('초대 실패: '+e.message)}
+}
+async function cancelClubInvite(id,uid){
+  try{
+    await DB.runTransaction(async tx=>{
+      const ref=DB.collection('clubs').doc(id);
+      const doc=await tx.get(ref);const c=doc.data();
+      const iv=Object.assign({},c.clubInvites||{});delete iv[uid];
+      tx.update(ref,{clubInvites:iv,clubInviteUids:(c.clubInviteUids||[]).filter(x=>x!==uid)});
+    });
+    loadMyClubs();
+  }catch(e){alert('취소 실패: '+e.message)}
+}
+async function acceptClubInvite(id,clubName){
+  if(!confirm('['+clubName+'] 클럽 가입 초대를 수락할까요?'))return;
+  try{
+    let ownerUid='';
+    await DB.runTransaction(async tx=>{
+      const ref=DB.collection('clubs').doc(id);
+      const doc=await tx.get(ref);const c=doc.data();
+      ownerUid=c.ownerUid||'';
+      const iv=Object.assign({},c.clubInvites||{});
+      const info=iv[KME.uid]||{};
+      delete iv[KME.uid];
+      const members=(c.members||[]).slice();
+      const mu=(c.memberUids||[]).slice();
+      if(mu.indexOf(KME.uid)<0){members.push({uid:KME.uid,name:(KMY&&KMY.name)||info.name||'',gender:(KMY&&KMY.gender)||'',birth:(KMY&&KMY.birth)||'',at:new Date().toISOString()});mu.push(KME.uid);}
+      tx.update(ref,{members:members,memberUids:mu,clubInvites:iv,clubInviteUids:(c.clubInviteUids||[]).filter(x=>x!==KME.uid)});
+    });
+    if(ownerUid)try{KFDF.notify(ownerUid,'✅ '+((KMY&&KMY.name)||'')+' 님이 초대를 수락해 클럽에 가입했습니다','club.html');}catch(e){}
+    alert('✓ 가입되었습니다.');
+    loadMyClubs();loadClubs();
+  }catch(e){alert('수락 실패: '+e.message)}
+}
+async function declineClubInvite(id){
+  try{
+    await DB.runTransaction(async tx=>{
+      const ref=DB.collection('clubs').doc(id);
+      const doc=await tx.get(ref);const c=doc.data();
+      const iv=Object.assign({},c.clubInvites||{});delete iv[KME.uid];
+      tx.update(ref,{clubInvites:iv,clubInviteUids:(c.clubInviteUids||[]).filter(x=>x!==KME.uid)});
+    });
+    loadMyClubs();
+  }catch(e){alert('거절 실패: '+e.message)}
 }
 // ── ⚔️ 클럽 교류전: 도전장 → 수락 → 결과 기록 → 전적 랭킹 ──
 let CM_ALL=[],CM_MYOWN=[];
