@@ -205,6 +205,8 @@ let RME=null,RMY=null,RAPPS=[],RUSERS=[],RFL='전체',RREG='전체',SEL=null;
 let RSCOPE=null; // 권역장 관할 권역 (admin은 null=전권역)
 
 // [겸직v3] 권역장 판정 헬퍼 — role 단일값 OR roles[] 겸직 배열 + 만료일 체크
+// [겸직] 한 사람이 여러 등급을 가질 수 있어 role(대표)과 roles[](전체)를 함께 봅니다
+function rgIsAdmin(d){return !!(d&&(d.owner===true||d.role==='admin'||(Array.isArray(d.roles)&&d.roles.indexOf('admin')>=0)))}
 function rgHasRA(d){
   if(!d)return false;
   var isRA=(d.role==='regionAdmin')||(Array.isArray(d.roles)&&d.roles.indexOf('regionAdmin')>=0);
@@ -219,7 +221,7 @@ AUTH.onAuthStateChanged(async u=>{
   RME=u;
   const d=await DB.collection('users').doc(u.uid).get();RMY=d.data();
   // [겸직v3] admin OR 권역장(role/roles[] 어느 쪽이든) 허용
-  if(!RMY||(RMY.role!=='admin'&&!rgHasRA(RMY))){
+  if(!RMY||(!rgIsAdmin(RMY)&&!rgHasRA(RMY))){
     g.style.display='block';g.innerHTML='⛔ 권역 관리자 권한이 없습니다. 사무국(오너)의 지정이 필요합니다.';return;
   }
   // [겸직v3] 권역장 만료는 rgHasRA() 안에서 이미 처리됨 (만료 시 false → 위 게이트에서 차단)

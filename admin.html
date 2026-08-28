@@ -1537,6 +1537,19 @@ function hasRole(v,r){
   if(v.role===r)return true;
   return Array.isArray(v.roles)&&v.roles.indexOf(r)>=0;
 }
+// [겸직] 권한 부여·해제 시 role(대표 등급)과 roles[](전체)를 함께 갱신합니다. 다른 등급은 그대로 보존됩니다.
+const PERM_ORDER=['admin','sidoOfficer','gugunOfficer','regionAdmin'];
+function permList(v){
+  const out=[];if(!v)return out;
+  if(Array.isArray(v.roles))v.roles.forEach(r=>{if(PERM_ORDER.indexOf(r)>=0&&out.indexOf(r)<0)out.push(r)});
+  if(v.role&&PERM_ORDER.indexOf(v.role)>=0&&out.indexOf(v.role)<0)out.push(v.role);
+  return PERM_ORDER.filter(r=>out.indexOf(r)>=0);
+}
+function permPatch(v,r,on){
+  const a=permList(v).filter(x=>x!==r);if(on)a.push(r);
+  const s=PERM_ORDER.filter(x=>a.indexOf(x)>=0);
+  return {roles:s,role:(s[0]||'member')};
+}
 function roleBadge(v){
   const pill=(t,bg)=>'<span style="font-size:11px;font-weight:900;color:#fff;background:'+bg+';padding:4px 10px;border-radius:999px;align-self:center">'+t+'</span>';
   const out=[];
@@ -1687,15 +1700,15 @@ async function setFullAdmin(uid){
   const doc=USERS.find(d=>d.id===uid);if(!doc)return;
   const v=doc.data();
   if(v.owner){alert('오너 계정은 이 버튼으로 변경할 수 없습니다.');return}
-  if(v.role==='admin'){
+  if(hasRole(v,'admin')){
     if(!confirm('['+v.name+'] 님의 전체 관리자 권한을 해제하고 일반 회원으로 되돌릴까요?'))return;
-    try{await DB.collection('users').doc(uid).update({role:'member'});alert('해제되었습니다.');loadUsers();}
+    try{await DB.collection('users').doc(uid).update(permPatch(v,'admin',false));alert('해제되었습니다.');loadUsers();}
     catch(e){alert('실패: '+e.message+'\n(권한 변경은 오너 계정만 가능합니다)')}
     return;
   }
   if(!confirm('⚠️ ['+v.name+'] 님에게 전체 관리자(admin) 권한을 부여합니다.\n\n· 관리자 페이지 전체 사용 가능 — 모든 회원 조회·승인·포인트·삭제, 강습·자격 관리 등\n· 단, 다른 사람에게 권한 부여(권역/전체 관리자 지정)와 오너 설정은 불가 (오너 전용)\n\n부여할까요?'))return;
   try{
-    await DB.collection('users').doc(uid).update({role:'admin',status:'approved'});
+    await DB.collection('users').doc(uid).update(Object.assign(permPatch(v,'admin',true),{status:'approved'}));
     alert('전체 관리자로 지정되었습니다.\n이제 이분도 관리자 페이지(admin)에서 모든 회원을 조회·관리할 수 있습니다.');loadUsers();
   }catch(e){alert('실패: '+e.message+'\n(권한 부여는 오너 계정만 가능합니다 — 규칙 파일의 owner 설정 안내 참고)')}
 }
@@ -1703,10 +1716,10 @@ async function setFullAdmin(uid){
 async function setRegionAdmin(uid){
   const doc=USERS.find(d=>d.id===uid);if(!doc)return;
   const v=doc.data();
-  if(v.role==='regionAdmin'){
+  if(hasRole(v,'regionAdmin')){
     if(!confirm(v.name+' 님의 권역 관리자 권한('+(v.managedRegion||'')+')을 해제할까요?'))return;
     try{
-      await DB.collection('users').doc(uid).update({role:'member',managedRegion:firebase.firestore.FieldValue.delete(),managedSido:firebase.firestore.FieldValue.delete(),duties:firebase.firestore.FieldValue.delete(),regionAdminExpiresAt:firebase.firestore.FieldValue.delete()});
+      await DB.collection('users').doc(uid).update(Object.assign(permPatch(v,'regionAdmin',false),{managedRegion:firebase.firestore.FieldValue.delete(),managedSido:firebase.firestore.FieldValue.delete(),duties:firebase.firestore.FieldValue.delete(),regionAdminExpiresAt:firebase.firestore.FieldValue.delete()}));
       alert('해제되었습니다.');loadUsers();
     }catch(e){alert('실패: '+e.message+'\n(권한 부여·해제는 오너 계정만 가능합니다)')}
     return;
@@ -1737,7 +1750,9 @@ async function setRegionAdmin(uid){
   // 참고: 자격 업무를 위임해도 공고 승인·결과보고 승인은 항상 중앙(오너/admin) 전용이며, 이 위임과 무관하게 자동 제외됩니다.
   if(!confirm(v.name+' 님에게 권역 관리자 권한을 부여할까요?\n\n· 강습 배정: '+(wantAssign?'관할 권역 ['+R+'] 만 열람·배정 (region.html)':'권한 없음')+'\n· 자격증 업무: '+(S?('['+SLABEL+'] 관할 신청처리·발급 가능 (산하 시도 포함: '+S.join('·')+') — 공고 승인·결과보고 승인은 항상 중앙 전용'):'권한 없음')+'\n· 만료: '+(exDate?exDate.toLocaleDateString('ko-KR')+' 이후 자동 회수':'상시(만료 없음)')+'\n· 회원 삭제·포인트 부여·권한 부여는 불가'))return;
   try{
-    const upd={role:'regionAdmin',managedRegion:R,duties:duties,sido:firebase.firestore.FieldValue.delete()};
+    const upd=Object.assign(permPatch(v,'regionAdmin',true),{managedRegion:R,duties:duties});
+    // 겸직: 시도임원을 겸하는 경우 sido 는 지우지 않습니다
+    if(upd.roles.indexOf('sidoOfficer')<0)upd.sido=firebase.firestore.FieldValue.delete();
     if(S)upd.managedSido=S;else upd.managedSido=firebase.firestore.FieldValue.delete();
     upd.regionAdminExpiresAt=exDate?firebase.firestore.Timestamp.fromDate(exDate):firebase.firestore.FieldValue.delete();
     await DB.collection('users').doc(uid).update(upd);
@@ -1749,9 +1764,9 @@ async function setSidoOfficer(uid){
   const doc=USERS.find(d=>d.id===uid);if(!doc)return;
   const v=doc.data();
   if(v.owner){alert('오너 계정은 이 버튼으로 변경할 수 없습니다.');return}
-  if(v.role==='sidoOfficer'){
+  if(hasRole(v,'sidoOfficer')){
     if(!confirm(v.name+' 님의 시도연맹 임원 권한('+(v.sido||'')+')을 해제하고 일반 회원으로 되돌릴까요?'))return;
-    try{await DB.collection('users').doc(uid).update({role:'member',sido:firebase.firestore.FieldValue.delete()});alert('해제되었습니다.');loadUsers();}
+    try{await DB.collection('users').doc(uid).update(Object.assign(permPatch(v,'sidoOfficer',false),{sido:firebase.firestore.FieldValue.delete()}));alert('해제되었습니다.');loadUsers();}
     catch(e){alert('실패: '+e.message+'\n(권한 변경은 오너 계정만 가능합니다)')}
     return;
   }
@@ -1760,8 +1775,10 @@ async function setSidoOfficer(uid){
   if(!sido.trim()){alert('관할 시도명을 입력해주세요.');return}
   if(!confirm(v.name+' 님을 ['+sido.trim()+'] 시도연맹 임원(상설)으로 지정할까요?\n\n· '+sido.trim()+' 시도 일정 캘린더 직접 등록·수정\n· '+sido.trim()+' 시도 클럽 생성 신청 승인\n· 회원 삭제·포인트·강습배정 등은 불가 (그것은 권역장/관리자 권한)'))return;
   try{
-    await DB.collection('users').doc(uid).update({role:'sidoOfficer',sido:sido.trim(),status:'approved',
-      managedRegion:firebase.firestore.FieldValue.delete(),duties:firebase.firestore.FieldValue.delete(),regionAdminExpiresAt:firebase.firestore.FieldValue.delete()});
+    const updS=Object.assign(permPatch(v,'sidoOfficer',true),{sido:sido.trim(),status:'approved'});
+    // 겸직: 권역장을 겸하는 경우 권역 관련 필드는 지우지 않습니다
+    if(updS.roles.indexOf('regionAdmin')<0){updS.managedRegion=firebase.firestore.FieldValue.delete();updS.duties=firebase.firestore.FieldValue.delete();updS.regionAdminExpiresAt=firebase.firestore.FieldValue.delete();}
+    await DB.collection('users').doc(uid).update(updS);
     alert('시도연맹 임원으로 지정되었습니다.');loadUsers();
   }catch(e){alert('실패: '+e.message+'\n(권한 부여는 오너 계정만 가능합니다 — 규칙 파일의 owner 설정 안내 참고)')}
 }
@@ -4040,8 +4057,8 @@ function calPermRow(d){
   const v=d.data();
   return '<div class="urow"><div class="grow"><b>'+esc(v.name||'')+'</b> <span style="font-size:12px;color:var(--gray)">'+esc(v.email||'')+(v.fedName?' · '+esc(v.fedName):'')+'</span>'
     +(v.calendarEditor?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">캘린더 권한</span>':'')
-    +(v.role==='admin'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px">관리자</span>':'')+'</div>'
-    +(v.role==='admin'?'<span style="font-size:12px;color:var(--gray)">관리자는 항상 가능</span>'
+    +(hasRole(v,'admin')?' <span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px">관리자</span>':'')+'</div>'
+    +(hasRole(v,'admin')?'<span style="font-size:12px;color:var(--gray)">관리자는 항상 가능</span>'
       :'<button class="btn-sub" style="background:'+(v.calendarEditor?'#8a919d':'#0f766e')+'" onclick="calToggle(\''+d.id+'\','+(!v.calendarEditor)+')">'+(v.calendarEditor?'권한 해제':'권한 부여')+'</button>')
     +'</div>';
 }
@@ -4086,8 +4103,8 @@ function cbPermRow(d){
   const v=d.data();
   return '<div class="urow"><div class="grow"><b>'+esc(v.name||'')+'</b> <span style="font-size:12px;color:var(--gray)">'+esc(v.email||'')+(v.fedName?' · '+esc(v.fedName):'')+'</span>'
     +(v.clubAdminSido?' <span style="font-size:11px;font-weight:800;color:#fff;background:#b8860b;padding:2px 8px;border-radius:999px">'+esc(v.clubAdminSido)+' 클럽승인</span>':'')
-    +(v.role==='admin'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px">관리자</span>':'')+'</div>'
-    +(v.role==='admin'?'<span style="font-size:12px;color:var(--gray)">관리자는 전체 승인 가능</span>'
+    +(hasRole(v,'admin')?' <span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px">관리자</span>':'')+'</div>'
+    +(hasRole(v,'admin')?'<span style="font-size:12px;color:var(--gray)">관리자는 전체 승인 가능</span>'
       :('<button class="btn-sub" style="background:#0f766e" onclick="cbSet(\''+d.id+'\')">'+(v.clubAdminSido?'관할 변경':'권한 부여')+'</button>'
         +(v.clubAdminSido?' <button class="btn-sub" style="background:#8a919d" onclick="cbClear(\''+d.id+'\')">해제</button>':'')))
     +'</div>';
