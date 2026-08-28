@@ -1673,7 +1673,10 @@ AUTH.onAuthStateChanged(async u=>{
   // 승인됐지만 아직 어떤 분야에도 지원하지 않은 회원 안내
   const fApplied=d.instructorFor&&(d.instructorFor.school||d.instructorFor.after||d.instructorFor.referee||d.instructorFor.staff);
   const pfIncomplete=pfGate(d);
-  if(pfIncomplete){pfExpand();}
+  // [접기/펼치기 수정] 미입력 항목이 있다는 이유만으로 매번 프로필 폼 전체를 강제로 다시
+  //   펼치던 동작을 제거합니다. 안내 배너(pfGate 내부)와 [지금 프로필 작성하기] 버튼은
+  //   그대로 유지되므로, 펼침은 그 버튼 또는 [✏️ 프로필 수정] 버튼 클릭으로만 일어납니다.
+  //   (주소 미입력·미승인 상태의 기존 펼침 로직은 fillProfile 내부에서 그대로 동작합니다)
   if(d.status==='approved'&&!fApplied&&!pfIncomplete){
     document.getElementById('phoneBox').insertAdjacentHTML('beforebegin',
       '<div style="margin-top:26px;background:#C41E2F;border-radius:16px;padding:20px 22px;font-size:15px;line-height:1.75;color:#fff;box-shadow:0 6px 18px rgba(196,30,47,.35);animation:kfdfPulse 1.6s ease-in-out infinite"><b style="font-size:17px">🚨 긴급 — 아직 강사·요원 지원을 하지 않으셨습니다!</b><br><b>2026 권역 사업 강사 배정을 받으려면 [지원하기] 클릭이 필수입니다.</b> 가입·승인만으로는 배정 명단에 오르지 않습니다.<br><a href="jobs.html" style="display:inline-block;margin-top:10px;background:#fff;color:#C41E2F;font-weight:900;padding:10px 22px;border-radius:10px;text-decoration:none;font-size:15px">👟 지금 지원하러 가기 →</a></div><style>@keyframes kfdfPulse{0%,100%{box-shadow:0 6px 18px rgba(196,30,47,.35)}50%{box-shadow:0 6px 26px rgba(196,30,47,.65)}}</style>');
