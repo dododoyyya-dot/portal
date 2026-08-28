@@ -863,18 +863,21 @@ async function delMyClub(id,name){
 }
 // ── 연맹 임원 등록(신청→승인) ──
 let OFFICER_REQS=[];
+// [겸직] 한 사람이 여러 등급을 가질 수 있어 role(대표 등급)과 roles[](전체)를 함께 봅니다
+function kbHasRole(v,r){return !!(v&&((r==='admin'&&v.owner===true)||v.role===r||(Array.isArray(v.roles)&&v.roles.indexOf(r)>=0)))}
 function ofTitleKo(k){return k==='sido'?'시도연맹 임원':'구·군연맹 임원';}
 function ofChip(t,c){return '<span class="cpill2" style="background:'+c+'">'+kesc(t)+'</span>';}
 async function loadOfficer(){
   const box=document.getElementById('officerBox');if(!box)return;box.style.display='block';
   const stat=document.getElementById('officerStatus'),applyEl=document.getElementById('officerApply'),apprEl=document.getElementById('officerApprovals');
   stat.innerHTML='';applyEl.innerHTML='';apprEl.innerHTML='';
-  const role=KMY.role||'member';
-  if(role==='sidoOfficer')stat.innerHTML=ofChip('현재 신분 · '+(KMY.sido||'')+' 시도연맹 임원','#0f766e');
-  else if(role==='gugunOfficer')stat.innerHTML=ofChip('현재 신분 · '+(KMY.sido||'')+' '+(KMY.gugun||'')+' 구·군연맹 임원','#0f766e');
-  else if(role==='admin'||KMY.owner)stat.innerHTML=ofChip('사무국(중앙관리자)','#153A77');
-  // 일반회원: 신청 폼 또는 대기 상태
-  if(role==='member'){
+  // [겸직] 겸직 회원은 대표 등급이 아니어도 인식되도록 roles[] 를 함께 봅니다
+  const _ofAdm=kbHasRole(KMY,'admin'),_ofSido=kbHasRole(KMY,'sidoOfficer'),_ofGugun=kbHasRole(KMY,'gugunOfficer'),_ofRegion=kbHasRole(KMY,'regionAdmin');
+  if(_ofAdm)stat.innerHTML=ofChip('사무국(중앙관리자)','#153A77');
+  else if(_ofSido)stat.innerHTML=ofChip('현재 신분 · '+(KMY.sido||'')+' 시도연맹 임원','#0f766e');
+  else if(_ofGugun)stat.innerHTML=ofChip('현재 신분 · '+(KMY.sido||'')+' '+(KMY.gugun||'')+' 구·군연맹 임원','#0f766e');
+  // 일반회원(관리 등급 없음): 신청 폼 또는 대기 상태
+  if(!_ofAdm&&!_ofSido&&!_ofGugun&&!_ofRegion){
     let mine=null;
     try{const my=await DB.collection('officerRequests').where('uid','==',KME.uid).limit(10).get();
       const md=my.docs.find(x=>x.data().status==='대기');if(md)mine={id:md.id,d:md.data()};}catch(e){}
@@ -898,16 +901,16 @@ async function loadOfficer(){
     }
   }
   // 임원 등록 신청 승인 — 시도임원(자기 시도 구군임원) · 오너(전체). ※등급 변경 규칙상 일반 admin은 승인 불가하므로 버튼 미노출
-  if(role==='sidoOfficer'||KMY.owner){
+  if(_ofSido||KMY.owner){
     try{
       // 복합 인덱스 회피: 단일 필드 조회 후 클라이언트 필터
-      const q=(role==='sidoOfficer')
+      const q=_ofSido
         ? DB.collection('officerRequests').where('sido','==',KMY.sido||'__')
         : DB.collection('officerRequests').where('status','==','대기');
       const snap=await q.limit(80).get();
       OFFICER_REQS=snap.docs.map(d=>({id:d.id,data:d.data()}))
         .filter(r=>r.data.status==='대기')
-        .filter(r=>role==='sidoOfficer'?r.data.kind==='gugun':true); // 시도임원은 구군 신청만
+        .filter(r=>_ofSido?r.data.kind==='gugun':true); // 시도임원은 구군 신청만
       apprEl.innerHTML='<div style="font-size:12.5px;font-weight:800;color:#153A77;margin-bottom:6px">임원 등록 신청 승인 '+(OFFICER_REQS.length?'('+OFFICER_REQS.length+'건)':'')+'</div>'
         +(OFFICER_REQS.length?OFFICER_REQS.map(r=>'<div style="background:#fff;border:1px solid #e2e8f2;border-radius:10px;padding:10px 13px;margin-bottom:7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
           +'<b>'+kesc(r.data.name||'')+'</b>'+ofChip(ofTitleKo(r.data.kind),'#153A77')
@@ -956,10 +959,11 @@ async function rejectOfficer(id){
 }
 // ── 시도/구군 임원: 관할 클럽 승인·반려 ──
 async function loadSidoApprovals(){
-  const role=KMY&&KMY.role;
-  const isAdm=role==='admin'||(KMY&&KMY.owner);
-  const isGugun=role==='gugunOfficer';
-  const sido=role==='sidoOfficer'?KMY.sido:(isGugun?KMY.sido:(KMY&&KMY.clubAdminSido));
+  // [겸직] roles[] 를 함께 봅니다 (kbHasRole 의 admin 판정에는 owner 가 포함됩니다)
+  const isAdm=kbHasRole(KMY,'admin');
+  const isSidoOf=kbHasRole(KMY,'sidoOfficer');
+  const isGugun=kbHasRole(KMY,'gugunOfficer');
+  const sido=isSidoOf?KMY.sido:(isGugun?KMY.sido:(KMY&&KMY.clubAdminSido));
   const gugun=isGugun?KMY.gugun:null;
   if(!sido&&!isAdm)return;
   const box=document.getElementById('sidoApproveBox');

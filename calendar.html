@@ -202,7 +202,9 @@ function render(){
   document.getElementById('monList').innerHTML=!monEvs.length
     ?'<div class="bempty" style="padding:20px;color:#8a919d">이번 달 등록된 일정이 없습니다.</div>'
     :monEvs.map(e=>{
-      const mine=CAN_EDIT&&e.id&&(MYU&&MYU.role==='admin'||e.byUid===(ME&&ME.uid));
+      // [겸직] 대표 등급이 아니어도 roles[] 에 admin 이 있으면 관리자로 봅니다
+      const _calAdm=!!(MYU&&(MYU.owner===true||MYU.role==='admin'||(Array.isArray(MYU.roles)&&MYU.roles.indexOf('admin')>=0)));
+      const mine=CAN_EDIT&&e.id&&(_calAdm||e.byUid===(ME&&ME.uid));
       return '<div class="evrow"><div class="ed">'+xesc((e.start||'').slice(5).replace('-','.'))+(e.end&&e.end!==e.start?'<br>~'+xesc(e.end.slice(5).replace('-','.')):'')+'</div>'
       +'<div style="flex:1"><span class="et">'+xesc(e.title)+'</span><span class="tbadge" style="background:'+(TYPES[e.type]||'#153A77')+'">'+xesc(e.type)+'</span>'+(e.auto?'<span class="tbadge" style="background:#c3c9d4">자동</span>':'')
       +'<div class="em">'+(e.sido?xesc(e.sido)+' · ':'')+(e.place?xesc(e.place)+' · ':'')+xesc(e.desc||'')

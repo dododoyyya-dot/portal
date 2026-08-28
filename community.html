@@ -209,7 +209,7 @@ async function openPost(id){
     +cs.docs.map(c=>{const w=c.data();return '<div class="cmt"><b>'+esc(w.name)+'</b><span class="lvmini" style="background:'+LVC[w.level||1]+'">Lv.'+(w.level||1)+'</span>'+(w.org?' '+orgChip(w.org,w.region,w.orgTitle,w.fedName):'')+' '+esc(w.body)+' <span style="color:#a8aeb8;font-size:12px">'+fmtDate(w.createdAt)+'</span></div>'}).join('')
     +'<div class="cmt-form"><input id="c-'+id+'" placeholder="댓글 입력"><button class="btn-sub" onclick="writeCmt(\''+id+'\')">등록</button></div>'
     +'<div style="margin-top:10px;display:flex;gap:6px">'
-    +((ME&&(v.uid===ME.uid||MYDOC.role==='admin'))?'<button class="btn-sub" style="background:#8a919d" onclick="delPost(\''+id+'\')">글 삭제</button>':'')
+    +((ME&&(v.uid===ME.uid||(MYDOC.owner===true||MYDOC.role==='admin'||(Array.isArray(MYDOC.roles)&&MYDOC.roles.indexOf('admin')>=0))))?'<button class="btn-sub" style="background:#8a919d" onclick="delPost(\''+id+'\')">글 삭제</button>':'')
     +((ME&&v.uid!==ME.uid)?'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="reportPost(\''+id+'\',\''+esc(v.title).replace(/\'/g,"")+'\')">🚩 신고</button>':'')
     +'</div>';
 }

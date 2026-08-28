@@ -91,10 +91,13 @@ AUTH.onAuthStateChanged(async u=>{
   if(!u){g.style.display='block';g.innerHTML='🔒 관리자 전용 페이지입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a>';return}
   const d=await DB.collection('users').doc(u.uid).get();
   const v=d.data();
-  if(!v||(v.role!=='admin'&&v.role!=='regionAdmin')){
+  // [겸직] 대표 등급이 아니어도 roles[] 에 있으면 인식합니다
+  const tHas=(r)=>!!(v&&((r==='admin'&&v.owner===true)||v.role===r||(Array.isArray(v.roles)&&v.roles.indexOf(r)>=0)));
+  if(!v||(!tHas('admin')&&!tHas('regionAdmin'))){
     g.style.display='block';g.innerHTML='⛔ 관리자·권역장 권한이 없습니다.';return;
   }
-  if(v.role==='regionAdmin'&&v.managedRegion&&KFDF_REGIONS.indexOf(v.managedRegion)>=0)SCOPE_R=v.managedRegion;
+  // 중앙관리자를 겸하면 전 권역, 권역장만이면 관할 권역으로 제한
+  if(!tHas('admin')&&tHas('regionAdmin')&&v.managedRegion&&KFDF_REGIONS.indexOf(v.managedRegion)>=0)SCOPE_R=v.managedRegion;
   document.getElementById('body').style.display='block';
   load();
 });
