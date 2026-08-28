@@ -1425,7 +1425,6 @@ async function saveProfile(){
       degreeDoc:degDoc,
       natCertName:document.getElementById('pfNatCertName').value.trim(),
       natCertDoc:ncDoc,
-      signatureImg:sigImg,   // [서명이미지] 수당 신청서 등에서 재사용
       affiliation:(af.length?af:((MYD&&MYD.affiliation)||[])),   // [저장 정책] 하나도 고르지 않았으면 기존 소속을 지우지 않습니다
       quals:{leader:document.getElementById('pfLeader').value,referee:document.getElementById('pfRef').value,youth:document.getElementById('pfYouth').checked},
       career:document.getElementById('pfCareer').value.trim(),
@@ -1444,6 +1443,10 @@ async function saveProfile(){
       schoolNorm:normSchool(document.getElementById('pfSchool')?document.getElementById('pfSchool').value.trim():(MYD.school||'')),
       birth:document.getElementById('pfBirth').value
     };
+    // [서명이미지] 규칙 화이트리스트에 signatureImg가 없어, 서명이미지가 없던 회원은
+    //   옷 치수 등 다른 항목만 고쳐도 저장 전체가 거부되는 버그가 있었습니다.
+    //   실제로 값이 바뀔 때(새 서명 업로드)만 포함하도록 방어적으로 수정합니다.
+    if(sigImg&&sigImg!==(MYD.signatureImg||''))upd.signatureImg=sigImg;
     if(qualLeader!==(MYD.qualNoLeader||''))upd.qualNoLeader=qualLeader;
     if(qualRef!==(MYD.qualNoReferee||''))upd.qualNoReferee=qualRef;
     if(df&&MYD.degreeDoc!==degDoc)upd.degreeApproved=false; // 새 증빙 첨부 시 재확인 대상
