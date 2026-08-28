@@ -526,7 +526,8 @@ function viewRoster(id){
   const consentBadge=(c,key)=>{
     if(!entry||!c.birth||!(ageOf(c.birth)<18&&ageOf(c.birth)>0))return '';
     if(c.kid)return ' <span style="font-size:10.5px;font-weight:900;color:#0f766e">👨‍👧 보호자서명✓</span>';
-    if(paper[key])return ' <span style="font-size:10.5px;font-weight:900;color:#0f766e" title="'+cesc((paper[key].by||'')+' 확인 '+String(paper[key].at||'').slice(0,10))+'">📄 수기동의✓</span>';
+    if(paper[key])return ' <span style="font-size:10.5px;font-weight:900;color:#0f766e" title="'+cesc((paper[key].by||'')+' 확인 '+String(paper[key].at||'').slice(0,10))+'">📄 수기동의✓</span>'
+      +((paper[key].files||[]).map((u,fi)=>' <a href="'+cesc(u)+'" target="_blank" style="font-size:10.5px;font-weight:900;color:#153A77" title="첨부 동의서 보기">📎'+(fi+1)+'</a>').join(''));
     return ' <span style="font-size:10.5px;font-weight:900;color:#C41E2F">⚠ 보호자동의 필요</span>'
       +(staff?' <button onclick="markPaper(\''+id+'\',\''+key+'\',\''+cesc(c.name||'')+'\')" style="border:1.5px solid #e6b422;background:#fffbeb;color:#8a5a00;border-radius:8px;padding:2px 8px;font-size:10.5px;font-weight:800;cursor:pointer" title="담당자가 서면(수기) 동의서를 수령한 경우 클릭">📄 수기동의서 확인완료</button>':'');
   };
@@ -547,7 +548,7 @@ function viewRoster(id){
         return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+' colspan="'+(entry?'4':'1')+'"><b>👥 '+cesc(c.name)+'</b> <span style="font-size:11.5px;color:#8a919d">'+cesc(c.teamType||'팀')+(c.teamOrg?' · '+cesc(c.teamOrg):'')+' · 인솔 '+cesc(c.leader||'')+'('+cesc(c.leaderRole||'')+')'+(c.leaderPhone?' '+cesc(c.leaderPhone):'')+'</span>'
           +'<details style="margin-top:4px"><summary style="cursor:pointer;font-size:12px;font-weight:800;color:#153A77">명단 '+(c.rosterN||0)+'명'+((c.consentFiles&&c.consentFiles.length)?' · 📎동의서 '+c.consentFiles.length:'')+'</summary>'
           +'<div style="font-size:12px;color:#4b5563;margin-top:4px">'+(c.roster||[]).map((r,j)=>(j+1)+'. '+cesc(r.name)+(r.birth?' ('+cesc(r.birth)+')':'')+(r.school?' · '+cesc(r.school):'')
-            +(r.birth&&ageOf(r.birth)>0&&ageOf(r.birth)<18?(paper[ckey(c)+'_'+j]?' <b style="color:#0f766e" title="'+cesc((paper[ckey(c)+'_'+j].by||'')+' 확인 '+String(paper[ckey(c)+'_'+j].at||'').slice(0,10))+'">📄 수기동의✓</b>':' <b style="color:#C41E2F">⚠미성년</b> <button onclick="markPaper(\''+id+'\',\''+ckey(c)+'_'+j+'\',\''+cesc(r.name)+'\')" style="border:1.5px solid #e6b422;background:#fffbeb;color:#8a5a00;border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:800;cursor:pointer">📄 수기동의서 확인완료</button>'):'')).join('<br>')+'</div></details>'
+            +(r.birth&&ageOf(r.birth)>0&&ageOf(r.birth)<18?(paper[ckey(c)+'_'+j]?' <b style="color:#0f766e" title="'+cesc((paper[ckey(c)+'_'+j].by||'')+' 확인 '+String(paper[ckey(c)+'_'+j].at||'').slice(0,10))+'">📄 수기동의✓</b>'+((paper[ckey(c)+'_'+j].files||[]).map((u,fi)=>' <a href="'+cesc(u)+'" target="_blank" style="font-size:10.5px;font-weight:900;color:#153A77">📎'+(fi+1)+'</a>').join('')):' <b style="color:#C41E2F">⚠미성년</b> <button onclick="markPaper(\''+id+'\',\''+ckey(c)+'_'+j+'\',\''+cesc(r.name)+'\')" style="border:1.5px solid #e6b422;background:#fffbeb;color:#8a5a00;border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:800;cursor:pointer">📄 수기동의서 확인완료</button>'):'')).join('<br>')+'</div></details>'
           +'<div style="margin-top:6px"><button onclick="openRosterEdit(\''+id+'\',\''+ckey(c)+'\')" style="border:1.5px solid #153A77;background:#fff;color:#153A77;border-radius:8px;padding:3px 10px;font-size:11.5px;font-weight:800;cursor:pointer">✏️ 명단 수정 (추가·제거)</button></div></td>'
           +'<td '+td+'>'+cesc((c.prefs||[])[0]||'-')+'</td><td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
           +'<td '+td+' style="text-align:center">'+stCell(c)+'</td>'
@@ -595,14 +596,74 @@ async function _refreshSlot(id){
 }
 async function markPaper(slotId,key,name){
   if(!isCompStaff()){alert('권한자만 확인 처리할 수 있습니다');return}
-  if(!confirm('['+(name||'참가자')+'] 보호자 서면(수기) 동의서를 실제로 수령·확인하셨습니까?\n확인 시 이 참가자는 보호자 동의 완료로 처리됩니다.'))return;
+  openPaperModal(slotId,key,name);
+}
+// ── [수기동의] 서면 동의서 사진·파일 등록 ──
+//  담당자가 종이로 받은 보호자 동의서를 그 자리에서 사진으로 찍거나 파일로 올려 함께 보관합니다.
+//  파일 없이 '확인만' 처리하는 기존 방식도 그대로 씁니다.
+let _PC={};
+function _pcShrink(file,max){return new Promise(function(res,rej){
+  const img=new Image();
+  img.onload=function(){const s=Math.min(1,max/Math.max(img.width,img.height));
+    const c=document.createElement('canvas');c.width=Math.round(img.width*s)||1;c.height=Math.round(img.height*s)||1;
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    c.toBlob(function(b){b?res(b):rej(new Error('이미지 처리 실패'))},'image/jpeg',0.85);};
+  img.onerror=function(){rej(new Error('이미지를 읽을 수 없습니다'))};
+  img.src=URL.createObjectURL(file);});}
+function openPaperModal(slotId,key,name){
+  _PC={slotId:slotId,key:key,name:name||''};
+  const old=document.getElementById('pcModal');if(old)old.remove();
+  const d=document.createElement('div');d.id='pcModal';
+  d.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.6);z-index:1300;display:flex;align-items:center;justify-content:center;padding:16px';
+  d.innerHTML='<div style="background:#fff;border-radius:16px;max-width:460px;width:100%;max-height:92vh;overflow:auto;padding:22px">'
+    +'<b style="font-size:16px">📄 보호자 서면(수기) 동의서 확인</b>'
+    +'<div style="font-size:13.5px;color:#4b5563;margin:8px 0 14px;line-height:1.7">참가자 <b>'+cesc(name||'')+'</b> 의 보호자 동의서를 실제로 수령·확인하셨습니까?<br><span style="color:#8a919d;font-size:12.5px">종이로 받으셨다면 아래에서 사진을 찍거나 파일을 올려 함께 보관할 수 있습니다.</span></div>'
+    +'<label style="display:block;border:1.5px dashed #dfe5ee;border-radius:12px;padding:16px;text-align:center;cursor:pointer;background:#f9fbfd">'
+      +'<div style="font-size:14px;font-weight:800;color:#153A77">📷 사진 찍기 · 📎 파일 선택</div>'
+      +'<div style="font-size:12px;color:#8a919d;margin-top:4px">이미지 또는 PDF · 최대 5개</div>'
+      +'<input type="file" id="pcFile" accept="image/*,application/pdf" capture="environment" multiple style="display:none" onchange="pcPreview()">'
+    +'</label>'
+    +'<div id="pcList" style="margin-top:10px;font-size:12.5px;color:#4b5563"></div>'
+    +'<div id="pcMsg" style="margin-top:10px;font-size:12.5px;color:#153A77"></div>'
+    +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap">'
+    +'<button class="cbtn" style="background:#0f766e;color:#fff" onclick="pcConfirm(true)">✅ 확인 처리</button>'
+    +'<button class="cbtn cbtn-ghost" onclick="document.getElementById(\'pcModal\').remove()">취소</button></div></div>';
+  document.body.appendChild(d);
+}
+function pcPreview(){
+  const f=document.getElementById('pcFile');
+  const box=document.getElementById('pcList');
+  const n=f&&f.files?Math.min(f.files.length,5):0;
+  if(!n){box.textContent='';return}
+  box.innerHTML='첨부 '+n+'개 — '+[].slice.call(f.files,0,5).map(x=>cesc(x.name)).join(', ');
+}
+async function pcConfirm(){
+  const el=document.getElementById('pcFile');
+  const files=(el&&el.files)?[].slice.call(el.files,0,5):[];
+  const msg=document.getElementById('pcMsg');
   try{
-    await DB.collection('compSlots').doc(slotId).update(
-      new firebase.firestore.FieldPath('paperConsents',key),
-      {name:name||'',by:(CMY&&CMY.name)||'관리자',at:new Date().toISOString()});
-    await _refreshSlot(slotId);
-    viewRoster(slotId);
-  }catch(e){alert('처리 실패: '+e.message+'\n(중앙 관리자 권한이 필요할 수 있습니다)')}
+    const urls=[];
+    for(let i=0;i<files.length;i++){
+      msg.textContent='업로드 중… ('+(i+1)+'/'+files.length+')';
+      const f=files[i];
+      const isImg=/^image\//.test(f.type);
+      const body=isImg?await _pcShrink(f,1600):f;
+      const ext=isImg?'jpg':((f.name.split('.').pop()||'pdf').toLowerCase());
+      const safe=String(_PC.key).replace(/[^A-Za-z0-9_-]/g,'');
+      const ref=firebase.storage().ref('logs/'+CME.uid+'/paperconsent_'+_PC.slotId+'_'+safe+'_'+Date.now()+'_'+i+'.'+ext);
+      const snap=await ref.put(body, isImg?{contentType:'image/jpeg'}:undefined);
+      urls.push(await snap.ref.getDownloadURL());
+    }
+    msg.textContent='저장 중…';
+    const rec={name:_PC.name||'',by:(CMY&&CMY.name)||'관리자',at:new Date().toISOString()};
+    if(urls.length)rec.files=urls;
+    await DB.collection('compSlots').doc(_PC.slotId).update(
+      new firebase.firestore.FieldPath('paperConsents',_PC.key), rec);
+    await _refreshSlot(_PC.slotId);
+    const m2=document.getElementById('pcModal');if(m2)m2.remove();
+    const m3=document.getElementById('rosterModal');if(m3)m3.remove();
+    viewRoster(_PC.slotId);
+  }catch(e){ msg.textContent='실패: '+e.message+' (중앙 관리자 권한이 필요할 수 있습니다)'; msg.style.color='#C41E2F'; }
 }
 // ── [단체 명단 수정] 팀 신청 명단 인원 추가·제거 (권한자 — 좌측 명단 ✕제거 / 우측 패널 추가) ──
 let _RED={roster:[]};
@@ -612,7 +673,8 @@ async function openRosterEdit(slotId,key){
   const arr=(s.claimed||[]).filter(c=>c.team&&ckey(c)===key);
   const c=arr[arr.length-1];
   if(!c){alert('팀 신청을 찾을 수 없습니다');return}
-  _RED={slotId:slotId,key:key,teamName:c.name,roster:(c.roster||[]).map(r=>Object.assign({},r))};
+  // [동의확인] 명단 수정 화면에서도 미성년 인원의 보호자 동의 여부를 함께 보여줍니다
+  _RED={slotId:slotId,key:key,teamName:c.name,roster:(c.roster||[]).map(r=>Object.assign({},r)),paper:(s.paperConsents||{})};
   const old=document.getElementById('reModal');if(old)old.remove();
   const div=document.createElement('div');div.id='reModal';
   div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.6);z-index:1200;display:flex;align-items:center;justify-content:center;padding:16px';
@@ -639,7 +701,7 @@ function reRender(){
   const el=document.getElementById('reList');if(!el)return;
   document.getElementById('reCnt').textContent='('+_RED.roster.length+'명)';
   el.innerHTML=_RED.roster.length?_RED.roster.map(function(r,i){
-    return '<div style="display:flex;align-items:center;gap:8px;border:1px solid #e5e9f0;border-radius:9px;padding:7px 10px;margin-bottom:5px;font-size:13px"><b style="min-width:52px">'+cesc(r.name)+'</b><span style="color:#6b7280;font-size:12px;flex:1">'+cesc(r.birth||'')+(r.school?' · '+cesc(r.school):'')+(r.birth&&ageOf(r.birth)>0&&ageOf(r.birth)<18?' <b style="color:#b8860b">미성년</b>':'')+'</span><button onclick="reDel('+i+')" title="명단에서 제거" style="border:none;background:#fee2e2;color:#C41E2F;border-radius:7px;width:26px;height:26px;font-weight:900;cursor:pointer">✕</button></div>';
+    return '<div style="display:flex;align-items:center;gap:8px;border:1px solid #e5e9f0;border-radius:9px;padding:7px 10px;margin-bottom:5px;font-size:13px"><b style="min-width:52px">'+cesc(r.name)+'</b><span style="color:#6b7280;font-size:12px;flex:1">'+cesc(r.birth||'')+(r.school?' · '+cesc(r.school):'')+(r.birth&&ageOf(r.birth)>0&&ageOf(r.birth)<18?(((_RED.paper||{})[_RED.key+'_'+i])?' <b style="color:#0f766e">미성년 · 📄동의✓</b>':' <b style="color:#C41E2F">미성년 · ⚠동의 필요</b>'):'')+'</span><button onclick="reDel('+i+')" title="명단에서 제거" style="border:none;background:#fee2e2;color:#C41E2F;border-radius:7px;width:26px;height:26px;font-weight:900;cursor:pointer">✕</button></div>';
   }).join(''):'<div style="font-size:12.5px;color:#8a919d;padding:10px;border:1.5px dashed #dfe5ee;border-radius:9px">명단이 비어 있습니다 — 오른쪽에서 추가하세요</div>';
 }
 function reDel(i){_RED.roster.splice(i,1);reRender()}
