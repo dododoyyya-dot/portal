@@ -1041,6 +1041,7 @@ async function submitApply(postId){
   const pfRrn=(_e('apPayRrn')&&_e('apPayRrn').value||'').trim();
   const pfAg1=!!(_e('apPayAg1')&&_e('apPayAg1').checked);
   const pfAg2=!!(_e('apPayAg2')&&_e('apPayAg2').checked);
+  const agSigNew=_getSigData(); // [서명유지수정] ③ 동의서 서명 — 재신청 시 빈 캔버스로 열리므로 미리 확보
   const pfSigNew=_getSigDataPay();
   const anyPay=!!(pfBank||pfAcct||pfRrn||pfSigNew||pfAg1||pfAg2);
   if(anyPay){
@@ -1050,6 +1051,8 @@ async function submitApply(postId){
   }
   try{
     const my=(APPS[postId]||[]).find(a=>a.uid===SME.uid);
+    // [서명유지수정] ③ 동의서 서명: 새 서명 우선, 없으면 이전 서명 유지 (재신청 시 다시 그리지 않으면 기존 서명이 사라지던 문제 수정)
+    const agSig=agSigNew||(my&&my.agree&&my.agree.signature)||null;
     // [v4] 수당지급용 서명: 새 서명 우선, 없으면 이전 서명 유지
     const pfSig=pfSigNew||(my&&my.payInfo&&my.payInfo.signature)||null;
     if(anyPay&&!pfSig){alert('수당지급내역서용 전자서명을 해주세요. (⑤번 서명란)');return}
@@ -1057,7 +1060,7 @@ async function submitApply(postId){
     const data={postId:postId,competitionName:p.competitionName||'',
       uid:SME.uid,name:SMY.name||'',phone:SMY.phone||'',lic:MYLIC||'',
       days:days,prefs:prefs,status:status,
-      agree:{privacy:true,rules:true,safety:true,signature:_getSigData()||null,signed:!!_getSigData(),at:new Date().toISOString()},
+      agree:{privacy:true,rules:true,safety:true,signature:agSig,signed:!!agSig,at:new Date().toISOString()},
       // [v4] 수당지급 정보 (미입력 시 이전 값 유지)
       payInfo:anyPay?{bank:pfBank,account:pfAcct,rrn:pfRrn,agreePrivacy:pfAg1,agreeThird:pfAg2,signature:pfSig,at:new Date().toISOString()}:((my&&my.payInfo)||null),
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
