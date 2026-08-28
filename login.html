@@ -406,6 +406,7 @@ function mode(m){
 // 통화 반영: "강사냐 교사냐 일반회원이냐 3분류 + 학생은 별도", "교사는 강사와 묶어 관리",
 //            "심판은 가입 유형이 아니라 보유 자격", "일반회원(학부모·동호인·타단체)은 계좌·주민번호 불필요"
 let SIGNUP_TYPE='instructor';
+let AF2_AUTO=false;  // [소속] '교사(교원)' 체크가 유형 선택 때문에 자동으로 켜진 것인지 표시
 // [일반회원 세분류] 연맹동호인·타소속 = 기존 일반회원 폼 / 학부모·서포터즈·협력기관 = 간략 가입(이름·성별·전화·주소·생년월일)
 let GEN_SUB='학부모'; // [5부문 개편] 동호인(연맹·타소속)은 선수회원 유형으로 분리 — 일반회원은 학부모·서포터즈·협력기관 간략가입만
 const GEN_SIMPLE=['학부모','서포터즈','협력기관'];
@@ -486,7 +487,14 @@ function setSignupType(t){
   // 교사는 소속에서 '교사(교원)' 자동 체크 + 근무지 열기
   if(t==='teacher'){
     const af2=document.getElementById('sAf2');
-    if(af2&&!af2.checked){af2.checked=true;syncAffS();}
+    if(af2&&!af2.checked){af2.checked=true;AF2_AUTO=true;syncAffS();}
+  }else if(AF2_AUTO){
+    // [소속] 교사 유형을 잠깐 눌렀다 다른 유형으로 옮긴 경우 — 자동으로 켠 체크였으므로 되돌립니다
+    // (본인이 직접 체크한 경우에는 AF2_AUTO 가 false 라 건드리지 않습니다)
+    const af2=document.getElementById('sAf2');
+    if(af2)af2.checked=false;
+    AF2_AUTO=false;
+    syncAffS();
   }
   // [유형분리] 학교 검색 블록의 문구 — 학생은 '소속 학교', 교사는 '재직 학교'
   (function(){
