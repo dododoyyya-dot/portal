@@ -1141,6 +1141,12 @@ function ageMigIsTarget(v){
   return (a!==null&&a>=18);
 }
 function ageMigBoxEl(){const b=document.getElementById('ageMigBox');b.style.display='block';return b}
+// [연령] 현황판의 「성인 전환 대기」 칸을 누르면 회원 탭으로 옮겨 전환 도구를 바로 열어줍니다
+function dashAgeMig(){
+  try{ tab(1); }catch(e){}
+  try{ ageMigScan(); }catch(e){}
+  setTimeout(function(){const b=document.getElementById('ageMigBox');if(b)b.scrollIntoView({behavior:'smooth',block:'center'});},260);
+}
 async function ageMigScan(){
   const b=ageMigBoxEl(); b.innerHTML='회원 목록을 불러오는 중…';
   try{
@@ -1867,6 +1873,16 @@ async function loadDash(){
       +box(a.filter(x=>x.status==='선정').length,'선정 (배정 대기)','#1F4E9C')
       +box(a.filter(x=>x.status==='배정완료').length,'배정 완료','#0f766e')
       +box(sl.docs.filter(d=>d.data().claimedBy).length,'지명 확정 대기 ⚡','#C41E2F');
+    // [연령] 성인 전환 대기 — 만 18세가 지났는데 아직 학생회원으로 남아 있는 인원.
+    //   0명이면 칸을 아예 만들지 않아 평소 현황판이 늘어나지 않습니다. 누르면 전환 도구가 열립니다.
+    if(VIEWER_IS_ADMIN){
+      const ageDue=u.filter(x=>ageMigIsTarget(x)).length;
+      if(ageDue)document.getElementById('dash').innerHTML+=
+        '<div onclick="dashAgeMig()" title="누르면 전환 도구가 열립니다" '
+        +'style="cursor:pointer;background:#fff;border:1.5px solid #d9c6f5;border-left:4px solid #7c3aed;border-radius:12px;padding:14px 16px">'
+        +'<b style="font-size:22px;color:#7c3aed">'+ageDue+'</b>'
+        +'<div style="font-size:12px;color:var(--gray);font-weight:700">🎓 성인 전환 대기 <span style="color:#7c3aed">→ 처리</span></div></div>';
+    }
     try{const rp=await DB.collection('reports').get();if(rp.size)document.getElementById('dash').innerHTML+=box(rp.size,'🚩 커뮤니티 신고','#C41E2F');}catch(e){}
   }catch(e){}
 }
