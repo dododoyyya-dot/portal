@@ -423,6 +423,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#555" onclick="closeWaitlist()">⏳ 대기자 일괄 종료</button>
         <button class="btn-sub" style="background:#0f766e" onclick="showSupply()">🧭 권역별 수급 현황</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="copyPhoneList('apps')">📱 문자명단 복사 (교사·현재 필터)</button>
+        <button class="btn-sub" style="background:#153A77" onclick="setSchoolHoursPolicy()">⏰ 정규수업시간 기준 설정</button>
           </div>
         </details>
       </div>
@@ -832,6 +833,7 @@ async function loadApps(){
   APPS=snap.docs.filter(d=>{const s=d.data();return !s.deleted&&sameSidoApp(s);});
   try{const g=await DB.collection('goodsConfirms').get();window.GOODS={};g.docs.forEach(x=>window.GOODS[x.id]=x.data());}catch(e){window.GOODS={};}
   await loadMailLog();  // [메일로그] 발송 이력 → 학교 카드 📧 뱃지용
+  await loadSchoolHoursPolicy();  // ▶ [시간대검증] 정규수업시간 기준 정책 로드 (2026-08-28)
   renderApps();
 }
 // ══════════ [메일로그] 발송 이력 기록·조회 (siteContent/mailLog, 최근 800건) ══════════
@@ -857,6 +859,31 @@ async function loadMailLog(){
     MAILLOG={};
     ((d.exists&&d.data().items)||[]).forEach(r=>{if(r&&r.to)MAILLOG[String(r.to).toLowerCase()]=r});
   }catch(e){MAILLOG={};}
+}
+// ▶ [시간대검증] 학교급별 정규수업시간 기준(siteContent/schoolHoursPolicy) — 관리자 조정 가능, 기본값 내장 (2026-08-28)
+let SCHOOL_HOURS_POLICY=null;
+async function loadSchoolHoursPolicy(){
+  try{
+    const d=await DB.collection('siteContent').doc('schoolHoursPolicy').get();
+    SCHOOL_HOURS_POLICY=(d.exists&&d.data().levels)||null;
+  }catch(e){SCHOOL_HOURS_POLICY=null;}
+}
+async function setSchoolHoursPolicy(){
+  const pol=Object.assign({},DEFAULT_SCHOOL_HOURS,SCHOOL_HOURS_POLICY||{});
+  const parseHM=(s)=>/^([01]?\d|2[0-3]):[0-5]\d$/.test(String(s||'').trim())?String(s).trim():null;
+  const next={};
+  for(const lv of ['초','중','고']){
+    const cur=pol[lv]||DEFAULT_SCHOOL_HOURS[lv];
+    const s=prompt(lv+'등학교 정규수업 시작시각 (HH:MM)',cur.start);if(s===null)return;
+    const e=prompt(lv+'등학교 정규수업 종료시각 (HH:MM)',cur.end);if(e===null)return;
+    const ps=parseHM(s),pe=parseHM(e);
+    if(!ps||!pe||pe<=ps){alert(lv+'등학교 시간 형식이 올바르지 않거나(HH:MM) 종료가 시작보다 빠릅니다. 처음부터 다시 시도해주세요.');return}
+    next[lv]={start:ps,end:pe};
+  }
+  await DB.collection('siteContent').doc('schoolHoursPolicy').set({levels:next,updatedAt:new Date().toISOString(),updatedBy:'admin'});
+  SCHOOL_HOURS_POLICY=next;
+  alert('✓ 정규수업시간 기준을 저장했습니다.\n초: '+next.초.start+'~'+next.초.end+' · 중: '+next.중.start+'~'+next.중.end+' · 고: '+next.고.start+'~'+next.고.end);
+  renderApps();
 }
 function mailBadge(email){
   const ml=email&&MAILLOG[String(email).toLowerCase()];
@@ -975,6 +1002,93 @@ function renderInstLink(){
       +'</div>';
   }).join(''):'<div style="font-size:13px;color:var(--gray);padding:6px">해당 조건의 지원 강사가 없습니다.</div>';
 }
+// ▶ [시간대검증] 학교 강습신청 '정규수업시간 겹침' 분류 로직 (2026-08-28)
+// 신규 제출을 막거나 경고 팝업을 띄우지 않음 — 기존 접수건에 admin.html 명단에서 참고용 분류 배지만 표시.
+// 학교별 실제 시간표 데이터가 없어 학교급(초/중/고) 고정 기준시간 + 자유서식 희망요일·시간 텍스트의
+// 최선추정 파싱으로 판정하며, 확신할 수 없는 경우 항상 '확인필요'로 분류(임의 확정 판정하지 않음).
+function schoolLevelOf(name){
+  const n = String(name||'').trim();
+  if(!n) return null;
+  if(n.indexOf('초등학교')>=0 || n.indexOf('초교')>=0 || /초$/.test(n)) return '초';
+  if(n.indexOf('중학교')>=0 || /중$/.test(n)) return '중';
+  if(n.indexOf('고등학교')>=0 || n.indexOf('고교')>=0 || /고$/.test(n)) return '고';
+  return null;
+}
+const SCHOOL_WEEKDAYS = ['월','화','수','목','금'];
+const SCHOOL_WEEKENDS = ['토','일'];
+function parseSchoolDays(text){
+  const t = String(text||'');
+  if(/협의|미정|추후|상담|조율|미확정/.test(t)) return {days:[], ambiguous:true};
+  const found = new Set();
+  const dayFull = t.match(/[월화수목금토일]요일/g) || [];
+  dayFull.forEach(m=>found.add(m[0]));
+  let rest = t.replace(/[월화수목금토일]요일/g, ' ');
+  if(/평일/.test(rest)){ SCHOOL_WEEKDAYS.forEach(d=>found.add(d)); rest = rest.replace(/평일/g,' '); }
+  if(/주말/.test(rest)){ SCHOOL_WEEKENDS.forEach(d=>found.add(d)); rest = rest.replace(/주말/g,' '); }
+  if(/매일/.test(rest)){ SCHOOL_WEEKDAYS.concat(SCHOOL_WEEKENDS).forEach(d=>found.add(d)); rest = rest.replace(/매일/g,' '); }
+  const shortMatches = rest.match(/[월화수목금토일]/g) || [];
+  shortMatches.forEach(c=>found.add(c));
+  return {days:Array.from(found), ambiguous:false};
+}
+function schoolTimeToMin(ampm, h, m){
+  h = parseInt(h,10); m = m?parseInt(m,10):0;
+  if(isNaN(h)||h<0||h>23||m<0||m>59) return null;
+  if(ampm==='오후' && h<12) h+=12;
+  if(ampm==='오전' && h===12) h=0;
+  return h*60+m;
+}
+function parseSchoolTimeRange(text){
+  const t = String(text||'').replace(/[～∼–—−\-]/g,'~').replace(/\s+/g,' ');
+  const re = /(오전|오후)?\s*(\d{1,2})(?::(\d{2}))?\s*시?\s*~\s*(오전|오후)?\s*(\d{1,2})(?::(\d{2}))?\s*시?/;
+  const m = t.match(re);
+  if(!m) return null;
+  let [, ap1, h1, mi1, ap2, h2, mi2] = m;
+  h1 = parseInt(h1,10); h2 = parseInt(h2,10);
+  if(!ap1 && ap2) ap1 = ap2;
+  if(!ap2 && ap1) ap2 = ap1;
+  if(!ap1 && !ap2){
+    if(h1>=1 && h1<=8) ap1='오후';
+    if(h2>=1 && h2<=8) ap2='오후';
+  }
+  const startMin = schoolTimeToMin(ap1,h1,mi1);
+  const endMin = schoolTimeToMin(ap2,h2,mi2);
+  if(startMin===null || endMin===null) return null;
+  if(endMin<=startMin) return null;
+  return {startMin, endMin};
+}
+const DEFAULT_SCHOOL_HOURS = {
+  '초': {start:'09:00', end:'14:00'},
+  '중': {start:'09:00', end:'16:00'},
+  '고': {start:'09:00', end:'17:00'}
+};
+function schoolHHMMToMin(s){ const m=String(s||'').match(/^(\d{1,2}):(\d{2})$/); if(!m) return null; return parseInt(m[1],10)*60+parseInt(m[2],10); }
+function classifyOneSchoolSlot(slotText, level, policy){
+  const raw = String(slotText||'').trim();
+  if(!raw) return null;
+  const {days, ambiguous} = parseSchoolDays(raw);
+  if(ambiguous) return 'unknown';
+  if(!days.length) return 'unknown';
+  const weekdayHit = days.some(d=>SCHOOL_WEEKDAYS.indexOf(d)>=0);
+  if(!weekdayHit) return 'clear';
+  if(!level) return 'unknown';
+  const pol = (policy && policy[level]) || DEFAULT_SCHOOL_HOURS[level];
+  const polStart = schoolHHMMToMin(pol.start), polEnd = schoolHHMMToMin(pol.end);
+  if(polStart===null||polEnd===null) return 'unknown';
+  const tr = parseSchoolTimeRange(raw);
+  if(!tr) return 'unknown';
+  const overlap = tr.startMin < polEnd && tr.endMin > polStart;
+  return overlap ? 'overlap' : 'clear';
+}
+function classifySchoolTimeConflict(app, policy){
+  const level = schoolLevelOf(app && app.school);
+  const r1 = classifyOneSchoolSlot(app && app.d1, level, policy);
+  const r2 = classifyOneSchoolSlot(app && app.d2, level, policy);
+  const results = [r1, r2].filter(Boolean);
+  if(!results.length) return 'clear';
+  if(results.indexOf('overlap')>=0) return 'overlap';
+  if(results.indexOf('unknown')>=0) return 'unknown';
+  return 'clear';
+}
 function renderApps(){
   renderInstLink();
   const dupKey={};APPS.forEach(d=>{const x=d.data();const k=(x.school||'').replace(/\s/g,'')+'|'+(x.type||'');dupKey[k]=(dupKey[k]||0)+1});
@@ -1000,6 +1114,7 @@ function renderApps(){
   const el=document.getElementById('appList');
   el.innerHTML=docs.length?docs.map(d=>{
     const s=d.data();
+    const tc=classifySchoolTimeConflict(s,SCHOOL_HOURS_POLICY);  // ▶ [시간대검증] 'overlap'|'clear'|'unknown'
     const st=s.status||'접수';
     const gc=(window.GOODS||{})[d.id];
     const stc={'접수':'#8a919d','대기':'#e6b422','선정':'#1F4E9C','배정완료':'#0f766e','미선정':'#C41E2F','취소':'#555555'}[st]||'#8a919d';
@@ -1009,6 +1124,8 @@ function renderApps(){
       +((s.selfTeach&&s.support!=='용품만')?' <span style="font-size:11px;font-weight:800;color:#0f766e">◉본인지도 희망'+(s.selfName?'('+esc(s.selfName)+')':'')+'</span>':'')
       +(s.selfTeach&&s.support!=='용품만'&&!s.selfUid&&!s.assignedName&&(st==='선정'||st==='접수'||st==='대기')?' <span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px" title="신청자가 비로그인 상태로 제출해 자동 배정이 안 됐습니다. 아래 🎯 강사 직접 배정으로 성명 대조 후 지정해주세요.">⚠ 본인지도 매칭필요</span>':'')
       +((dupKey[(s.school||'').replace(/\s/g,'')+'|'+(s.type||'')]>1)?' <span style="font-size:11px;font-weight:800;color:#fff;background:#e6b422;padding:2px 8px;border-radius:999px">⚠ 중복의심</span>':'')
+      +(tc==='overlap'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px" title="희망 요일·시간이 정규수업시간과 겹치는 것으로 추정됩니다(자동 추정 · 확정 아님) — 담당교사와 실제 가능 시간을 재확인해주세요.">⏰ 정규수업시간 겹침 의심</span>':'')
+      +(tc==='unknown'?' <span style="font-size:11px;font-weight:700;color:#6b7280;background:#eef1f5;padding:2px 8px;border-radius:999px" title="희망 요일·시간 텍스트 형식을 자동으로 해석하지 못해 정규수업시간 겹침 여부를 판단할 수 없습니다. 필요시 담당교사에게 직접 확인해주세요.">⏰ 시간 확인필요</span>':'')
       +(s.support==='용품만'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">🎁 용품만</span>':'')
       +' <span style="font-size:11px;font-weight:800;color:#fff;background:'+(appTypeOf(s).indexOf('방과후')>=0?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+'</span>'
       +((st==='선정'||st==='배정완료')?' <span style="font-size:11px;font-weight:800;color:'+(gc&&gc.delivery?'#0f766e':'#C41E2F')+'" title="'+(gc&&gc.delivery?esc(((gc.delivery.addr||'')+' '+(gc.delivery.addr2||'')).trim())+' · '+esc(gc.delivery.receiver||'')+' '+esc(gc.delivery.phone||''):'배송지 미입력 — 📦 버튼으로 링크를 교사에게 전달하세요')+'">🚚 배송지 '+(gc&&gc.delivery?'O':'X')+'</span>':'')
