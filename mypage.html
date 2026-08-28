@@ -840,6 +840,15 @@ function pfAfEtcValue(){
 }
 // 학생회원이면 학생용 소속 블록, 아니면 기존 성인용 블록을 노출
 function pfIsStudent(d){ return !!(d&&(d.accountType==='student'||d.memberGroup==='student')); }
+// [수당·피복] 강사복 지급 및 수당 지급 대상(지도자·교사·국가공인자격) 판정
+//   구계정(유형 정보가 없는 오래된 계정)은 기존 동작을 유지하기 위해 대상으로 봅니다
+function pfNeedsPay(d){
+  if(!d)return false;
+  if(d.memberGroup==='active')return true;
+  if(['instructor','teacher','natcert'].indexOf(d.accountType)>=0)return true;
+  if(!d.memberGroup&&!d.accountType)return true;
+  return false;
+}
 function pfAffModeSync(d){
   const sBox=document.getElementById('pfStudentAffBox'), aBox=document.getElementById('pfAdultAffBox');
   if(!sBox||!aBox)return;
@@ -1011,8 +1020,10 @@ function pfMissing(d){
   if(!d.address)miss.push('집 주소(상세주소 포함)');
   if(!(d.activityRegions&&d.activityRegions.length))miss.push('활동 가능 범위');
   if(!(d.affiliation&&d.affiliation.length))miss.push('소속');
-  // [피복·학생] 학생회원은 강사복 대상이 아니므로 미작성 항목에서 제외
-  if(!pfIsStudent(d)&&(!d.clothingSize||!d.sizePants||!d.sizeShoe||!d.sizeCap))miss.push('피복 사이즈');
+  // [피복·수당] 지급 대상(지도자·교사·국가공인자격)에게만 안내합니다 — 학생·일반·선수는 대상 아님
+  if(pfNeedsPay(d)&&(!d.clothingSize||!d.sizePants||!d.sizeShoe||!d.sizeCap))miss.push('피복 사이즈');
+  // [수당 계좌] 가입 단계에서 받지 않으므로 마이페이지에서 반드시 안내합니다
+  if(pfNeedsPay(d)&&(!d.bank||!d.accountNum||!d.accountHolder))miss.push('수당 지급 계좌');
   return miss;
 }
 window.pfMissing=pfMissing;
@@ -1345,8 +1356,8 @@ async function saveProfile(){
     if(document.getElementById('pfAf2').checked&&req('pfTeachLv','학교급 (교원)'))return;
     if((document.getElementById('pfAf2').checked||document.getElementById('pfAf3').checked)&&req('pfWork','근무지 (학교·기관명)'))return;
   }
-  // [피복·학생] 학생회원은 강사복 지급 대상이 아니므로 사이즈 필수에서 제외 (다른 유형은 기존과 동일)
-  if(!pfIsStudent(MYD)){
+  // [피복] 강사복 지급 대상(지도자·교사·국가공인자격)에게만 필수 — 학생·일반·선수는 제외
+  if(pfNeedsPay(MYD)){
     if(req('pfSize','피복 사이즈(상의)'))return;
     if(req('pfSizePants','피복 사이즈(하의)'))return;
     if(req('pfSizeShoe','피복 사이즈(신발)'))return;
