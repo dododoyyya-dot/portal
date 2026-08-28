@@ -170,7 +170,17 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <button id="t4" onclick="tab(4)">대회 관리</button>
       <button id="t5" onclick="tab(5)">단체 메일</button>
       <button id="t6" onclick="tab(6)">🪧 팝업 관리</button>
+      <button id="t7" onclick="tab(7)">📄 동의서 보관함</button>
       <a href="perm.html" style="margin-left:auto;display:inline-flex;align-items:center;padding:10px 20px;border-radius:10px;background:linear-gradient(135deg,#1F4E9C,#153A77);color:#fff;font-weight:800;font-size:14px;text-decoration:none;box-shadow:0 3px 10px rgba(21,58,119,.25)">🛡 권한 관리 센터 →</a>
+    </div>
+    <!-- ══════════ [동의서 보관함] v7: 팀 신청 첨부 스캔본 + 수기 동의 확인 기록 ══════════ -->
+    <div id="v7" style="display:none">
+      <div class="authbox" style="max-width:none;margin:0 0 14px">
+        <h3 style="margin:0 0 4px;font-size:17px">📄 동의서 보관함</h3>
+        <div style="font-size:12.5px;color:var(--gray);line-height:1.7">클럽장이 단체 신청 시 첨부한 <b>수기 동의서 스캔본</b>과, 담당자가 현장에서 <b>서면 동의를 확인</b>한 기록을 공고별로 모아 보여줍니다. (읽기 전용 — 여기서 자료가 변경되지 않습니다)</div>
+        <div style="margin-top:10px"><button class="btn-sub" style="background:#1F4E9C" onclick="loadConsentBox()">🔄 새로고침</button></div>
+      </div>
+      <div class="board" id="cboxList"><div class="bempty">[📄 동의서 보관함] 탭을 열면 자동으로 불러옵니다.</div></div>
     </div>
     <!-- ══════════ [팝업] v6: 홈페이지 팝업 관리 (신규 탭) ══════════ -->
     <div id="v6" style="display:none">
@@ -533,7 +543,7 @@ async function loadExtClubMap(){
   }catch(e){console.warn('extClubMap',e);}
 }
 function tab(n){
-  [1,2,3,4,5,6].forEach(i=>{
+  [1,2,3,4,5,6,7].forEach(i=>{
     document.getElementById('t'+i).classList.toggle('on',i===n);
     document.getElementById('v'+i).style.display=i===n?'block':'none';
   });
@@ -541,6 +551,7 @@ function tab(n){
   if(n===4)loadCompsAdmin();
   if(n===5){if(!USERS.length){loadUsers().then(()=>mpRender()).catch(()=>{});}else mpRender();}  // [단체발송] 회원 선택 목록
   if(n===6)loadPopups();  // [팝업] 신규 탭
+  if(n===7)loadConsentBox();  // [동의서 보관함] 신규 탭
 }
 // ══════════ [단체발송] 회원 선택 + 단체 문자 ══════════
 let MP_SEL={},MP_F='전체';  // MP_SEL: uid → {name,email,phone}
@@ -1227,6 +1238,74 @@ async function ageMigUndo(){
     b.innerHTML='<b style="color:#0f766e">↩ 복원 완료 — '+n+'명</b>';
     loadUsers();
   }catch(e){ b.innerHTML='<b style="color:#C41E2F">복원 실패: '+esc(e.message)+'</b>'; }
+}
+// ══════════ [동의서] 참가 신청 계약 키 조회 ══════════
+//  저장 시: 참가 신청은 'compapply_{공고}_{참가자키}', 위촉 신청은 'compapply_{공고}'
+//  기존 조회는 뒤쪽 형태만 찾아 참가 신청 건의 동의일자·서명이 항상 비어 있었습니다.
+function compContract(ud,id,key){
+  const c=(ud&&ud.contracts)||{};
+  if(key&&c['compapply_'+id+'_'+key])return c['compapply_'+id+'_'+key];
+  if(c['compapply_'+id])return c['compapply_'+id];
+  const pre='compapply_'+id+'_';
+  for(const k in c){ if(k.indexOf(pre)===0)return c[k]; }
+  return {};
+}
+function compSigned(ud,id,key){ return !!(compContract(ud,id,key).sign) }
+function compSignImg(ud,id,key){ return compContract(ud,id,key).sign||'' }
+// ══════════ [동의서 보관함] 팀 신청 첨부 스캔본 + 수기 동의 확인 기록 ══════════
+async function loadConsentBox(){
+  const b=document.getElementById('cboxList');
+  if(!b)return;
+  b.innerHTML='<div class="bempty">불러오는 중…</div>';
+  try{
+    const [tc,sl]=await Promise.all([
+      DB.collection('teamConsents').get().catch(()=>({docs:[]})),
+      DB.collection('compSlots').orderBy('date','desc').limit(200).get()
+    ]);
+    const slotMap={}; sl.docs.forEach(d=>{slotMap[d.id]=d.data()||{}});
+    const groups={};
+    const g=id=>(groups[id]=groups[id]||{files:[],paper:[]});
+    (tc.docs||[]).forEach(d=>{
+      const v=d.data()||{};
+      const sid=v.slotId||String(d.id).split('_')[0];
+      const s=slotMap[sid];
+      if(s&&!sameSidoComp(s))return;
+      g(sid).files.push({docId:d.id,pid:v.pid||'',uid:v.uid||'',files:(v.files||[]),at:v.at||''});
+    });
+    sl.docs.forEach(d=>{
+      const v=d.data()||{};
+      if(!sameSidoComp(v))return;
+      const pc=v.paperConsents||{};
+      const keys=Object.keys(pc);
+      if(keys.length)g(d.id).paper=keys.map(k=>Object.assign({key:k},pc[k]||{}));
+    });
+    const ids=Object.keys(groups).filter(id=>groups[id].files.length||groups[id].paper.length);
+    if(!ids.length){b.innerHTML='<div class="bempty">보관된 동의서가 없습니다.<br><span style="font-size:12.5px;color:var(--gray)">클럽장이 단체 신청에 첨부한 스캔본과, 담당자가 「수기동의서 확인완료」를 누른 기록이 여기에 모입니다.</span></div>';return}
+    ids.sort((a,b2)=>String((slotMap[b2]||{}).date||'').localeCompare(String((slotMap[a]||{}).date||'')));
+    let nFile=0,nPaper=0;
+    const html=ids.map(id=>{
+      const s=slotMap[id]||{};
+      const gr=groups[id];
+      const fileRows=gr.files.map(x=>{
+        nFile+=x.files.length;
+        const links=x.files.map((u,i)=>'<a href="'+esc(u)+'" target="_blank" style="color:#153A77;font-weight:800;margin-right:8px">📎 '+(i+1)+'</a>').join('');
+        return '<div class="sub3" style="margin-top:4px">· 신청번호 <b>'+esc(x.pid||'-')+'</b> — 첨부 '+x.files.length+'건 &nbsp;'+links
+          +(x.at?'<span style="color:#8a919d;margin-left:6px">'+esc(String(x.at).slice(0,16).replace('T',' '))+'</span>':'')+'</div>';
+      }).join('');
+      const paperRows=gr.paper.map(x=>{
+        nPaper++;
+        return '<div class="sub3" style="margin-top:4px">· <b>'+esc(x.name||x.key||'')+'</b> — 📄 서면 동의 확인 <span style="color:#8a919d">('+esc(x.by||'담당자')+' · '+esc(String(x.at||'').slice(0,16).replace('T',' '))+')</span></div>';
+      }).join('');
+      return '<div class="urow" style="align-items:flex-start"><div class="grow">'
+        +'<b>'+esc(s.title||'(제목 없음)')+'</b> <span style="color:#8a919d;font-size:12px">'+esc(s.date||'')+(s.region?' · '+esc(s.region):'')+'</span>'
+        +(fileRows?'<div style="margin-top:6px;font-weight:800;font-size:12.5px;color:#153A77">📎 첨부 스캔본</div>'+fileRows:'')
+        +(paperRows?'<div style="margin-top:8px;font-weight:800;font-size:12.5px;color:#8a5a00">📄 수기 동의 확인</div>'+paperRows:'')
+        +'</div><div style="display:flex;gap:6px;flex-wrap:wrap">'
+        +'<button class="btn-sub" style="background:#0f766e" onclick="compConsentDocs(\''+id+'\')">🖨 동의서 출력</button>'
+        +'</div></div>';
+    }).join('');
+    b.innerHTML='<div style="padding:12px 16px;background:#f4f6f9;border-radius:10px;margin-bottom:10px;font-size:13px;font-weight:700">공고 '+ids.length+'건 · 첨부 스캔본 '+nFile+'건 · 수기 확인 '+nPaper+'건</div>'+html;
+  }catch(e){ b.innerHTML='<div class="bempty" style="color:#C41E2F">불러오기 실패: '+esc(e.message)+'</div>'; }
 }
 // ── 단기 구인 공고 승인 (gigs) ──
 let GIGS=[];
@@ -4140,7 +4219,7 @@ async function compCSV(id){
     if(u)ud=u.data();
     else{try{const snap=await DB.collection('users').doc(c.uid).get();if(snap.exists)ud=snap.data();}catch(e){}}
     ud=ud||{};
-    const signed=!!(ud.contracts&&ud.contracts['compapply_'+id]&&ud.contracts['compapply_'+id].sign);
+    const signed=compSigned(ud,id,compKey(c));
     const p=c.prefs||[];
     rows.push([c.name,s.role,p[0]||'',p[1]||'',p[2]||'',c.consent?'O':'',signed?'O':'',confirmed.indexOf(c.uid)>=0?'확정':'',ud.phone||'',ud.bank||'',ud.accountNum||'',ud.accountHolder||'',(c.at||'').slice(0,16).replace('T',' ')]);
   }
@@ -4227,7 +4306,7 @@ async function compConsentDocs(id){
     let ud={},rrn='';
     try{const snap=await DB.collection('users').doc(c.uid).get();if(snap.exists)ud=snap.data();}catch(e){}
     try{const pd=await DB.collection('privateInfo').doc(c.uid).get();if(pd.exists)rrn=pd.data().rrn||'';}catch(e){}
-    const ct=(ud.contracts||{})['compapply_'+id]||{};
+    const ct=compContract(ud,id,compKey(c));
     const aff=(ud.affiliation&&ud.affiliation.length)?ud.affiliation.join('·'):(ud.workSchool||ud.fedName||'');
     pages.push('<div style="page-break-after:always;font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:30px 10px">'
       +'<h2 style="text-align:center;border:2px solid #333;padding:12px">'+esc(s.title)+' 관련 수당 지급<br><span style="font-size:15px">개인정보 수집·이용·제공 동의서</span></h2>'
@@ -4288,7 +4367,7 @@ async function compPayroll(id){
     try{const u=await DB.collection('users').doc(c.uid).get();if(u.exists)ud=u.data();}catch(e){}
     try{const p=await DB.collection('privateInfo').doc(c.uid).get();if(p.exists)rrn=p.data().rrn||'';}catch(e){}
     rows.push({uid:c.uid,name:c.name,prefs:c.prefs||[],phone:ud.phone||'',bank:ud.bank||'',accountNum:ud.accountNum||'',accountHolder:ud.accountHolder||'',rrn:rrn,
-      signed:!!(ud.contracts&&ud.contracts['compapply_'+id]&&ud.contracts['compapply_'+id].sign),
+      signed:compSigned(ud,id,compKey(c)),
       amt:(saved[c.uid]&&saved[c.uid].amt)||''});
   }
   PAY_CTX={id:id,s:s,rows:rows};
@@ -4405,8 +4484,8 @@ async function govPayroll(id){
       org:sv.org||ud.fedName||((ud.affiliation||[])[0]==='시도연맹'?((ud.region||'').split('·')[0]+'플라잉디스크연맹'):(ud.workSchool||'')),
       role:role,base:(sv.base!=null?sv.base:df.base),over:(sv.over!=null?sv.over:df.over),extra:(sv.extra!=null?sv.extra:df.extra),
       bank:ud.bank||'',accountNum:ud.accountNum||'',rrn:rrn,
-      signed:!!(ud.contracts&&ud.contracts['compapply_'+id]&&ud.contracts['compapply_'+id].sign),
-      signImg:(ud.contracts&&ud.contracts['compapply_'+id]&&ud.contracts['compapply_'+id].sign)||''});
+      signed:compSigned(ud,id,compKey(c)),
+      signImg:compSignImg(ud,id,compKey(c))});
   }
   GOVPAY_CTX={id:id,s:s,rows:rows,fmt:fmt};
   const old=document.getElementById('govPayModal');if(old)old.remove();
