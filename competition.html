@@ -1473,11 +1473,11 @@ async function loadLiveComps(){
       rows.push({date:s.date||'',end:s.date||'',title:s.title||'',kind:s.role==='참가'?'참가 모집':(s.role+'요원 모집'),
         color:s.role==='참가'?'#153A77':(s.role==='심판'?'#7c3aed':'#b8860b'),
         ind:s.role==='참가'&&((s.roles||[]).length>_tn),team:s.role==='참가'&&_tn>0,
-        done:!!(s.deadline&&s.deadline<today),place:(s.place?s.place+(s.region?' ('+s.region+')':''):(s.region||'')),href:'#cSlotList'});});
+        done:!!(s.deadline&&s.deadline<today),place:(s.place?s.place+(s.region?' ('+s.region+')':''):(s.region||'')),href:'competition.html?slot='+d.id});});
     if(st)st.docs.forEach(d=>{const s=d.data();
       const ds=(s.dates||[]).map(x=>x.date).filter(Boolean).sort();
       rows.push({date:ds[0]||s.startDate||'',end:ds[ds.length-1]||s.endDate||'',title:s.competitionName||'',kind:'심판·운영 모집',color:'#0f766e',
-        done:!!(s.manualClosed||(s.deadline&&s.deadline<today)),place:s.location||'',href:'staff.html'});});
+        done:!!(s.manualClosed||(s.deadline&&s.deadline<today)),place:s.location||'',href:'staff.html?post='+d.id});});
     rows.sort((x,y)=>String(x.date).localeCompare(String(y.date)));
     const act=rows.filter(r=>!r.done&&(!r.end||r.end>=today));
     const past=rows.filter(r=>r.done||(r.end&&r.end<today)).reverse();
