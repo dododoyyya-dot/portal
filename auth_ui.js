@@ -16,7 +16,7 @@
       ['대회 일정 · 안내','competition.html'],['참가 신청 (선수)','competition.html'],
       ['심판 · 운영요원 신청','competition.html#staff'],['연맹 일정 캘린더','calendar.html']]},
     {t:'클럽',h:'club.html',d:[
-      ['클럽 찾기 · 가입','club.html'],['클럽 만들기 (클럽장)','club.html'],['내 클럽 · 가입 승인','club.html']]},
+      ['클럽 찾기 · 가입','club.html'],['클럽 만들기 (클럽장)','club.html'],['내 클럽 · 가입 승인','club.html'],['⚔️ 클럽 교류전','club.html?tab=4']]},
     {t:'자격증',h:'license.html',d:[
       ['연맹 자격증 신청 (지도자·심판)','license.html'],
       ['이수증 · 자격 진위확인','verify.html'],['안전교육 이수','safety.html'],

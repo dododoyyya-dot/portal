@@ -298,6 +298,10 @@ AUTH.onAuthStateChanged(async u=>{
   loadMyClubs();
   loadSidoApprovals().catch(()=>{});
   loadOfficer().catch(()=>{});
+  // [메뉴딥링크] club.html?tab=4 처럼 상단 메뉴·외부 링크에서 특정 탭으로 바로 이동
+  //   (competition.html의 ?slot=, staff.html의 ?post= 와 동일한 패턴)
+  const _tabQ=new URLSearchParams(location.search).get('tab');
+  if(_tabQ&&['1','2','3','4'].indexOf(_tabQ)>=0)showClTab(_tabQ);
 });
 function renderSido(){
   document.getElementById('sidoChips').innerHTML=['전체'].concat(SIDOS).map(s=>{
