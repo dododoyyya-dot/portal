@@ -335,7 +335,7 @@ async function loadStaffEmbed(){
         +'<div style="font-size:12px;color:#6b7280;margin-top:2px">📅 '+cesc(dateTxt)+' &nbsp;·&nbsp; 📍 '+cesc(p.location||(comp&&comp.place)||'')+(p.deadline?' &nbsp;·&nbsp; 마감 '+cesc(p.deadline):'')+' &nbsp;·&nbsp; 주최: '+cesc((p.author&&p.author.organization)||'')+'</div>'
         +(p.description?'<div style="font-size:11.5px;color:#555;margin-top:2px">📌 '+cesc(p.description)+'</div>':'')
         +'</div>'
-        +'<a href="staff.html" style="font-size:12.5px;font-weight:800;color:#fff;background:#1F4E9C;border-radius:9px;padding:7px 14px;text-decoration:none;white-space:nowrap">자세히 · 신청 →</a>'
+        +'<a href="staff.html?post='+p.id+'" style="font-size:12.5px;font-weight:800;color:#fff;background:#1F4E9C;border-radius:9px;padding:7px 14px;text-decoration:none;white-space:nowrap">자세히 · 신청 →</a>'
         +'</div>';
     };
     let html='';
@@ -1480,18 +1480,49 @@ async function loadSlots(){
         +'<span style="font-size:12.5px;color:#5b6472;font-weight:700">📅 '+cesc(c.dateStart)+(c.dateEnd&&c.dateEnd!==c.dateStart?' ~ '+cesc(c.dateEnd):'')+' · <span style="font-size:14px;font-weight:800;color:#374151">📍 '+cesc(c.place||'')+'</span></span></div>'
         +(c.desc?'<div style="font-size:12.5px;color:#4b5563;padding:0 4px 8px;white-space:pre-line;word-break:keep-all;line-height:1.75">'+cesc(c.desc)+'</div>':'')
         +((c.sports||[]).some(x=>x.mode==='체험부스')?'<div style="font-size:12.5px;font-weight:800;color:#8a5a00;background:#fff8ed;border:1px solid #ecd9b0;border-radius:9px;padding:8px 12px;margin:0 4px 8px">🎪 체험부스 종목은 신청 없이 현장에서 자유롭게 참여하실 수 있습니다.</div>':'')
-        +(slots.filter(d=>d.data().role==='참가').length?slots.filter(d=>d.data().role==='참가').map(d=>slotCard(d,today)).join(''):'<div class="bempty" style="margin:4px">참가 모집 공고 준비 중</div>')
+        +(slots.filter(d=>d.data().role==='참가').length?slots.filter(d=>d.data().role==='참가').map(d=>slotCardCompact(d,today)).join(''):'<div class="bempty" style="margin:4px">참가 모집 공고 준비 중</div>')
         +'</div>';
     });
-    html+=snap.docs.filter(d=>!linked.has(d.id)&&d.data().role==='참가').map(d=>slotCard(d,today)).join('');
+    html+=snap.docs.filter(d=>!linked.has(d.id)&&d.data().role==='참가').map(d=>slotCardCompact(d,today)).join('');
     el.innerHTML=html||'<div class="bempty">현재 모집 중인 대회 참가 공고가 없습니다.</div>';
     // [구조개편] 심판·운영 위촉 공고(compSlots)는 별도 섹션에 렌더 — 참가 모집과 분리
     const refEl=document.getElementById('cRefSlotList');
     if(refEl){
-      const rf=snap.docs.filter(d=>d.data().role!=='참가').map(d=>slotCard(d,today)).join('');
+      const rf=snap.docs.filter(d=>d.data().role!=='참가').map(d=>slotCardCompact(d,today)).join('');
       refEl.innerHTML=rf||'<div class="bempty">진행 중인 심판·운영 위촉 공고가 없습니다. (신규 공고는 위 「심판·운영요원 모집공고」에 게시됩니다)</div>';
     }
+    // [1공고 1상세] 목록에서 공고 하나를 눌러 들어오면(?slot=id) 그 공고 하나만 단독으로 보여줍니다.
+    const _qs=new URLSearchParams(location.search).get('slot');
+    if(_qs){
+      const _d=CSLOTS.find(x=>x.id===_qs);
+      const _back='<div style="margin-bottom:12px"><a href="competition.html" style="font-weight:800;color:var(--blue);font-size:13.5px">← 전체 공고 목록</a></div>';
+      if(_d){
+        const _card=_back+slotCard(_d,today);
+        if(_d.data().role==='참가'){el.innerHTML=_card;if(refEl)refEl.innerHTML='<div class="bempty">전체 공고 목록에서 확인하세요. <a href="competition.html" style="font-weight:800;color:var(--blue)">← 목록으로</a></div>';}
+        else{el.innerHTML='<div class="bempty">전체 공고 목록에서 확인하세요. <a href="competition.html" style="font-weight:800;color:var(--blue)">← 목록으로</a></div>';if(refEl)refEl.innerHTML=_card;}
+      }else{
+        const _msg=_back+'<div class="bempty">공고를 찾을 수 없습니다 — 마감 후 정리되었거나 삭제되었을 수 있습니다.</div>';
+        el.innerHTML=_msg;if(refEl)refEl.innerHTML='';
+      }
+    }
   }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+cesc(e.message)+'</div>'}
+}
+// [목록간소화] 목록에는 요약만 표시합니다. 클릭하면 이 공고 하나만 보여주는 단독 상세 페이지(competition.html?slot=id)로 이동합니다.
+//   본문(포스터 이미지·안내문 등 — 아래 slotCard)은 목록 DOM에 아예 넣지 않아, 공고가 많아도 목록 페이지 길이가 늘어나지 않습니다.
+function slotCardCompact(d,today){
+  const s=d.data();
+  const act=activeCount(s);
+  const closed=(s.deadline&&today>s.deadline)||act>=s.quota;
+  const rc=ROLE_COLOR[s.role]||'#153A77';
+  const applied=myEntries(s).length>0;
+  return '<div class="cslot" style="cursor:pointer" onclick="location.href=\'competition.html?slot='+d.id+'\'">'
+    +'<div class="chead">'+(s.host?'<span style="font-size:12px;font-weight:800;color:#6b7280">'+cesc(s.host)+' · </span>':'')+'<span class="ctitle">'+cesc(s.title)+'</span><span class="rbadge" style="background:'+rc+'">'+cesc(s.role)+(s.role==='참가'?' (선수)':'요원')+'</span>'
+    +(closed?'<span class="rbadge" style="background:#8a919d">마감</span>':'')
+    +(applied?'<span class="rbadge" style="background:#0f766e">✓ 신청함</span>':'')
+    +'</div>'
+    +'<div class="cmeta"><span style="font-size:14.5px;font-weight:800">📍 <b>'+cesc(s.region)+(s.place?' · '+cesc(s.place):'')+'</b></span><span>📅 <b>'+cesc(s.date)+'</b></span><span>👥 신청 <b>'+act+'/'+s.quota+'</b></span>'+(s.deadline?'<span>⏳ 마감 <b>'+cesc(s.deadline)+'</b></span>':'')+'</div>'
+    +'<div style="text-align:right;margin-top:2px"><span style="font-size:12.5px;font-weight:800;color:var(--blue)">자세히 보기 →</span></div>'
+    +'</div>';
 }
 function slotCard(d,today){
   {
