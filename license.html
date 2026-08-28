@@ -288,12 +288,14 @@ let LME=null,LMY=null,ISMGR=false,CENTRAL=false,MSIDOS=[],MFEDS=[],NOTICES=[],LA
 const FED_LIST=['경기','강원','부산','경남','경북','전남광주','기타(중앙 처리)'];
 const SIDO_LIST=['서울','부산','대구','인천','광주','대전','울산','경기','강원','충북','충남','전북','전남','경북','경남','제주','세종'];
 
+// [겸직] 한 사람이 여러 등급을 가질 수 있어 role(대표 등급)과 roles[](전체)를 함께 봅니다
+function lcHasRole(v,r){return !!(v&&((r==='admin'&&v.owner===true)||v.role===r||(Array.isArray(v.roles)&&v.roles.indexOf(r)>=0)))}
 AUTH.onAuthStateChanged(async u=>{
   LME=u;
   if(u){
     const d=await DB.collection('users').doc(u.uid).get();LMY=d.data()||{};
-    ISMGR=(LMY.role==='admin'||(LMY.role==='regionAdmin'&&(Array.isArray(LMY.managedSido)?LMY.managedSido.length:LMY.managedSido)));
-    CENTRAL=(LMY.role==='admin');
+    ISMGR=(lcHasRole(LMY,'admin')||(lcHasRole(LMY,'regionAdmin')&&(Array.isArray(LMY.managedSido)?LMY.managedSido.length:LMY.managedSido)));
+    CENTRAL=lcHasRole(LMY,'admin');
     const _ms=LMY.managedSido;
     MSIDOS=CENTRAL?[]:(Array.isArray(_ms)?_ms.slice():(_ms?[_ms]:[]));
     MFEDS=MSIDOS.filter(s=>FED_LIST.indexOf(s)>=0); // 연맹 단위(공고 주관·신청 배정용)
@@ -427,7 +429,7 @@ async function addNotice(){
   const v=id=>document.getElementById(id).value.trim();
   if(!v('nTitle')||!v('nDate')){m.textContent='제목·일시는 필수입니다';m.style.color='#C41E2F';return}
   const sido=document.getElementById('nSido').value;
-  const isCentral=(LMY.role==='admin');
+  const isCentral=lcHasRole(LMY,'admin');
   if(EDIT_ID){
     // ── 공고 수정 (승인·보고 상태는 유지, 내용만 갱신) ──
     const upd={

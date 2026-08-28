@@ -210,7 +210,8 @@ async function loadClub(){
     if(!doc.exists){g.style.display='block';g.innerHTML='클럽을 찾을 수 없습니다. <a href="club.html" style="font-weight:800;color:var(--red)">클럽 목록으로 →</a>';return}
     CCLUB=doc.data();
     CH_IS_OWNER=CCLUB.ownerUid===CHME.uid;
-    CH_IS_ADMIN=!!(CHMY.role==='admin'||CHMY.owner);
+    // [겸직] 대표 등급(role)이 아니어도 roles[] 에 admin 이 있으면 관리자로 봅니다
+    CH_IS_ADMIN=!!(CHMY.owner===true||CHMY.role==='admin'||(Array.isArray(CHMY.roles)&&CHMY.roles.indexOf('admin')>=0));
     const isMemberAcc=(CCLUB.memberUids||[]).indexOf(CHME.uid)>=0;
     CH_IS_MEMBER=CH_IS_OWNER||isMemberAcc||CH_IS_ADMIN;
     document.getElementById('chGate').style.display='none';

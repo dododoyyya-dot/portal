@@ -1554,9 +1554,19 @@ async function doConsent(){
   await DB.collection('users').doc(u.uid).update({consents:{privacy:true,rrn:true,crimCheck:true,agreedAt:firebase.firestore.FieldValue.serverTimestamp()}});
   location.reload();
 }
+// [겸직] 한 사람이 여러 등급을 가질 수 있어 role(대표 등급)과 roles[](전체)를 함께 봅니다
+function myHasRole(v,r){return !!(v&&(v.role===r||(Array.isArray(v.roles)&&v.roles.indexOf(r)>=0)))}
+function myIsAdmin(v){return !!(v&&(v.owner===true||myHasRole(v,'admin')))}
 // ── 내 신분·자격 뱃지 + 선수(athlete) 자가신고 ──
 function renderIdentity(d){
-  const role=d.owner?'오너':(d.role==='admin'?'중앙관리자':(d.role==='sidoOfficer'?('시도연맹 임원'+(d.sido?' ('+esc(d.sido)+')':'')):(d.role==='regionAdmin'?'권역장':'일반회원')));
+  // [겸직] 보유한 등급을 모두 표시합니다 (예: 중앙관리자 · 시도연맹 임원)
+  const _rl=[];
+  if(d.owner)_rl.push('오너');
+  else if(myHasRole(d,'admin'))_rl.push('중앙관리자');
+  if(myHasRole(d,'sidoOfficer'))_rl.push('시도연맹 임원'+(d.sido?' ('+esc(d.sido)+')':''));
+  if(myHasRole(d,'gugunOfficer'))_rl.push('구군 임원'+(d.gugun?' ('+esc(d.gugun)+')':''));
+  if(myHasRole(d,'regionAdmin'))_rl.push('권역장'+(d.managedRegion?' ('+esc(d.managedRegion)+')':''));
+  const role=_rl.length?_rl.join(' · '):'일반회원';
   const inst=d.instructorFor||{};const caps=[];
   if((inst.school||inst.after)&&d.instructorVerified)caps.push('✔ 검증강사');
   else if(inst.school||inst.after)caps.push('강사(신청)');
@@ -1730,8 +1740,9 @@ AUTH.onAuthStateChanged(async u=>{
     if(d.safetyEdu){sb.style.background='#eafaf3';sb.style.color='#0f766e';sb.innerHTML='🛡 <b>안전교육 이수 완료</b>'+(d.safetyEduAt?' <span style="font-weight:600;color:#555">('+fmtDate(d.safetyEduAt)+')</span>':'');}
     else{sb.style.background='#fdf3f4';sb.style.color='#8c1622';sb.innerHTML='🛡 <b>안전교육 미이수</b> — 강습 활동 전 필수입니다. <a href="safety.html" style="color:#C41E2F;font-weight:900;text-decoration:underline">안전교육 이수하러 가기 →</a>';}
   })();
-  if(d.role==='admin')document.getElementById('adminBtn').style.display='inline-block';
-  if(d.role==='regionAdmin'||d.role==='admin')document.getElementById('regionBtn').style.display='inline-block';
+  // [겸직] 관리자 페이지는 중앙관리자·오너·시도연맹 임원이 사용할 수 있습니다 (admin.html 접근 기준과 동일)
+  if(myIsAdmin(d)||myHasRole(d,'sidoOfficer'))document.getElementById('adminBtn').style.display='inline-block';
+  if(myHasRole(d,'regionAdmin')||myIsAdmin(d))document.getElementById('regionBtn').style.display='inline-block';
   if(d.consents&&d.consents.agreedAt){
     document.getElementById('consentForm').style.display='none';
     const cd=document.getElementById('consentDone');

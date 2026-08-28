@@ -279,7 +279,9 @@ function isCompStaff(){
 }
 // ── 🛠 시도임원 제한 모집공고 등록 (심판·운영요원만 — 종목·팀신청 등 대회 신설은 중앙관리자 전용) ──
 const SO_SIDO2REG={'서울':'서울·경기','인천':'서울·경기','경기':'서울·경기','강원':'강원','대전':'충청','세종':'충청','충청북':'충청','충북':'충청','충청남':'충청','충남':'충청','광주':'전라','전라북':'전라','전북':'전라','전라남':'전라','전남':'전라','전남광주':'전라','부산':'경상','대구':'경상','울산':'경상','경상북':'경상','경북':'경상','경상남':'경상','경남':'경상','제주':'제주'};
-function isSidoOfficer(){return !!(CMY&&(CMY.role==='admin'||CMY.role==='sidoOfficer'||(CMY.roles&&CMY.roles.indexOf('sidoOfficer')>=0)))}
+// [겸직] 한 사람이 여러 등급을 가질 수 있어 role(대표 등급)과 roles[](전체)를 함께 봅니다
+function cHasRole(v,r){return !!(v&&((r==='admin'&&v.owner===true)||v.role===r||(Array.isArray(v.roles)&&v.roles.indexOf(r)>=0)))}
+function isSidoOfficer(){return !!(CMY&&(cHasRole(CMY,'admin')||cHasRole(CMY,'sidoOfficer')))}
 let SO_POSTS=[];
 function initSoAdmin(){
   if(!isSidoOfficer())return;
@@ -384,7 +386,7 @@ function openSoPost(editId){
   const lb='style="font-size:12.5px;font-weight:800;display:block;margin-top:11px"';
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:480px;width:100%;max-height:92vh;overflow:auto;padding:22px 24px">'
     +'<b style="font-size:16px">🛠 '+(ed?'모집공고 수정':'심판·운영요원 모집공고 등록')+'</b>'
-    +'<div style="font-size:11.5px;color:#8a919d;margin-top:4px">'+(CMY.role==='admin'?'중앙관리자 · 대회 신설(종목·팀신청 등)은 관리자 페이지의 「대회 통합 등록」 마법사를 이용해주세요':cesc(CMY.sido||'')+' 시도연맹 소속 · 대회 신설(종목·팀신청 등)은 사무국(중앙관리자)에 요청해주세요')+'</div>'
+    +'<div style="font-size:11.5px;color:#8a919d;margin-top:4px">'+(cHasRole(CMY,'admin')?'중앙관리자 · 대회 신설(종목·팀신청 등)은 관리자 페이지의 「대회 통합 등록」 마법사를 이용해주세요':cesc(CMY.sido||'')+' 시도연맹 소속 · 대회 신설(종목·팀신청 등)은 사무국(중앙관리자)에 요청해주세요')+'</div>'
     +'<label '+lb+'>대회명 *</label><input id="soTitle" '+inp+' value="'+cesc(s.title||'')+'" placeholder="예: 2026 전국 플라잉디스크대회">'
     +'<label '+lb+'>역할 *</label><select id="soRole" '+inp+'><option'+(s.role==='심판'?' selected':'')+'>심판</option><option'+(s.role==='운영'?' selected':'')+'>운영</option></select>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label '+lb+'>일자 *</label><input id="soDate" type="date" '+inp+' value="'+cesc(s.date||'')+'"></div><div><label '+lb+'>신청 마감일</label><input id="soDL" type="date" '+inp+' value="'+cesc(s.deadline||'')+'"></div></div>'
@@ -404,7 +406,7 @@ async function saveSoPost(editId){
   if(!title||!date||!quota){alert('대회명·일자·정원을 입력해주세요.');return}
   const rolesTxt=v('soRoles');
   const roles=rolesTxt?rolesTxt.split(',').map(x=>x.trim()).filter(Boolean):(DEFAULT_ROLES[role]||[]);
-  const region=SO_SIDO2REG[CMY.sido]||CMY.sido||(CMY.role==='admin'?'전국':'');
+  const region=SO_SIDO2REG[CMY.sido]||CMY.sido||(cHasRole(CMY,'admin')?'전국':'');
   const data={title:title,role:role,roles:roles,quota:quota,date:date,region:region,
     deadline:v('soDL'),note:v('soNote'),fee:'',byUid:CME.uid,byName:CMY.name||'',bySido:CMY.sido||''};
   try{
@@ -1084,13 +1086,13 @@ let CCOMPS=[];
 // ══════════ [대회이전] 대회 참가모집 공고 등록·관리 (관리자 위저드 이전판, cc2 접두어) ══════════
 const CC2_SIDOS=['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
 let CC2_ENTRY=null,CC2_DATES=[],CC2_Y=0,CC2_M=0,CC2_ATTACH=[],CC2_CIMGS=[],CC2_EDIT=null,CC2_LIST=[];
-function _cc2Admin(){return !!(CMY&&(CMY.role==='admin'||CMY.owner))}
+function _cc2Admin(){return cHasRole(CMY,'admin')}
 async function cc2LoadMine(){
   const el=document.getElementById('cc2MyList');if(!el)return;
   try{
     const snap=await DB.collection('competitions').orderBy('dateStart','desc').limit(30).get();
     CC2_LIST=snap.docs.map(d=>({id:d.id,...d.data()}))
-      .filter(c=>_cc2Admin()||c.byUid===CME.uid||(CMY.role==='sidoOfficer'&&c.sido===CMY.sido));
+      .filter(c=>_cc2Admin()||c.byUid===CME.uid||(cHasRole(CMY,'sidoOfficer')&&c.sido===CMY.sido));
     el.innerHTML=CC2_LIST.length?CC2_LIST.map(c=>'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#fff;border:1.5px solid #d3e0f2;border-radius:10px;padding:8px 13px;margin-top:6px;font-size:13px">'
       +'<b>'+cesc(c.title||'')+'</b><span style="color:#6b7280;font-size:12px">📅 '+cesc(c.dateStart||'')+(c.dateEnd&&c.dateEnd!==c.dateStart?'~'+cesc(c.dateEnd):'')+' · 📍 '+cesc(c.place||'')+'</span>'
       +'<span style="flex:1"></span>'
@@ -1323,7 +1325,7 @@ async function cc2Save(){
   const title=v('cc2Title'),place=v('cc2Place'),sido=v('cc2Sido');
   const ds=CC2_DATES.slice().sort();
   if(!title||!ds.length||!place){alert('대회명·대회 일자(달력)·대회 장소를 입력해주세요.');return}
-  if(!_cc2Admin()&&CMY.role==='sidoOfficer'&&sido!==CMY.sido){alert('자신의 관할 시도('+CMY.sido+')만 등록할 수 있습니다.');return}
+  if(!_cc2Admin()&&cHasRole(CMY,'sidoOfficer')&&sido!==CMY.sido){alert('자신의 관할 시도('+CMY.sido+')만 등록할 수 있습니다.');return}
   const btn=document.getElementById('cc2SaveBtn');btn.disabled=true;btn.textContent='저장 중…';
   try{
     const entry=cc2Data();

@@ -147,7 +147,8 @@ function isRefDuty(r){r=String(r||'');return REF_ONLY_DUTIES.indexOf(r)>=0||r.in
 function hasValidRefLic(){return Array.isArray(MYLIC_DOCS._valid)&&MYLIC_DOCS._valid.some(l=>String(l.type||'').indexOf('심판')>=0);}
 
 let SME=null,SMY=null,POSTS=[],APPS={},MYLIC='',MYLIC_DOCS=[],LIC_CACHE={};
-function isAdminU(){return !!(SMY&&(SMY.role==='admin'||SMY.owner))}
+// [겸직] 대표 등급(role)이 아니어도 roles[] 에 admin 이 있으면 관리자로 봅니다
+function isAdminU(){return !!(SMY&&(SMY.owner===true||SMY.role==='admin'||(Array.isArray(SMY.roles)&&SMY.roles.indexOf('admin')>=0)))}
 function isSidoU(){return !!(SMY&&(SMY.role==='sidoOfficer'||(SMY.roles&&SMY.roles.indexOf('sidoOfficer')>=0)))}
 // [겸직v3] 권역장 여부 (role 단일값 OR roles[] 겸직 배열 + 만료일 체크)
 function isRegionActiveU(){
