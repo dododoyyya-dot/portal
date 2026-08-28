@@ -3552,8 +3552,9 @@ function openCompWizard(editId){
       +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer"><input type="checkbox" id="cwNoTempClub" style="width:auto"'+((c.extras&&c.extras.noTempClub)?' checked':'')+'> 🚫 임시클럽 참가 불가</label>'
       +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer"><input type="checkbox" id="cwNoExternal" style="width:auto"'+((c.extras&&c.extras.noExternal)?' checked':'')+'> 🚫 타 단체 클럽 참가 불가</label>'
       +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer"><input type="checkbox" id="cwNeedPay" style="width:auto"'+((c.extras&&c.extras.needPay)?' checked':'')+'> 💳 참가비 입금 확인 필요</label>'
+      +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer"><input type="checkbox" id="cwAllowMinorLeader" style="width:auto"'+((c.extras&&c.extras.allowMinorLeader)?' checked':'')+'> 🧒 미성년 클럽장도 인솔자 등록 허용</label>'
       +'</div>'
-      +'<div style="font-size:12px;color:#8a919d;margin-top:8px;line-height:1.7">· <b>임시클럽</b>: 보호자 미연동 등으로 아직 정식 승인 전인 클럽<br>· <b>타 단체 클럽</b>: 연맹 소속이 아닌 외부 단체 클럽<br>· <b>참가비 입금 확인</b>: 체크하면 참가자 관리에서 입금 확인 후 확정하도록 안내됩니다</div>')
+      +'<div style="font-size:12px;color:#8a919d;margin-top:8px;line-height:1.7">· <b>임시클럽</b>: 보호자 미연동 등으로 아직 정식 승인 전인 클럽<br>· <b>타 단체 클럽</b>: 연맹 소속이 아닌 외부 단체 클럽<br>· <b>참가비 입금 확인</b>: 체크하면 참가자 관리에서 입금 확인 후 확정하도록 안내됩니다<br>· <b>미성년 클럽장 인솔 허용</b>: 기본은 성인만 인솔자(팀 신청) 등록 가능 — 체크하면 만 18세 미만 클럽장도 등록 가능(보호자 동의 수합 책임은 여전히 인솔자 본인에게 있습니다)</div>')
     +sec('⑥ 동의서 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 참가·심판·운영 공고에 일괄 적용, 직접 입력하거나 보관함에서 불러오기</span>',
       '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">'
       +'<select id="cwTplSel" onfocus="fillTplSel()" style="padding:8px 11px;border:1.5px solid #dfe5ee;border-radius:8px;font-family:inherit;font-size:13px;flex:1;min-width:160px"><option value="">📂 보관함에서 불러오기…</option></select>'
@@ -3757,7 +3758,8 @@ async function saveCompMaster(editId){
     // [공고규칙] 체크 안 하면 false — 기존 공고 동작 그대로
     noTempClub:!!(document.getElementById('cwNoTempClub')&&document.getElementById('cwNoTempClub').checked),
     noExternal:!!(document.getElementById('cwNoExternal')&&document.getElementById('cwNoExternal').checked),
-    needPay:!!(document.getElementById('cwNeedPay')&&document.getElementById('cwNeedPay').checked)};
+    needPay:!!(document.getElementById('cwNeedPay')&&document.getElementById('cwNeedPay').checked),
+    allowMinorLeader:!!(document.getElementById('cwAllowMinorLeader')&&document.getElementById('cwAllowMinorLeader').checked)};
   const committee=v('cwCommittee')||(title+' 조직위원회');
   const base={title:title,dateStart:d1,dateEnd:_d2,dates:_cwDs,place:place,sido:sido,desc:v('cwDesc'),
     attachments:attachments,extras:extras,committee:committee,
@@ -4271,6 +4273,7 @@ function editComp(id){
     +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:6px 13px;cursor:pointer"><input type="checkbox" id="ecNoTempClub" style="width:auto"'+((s.extras&&s.extras.noTempClub)?' checked':'')+'> 🚫 임시클럽 불가</label>'
     +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:6px 13px;cursor:pointer"><input type="checkbox" id="ecNoExternal" style="width:auto"'+((s.extras&&s.extras.noExternal)?' checked':'')+'> 🚫 타 단체 불가</label>'
     +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:6px 13px;cursor:pointer"><input type="checkbox" id="ecNeedPay" style="width:auto"'+((s.extras&&s.extras.needPay)?' checked':'')+'> 💳 참가비 입금 확인</label>'
+    +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:6px 13px;cursor:pointer"><input type="checkbox" id="ecAllowMinorLeader" style="width:auto"'+((s.extras&&s.extras.allowMinorLeader)?' checked':'')+'> 🧒 미성년 클럽장 인솔 허용</label>'
     +'</div>'
     +'<label>안내문 (신청 화면에 표시)</label><textarea id="ecNote" rows="3">'+esc(s.note||'')+'</textarea>'
     +'<label>심판·운영요원 확정 통보문 (비우면 기본 문안)</label><textarea id="ecNoticeText" rows="4" placeholder="예: [플라잉디스크연맹] ○○대회 심판요원으로 확정되었습니다.">'+esc(s.noticeText||'')+'</textarea>'
@@ -4322,11 +4325,12 @@ async function saveEditComp(){
     eligRegion:document.getElementById('ecEligRegion').value.trim(),
     eligNote:document.getElementById('ecEligNote').value.trim(),
     blockClubs:document.getElementById('ecBlockClubs').value.split(',').map(x=>x.trim()).filter(Boolean),
-    // [공고규칙] 기존 extras(시상품·기념품·보험 등)는 그대로 두고 3항목만 갱신
+    // [공고규칙] 기존 extras(시상품·기념품·보험 등)는 그대로 두고 4항목만 갱신
     extras:Object.assign({},(EC_SNAP&&EC_SNAP.s&&EC_SNAP.s.extras)||{},{
       noTempClub:!!(document.getElementById('ecNoTempClub')&&document.getElementById('ecNoTempClub').checked),
       noExternal:!!(document.getElementById('ecNoExternal')&&document.getElementById('ecNoExternal').checked),
-      needPay:!!(document.getElementById('ecNeedPay')&&document.getElementById('ecNeedPay').checked)}),
+      needPay:!!(document.getElementById('ecNeedPay')&&document.getElementById('ecNeedPay').checked),
+      allowMinorLeader:!!(document.getElementById('ecAllowMinorLeader')&&document.getElementById('ecAllowMinorLeader').checked)}),
     consentText:document.getElementById('ecConsentText').value.trim(),
     consentImgs:CONSENT_IMGS.ec.slice(),consentImg:'',consentOverlays:ovlPack('ec')};
   if(!act.length)upd.role=newRole;

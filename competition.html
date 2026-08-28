@@ -797,12 +797,13 @@ function myTeamEntries(s){
 }
 let TA_ID=null,TA_ROSTER=[],TA_FILES=[],TA_SIGPAD=null;
 // [공고규칙] 이번 공고의 참가 규칙 — 모두 false 가 기본이며 그때는 기존과 동일하게 동작합니다
-let TA_RULES={noTempClub:false,noExternal:false,needPay:false};
+let TA_RULES={noTempClub:false,noExternal:false,needPay:false,allowMinorLeader:false};
 async function openTeamApply(id){
   const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
   const s=doc.data();
   // 인솔자는 성인만 (교사·클럽장·학부모·일반 성인 회원 모두 가능)
-  if(CMY.birth&&ageOf(CMY.birth)<18){
+  // [공고규칙] 담당자가 이 공고에서 '미성년 클럽장 인솔 허용'을 켠 경우에만 예외를 둡니다
+  if(CMY.birth&&ageOf(CMY.birth)<18&&!(s.extras&&s.extras.allowMinorLeader)){
     alert('👥 팀 신청(인솔자 등록)은 성인 회원만 할 수 있습니다.\n지도교사·클럽장·보호자께 요청해주세요.');return;
   }
   TA_ID=id;TA_ROSTER=[];TA_FILES=[];
@@ -810,7 +811,7 @@ async function openTeamApply(id){
   // 내가 클럽장인 클럽 (클럽팀용)
   let myClubs=[];
   // [공고규칙] 이 공고의 참가 규칙을 읽어 둡니다 (설정이 없으면 전부 허용)
-  TA_RULES={noTempClub:!!(s.extras&&s.extras.noTempClub),noExternal:!!(s.extras&&s.extras.noExternal),needPay:!!(s.extras&&s.extras.needPay)};
+  TA_RULES={noTempClub:!!(s.extras&&s.extras.noTempClub),noExternal:!!(s.extras&&s.extras.noExternal),needPay:!!(s.extras&&s.extras.needPay),allowMinorLeader:!!(s.extras&&s.extras.allowMinorLeader)};
   try{const cs=await DB.collection('clubs').where('ownerUid','==',CME.uid).limit(10).get();
     myClubs=cs.docs.filter(x=>{const c=x.data()||{};
       if((TA_RULES.noTempClub?['승인']:['승인','임시']).indexOf(c.status)<0)return false;
