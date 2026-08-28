@@ -448,9 +448,9 @@ const MTYPE_CFG={
   teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sSchoolBlock','sEmployBlock','sQualBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
   // [유형분리] 국가공인자격증 — 연맹 DB에 없는 자격이라 사본을 첨부해 신청 (그 외 항목은 기존 교사 탭과 동일)
   natcert:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
-  athlete:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sAffBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:false,size:false,degree:false,rrn:true}}, // [5부문] 선수군 — 자격증란 없음·주민번호 필수
+  athlete:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sAffBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:false,size:false,degree:false,rrn:true}}, // [5부문] 선수군 — 자격증란 없음·주민번호 필수
   general:   {show:['sAddrBlock','sAreaBlock','sPledgeBox','sPrivacyBox'],req:{addr:false,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}, // [5부문] 일반 — 소속·자격증 블록 제거(간소화)
-  student:   {show:['sSchoolBlock','sAddrBlock','sAreaBlock','sStudentAffBlock','sPrivacyBox'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}
+  student:   {show:['sSchoolBlock','sAddrBlock','sAreaBlock','sStudentAffBlock','sSizeBlock','sBankBlock','sPrivacyBox'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}
 };
 const MTYPE_ALL=['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sSchoolBlock','sEmployBlock','sStudentAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'];
 function setSignupType(t){
@@ -469,6 +469,20 @@ function setSignupType(t){
   const mark=(id,on)=>{const e=document.getElementById(id);if(e)e.style.display=on?'':'none';};
   mark('reqAddr',cfg.req.addr);mark('reqArea',cfg.req.area);mark('reqWork',cfg.req.work);
   mark('reqBank',cfg.req.bank);mark('reqSize',cfg.req.size);mark('reqDegree',cfg.req.degree);
+  // [소속] 선수회원에게는 지도자 전용 항목(교사·학교급·초등스포츠강사)을 보여주지 않습니다
+  (function(){
+    const leaderOpts=(t!=='athlete');
+    const l2=document.getElementById('sAf2'), l3=document.getElementById('sAf3');
+    const lb2=l2&&l2.closest('label'), lb3=l3&&l3.closest('label');
+    if(lb2)lb2.style.display=leaderOpts?'':'none';
+    if(lb3)lb3.style.display=leaderOpts?'':'none';
+    if(!leaderOpts){
+      if(l2)l2.checked=false;
+      if(l3)l3.checked=false;
+      const tl=document.getElementById('sTeachLv'); if(tl)tl.style.display='none';
+      const ww=document.getElementById('sWorkWrap'); if(ww)ww.style.display='none';
+    }
+  })();
   // 교사는 소속에서 '교사(교원)' 자동 체크 + 근무지 열기
   if(t==='teacher'){
     const af2=document.getElementById('sAf2');
