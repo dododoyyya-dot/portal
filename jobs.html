@@ -254,7 +254,9 @@ function showJTab(k){
   document.getElementById('jPane2').style.display=(k==='2'?'':'none');
   var p3=document.getElementById('jPane3');if(p3)p3.style.display=(k==='3'?'':'none');
   document.querySelectorAll('#jTabs .st').forEach(b=>b.classList.toggle('on',b.dataset.s===k));
-  window.scrollTo({top:0});
+  // 탭바가 화면 밖일 때만 탭바 위치로 (최상단 강제 스크롤 X)
+  const tb=document.getElementById('jTabs');
+  if(tb){const r=tb.getBoundingClientRect();if(r.top<0||r.top>window.innerHeight-80)tb.scrollIntoView({block:'start'});}
 }
 function jHash(){if((location.hash||'').indexOf('gig')>=0)showJTab('2');else if((location.hash||'').indexOf('slot')>=0)showJTab('3');}
 window.addEventListener('hashchange',jHash);

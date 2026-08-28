@@ -288,7 +288,9 @@ function showClTab(k){
   ['1','2','3','4'].forEach(n=>{const p=document.getElementById('clPane'+n);if(p)p.style.display=(n===k?'':'none')});
   document.querySelectorAll('#clTabs .st').forEach(b=>b.classList.toggle('on',b.dataset.s===k));
   if(k==='4'&&!_matchLoaded){_matchLoaded=true;loadMatches();}
-  window.scrollTo({top:0});
+  // 탭바가 화면 밖일 때만 탭바 위치로 (최상단 강제 스크롤 X)
+  const tb=document.getElementById('clTabs');
+  if(tb){const r=tb.getBoundingClientRect();if(r.top<0||r.top>window.innerHeight-80)tb.scrollIntoView({block:'start'});}
 }
 let KME=null,KMY=null,ALLCLUBS=[],SIDO_F='',MYCLUB_CACHE=[];
 AUTH.onAuthStateChanged(async u=>{

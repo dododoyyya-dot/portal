@@ -106,7 +106,9 @@ const ABOUT_SECS=['greet','ci','org','rule','region','way'];
 function showAbout(k){
   ABOUT_SECS.forEach(s=>{const el=document.getElementById(s);if(el)el.style.display=(s===k?'':'none')});
   document.querySelectorAll('#aboutTabs .st').forEach(b=>b.classList.toggle('on',b.dataset.s===k));
-  window.scrollTo({top:0});
+  // 탭바가 화면 밖일 때만 탭바 위치로 (최상단 강제 스크롤 X)
+  const tb=document.getElementById('aboutTabs');
+  if(tb){const r=tb.getBoundingClientRect();if(r.top<0||r.top>window.innerHeight-80)tb.scrollIntoView({block:'start'});}
 }
 function aboutHash(){
   const h=(location.hash||'').replace('#','');
