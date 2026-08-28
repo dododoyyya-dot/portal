@@ -643,6 +643,8 @@ function myTeamEntries(s){
   return compClaimList(s).filter(c=>c.team&&c.uid===CME.uid);
 }
 let TA_ID=null,TA_ROSTER=[],TA_FILES=[],TA_SIGPAD=null;
+// [공고규칙] 이번 공고의 참가 규칙 — 모두 false 가 기본이며 그때는 기존과 동일하게 동작합니다
+let TA_RULES={noTempClub:false,noExternal:false,needPay:false};
 async function openTeamApply(id){
   const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
   const s=doc.data();
@@ -654,8 +656,14 @@ async function openTeamApply(id){
   const tts=(s.teamTypes&&s.teamTypes.length)?s.teamTypes:['클럽팀','학교팀','자유팀'];
   // 내가 클럽장인 클럽 (클럽팀용)
   let myClubs=[];
+  // [공고규칙] 이 공고의 참가 규칙을 읽어 둡니다 (설정이 없으면 전부 허용)
+  TA_RULES={noTempClub:!!(s.extras&&s.extras.noTempClub),noExternal:!!(s.extras&&s.extras.noExternal),needPay:!!(s.extras&&s.extras.needPay)};
   try{const cs=await DB.collection('clubs').where('ownerUid','==',CME.uid).limit(10).get();
-    myClubs=cs.docs.filter(x=>['승인','임시'].indexOf(x.data().status)>=0).map(x=>({id:x.id,name:x.data().name,data:x.data()}));}catch(e){}
+    myClubs=cs.docs.filter(x=>{const c=x.data()||{};
+      if((TA_RULES.noTempClub?['승인']:['승인','임시']).indexOf(c.status)<0)return false;
+      if(TA_RULES.noExternal&&c.clubType==='external')return false;
+      return true;
+    }).map(x=>({id:x.id,name:x.data().name,data:x.data()}));}catch(e){}
   window.TA_MYCLUBS=myClubs;
   const old=document.getElementById('taModal');if(old)old.remove();
   const div=document.createElement('div');div.id='taModal';
@@ -711,7 +719,11 @@ async function taFindTeams(focusMembers){
       DB.collection('clubs').where('memberUids','array-contains',CME.uid).limit(10).get().catch(()=>({docs:[]}))
     ]);
     const map={};
-    own.docs.concat(mem.docs||[]).forEach(d=>{const c=d.data();if(!c.status||['승인','임시'].indexOf(c.status)>=0)map[d.id]=Object.assign({id:d.id},c);});
+    own.docs.concat(mem.docs||[]).forEach(d=>{const c=d.data()||{};
+      // [공고규칙] 임시클럽·타 단체 제한이 켜진 공고에서는 목록에서도 제외
+      if(c.status&&(TA_RULES.noTempClub?['승인']:['승인','임시']).indexOf(c.status)<0)return;
+      if(TA_RULES.noExternal&&c.clubType==='external')return;
+      map[d.id]=Object.assign({id:d.id},c);});
     TA_TEAMS=Object.values(map);
   }catch(e){TA_TEAMS=[];}
   taRenderPanel();
@@ -857,6 +869,15 @@ async function submitTeam(){
     if(!orgEl||!orgEl.value)return alert('소속 클럽을 선택해주세요.');
     teamOrgId=orgEl.value;
     teamOrg=((window.TA_MYCLUBS||[]).find(c=>c.id===orgEl.value)||{}).name||'';
+    // [공고규칙] 제출 직전 클럽 상태 재확인 — 규칙이 켜진 공고에서만 조회합니다
+    if(TA_RULES.noTempClub||TA_RULES.noExternal){
+      try{
+        const cd=await DB.collection('clubs').doc(teamOrgId).get();
+        const cv=cd.exists?(cd.data()||{}):{};
+        if(TA_RULES.noTempClub&&cv.status==='임시')return alert('⛔ 이 대회는 임시클럽의 참가를 받지 않습니다.\n클럽이 정식 승인된 뒤 신청해주세요.');
+        if(TA_RULES.noExternal&&cv.clubType==='external')return alert('⛔ 이 대회는 연맹 소속 클럽만 참가할 수 있습니다.');
+      }catch(e){}
+    }
   }else{
     teamOrg=orgEl?orgEl.value.trim():'';
     if(teamType==='학교팀'&&!teamOrg)return alert('소속 학교를 입력해주세요.');
@@ -1153,7 +1174,13 @@ function cc2Open(editId){
       +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer"><input type="checkbox" id="cc2Souv" style="width:auto"'+((c.extras&&c.extras.souvenir)?' checked':'')+'> 🎁 기념품 지급</label>'
       +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer"><input type="checkbox" id="cc2Ins" style="width:auto"'+((c.extras&&c.extras.insurance)?' checked':'')+'> 🛡 행사 보험 가입</label>'
       +'</div>'
-      +'<label '+lb+'>시상 안내문 (선택)</label><textarea id="cc2PrizeNote" rows="2" '+inp+'>'+cesc((c.extras&&c.extras.prizeNote)||'')+'</textarea>')
+      +'<label '+lb+'>시상 안내문 (선택)</label><textarea id="cc2PrizeNote" rows="2" '+inp+'>'+cesc((c.extras&&c.extras.prizeNote)||'')+'</textarea>'
+      +'<label '+lb+'>참가 규칙 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 체크하지 않으면 지금까지와 똑같이 동작합니다</span></label>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:13px">'
+      +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer"><input type="checkbox" id="cc2NoTemp" style="width:auto"'+((c.extras&&c.extras.noTempClub)?' checked':'')+'> 🚫 임시클럽 참가 불가</label>'
+      +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer"><input type="checkbox" id="cc2NoExt" style="width:auto"'+((c.extras&&c.extras.noExternal)?' checked':'')+'> 🚫 타 단체 클럽 참가 불가</label>'
+      +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer"><input type="checkbox" id="cc2NeedPay" style="width:auto"'+((c.extras&&c.extras.needPay)?' checked':'')+'> 💳 참가비 입금 확인 필요</label>'
+      +'</div>')
     +sec('⑤ 신청서·동의서 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 조직위원회 명의, 전자서명 또는 인쇄 제출</span>',
       '<label '+lb+'>명의 (조직위원회)</label><input id="cc2Cmte" '+inp+' value="'+cesc(c.committee||'')+'" placeholder="비우면 「대회명 조직위원회」 자동">'
       +'<label '+lb+'>동의서 문안</label><textarea id="cc2CText" rows="4" '+inp+' placeholder="비우면 기본 문안 사용">'+cesc(c.consentText||'')+'</textarea>'
@@ -1212,7 +1239,11 @@ async function cc2Save(){
     const consentImgs=[];
     for(const x of CC2_CIMGS)consentImgs.push(await upFile(x,'compconsent'));
     const extras={prize:document.getElementById('cc2Prize').checked,souvenir:document.getElementById('cc2Souv').checked,
-      insurance:document.getElementById('cc2Ins').checked,prizeNote:v('cc2PrizeNote')};
+      insurance:document.getElementById('cc2Ins').checked,prizeNote:v('cc2PrizeNote'),
+      // [공고규칙] 체크 안 하면 false — 기존 공고 동작 그대로
+      noTempClub:!!(document.getElementById('cc2NoTemp')&&document.getElementById('cc2NoTemp').checked),
+      noExternal:!!(document.getElementById('cc2NoExt')&&document.getElementById('cc2NoExt').checked),
+      needPay:!!(document.getElementById('cc2NeedPay')&&document.getElementById('cc2NeedPay').checked)};
     const committee=v('cc2Cmte')||(title+' 조직위원회');
     const prev=CC2_EDIT?(CC2_LIST.find(x=>x.id===CC2_EDIT)||{}):{};
     const sports=[...new Set(entry.indiv.concat(entry.team).map(x=>x.name))].map(n=>({name:n,mode:'일반'}));
@@ -1397,8 +1428,8 @@ function slotCard(d,today){
             const isImg=x=>/\.(jpe?g|png|gif|webp)(\?|$)/i.test(x.url||'')||String(x.url||'').indexOf('image')>=0;
             const imgs=att.filter(isImg);
             const docsA=att.filter(x=>!isImg(x));
-            const hasEx=!!(s.extras&&(s.extras.prize||s.extras.souvenir||s.extras.insurance||s.extras.prizeNote));
-            const exHtml=hasEx?'<div class="cnote" style="display:block;box-sizing:border-box;width:100%;margin-top:8px;background:#fffbeb;border:1.5px solid #fde68a;color:#8a5a00">'+[s.extras.prize?'🏆 시상품 지급':'',s.extras.souvenir?'🎁 기념품 지급':'',s.extras.insurance?'🛡 행사 보험 가입':''].filter(Boolean).join(' · ')+(s.extras.prizeNote?'<br>🎖 '+cesc(s.extras.prizeNote):'')+'</div>':'';
+            const hasEx=!!(s.extras&&(s.extras.prize||s.extras.souvenir||s.extras.insurance||s.extras.prizeNote||s.extras.noTempClub||s.extras.noExternal||s.extras.needPay));
+            const exHtml=hasEx?'<div class="cnote" style="display:block;box-sizing:border-box;width:100%;margin-top:8px;background:#fffbeb;border:1.5px solid #fde68a;color:#8a5a00">'+[s.extras.prize?'🏆 시상품 지급':'',s.extras.souvenir?'🎁 기념품 지급':'',s.extras.insurance?'🛡 행사 보험 가입':'',s.extras.noTempClub?'🚫 임시클럽 참가 불가':'',s.extras.noExternal?'🚫 타 단체 클럽 참가 불가':'',s.extras.needPay?'💳 참가비 입금 확인 후 확정':''].filter(Boolean).join(' · ')+(s.extras.prizeNote?'<br>🎖 '+cesc(s.extras.prizeNote):'')+'</div>':'';
             const noteHtml=s.note?'<div class="cnote" style="flex:1 1 300px;margin-top:0;display:block;min-width:min(280px,100%)">📌 '+cesc(s.note)+'</div>':'';
             let posterHtml='';
             if(imgs.length){
