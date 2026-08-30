@@ -340,7 +340,7 @@ function expandRowHtml(p){
       :'<div style="margin-bottom:8px">'+(noteHtml||rightCol)+'</div>');
   return '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px">'
     +'<span>📍 <b>장소:</b> '+esc(p.location||(comp&&comp.place)||'')+'</span>'
-    +'<span>🕐 <b>집합시간:</b> '+esc(p.time||'')+'</span>'
+    +'<span>🕐 <b>경기시간:</b> '+esc(p.time||'')+'</span>'
     +'<span>🏅 <b>종목:</b> '+esc(p.sport||'')+'</span>'
     +'</div>'
     +rolesHtml
@@ -351,6 +351,9 @@ function expandRowHtml(p){
     +' &nbsp;·&nbsp; <span style="font-weight:800">심판복</span> '+esc(p.uniform||'미정')
     +'</div>'
     +(p.supplies&&p.supplies.length?'<div style="margin-bottom:6px"><span style="font-weight:800">준비물:</span> '+esc(p.supplies.join(', '))+'</div>':'')
+    // [시간표기] 집합시간은 경기시간과 다른 별도 항목이라 준비물 아래에 따로 표시합니다.
+    //   기존 공고에는 이 값이 없으므로 입력된 공고에서만 나타납니다 (기존 공고 표시 무변경).
+    +(p.gatherTime?'<div style="margin-bottom:6px"><span style="font-weight:800">🕘 집합시간:</span> '+esc(p.gatherTime)+'</div>':'')
     +noteRow
     +(comp?'<div style="margin-bottom:10px;font-size:12px;color:#7c3aed">🔗 연동된 대회: <b>'+esc(comp.title||p.competitionName||'')+'</b> — 대회 참가자 대상 상세 안내(식사·경기 규정 등)는 대회 페이지에서 확인하세요.</div>':'')
     +(p.contactInfo?'<div style="margin-bottom:10px;color:#6b7280">📞 '+esc(p.contactInfo)+'</div>':'')
@@ -511,7 +514,7 @@ function openPostForm(editId){
     +'<div id="pfPickedDates" style="margin-top:6px"></div>'
     +'<div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">'
     +'<div><label class="stlabel">대회 장소 (상세 주소) *</label><input id="pfLoc" class="stfield" value="'+esc(ed?ed.location:'')+'" placeholder="예: 강원 춘천시 ○○체육관"></div>'
-    +'<div><label class="stlabel">대회 시간 *</label><input id="pfTime" class="stfield" value="'+esc(ed?ed.time:'')+'" placeholder="예: 09:00~18:00"></div></div>'
+    +'<div><label class="stlabel">경기시간 * <span style="font-weight:600;color:#8a919d;font-size:11px">— 대회가 진행되는 시간</span></label><input id="pfTime" class="stfield" value="'+esc(ed?ed.time:'')+'" placeholder="예: 09:00~18:00"></div></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
     +'<div><label class="stlabel">대회 종목 * <span style="font-weight:600;color:#8a919d;font-size:11px">(복수 선택 가능)</span></label>'
     +'<div style="margin-top:6px">'
@@ -531,6 +534,8 @@ function openPostForm(editId){
     +'<label class="stlabel">준비물</label><div id="pfSupWrap">'
     +DEFAULT_SUPPLIES.map(s2=>'<label class="chipck"><input type="checkbox" class="pfSup" value="'+esc(s2)+'"'+((ed?(ed.supplies||[]):DEFAULT_CHECKED).indexOf(s2)>=0?' checked':'')+'> '+esc(s2)+'</label>').join('')
     +'<input id="pfSupEtc" class="stfield" style="display:inline-block;width:220px;margin-left:6px" placeholder="기타 준비물 (쉼표 구분)" value="'+esc(ed?(ed.supplies||[]).filter(x=>DEFAULT_SUPPLIES.indexOf(x)<0).join(', '):'')+'"></div>'
+    +'<label class="stlabel">집합시간 <span style="font-weight:600;color:#8a919d;font-size:11px">— 심판·운영요원이 모이는 시간 (선택 · 경기시간과 별개로 공고 준비물 아래에 표시됩니다)</span></label>'
+    +'<input id="pfGather" class="stfield" value="'+esc(ed?(ed.gatherTime||''):'')+'" placeholder="예: 08:30 (경기 시작 30분 전 집결)">'
     +'<label class="stlabel">대회 안내 포스터·자료 첨부 <span style="font-weight:600;color:#8a919d;font-size:11px">(최대 10개 — 대진표·시간표 필수 포함 권장, 썸네일로 표시됩니다)</span></label>'
     +'<input type="file" id="pfPoster" accept="image/*" multiple style="display:block;margin-top:5px;font-size:13px" onchange="pfAddPosters(this)">'
     +'<div id="pfPosterList" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>'
@@ -733,7 +738,7 @@ async function savePost(editId){
     const instant=isAdminU()||isSidoU();
     const data={
       competitionName:name,startDate:dates[0],endDate:dates[dates.length-1],dates:dateArr,
-      location:loc,time:time,sport:SPORTS.join(' · '),sports:SPORTS,deadline:dl,
+      location:loc,time:time,gatherTime:v('pfGather'),sport:SPORTS.join(' · '),sports:SPORTS,deadline:dl,
       transportation:(document.querySelector('input[name=pfTrans]:checked')||{}).value||'미제공',
       meal:(document.querySelector('input[name=pfMeal]:checked')||{}).value||'제공',
       uniform:uniform,lodging:lodging,
@@ -852,7 +857,7 @@ async function _renderDetailInner(isStale){
     +'<span style="flex:1"></span><button class="stbtn stbtn-ghost" onclick="document.getElementById(\'dtModal\').remove()">닫기 ✕</button></div>'
     +'<div style="font-size:13px;color:#4b5563;margin-top:8px;line-height:1.9">'
     +'📅 '+periodTxt(p)
-    +' &nbsp;·&nbsp; 📍 '+esc(p.location||'')+' &nbsp;·&nbsp; 🕐 '+esc(p.time||'')+' &nbsp;·&nbsp; 🥏 '+esc(p.sport||'')
+    +' &nbsp;·&nbsp; 📍 '+esc(p.location||'')+' &nbsp;·&nbsp; 🕐 경기 '+esc(p.time||'')+(p.gatherTime?' &nbsp;·&nbsp; 🕘 집합 '+esc(p.gatherTime):'')+' &nbsp;·&nbsp; 🥏 '+esc(p.sport||'')
     +'<br>🗓 모집 마감: <b>'+fmtD(p.deadline)+'</b>'
     +' &nbsp;·&nbsp; 🚌 교통비: '+esc(p.transportation||'-')+' &nbsp;·&nbsp; 🍱 식사: '+esc(p.meal||'-')
     +'<br>🥋 심판복: '+esc(p.uniform||'-')+' &nbsp;·&nbsp; 🛏 숙박: '+esc(p.lodging||'-')
@@ -1589,6 +1594,7 @@ async function openNotifyModal(postId){
     +'장소: '+(p.location||'')+'\n'
     +(p.uniform?'심판복: '+p.uniform+'\n':'')
     +(p.supplies&&p.supplies.length?'준비물: '+p.supplies.join(', ')+'\n':'')
+    +(p.gatherTime?'집합시간: '+p.gatherTime+'\n':'')
     +'\n확정되셨습니다. 일정 확인 부탁드립니다.\n문의: '+(p.contactInfo||(p.author&&p.author.contact)||'사무국 031-984-3248');
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:640px;width:100%;padding:24px 26px;margin:10px 0">'
     +'<div style="display:flex;align-items:center;gap:8px"><b style="font-size:16px">📣 확정자 단체 알림</b><span style="font-size:12px;color:#8a919d">'+esc(p.competitionName||'')+'</span><span style="flex:1"></span><button class="stbtn stbtn-ghost" onclick="document.getElementById(\'ntModal\').remove()">닫기 ✕</button></div>'
@@ -1873,7 +1879,8 @@ async function copyRoster(id){
     });
   });
   if((p.supplies||[]).length)txt+='\n※ 준비물: '+(p.supplies||[]).join(', ')+'\n';
-  txt+='※ 시간: '+(p.time||'')+'\n';
+  if(p.gatherTime)txt+='※ 집합시간: '+p.gatherTime+'\n';
+  txt+='※ 경기시간: '+(p.time||'')+'\n';
   if(p.description)txt+='※ 안내: '+p.description+'\n';
   try{await navigator.clipboard.writeText(txt);alert('📋 확정 명단 공고문이 복사되었습니다!\n카카오톡 등에 붙여넣기 하세요.\n\n'+txt.slice(0,300)+(txt.length>300?'…':''));}
   catch(e){prompt('아래 내용을 복사하세요 (Ctrl+C):',txt)}
