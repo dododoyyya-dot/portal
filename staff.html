@@ -887,6 +887,7 @@ async function _renderDetailInner(isStale){
 // ══════════════ 신청 ══════════════
 function openApplyForm(id){
   const p=POSTS.find(x=>x.id===id);if(!p)return;
+  SIG_URLMODE={agree:'',pay:''}; // [서명연동] 신청 창을 새로 열 때 링크형 서명 상태 초기화
   if(!SMY||SMY.status!=='approved'){alert('사무국 승인 후 신청할 수 있습니다.');return}
   if(SMY.sanction&&SMY.sanction.active){alert('🚫 현재 징계 기간 중이어서 심판·운영요원 신청이 제한됩니다.\n문의: 사무국 031-984-3248');return}
   // [v4] 자격 미보유자도 신청 진입 허용 — 운영요원 임무는 자격 검증 없이 신청 가능, 심판 임무만 유효 심판자격 검사
@@ -1336,7 +1337,9 @@ function viewSig(appId){
 function _dlSig(name,appId){
   const app=Object.values(APPS).flat().find(a=>a.id===appId);
   if(!app||!app.agree||!app.agree.signature)return;
-  const a=document.createElement('a');a.href=app.agree.signature;a.download='서명_'+name+'.png';a.click();
+  const s=app.agree.signature;
+  if(s.indexOf('http')===0){window.open(s,'_blank');return} // [서명연동] 링크형 서명은 원본을 새 탭으로
+  const a=document.createElement('a');a.href=s;a.download='서명_'+name+'.png';a.click();
 }
 // ══════════════ [신규] 수당지급 엑셀 출력 ══════════════
 function exportPayExcel(postId){
@@ -1383,6 +1386,19 @@ async function exportPayReport(postId){
   await Promise.all([..._uidSet].map(async uid=>{
     try{const d=await DB.collection('users').doc(uid).get();
       if(d.exists){const u=d.data();_bankMap[uid]={bank:u.bank||'',account:u.accountNum||''};}}catch(e){}
+  }));
+  // [서명연동] 링크형 서명(원본 URL로 저장된 분)을 엑셀 삽입용 base64로 미리 변환 (변환 실패 시 텍스트로 표기)
+  const _SIGB64={};
+  await Promise.all(apps.map(async a=>{
+    const s=((a.payInfo&&a.payInfo.signature)||(a.agree&&a.agree.signature))||null;
+    if(!s||s.indexOf('http')!==0||_SIGB64[s]!==undefined)return;
+    _SIGB64[s]=null;
+    try{
+      const r=await fetch(s);if(!r.ok)throw 0;
+      const bl=await r.blob();
+      const du=await new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=no;fr.readAsDataURL(bl);});
+      if(typeof du==='string'&&du.indexOf('data:image')===0)_SIGB64[s]=du;
+    }catch(e){}
   }));
   const wb=new ExcelJS.Workbook();
   let made=0;
@@ -1433,7 +1449,8 @@ async function exportPayReport(postId){
       row.getCell(13).value=pi.rrn||'';
       for(let c=1;c<=14;c++){const cell=row.getCell(c);cell.border=bAll;cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};cell.font={size:10};}
       // 전자서명 이미지 (수당지급용 서명 우선, 없으면 신청 동의 서명)
-      const sig=pi.signature||(a.agree&&a.agree.signature)||null;
+      let sig=pi.signature||(a.agree&&a.agree.signature)||null;
+      if(sig&&sig.indexOf('http')===0)sig=_SIGB64[sig]||sig; // [서명연동] 링크형이면 변환본으로 교체
       if(sig&&sig.indexOf('data:image')===0){
         try{
           const b64=sig.split(',')[1];
@@ -1441,6 +1458,8 @@ async function exportPayReport(postId){
           const imgId=wb.addImage({base64:b64,extension:ext});
           ws.addImage(imgId,{tl:{col:13.12,row:rIdx-1+0.12},ext:{width:82,height:28},editAs:'oneCell'});
         }catch(e){}
+      }else if(sig&&sig.indexOf('http')===0){
+        row.getCell(14).value='서명등록됨(링크)'; // [서명연동] 이미지 변환이 막힌 경우에도 서명 사실은 표기
       }
       rIdx++;
     });
@@ -1743,16 +1762,21 @@ function _initSigCanvas(){
   canvas.addEventListener('mousedown',start);canvas.addEventListener('mousemove',move);canvas.addEventListener('mouseup',end);canvas.addEventListener('mouseleave',end);
   canvas.addEventListener('touchstart',start,{passive:false});canvas.addEventListener('touchmove',move,{passive:false});canvas.addEventListener('touchend',end,{passive:false});
 }
+let SIG_URLMODE={agree:'',pay:''}; // [서명연동] 저장된 서명을 '원본 이미지 링크'로 쓰는 폴백 모드 (Storage CORS 미설정 환경 대비)
 function _sigClear(){
   const c=document.getElementById('sigCanvas');if(!c)return;
   c.getContext('2d').clearRect(0,0,c.width,c.height);
+  SIG_URLMODE.agree='';
+  const m=document.getElementById('apSigMsg');
+  if(m){m.style.color='#8a919d';m.textContent=(SMY&&SMY.signatureImg)?'마이페이지에 등록된 서명이 있습니다.':'마이페이지 → 내 정보에서 서명 이미지를 등록하면 매번 그리지 않아도 됩니다.';}
 }
 function _getSigData(){
-  const c=document.getElementById('sigCanvas');if(!c)return null;
+  const c=document.getElementById('sigCanvas');if(!c)return SIG_URLMODE.agree||null;
   const ctx=c.getContext('2d');
   const d=ctx.getImageData(0,0,c.width,c.height).data;
   const hasData=Array.from(d).some((v,i)=>i%4===3&&v>0);
-  return hasData?c.toDataURL('image/png'):null;
+  // [서명연동] 직접 그린 서명이 항상 우선, 없으면 링크형 서명(URL) 사용
+  return hasData?c.toDataURL('image/png'):(SIG_URLMODE.agree||null);
 }
 // ══════════════ [저장된 서명] 마이페이지에 등록한 서명 이미지를 캔버스에 그려넣기 ══════════════
 // 캔버스에 직접 그리므로 기존 저장·삽입 로직(_getSigData 등)은 전혀 손대지 않아도 됩니다.
@@ -1781,10 +1805,21 @@ async function useSavedSig(which){
     ctx.drawImage(img,(c.width-w)/2,(c.height-h)/2,w,h);
     // 캔버스가 오염(taint)되지 않았는지 즉시 확인 — 오염 시 저장 단계에서 실패하므로 미리 되돌림
     try{ c.toDataURL('image/png'); }
-    catch(err){ ctx.clearRect(0,0,c.width,c.height); say('브라우저 보안 정책으로 불러오지 못했습니다. 직접 서명해 주세요.','#C41E2F'); return; }
+    catch(err){ ctx.clearRect(0,0,c.width,c.height); _sigUrlMode(which,url,msg); return; }
+    SIG_URLMODE[which==='pay'?'pay':'agree']='';
     say('✓ 저장된 서명을 불러왔습니다. 필요하면 위에 덧그리거나 [지우기]로 지울 수 있습니다.','#0f766e');
   }catch(e){
-    say('불러오지 못했습니다. 직접 서명해 주세요.','#C41E2F');
+    _sigUrlMode(which,url,msg);
+  }
+}
+// [서명연동] 이미지 직접 로드가 막힌 환경(Storage CORS 미설정 등)에서도 기능이 죽지 않도록,
+//   서명을 '원본 이미지 링크'로 사용하는 폴백. 제출 시 링크가 저장되고, 확인 화면·서식에는 그대로 표시/변환됩니다.
+//   직접 그린 서명이 있으면 항상 그쪽이 우선합니다(_getSigData 참조).
+function _sigUrlMode(which,url,msg){
+  SIG_URLMODE[which==='pay'?'pay':'agree']=url;
+  if(msg){
+    msg.style.color='#0f766e';
+    msg.innerHTML='✓ 저장된 서명을 사용합니다 (등록 원본 연결) <img src="'+url.replace(/"/g,'&quot;')+'" alt="서명 미리보기" style="height:34px;vertical-align:middle;background:#fff;border:1px solid #dfe5ee;border-radius:6px;margin-left:6px"> — 새로 그리려면 [지우기] 후 직접 서명해 주세요.';
   }
 }
 // ══════════════ [v4] 수당지급내역서용 서명 캔버스 (별도) ══════════════
@@ -1808,13 +1843,16 @@ function _initSigCanvasPay(){
 function _sigClearPay(){
   const c=document.getElementById('sigCanvasPay');if(!c)return;
   c.getContext('2d').clearRect(0,0,c.width,c.height);
+  SIG_URLMODE.pay='';
+  const m=document.getElementById('apSigMsgPay');
+  if(m){m.style.color='#8a919d';m.textContent=(SMY&&SMY.signatureImg)?'마이페이지에 등록된 서명이 있습니다.':'마이페이지에서 서명 이미지를 등록하면 매번 그리지 않아도 됩니다.';}
 }
 function _getSigDataPay(){
-  const c=document.getElementById('sigCanvasPay');if(!c)return null;
+  const c=document.getElementById('sigCanvasPay');if(!c)return SIG_URLMODE.pay||null;
   const ctx=c.getContext('2d');
   const d=ctx.getImageData(0,0,c.width,c.height).data;
   const hasData=Array.from(d).some((v,i)=>i%4===3&&v>0);
-  return hasData?c.toDataURL('image/png'):null;
+  return hasData?c.toDataURL('image/png'):(SIG_URLMODE.pay||null);
 }
 // ══════════════ 공고문 복사 (날짜별 확정 명단) ══════════════
 async function copyRoster(id){
