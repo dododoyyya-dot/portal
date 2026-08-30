@@ -495,7 +495,22 @@ async function setClaimReview(slotId,key,st,name,uid){
   }else if(st==='보류'){
     // [보류] 담당자 내부 확인용 메모 — 신청자에게는 공개되지 않으며, 입력하지 않아도 진행됩니다.
     reason=prompt('보류 메모(선택) — 담당자 확인용이며 신청자에게는 표시되지 않습니다.\n(예: 서류 확인 중, 입금 확인 대기)','')||'';
-  }else if(!confirm((name?'['+name+'] ':'')+'신청을 승인 처리할까요?'))return;
+  }else{
+    // [보호자동의 확인] 미성년인데 보호자 전자서명도, 수기 동의서 확인도 없는 상태에서 승인하려는 경우
+    //   담당자에게 한 번 더 알립니다. (기존 데이터와의 호환을 위해 차단이 아닌 확인 절차로 둡니다)
+    let warn='';
+    try{
+      const s3=(CSLOTS.find(x=>x.id===slotId)||{data:function(){return{}}}).data()||{};
+      const arr=(s3.claimed||[]).filter(function(c){return ckey(c)===key});
+      const c3=arr[arr.length-1];
+      if(c3&&c3.birth&&ageOf(c3.birth)>0&&ageOf(c3.birth)<18&&!c3.kid&&!((s3.paperConsents||{})[key])){
+        warn='\n\n⚠ 이 참가자는 만 18세 미만인데 보호자 동의가 아직 확인되지 않았습니다.'
+            +'\n   서면(수기) 동의서를 받으셨다면 먼저 [📄 수기동의서 확인완료]로 등록해 주세요.'
+            +'\n   동의 확인 없이 승인하시겠습니까?';
+      }
+    }catch(e){}
+    if(!confirm((name?'['+name+'] ':'')+'신청을 승인 처리할까요?'+warn))return;
+  }
   try{
     await DB.collection('compSlots').doc(slotId).update(
       new firebase.firestore.FieldPath('reviewStatus',key),
@@ -551,7 +566,8 @@ function viewRoster(id){
     if(c.kid)return ' <span style="font-size:10.5px;font-weight:900;color:#0f766e">👨‍👧 보호자서명✓</span>';
     if(paper[key])return ' <span style="font-size:10.5px;font-weight:900;color:#0f766e" title="'+cesc((paper[key].by||'')+' 확인 '+String(paper[key].at||'').slice(0,10))+'">📄 수기동의✓</span>'
       +((paper[key].files||[]).map((u,fi)=>' <a href="'+cesc(u)+'" target="_blank" style="font-size:10.5px;font-weight:900;color:#153A77" title="첨부 동의서 보기">📎'+(fi+1)+'</a>').join(''));
-    return ' <span style="font-size:10.5px;font-weight:900;color:#C41E2F">⚠ 보호자동의 필요</span>'
+    // [수기동의 경로] 본인이 '서면 제출' 전제로 접수한 건은 그 사실을 함께 보여줍니다.
+    return ' <span style="font-size:10.5px;font-weight:900;color:#C41E2F">⚠ 보호자동의 필요'+(c.needPaper?' (서면 제출 예정)':'')+'</span>'
       +(staff?' <button onclick="markPaper(\''+id+'\',\''+key+'\',\''+cesc(c.name||'')+'\')" style="border:1.5px solid #e6b422;background:#fffbeb;color:#8a5a00;border-radius:8px;padding:2px 8px;font-size:10.5px;font-weight:800;cursor:pointer" title="담당자가 서면(수기) 동의서를 수령한 경우 클릭">📄 수기동의서 확인완료</button>':'');
   };
   // [참가자 상태] 상태 표시 + 담당자용 승인·반려 버튼
@@ -662,16 +678,21 @@ function openPaperModal(slotId,key,name){
   d.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.6);z-index:1300;display:flex;align-items:center;justify-content:center;padding:16px';
   d.innerHTML='<div style="background:#fff;border-radius:16px;max-width:460px;width:100%;max-height:92vh;overflow:auto;padding:22px">'
     +'<b style="font-size:16px">📄 보호자 서면(수기) 동의서 확인</b>'
-    +'<div style="font-size:13.5px;color:#4b5563;margin:8px 0 14px;line-height:1.7">참가자 <b>'+cesc(name||'')+'</b> 의 보호자 동의서를 실제로 수령·확인하셨습니까?<br><span style="color:#8a919d;font-size:12.5px">종이로 받으셨다면 아래에서 사진을 찍거나 파일을 올려 함께 보관할 수 있습니다.</span></div>'
+    +'<div style="font-size:13.5px;color:#4b5563;margin:8px 0 12px;line-height:1.7">참가자 <b>'+cesc(name||'')+'</b> 의 보호자 동의서를 실제로 수령·확인하셨습니까?</div>'
+    // [수기서류 승인] 종이 서류만 받은 경우를 위한 안내 — 첨부는 어디까지나 선택입니다.
+    //   예전에는 업로드 영역만 크게 보여서 "파일을 올려야만 처리된다"고 오해하기 쉬웠습니다.
+    +'<div style="font-size:12.5px;font-weight:800;color:#0f766e;background:#f0f7f2;border:1.5px solid #cfe3d8;border-radius:10px;padding:10px 12px;margin-bottom:12px;line-height:1.65">'
+      +'✅ <b>첨부는 선택입니다.</b> 종이 서류로만 받으셨다면 아무것도 올리지 않고 아래 버튼을 바로 누르셔도 승인 처리됩니다.'
+      +'<div style="font-weight:600;color:#4b5563;margin-top:3px">사본을 함께 보관하시려면 아래에서 사진·파일을 추가하세요.</div></div>'
     +'<label style="display:block;border:1.5px dashed #dfe5ee;border-radius:12px;padding:16px;text-align:center;cursor:pointer;background:#f9fbfd">'
-      +'<div style="font-size:14px;font-weight:800;color:#153A77">📷 사진 찍기 · 📎 파일 선택</div>'
+      +'<div style="font-size:14px;font-weight:800;color:#153A77">📷 사진 찍기 · 📎 파일 선택 <span style="font-weight:600;color:#8a919d;font-size:12px">(선택)</span></div>'
       +'<div style="font-size:12px;color:#8a919d;margin-top:4px">이미지 또는 PDF · 최대 5개</div>'
       +'<input type="file" id="pcFile" accept="image/*,application/pdf" capture="environment" multiple style="display:none" onchange="pcPreview()">'
     +'</label>'
     +'<div id="pcList" style="margin-top:10px;font-size:12.5px;color:#4b5563"></div>'
     +'<div id="pcMsg" style="margin-top:10px;font-size:12.5px;color:#153A77"></div>'
     +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap">'
-    +'<button class="cbtn" style="background:#0f766e;color:#fff" onclick="pcConfirm(true)">✅ 확인 처리</button>'
+    +'<button id="pcOk" class="cbtn" style="background:#0f766e;color:#fff" onclick="pcConfirm(true)">✅ 서류 확인만 처리 (첨부 없이)</button>'
     +'<button class="cbtn cbtn-ghost" onclick="document.getElementById(\'pcModal\').remove()">취소</button></div></div>';
   document.body.appendChild(d);
 }
@@ -679,6 +700,9 @@ function pcPreview(){
   const f=document.getElementById('pcFile');
   const box=document.getElementById('pcList');
   const n=f&&f.files?Math.min(f.files.length,5):0;
+  // [수기서류 승인] 첨부 유무에 따라 버튼 문구를 바꿔, 지금 무엇이 저장되는지 분명히 보이게 합니다.
+  const ok=document.getElementById('pcOk');
+  if(ok)ok.textContent=n?('✅ 첨부 '+n+'개와 함께 확인 처리'):'✅ 서류 확인만 처리 (첨부 없이)';
   if(!n){box.textContent='';return}
   box.innerHTML='첨부 '+n+'개 — '+[].slice.call(f.files,0,5).map(x=>cesc(x.name)).join(', ');
 }
@@ -779,6 +803,10 @@ async function reSave(){
 }
 // ── 미성년 참가: 자녀 요청 → 보호자 승인(신청서 작성·서명) ──
 let FAMREQ=null;
+// [수기동의 경로] 보호자 계정이 연동되지 않은 미성년이 '서면 동의서 제출'을 전제로 신청하는 모드.
+//   이 모드로 접수된 건은 kid(보호자 전자서명)가 아니므로 명단에 '⚠ 보호자동의 필요'로 남고,
+//   담당자가 [📄 수기동의서 확인완료]를 눌러야 동의가 확보된 것으로 처리됩니다.
+let PAPER_MODE=false;
 async function checkFamReq(){
   const id=new URLSearchParams(location.search).get('famreq');
   if(!id)return;
@@ -1116,7 +1144,17 @@ async function teamConsentUpload(slotId){
 }
 async function openMinorReq(id){
   if(!(CMY&&CMY.guardianUid)){
-    alert('👨‍👧 만 18세 미만은 보호자 승인으로 참가 신청합니다.\n아직 보호자 계정이 연동되지 않았습니다.\n마이페이지 › 보호자 연동(연동 코드)을 먼저 진행해 주세요.');return;
+    // [수기동의 경로] 예전에는 여기서 신청 자체가 막혀, 종이 동의서를 들고 와도 명단에 이름이
+    //   없어 담당자가 승인할 대상조차 없었습니다. 이제 서면(수기) 제출 경로로 접수할 수 있게 하고,
+    //   담당자가 [📄 수기동의서 확인완료]로 승인하는 방식으로 처리합니다.
+    if(!confirm('👨‍👧 보호자 계정이 연동되어 있지 않습니다.\n\n'
+      +'[확인] 보호자 동의서를 종이(서면)로 제출하는 방식으로 신청합니다.\n'
+      +'   · 신청은 접수되지만 담당자가 동의서를 수령·확인해야 참가가 확정됩니다.\n'
+      +'   · 동의서는 대회 전까지 담당자에게 제출해 주세요.\n\n'
+      +'[취소] 마이페이지 › 보호자 연동을 먼저 진행합니다. (연동하면 보호자 전자서명으로 바로 처리됩니다)'))return;
+    PAPER_MODE=true;
+    openApply(id);
+    return;
   }
   const doc0=CSLOTS.find(d=>d.id===id);const s0=doc0?doc0.data():{};
   if(!confirm('['+(s0.title||'대회')+']\n보호자에게 참가 승인 요청을 보낼까요?\n보호자가 신청서를 확인·서명하면 참가 신청이 완료됩니다.'))return;
@@ -1856,9 +1894,10 @@ async function openApply(id){
     // ── 참가(선수) 신청 — 본인(성인) 또는 자녀 선택, 자녀는 법정대리인(보호자) 서명 동의 ──
     // 본인이 만 18세 미만이면 보호자 승인 요청으로 전환 (미성년은 보호자 승인·서명으로만 참가)
     const selfMinor=CMY.birth?(ageOf(CMY.birth)<18):false;
-    if(selfMinor&&!FAMREQ){openMinorReq(id);return;}
+    // [수기동의 경로] PAPER_MODE(서면 동의서 제출 전제)로 들어온 경우에만 미성년 본인 신청을 허용합니다.
+    if(selfMinor&&!FAMREQ&&!PAPER_MODE){openMinorReq(id);return;}
     const parts=(FAMREQ?[{pid:FAMREQ.childUid,name:FAMREQ.childName||'',label:(FAMREQ.childName||'자녀')+' · 자녀(승인 진행)',birth:FAMREQ.childBirth||'',gender:FAMREQ.childGender||'',school:FAMREQ.childSchool||'',kid:true}]
-      :(selfMinor?[]:[{pid:CME.uid+'#self',name:CMY.name||'',label:(CMY.name||'본인')+' · 본인',birth:CMY.birth||'',gender:CMY.gender||'',school:'',kid:false}]))
+      :((selfMinor&&!PAPER_MODE)?[]:[{pid:CME.uid+'#self',name:CMY.name||'',label:(CMY.name||'본인')+' · 본인',birth:CMY.birth||'',gender:CMY.gender||'',school:'',kid:false}]))
       .concat(FAMREQ?[]:(CMY.children||[]).map((k,i)=>({pid:CME.uid+'#k'+i,name:k.name,label:k.name+' · 자녀',birth:k.birth||'',gender:k.gender||'',school:k.school||'',kid:true})));
     APPLY_PARTS=parts.filter(p=>!activeOfKey(s,p.pid)||p.pid===EDIT_KEY); // [신청수정] 수정 대상 참가자는 목록에 포함
     const clubOpts=(MY_CLUBS||[]).map(n=>'<option>'+cesc(n)+'</option>').join('');
@@ -1866,6 +1905,12 @@ async function openApply(id){
       +'<div class="mhead"><div class="mt">🏃 대회 개인전 참가 신청서</div><div class="ms">'+cesc(s.title)+' · '+cesc(s.region)+' · '+cesc(s.date)+(s.place?' · 📍 '+cesc(s.place):'')+(s.note?' · 📌 '+cesc(String(s.note).replace(/\s+/g,' ').slice(0,80)):'')+'</div></div>'
       +'<div class="mbody">'
       +'<div style="font-size:11.5px;color:#8a919d;text-align:right;margin-bottom:8px">작성일 '+today+' · 자녀는 <a href="mypage.html" style="color:var(--red);font-weight:800">마이페이지 자녀 프로필</a>에서 등록</div>'
+      // [수기동의 경로] 서면 제출 전제로 접수되는 건임을 신청자가 분명히 알도록 상단에 고지합니다.
+      +(PAPER_MODE?'<div style="background:#fffbeb;border:1.5px solid #fde68a;color:#8a5a00;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:12.5px;line-height:1.7">'
+        +'📄 <b>보호자 서면 동의서 제출 방식으로 신청합니다.</b><br>'
+        +'아래 서명은 <b>참가자 본인 확인용</b>이며, 보호자(법정대리인) 동의는 <b>종이 동의서를 담당자에게 제출</b>해야 완료됩니다.<br>'
+        +'담당자가 동의서를 수령·확인하기 전까지는 <b>참가가 확정되지 않습니다.</b>'
+        +'</div>':'')
       +'<div style="font-size:13px;font-weight:800;margin-bottom:7px">① 참가자 선택</div>'
       +'<div id="cPartBtns" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
       +(APPLY_PARTS.length?APPLY_PARTS.map((p,i)=>'<button type="button" class="rolechip" data-pid="'+cesc(p.pid)+'" onclick="selPart('+i+')">'+cesc(p.label)+'</button>').join(''):'<span style="font-size:12.5px;color:#C41E2F;font-weight:700">'+(selfMinor?'👨‍👧 만 18세 미만은 본인이 직접 신청할 수 없습니다. 보호자 계정에서 자녀 프로필을 등록해 신청해 주세요.':'신청 가능한 참가자가 없습니다 (전원 신청 완료)')+'</span>')
@@ -1897,7 +1942,9 @@ async function openApply(id){
       // [특수부문 제거] 신청서의 특수 부문 선택 버튼 미표시 — submitEntry의 수집 코드(cSpecialBtns)는 빈 배열로 안전 동작
       +'<div class="clause">① 참가자는 대회 규정과 안전 수칙을 준수하며, 주최 측의 경기 운영에 따릅니다.<br>'
       +'② 대회 중 촬영된 기록·사진·영상은 연맹 홍보 자료로 활용될 수 있음에 동의합니다.<br>'
-      +'③ 미성년 참가자의 경우 아래 서명은 <b>법정대리인(보호자)의 참가 동의</b>로서 효력을 가집니다.</div>'
+      +(PAPER_MODE
+        ?'③ 이 신청은 <b>보호자 서면 동의서 제출</b>을 전제로 접수되며, 아래 서명은 참가자 본인 확인용입니다. 법정대리인(보호자) 동의는 <b>담당자가 서면 동의서를 확인한 시점</b>에 효력이 발생합니다.</div>'
+        :'③ 미성년 참가자의 경우 아래 서명은 <b>법정대리인(보호자)의 참가 동의</b>로서 효력을 가집니다.</div>')
       +'</div>'
       +'<div class="docsec"><div class="dtitle">개인정보 수집·이용 동의서</div>'
       +consentBlockHtml(s,'<div style="font-size:12px;color:#4b5563;line-height:1.8;margin-bottom:10px">'
@@ -1966,7 +2013,7 @@ function selPart(i){
   document.getElementById('epGender').textContent=p.gender||'-';
   document.getElementById('epSchool').textContent=p.school||(p.kid?'-':'(성인)');
   document.getElementById('guardRow').style.display=p.kid?'':'none';
-  document.getElementById('sigLabel').textContent=p.kid?'③ 보호자(법정대리인) 서명':'③ 본인 서명';
+  document.getElementById('sigLabel').textContent=p.kid?'③ 보호자(법정대리인) 서명':(PAPER_MODE?'③ 참가자 본인 서명 (보호자 동의는 서면 제출)':'③ 본인 서명');
 }
 // ── 서명 패드 ──
 let SIG_DRAWN=false;
@@ -2023,7 +2070,8 @@ async function submitEntry(){
   }
   if(!APPLY_SEL.length){alert('참가 부문을 선택해주세요.');return}
   // [보호자동의 가드] 미성년 참가자는 보호자(법정대리인) 동의·서명 경로로만 접수 — 대리 신청(자녀 프로필=보호자 서명)·본인 신청(보호자 승인 요청) 외 차단
-  if(p.birth&&ageOf(p.birth)<18&&!p.kid&&!FAMREQ){
+  // [수기동의 경로] PAPER_MODE(서면 동의서 제출 전제)는 예외로 접수하고, 담당자 확인 전까지 미확정 상태로 둡니다.
+  if(p.birth&&ageOf(p.birth)<18&&!p.kid&&!FAMREQ&&!PAPER_MODE){
     alert('👨‍👧 만 18세 미만 참가자는 보호자(법정대리인)의 동의가 있어야 접수됩니다.\n보호자 승인 절차로 전환합니다.');
     document.getElementById('cApplyModal').remove();openMinorReq(APPLY_ID);return;
   }
@@ -2079,6 +2127,8 @@ async function submitEntry(){
         special:_specials,
         guardian:p.kid?(CMY.name||''):'',guardianPhone:p.kid?(CMY.phone||''):'',
         prefs:APPLY_SEL.slice(),consent:true,signed:true,at:new Date().toISOString()};
+      // [수기동의 경로] 서면 동의서 제출 전제로 접수된 건 표시 — 명단에서 담당자가 바로 알아볼 수 있게 합니다.
+      if(PAPER_MODE&&p.birth&&ageOf(p.birth)<18&&!p.kid)_newClaim.needPaper=true;
       if(isEdit)_newClaim.edited=true; // [버그수정] undefined 필드값은 Firestore가 거부 → 수정건에만 표기
       claimed.push(_newClaim);
       tx.update(ref,isEdit?{claimed:claimed,cancels:cancels}:{claimed:claimed});
