@@ -411,6 +411,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#0f766e" onclick="backfillPhoneIndex()">📇 전화번호 중복확인 보정</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="ageMigScan()">🎓 만 18세 도달 학생 → 성인 전환</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="qualFixScan()">🎖 미검증 급수 정리</button>
+        <button class="btn-sub" style="background:#8a5a00" onclick="noBirthScan()">🎂 생년월일 미입력 회원</button>
         <button class="btn-sub" style="background:#0e7490" onclick="ncWaiveScan()">🏅 국가자격 승인차단 해제</button>
         <button class="btn-sub" style="background:#8a919d" onclick="showTrash()">🗑 휴지통</button>
         <details style="display:inline-block">
@@ -436,6 +437,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <div id="ageMigBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="qualFixBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="applyGateBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
+      <div id="noBirthBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="ncWaiveBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="trashBox" style="display:none;background:#faf8f4;border:1.5px solid #e5e0d8;border-radius:14px;padding:14px 18px;margin-bottom:14px"></div>
       <div id="instLinkBox" style="background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:14px;padding:14px 18px;margin-bottom:14px">
@@ -1548,6 +1550,72 @@ async function qualFixUndo(){
     loadUsers();
   }catch(e){ b.innerHTML='<b style="color:#C41E2F">복원 실패: '+esc(e.message)+'</b>'; }
 }
+// ══════════ [연령필수] 생년월일 미입력 회원 찾기·채우기 ══════════
+//  생년월일이 없으면 ① 만 18세 도달 시 학생회원 → 일반회원 자동 전환이 되지 않고
+//  ② 대회에서 미성년으로 잡히지 않아 보호자 동의 대상에서 빠집니다.
+//  가입 화면에서는 이미 필수라 신규 가입자는 해당 없고, 예전 계정·중간에 비워진 계정을 찾습니다.
+let NOBIRTH=[];
+function noBirthBoxEl(){const b=document.getElementById('noBirthBox');b.style.display='block';return b}
+function noBirthIsTarget(v){ return !v.deleted && !String(v.birth||'').trim(); }
+function dashNoBirth(){
+  try{ tab(3); }catch(e){}
+  try{ noBirthScan(); }catch(e){}
+  setTimeout(function(){const b=document.getElementById('noBirthBox');if(b)b.scrollIntoView({behavior:'smooth',block:'center'});},260);
+}
+async function noBirthScan(){
+  const b=noBirthBoxEl(); b.innerHTML='회원 목록을 불러오는 중…';
+  try{
+    const snap=await DB.collection('users').get();
+    NOBIRTH=[];
+    snap.docs.forEach(function(d){
+      const v=d.data()||{};
+      if(!sameSidoUser(v))return;                 // 시도임원은 관할 회원만
+      if(noBirthIsTarget(v))NOBIRTH.push({id:d.id,v:v});
+    });
+    if(!NOBIRTH.length){b.innerHTML='<b style="color:#0f766e">✅ 생년월일이 비어 있는 회원이 없습니다.</b>';return}
+    const rows=NOBIRTH.map(function(x,i){
+      const stu=(x.v.accountType==='student'||x.v.memberGroup==='student');
+      return '<tr><td>'+(i+1)+'</td>'
+        +'<td><b>'+esc(x.v.name||'')+'</b>'+(stu?' <span style="font-size:10.5px;font-weight:900;color:#fff;background:#C41E2F;border-radius:999px;padding:1px 7px">학생회원</span>':'')+'</td>'
+        +'<td>'+esc({instructor:'지도자·강사',teacher:'교사',natcert:'국가공인자격',athlete:'선수',general:'일반',student:'학생'}[x.v.accountType]||x.v.accountType||'-')+'</td>'
+        +'<td>'+esc(x.v.region||'')+'</td><td>'+esc(x.v.phone||'')+'</td>'
+        +'<td>'+esc(x.v.status==='approved'?'승인':(x.v.status||''))+'</td>'
+        +'<td><button class="btn-sub" style="background:#153A77;padding:3px 10px;font-size:11.5px" onclick="noBirthSet(\''+x.id+'\',\''+esc(x.v.name||'')+'\')">🎂 생년월일 입력</button></td></tr>';
+    }).join('');
+    const stuN=NOBIRTH.filter(function(x){return x.v.accountType==='student'||x.v.memberGroup==='student'}).length;
+    b.innerHTML='<div style="font-weight:900;font-size:15.5px;margin-bottom:6px">🎂 생년월일 미입력 '+NOBIRTH.length+'명'
+      +(stuN?' <span style="color:#C41E2F;font-size:13px">— 이 중 학생회원 '+stuN+'명은 성인이 되어도 자동 전환되지 않습니다</span>':'')+'</div>'
+      +'<div style="font-size:12.5px;color:#6b7280;margin-bottom:10px;line-height:1.7">생년월일이 없으면 <b>미성년 여부 판단</b>과 <b>만 18세 도달 시 일반회원 자동 전환</b>이 모두 작동하지 않습니다.<br>본인에게 마이페이지에서 입력하도록 안내하시거나, 확인된 경우 아래에서 직접 입력할 수 있습니다. <span style="color:#8a5a00">(가입 화면에서는 이미 필수 항목이라 신규 가입자는 여기 나타나지 않습니다)</span></div>'
+      +'<div style="overflow-x:auto"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:700px"><thead><tr><th>#</th><th>이름</th><th>유형</th><th>권역</th><th>연락처</th><th>상태</th><th>처리</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'
+      +'<button class="btn-sub" style="background:#0f766e" onclick="noBirthNotify()">📨 대상자에게 입력 요청 알림 보내기</button>'
+      +'<button class="btn-sub" style="background:#1F4E9C" onclick="noBirthScan()">🔄 다시 조회</button></div>';
+  }catch(e){ b.innerHTML='<b style="color:#C41E2F">조회 실패: '+esc(e.message)+'</b>'; }
+}
+async function noBirthSet(uid,name){
+  if(!VIEWER_IS_ADMIN){alert('중앙관리자만 입력할 수 있습니다.');return}
+  const v=prompt('['+(name||'')+'] 님의 생년월일을 입력하세요 (YYYY-MM-DD)\n\n※ 본인 확인된 값만 입력해 주세요. 나이 계산·미성년 판정의 기준이 됩니다.','');
+  if(v===null)return;
+  const s=String(v).trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(s)){alert('형식이 올바르지 않습니다. 예: 2013-05-01');return}
+  const d=new Date(s);
+  if(isNaN(d.getTime())||d>new Date()||d.getFullYear()<1900){alert('생년월일을 다시 확인해주세요.');return}
+  if(!confirm((name||'')+' 님의 생년월일을 ['+s+'] (만 '+ageNow(s)+'세) 로 저장할까요?'))return;
+  try{
+    await DB.collection('users').doc(uid).update({birth:s,birthSetBy:((CMY&&CMY.name)||'관리자'),birthSetAt:new Date().toISOString()});
+    alert('✓ 저장했습니다.');
+    noBirthScan(); loadUsers();
+  }catch(e){ alert('저장 실패: '+e.message); }
+}
+async function noBirthNotify(){
+  if(!NOBIRTH.length){alert('먼저 조회를 실행해주세요.');return}
+  if(!confirm(NOBIRTH.length+'명에게 "마이페이지에서 생년월일을 입력해 주세요" 알림을 보낼까요?'))return;
+  let ok=0;
+  for(const x of NOBIRTH){
+    try{ await KFDF.notify(x.id,'🎂 생년월일이 등록되어 있지 않습니다 — 마이페이지에서 입력해 주세요 (대회 참가·회원 전환에 필요합니다)','mypage.html'); ok++; }catch(e){}
+  }
+  alert('✓ '+ok+'명에게 알림을 보냈습니다.');
+}
 // ══════════ [접수마감] 강습신청 접수 마감·재개 (siteContent/applyGate) ══════════
 //  예전에는 apply.html 안의 DEADLINE 날짜를 코드에서 고쳐 다시 올려야 마감할 수 있었습니다.
 //  이제 이 버튼으로 학교체육·방과후를 각각 즉시 마감/재개할 수 있습니다(코드 수정·재배포 불필요).
@@ -2258,6 +2326,13 @@ async function loadDash(){
           +'style="cursor:pointer;background:#fff;border:1.5px solid #f0c7cc;border-left:4px solid #C41E2F;border-radius:12px;padding:14px 16px">'
           +'<b style="font-size:22px;color:#C41E2F">'+qfDue+'</b>'
           +'<div style="font-size:12px;color:var(--gray);font-weight:700">🎖 미검증 급수 표기 <span style="color:#C41E2F">→ 정리</span></div></div>';
+        // [연령필수] 생년월일 미입력 — 성인 전환·미성년 판정이 막혀 있는 회원
+        const nbDue=us.docs.filter(d=>noBirthIsTarget(d.data()||{})).length;
+        if(nbDue)document.getElementById('dash').innerHTML+=
+          '<div onclick="dashNoBirth()" title="누르면 목록이 열립니다" '
+          +'style="cursor:pointer;background:#fff;border:1.5px solid #eddfc4;border-left:4px solid #8a5a00;border-radius:12px;padding:14px 16px">'
+          +'<b style="font-size:22px;color:#8a5a00">'+nbDue+'</b>'
+          +'<div style="font-size:12px;color:var(--gray);font-weight:700">🎂 생년월일 미입력 <span style="color:#8a5a00">→ 확인</span></div></div>';
       }catch(e){}
     }
     try{const rp=await DB.collection('reports').get();if(rp.size)document.getElementById('dash').innerHTML+=box(rp.size,'🚩 커뮤니티 신고','#C41E2F');}catch(e){}
