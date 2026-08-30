@@ -803,10 +803,62 @@ function reRender(){
                  :' <b style="color:#8a5a00">⚠ 생년월일 없음 — 연령 확인 필요</b>'
                    +(looksMinorSchool(r.school)?' <b style="color:#C41E2F">(미성년 추정)</b>':''))
           : '');
-    return '<div style="display:flex;align-items:center;gap:8px;border:1px solid '+(st==='unknown'&&!done?'#eddfc4':'#e5e9f0')+';background:'+(st==='unknown'&&!done?'#fffdf5':'#fff')+';border-radius:9px;padding:7px 10px;margin-bottom:5px;font-size:13px"><b style="min-width:52px">'+cesc(r.name)+'</b><span style="color:#6b7280;font-size:12px;flex:1">'+cesc(r.birth||'')+(r.school?' · '+cesc(r.school):'')+(r.nonMember?' <b style="color:#8a5a00">🧾 비회원 참가자</b>':'')+mark+'</span><button onclick="reDel('+i+')" title="명단에서 제거" style="border:none;background:#fee2e2;color:#C41E2F;border-radius:7px;width:26px;height:26px;font-weight:900;cursor:pointer">✕</button></div>';
+    // [연령확인] 생년월일이 비어 있으면 그 자리에서 채울 수 있게 버튼을 답니다.
+    //   회원 명단에서 같은 이름을 찾아 불러오거나, 직접 입력할 수 있습니다.
+    const fixBtn=(st==='unknown')
+      ? '<button onclick="reFillBirth('+i+')" title="회원 정보에서 불러오거나 직접 입력합니다" style="border:1.5px solid #b8860b;background:#fffbeb;color:#8a5a00;border-radius:8px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;margin-right:4px">🎂 생년월일 채우기</button>'
+      : '';
+    return '<div style="display:flex;align-items:center;gap:8px;border:1px solid '+(st==='unknown'&&!done?'#eddfc4':'#e5e9f0')+';background:'+(st==='unknown'&&!done?'#fffdf5':'#fff')+';border-radius:9px;padding:7px 10px;margin-bottom:5px;font-size:13px"><b style="min-width:52px">'+cesc(r.name)+'</b><span style="color:#6b7280;font-size:12px;flex:1">'+cesc(r.birth||'')+(r.school?' · '+cesc(r.school):'')+(r.nonMember?' <b style="color:#8a5a00">🧾 비회원 참가자</b>':'')+mark+'</span>'+fixBtn+'<button onclick="reDel('+i+')" title="명단에서 제거" style="border:none;background:#fee2e2;color:#C41E2F;border-radius:7px;width:26px;height:26px;font-weight:900;cursor:pointer">✕</button></div>';
   }).join(''):'<div style="font-size:12.5px;color:#8a919d;padding:10px;border:1.5px dashed #dfe5ee;border-radius:9px">명단이 비어 있습니다 — 오른쪽에서 추가하세요</div>';
 }
 function reDel(i){_RED.roster.splice(i,1);reRender()}
+// [연령확인] 명단의 생년월일 채우기 — ① 같은 이름의 회원을 찾아 불러오기 ② 직접 입력
+//   클럽 명단에 생년월일이 복사되지 않은 채 팀 명단으로 넘어온 경우를 그 자리에서 바로잡습니다.
+async function reFillBirth(i){
+  const r=_RED.roster[i]; if(!r)return;
+  let hits=[];
+  try{
+    const snap=await DB.collection('users').where('name','==',String(r.name||'').trim()).limit(10).get();
+    hits=snap.docs.map(function(d){return Object.assign({_id:d.id},d.data()||{})}).filter(function(u){return String(u.birth||'').trim()});
+  }catch(e){ /* 조회 실패 시에도 직접 입력은 가능하게 */ }
+  if(hits.length){
+    // 학교가 같은 회원을 우선 제시 (동명이인 구분)
+    const sch=String(r.school||'').replace(/\s/g,'');
+    hits.sort(function(a,b){
+      const am=(sch&&String(a.school||'').replace(/\s/g,'')===sch)?0:1;
+      const bm=(sch&&String(b.school||'').replace(/\s/g,'')===sch)?0:1;
+      return am-bm;
+    });
+    const lines=hits.map(function(u,n){
+      return (n+1)+') '+u.birth+' (만 '+ageOf(u.birth)+'세)'
+        +(u.school?' · '+u.school:'')+(u.region?' · '+u.region:'')
+        +(u.accountType==='student'?' · 학생회원':'');
+    }).join('\n');
+    const pick=prompt('['+r.name+'] 이름으로 등록된 회원을 찾았습니다.\n같은 사람이면 번호를 입력하세요.\n\n'
+      +lines+'\n\n※ 동명이인일 수 있으니 학교·권역을 확인하세요.\n'
+      +'해당 없으면 0 을 누르면 직접 입력합니다.','1');
+    if(pick===null)return;
+    const n=parseInt(pick,10);
+    if(n>=1&&n<=hits.length){
+      _RED.roster[i].birth=hits[n-1].birth;
+      if(!_RED.roster[i].gender&&hits[n-1].gender)_RED.roster[i].gender=hits[n-1].gender;
+      if(!_RED.roster[i].school&&hits[n-1].school)_RED.roster[i].school=hits[n-1].school;
+      reRender();
+      return;
+    }
+  }else{
+    if(!confirm('['+r.name+'] 이름으로 생년월일이 등록된 회원을 찾지 못했습니다.\n(비회원 참가자이거나 회원 정보에 없는 경우)\n\n직접 입력하시겠습니까?'))return;
+  }
+  const v=prompt('['+r.name+'] 님의 생년월일을 입력하세요 (YYYY-MM-DD)\n\n※ 확인된 값만 입력해 주세요. 미성년 여부 판정의 기준이 됩니다.', r.birth||'');
+  if(v===null)return;
+  const s=String(v).trim();
+  if(!s)return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(s)){alert('형식이 올바르지 않습니다. 예: 2013-05-01');return}
+  const d=new Date(s);
+  if(isNaN(d.getTime())||d>new Date()||d.getFullYear()<1900){alert('생년월일을 다시 확인해주세요.');return}
+  _RED.roster[i].birth=s;
+  reRender();
+}
 function reAdd(){
   const v=function(id){return (document.getElementById(id).value||'').trim()};
   const n=v('reName');if(!n){alert('성명을 입력해주세요');return}
