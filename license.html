@@ -287,6 +287,12 @@ let LME=null,LMY=null,ISMGR=false,CENTRAL=false,MSIDOS=[],MFEDS=[],NOTICES=[],LA
 // 자격 업무 활성 시도연맹 (신청 배정 단위 — 연맹 추가 시 이 목록만 수정)
 const FED_LIST=['경기','강원','부산','경남','경북','전남광주','기타(중앙 처리)'];
 const SIDO_LIST=['서울','부산','대구','인천','광주','대전','울산','경기','강원','충북','충남','전북','전남','경북','경남','제주','세종'];
+// [자격 업무 = 시도연맹+중앙] 연맹별 관할 시도 묶음(perm.html PM_EXP와 동일 기준).
+// 시도임원(sidoOfficer)은 권역장 위임 없이도 본인 소속 연맹의 자격 업무를 볼 수 있어야 하므로,
+// 로그인 시 sido → 소속 연맹을 찾아 권역장의 managedSido와 동일한 방식으로 대입합니다.
+// (실적 없어 연맹이 없는 시도=대전·충북·충남·제주·세종은 대상에서 빠져 기존대로 중앙 직할 유지)
+const FED_GROUPS={'경기':['경기','서울','인천'],'강원':['강원'],'부산':['부산','울산'],'경남':['경남'],'경북':['경북','대구'],'전남광주':['전남광주','광주전남','광주','전북','전남']};
+const SIDO_FED={};Object.keys(FED_GROUPS).forEach(f=>FED_GROUPS[f].forEach(s=>{SIDO_FED[s]=f}));
 
 // [겸직] 한 사람이 여러 등급을 가질 수 있어 role(대표 등급)과 roles[](전체)를 함께 봅니다
 function lcHasRole(v,r){return !!(v&&((r==='admin'&&v.owner===true)||v.role===r||(Array.isArray(v.roles)&&v.roles.indexOf(r)>=0)))}
@@ -294,9 +300,11 @@ AUTH.onAuthStateChanged(async u=>{
   LME=u;
   if(u){
     const d=await DB.collection('users').doc(u.uid).get();LMY=d.data()||{};
-    ISMGR=(lcHasRole(LMY,'admin')||(lcHasRole(LMY,'regionAdmin')&&(Array.isArray(LMY.managedSido)?LMY.managedSido.length:LMY.managedSido)));
+    const isRegion=lcHasRole(LMY,'regionAdmin')&&(Array.isArray(LMY.managedSido)?LMY.managedSido.length:LMY.managedSido);
+    const myFed=lcHasRole(LMY,'sidoOfficer')?SIDO_FED[LMY.sido]:null; // 시도임원 본인 소속 연맹(없으면 중앙 직할 시도)
+    ISMGR=(lcHasRole(LMY,'admin')||isRegion||!!myFed);
     CENTRAL=lcHasRole(LMY,'admin');
-    const _ms=LMY.managedSido;
+    const _ms=CENTRAL?null:(isRegion?LMY.managedSido:(myFed?FED_GROUPS[myFed]:null));
     MSIDOS=CENTRAL?[]:(Array.isArray(_ms)?_ms.slice():(_ms?[_ms]:[]));
     MFEDS=MSIDOS.filter(s=>FED_LIST.indexOf(s)>=0); // 연맹 단위(공고 주관·신청 배정용)
     if(ISMGR){
