@@ -277,7 +277,42 @@ const TYPE_INFO={
   school:{label:'학교체육 강습', store:'학교체육 강습', color:'#8c1622', prefix:'S', desc:'정규 체육수업 연계 · 24회차'},
   after:{label:'방과후 · 늘봄학교', store:'방과후·늘봄·돌봄', color:'#0f766e', prefix:'A', desc:'방과후·늘봄·돌봄교실 · 24회차'}
 };
+// ▶ [접수마감] 관리자 페이지에서 유형별로 즉시 마감/재개할 수 있습니다 (siteContent/applyGate).
+//   기존 DEADLINE(연간 마감일)은 그대로 두고, 그 위에 수동 마감을 더한 구조입니다.
+let APPLY_GATE={};
+function gateClosed(t){ return !!((APPLY_GATE[t]||{}).closed); }
+function gateMsg(){ return String(APPLY_GATE.msg||'').trim(); }
+function gateClosedHtml(title){
+  const m=gateMsg();
+  return '<div class="authbox" style="max-width:none;text-align:center"><div style="font-size:44px">⏰</div>'
+    +'<h3 style="margin-top:8px">'+title+'</h3>'
+    +'<p style="font-size:14.5px;color:var(--gray)">'+(m?m.replace(/[<>&]/g,''):'현재 접수를 받지 않고 있습니다.')
+    +'<br>문의: 031-984-3248 / kfdf60@hanmail.net</p></div>';
+}
+function applyGateApply(){
+  // 두 유형 모두 마감이면 선택 화면 전체를 마감 안내로 대체
+  if(gateClosed('school')&&gateClosed('after')){
+    const tp=document.getElementById('typePick');
+    if(tp)tp.innerHTML=gateClosedHtml('현재 강습 신청 접수가 마감되었습니다');
+    return;
+  }
+  // 한쪽만 마감이면 해당 카드만 잠금 표시
+  [['school','cardSchool'],['after','cardAfter']].forEach(([k,id])=>{
+    if(!gateClosed(k))return;
+    const c=document.getElementById(id);
+    if(!c)return;
+    c.onclick=null;
+    c.style.cursor='not-allowed';
+    c.style.opacity='.55';
+    c.style.borderColor='#f0c7cc';
+    const btn=c.querySelector('button');
+    if(btn){btn.textContent='접수 마감';btn.style.background='#8a919d';btn.disabled=true;btn.style.cursor='not-allowed';}
+    const m=gateMsg();
+    c.insertAdjacentHTML('beforeend','<div style="margin-top:10px;font-size:12.5px;font-weight:800;color:#C41E2F">■ 현재 접수를 받지 않습니다'+(m?'<div style="font-weight:600;color:var(--gray);margin-top:4px">'+m.replace(/[<>&]/g,'')+'</div>':'')+'</div>');
+  });
+}
 function pickType(t){
+  if(gateClosed(t)){ alert(TYPE_INFO[t].label+' 접수가 마감되었습니다.'+(gateMsg()?'\n\n'+gateMsg():'')+'\n\n문의: 031-984-3248'); return; }
   APPLY_TYPE=t;const i=TYPE_INFO[t];
   document.getElementById('typePick').style.display='none';
   document.getElementById('applyBox').style.display='block';
@@ -316,8 +351,16 @@ function applyOther(){
     document.getElementById('typePick').innerHTML='<div class="authbox" style="max-width:none;text-align:center"><div style="font-size:44px">⏰</div><h3 style="margin-top:8px">2026년 접수가 마감되었습니다</h3><p style="font-size:14.5px;color:var(--gray)">2026년 사업 접수가 종료되었습니다.<br>추가 접수 및 문의: 031-984-3248 / kfdf60@hanmail.net</p></div>';
     return;
   }
-  const p=new URLSearchParams(location.search).get('type');
-  if(p==='after'||p==='school')pickType(p);
+  // ▶ [접수마감] 관리자 설정을 먼저 확인한 뒤 화면을 구성합니다.
+  //   조회에 실패하면(네트워크·규칙 등) 기존과 동일하게 접수를 계속 받습니다 — 조회 실패로 접수가 막히지 않도록.
+  DB.collection('siteContent').doc('applyGate').get()
+    .then(doc=>{ APPLY_GATE=(doc.exists&&doc.data())||{}; })
+    .catch(()=>{ APPLY_GATE={}; })
+    .then(()=>{
+      applyGateApply();
+      const p=new URLSearchParams(location.search).get('type');
+      if((p==='after'||p==='school')&&!gateClosed(p))pickType(p);
+    });
 })();
 AUTH.onAuthStateChanged(async u=>{
   if(!u)return;
@@ -387,6 +430,17 @@ async function submitApply(){
   }
   if(!/^01[016789][-. ]?\d{3,4}[-. ]?\d{4}$/.test(req.phone)){m.textContent='담당교사 휴대전화 번호를 확인해주세요 (예: 010-1234-5678)';m.className='msg err';return}
   if(!document.getElementById('fAgree').checked){m.textContent='개인정보 수집·이용에 동의해주세요';m.className='msg err';return}
+  // ▶ [접수마감] 제출 직전 재확인 — 폼을 열어둔 사이에 마감됐을 수 있으므로 최신 상태를 다시 읽습니다.
+  //   (조회 실패 시에는 막지 않고 그대로 진행 — 일시적 오류로 정상 접수가 차단되지 않도록)
+  try{
+    const gd=await DB.collection('siteContent').doc('applyGate').get();
+    APPLY_GATE=(gd.exists&&gd.data())||{};
+  }catch(e){}
+  if(gateClosed(APPLY_TYPE)){
+    m.textContent=TYPE_INFO[APPLY_TYPE].label+' 접수가 마감되었습니다.'+(gateMsg()?' '+gateMsg():'')+' (문의 031-984-3248)';
+    m.className='msg err';
+    return;
+  }
   m.textContent='제출 중…';m.className='msg';SUBMITTING=true;
   try{
     const ref=DB.collection('schoolApplications').doc();

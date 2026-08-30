@@ -402,6 +402,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#153A77" onclick="window.open('tally.html','_blank')">📊 총집계 현황</button>
         <button class="btn-sub" style="background:#0f766e" onclick="exportCSV()">⬇ 전체 CSV</button>
         <button class="btn-sub" style="background:#0e7490" onclick="showSlotAdmin()">📢 학교 공고 관리</button>
+        <button class="btn-sub" style="background:#C41E2F" onclick="applyGateScan()">🚦 강습신청 접수 마감·재개</button>
         <button class="btn-sub" style="background:#b8860b" onclick="dlDeliveryCsv()">🚚 배송명단 CSV</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="dlSizesXlsx()">👕 강사복 사이즈 (엑셀·집계·그래프)</button>
         <button class="btn-sub" style="background:#153A77" onclick="dlGoodsCerts()">🧾 수령확인증 일괄 다운로드</button>
@@ -434,6 +435,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <div id="phoneIdxBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;white-space:pre-line;font-size:13px;line-height:1.8"></div>
       <div id="ageMigBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="qualFixBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
+      <div id="applyGateBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="ncWaiveBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="trashBox" style="display:none;background:#faf8f4;border:1.5px solid #e5e0d8;border-radius:14px;padding:14px 18px;margin-bottom:14px"></div>
       <div id="instLinkBox" style="background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:14px;padding:14px 18px;margin-bottom:14px">
@@ -1117,6 +1119,11 @@ function renderApps(){
   el.innerHTML=docs.length?docs.map(d=>{
     const s=d.data();
     const tc=classifySchoolTimeConflict(s,SCHOOL_HOURS_POLICY);  // ▶ [시간대검증] 'overlap'|'clear'|'unknown'
+    // ▶ [시간대검증·범위축소 2026-08-30] 정규수업시간 겹침 판정은 '본인지도 희망' 건에만 표시합니다.
+    //   외부 강사가 파견되는 일반 건은 정규 체육수업 시간에 진행되는 것이 정상이라 겹침이 문제가 아니며,
+    //   전건에 배지를 달면 실제로 확인이 필요한 본인지도 건이 묻혀버립니다.
+    //   본인지도는 담당교사가 직접 지도하므로, 본인 수업시간과 겹치면 실제 일정 충돌입니다.
+    const tcShow=!!(s.selfTeach&&s.support!=='용품만');
     const st=s.status||'접수';
     const gc=(window.GOODS||{})[d.id];
     const stc={'접수':'#8a919d','대기':'#e6b422','선정':'#1F4E9C','배정완료':'#0f766e','미선정':'#C41E2F','취소':'#555555'}[st]||'#8a919d';
@@ -1126,8 +1133,8 @@ function renderApps(){
       +((s.selfTeach&&s.support!=='용품만')?' <span style="font-size:11px;font-weight:800;color:#0f766e">◉본인지도 희망'+(s.selfName?'('+esc(s.selfName)+')':'')+'</span>':'')
       +(s.selfTeach&&s.support!=='용품만'&&!s.selfUid&&!s.assignedName&&(st==='선정'||st==='접수'||st==='대기')?' <span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px" title="신청자가 비로그인 상태로 제출해 자동 배정이 안 됐습니다. 아래 🎯 강사 직접 배정으로 성명 대조 후 지정해주세요.">⚠ 본인지도 매칭필요</span>':'')
       +((dupKey[(s.school||'').replace(/\s/g,'')+'|'+(s.type||'')]>1)?' <span style="font-size:11px;font-weight:800;color:#fff;background:#e6b422;padding:2px 8px;border-radius:999px">⚠ 중복의심</span>':'')
-      +(tc==='overlap'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px" title="희망 요일·시간이 정규수업시간과 겹치는 것으로 추정됩니다(자동 추정 · 확정 아님) — 담당교사와 실제 가능 시간을 재확인해주세요.">⏰ 정규수업시간 겹침 의심</span>':'')
-      +(tc==='unknown'?' <span style="font-size:11px;font-weight:700;color:#6b7280;background:#eef1f5;padding:2px 8px;border-radius:999px" title="희망 요일·시간 텍스트 형식을 자동으로 해석하지 못해 정규수업시간 겹침 여부를 판단할 수 없습니다. 필요시 담당교사에게 직접 확인해주세요.">⏰ 시간 확인필요</span>':'')
+      +(tcShow&&tc==='overlap'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#C41E2F;padding:2px 8px;border-radius:999px" title="본인지도 희망 건입니다. 희망 요일·시간이 담당교사의 정규수업시간과 겹치는 것으로 추정됩니다(자동 추정 · 확정 아님) — 담당교사와 실제 가능 시간을 재확인해주세요.">⏰ 정규수업시간 겹침 의심</span>':'')
+      +(tcShow&&tc==='unknown'?' <span style="font-size:11px;font-weight:700;color:#6b7280;background:#eef1f5;padding:2px 8px;border-radius:999px" title="본인지도 희망 건입니다. 희망 요일·시간 텍스트 형식을 자동으로 해석하지 못해 정규수업시간 겹침 여부를 판단할 수 없습니다. 필요시 담당교사에게 직접 확인해주세요.">⏰ 시간 확인필요</span>':'')
       +(s.support==='용품만'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">🎁 용품만</span>':'')
       +' <span style="font-size:11px;font-weight:800;color:#fff;background:'+(appTypeOf(s).indexOf('방과후')>=0?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+'</span>'
       +((st==='선정'||st==='배정완료')?' <span style="font-size:11px;font-weight:800;color:'+(gc&&gc.delivery?'#0f766e':'#C41E2F')+'" title="'+(gc&&gc.delivery?esc(((gc.delivery.addr||'')+' '+(gc.delivery.addr2||'')).trim())+' · '+esc(gc.delivery.receiver||'')+' '+esc(gc.delivery.phone||''):'배송지 미입력 — 📦 버튼으로 링크를 교사에게 전달하세요')+'">🚚 배송지 '+(gc&&gc.delivery?'O':'X')+'</span>':'')
@@ -1540,6 +1547,77 @@ async function qualFixUndo(){
     b.innerHTML='<b style="color:#0f766e">↩ 복원 완료 — '+n+'명</b>';
     loadUsers();
   }catch(e){ b.innerHTML='<b style="color:#C41E2F">복원 실패: '+esc(e.message)+'</b>'; }
+}
+// ══════════ [접수마감] 강습신청 접수 마감·재개 (siteContent/applyGate) ══════════
+//  예전에는 apply.html 안의 DEADLINE 날짜를 코드에서 고쳐 다시 올려야 마감할 수 있었습니다.
+//  이제 이 버튼으로 학교체육·방과후를 각각 즉시 마감/재개할 수 있습니다(코드 수정·재배포 불필요).
+//  기존 DEADLINE(연간 마감일) 로직은 그대로 두고, 그 위에 수동 마감을 더하는 방식입니다.
+const AG_TYPES=[{k:'school',label:'🏫 학교체육 강습'},{k:'after',label:'🌱 방과후 · 늘봄학교'}];
+let APPLY_GATE={};
+function applyGateBoxEl(){const b=document.getElementById('applyGateBox');b.style.display='block';return b}
+async function applyGateScan(){
+  const b=applyGateBoxEl(); b.innerHTML='접수 상태를 불러오는 중…';
+  try{
+    const d=await DB.collection('siteContent').doc('applyGate').get();
+    APPLY_GATE=(d.exists&&d.data())||{};
+    applyGateRender();
+  }catch(e){ b.innerHTML='<b style="color:#C41E2F">조회 실패: '+esc(e.message)+'</b>'; }
+}
+function applyGateRender(){
+  const b=applyGateBoxEl();
+  const g=APPLY_GATE||{};
+  const rows=AG_TYPES.map(t=>{
+    const closed=!!((g[t.k]||{}).closed);
+    return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1.5px solid '+(closed?'#f0c7cc':'#cfe3d8')+';background:'+(closed?'#fff5f5':'#f0f7f2')+';border-radius:10px;margin-top:8px">'
+      +'<b style="font-size:14px;min-width:150px">'+t.label+'</b>'
+      +'<span style="font-size:12px;font-weight:900;color:#fff;background:'+(closed?'#C41E2F':'#0f766e')+';padding:3px 12px;border-radius:999px">'+(closed?'마감':'접수중')+'</span>'
+      +'<span style="flex:1"></span>'
+      +(closed
+        ? '<button class="btn-sub" style="background:#0f766e" onclick="applyGateSet(\''+t.k+'\',false)">▶ 접수 재개</button>'
+        : '<button class="btn-sub" style="background:#C41E2F" onclick="applyGateSet(\''+t.k+'\',true)">■ 접수 마감</button>')
+      +'</div>';
+  }).join('');
+  const upd=g.updatedAt?('<div style="font-size:11.5px;color:#8a919d;margin-top:10px">최근 변경: '+esc(String(g.updatedAt).slice(0,16).replace('T',' '))+(g.updatedBy?' · '+esc(g.updatedBy):'')+'</div>'):'';
+  b.innerHTML='<div style="font-weight:900;font-size:15.5px;margin-bottom:6px">🚦 강습신청 접수 마감·재개</div>'
+    +'<div style="font-size:12.5px;color:#6b7280;margin-bottom:4px;line-height:1.7">마감하면 신청 페이지에서 해당 유형을 고를 수 없고, 폼을 열어둔 상태로 제출해도 거부됩니다. <b>이미 접수된 신청은 그대로 유지</b>되며 심사·배정에 영향이 없습니다. 언제든 재개할 수 있습니다.</div>'
+    +rows
+    +'<div style="margin-top:12px"><label style="font-size:12.5px;font-weight:800;display:block;margin-bottom:4px">마감 안내 문구 <span style="font-weight:600;color:#8a919d">(비우면 기본 문구가 표시됩니다)</span></label>'
+    +'<input id="agMsg" value="'+esc(g.msg||'')+'" placeholder="예: 2026년 상반기 접수가 마감되었습니다. 하반기 추가 접수는 9월 중 공지 예정입니다." style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;font-size:13px;box-sizing:border-box">'
+    +'<button class="btn-sub" style="background:#153A77;margin-top:8px" onclick="applyGateSaveMsg()">💬 안내 문구 저장</button></div>'
+    +upd;
+}
+async function applyGateSet(type,closed){
+  if(!VIEWER_IS_ADMIN){alert('중앙관리자만 변경할 수 있습니다.');return}
+  const t=AG_TYPES.find(x=>x.k===type)||{label:type};
+  if(!confirm(t.label+' 접수를 '+(closed?'마감':'재개')+'할까요?\n\n'+(closed
+      ? '· 신청 페이지에서 이 유형을 선택할 수 없게 됩니다\n· 이미 접수된 신청은 그대로 유지됩니다\n· 언제든 다시 재개할 수 있습니다'
+      : '· 신청 페이지에서 이 유형을 다시 신청할 수 있게 됩니다')))return;
+  const b=applyGateBoxEl(); b.innerHTML='저장 중…';
+  try{
+    const upd={updatedAt:new Date().toISOString(),updatedBy:((typeof CMY!=='undefined'&&CMY&&CMY.name)||'관리자')};
+    upd[type]={closed:!!closed};
+    await DB.collection('siteContent').doc('applyGate').set(upd,{merge:true});
+    APPLY_GATE=Object.assign({},APPLY_GATE,upd);
+    applyGateRender();
+    try{
+      const ref=DB.collection('siteContent').doc('migrationLog');
+      const cur=await ref.get();
+      const arr=(((cur.exists&&cur.data())||{}).items||[]).slice(-199);
+      arr.push({job:'applyGate',type:type,closed:!!closed,at:new Date().toISOString(),by:upd.updatedBy});
+      await ref.set({items:arr},{merge:true});
+    }catch(e){}
+  }catch(e){ b.innerHTML='<b style="color:#C41E2F">저장 실패: '+esc(e.message)+'</b>'; }
+}
+async function applyGateSaveMsg(){
+  if(!VIEWER_IS_ADMIN){alert('중앙관리자만 변경할 수 있습니다.');return}
+  const el=document.getElementById('agMsg'); if(!el)return;
+  const msg=el.value.trim();
+  try{
+    await DB.collection('siteContent').doc('applyGate').set({msg:msg,updatedAt:new Date().toISOString(),updatedBy:((typeof CMY!=='undefined'&&CMY&&CMY.name)||'관리자')},{merge:true});
+    APPLY_GATE.msg=msg;
+    alert('✓ 안내 문구를 저장했습니다.');
+    applyGateScan();
+  }catch(e){ alert('저장 실패: '+e.message); }
 }
 // ══════════ [동의서] 참가 신청 계약 키 조회 ══════════
 //  저장 시: 참가 신청은 'compapply_{공고}_{참가자키}', 위촉 신청은 'compapply_{공고}'
