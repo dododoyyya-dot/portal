@@ -5061,10 +5061,23 @@ function payGather(){
 }
 async function savePayroll(){
   const data=payGather();
-  const payroll={};
-  data.forEach(r=>{if(r.amt)payroll[r.uid]={amt:r.amt,tax:r.tax,local:r.local,net:r.net,at:new Date().toISOString()}});
-  await DB.collection('compSlots').doc(PAY_CTX.id).update({payroll:payroll});
-  alert('수당지급내역이 저장되었습니다. (입력 '+Object.keys(payroll).length+'명)');
+  // [동시처리] 예전에는 수당 맵을 통째로 덮어써서, 다른 담당자가 같은 공고에 입력한 자료가 사라졌습니다.
+  //   이제 "이번에 값이 바뀐 사람"의 항목만 갱신합니다. 손대지 않은 사람은 서버 값을 그대로 둡니다.
+  //   (금액을 0으로 지우면 그 사람 항목만 삭제 — 기존 동작과 동일)
+  const args=[];let n=0;
+  data.forEach((r,i)=>{
+    if(r.amt)n++;
+    const was=parseInt((PAY_CTX.rows[i]||{}).amt)||0;
+    if(was===r.amt)return;                       // 이번에 손대지 않은 항목은 건드리지 않는다
+    args.push(new firebase.firestore.FieldPath('payroll',r.uid));
+    args.push(r.amt?{amt:r.amt,tax:r.tax,local:r.local,net:r.net,at:new Date().toISOString()}
+                   :firebase.firestore.FieldValue.delete());
+  });
+  if(!args.length){alert('변경된 내용이 없습니다.');return}
+  const _ref=DB.collection('compSlots').doc(PAY_CTX.id);
+  await _ref.update.apply(_ref,args);
+  PAY_CTX.rows=data;                             // 저장 후 기준값 갱신 (연속 저장 대비)
+  alert('수당지급내역이 저장되었습니다. (입력 '+n+'명)');
   loadCompsAdmin();
 }
 function payrollCompCSV(){
@@ -5188,10 +5201,20 @@ function gpGather(){
 }
 async function saveGovPayroll(){
   const data=gpGather();
-  const payrollGov={};
-  data.forEach(r=>{payrollGov[r.uid]={org:r.org,role:r.role,base:r.base,over:r.over,extra:r.extra,at:new Date().toISOString()}});
-  await DB.collection('compSlots').doc(GOVPAY_CTX.id).update({payrollGov:payrollGov});
-  alert('✓ 교육청 서식 수당조서가 저장되었습니다 ('+data.length+'명). 다음에 열면 그대로 불러옵니다.');
+  // [동시처리] 맵 통째 덮어쓰기 대신, 이번에 값이 바뀐 사람의 항목만 갱신 (다른 담당자 입력분 보존)
+  const _sig=r=>[r.org,r.role,r.base,r.over,r.extra].join('|');
+  const args=[];
+  data.forEach((r,i)=>{
+    const was=GOVPAY_CTX.rows[i];
+    if(was&&_sig(was)===_sig(r))return;          // 이번에 손대지 않은 항목은 건드리지 않는다
+    args.push(new firebase.firestore.FieldPath('payrollGov',r.uid));
+    args.push({org:r.org,role:r.role,base:r.base,over:r.over,extra:r.extra,at:new Date().toISOString()});
+  });
+  if(!args.length){alert('변경된 내용이 없습니다.');return}
+  const _gref=DB.collection('compSlots').doc(GOVPAY_CTX.id);
+  await _gref.update.apply(_gref,args);
+  GOVPAY_CTX.rows=data;                          // 저장 후 기준값 갱신
+  alert('✓ 교육청 서식 수당조서가 저장되었습니다 ('+(args.length/2)+'명 변경). 다음에 열면 그대로 불러옵니다.');
 }
 function govPayPrint(){
   const s=GOVPAY_CTX.s;const data=gpGather();
