@@ -284,6 +284,10 @@ async function addHist(uid,label){
   }catch(e){}
 }
 let LME=null,LMY=null,ISMGR=false,CENTRAL=false,MSIDOS=[],MFEDS=[],NOTICES=[],LAPPS=[],LICS=[];
+// [쓰기 권한] 자격 대장을 고칠 수 있는 사람 = 중앙연맹 또는 권역 관리자.
+//   시도연맹 임원은 조회만 하고, 처리는 중앙연맹에 전달합니다(회장님 방침).
+//   눌러도 권한 오류만 나는 버튼은 아예 보여주지 않습니다.
+let LICWRITE=false;
 // 자격 업무 활성 시도연맹 (신청 배정 단위 — 연맹 추가 시 이 목록만 수정)
 const FED_LIST=['경기','강원','부산','경남','경북','전남광주','기타(중앙 처리)'];
 const SIDO_LIST=['서울','부산','대구','인천','광주','대전','울산','경기','강원','충북','충남','전북','전남','경북','경남','제주','세종'];
@@ -304,6 +308,7 @@ AUTH.onAuthStateChanged(async u=>{
     const myFed=lcHasRole(LMY,'sidoOfficer')?SIDO_FED[LMY.sido]:null; // 시도임원 본인 소속 연맹(없으면 중앙 직할 시도)
     ISMGR=(lcHasRole(LMY,'admin')||isRegion||!!myFed);
     CENTRAL=lcHasRole(LMY,'admin');
+    LICWRITE=CENTRAL||!!isRegion;
     const _ms=CENTRAL?null:(isRegion?LMY.managedSido:(myFed?FED_GROUPS[myFed]:null));
     MSIDOS=CENTRAL?[]:(Array.isArray(_ms)?_ms.slice():(_ms?[_ms]:[]));
     MFEDS=MSIDOS.filter(s=>FED_LIST.indexOf(s)>=0); // 연맹 단위(공고 주관·신청 배정용)
@@ -318,6 +323,8 @@ AUTH.onAuthStateChanged(async u=>{
         ['renew','bulk'].forEach(function(t){
           const c=document.querySelector('.lcchip[data-t="'+t+'"]');
           if(c)c.style.display='none';
+          const p=document.getElementById('mg_'+t);          // 패널 자체도 감춰 둡니다
+          if(p)p.style.display='none';
         });
         const note=document.getElementById('mgrBadge');
         if(note)note.textContent+=' · 갱신 처리와 기존 자격 일괄 등록은 중앙연맹 승인 업무입니다';
@@ -823,15 +830,17 @@ async function loadClaims(){
         +' <span class="lctag" style="background:'+(c.nameMatch?'#0f766e':'#C41E2F')+'">'+(c.nameMatch?'✓ 성명 일치':'✗ 성명 불일치')+'</span>'
         +' <span class="lctag" style="background:'+stc+'">'+esc(c.status)+'</span>'
         +'<div style="font-size:12px;color:var(--gray)">대장 성명: '+esc(c.licName||c.licMask)+(c.phone?' · ☎ '+esc(c.phone):'')+'</div></div>'
-        +(c.status==='대기'?'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+        +(c.status==='대기'?(!LICWRITE
+          ?'<span class="lctag" style="background:#8a919d">중앙연맹 처리 대기</span>'
+          :'<div style="display:flex;gap:6px;flex-wrap:wrap">'
           +'<button class="lcbtn s" onclick="approveClaim(\''+d.id+'\')">연결 승인</button>'
           +(c.nameMatch?'':'<button class="lcbtn b" onclick="fixAndApproveClaim(\''+d.id+'\')">🔧 대장 성명 정정 후 연결</button>')
           +'<button class="lcbtn w" onclick="correctClaimNumber(\''+d.id+'\')">🔢 올바른 번호 입력 후 승인</button>'
-          +'<button class="lcbtn d" onclick="rejectClaim(\''+d.id+'\')">거절</button></div>'
-          :(c.status==='승인'?'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-            +'<button class="lcbtn ghost" onclick="undoApproveClaim(\''+d.id+'\')">↩ 되돌리기</button></div>'
-            :(c.status==='거절'?'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-              +'<button class="lcbtn ghost" onclick="reopenClaim(\''+d.id+'\')">↩ 재처리(대기로)</button></div>':'')))
+          +'<button class="lcbtn d" onclick="rejectClaim(\''+d.id+'\')">거절</button></div>')
+          :(c.status==='승인'?(LICWRITE?'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+            +'<button class="lcbtn ghost" onclick="undoApproveClaim(\''+d.id+'\')">↩ 되돌리기</button></div>':'')
+            :(c.status==='거절'?(LICWRITE?'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+              +'<button class="lcbtn ghost" onclick="reopenClaim(\''+d.id+'\')">↩ 재처리(대기로)</button></div>':''):'')))
         +'</div>';
     };
     el.innerHTML=(pend.length?'<b style="font-size:13.5px">처리 대기 '+pend.length+'건</b>':'')+pend.map(row).join('')
@@ -1455,10 +1464,10 @@ function renderLics(){
       +'<div style="font-size:12px;color:var(--gray)">발급 '+esc(l.issuedAt)+' · 유효 ~'+esc(l.expireAt)+' · '+esc(l.issuer||'')+(l.uid?' · 회원연결됨':'')
       +(l.regionMovedFrom?' · 이관: '+esc(l.regionMovedFrom)+'→'+esc(l.region):'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +'<button class="lcbtn b" onclick="renameLic(\''+d.id+'\')">✏️ 성명 수정</button>'
-      +(l.uid?'<button class="lcbtn ghost" onclick="showLicMember(\''+d.id+'\')">👤 연결회원</button>':'<button class="lcbtn s" onclick="linkLic(\''+d.id+'\')">🔗 회원 연동</button>')
-      +(l.uid?'<button class="lcbtn d" onclick="unlinkLic(\''+d.id+'\')">🔗 연결 해제</button>':'')
-      +'<button class="lcbtn g" onclick="moveLic(\''+d.id+'\')">↪ 소속 이관</button>'
+      +(LICWRITE?'<button class="lcbtn b" onclick="renameLic(\''+d.id+'\')">✏️ 성명 수정</button>':'')
+      +(l.uid?'<button class="lcbtn ghost" onclick="showLicMember(\''+d.id+'\')">👤 연결회원</button>':(LICWRITE?'<button class="lcbtn s" onclick="linkLic(\''+d.id+'\')">🔗 회원 연동</button>':''))
+      +((l.uid&&LICWRITE)?'<button class="lcbtn d" onclick="unlinkLic(\''+d.id+'\')">🔗 연결 해제</button>':'')
+      +(LICWRITE?'<button class="lcbtn g" onclick="moveLic(\''+d.id+'\')">↪ 소속 이관</button>':'')
       +(CENTRAL?'<button class="lcbtn ghost" onclick="delLic(\''+d.id+'\')">🗑 삭제</button>':'')
       +'</div></div>';
   }).join('');
