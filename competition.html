@@ -261,6 +261,13 @@ function looksMinorSchool(s){
   return /(초등학교|중학교|고등학교|초교|중교|고교)/.test(n)||/(초|중|고)$/.test(n);
 }
 function ckey(c){return c.pid||c.uid}  // 참가는 참가자 단위(pid), 심판·운영은 계정 단위
+// [확정 판정] confirmedKeys(건 단위)가 있으면 우선, 없으면 기존 confirmed(uid)로 폴백 — 구 공고 데이터 보존.
+//   → 보호자가 자녀 둘을 신청했을 때 한 명만 확정해도 둘 다 "🏅 확정"으로 보이던 문제 해결.
+function isConfirmedClaim(s,c){
+  const keys=s&&s.confirmedKeys;
+  if(Array.isArray(keys)&&keys.length)return keys.indexOf(ckey(c))>=0;
+  return ((s&&s.confirmed)||[]).indexOf(c.uid)>=0;
+}
 // 유효 신청 판정: 신청 횟수 - 취소 횟수 (재신청 허용) — key = 참가자 단위(pid) 또는 계정(uid)
 function activeOfKey(s,key){
   const c=(s.claimed||[]).filter(x=>ckey(x)===key).length;
@@ -510,7 +517,7 @@ async function togglePayStatus(slotId,uid,pid,at){
 function claimState(s,c){
   const key=ckey(c);
   const rv=((s.reviewStatus||{})[key])||{};
-  if((s.confirmed||[]).indexOf(c.uid)>=0)return {t:'🏅 확정',col:'#b8860b',reason:''};
+  if(isConfirmedClaim(s,c))return {t:'🏅 확정',col:'#b8860b',reason:''};
   if(rv.st==='반려')return {t:'❌ 반려',col:'#C41E2F',reason:rv.reason||''};
   if(rv.st==='보류')return {t:'⏸ 보류',col:'#b8860b',reason:rv.reason||''};
   if(rv.st==='승인'){
@@ -623,7 +630,7 @@ function viewRoster(id){
   const rejList=staff?[...new Set((s.claimed||[]).map(ckey))]
     .filter(k=>(((s.reviewStatus||{})[k])||{}).st==='반려')
     .map(k=>{const arr=(s.claimed||[]).filter(c=>ckey(c)===k);return arr[arr.length-1];})
-    .filter(c=>(s.confirmed||[]).indexOf(c.uid)<0)
+    .filter(c=>!isConfirmedClaim(s,c))
     .sort((a,b)=>String(a.at||'').localeCompare(String(b.at||''))):[];
   let rows;
   if(!list.length)rows='<tr><td '+td+' colspan="10" style="text-align:center;color:#8a919d">아직 신청자가 없습니다</td></tr>';
