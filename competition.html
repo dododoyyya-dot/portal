@@ -576,12 +576,18 @@ function viewRoster(id){
   // [수기동의] 미성년 보호자 동의 상태 뱃지 (전자서명 kid / 수기동의서 확인 / 미확인+확인 버튼)
   const paper=s.paperConsents||{};
   const consentBadge=(c,key)=>{
-    if(!entry||!c.birth||!(ageOf(c.birth)<18&&ageOf(c.birth)>0))return '';
+    // [연령확인] 개인 참가자도 팀 명단과 동일하게 'adult / minor / unknown' 으로 판정합니다.
+    //   예전에는 생년월일이 비어 있으면 배지가 아예 안 나와, 중학생이어도 담당자가
+    //   [📄 수기동의서 확인완료] 버튼을 볼 수 없었습니다.
+    if(!entry)return '';
+    const _as=ageState(c);
+    if(_as==='adult')return '';
     if(c.kid)return ' <span style="font-size:10.5px;font-weight:900;color:#0f766e">👨‍👧 보호자서명✓</span>';
     if(paper[key])return ' <span style="font-size:10.5px;font-weight:900;color:#0f766e" title="'+cesc((paper[key].by||'')+' 확인 '+String(paper[key].at||'').slice(0,10))+'">📄 수기동의✓</span>'
       +((paper[key].files||[]).map((u,fi)=>' <a href="'+cesc(u)+'" target="_blank" style="font-size:10.5px;font-weight:900;color:#153A77" title="첨부 동의서 보기">📎'+(fi+1)+'</a>').join(''));
     // [수기동의 경로] 본인이 '서면 제출' 전제로 접수한 건은 그 사실을 함께 보여줍니다.
-    return ' <span style="font-size:10.5px;font-weight:900;color:#C41E2F">⚠ 보호자동의 필요'+(c.needPaper?' (서면 제출 예정)':'')+'</span>'
+    const _albl=(_as==='minor')?'⚠ 보호자동의 필요':('⚠ 생년월일 없음'+(looksMinorSchool(c.school||c.club)?' · 미성년 추정':''));
+    return ' <span style="font-size:10.5px;font-weight:900;color:'+(_as==='minor'?'#C41E2F':'#8a5a00')+'">'+_albl+(c.needPaper?' (서면 제출 예정)':'')+'</span>'
       +(staff?' <button onclick="markPaper(\''+id+'\',\''+key+'\',\''+cesc(c.name||'')+'\')" style="border:1.5px solid #e6b422;background:#fffbeb;color:#8a5a00;border-radius:8px;padding:2px 8px;font-size:10.5px;font-weight:800;cursor:pointer" title="담당자가 서면(수기) 동의서를 수령한 경우 클릭">📄 수기동의서 확인완료</button>':'');
   };
   // [참가자 상태] 상태 표시 + 담당자용 승인·반려 버튼
