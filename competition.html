@@ -268,6 +268,36 @@ function isConfirmedClaim(s,c){
   if(Array.isArray(keys)&&keys.length)return keys.indexOf(ckey(c))>=0;
   return ((s&&s.confirmed)||[]).indexOf(c.uid)>=0;
 }
+// ── [수기동의 키] 팀 명단 인원의 동의 기록 키 ──
+//  예전에는 '{팀키}_{명단순번}' 이라, 명단에서 한 명을 빼면 뒤 사람들의 동의 기록이 한 칸씩 밀렸습니다.
+//  이제 '이름+생년월일' 기반의 고정 키를 쓰므로 순번이 바뀌어도 기록이 그대로 따라갑니다.
+//  (동명이인이면서 생년월일까지 같은 경우에만 두 번째부터 #2 를 덧붙여 구분합니다)
+function pcMemberKeys(teamKey,roster){
+  const seen={},out=[];
+  (roster||[]).forEach(function(r){
+    const nm=String((r&&r.name)||'').replace(/\s+/g,'');
+    const bt=String((r&&r.birth)||'').replace(/[^0-9]/g,'');
+    let k=teamKey+'::'+nm+'_'+bt;
+    seen[k]=(seen[k]||0)+1;
+    if(seen[k]>1)k=k+'#'+seen[k];
+    out.push(k);
+  });
+  return out;
+}
+function pcKeyAt(teamKey,roster,i){return pcMemberKeys(teamKey,roster)[i]||(teamKey+'_'+i)}
+// 동의 기록 조회 — 고정 키 우선, 없으면 구 순번 키로 폴백.
+//  단, 구 기록은 저장해 둔 성명이 지금 명단의 그 자리 사람과 같을 때만 인정합니다.
+//  (명단이 바뀌어 이미 밀려 있던 예전 기록을 엉뚱한 사람의 동의로 표시하지 않기 위함)
+function pcRec(paper,teamKey,roster,i){
+  const p=paper||{};
+  const k=pcKeyAt(teamKey,roster,i);
+  if(k&&p[k])return p[k];
+  const old=p[teamKey+'_'+i];
+  if(!old)return null;
+  const nm=String((((roster||[])[i])||{}).name||'').replace(/\s+/g,'');
+  const on=String(old.name||'').replace(/\s+/g,'');
+  return (!on||on===nm)?old:null;
+}
 // 유효 신청 판정: 신청 횟수 - 취소 횟수 (재신청 허용) — key = 참가자 단위(pid) 또는 계정(uid)
 function activeOfKey(s,key){
   const c=(s.claimed||[]).filter(x=>ckey(x)===key).length;
@@ -642,7 +672,7 @@ function viewRoster(id){
           +'<div style="font-size:12px;color:#4b5563;margin-top:4px">'+(c.roster||[]).map((r,j)=>(j+1)+'. '+cesc(r.name)+(r.birth?' ('+cesc(r.birth)+')':'')+(r.school?' · '+cesc(r.school):'')+(r.nonMember?' <b style="color:#8a5a00;font-size:10.5px">🧾 비회원 참가자</b>':'')
             +(function(){
               // [연령확인] 미성년 + '생년월일 없음' 둘 다 확인 대상으로 표시합니다.
-              const st=ageState(r), pk=paper[ckey(c)+'_'+j];
+              const st=ageState(r), pk=pcRec(paper,ckey(c),c.roster,j);
               if(st==='adult')return '';
               if(pk)return ' <b style="color:#0f766e" title="'+cesc((pk.by||'')+' 확인 '+String(pk.at||'').slice(0,10))+'">📄 수기동의✓</b>'
                 +((pk.files||[]).map((u,fi)=>' <a href="'+cesc(u)+'" target="_blank" style="font-size:10.5px;font-weight:900;color:#153A77">📎'+(fi+1)+'</a>').join(''));
@@ -856,7 +886,7 @@ async function pcArcLoad(){
           const st=ageState(r);
           return {name:r.name||'',birth:r.birth||'',school:r.school||'',adult:(st==='adult'),
                   unknown:(st==='unknown'),guess:looksMinorSchool(r.school),
-                  kid:false,rec:paper[key+'_'+j]||null};
+                  kid:false,rec:pcRec(paper,key,c.roster,j)};
         });
         const t={key:key,name:c.name||'',type:c.teamType||'팀',org:c.teamOrg||'',
                  leader:c.leader||'',leaderPhone:c.leaderPhone||'',members:mem,bulk:[],bulkAt:''};
@@ -999,7 +1029,7 @@ function reRender(){
   document.getElementById('reCnt').textContent='('+_RED.roster.length+'명)';
   el.innerHTML=_RED.roster.length?_RED.roster.map(function(r,i){
     // [연령확인] 생년월일이 없으면 조용히 넘어가지 않고 '생년월일 없음'으로 드러냅니다.
-    const st=ageState(r), done=((_RED.paper||{})[_RED.key+'_'+i]);
+    const st=ageState(r), done=pcRec(_RED.paper,_RED.key,_RED.roster,i);
     // [수기동의] 확인한 사람·날짜와 첨부한 동의서 사본을 이 화면에서도 바로 열어볼 수 있게 합니다.
     const _dtt=done?(' title="'+cesc((done.by||'')+' 확인 '+String(done.at||'').slice(0,10))+'"'):'';
     const _dfl=done?((done.files||[]).map(function(u,fi){
@@ -1037,7 +1067,7 @@ function reMarkPaper(i){
     alert('명단이 변경되었습니다.\n\n동의 기록은 명단 순번으로 저장되므로, 먼저 [\uD83D\uDCBE 저장]을 눌러 명단을 확정한 뒤 수기동의 확인을 진행해 주세요.');
     return;
   }
-  openPaperModal(_RED.slotId,_RED.key+'_'+i,r.name||'','re');
+  openPaperModal(_RED.slotId,pcKeyAt(_RED.key,_RED.roster,i),r.name||'','re');
 }
 // [연령확인] 명단의 생년월일 채우기 — ① 같은 이름의 회원을 찾아 불러오기 ② 직접 입력
 //   클럽 명단에 생년월일이 복사되지 않은 채 팀 명단으로 넘어온 경우를 그 자리에서 바로잡습니다.
