@@ -701,8 +701,8 @@ function _pcShrink(file,max){return new Promise(function(res,rej){
     c.toBlob(function(b){b?res(b):rej(new Error('이미지 처리 실패'))},'image/jpeg',0.85);};
   img.onerror=function(){rej(new Error('이미지를 읽을 수 없습니다'))};
   img.src=URL.createObjectURL(file);});}
-function openPaperModal(slotId,key,name){
-  _PC={slotId:slotId,key:key,name:name||''};
+function openPaperModal(slotId,key,name,from){
+  _PC={slotId:slotId,key:key,name:name||'',from:from||''};
   const old=document.getElementById('pcModal');if(old)old.remove();
   const d=document.createElement('div');d.id='pcModal';
   d.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.6);z-index:1300;display:flex;align-items:center;justify-content:center;padding:16px';
@@ -760,6 +760,13 @@ async function pcConfirm(){
       new firebase.firestore.FieldPath('paperConsents',_PC.key), rec);
     await _refreshSlot(_PC.slotId);
     const m2=document.getElementById('pcModal');if(m2)m2.remove();
+    // [수기동의] 명단 수정 화면에서 눌렀으면 그 화면에 그대로 머무르며 표시만 갱신합니다.
+    if(_PC.from==='re'&&document.getElementById('reModal')){
+      const sv=await _refreshSlot(_PC.slotId);
+      _RED.paper=(sv&&sv.paperConsents)||{};
+      reRender();
+      return;
+    }
     const m3=document.getElementById('rosterModal');if(m3)m3.remove();
     viewRoster(_PC.slotId);
   }catch(e){ msg.textContent='실패: '+e.message+' (중앙 관리자 권한이 필요할 수 있습니다)'; msg.style.color='#C41E2F'; }
@@ -774,6 +781,10 @@ async function openRosterEdit(slotId,key){
   if(!c){alert('팀 신청을 찾을 수 없습니다');return}
   // [동의확인] 명단 수정 화면에서도 미성년 인원의 보호자 동의 여부를 함께 보여줍니다
   _RED={slotId:slotId,key:key,teamName:c.name,roster:(c.roster||[]).map(r=>Object.assign({},r)),paper:(s.paperConsents||{})};
+  // [수기동의] 동의 기록은 '명단 순번'으로 저장되므로, 이 화면에서 인원을 빼거나 더한 뒤
+  //   저장하지 않은 상태로 수기동의를 누르면 다른 사람에게 기록될 수 있습니다.
+  //   열었을 때의 순서를 기억해 두고, 달라졌으면 먼저 [저장]하도록 막습니다.
+  _RED.orig=JSON.stringify(_RED.roster.map(function(r){return r.name||''}));
   const old=document.getElementById('reModal');if(old)old.remove();
   const div=document.createElement('div');div.id='reModal';
   div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.6);z-index:1200;display:flex;align-items:center;justify-content:center;padding:16px';
@@ -814,10 +825,29 @@ function reRender(){
     const fixBtn=(st==='unknown')
       ? '<button onclick="reFillBirth('+i+')" title="회원 정보에서 불러오거나 직접 입력합니다" style="border:1.5px solid #b8860b;background:#fffbeb;color:#8a5a00;border-radius:8px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;margin-right:4px">🎂 생년월일 채우기</button>'
       : '';
-    return '<div style="display:flex;align-items:center;gap:8px;border:1px solid '+(st==='unknown'&&!done?'#eddfc4':'#e5e9f0')+';background:'+(st==='unknown'&&!done?'#fffdf5':'#fff')+';border-radius:9px;padding:7px 10px;margin-bottom:5px;font-size:13px"><b style="min-width:52px">'+cesc(r.name)+'</b><span style="color:#6b7280;font-size:12px;flex:1">'+cesc(r.birth||'')+(r.school?' · '+cesc(r.school):'')+(r.nonMember?' <b style="color:#8a5a00">🧾 비회원 참가자</b>':'')+mark+'</span>'+fixBtn+'<button onclick="reDel('+i+')" title="명단에서 제거" style="border:none;background:#fee2e2;color:#C41E2F;border-radius:7px;width:26px;height:26px;font-weight:900;cursor:pointer">✕</button></div>';
+    // [수기동의] 이 화면에서도 바로 서면 동의서 확인 처리를 할 수 있게 합니다.
+    //   예전에는 [📄 수기동의서 확인완료]가 '👥 신청 현황' 화면에만 있어, 명단을 손보던
+    //   담당자가 버튼을 찾지 못하는 일이 있었습니다.
+    const pprBtn=(st!=='adult'&&!done&&isCompStaff())
+      ? '<button onclick="reMarkPaper('+i+')" title="담당자가 서면(수기) 동의서를 수령한 경우 클릭" style="border:1.5px solid #e6b422;background:#fffbeb;color:#8a5a00;border-radius:8px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;margin-right:4px">📄 수기동의 확인</button>'
+      : '';
+    // [줄바꿈] 버튼이 붙으면 좁은 화면에서 설명 글이 한 글자씩 세로로 쪼개지던 문제 →
+    //   행을 wrap 시키고 설명 칸에 최소 너비를 주어 버튼이 아랫줄로 내려가게 합니다.
+    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid '+(st==='unknown'&&!done?'#eddfc4':'#e5e9f0')+';background:'+(st==='unknown'&&!done?'#fffdf5':'#fff')+';border-radius:9px;padding:7px 10px;margin-bottom:5px;font-size:13px"><b style="min-width:52px;flex:0 0 auto">'+cesc(r.name)+'</b><span style="color:#6b7280;font-size:12px;flex:1 1 150px;min-width:130px;line-height:1.55">'+cesc(r.birth||'')+(r.school?' · '+cesc(r.school):'')+(r.nonMember?' <b style="color:#8a5a00">🧾 비회원 참가자</b>':'')+mark+'</span>'+fixBtn+pprBtn+'<button onclick="reDel('+i+')" title="명단에서 제거" style="border:none;background:#fee2e2;color:#C41E2F;border-radius:7px;width:26px;height:26px;font-weight:900;cursor:pointer">✕</button></div>';
   }).join(''):'<div style="font-size:12.5px;color:#8a919d;padding:10px;border:1.5px dashed #dfe5ee;border-radius:9px">명단이 비어 있습니다 — 오른쪽에서 추가하세요</div>';
 }
 function reDel(i){_RED.roster.splice(i,1);reRender()}
+// [수기동의] 명단 수정 화면에서 서면 동의서 확인 처리 — 순번이 어긋나지 않았을 때만 허용
+function reMarkPaper(i){
+  const r=_RED.roster[i]; if(!r)return;
+  if(!isCompStaff()){alert('권한자만 확인 처리할 수 있습니다');return}
+  const now=JSON.stringify(_RED.roster.map(function(x){return x.name||''}));
+  if(now!==_RED.orig){
+    alert('명단이 변경되었습니다.\n\n동의 기록은 명단 순번으로 저장되므로, 먼저 [\uD83D\uDCBE 저장]을 눌러 명단을 확정한 뒤 수기동의 확인을 진행해 주세요.');
+    return;
+  }
+  openPaperModal(_RED.slotId,_RED.key+'_'+i,r.name||'','re');
+}
 // [연령확인] 명단의 생년월일 채우기 — ① 같은 이름의 회원을 찾아 불러오기 ② 직접 입력
 //   클럽 명단에 생년월일이 복사되지 않은 채 팀 명단으로 넘어온 경우를 그 자리에서 바로잡습니다.
 async function reFillBirth(i){
