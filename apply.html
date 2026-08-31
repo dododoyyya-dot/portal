@@ -412,12 +412,28 @@ async function lookup(){
       +'<div style="font-size:13.5px;color:var(--gray);margin-top:10px">'+stmsg+'</div>'+extra+'</div>';
   }catch(e){el.innerHTML='<span style="color:var(--red);font-size:14px">조회 실패: '+esc(e.message)+'</span>'}
 }
+// [관할판정] 보안 규칙이 검증할 수 있도록, 회원의 소속 시도를 표준 이름 하나로 정규화합니다.
+//   회원 문서에는 시도 단일 필드가 없어(region=6대 권역, baseCity=주소 문자열) 규칙이 관할을 판정할 수 없었습니다.
+//   거점 시군구 → 활동 범위 → 집 주소 순서로 찾고, 못 찾으면 빈 값으로 둡니다(빈 값이면 관할 조회에 잡히지 않음).
+var KFDF_SIDO_ALIAS={'서울':['서울'],'부산':['부산'],'대구':['대구'],'인천':['인천'],'광주':['광주'],'대전':['대전'],'울산':['울산'],'세종':['세종'],'경기':['경기'],'강원':['강원'],'충북':['충북','충청북'],'충남':['충남','충청남'],'전북':['전북','전라북'],'전남':['전남','전라남'],'경북':['경북','경상북'],'경남':['경남','경상남'],'제주':['제주']};
+function kfdfSidoKey(v){
+  v=v||{};
+  var hay=[v.baseCity,(v.activityAreas||[]).join(' '),v.address,v.workSchool].map(function(x){return String(x||'')}).join(' ');
+  var ks=Object.keys(KFDF_SIDO_ALIAS);
+  for(var i=0;i<ks.length;i++){
+    var al=KFDF_SIDO_ALIAS[ks[i]];
+    for(var j=0;j<al.length;j++){ if(hay.indexOf(al[j])>=0)return ks[i]; }
+  }
+  return '';
+}
 let SUBMITTING=false;
 async function submitApply(){
   const m=document.getElementById('fMsg');
   if(!APPLY_TYPE){m.textContent='프로그램 유형을 먼저 선택해주세요';m.className='msg err';return}
   if(SUBMITTING)return;
-  const req={school:v('fSchool'),city:(v('fSido')+' '+v('fCity')).trim(),sido:v('fSido'),sigungu:v('fCity'),teacher:v('fTeacher'),phone:v('fPhone'),students:v('fStudents'),d1:v('fD1')};
+  // [관할] 시도연맹 임원이 자기 시도 신청서를 조회할 수 있도록 표준 시도 키를 함께 저장합니다.
+  //   sido 는 "부산광역시" 처럼 저장되는데, 회원 쪽 키는 "부산" 이라 그대로는 대조가 되지 않습니다.
+  const req={school:v('fSchool'),city:(v('fSido')+' '+v('fCity')).trim(),sido:v('fSido'),sidoKey:kfdfSidoKey({baseCity:v('fSido')}),sigungu:v('fCity'),teacher:v('fTeacher'),phone:v('fPhone'),students:v('fStudents'),d1:v('fD1')};
   const FN={school:['fSchool','학교명'],sido:['fSido','시도'],sigungu:['fCity','시군구'],teacher:['fTeacher','담당교사 성명'],phone:['fPhone','담당교사 휴대전화'],students:['fStudents','대상 학년·인원'],d1:['fD1','희망 요일·시간(1지망)'],city:['fCity','시군구']};
   for(const k of ['school','sido','sigungu','teacher','phone','students','d1']){
     if(!req[k]){

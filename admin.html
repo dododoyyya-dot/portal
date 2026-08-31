@@ -271,6 +271,13 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub vwl" data-v="card" onclick="setView('card',this)" style="background:#8a919d">🔖 상세·승인·검증</button>
         <button class="btn-sub vwl" data-v="inst" onclick="setView('inst',this)" style="background:#8a919d">👟 강사명단</button>
       </div>
+      <!-- [관할] 시도연맹 임원 전용 — 관할 회원과 '관할 미판정' 회원을 나눠서 봅니다 -->
+      <div id="sidoScopeBar" style="display:none;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:12.5px;font-weight:800;color:#6b7280">조회 범위</span>
+        <button class="btn-sub svw" data-s="mine" onclick="setSidoView('mine',this)">🏳 관할 회원 <b id="svMineCnt"></b></button>
+        <button class="btn-sub svw" data-s="none" onclick="setSidoView('none',this)" style="background:#8a919d">❓ 관할 미판정 <b id="svNoneCnt"></b></button>
+        <span id="sidoScopeWarn" style="display:none;font-size:12.5px;font-weight:800;color:#7a5b00;background:#fff8e6;border:1.5px solid #f0d68a;border-radius:10px;padding:6px 11px"></span>
+      </div>
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
         <select id="userSido" onchange="renderUsers()" style="width:auto;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px;font-weight:700">
           <option value="">시도 전체</option>
@@ -416,6 +423,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#1F4E9C" onclick="memberNoScan()">🔢 회원 고유번호 부여</button>
         <button class="btn-sub" style="background:#0e7490" onclick="typeFixScan()">🧩 회원 유형 누락 정리</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="sidoKeyScan()">🗺 관할 시도 키 채우기</button>
+        <button class="btn-sub" style="background:#8c1622" onclick="appKeyScan()">🏫 강습 신청서 관할 채우기</button>
         <button class="btn-sub" style="background:#8a5a00" onclick="noBirthScan()">🎂 생년월일 미입력 회원</button>
         <button class="btn-sub" style="background:#0e7490" onclick="ncWaiveScan()">🏅 국가자격 승인차단 해제</button>
         <button class="btn-sub" style="background:#8a919d" onclick="showTrash()">🗑 휴지통</button>
@@ -443,6 +451,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <div id="qualFixBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="memberNoBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="typeFixBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
+      <div id="appKeyBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px"></div>
       <div id="sidoKeyBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="applyGateBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="noBirthBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
@@ -547,10 +556,19 @@ AUTH.onAuthStateChanged(async u=>{
   IS_OWNER=md.owner===true;
   VIEWER_IS_ADMIN=isAdmin;
   document.getElementById('adminBody').style.display='block';loadDash();
-  // [첫 화면] 시도연맹 임원은 본인 관할 시도부터 보이도록 맞춰 둡니다(전체 조회는 [시도 전체] 선택).
-  if(IS_SIDO&&CMY&&CMY.sido){
-    const sel=document.getElementById('userSido');
-    if(sel&&[].some.call(sel.options,function(o){return o.value===CMY.sido||o.text===CMY.sido}))sel.value=CMY.sido;
+  // [관할] 시도연맹 임원에게만 조회 범위 전환(관할 / 미판정)을 보여줍니다.
+  //   ※ 예전에 넣었던 '첫 화면을 관할 시도로 미리 선택' 은 지웠습니다.
+  //     그 필터는 거점(baseCity)이 비어 있는 회원을 모두 걸러내서, 명단이 통째로 비어 보였습니다.
+  if(IS_SIDO){
+    const bar=document.getElementById('sidoScopeBar');
+    if(bar)bar.style.display='flex';
+    const mine=((CMY&&CMY.sido)||'');
+    const w=document.getElementById('sidoScopeWarn');
+    // 관할 시도명이 표준형(예: 부산)이 아니면 규칙의 대조가 어긋나 목록이 비게 됩니다 — 미리 알려줍니다.
+    if(w&&mine&&typeof kfdfSidoKey==='function'&&kfdfSidoKey({baseCity:mine})!==mine){
+      w.style.display='inline-block';
+      w.textContent='⚠ 관할 시도가 "'+mine+'" 로 저장되어 있습니다. 표준형(예: 부산)이 아니면 목록이 뜨지 않습니다 — 사무국에 정정을 요청해주세요.';
+    }
   }
   loadUsers();
   loadExtClubMap().then(renderUsers).catch(()=>{});
@@ -1436,9 +1454,9 @@ async function sidoKeyScan(){
       return;
     }
     const rows=SIDOKEY.map(function(x,i){
-      return '<tr><td><input type="checkbox" class="skChk" data-i="'+i+'"'+(x.key?'':' disabled title="판정 불가 — 적용 대상이 아닙니다"')+'></td><td>'+(i+1)+'</td><td><b>'+esc(x.v.name||'')+'</b></td>'
+      return '<tr><td><input type="checkbox" class="skChk" data-i="'+i+'"></td><td>'+(i+1)+'</td><td><b>'+esc(x.v.name||'')+'</b></td>'
         +'<td style="font-size:12px;color:#6b7280">'+esc(x.v.baseCity||x.v.address||'(주소 정보 없음)')+'</td>'
-        +'<td>'+(x.key?('<b style="color:#0e7490">'+esc(x.key)+'</b>'):'<b style="color:#C41E2F">판정 불가</b>')+'</td></tr>';
+        +'<td>'+(x.key?('<b style="color:#0e7490">'+esc(x.key)+'</b>'):'<b style="color:#b45309">미판정으로 표시</b>')+'</td></tr>';
     }).join('');
     b.innerHTML='<div style="font-weight:900;font-size:15.5px;margin-bottom:6px">🗺 관할 시도 키 지정 대상 '+SIDOKEY.length+'명'
       +(unknown?' <span style="color:#C41E2F;font-size:13px">(판정 불가 '+unknown+'명)</span>':'')+'</div>'
@@ -1462,7 +1480,10 @@ async function sidoKeyApply(mode){
   if(!SIDOKEY.length){alert('먼저 미리보기를 실행해주세요.');return}
   if(!SIDOKEY_BACKED){alert('⚠ 먼저 [① 백업 내려받기]를 실행해주세요.\n회원 데이터를 바꾸는 작업이라 백업이 필수입니다.');return}
   const base=(mode==='sel')?bulkPicked('skChk',SIDOKEY):SIDOKEY;
-  const use=base.filter(function(x){return !!x.key});               // 판정 불가는 건드리지 않음
+  // [미판정] 예전에는 판정 불가 회원을 건너뛰었는데, 그러면 sidoKey 항목 자체가 없어
+  //   어느 시도 임원에게도 조회되지 않고(규칙이 증명할 수 없음) 방치됩니다.
+  //   빈 값('')을 남겨두면 [관할 미판정] 화면에서 확인하고 채워 넣을 수 있습니다.
+  const use=base;
   if(!use.length){alert((mode==='sel')?'선택된 회원이 없습니다.\n위 표에서 처리할 회원을 체크해주세요. (한 명만 체크하면 시험 적용)':'지정할 수 있는 회원이 없습니다. (모두 판정 불가)');return}
   if(!confirm('아래 '+use.length+'명에게 관할 시도를 지정합니다.\n\n· 대상: '+bulkNames(use)+'\n· 지정 값: '+use.map(function(x){return x.key}).slice(0,8).join(', ')+(use.length>8?' …':'')+'\n· 판정 불가인 회원은 건드리지 않습니다\n· 문제가 있으면 [↩ 되돌리기]로 복구할 수 있습니다\n\n진행할까요?'))return;
   const b=sidoKeyBoxEl();
@@ -1472,7 +1493,7 @@ async function sidoKeyApply(mode){
     const batch=DB.batch();
     chunk.forEach(function(x){
       batch.update(DB.collection('users').doc(x.id),{
-        sidoKey:x.key, sidoKeyV:SIDOKEY_V,
+        sidoKey:x.key||'', sidoKeyV:SIDOKEY_V,
         sidoKeyAt:firebase.firestore.FieldValue.serverTimestamp()});
     });
     try{ await batch.commit(); done+=chunk.length; }
@@ -1512,6 +1533,106 @@ async function sidoKeyUndo(){
     b.innerHTML='<b style="color:#0f766e">↩ 복원 완료 — '+n+'명</b>'
       +'<div style="margin-top:8px"><button class="btn-sub" style="background:#1F4E9C" onclick="sidoKeyScan()">🔄 다시 조회</button></div>';
     loadUsers();
+  }catch(e){ b.innerHTML='<b style="color:#C41E2F">복원 실패: '+esc(e.message)+'</b>'; }
+}
+// ══════════ [관할] 강습 신청서 관할 시도 키 채우기 ══════════
+//  배경: 신청서의 sido 는 "부산광역시" 처럼 저장되는데, 회원 쪽 관할 키는 "부산" 입니다.
+//        형태가 달라 시도연맹 임원이 자기 시도 신청서를 조회할 수 없었습니다(현황판이 0건으로 보임).
+//  원칙: 신청서에 이미 적힌 시도명으로만 판정하고, 알아볼 수 없으면 빈 값('')을 남깁니다.
+//        빈 값이라도 항목이 있어야 규칙이 조회를 통과시킬 수 있습니다.
+//  안전장치: 미리보기(쓰기 0건) → 백업 → 1건 시험 → 적용 → 되돌리기
+const APPKEY_V=1;
+let APPKEY=[], APPKEY_BACKED=false;
+function appKeyBoxEl(){const b=document.getElementById('appKeyBox');b.style.display='block';return b}
+async function appKeyScan(){
+  const b=appKeyBoxEl(); b.innerHTML='강습 신청서를 불러오는 중…';
+  try{
+    const snap=await DB.collection('schoolApplications').get();
+    APPKEY=[]; APPKEY_BACKED=false;
+    let already=0, unknown=0;
+    snap.docs.forEach(function(d){
+      const v=d.data()||{};
+      if(typeof v.sidoKey==='string'){already++;return}          // 이미 채워진 신청서는 건드리지 않습니다
+      const k=kfdfSidoKey({baseCity:String(v.sido||'')+' '+String(v.city||'')});
+      if(!k)unknown++;
+      APPKEY.push({id:d.id,v:v,key:k});
+    });
+    if(!APPKEY.length){
+      b.innerHTML='<b style="color:#0f766e">✅ 모든 신청서에 관할 시도 키가 있습니다.</b>'
+        +'<div style="font-size:12.5px;color:#6b7280;margin-top:6px">이미 지정됨 '+already+'건</div>'
+        +'<div style="margin-top:10px"><button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="appKeyUndo()">↩ 되돌리기</button></div>';
+      return;
+    }
+    const rows=APPKEY.map(function(x,i){
+      return '<tr><td><input type="checkbox" class="akChk" data-i="'+i+'"></td><td>'+(i+1)+'</td>'
+        +'<td><b>'+esc(x.v.school||'(학교명 없음)')+'</b></td>'
+        +'<td style="font-size:12px;color:#6b7280">'+esc(x.v.sido||'(시도 미입력)')+' '+esc(x.v.sigungu||'')+'</td>'
+        +'<td>'+(x.key?('<b style="color:#0e7490">'+esc(x.key)+'</b>'):'<b style="color:#b45309">미판정으로 표시</b>')+'</td></tr>';
+    }).join('');
+    b.innerHTML='<div style="font-weight:900;font-size:15.5px;margin-bottom:6px">🏫 강습 신청서 관할 지정 대상 '+APPKEY.length+'건'
+      +(unknown?' <span style="color:#b45309;font-size:13px">(판정 불가 '+unknown+'건 — 미판정으로 기록)</span>':'')+'</div>'
+      +'<div style="font-size:12.5px;color:#6b7280;margin-bottom:10px">이미 지정된 신청서 '+already+'건은 대상에서 제외했습니다.</div>'
+      +'<div class="tblwrap"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:560px"><thead><tr><th style="width:34px"></th><th>#</th><th>학교</th><th>지역</th><th>지정될 값</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      +bulkBtns('akChk','appKeyApply','appKeyScan','appKeyBackup','appKeyUndo');
+  }catch(e){ b.innerHTML='<b style="color:#C41E2F">조회 실패: '+esc(e.message)+'</b>'; }
+}
+function appKeyBackup(){
+  if(!APPKEY.length){alert('먼저 [🏫 강습 신청서 관할 채우기]로 미리보기를 실행해주세요.');return}
+  const data={job:'appSidoKey',version:APPKEY_V,at:new Date().toISOString(),count:APPKEY.length,
+    apps:APPKEY.map(function(x){return {_id:x.id,school:x.v.school||'',sido:x.v.sido||'',sidoKeyAfter:x.key}})};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='backup_appSidoKey_'+(new Date().toISOString().slice(0,10))+'.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  APPKEY_BACKED=true;
+  alert('백업을 내려받았습니다. 이제 적용할 수 있습니다.');
+}
+async function appKeyApply(mode){
+  if(!APPKEY.length){alert('먼저 미리보기를 실행해주세요.');return}
+  if(!APPKEY_BACKED){alert('⚠ 먼저 [① 백업 내려받기]를 실행해주세요.');return}
+  const use=(mode==='sel')?bulkPicked('akChk',APPKEY):APPKEY;
+  if(!use.length){alert('선택된 신청서가 없습니다.'+''+String.fromCharCode(10)+''+'위 표에서 처리할 신청서를 체크해주세요. (하나만 체크하면 시험 적용)');return}
+  if(!confirm('아래 '+use.length+'건에 관할 시도를 지정합니다.'+''+String.fromCharCode(10)+''+String.fromCharCode(10)+''+'· 대상: '+use.map(function(x){return x.v.school||x.id}).slice(0,8).join(', ')+(use.length>8?(' 외 '+(use.length-8)+'건'):'')+''+String.fromCharCode(10)+''+String.fromCharCode(10)+''+'진행할까요?'))return;
+  const b=appKeyBoxEl();
+  let done=0; const fail=[];
+  for(let i=0;i<use.length;i+=400){
+    const chunk=use.slice(i,i+400);
+    const batch=DB.batch();
+    chunk.forEach(function(x){
+      batch.update(DB.collection('schoolApplications').doc(x.id),{
+        sidoKey:x.key||'', sidoKeyV:APPKEY_V,
+        sidoKeyAt:firebase.firestore.FieldValue.serverTimestamp()});
+    });
+    try{ await batch.commit(); done+=chunk.length; }
+    catch(e){ chunk.forEach(function(x){fail.push((x.v.school||x.id)+' — '+e.message)}); }
+    b.innerHTML='적용 중… '+done+' / '+use.length;
+  }
+  b.innerHTML='<b style="color:#0f766e">✅ 적용 완료 — '+done+'건</b>'
+    +'<div style="font-size:12.5px;color:#6b7280;margin-top:6px">'+esc(use.map(function(x){return x.v.school||x.id}).slice(0,8).join(', ')+(use.length>8?(' 외 '+(use.length-8)+'건'):''))+'</div>'
+    +(fail.length?('<div style="color:#C41E2F;font-size:12.5px;margin-top:8px">실패 '+fail.length+'건<br>'+esc(fail.slice(0,5).join(' / '))+'</div>'):'')
+    +'<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'
+    +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="appKeyUndo()">↩ 되돌리기</button>'
+    +'<button class="btn-sub" style="background:#1F4E9C" onclick="appKeyScan()">🔄 다시 조회</button></div>';
+  loadDash();
+}
+async function appKeyUndo(){
+  if(!confirm('되돌리기 — 이 도구로 지정한 신청서 관할 시도 키를 모두 지웁니다.'+''+String.fromCharCode(10)+''+String.fromCharCode(10)+''+'진행할까요?'))return;
+  const b=appKeyBoxEl(); b.innerHTML='복원 대상 조회 중…';
+  try{
+    const snap=await DB.collection('schoolApplications').where('sidoKeyV','==',APPKEY_V).get();
+    if(snap.empty){b.innerHTML='복원할 대상이 없습니다.';return}
+    const docs=snap.docs; let n=0;
+    const del=firebase.firestore.FieldValue.delete();
+    for(let i=0;i<docs.length;i+=400){
+      const chunk=docs.slice(i,i+400);
+      const batch=DB.batch();
+      chunk.forEach(function(d){ batch.update(d.ref,{sidoKey:del,sidoKeyV:del,sidoKeyAt:del}); });
+      await batch.commit(); n+=chunk.length;
+      b.innerHTML='복원 중… '+n+' / '+docs.length;
+    }
+    b.innerHTML='<b style="color:#0f766e">↩ 복원 완료 — '+n+'건</b>'
+      +'<div style="margin-top:8px"><button class="btn-sub" style="background:#1F4E9C" onclick="appKeyScan()">🔄 다시 조회</button></div>';
+    loadDash();
   }catch(e){ b.innerHTML='<b style="color:#C41E2F">복원 실패: '+esc(e.message)+'</b>'; }
 }
 // ══════════ [유형정리] 회원 유형(accountType·memberGroup) 누락 채우기 ══════════
@@ -2671,7 +2792,11 @@ async function setSidoOfficer(uid){
   if(!sido.trim()){alert('관할 시도명을 입력해주세요.');return}
   if(!confirm(v.name+' 님을 ['+sido.trim()+'] 시도연맹 임원(상설)으로 지정할까요?\n\n· '+sido.trim()+' 시도 일정 캘린더 직접 등록·수정\n· '+sido.trim()+' 시도 클럽 생성 신청 승인\n· 회원 삭제·포인트·강습배정 등은 불가 (그것은 권역장/관리자 권한)'))return;
   try{
-    const updS=Object.assign(permPatch(v,'sidoOfficer',true),{sido:sido.trim(),status:'approved'});
+    // [관할] 규칙이 회원의 sidoKey 와 글자 그대로 대조하므로, 관할 시도명을 표준형으로 맞춰 저장합니다.
+    //   ("부산광역시" 로 저장되면 sidoKey "부산" 과 어긋나 목록이 통째로 비어 보입니다)
+    const sidoStd=(typeof kfdfSidoKey==='function'&&kfdfSidoKey({baseCity:sido.trim()}))||'';
+    if(!sidoStd){alert('시도명을 알아볼 수 없습니다: '+sido.trim()+''+String.fromCharCode(10)+'서울·부산·경기·강원 처럼 입력해주세요.');return}
+    const updS=Object.assign(permPatch(v,'sidoOfficer',true),{sido:sidoStd,status:'approved'});
     // 겸직: 권역장을 겸하는 경우 권역 관련 필드는 지우지 않습니다
     if(updS.roles.indexOf('regionAdmin')<0){updS.managedRegion=firebase.firestore.FieldValue.delete();updS.duties=firebase.firestore.FieldValue.delete();updS.regionAdminExpiresAt=firebase.firestore.FieldValue.delete();}
     await DB.collection('users').doc(uid).update(updS);
@@ -2748,8 +2873,17 @@ async function loadDash(){
   const dashDenied=[];
   const dashGet=async function(label,p){ try{ return await p; }catch(e){ dashDenied.push(label); return null; } };
   try{
-    const us=await dashGet('회원 현황',DB.collection('users').get());
-    const ap=await dashGet('강습 신청 현황',DB.collection('schoolApplications').get());
+    // [관할] 시도연맹 임원은 관할 자료만 조회합니다. 전체 조회로는 규칙이 통과시키지 못해
+    //   현황판이 통째로 '권한 없음' 으로 표시됩니다.
+    const _mine=((typeof CMY!=='undefined'&&CMY&&CMY.sido)||'');
+    const _uq=(IS_SIDO&&_mine)
+      ? DB.collection('users').where('sidoKey','==',_mine).get()
+      : DB.collection('users').get();
+    const _aq=(IS_SIDO&&_mine)
+      ? DB.collection('schoolApplications').where('sidoKey','==',_mine).get()
+      : DB.collection('schoolApplications').get();
+    const us=await dashGet('회원 현황',_uq);
+    const ap=await dashGet('강습 신청 현황',_aq);
     const sl=await dashGet('지명 대기',DB.collection('openSlots').get());
     const u=us?us.docs.map(d=>d.data()):[],a=ap?ap.docs.map(d=>d.data()):[];
     const box=(n,l,c)=>'<div style="background:#fff;border:1.5px solid var(--line);border-left:4px solid '+c+';border-radius:12px;padding:14px 16px"><b style="font-size:22px">'+n+'</b><div style="font-size:12px;color:var(--gray);font-weight:700">'+l+'</div></div>';
@@ -3349,6 +3483,15 @@ function exportCSV(){
   a.download='강습신청_전체.csv';a.click();
 }
 let UFL='전체';
+// [관할] 시도연맹 임원의 조회 범위 — 'mine'(관할 회원) / 'none'(관할 미판정)
+//   회원 문서에 sidoKey 가 비어 있으면 어느 시도에도 잡히지 않아 아무도 돌보지 못하게 됩니다.
+//   그래서 '미판정' 을 따로 볼 수 있게 하고, 채우기 도구가 판정 불가 회원에게도 빈 값('')을 남깁니다.
+let SIDO_VIEW='mine';
+function setSidoView(s,btn){
+  SIDO_VIEW=s;
+  document.querySelectorAll('.svw').forEach(function(b){b.style.background=(b.dataset.s===s)?'':'#8a919d'});
+  renderUsers();
+}
 function userFilter(f,btn){UFL=f;document.querySelectorAll('.ufl').forEach(b=>{b.style.background=b.dataset.f===f?'':'#8a919d'});renderUsers();}
 let VIEWMODE='table';
 function setView(m,btn){VIEWMODE=m;document.querySelectorAll('.vwl').forEach(b=>b.style.background=b.dataset.v===m?'':'#8a919d');renderUsers();}
@@ -3483,6 +3626,13 @@ function uMatch(v){
   if(UFL==='pending'){if(v.status==='approved')return false}
   else if(UFL==='any'){const f=v.instructorFor||{};if(v.status!=='approved')return false;if(!(f.school||f.after||f.referee||f.staff))return false}
   else if(UFL!=='전체'){if(!(v.instructorFor&&v.instructorFor[UFL]))return false}
+  // [관할] 시도연맹 임원은 '관할 회원' 과 '관할 미판정' 을 나눠 봅니다 (중앙 관리자는 해당 없음)
+  if(typeof IS_SIDO!=='undefined'&&IS_SIDO){
+    const mine=((typeof CMY!=='undefined'&&CMY&&CMY.sido)||'');
+    const mk=String(v.sidoKey||'');
+    if(SIDO_VIEW==='none'){ if(mk)return false; }
+    else if(mk!==mine)return false;
+  }
   const sido=(document.getElementById('userSido')||{}).value||'';
   const hasReg=!!(v.region||(v.activityRegions&&v.activityRegions.length));
   if(sido==='__none'){
@@ -3567,9 +3717,21 @@ async function loadUsers(){
   // [권한] 회원 목록을 볼 수 없는 계정이면 '불러오는 중…' 에서 멈추지 않고 이유를 알려줍니다.
   let snap;
   try{
-    // [조회 범위] 시도연맹 임원도 전체 회원을 조회합니다(업무상 교차확인 필요 — 2026-08-31 결정).
-    //   첫 화면은 본인 관할 시도로 맞춰 두고, 위 [시도] 선택에서 '시도 전체'로 바꿔 볼 수 있습니다.
-    snap=await DB.collection('users').orderBy('createdAt','desc').get();
+    // [조회 범위] 시도연맹 임원은 본인 관할 회원만 조회합니다(회장님 결정).
+    //   보안 규칙이 "이 시도 회원만" 을 검증하려면 조회식 자체가 관할로 좁혀져 있어야 합니다.
+    //   관할 미판정(sidoKey 가 빈 값) 회원은 어느 시도에도 잡히지 않으므로 따로 한 번 더 조회해
+    //   합쳐 보여줍니다. 두 조회 모두 규칙이 그대로 검증할 수 있는 형태입니다.
+    if(IS_SIDO){
+      const mine=((CMY&&CMY.sido)||'');
+      if(!mine)throw new Error('관할 시도가 지정되어 있지 않습니다. 사무국에 관할 시도 지정을 요청해주세요.');
+      const two=await Promise.all([
+        DB.collection('users').where('sidoKey','==',mine).get(),
+        DB.collection('users').where('sidoKey','==','').get()
+      ]);
+      snap={docs:two[0].docs.concat(two[1].docs)};
+    }else{
+      snap=await DB.collection('users').orderBy('createdAt','desc').get();
+    }
   }catch(e){
     const el=document.getElementById('userList');
     if(el)el.innerHTML='<div class="bempty" style="color:#7a5b00;background:#fff8e6;border-radius:12px;padding:16px 18px;font-weight:700">🔒 이 계정 권한으로는 회원 목록을 볼 수 없습니다.'
@@ -3947,6 +4109,13 @@ function renderUsers(){
     const w=document.getElementById('userIncRegWrap');
     if(w)w.style.display=(sv&&sv!=='__none'&&sv!=='__unclass')?'flex':'none';
   })();
+  // [관할] 조회 범위 버튼에 각각 몇 명인지 표시합니다.
+  if(typeof IS_SIDO!=='undefined'&&IS_SIDO){
+    const mine=((typeof CMY!=='undefined'&&CMY&&CMY.sido)||'');
+    const a=document.getElementById('svMineCnt'), b2=document.getElementById('svNoneCnt');
+    if(a)a.textContent=USERS.filter(d=>String((d.data()||{}).sidoKey||'')===mine).length+'명';
+    if(b2)b2.textContent=USERS.filter(d=>!String((d.data()||{}).sidoKey||'')).length+'명';
+  }
   const docs=USERS.filter(d=>uMatch(d.data()));
   const uc=document.getElementById('userCount');
   if(uc)uc.textContent=docs.length+'명'+(docs.length!==USERS.length?' (전체 '+USERS.length+'명 중)':'');
