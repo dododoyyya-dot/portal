@@ -2596,25 +2596,30 @@ async function syncStatusById(id){
   if(d.exists)await syncStatus(d.data(),d.data().status);
 }
 async function loadDash(){
+  // [현황판] 예전에는 조회 3건을 한꺼번에 묶고(Promise.all) 실패를 조용히 삼켜서,
+  //   권한이 없는 항목이 하나라도 있으면 현황판 전체가 빈 화면으로 남았습니다(시도연맹 임원 계정).
+  //   이제 항목별로 따로 조회해 볼 수 있는 것만 채우고, 못 보는 항목은 화면에 안내합니다.
+  const dashDenied=[];
+  const dashGet=async function(label,p){ try{ return await p; }catch(e){ dashDenied.push(label); return null; } };
   try{
-    const [us,ap,sl]=await Promise.all([
-      DB.collection('users').get(),
-      DB.collection('schoolApplications').get(),
-      DB.collection('openSlots').get()]);
-    const u=us.docs.map(d=>d.data()),a=ap.docs.map(d=>d.data());
+    const us=await dashGet('회원 현황',DB.collection('users').get());
+    const ap=await dashGet('강습 신청 현황',DB.collection('schoolApplications').get());
+    const sl=await dashGet('지명 대기',DB.collection('openSlots').get());
+    const u=us?us.docs.map(d=>d.data()):[],a=ap?ap.docs.map(d=>d.data()):[];
     const box=(n,l,c)=>'<div style="background:#fff;border:1.5px solid var(--line);border-left:4px solid '+c+';border-radius:12px;padding:14px 16px"><b style="font-size:22px">'+n+'</b><div style="font-size:12px;color:var(--gray);font-weight:700">'+l+'</div></div>';
     document.getElementById('dash').innerHTML=
-      box(u.filter(x=>x.status==='pending').length,'승인 대기 회원','#e6b422')
-      +box(u.filter(x=>x.status==='approved').length,'승인 회원','#0f766e')
-      +box(a.filter(x=>String(x.type||'').indexOf('방과후')<0).length,'🏫 학교체육 신청','#8c1622')
+      (us?(box(u.filter(x=>x.status==='pending').length,'승인 대기 회원','#e6b422')
+      +box(u.filter(x=>x.status==='approved').length,'승인 회원','#0f766e')):'')
+      +(ap?(box(a.filter(x=>String(x.type||'').indexOf('방과후')<0).length,'🏫 학교체육 신청','#8c1622')
       +box(a.filter(x=>String(x.type||'').indexOf('방과후')>=0).length,'🌱 방과후·늘봄 신청','#0f766e')
       +box(a.filter(x=>x.status==='대기').length,'⏳ 정원초과 대기','#e6b422')
       +box(a.filter(x=>x.status==='선정').length,'선정 (배정 대기)','#1F4E9C')
-      +box(a.filter(x=>x.status==='배정완료').length,'배정 완료','#0f766e')
-      +box(sl.docs.filter(d=>d.data().claimedBy).length,'지명 확정 대기 ⚡','#C41E2F');
+      +box(a.filter(x=>x.status==='배정완료').length,'배정 완료','#0f766e')):'')
+      +(sl?box(sl.docs.filter(d=>d.data().claimedBy).length,'지명 확정 대기 ⚡','#C41E2F'):'')
+      +(dashDenied.length?'<div style="grid-column:1/-1;background:#fff8e6;border:1.5px solid #f0d68a;border-radius:12px;padding:12px 15px;font-size:12.5px;font-weight:800;color:#7a5b00">🔒 이 계정 권한으로는 다음 현황을 볼 수 없습니다 — '+esc(dashDenied.join(' · '))+'<div style="font-weight:600;margin-top:4px">비어 있는 것이 아니라 <b>권한 때문</b>입니다. 필요하면 사무국에 문의해주세요. (다른 기능은 정상 이용 가능합니다)</div></div>':'');
     // [연령] 성인 전환 대기 — 만 18세가 지났는데 아직 학생회원으로 남아 있는 인원.
     //   0명이면 칸을 아예 만들지 않아 평소 현황판이 늘어나지 않습니다. 누르면 전환 도구가 열립니다.
-    if(VIEWER_IS_ADMIN){
+    if(VIEWER_IS_ADMIN&&us){
       const ageDue=u.filter(x=>ageMigIsTarget(x)).length;
       if(ageDue)document.getElementById('dash').innerHTML+=
         '<div onclick="dashAgeMig()" title="누르면 전환 도구가 열립니다" '
@@ -3413,7 +3418,17 @@ function licPlain(uid,q){
   return {leader:pick('지도자'),referee:pick('심판')};
 }
 async function loadUsers(){
-  const snap=await DB.collection('users').orderBy('createdAt','desc').get();
+  // [권한] 회원 목록을 볼 수 없는 계정이면 '불러오는 중…' 에서 멈추지 않고 이유를 알려줍니다.
+  let snap;
+  try{
+    snap=await DB.collection('users').orderBy('createdAt','desc').get();
+  }catch(e){
+    const el=document.getElementById('userList');
+    if(el)el.innerHTML='<div class="bempty" style="color:#7a5b00;background:#fff8e6;border-radius:12px;padding:16px 18px;font-weight:700">🔒 이 계정 권한으로는 회원 목록을 볼 수 없습니다.'
+      +'<div style="font-weight:600;font-size:12.5px;margin-top:6px">권한이 필요하면 사무국에 문의해주세요. (오류: '+esc(e.message)+')</div></div>';
+    USERS=[]; TRASH.users=[];
+    return;
+  }
   TRASH.users=snap.docs.filter(d=>{const v=d.data();return v.deleted&&sameSidoUser(v);});
   USERS=snap.docs.filter(d=>{const v=d.data();return !v.deleted&&sameSidoUser(v);});
   await loadLicenses();   // [보유자격] 자격 대장 1회 로드
