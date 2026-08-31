@@ -287,12 +287,13 @@ let LME=null,LMY=null,ISMGR=false,CENTRAL=false,MSIDOS=[],MFEDS=[],NOTICES=[],LA
 // [쓰기 권한] 자격 대장을 고칠 수 있는 사람 = 중앙연맹 또는 권역 관리자.
 //   시도연맹 임원은 조회만 하고, 처리는 중앙연맹에 전달합니다(회장님 방침).
 //   눌러도 권한 오류만 나는 버튼은 아예 보여주지 않습니다.
-// [쓰기] 자격 업무는 시도연맹 임원도 직접 처리합니다(회장님 방침).
-//   ※ 예전에는 관할 지정(managedSido)이 있어야 했는데, 지정 경로가 여러 갈래라 빠지는 일이 잦았습니다.
-//     이제 시도연맹 임원이면 관할 지정 여부와 무관하게 업무를 볼 수 있습니다.
-let LICWRITE=false;
-// [최종 승인] 합격·불합격 판정과 자격 발급은 중앙연맹(및 권역 관리자)만 합니다.
-let LICFINAL=false;
+// [권한] 검정 시행지가 각 시도이므로, 자격 업무는 시도연맹 임원이 끝까지 처리합니다(회장님 방침 2026-08-31).
+//   합격·불합격 판정, 자격 발급·결과 취소·일괄 발급, 갱신, 기존 자격 일괄 등록까지 전부입니다.
+//   중앙연맹에만 남는 것: ① 자격 연결 요청 처리 ② 대장 삭제.
+//   (권역 관리자의 자격 권한은 유소년사업용 겸직 흔적이라 지금은 손대지 않고 그대로 둡니다)
+let LICWRITE=false;   // 자격 업무 전반 — 중앙·권역·시도연맹
+let LICFINAL=false;   // 최종 판정·발급 — 이제 시도연맹도 포함(LICWRITE 와 동일)
+let LICCLAIMS=false;  // 자격 연결 요청 — 중앙·권역만
 // [열람 범위] 자격증 대장은 시도연맹 임원이면 누구나 전국을 조회합니다.
 let LICALL=false;
 // 자격 업무 활성 시도연맹 (신청 배정 단위 — 연맹 추가 시 이 목록만 수정)
@@ -315,8 +316,9 @@ AUTH.onAuthStateChanged(async u=>{
     const myFed=lcHasRole(LMY,'sidoOfficer')?SIDO_FED[LMY.sido]:null; // 시도임원 본인 소속 연맹(없으면 중앙 직할 시도)
     ISMGR=(lcHasRole(LMY,'admin')||isRegion||!!myFed);
     CENTRAL=lcHasRole(LMY,'admin');
-    LICFINAL=CENTRAL||!!isRegion;
-    LICWRITE=LICFINAL||lcHasRole(LMY,'sidoOfficer');
+    LICCLAIMS=CENTRAL||!!isRegion;
+    LICWRITE=LICCLAIMS||lcHasRole(LMY,'sidoOfficer');
+    LICFINAL=LICWRITE;
     LICALL=CENTRAL||lcHasRole(LMY,'sidoOfficer');
     const _ms=CENTRAL?null:(isRegion?LMY.managedSido:(myFed?FED_GROUPS[myFed]:null));
     MSIDOS=CENTRAL?[]:(Array.isArray(_ms)?_ms.slice():(_ms?[_ms]:[]));
@@ -327,26 +329,14 @@ AUTH.onAuthStateChanged(async u=>{
       if(!CENTRAL){
         const ns=document.getElementById('nSido');
         ns.innerHTML=MFEDS.map(s=>'<option>'+s+'</option>').join(''); // 관할 연맹만 선택 가능
-        // [중앙 승인] 자격 갱신 처리와 기존 자격 일괄 등록은 중앙연맹 업무입니다.
-        //   시도연맹 화면에서는 눌러도 권한 오류만 나므로 아예 감추고, 어디로 가야 하는지 알려줍니다.
-        // 합격자 일괄 발급은 최종 발급 단계라 중앙·권역 관리자만 사용합니다.
-        // 자격 연결 요청도 시도 단위 업무가 아니므로(회장님 방침) 탭째 감춥니다.
-        if(!LICFINAL){
-          const bb=document.getElementById('apBulkBtn');
-          if(bb)bb.style.display='none';
+        // [중앙 전용] 자격 연결 요청만 중앙(·권역) 업무로 남습니다 — 시도연맹 화면에서는 탭째 감춥니다.
+        //   갱신·일괄등록·일괄발급은 시행지(각 시도) 업무라 시도연맹이 직접 처리합니다.
+        if(!LICCLAIMS){
           const cc=document.querySelector('.lcchip[data-t="claims"]');
           if(cc)cc.style.display='none';
           const cp=document.getElementById('mg_claims');
           if(cp)cp.style.display='none';
         }
-        ['renew','bulk'].forEach(function(t){
-          const c=document.querySelector('.lcchip[data-t="'+t+'"]');
-          if(c)c.style.display='none';
-          const p=document.getElementById('mg_'+t);          // 패널 자체도 감춰 둡니다
-          if(p)p.style.display='none';
-        });
-        const note=document.getElementById('mgrBadge');
-        if(note)note.textContent+=' · 갱신 처리와 기존 자격 일괄 등록은 중앙연맹 승인 업무입니다';
       }
       loadLics();
     }
@@ -836,16 +826,16 @@ async function loadClaims(){
         +' <span class="lctag" style="background:'+(c.nameMatch?'#0f766e':'#C41E2F')+'">'+(c.nameMatch?'✓ 성명 일치':'✗ 성명 불일치')+'</span>'
         +' <span class="lctag" style="background:'+stc+'">'+esc(c.status)+'</span>'
         +'<div style="font-size:12px;color:var(--gray)">대장 성명: '+esc(c.licName||c.licMask)+(c.phone?' · ☎ '+esc(c.phone):'')+'</div></div>'
-        +(c.status==='대기'?(!LICWRITE
+        +(c.status==='대기'?(!LICCLAIMS
           ?'<span class="lctag" style="background:#8a919d">중앙연맹 처리 대기</span>'
           :'<div style="display:flex;gap:6px;flex-wrap:wrap">'
           +'<button class="lcbtn s" onclick="approveClaim(\''+d.id+'\')">연결 승인</button>'
           +(c.nameMatch?'':'<button class="lcbtn b" onclick="fixAndApproveClaim(\''+d.id+'\')">🔧 대장 성명 정정 후 연결</button>')
           +'<button class="lcbtn w" onclick="correctClaimNumber(\''+d.id+'\')">🔢 올바른 번호 입력 후 승인</button>'
           +'<button class="lcbtn d" onclick="rejectClaim(\''+d.id+'\')">거절</button></div>')
-          :(c.status==='승인'?(LICWRITE?'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+          :(c.status==='승인'?(LICCLAIMS?'<div style="display:flex;gap:6px;flex-wrap:wrap">'
             +'<button class="lcbtn ghost" onclick="undoApproveClaim(\''+d.id+'\')">↩ 되돌리기</button></div>':'')
-            :(c.status==='거절'?(LICWRITE?'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+            :(c.status==='거절'?(LICCLAIMS?'<div style="display:flex;gap:6px;flex-wrap:wrap">'
               +'<button class="lcbtn ghost" onclick="reopenClaim(\''+d.id+'\')">↩ 재처리(대기로)</button></div>':''):'')))
         +'</div>';
     };
@@ -1275,8 +1265,8 @@ async function bulkIssue(){
 // ── 관리: 갱신 ──
 async function renewLic(){
   const m=document.getElementById('rnMsg');
-  // [중앙 승인] 유효기간 연장은 중앙연맹만 처리합니다(시도연맹은 조회만).
-  if(!CENTRAL){alert('자격 갱신은 중앙연맹 승인 업무입니다.'+''+String.fromCharCode(10)+''+'대상 자격번호와 사유를 중앙연맹에 전달해주세요.');return}
+  // [권한] 갱신은 시행지(각 시도) 업무 — 시도연맹 임원도 직접 처리합니다.
+  if(!LICWRITE){alert('자격 갱신은 연맹 관리자 업무입니다.');return}
   const no=document.getElementById('rnNo').value.trim().toUpperCase();
   if(!no){m.textContent='자격번호를 입력하세요';m.style.color='#C41E2F';return}
   const doc=await DB.collection('licenses').doc(no).get();
@@ -1292,8 +1282,8 @@ async function renewLic(){
 
 // ── 관리: 일괄 등록 ──
 async function bulkImport(){
-  // [중앙 승인] 기존 자격 소급 등록은 중앙연맹만 처리합니다(대장 전체에 영향).
-  if(!CENTRAL){alert('기존 자격 일괄 등록은 중앙연맹 승인 업무입니다.'+''+String.fromCharCode(10)+''+'등록할 명단을 중앙연맹에 전달해주세요.');return}
+  // [권한] 기존 자격 소급 등록도 시행지(각 시도) 업무 — 시도연맹 임원도 직접 처리합니다.
+  if(!LICWRITE){alert('기존 자격 일괄 등록은 연맹 관리자 업무입니다.');return}
   const m=document.getElementById('bkMsg');const rst=document.getElementById('bkResult');
   const raw=document.getElementById('bkData').value.trim();
   if(!raw){m.textContent='붙여넣은 데이터가 없습니다';m.style.color='#C41E2F';return}
