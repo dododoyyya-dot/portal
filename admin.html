@@ -547,6 +547,11 @@ AUTH.onAuthStateChanged(async u=>{
   IS_OWNER=md.owner===true;
   VIEWER_IS_ADMIN=isAdmin;
   document.getElementById('adminBody').style.display='block';loadDash();
+  // [첫 화면] 시도연맹 임원은 본인 관할 시도부터 보이도록 맞춰 둡니다(전체 조회는 [시도 전체] 선택).
+  if(IS_SIDO&&CMY&&CMY.sido){
+    const sel=document.getElementById('userSido');
+    if(sel&&[].some.call(sel.options,function(o){return o.value===CMY.sido||o.text===CMY.sido}))sel.value=CMY.sido;
+  }
   loadUsers();
   loadExtClubMap().then(renderUsers).catch(()=>{});
   purgeOldTrash();
@@ -3546,12 +3551,9 @@ async function loadUsers(){
   // [권한] 회원 목록을 볼 수 없는 계정이면 '불러오는 중…' 에서 멈추지 않고 이유를 알려줍니다.
   let snap;
   try{
-    // [관할] 시도연맹 임원은 자기 관할(sidoKey) 회원만 조회합니다.
-    //   보안 규칙이 "이 시도 회원만" 을 검증할 수 있게 하려면 조회 자체가 관할로 좁혀져 있어야 합니다.
-    //   (전체 조회로는 규칙이 통과시킬 수 없어 목록이 아예 안 뜹니다)
-    snap=(IS_SIDO&&CMY&&CMY.sido)
-      ? await DB.collection('users').where('sidoKey','==',CMY.sido).get()
-      : await DB.collection('users').orderBy('createdAt','desc').get();
+    // [조회 범위] 시도연맹 임원도 전체 회원을 조회합니다(업무상 교차확인 필요 — 2026-08-31 결정).
+    //   첫 화면은 본인 관할 시도로 맞춰 두고, 위 [시도] 선택에서 '시도 전체'로 바꿔 볼 수 있습니다.
+    snap=await DB.collection('users').orderBy('createdAt','desc').get();
   }catch(e){
     const el=document.getElementById('userList');
     if(el)el.innerHTML='<div class="bempty" style="color:#7a5b00;background:#fff8e6;border-radius:12px;padding:16px 18px;font-weight:700">🔒 이 계정 권한으로는 회원 목록을 볼 수 없습니다.'
@@ -3559,8 +3561,10 @@ async function loadUsers(){
     USERS=[]; TRASH.users=[];
     return;
   }
-  TRASH.users=snap.docs.filter(d=>{const v=d.data();return v.deleted&&sameSidoUser(v);});
-  USERS=snap.docs.filter(d=>{const v=d.data();return !v.deleted&&sameSidoUser(v);});
+  // [조회 범위] 예전에는 시도임원에게 관할 회원만 남겼지만, 교차확인 업무를 위해 전체를 담습니다.
+  //   화면에 무엇을 보여줄지는 위의 [시도] 선택(userSido)이 결정합니다.
+  TRASH.users=snap.docs.filter(d=>d.data().deleted);
+  USERS=snap.docs.filter(d=>!d.data().deleted);
   await loadLicenses();   // [보유자격] 자격 대장 1회 로드
   renderUsers();
   pcUpdateBadge();
