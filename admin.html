@@ -414,6 +414,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#7c3aed" onclick="ageMigScan()">🎓 만 18세 도달 학생 → 성인 전환</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="qualFixScan()">🎖 미검증 급수 정리</button>
         <button class="btn-sub" style="background:#1F4E9C" onclick="memberNoScan()">🔢 회원 고유번호 부여</button>
+        <button class="btn-sub" style="background:#0e7490" onclick="typeFixScan()">🧩 회원 유형 누락 정리</button>
         <button class="btn-sub" style="background:#8a5a00" onclick="noBirthScan()">🎂 생년월일 미입력 회원</button>
         <button class="btn-sub" style="background:#0e7490" onclick="ncWaiveScan()">🏅 국가자격 승인차단 해제</button>
         <button class="btn-sub" style="background:#8a919d" onclick="showTrash()">🗑 휴지통</button>
@@ -440,6 +441,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <div id="ageMigBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="qualFixBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="memberNoBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
+      <div id="typeFixBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="applyGateBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="noBirthBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="ncWaiveBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
@@ -1383,6 +1385,160 @@ async function ageMigUndo(){
       b.innerHTML='복원 중… '+n+' / '+docs.length;
     }
     b.innerHTML='<b style="color:#0f766e">↩ 복원 완료 — '+n+'명</b>';
+    loadUsers();
+  }catch(e){ b.innerHTML='<b style="color:#C41E2F">복원 실패: '+esc(e.message)+'</b>'; }
+}
+// ══════════ [유형정리] 회원 유형(accountType·memberGroup) 누락 채우기 ══════════
+//  배경: 구세대 가입 페이지로 가입한 회원은 유형 항목이 비어 있어, 회원 목록의 유형 표시와
+//        승인 게이트(교사 재직증명 확인 등)가 제대로 동작하지 않습니다.
+//  원칙: ① 이미 유형이 있는 회원은 건드리지 않음  ② 회원이 가진 정보로만 추정하고 근거를 함께 표시
+//        ③ 추정 근거가 약하면 '일반'으로 두되 화면에 '근거 약함'으로 표시
+//  안전장치: 미리보기(쓰기 0건) → 백업 → 1명 시험 → 전체 적용 → 되돌리기
+const TYPEFIX_V=1;
+let TYPEFIX=[], TYPEFIX_BACKED=false;
+const TF_LABEL={instructor:'지도자·강사',teacher:'교사(교원)',natcert:'국가공인자격',athlete:'선수',student:'학생',general:'일반'};
+function typeFixBoxEl(){const b=document.getElementById('typeFixBox');b.style.display='block';return b}
+// accountType → memberGroup (가입 페이지와 동일한 규칙)
+function tfGroupOf(t){
+  if(t==='instructor'||t==='teacher'||t==='natcert')return 'active';
+  if(t==='student')return 'student';
+  return 'general';
+}
+// 회원이 가진 정보로 유형 추정 (근거·확신도 함께 반환)
+function tfGuess(v){
+  const af=(v.affiliation||[]).join(' ');
+  if(v.natCertName)return {t:'natcert',why:'국가공인자격 신고('+String(v.natCertName).slice(0,20)+')',sure:true};
+  if(v.employDoc||v.teacherLevel||af.indexOf('교사')>=0)
+    return {t:'teacher',why:'교사 정보('+[v.teacherLevel?'교원구분':'',v.employDoc?'재직증빙':'',af.indexOf('교사')>=0?'소속 교사':''].filter(Boolean).join('·')+')',sure:true};
+  const f=v.instructorFor||{};
+  if(f.school||f.after||f.referee||f.staff)
+    return {t:'instructor',why:'강사·요원 지원 이력',sure:true};
+  const q=v.quals||{};
+  if(q.leader||q.referee||q.youth)return {t:'instructor',why:'연맹 자격 보유',sure:true};
+  if(v.birth&&isMinorNow(v.birth)===true)return {t:'student',why:'생년월일 기준 미성년',sure:true};
+  if(v.caps&&v.caps.athlete)return {t:'athlete',why:'선수 등록',sure:true};
+  return {t:'general',why:'뚜렷한 근거 없음 → 일반으로 지정',sure:false};
+}
+function tfIsTarget(v){
+  if(v.deleted)return false;
+  const noType=!v.accountType, noGroup=!v.memberGroup;
+  return noType||noGroup;
+}
+async function typeFixScan(){
+  const b=typeFixBoxEl(); b.innerHTML='회원 목록을 불러오는 중…';
+  try{
+    const snap=await DB.collection('users').get();
+    TYPEFIX=[]; TYPEFIX_BACKED=false;
+    snap.docs.forEach(function(d){
+      const v=d.data()||{};
+      if(!tfIsTarget(v))return;
+      // 유형은 있고 그룹만 비었으면 → 규칙대로 그대로 환산(추정 아님)
+      if(v.accountType){
+        TYPEFIX.push({id:d.id,v:v,t:v.accountType,group:tfGroupOf(v.accountType),why:'유형은 있고 분류만 비어 있음',sure:true,onlyGroup:true});
+      }else{
+        const g=tfGuess(v);
+        TYPEFIX.push({id:d.id,v:v,t:g.t,group:tfGroupOf(g.t),why:g.why,sure:g.sure,onlyGroup:false});
+      }
+    });
+    if(!TYPEFIX.length){
+      b.innerHTML='<b style="color:#0f766e">✅ 유형이 비어 있는 회원이 없습니다.</b>'
+        +'<div style="margin-top:10px"><button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="typeFixUndo()">↩ 되돌리기</button></div>';
+      return;
+    }
+    const weak=TYPEFIX.filter(function(x){return !x.sure}).length;
+    const rows=TYPEFIX.map(function(x,i){
+      return '<tr><td>'+(i+1)+'</td><td><b>'+esc(x.v.name||'')+'</b><div style="font-size:11.5px;color:#8a919d">'+esc(x.v.email||'')+'</div></td>'
+        +'<td style="font-size:12px;color:#8a919d">'+esc(x.v.accountType||'(없음)')+' / '+esc(x.v.memberGroup||'(없음)')+'</td>'
+        +'<td><b style="color:#0e7490">'+esc(TF_LABEL[x.t]||x.t)+'</b><div style="font-size:11.5px;color:#8a919d">'+esc(x.group)+'</div></td>'
+        +'<td style="font-size:12px">'+esc(x.why)+(x.sure?'':' <b style="color:#C41E2F">⚠ 근거 약함</b>')+'</td></tr>';
+    }).join('');
+    b.innerHTML='<div style="font-weight:900;font-size:15.5px;margin-bottom:6px">🧩 유형 정리 대상 '+TYPEFIX.length+'명'
+      +(weak?' <span style="color:#C41E2F;font-size:13px">(근거 약함 '+weak+'명 — 확인 후 진행)</span>':'')+'</div>'
+      +'<div style="font-size:12.5px;color:#6b7280;margin-bottom:10px;line-height:1.7">구세대 가입 경로로 등록되어 <b>회원 유형이 비어 있는</b> 분들입니다. 회원이 가진 정보로 유형을 추정했고, 근거를 함께 표시했습니다.<br>이 화면은 <b>미리보기</b>일 뿐 아직 저장하지 않았습니다. 추정이 맞지 않는 회원은 적용 후 회원 상세에서 개별 수정할 수 있습니다.</div>'
+      +'<div class="tblwrap"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:640px"><thead><tr><th>#</th><th>회원</th><th>현재(유형/분류)</th><th>지정할 값</th><th>근거</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'
+      +'<button class="btn-sub" style="background:#153A77" onclick="typeFixBackup()">💾 ① 백업 내려받기 (필수)</button>'
+      +'<button class="btn-sub" style="background:#b8860b" onclick="typeFixApply(1)">🧪 ② 1명만 시험 적용</button>'
+      +'<button class="btn-sub" style="background:#0f766e" onclick="typeFixApply(0)">✅ ③ 전체 적용</button>'
+      +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="typeFixUndo()">↩ 되돌리기</button>'
+      +'<button class="btn-sub" style="background:#1F4E9C" onclick="typeFixScan()">🔄 다시 조회</button></div>';
+  }catch(e){ b.innerHTML='<b style="color:#C41E2F">조회 실패: '+esc(e.message)+'</b>'; }
+}
+function typeFixBackup(){
+  if(!TYPEFIX.length){alert('먼저 [🧩 회원 유형 누락 정리]로 미리보기를 실행해주세요.');return}
+  const data={job:'typeFix',version:TYPEFIX_V,at:new Date().toISOString(),count:TYPEFIX.length,
+    users:TYPEFIX.map(function(x){return {_id:x.id,name:x.v.name||'',email:x.v.email||'',
+      accountTypeBefore:(x.v.accountType||null),memberGroupBefore:(x.v.memberGroup||null),
+      accountTypeAfter:x.t,memberGroupAfter:x.group,근거:x.why}})};
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));
+  a.download='회원백업_유형정리_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  TYPEFIX_BACKED=true;
+  alert('💾 백업 파일을 내려받았습니다.\n\n파일이 실제로 저장됐는지 확인한 뒤 적용을 진행해주세요.');
+}
+async function typeFixApply(limitN){
+  if(!TYPEFIX.length){alert('먼저 미리보기를 실행해주세요.');return}
+  if(!TYPEFIX_BACKED){alert('⚠ 먼저 [① 백업 내려받기]를 실행해주세요.\n회원 데이터를 바꾸는 작업이라 백업이 필수입니다.');return}
+  const list=limitN?TYPEFIX.slice(0,limitN):TYPEFIX;
+  const weak=list.filter(function(x){return !x.sure}).length;
+  if(!confirm('회원 '+list.length+'명의 유형을 채웁니다.'+(weak?('\n\n⚠ 이 중 '+weak+'명은 근거가 약해 [일반]으로 지정됩니다.'):'')+'\n\n· 이미 유형이 있는 회원은 대상이 아닙니다\n· 문제가 있으면 [↩ 되돌리기]로 복구할 수 있습니다\n\n진행할까요?'))return;
+  const b=typeFixBoxEl();
+  let done=0; const fail=[];
+  for(let i=0;i<list.length;i+=400){
+    const chunk=list.slice(i,i+400);
+    const batch=DB.batch();
+    chunk.forEach(function(x){
+      batch.update(DB.collection('users').doc(x.id),{
+        accountType:x.t, memberGroup:x.group,
+        typeFixV:TYPEFIX_V,
+        typeFixAt:firebase.firestore.FieldValue.serverTimestamp(),
+        typeFixBak:{accountType:(x.v.accountType||''),memberGroup:(x.v.memberGroup||'')}
+      });
+    });
+    try{ await batch.commit(); done+=chunk.length; }
+    catch(e){ chunk.forEach(function(x){fail.push((x.v.name||x.id)+' — '+e.message)}); }
+    b.innerHTML='적용 중… '+done+' / '+list.length;
+  }
+  try{
+    const ref=DB.collection('siteContent').doc('migrationLog');
+    const c2=await ref.get();
+    const arr=(((c2.exists&&c2.data())||{}).items||[]).slice(-199);
+    arr.push({job:'typeFix',v:TYPEFIX_V,at:new Date().toISOString(),by:((typeof CMY!=='undefined'&&CMY&&CMY.name)||'관리자'),ok:done,fail:fail.length});
+    await ref.set({items:arr},{merge:true});
+  }catch(e){}
+  b.innerHTML='<b style="color:#0f766e;font-size:15px">✅ 유형 정리 완료 — '+done+'명</b>'
+    +(fail.length?'<div style="margin-top:8px;color:#C41E2F;font-size:12.5px">⚠ 실패 '+fail.length+'건<br>'+fail.map(esc).join('<br>')+'</div>':'')
+    +'<div style="margin-top:10px;font-size:12.5px;color:#6b7280">바꾸기 전 값이 각 회원 문서에 보관되어 있습니다. 문제가 있으면 아래 [↩ 되돌리기]를 눌러주세요.</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'
+    +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="typeFixUndo()">↩ 되돌리기</button>'
+    +'<button class="btn-sub" style="background:#1F4E9C" onclick="typeFixScan()">🔄 다시 조회</button></div>';
+  loadUsers();
+}
+async function typeFixUndo(){
+  if(!confirm('되돌리기 — 이 도구로 채운 회원 유형을 원래(비어 있던) 상태로 복구합니다.\n\n진행할까요?'))return;
+  const b=typeFixBoxEl(); b.innerHTML='복원 대상 조회 중…';
+  try{
+    const snap=await DB.collection('users').where('typeFixV','==',TYPEFIX_V).get();
+    if(snap.empty){b.innerHTML='복원할 대상이 없습니다.';return}
+    const docs=snap.docs; let n=0;
+    const del=firebase.firestore.FieldValue.delete();
+    for(let i=0;i<docs.length;i+=400){
+      const chunk=docs.slice(i,i+400);
+      const batch=DB.batch();
+      chunk.forEach(function(d){
+        const bak=(d.data()||{}).typeFixBak||{};
+        batch.update(d.ref,{
+          accountType:(bak.accountType?bak.accountType:del),
+          memberGroup:(bak.memberGroup?bak.memberGroup:del),
+          typeFixV:del, typeFixBak:del, typeFixAt:del
+        });
+      });
+      await batch.commit(); n+=chunk.length;
+      b.innerHTML='복원 중… '+n+' / '+docs.length;
+    }
+    b.innerHTML='<b style="color:#0f766e">↩ 복원 완료 — '+n+'명</b>'
+      +'<div style="margin-top:8px"><button class="btn-sub" style="background:#1F4E9C" onclick="typeFixScan()">🔄 다시 조회</button></div>';
     loadUsers();
   }catch(e){ b.innerHTML='<b style="color:#C41E2F">복원 실패: '+esc(e.message)+'</b>'; }
 }
