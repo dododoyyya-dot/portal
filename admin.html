@@ -4694,14 +4694,22 @@ async function confirmComp(id){
   else picks=pick.split(',').map(x=>claimed[parseInt(x.trim())-1]).filter(Boolean);
   if(!picks.length){alert('선택된 지명자가 없습니다.');return}
   const sel=[...new Set(picks.map(c=>c.uid))];
-  // 기존 확정분을 건 단위 키로 승계(구 데이터 이관) 후, 이번 선택분을 추가
-  const prevKeys=Array.isArray(s.confirmedKeys)&&s.confirmedKeys.length
-    ? s.confirmedKeys
-    : claimed.filter(c=>confirmed.indexOf(c.uid)>=0).map(compKey);
   const selKeys=picks.map(compKey);
-  await DB.collection('compSlots').doc(id).update({
-    confirmed:[...new Set([...confirmed,...sel])],            // 수당·이력용(계정 단위) 유지
-    confirmedKeys:[...new Set([...prevKeys,...selKeys])]});   // 표시·명단용(건 단위) 신규
+  // [동시처리] 확인창이 열려 있는 동안 다른 담당자가 확정했을 수 있으므로,
+  //   저장 직전에 최신 상태를 다시 읽어 "합쳐서" 저장한다 (한쪽 확정이 사라지던 문제 방지).
+  //   기존 확정분(uid만 있는 구 데이터)은 이때 건 단위 키로 승계한다.
+  const _ref=DB.collection('compSlots').doc(id);
+  await DB.runTransaction(async tx=>{
+    const cur=await tx.get(_ref);
+    const cs=cur.data()||{};
+    const curConfirmed=cs.confirmed||[];
+    const curKeys=Array.isArray(cs.confirmedKeys)&&cs.confirmedKeys.length
+      ? cs.confirmedKeys
+      : compActiveClaims(cs).filter(c=>curConfirmed.indexOf(c.uid)>=0).map(compKey);
+    tx.update(_ref,{
+      confirmed:[...new Set([...curConfirmed,...sel])],       // 수당·이력용(계정 단위) 유지
+      confirmedKeys:[...new Set([...curKeys,...selKeys])]});  // 표시·명단용(건 단위)
+  });
   // 회원 공식 이력 기록
   for(const u of sel){
     if(confirmed.indexOf(u)>=0)continue; // 기확정자 중복 방지
