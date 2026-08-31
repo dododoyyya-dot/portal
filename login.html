@@ -568,6 +568,20 @@ async function postRedeemCode(){
     setTimeout(()=>location.href='mypage.html',1200);
   }catch(e){m.textContent='연동 실패: '+e.message;m.style.color='#C41E2F'}
 }
+// [관할판정] 보안 규칙이 검증할 수 있도록, 회원의 소속 시도를 표준 이름 하나로 정규화합니다.
+//   회원 문서에는 시도 단일 필드가 없어(region=6대 권역, baseCity=주소 문자열) 규칙이 관할을 판정할 수 없었습니다.
+//   거점 시군구 → 활동 범위 → 집 주소 순서로 찾고, 못 찾으면 빈 값으로 둡니다(빈 값이면 관할 조회에 잡히지 않음).
+var KFDF_SIDO_ALIAS={'서울':['서울'],'부산':['부산'],'대구':['대구'],'인천':['인천'],'광주':['광주'],'대전':['대전'],'울산':['울산'],'세종':['세종'],'경기':['경기'],'강원':['강원'],'충북':['충북','충청북'],'충남':['충남','충청남'],'전북':['전북','전라북'],'전남':['전남','전라남'],'경북':['경북','경상북'],'경남':['경남','경상남'],'제주':['제주']};
+function kfdfSidoKey(v){
+  v=v||{};
+  var hay=[v.baseCity,(v.activityAreas||[]).join(' '),v.address,v.workSchool].map(function(x){return String(x||'')}).join(' ');
+  var ks=Object.keys(KFDF_SIDO_ALIAS);
+  for(var i=0;i<ks.length;i++){
+    var al=KFDF_SIDO_ALIAS[ks[i]];
+    for(var j=0;j<al.length;j++){ if(hay.indexOf(al[j])>=0)return ks[i]; }
+  }
+  return '';
+}
 function say(t,ok){const e=document.getElementById('aMsg');e.textContent=t;e.className='msg '+(ok?'ok':'err')}
 function syncAffS(){
   document.getElementById('sAfFed').style.display=document.getElementById('sAf1').checked?'block':'none';
@@ -1027,6 +1041,7 @@ async function go(){
         gender:gender, birth:birth,
         activityAreas:aaSave(), activityRegions:aaRegions(), baseCity:aaBase(),
         region:(aaRegions()[0]||'서울·경기'),
+        sidoKey:kfdfSidoKey({baseCity:aaBase(),activityAreas:aaSave()}),
         accountType:SIGNUP_TYPE,
         // [가입폼 다이어트] 선수 소분류는 '소속 구분' 대신 '소속' 선택값에서 유도합니다 (시도연맹→연맹동호인 / 소속없음·미선택→무소속 / 그 외→타소속)
         memberClass:(SIGNUP_TYPE==='general'?GEN_SUB:(SIGNUP_TYPE==='athlete'?('선수·'+((af.indexOf('시도연맹')>=0)?'연맹동호인':((!af.length||af.indexOf('소속 없음')>=0)?'무소속':'타소속'))):'')),  // [세분류] 선수·연맹동호인/타소속/무소속 · 학부모·서포터즈·협력기관
