@@ -411,6 +411,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#0f766e" onclick="backfillPhoneIndex()">📇 전화번호 중복확인 보정</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="ageMigScan()">🎓 만 18세 도달 학생 → 성인 전환</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="qualFixScan()">🎖 미검증 급수 정리</button>
+        <button class="btn-sub" style="background:#1F4E9C" onclick="memberNoScan()">🔢 회원 고유번호 부여</button>
         <button class="btn-sub" style="background:#8a5a00" onclick="noBirthScan()">🎂 생년월일 미입력 회원</button>
         <button class="btn-sub" style="background:#0e7490" onclick="ncWaiveScan()">🏅 국가자격 승인차단 해제</button>
         <button class="btn-sub" style="background:#8a919d" onclick="showTrash()">🗑 휴지통</button>
@@ -436,6 +437,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <div id="phoneIdxBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;white-space:pre-line;font-size:13px;line-height:1.8"></div>
       <div id="ageMigBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="qualFixBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
+      <div id="memberNoBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="applyGateBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="noBirthBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="ncWaiveBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
@@ -1379,6 +1381,150 @@ async function ageMigUndo(){
       b.innerHTML='복원 중… '+n+' / '+docs.length;
     }
     b.innerHTML='<b style="color:#0f766e">↩ 복원 완료 — '+n+'명</b>';
+    loadUsers();
+  }catch(e){ b.innerHTML='<b style="color:#C41E2F">복원 실패: '+esc(e.message)+'</b>'; }
+}
+// ══════════ [회원번호] 승인 회원 고유번호 부여 (900번부터 · 가입순) ══════════
+//  안전장치: ageMig 도구와 동일 — 미리보기(쓰기 0건) → 백업 → 1명 시험 → 선택 적용 → 되돌리기.
+//  원칙: ① 승인(approved) 회원만  ② 이미 번호가 있는 회원은 절대 다시 부여하지 않음
+//        ③ 가입일(createdAt) 순서로 이어붙임  ④ 한번 쓴 번호는 결번이 생겨도 재사용하지 않음
+const MEMNO_V=1, MEMNO_START=900;
+let MEMNO=[], MEMNO_BACKED=false, MEMNO_MAXSEEN=0;
+function memberNoBoxEl(){const b=document.getElementById('memberNoBox');b.style.display='block';return b}
+function memNoTime(v){
+  const c=v&&v.createdAt;
+  if(c&&typeof c.toMillis==='function')return c.toMillis();
+  if(c&&c.seconds)return c.seconds*1000;
+  const d=c?new Date(c):null;
+  return (d&&!isNaN(d))?d.getTime():Infinity;      // 가입일이 없는 회원은 맨 뒤로
+}
+async function memberNoScan(){
+  const b=memberNoBoxEl(); b.innerHTML='회원 목록을 불러오는 중…';
+  try{
+    const snap=await DB.collection('users').get();
+    const all=snap.docs.map(function(d){return {id:d.id,v:d.data()||{}}}).filter(function(x){return !x.v.deleted});
+    let maxNo=MEMNO_START-1, have=0;
+    all.forEach(function(x){const n=parseInt(x.v.memberNo); if(n>0){have++; if(n>maxNo)maxNo=n;}});
+    MEMNO_MAXSEEN=maxNo; MEMNO_BACKED=false;
+    const targets=all.filter(function(x){return x.v.status==='approved' && !(parseInt(x.v.memberNo)>0)});
+    targets.sort(function(a,b){
+      const ta=memNoTime(a.v), tb=memNoTime(b.v);
+      if(ta!==tb)return ta-tb;
+      return String(a.v.name||'').localeCompare(String(b.v.name||''));
+    });
+    MEMNO=targets.map(function(x,i){return {id:x.id,v:x.v,no:maxNo+1+i}});
+    if(!MEMNO.length){
+      b.innerHTML='<b style="color:#0f766e">✅ 번호를 부여할 대상이 없습니다.</b>'
+        +'<div style="color:#6b7280;font-size:12.5px;margin-top:6px">승인 회원 중 번호가 없는 분이 없습니다. (이미 부여됨 '+have+'명)</div>'
+        +'<div style="margin-top:10px"><button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="memberNoUndo()">↩ 되돌리기</button></div>';
+      return;
+    }
+    const rows=MEMNO.map(function(x,i){
+      const t=memNoTime(x.v);
+      const dt=(t===Infinity)?'<span style="color:#C41E2F">가입일 없음</span>':new Date(t).toISOString().slice(0,10);
+      return '<tr><td>'+(i+1)+'</td><td><b>'+esc(x.v.name||'')+'</b></td><td>'+esc(x.v.email||'')+'</td><td>'+dt+'</td><td><b style="color:#1F4E9C">'+x.no+'</b></td></tr>';
+    }).join('');
+    b.innerHTML='<div style="font-weight:900;font-size:15.5px;margin-bottom:6px">🔢 번호 부여 대상 '+MEMNO.length+'명 &nbsp;<span style="color:#1F4E9C;font-size:13px">'+MEMNO[0].no+' ~ '+MEMNO[MEMNO.length-1].no+'번</span></div>'
+      +'<div style="font-size:12.5px;color:#6b7280;margin-bottom:10px;line-height:1.7">승인 회원에게 <b>가입한 순서대로</b> 고유번호를 부여합니다. 이미 번호가 있는 회원('+have+'명)은 대상이 아니며 번호가 바뀌지 않습니다.<br>이 화면은 <b>미리보기</b>일 뿐 아직 저장하지 않았습니다.</div>'
+      +'<div class="tblwrap"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:560px"><thead><tr><th>#</th><th>이름</th><th>이메일</th><th>가입일</th><th>부여 번호</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'
+      +'<button class="btn-sub" style="background:#153A77" onclick="memberNoBackup()">💾 ① 백업 내려받기 (필수)</button>'
+      +'<button class="btn-sub" style="background:#b8860b" onclick="memberNoApply(1)">🧪 ② 1명만 시험 적용</button>'
+      +'<button class="btn-sub" style="background:#0f766e" onclick="memberNoApply(0)">✅ ③ 전체 적용</button>'
+      +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="memberNoUndo()">↩ 되돌리기</button>'
+      +'<button class="btn-sub" style="background:#1F4E9C" onclick="memberNoScan()">🔄 다시 조회</button>'
+      +'</div>';
+  }catch(e){ b.innerHTML='<b style="color:#C41E2F">조회 실패: '+esc(e.message)+'</b>'; }
+}
+function memberNoBackup(){
+  if(!MEMNO.length){alert('먼저 [🔢 회원 고유번호 부여]로 미리보기를 실행해주세요.');return}
+  const data={job:'memberNo',version:MEMNO_V,at:new Date().toISOString(),count:MEMNO.length,
+    users:MEMNO.map(function(x){return {_id:x.id,name:x.v.name||'',email:x.v.email||'',memberNoBefore:(x.v.memberNo||null),memberNoAfter:x.no}})};
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));
+  a.download='회원백업_고유번호_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  MEMNO_BACKED=true;
+  alert('💾 백업 파일을 내려받았습니다.\n\n파일이 실제로 저장됐는지 확인한 뒤 적용을 진행해주세요.');
+}
+async function memberNoApply(limitN){
+  if(!MEMNO.length){alert('먼저 미리보기를 실행해주세요.');return}
+  if(!MEMNO_BACKED){alert('⚠ 먼저 [① 백업 내려받기]를 실행해주세요.\n회원 데이터를 바꾸는 작업이라 백업이 필수입니다.');return}
+  const list=limitN?MEMNO.slice(0,limitN):MEMNO;
+  if(!confirm('승인 회원 '+list.length+'명에게 고유번호를 부여합니다.\n\n· 부여 범위: '+list[0].no+' ~ '+list[list.length-1].no+'번\n· 이미 번호가 있는 회원은 대상이 아닙니다\n· 문제가 있으면 [↩ 되돌리기]로 복구할 수 있습니다\n\n진행할까요?'))return;
+  const b=memberNoBoxEl(); b.innerHTML='최신 상태 확인 중…';
+  // [중복 방지] 미리보기 이후 다른 담당자가 번호를 부여했을 수 있으므로 다시 확인
+  try{
+    const cur=await DB.collection('users').get();
+    let mx=MEMNO_START-1;
+    cur.docs.forEach(function(d){const n=parseInt((d.data()||{}).memberNo); if(n>mx)mx=n;});
+    if(mx!==MEMNO_MAXSEEN){
+      b.innerHTML='<b style="color:#C41E2F">⚠ 미리보기 이후 다른 곳에서 번호가 부여되었습니다.</b>'
+        +'<div style="font-size:12.5px;color:#6b7280;margin-top:6px">번호가 겹치지 않도록 [🔄 다시 조회] 후 진행해주세요. (아무것도 저장하지 않았습니다)</div>'
+        +'<div style="margin-top:10px"><button class="btn-sub" style="background:#1F4E9C" onclick="memberNoScan()">🔄 다시 조회</button></div>';
+      return;
+    }
+  }catch(e){}
+  let done=0; const fail=[];
+  for(let i=0;i<list.length;i+=400){
+    const chunk=list.slice(i,i+400);
+    const batch=DB.batch();
+    chunk.forEach(function(x){
+      batch.update(DB.collection('users').doc(x.id),{
+        memberNo:x.no, memberNoV:MEMNO_V,
+        memberNoAt:firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    try{ await batch.commit(); done+=chunk.length; }
+    catch(e){ chunk.forEach(function(x){fail.push((x.v.name||x.id)+' — '+e.message)}); }
+    b.innerHTML='적용 중… '+done+' / '+list.length;
+  }
+  const lastNo=done?list[done-1].no:MEMNO_MAXSEEN;
+  try{ await DB.collection('counters').doc('memberNo').set({count:lastNo,at:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}); }catch(e){}
+  try{
+    const ref=DB.collection('siteContent').doc('migrationLog');
+    const c2=await ref.get();
+    const arr=(((c2.exists&&c2.data())||{}).items||[]).slice(-199);
+    arr.push({job:'memberNo',v:MEMNO_V,at:new Date().toISOString(),by:((typeof CMY!=='undefined'&&CMY&&CMY.name)||'관리자'),ok:done,fail:fail.length});
+    await ref.set({items:arr},{merge:true});
+  }catch(e){}
+  b.innerHTML='<b style="color:#0f766e;font-size:15px">✅ 번호 부여 완료 — '+done+'명 ('+(done?(list[0].no+' ~ '+lastNo+'번'):'-')+')</b>'
+    +(fail.length?'<div style="margin-top:8px;color:#C41E2F;font-size:12.5px">⚠ 실패 '+fail.length+'건<br>'+fail.map(esc).join('<br>')+'</div>':'')
+    +'<div style="margin-top:10px;font-size:12.5px;color:#6b7280">문제가 있으면 아래 [↩ 되돌리기]로 이번에 부여한 번호를 모두 지울 수 있습니다.</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'
+    +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="memberNoUndo()">↩ 되돌리기</button>'
+    +'<button class="btn-sub" style="background:#1F4E9C" onclick="memberNoScan()">🔄 다시 조회</button></div>';
+  loadUsers();
+}
+async function memberNoUndo(){
+  if(!confirm('되돌리기 — 이 도구로 부여한 회원 고유번호를 모두 지웁니다.\n(도구로 부여한 것만 지우며, 그 밖의 정보는 건드리지 않습니다)\n\n진행할까요?'))return;
+  const b=memberNoBoxEl(); b.innerHTML='복원 대상 조회 중…';
+  try{
+    const snap=await DB.collection('users').where('memberNoV','==',MEMNO_V).get();
+    if(snap.empty){b.innerHTML='복원할 대상이 없습니다.';return}
+    const docs=snap.docs; let n=0;
+    for(let i=0;i<docs.length;i+=400){
+      const chunk=docs.slice(i,i+400);
+      const batch=DB.batch();
+      chunk.forEach(function(d){
+        batch.update(d.ref,{
+          memberNo:firebase.firestore.FieldValue.delete(),
+          memberNoV:firebase.firestore.FieldValue.delete(),
+          memberNoAt:firebase.firestore.FieldValue.delete()
+        });
+      });
+      await batch.commit(); n+=chunk.length;
+      b.innerHTML='복원 중… '+n+' / '+docs.length;
+    }
+    // 남아 있는 번호 기준으로 카운터 정리
+    try{
+      const cur=await DB.collection('users').get();
+      let mx=MEMNO_START-1;
+      cur.docs.forEach(function(d){const k=parseInt((d.data()||{}).memberNo); if(k>mx)mx=k;});
+      await DB.collection('counters').doc('memberNo').set({count:mx,at:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    }catch(e){}
+    b.innerHTML='<b style="color:#0f766e">↩ 복원 완료 — '+n+'명</b>'
+      +'<div style="margin-top:8px"><button class="btn-sub" style="background:#1F4E9C" onclick="memberNoScan()">🔄 다시 조회</button></div>';
     loadUsers();
   }catch(e){ b.innerHTML='<b style="color:#C41E2F">복원 실패: '+esc(e.message)+'</b>'; }
 }
