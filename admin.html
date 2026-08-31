@@ -2832,7 +2832,14 @@ async function setSidoOfficer(uid){
     //   ("부산광역시" 로 저장되면 sidoKey "부산" 과 어긋나 목록이 통째로 비어 보입니다)
     const sidoStd=(typeof kfdfSidoKey==='function'&&kfdfSidoKey({baseCity:sido.trim()}))||'';
     if(!sidoStd){alert('시도명을 알아볼 수 없습니다: '+sido.trim()+''+String.fromCharCode(10)+'서울·부산·경기·강원 처럼 입력해주세요.');return}
-    const updS=Object.assign(permPatch(v,'sidoOfficer',true),{sido:sidoStd,status:'approved'});
+    // [자격업무] 자격증 화면은 '연맹' 단위(예: 부산연맹 = 부산·울산)로 관할을 봅니다.
+    //   보안 규칙이 대조할 수 있도록 관할 시도 목록을 함께 저장합니다.
+    //   (license.html 의 FED_GROUPS 와 같은 표를 씁니다 — 바뀌면 양쪽을 함께 고쳐야 합니다)
+    const FED_GROUPS={'경기':['경기','서울','인천'],'강원':['강원'],'부산':['부산','울산'],'경남':['경남'],'경북':['경북','대구'],'전남광주':['전남광주','광주전남','광주','전북','전남']};
+    const SIDO_FED={};Object.keys(FED_GROUPS).forEach(function(f){FED_GROUPS[f].forEach(function(s){SIDO_FED[s]=f})});
+    const myFed=SIDO_FED[sidoStd];
+    const updS=Object.assign(permPatch(v,'sidoOfficer',true),{sido:sidoStd,status:'approved'},
+      myFed?{managedSido:FED_GROUPS[myFed]}:{});
     // 겸직: 권역장을 겸하는 경우 권역 관련 필드는 지우지 않습니다
     if(updS.roles.indexOf('regionAdmin')<0){updS.managedRegion=firebase.firestore.FieldValue.delete();updS.duties=firebase.firestore.FieldValue.delete();updS.regionAdminExpiresAt=firebase.firestore.FieldValue.delete();}
     await DB.collection('users').doc(uid).update(updS);

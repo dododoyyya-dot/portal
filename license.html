@@ -313,6 +313,27 @@ AUTH.onAuthStateChanged(async u=>{
       if(!CENTRAL){
         const ns=document.getElementById('nSido');
         ns.innerHTML=MFEDS.map(s=>'<option>'+s+'</option>').join(''); // 관할 연맹만 선택 가능
+        // [중앙 승인] 자격 갱신 처리와 기존 자격 일괄 등록은 중앙연맹 업무입니다.
+        //   시도연맹 화면에서는 눌러도 권한 오류만 나므로 아예 감추고, 어디로 가야 하는지 알려줍니다.
+        ['renew','bulk'].forEach(function(t){
+          const c=document.querySelector('.lcchip[data-t="'+t+'"]');
+          if(c)c.style.display='none';
+        });
+        const note=document.getElementById('mgrBadge');
+        if(note)note.textContent+=' · 갱신 처리와 기존 자격 일괄 등록은 중앙연맹 승인 업무입니다';
+        // [관할 정비] 보안 규칙은 users.managedSido(관할 시도 목록)와 대조합니다.
+        //   이 항목은 시도연맹 임원 지정 시에 채워지므로, 그 전에 지정된 임원에게는 없습니다.
+        //   없으면 조회가 통째로 막히므로, 원인 모를 권한 오류 대신 무엇을 해야 하는지 먼저 알려줍니다.
+        if(lcHasRole(LMY,'sidoOfficer') && !Array.isArray(LMY.managedSido)){
+          const p=document.getElementById('adminPanel');
+          if(p){
+            const w=document.createElement('div');
+            w.style.cssText='background:#fff8e6;border:1.5px solid #f0d68a;border-radius:12px;padding:14px 16px;margin-bottom:12px;font-weight:800;color:#7a5b00;font-size:13.5px';
+            w.innerHTML='⚠ 자격 업무 관할이 아직 지정되지 않았습니다 — 발급 대장·연결 요청이 조회되지 않습니다.'
+              +'<div style="font-weight:600;font-size:12.5px;margin-top:6px">사무국(회장님)께 <b>[권한 관리 센터]에서 이 계정을 시도연맹 임원으로 다시 지정</b>해 달라고 요청해주세요. 다시 지정하면 관할이 자동으로 채워집니다.</div>';
+            p.insertBefore(w,p.firstChild);
+          }
+        }
       }
       loadLics();
     }
@@ -815,7 +836,10 @@ async function loadClaims(){
     };
     el.innerHTML=(pend.length?'<b style="font-size:13.5px">처리 대기 '+pend.length+'건</b>':'')+pend.map(row).join('')
       +(done.length?'<b style="font-size:13.5px;display:block;margin-top:10px">처리 완료</b>'+done.map(row).join(''):'');
-  }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+esc(e.message)+'</div>'}
+  }catch(e){
+    el.innerHTML='<div class="bempty" style="color:#7a5b00;background:#fff8e6;border-radius:12px;padding:16px 18px;font-weight:700">🔒 자격 연결 요청을 불러오지 못했습니다.'
+      +'<div style="font-weight:600;font-size:12.5px;margin-top:6px">요청이 없는 것이 아니라 조회가 막힌 것입니다. 사무국에 문의해주세요. (오류: '+esc(e.message)+')</div></div>';
+  }
 }
 async function approveClaim(id){
   const doc=CLAIMS.find(d=>d.id===id);if(!doc)return;
@@ -1228,6 +1252,8 @@ async function bulkIssue(){
 // ── 관리: 갱신 ──
 async function renewLic(){
   const m=document.getElementById('rnMsg');
+  // [중앙 승인] 유효기간 연장은 중앙연맹만 처리합니다(시도연맹은 조회만).
+  if(!CENTRAL){alert('자격 갱신은 중앙연맹 승인 업무입니다.'+''+String.fromCharCode(10)+''+'대상 자격번호와 사유를 중앙연맹에 전달해주세요.');return}
   const no=document.getElementById('rnNo').value.trim().toUpperCase();
   if(!no){m.textContent='자격번호를 입력하세요';m.style.color='#C41E2F';return}
   const doc=await DB.collection('licenses').doc(no).get();
@@ -1243,6 +1269,8 @@ async function renewLic(){
 
 // ── 관리: 일괄 등록 ──
 async function bulkImport(){
+  // [중앙 승인] 기존 자격 소급 등록은 중앙연맹만 처리합니다(대장 전체에 영향).
+  if(!CENTRAL){alert('기존 자격 일괄 등록은 중앙연맹 승인 업무입니다.'+''+String.fromCharCode(10)+''+'등록할 명단을 중앙연맹에 전달해주세요.');return}
   const m=document.getElementById('bkMsg');const rst=document.getElementById('bkResult');
   const raw=document.getElementById('bkData').value.trim();
   if(!raw){m.textContent='붙여넣은 데이터가 없습니다';m.style.color='#C41E2F';return}
@@ -1285,17 +1313,28 @@ async function bulkImport(){
 
 // ── 관리: 발급 대장 ──
 async function loadLics(){
+  // [관할] 조회가 막히면 예전에는 아무 안내 없이 화면이 비어 버렸습니다.
+  //   "자격증이 없다" 와 "조회 권한이 없다" 는 전혀 다른 상황이므로 구분해 알려줍니다.
+  const el=document.getElementById('licList');
   let docs=[];
-  if(!CENTRAL){
-    // 관할 시도 목록(확장 저장분) — 'in' 쿼리 10개 제한 대비 분할 조회
-    const J=MSIDOS.length?MSIDOS:['-'];
-    for(let i=0;i<J.length;i+=10){
-      const snap=await DB.collection('licenses').where('region','in',J.slice(i,i+10)).get();
-      docs=docs.concat(snap.docs);
+  try{
+    if(!CENTRAL){
+      if(!MSIDOS.length)throw new Error('자격 업무 관할이 지정되어 있지 않습니다. 사무국에 관할 지정을 요청해주세요.');
+      // 관할 시도 목록(확장 저장분) — 'in' 쿼리 10개 제한 대비 분할 조회
+      const J=MSIDOS;
+      for(let i=0;i<J.length;i+=10){
+        const snap=await DB.collection('licenses').where('region','in',J.slice(i,i+10)).get();
+        docs=docs.concat(snap.docs);
+      }
+    }else{
+      const snap=await DB.collection('licenses').get();
+      docs=snap.docs;
     }
-  }else{
-    const snap=await DB.collection('licenses').get();
-    docs=snap.docs;
+  }catch(e){
+    if(el)el.innerHTML='<div class="bempty" style="color:#7a5b00;background:#fff8e6;border-radius:12px;padding:16px 18px;font-weight:700">🔒 발급 대장을 불러오지 못했습니다.'
+      +'<div style="font-weight:600;font-size:12.5px;margin-top:6px">비어 있는 것이 아니라 조회가 막힌 것입니다. 사무국에 문의해주세요. (오류: '+esc(e.message)+')</div></div>';
+    LICS=[];
+    return;
   }
   LICS=docs.sort((a,b)=>(b.data().issuedAt||'').localeCompare(a.data().issuedAt||''));
   renderLics();
