@@ -865,13 +865,42 @@ function appFilter(f,btn){
   renderApps();
 }
 async function loadApps(){
-  const snap=await DB.collection('schoolApplications').orderBy('createdAt','desc').get();
+  // [관할] 시도연맹 임원은 관할 신청서만 조회합니다. 예전에는 여기서 전체를 불러와
+  //   규칙이 통과시키지 못했고, 오류 안내도 없어 목록이 그냥 비어 보였습니다.
+  //   회원 명단과 같은 방식으로 '관할' 과 '관할 미판정('')' 을 나눠 두 번 조회해 합칩니다.
+  let snap;
+  try{
+    if(IS_SIDO){
+      const mine=((CMY&&CMY.sido)||'');
+      if(!mine)throw new Error('관할 시도가 지정되어 있지 않습니다. 사무국에 관할 시도 지정을 요청해주세요.');
+      const two=await Promise.all([
+        DB.collection('schoolApplications').where('sidoKey','==',mine).get(),
+        DB.collection('schoolApplications').where('sidoKey','==','').get()
+      ]);
+      snap={docs:two[0].docs.concat(two[1].docs)};
+    }else{
+      snap=await DB.collection('schoolApplications').orderBy('createdAt','desc').get();
+    }
+  }catch(e){
+    const el=document.getElementById('appList');
+    if(el)el.innerHTML='<div class="bempty" style="color:#7a5b00;background:#fff8e6;border-radius:12px;padding:16px 18px;font-weight:700">🔒 강습 신청 목록을 불러오지 못했습니다.'
+      +'<div style="font-weight:600;font-size:12.5px;margin-top:6px">비어 있는 것이 아니라 조회가 막힌 것입니다. 사무국에 문의해주세요. (오류: '+esc(e.message)+')</div></div>';
+    APPS=[]; TRASH.apps=[];
+    return;
+  }
   TRASH.apps=snap.docs.filter(d=>{const s=d.data();return s.deleted&&sameSidoApp(s);});
   APPS=snap.docs.filter(d=>{const s=d.data();return !s.deleted&&sameSidoApp(s);});
   try{const g=await DB.collection('goodsConfirms').get();window.GOODS={};g.docs.forEach(x=>window.GOODS[x.id]=x.data());}catch(e){window.GOODS={};}
   await loadMailLog();  // [메일로그] 발송 이력 → 학교 카드 📧 뱃지용
   await loadSchoolHoursPolicy();  // ▶ [시간대검증] 정규수업시간 기준 정책 로드 (2026-08-28)
   renderApps();
+  // [안내] 관할 신청서가 하나도 없을 때는 "없다" 와 "아직 분류 전이다" 를 구분해 알려줍니다.
+  //   기존 신청서에는 관할 항목(sidoKey)이 없어, 사무국이 분류 도구를 돌리기 전까지는 조회되지 않습니다.
+  if(IS_SIDO&&!APPS.length){
+    const el=document.getElementById('appList');
+    if(el)el.innerHTML='<div class="bempty" style="color:#7a5b00;background:#fff8e6;border-radius:12px;padding:16px 18px;font-weight:700">관할 강습 신청이 아직 없습니다.'
+      +'<div style="font-weight:600;font-size:12.5px;margin-top:6px">이전에 접수된 신청서는 사무국이 <b>[🏫 강습 신청서 관할 채우기]</b> 를 실행해야 관할별로 나타납니다. 목록이 계속 비어 있으면 사무국에 문의해주세요.</div></div>';
+  }
 }
 // ══════════ [메일로그] 발송 이력 기록·조회 (siteContent/mailLog, 최근 800건) ══════════
 let MAILLOG={};        // 이메일 주소(소문자) → 최근 발송 기록
@@ -983,7 +1012,14 @@ async function resendSelMail(){
 const SIDO_ALIAS={'서울':['서울'],'인천':['인천'],'경기':['경기'],'강원':['강원'],'대전':['대전'],'세종':['세종'],'충북':['충북','충청북도'],'충남':['충남','충청남도'],'광주':['광주'],'전북':['전북','전라북도'],'전남':['전남','전라남도'],'부산':['부산'],'대구':['대구'],'울산':['울산'],'경북':['경북','경상북도'],'경남':['경남','경상남도'],'제주':['제주'],'전남광주':['광주','전남','전라남도','전남광주']};
 function inSido(str,sido){ const A=SIDO_ALIAS[sido]||[sido]; const s=String(str||''); return A.some(a=>s.indexOf(a)>=0); }
 function sameSidoUser(v){ return !IS_SIDO || inSido(v.sido,CMY.sido) || inSido(v.baseCity,CMY.sido) || inSido(v.region,CMY.sido) || inSido((v.activityRegions||[]).join(' '),CMY.sido); }
-function sameSidoApp(s){ return !IS_SIDO || inSido(s.sido,CMY.sido) || inSido(s.city,CMY.sido) || inSido(s.school,CMY.sido) || inSido(s.region,CMY.sido); }
+function sameSidoApp(s){
+  if(!IS_SIDO)return true;
+  // [관할] 분류가 끝난 신청서는 관할 키(sidoKey)를 기준으로 봅니다 — 보안 규칙과 같은 기준입니다.
+  //   빈 값('')은 '관할 미판정' 이라 어느 시도에도 잡히지 않으므로 함께 보여줍니다.
+  //   아직 분류 전(항목 자체가 없음)인 신청서는 예전처럼 주소 문자열로 판정합니다.
+  if(typeof s.sidoKey==='string')return s.sidoKey===CMY.sido||s.sidoKey==='';
+  return inSido(s.sido,CMY.sido) || inSido(s.city,CMY.sido) || inSido(s.school,CMY.sido) || inSido(s.region,CMY.sido);
+}
 function sameSidoClub(c){ return !IS_SIDO || inSido(c.sido,CMY.sido); }
 function sameSidoComp(s){ return !IS_SIDO || inSido(s.sido,CMY.sido) || inSido(s.region,CMY.sido) || inSido(s.bySido,CMY.sido); }
 
