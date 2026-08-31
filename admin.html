@@ -293,6 +293,8 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <div id="auditBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:16px"></div>
       <div style="margin-bottom:10px"><button class="btn-sub" style="background:#0f766e" onclick="toggleSchoolGroups()">🏫 학교별 회원 보기 (동호회 분류)</button></div>
       <div id="schoolGroupBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:16px"></div>
+      <div style="margin-bottom:10px"><button class="btn-sub" style="background:#7c3aed" onclick="pcCenterScan()">🗂 중앙 승인센터<span id="pcCntBadge" style="display:none;background:#C41E2F;border-radius:999px;padding:1px 8px;margin-left:6px;font-size:11px">0</span></button></div>
+      <div id="pcCenterBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:16px"></div>
       <div class="board" id="userList"><div class="bempty">불러오는 중…</div></div></div>
     <div id="v5" style="display:none">
       <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
@@ -3260,6 +3262,7 @@ async function loadUsers(){
   USERS=snap.docs.filter(d=>{const v=d.data();return !v.deleted&&sameSidoUser(v);});
   await loadLicenses();   // [보유자격] 자격 대장 1회 로드
   renderUsers();
+  pcUpdateBadge();
 }
 function renderInstTable(docs){
   const list=docs.filter(d=>{const v=d.data();const f=v.instructorFor||{};return v.status==='approved'&&(f.school||f.after||f.referee||f.staff)});
@@ -3657,6 +3660,7 @@ function renderUsers(){
       +(v.crimDoc?'<b style="color:#0f766e">✓경력확인</b>':'<b style="color:#C41E2F">✗경력확인 전</b>')+(v.contracts&&Object.keys(v.contracts).length?' · <b style="color:#0f766e">✓위촉계약 '+Object.keys(v.contracts).length+'건 동의</b>':'')
       +(v.certDoc?' · <b style="color:#0f766e">✓자격확인</b>':' · <b style="color:#C41E2F">✗자격 미확인</b>')+((v.consents&&v.consents.agreedAt&&v.crimDoc&&v.certDoc)?' <span style="background:#0f766e;color:#fff;font-weight:900;font-size:11px;padding:2px 10px;border-radius:999px">위촉 가능</span>':'')
       +'</div></div>'
+      +pcBadge(v)
       +(v.status==='approved'
         ?'<span style="font-size:13px;font-weight:800;color:#0f766e">승인됨</span>'
         // [유형분리] 교사(교원)는 재직증명서 확인이 끝나야 승인 가능
@@ -5736,11 +5740,125 @@ async function approveNatCert(uid,on){
   await DB.collection('users').doc(uid).update({natCertApproved:true,natCertApprovedAt:firebase.firestore.FieldValue.serverTimestamp()});
   loadUsers();
 }
+// ══════════ [2단계 결재] 시도연맹 임원 요청 → 중앙(사무국) 최종 승인 ══════════
+//  범위(확정): ① 가입 승인  ② 가입 거절  ③ 회원 기본정보 수정
+//    → 시도연맹 임원은 "요청"만 남기고, 실제 반영은 중앙이 승인센터에서 확정합니다.
+//  클럽·임원·대회 운영은 기존대로 즉시 반영합니다(범위 확대 금지).
+//  자격증 결과보고 승인은 license.html 에 이미 2단계(제출→중앙승인)로 구현되어 있습니다.
+const PC_LABEL={approve:'가입 승인',reject:'가입 거절',edit:'정보 수정'};
+function pcBadge(v){
+  const p=v&&v.pendingChanges; if(!p)return '';
+  if(p.status==='대기')
+    return '<span style="background:#7c3aed;color:#fff;font-weight:900;font-size:11px;padding:2px 10px;border-radius:999px" title="'+esc((p.byName||'')+' 요청')+'">⏳ 중앙승인 대기 · '+esc(PC_LABEL[p.kind]||p.kind||'')+'</span>';
+  if(p.status==='반려')
+    return '<span style="background:#C41E2F;color:#fff;font-weight:900;font-size:11px;padding:2px 10px;border-radius:999px" title="'+esc(p.remand||'')+'">⛔ 중앙 반려</span>';
+  return '';
+}
+// 시도연맹 임원이 실행하면 즉시 반영 대신 결재 요청을 남긴다
+async function pcRequest(uid,kind,extra){
+  const me=(AUTH.currentUser&&AUTH.currentUser.uid)||'';
+  const rec=Object.assign({kind:kind,status:'대기',by:me,byName:((CMY&&CMY.name)||''),bySido:((CMY&&CMY.sido)||''),at:new Date().toISOString()},extra||{});
+  try{
+    await DB.collection('users').doc(uid).update({pendingChanges:rec});
+    alert('📨 중앙 결재 요청이 접수되었습니다.\n\n· 요청 내용: '+(PC_LABEL[kind]||kind)+'\n· 사무국(중앙) 승인 후 실제로 반영됩니다.');
+    loadUsers();
+  }catch(e){
+    alert('요청 실패: '+e.message+'\n(권한 규칙에 막혔을 수 있습니다 — 사무국에 문의해주세요)');
+  }
+}
+// 대기 중인 결재 요청 — 이미 불러온 회원 목록에서 추립니다(추가 조회·색인 불필요)
+function pcPendingList(){
+  return (USERS||[]).map(function(d){return {id:d.id,v:d.data()||{}}})
+    .filter(function(x){const p=x.v.pendingChanges;return p&&p.status==='대기'});
+}
+function pcUpdateBadge(){
+  const el=document.getElementById('pcCntBadge'); if(!el)return;
+  const n=pcPendingList().length;
+  el.textContent=n; el.style.display=n?'inline-block':'none';
+}
+function pcBoxEl(){const b=document.getElementById('pcCenterBox');b.style.display='block';return b}
+let PCLIST=[];
+function pcCenterScan(){
+  const b=pcBoxEl();
+  PCLIST=pcPendingList();
+  if(!PCLIST.length){
+    b.innerHTML='<b style="color:#0f766e">✅ 대기 중인 결재 요청이 없습니다.</b>'
+      +'<div style="font-size:12.5px;color:#6b7280;margin-top:6px">시도연맹 임원이 회원 가입 승인·거절·정보수정을 요청하면 이곳에 표시됩니다.</div>';
+    return;
+  }
+  const rows=PCLIST.map(function(x){
+    const p=x.v.pendingChanges||{};
+    const detail=(p.kind==='reject')?('사유: '+esc(p.reason||''))
+      :(p.kind==='edit')?('변경: '+Object.keys(p.patch||{}).map(function(k){return esc(k)+' → '+esc(String((p.patch||{})[k]))}).join(' · '))
+      :'가입 승인 요청';
+    return '<tr><td><b>'+esc(x.v.name||'')+'</b><div style="font-size:11.5px;color:#8a919d">'+esc(x.v.email||'')+'</div></td>'
+      +'<td><span style="background:#7c3aed;color:#fff;font-weight:900;font-size:11px;padding:2px 9px;border-radius:999px">'+esc(PC_LABEL[p.kind]||p.kind||'')+'</span></td>'
+      +'<td style="font-size:12px">'+esc(p.byName||'')+'<div style="color:#8a919d">'+esc(p.bySido||'')+'</div></td>'
+      +'<td style="font-size:12px">'+esc(String(p.at||'').slice(0,16).replace('T',' '))+'</td>'
+      +'<td style="font-size:12px">'+detail+'</td>'
+      +'<td style="white-space:nowrap">'
+      +'<button class="btn-sub" style="background:#0f766e;padding:4px 12px;font-size:12px" onclick="pcApprove(\''+x.id+'\')">✅ 승인</button> '
+      +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F;padding:4px 12px;font-size:12px" onclick="pcRemand(\''+x.id+'\')">반려</button></td></tr>';
+  }).join('');
+  b.innerHTML='<div style="font-weight:900;font-size:15.5px;margin-bottom:6px">🗂 중앙 승인센터 — 대기 '+PCLIST.length+'건</div>'
+    +'<div style="font-size:12.5px;color:#6b7280;margin-bottom:10px;line-height:1.7">시도연맹 임원이 올린 요청입니다. <b>승인</b>해야 실제로 반영되며, <b>반려</b> 시 사유가 요청자에게 표시됩니다.</div>'
+    +'<div class="tblwrap"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:720px"><thead><tr><th>회원</th><th>요청</th><th>요청자</th><th>요청일시</th><th>내용</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+async function pcApprove(uid){
+  const it=PCLIST.find(function(x){return x.id===uid}); if(!it)return;
+  const p=it.v.pendingChanges||{};
+  if(!confirm('['+(it.v.name||'')+'] '+(PC_LABEL[p.kind]||p.kind)+' 요청을 승인합니다.\n요청자: '+(p.byName||'')+' ('+(p.bySido||'')+')\n\n진행할까요?'))return;
+  const del=firebase.firestore.FieldValue.delete();
+  try{
+    if(p.kind==='approve'){
+      await approve(uid);                                   // 기존 승인 로직 그대로 실행
+      const re=await DB.collection('users').doc(uid).get();
+      if(((re.data()||{}).status)!=='approved'){
+        alert('승인이 완료되지 않았습니다. 화면 안내를 확인한 뒤 다시 시도해주세요.\n(요청은 그대로 보관됩니다)');
+        return;
+      }
+      await DB.collection('users').doc(uid).update({pendingChanges:del});
+    }else if(p.kind==='reject'){
+      await pcDoReject(uid,p.reason||'');
+      await DB.collection('users').doc(uid).update({pendingChanges:del});
+    }else if(p.kind==='edit'){
+      const patch=Object.assign({},p.patch||{});
+      patch.pendingChanges=del;
+      await DB.collection('users').doc(uid).update(patch);
+      alert('✓ 정보 수정이 반영되었습니다: '+Object.keys(p.patch||{}).join(', '));
+    }else{
+      alert('알 수 없는 요청 유형입니다: '+(p.kind||''));return;
+    }
+    try{ if(typeof KFDF!=='undefined'&&KFDF.notify&&p.by)KFDF.notify(p.by,'✅ 요청하신 ['+(PC_LABEL[p.kind]||p.kind)+']이(가) 중앙에서 승인되었습니다','admin.html'); }catch(e){}
+    await loadUsers(); pcCenterScan();
+  }catch(e){ alert('승인 처리 실패: '+e.message); }
+}
+async function pcRemand(uid){
+  const r=prompt('반려 사유를 입력하세요 (요청한 시도연맹 임원에게 표시됩니다)');
+  if(r===null)return;
+  if(!r.trim()){alert('사유를 입력해야 합니다.');return}
+  const it=PCLIST.find(function(x){return x.id===uid});
+  const by=it&&it.v.pendingChanges&&it.v.pendingChanges.by;
+  try{
+    await DB.collection('users').doc(uid).update({
+      'pendingChanges.status':'반려','pendingChanges.remand':r.trim(),'pendingChanges.remandAt':new Date().toISOString()});
+    try{ if(typeof KFDF!=='undefined'&&KFDF.notify&&by)KFDF.notify(by,'⛔ 요청이 반려되었습니다 — 사유: '+r.trim(),'admin.html'); }catch(e){}
+    alert('반려 처리되었습니다.');
+    await loadUsers(); pcCenterScan();
+  }catch(e){ alert('반려 처리 실패: '+e.message); }
+}
 // ── 가입 거절 (사유 필수 — 회원 마이페이지에 표시 + 알림/메일 발송, 보완 후 재검토 요청 가능) ──
 async function rejectUser(uid,name){
   const reason=prompt('🚫 ['+(name||'')+'] 가입 거절/보완요청 사유를 입력하세요.\n(회원 마이페이지에 그대로 표시되고 메일로도 발송됩니다)\n\n예: 이름을 한글 실명으로 수정해주세요 / 국가자격증 사본을 첨부해주세요');
   if(reason===null)return;
   if(!reason.trim()){alert('사유를 입력해야 합니다.');return}
+  // [2단계 결재] 시도연맹 임원의 거절도 중앙 승인 후 반영됩니다
+  if(IS_SIDO){ return pcRequest(uid,'reject',{reason:reason.trim()}); }
+  return pcDoReject(uid,reason.trim());
+}
+// 실제 거절 처리 (중앙 전용 — 시도임원 요청은 승인센터를 통해 이 함수로 들어옵니다)
+async function pcDoReject(uid,reason){
+  reason=String(reason||'');
   try{
     await DB.collection('users').doc(uid).update({status:'거절',rejectReason:reason.trim(),rejectedAt:firebase.firestore.FieldValue.serverTimestamp(),reviewReqAt:firebase.firestore.FieldValue.delete()});
     const d=(await DB.collection('users').doc(uid).get()).data();
@@ -5762,6 +5880,8 @@ async function editUserBasic(uid){
     if(birth.trim()!==(d.birth||''))upd.birth=birth.trim();
     if(phone.trim()!==(d.phone||''))upd.phone=phone.trim();
     if(!Object.keys(upd).length){alert('변경된 내용이 없습니다.');return}
+    // [2단계 결재] 시도연맹 임원의 정보수정은 중앙 승인 후 반영됩니다
+    if(IS_SIDO){ return pcRequest(uid,'edit',{patch:upd}); }
     await DB.collection('users').doc(uid).update(upd);
     alert('✓ 수정 완료: '+Object.keys(upd).join(', '));
     loadUsers();
@@ -5822,6 +5942,8 @@ async function approve(uid){
   const doc=await DB.collection('users').doc(uid).get();
   const d=doc.data();
   if(IS_SIDO && !sameSidoUser(d)){alert('관할 시도가 아닌 회원입니다.');return;}
+  // [2단계 결재] 시도연맹 임원은 즉시 승인하지 않고 중앙에 결재를 요청합니다
+  if(IS_SIDO){ return pcRequest(uid,'approve'); }
   // 국가공인 체육지도사 자격을 신고했는데 아직 사본 미확인이면 승인 보류(사무국이 직접 확인해야 함)
   if(d.natCertName&&!d.natCertApproved&&!d.natCertGateWaived){
     alert('🏅 ['+(d.name||'')+'] 국가공인 체육지도사 자격("'+d.natCertName+'")을 신고했으나 아직 확인되지 않았습니다.\n회원목록에서 첨부된 자격증 사본을 먼저 확인·승인해주세요.'+(d.natCertDoc?'':'\n(아직 사본이 첨부되지 않았습니다 — 회원이 마이페이지에서 첨부할 때까지 기다려야 합니다)'));
