@@ -280,6 +280,13 @@ async function savePerm(uid){
       // 관할 시도 필수 — 미설정 시 staff.html canDecide() 범위 검증이 작동하지 않습니다
       if(!sido){alert('⚠️ 관할 시도를 반드시 선택해주세요.\n\n시도 미설정 시 해당 임원이 모든 시도의 공고를 관리할 수 있게 됩니다.');return}
       upd.sido=sido;
+      // [자격업무] 자격 화면은 '연맹' 단위(예: 부산연맹 = 부산·울산)로 관할을 봅니다.
+      //   예전에는 여기서 이 값을 저장하지 않아, 시도임원을 아무리 다시 지정해도
+      //   자격 관할이 비어 있는 채로 남았습니다. 지정과 동시에 채워 둡니다.
+      if(roles.indexOf('sidoOfficer')>=0){
+        const fed=Object.keys(PM_EXP).filter(function(f){return PM_EXP[f].indexOf(sido)>=0})[0];
+        if(fed)upd.managedSido=PM_EXP[fed].slice();
+      }
       if(roles.indexOf('gugunOfficer')>=0){
         const g=document.getElementById('pmGugun').value;
         if(!g){alert('관할 시군구를 선택해주세요.');return}
