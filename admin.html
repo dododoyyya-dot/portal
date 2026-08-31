@@ -6238,8 +6238,24 @@ async function editChildAdmin(uid,idx){
       updatedAt:new Date().toISOString(),
       updatedBy:'admin'
     });
-    kids[idx]=nk;
-    await DB.collection('users').doc(uid).update({children:kids});
+    // [동시 편집] 입력창을 띄워둔 사이 보호자가 마이페이지에서 자녀를 더하거나 지웠을 수 있습니다.
+    //   불러둔 명단을 통째로 덮어쓰면 그 자녀가 사라지므로, 저장 직전에 다시 읽어 해당 자녀만 바꿉니다.
+    const ref=DB.collection('users').doc(uid);
+    let ok=false;
+    await DB.runTransaction(async function(tx){
+      const snap=await tx.get(ref);
+      const cur=(((snap.data()||{}).children)||[]).slice();
+      let j=-1;
+      if(k.cid)j=cur.findIndex(function(x){return x.cid===k.cid});
+      else if(cur[idx]&&String(cur[idx].name||'')===String(k.name||'')&&String(cur[idx].birth||'')===String(k.birth||''))j=idx;
+      if(j<0)return;                       // 그 자녀가 사라졌으면 아무것도 쓰지 않습니다
+      const c=cur[j];
+      const h=(c.schoolHistory||[]).slice();
+      if(newSchool!==(c.school||'')&&(c.school||''))h.push({school:c.school,at:new Date().toISOString()});
+      cur[j]=Object.assign({},c,nk,{schoolHistory:h});
+      ok=true; tx.update(ref,{children:cur});
+    });
+    if(!ok){alert('그 사이 보호자가 자녀 명단을 변경해 수정하지 못했습니다.\n새로고침 후 다시 시도해주세요.');return}
     alert('✓ 자녀 정보를 수정했습니다.');
     showMemberModal(uid);
   }catch(e){alert('수정 실패: '+e.message)}

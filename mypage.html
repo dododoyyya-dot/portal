@@ -1078,26 +1078,48 @@ function renderKids(){
       +'</div>'}).join('');
 }
 // 자녀 정보 수정 — 진학·전학 시 소속 학교 변경 (초→중→고, 미변경 시 그대로 유지)
+// [동시 편집] 자녀 명단은 보호자(이 화면)와 사무국(관리자 화면)이 동시에 고칠 수 있습니다.
+//   화면에 불러둔 명단을 통째로 덮어쓰면, 그 사이 사무국이 고친 내용이 사라지거나
+//   순서가 밀려 엉뚱한 자녀가 지워질 수 있습니다.
+//   → 저장 직전에 최신 명단을 다시 읽고, 자녀는 순번이 아니라 고유 식별자(cid)로 찾습니다.
+async function kidsSave(mutate){
+  const ref=DB.collection('users').doc(AUTH.currentUser.uid);
+  let saved=null;
+  await DB.runTransaction(async function(tx){
+    const snap=await tx.get(ref);
+    const cur=(((snap.data()||{}).children)||[]).slice();
+    const next=mutate(cur);
+    if(!next)return;                       // 대상이 사라졌으면 아무것도 쓰지 않습니다
+    saved=next; tx.update(ref,{children:next});
+  });
+  if(saved){MYD.children=saved;renderKids();}
+  return saved;
+}
 async function editKid(i){
   const kids=((MYD&&MYD.children)||[]).slice();
   const k=kids[i];if(!k)return;
   const nv=prompt('['+k.name+'] 소속 학교·학년 변경\n(진학·전학 시 새 학교로 바꿔주세요. 예: ○○중학교 1학년)\n\n현재: '+(k.school||'미입력'),k.school||'');
   if(nv===null)return;
-  const old=k.school||'';
-  const changed=nv.trim()!==old;
-  const hist=(k.schoolHistory||[]).slice();
-  if(changed && old){
-    hist.push({school:old, at:new Date().toISOString()});
-  }
-  kids[i]=Object.assign({},k,{
-    school:nv.trim(),
-    schoolNorm:normSchool(nv.trim()),
-    schoolHistory:hist,
-    updatedAt:new Date().toISOString()
-  });
+  const cid=k.cid;
   try{
-    await DB.collection('users').doc(AUTH.currentUser.uid).update({children:kids});
-    MYD.children=kids;renderKids();
+    // 학교 이력은 화면에 불러둔 값이 아니라 '최신 기록(c)' 을 기준으로 쌓습니다
+    //   — 그 사이 사무국이 남긴 이력을 지우지 않기 위해서입니다.
+    const ok=await kidsSave(function(cur){
+      const j=cur.findIndex(function(x){return x.cid===cid});
+      if(j<0)return null;
+      const c=cur[j];
+      const old=c.school||'';
+      const hist=(c.schoolHistory||[]).slice();
+      if(nv.trim()!==old && old)hist.push({school:old, at:new Date().toISOString()});
+      cur[j]=Object.assign({},c,{
+        school:nv.trim(),
+        schoolNorm:normSchool(nv.trim()),
+        schoolHistory:hist,
+        updatedAt:new Date().toISOString()
+      });
+      return cur;
+    });
+    if(!ok)alert('그 사이 자녀 정보가 바뀌어 저장하지 못했습니다.\n화면을 새로고침한 뒤 다시 시도해주세요.');
   }catch(e){alert('저장 실패: '+e.message)}
 }
 // ── 보호자-자녀 본인계정 연동 (Firebase 전화인증 기반, 6자리 코드) ──
@@ -1306,19 +1328,26 @@ async function addKid(){
   const age=ageOf(birth);
   if(age>=18){m.textContent='만 18세 이상은 본인 계정으로 가입해주세요';m.style.color='#C41E2F';return}
   if(!document.getElementById('kidConsent').checked){m.textContent='법정대리인 동의에 체크해주세요';m.style.color='#C41E2F';return}
-  const kids=((MYD&&MYD.children)||[]).slice();
-  kids.push({cid:newCid(),name:name,birth:birth,gender:gender,school:school,schoolNorm:normSchool(school),consentAt:new Date().toISOString(),parentName:MYD.name||''});
+  const kid={cid:newCid(),name:name,birth:birth,gender:gender,school:school,schoolNorm:normSchool(school),consentAt:new Date().toISOString(),parentName:MYD.name||''};
   try{
-    await DB.collection('users').doc(AUTH.currentUser.uid).update({children:kids});
-    MYD.children=kids;renderKids();
+    await kidsSave(function(cur){cur.push(kid);return cur});
     document.getElementById('kidName').value='';document.getElementById('kidSchool').value='';document.getElementById('kidConsent').checked=false;
     m.textContent='✓ 자녀가 등록되었습니다';m.style.color='#0f766e';
   }catch(e){m.textContent='저장 실패: '+(e.code==='permission-denied'?'권한 오류 — 사무국에 문의해주세요':e.message);m.style.color='#C41E2F'}
 }
 async function delKid(i){
-  if(!confirm('이 자녀 프로필을 삭제할까요?'))return;
-  const kids=((MYD&&MYD.children)||[]).slice();kids.splice(i,1);
-  try{await DB.collection('users').doc(AUTH.currentUser.uid).update({children:kids});MYD.children=kids;renderKids();}catch(e){alert('삭제 실패: '+e.message)}
+  const k=((MYD&&MYD.children)||[])[i]; if(!k)return;
+  // 누구를 지우는지 이름으로 확인받고, 실제 삭제도 순번이 아니라 cid 로 지목합니다.
+  if(!confirm('['+(k.name||'이름없음')+'] 자녀 프로필을 삭제할까요?'))return;
+  const cid=k.cid;
+  try{
+    const ok=await kidsSave(function(cur){
+      const j=cur.findIndex(function(x){return x.cid===cid});
+      if(j<0)return null;
+      cur.splice(j,1);return cur;
+    });
+    if(!ok){alert('이미 삭제된 자녀입니다.');renderKids();}
+  }catch(e){alert('삭제 실패: '+e.message)}
 }
 async function saveProfile(){
   if(PFBUSY)return;PFBUSY=true;
