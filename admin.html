@@ -6076,9 +6076,12 @@ function pcBadge(v){
   return '';
 }
 // 시도연맹 임원이 실행하면 즉시 반영 대신 결재 요청을 남긴다
+// 보안 규칙이 확인하는 동작 이름 (규칙: action in ['approve','reject','editBasic'])
+const PC_ACTION={approve:'approve',reject:'reject',edit:'editBasic'};
 async function pcRequest(uid,kind,extra){
   const me=(AUTH.currentUser&&AUTH.currentUser.uid)||'';
-  const rec=Object.assign({kind:kind,status:'대기',by:me,byName:((CMY&&CMY.name)||''),bySido:((CMY&&CMY.sido)||''),at:new Date().toISOString()},extra||{});
+  // kind = 화면 표시용, action = 보안 규칙 검증용 (두 이름을 함께 기록합니다)
+  const rec=Object.assign({kind:kind,action:(PC_ACTION[kind]||kind),status:'대기',by:me,byName:((CMY&&CMY.name)||''),bySido:((CMY&&CMY.sido)||''),at:new Date().toISOString()},extra||{});
   try{
     await DB.collection('users').doc(uid).update({pendingChanges:rec});
     alert('📨 중앙 결재 요청이 접수되었습니다.\n\n· 요청 내용: '+(PC_LABEL[kind]||kind)+'\n· 사무국(중앙) 승인 후 실제로 반영됩니다.');
