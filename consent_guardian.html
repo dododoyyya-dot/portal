@@ -9,8 +9,8 @@
 body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;color:#111;margin:0;padding:24px;background:#f2f3f6}
 .paper{max-width:720px;margin:0 auto;background:#fff;padding:34px 40px;box-shadow:0 4px 18px rgba(0,0,0,.08)}
 h1{text-align:center;font-size:22px;letter-spacing:6px;border:2.5px solid #222;padding:13px;margin:0 0 4px}
-.sub{text-align:center;font-size:12px;color:#666;margin-bottom:18px}
 h2{font-size:14.5px;margin:20px 0 7px;color:#153A77}
+.sub{text-align:center;font-size:12px;color:#666;margin-bottom:18px}
 table{width:100%;border-collapse:collapse;margin-top:6px}
 th{border:1px solid #555;background:#f2f2f2;padding:8px 9px;font-size:13px;width:110px;font-weight:800}
 td{border:1px solid #555;padding:8px 9px;font-size:13px;height:18px}
@@ -18,23 +18,34 @@ p,li{font-size:12.8px;line-height:1.85;margin:5px 0}
 .chk{display:flex;gap:22px;justify-content:center;margin:9px 0;padding:9px;background:#fafaf3;border:1.2px solid #d8d2bd;border-radius:7px;font-size:13.5px;font-weight:800}
 .sign{display:flex;justify-content:space-between;align-items:flex-end;margin-top:22px;font-size:13.5px;font-weight:700;flex-wrap:wrap;gap:10px}
 .noprint{text-align:center;margin:18px auto;max-width:720px}
-.noprint button{background:#153A77;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}
+.noprint button,.noprint a.sw{background:#153A77;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-block}
+.noprint a.sw{background:#fff;color:#153A77;border:1.5px solid #153A77;padding:10px 18px;font-size:13px;margin-left:8px}
+/* ── 강서구청장배 양식 전용 ── */
+.gs h1{font-size:21px;letter-spacing:3px;line-height:1.5;margin-bottom:18px}
+.gs th{width:150px;text-align:left;padding:9px}
+.gs td{padding:9px;height:20px}
+.gs .meta{font-size:13.5px;font-weight:800;margin:6px 0}
+.gs .pledge{margin:18px 0 6px;padding:12px 14px;background:#fafaf3;border:1.2px solid #d8d2bd;border-radius:7px;font-size:13.5px;font-weight:800;text-align:center}
+.gs .date{text-align:center;font-size:14px;font-weight:800;margin:26px 0 14px;letter-spacing:2px}
+.gs .sign{justify-content:flex-end;gap:36px;margin:8px 0}
+.gs .to{text-align:center;font-size:14px;font-weight:900;margin-top:26px;letter-spacing:1px}
 @media print{body{background:#fff;padding:0}.paper{box-shadow:none;padding:0}.noprint{display:none}}
 </style>
 </head>
 <body>
-<div class="noprint"><button onclick="window.print()">🖨 인쇄 · PDF 저장</button>
+<div class="noprint"><button onclick="window.print()">🖨 인쇄 · PDF 저장</button><a class="sw" id="swLink" href="?form=gangseo">다른 양식 보기 →</a>
 <div style="font-size:12px;color:#666;margin-top:6px">작성 후 인솔자(지도교사·클럽장·보호자 대표)가 수합하여 보관하고, 대회 신청 화면에서 사진·스캔본을 업로드해 주세요.</div></div>
 
-<div class="paper">
+<!-- ═══ 양식 ① 연맹 기본 — 보호자 동의서 (기본값) ═══ -->
+<div class="paper" id="fBasic">
   <div class="sub">대한민국플라잉디스크연맹 주최·주관 대회</div>
   <h1>대회 참가 보호자 동의서</h1>
   <div class="sub">— 만 18세 미만 참가자용 (서면 제출) —</div>
 
   <h2>1. 대회 정보</h2>
   <table>
-    <tr><th>대 회 명</th><td></td></tr>
-    <tr><th>대회 일자</th><td></td><th style="border-left:1px solid #555">장 소</th><td></td></tr>
+    <tr><th>대 회 명</th><td id="bTitle"></td></tr>
+    <tr><th>대회 일자</th><td id="bDate"></td><th style="border-left:1px solid #555">장 소</th><td id="bPlace"></td></tr>
     <tr><th>참가 팀명</th><td></td><th style="border-left:1px solid #555">부 문</th><td></td></tr>
   </table>
 
@@ -66,5 +77,73 @@ p,li{font-size:12.8px;line-height:1.85;margin:5px 0}
   본 동의서는 팀 인솔자(지도교사·클럽장·보호자 대표)가 수합하여 대회 종료 후 보유기간까지 보관하며,
   연맹 홈페이지 대회 신청 화면에서 사진·스캔본을 업로드해 제출합니다. 문의: 사무국 031-984-3248 / kfdf60@hanmail.net</p>
 </div>
+
+<!-- ═══ 양식 ② 강서구청장배 — 참가 동의서 (2026 강서구청장배 HWP 양식을 그대로 옮김) ═══
+     대회 공고 작성에서 [강서구청장배 — 참가 동의서]를 고른 대회에서 열립니다(주소 form=gangseo).
+     대회명·일시·장소는 t·d·p 값으로 채워지고, 없으면 강서구청장배 기본값이 표시됩니다. -->
+<div class="paper gs" id="fGangseo" style="display:none">
+  <h1 id="gTitle">2026년 강서구청장배 플라잉디스크 대회 참가 동의서</h1>
+
+  <div class="meta">대회 일시 : <span id="gDate">2026년 9월 20일 일요일 08시~13시(예상)</span></div>
+  <div class="meta">장&nbsp;&nbsp;&nbsp;&nbsp;소 : <span id="gPlace">명지동 근린공원 잔디 구장</span></div>
+
+  <h2>참가자 정보</h2>
+  <table>
+    <tr><th>성명</th><td></td></tr>
+    <tr><th>생년월일</th><td></td></tr>
+    <tr><th>성별</th><td></td></tr>
+    <tr><th>연락처</th><td></td></tr>
+    <tr><th>소속(학교 및 클럽명)</th><td></td></tr>
+    <tr><th>보호자 연락처</th><td></td></tr>
+  </table>
+
+  <div class="pledge">상기 본인은 상기 대회에 출전함을 보호자(법정대리인)가 동의합니다.</div>
+
+  <h2>개인정보수집 및 이용 동의서</h2>
+  <p>□ 수집 항목 : 성명, 생년월일, 성별, 소속, 연락처</p>
+  <p>□ 이용 목적 : 대회 참가 관리, 행사 보험 가입, 기록 관리</p>
+  <p>□ 보유 기간 : 대회 종료 후 1년</p>
+  <p style="font-size:12px;color:#555">※ 동의를 거부할 권리가 있으며, 거부 시 대회 참가가 제한 될 수 있습니다.</p>
+
+  <div class="date"><span id="gYr">2026</span> 년&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;일</div>
+  <div class="sign"><span>신청인(참가자) :&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(서명)</span></div>
+  <div class="sign"><span>보호자(법정대리인) :&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(서명)</span></div>
+
+  <div class="to" id="gTo">2026년 부산강서구청장배 플라잉디스크대회 운영위원회 귀중</div>
+</div>
+
+<script>
+// 주소 값: form(basic|gangseo) · t(대회명) · d(일시) · p(장소). 대회 신청 화면의 링크가 채워서 엽니다.
+(function(){
+  try{
+    var q=new URLSearchParams(location.search);
+    var form=(q.get('form')||'basic').trim();
+    var t=(q.get('t')||'').trim(), d=(q.get('d')||'').trim(), p=(q.get('p')||'').trim();
+    var yr=(d.match(/20\d\d/)||[])[0]||'2026';
+    var gs=(form==='gangseo');
+    document.getElementById('fBasic').style.display=gs?'none':'block';
+    document.getElementById('fGangseo').style.display=gs?'block':'none';
+    // 다른 양식 보기 — 같은 대회 정보를 유지한 채 양식만 바꿉니다
+    var sw=document.getElementById('swLink');
+    var keep='&t='+encodeURIComponent(t)+'&d='+encodeURIComponent(d)+'&p='+encodeURIComponent(p);
+    sw.href='?form='+(gs?'basic':'gangseo')+keep;
+    sw.textContent=gs?'연맹 기본 양식 보기 →':'강서구청장배 양식 보기 →';
+    if(gs){
+      if(t){
+        document.getElementById('gTitle').textContent=(/^20\d\d/.test(t)?'':yr+'년 ')+t+' 참가 동의서';
+        document.getElementById('gTo').textContent=t+' 운영위원회 귀중';
+        document.title=t+' 참가 동의서 | 대한민국플라잉디스크연맹';
+      }
+      if(d)document.getElementById('gDate').textContent=d;
+      if(p)document.getElementById('gPlace').textContent=p; else if(t)document.getElementById('gPlace').textContent='';
+      document.getElementById('gYr').textContent=yr;
+    }else{
+      if(t){document.getElementById('bTitle').textContent=t;document.title=t+' 보호자 동의서 | 대한민국플라잉디스크연맹';}
+      if(d)document.getElementById('bDate').textContent=d;
+      if(p)document.getElementById('bPlace').textContent=p;
+    }
+  }catch(e){}
+})();
+</script>
 </body>
 </html>

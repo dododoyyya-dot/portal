@@ -5821,6 +5821,7 @@ async function govPayroll(id){
       org:sv.org||ud.fedName||((ud.affiliation||[])[0]==='시도연맹'?((ud.region||'').split('·')[0]+'플라잉디스크연맹'):(ud.workSchool||'')),
       role:role,base:(sv.base!=null?sv.base:df.base),over:(sv.over!=null?sv.over:df.over),extra:(sv.extra!=null?sv.extra:df.extra),
       bank:ud.bank||'',accountNum:ud.accountNum||'',rrn:rrn,
+      phone:ud.phone||'',                                   // [연락처] 주최기관·타 시도 연락용
       signed:compSigned(ud,id,compKey(c)),
       signImg:compSignImg(ud,id,compKey(c))});
   }
@@ -5941,10 +5942,10 @@ function govPayCSV(){
   const s=GOVPAY_CTX.s;const data=gpGather();
   const date=document.getElementById('gpDate').value.trim()||s.date||'';
   const time=document.getElementById('gpTime').value.trim()||'09:00~17:00';
-  const rows=[['연번','일시','소속','성명','수당종류','횟수','기본','초과','가산','계','은행명','계좌번호','주민등록번호','서명']];
-  data.forEach((r,i)=>rows.push([i+1,date+' '+time,r.org,r.name,r.role,1,r.base,r.over,r.extra,r.sum,r.bank,r.accountNum,r.rrn,r.signed?'전자서명':'']));
+  const rows=[['연번','일시','소속','성명','휴대전화','수당종류','횟수','기본','초과','가산','계','은행명','계좌번호','주민등록번호','서명']];
+  data.forEach((r,i)=>rows.push([i+1,date+' '+time,r.org,r.name,r.phone||'',r.role,1,r.base,r.over,r.extra,r.sum,r.bank,r.accountNum,r.rrn,r.signed?'전자서명':'']));
   const tot=data.reduce((a,r)=>({b:a.b+r.base,o:a.o+r.over,e:a.e+r.extra,s:a.s+r.sum}),{b:0,o:0,e:0,s:0});
-  rows.push(['합계','','','','','',tot.b,tot.o,tot.e,tot.s,'','','','']);
+  rows.push(['합계','','','','','','',tot.b,tot.o,tot.e,tot.s,'','','','']);
   const csv='\ufeff'+rows.map(r=>r.map(x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));

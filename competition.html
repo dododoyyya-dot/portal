@@ -59,6 +59,11 @@
 .rolechip{position:relative;border:1.5px solid #c9d6ec;background:#fff;color:#153A77;font-weight:800;font-size:13px;padding:9px 16px;border-radius:999px;cursor:pointer;font-family:inherit;transition:all .15s}
 .rolechip:hover{border-color:#153A77}
 .rolechip.on{background:#153A77;color:#fff;border-color:#153A77;box-shadow:0 3px 10px rgba(21,58,119,.3)}
+/* [버튼식] 대회 공고 작성 폼의 선택칩 — 심판 모집 공고와 같은 클릭 선택 방식 */
+.cc2chip{border:1.5px solid #dfe5ee;background:#f6f8fb;color:#333;font-weight:700;font-size:12.5px;padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit;margin:4px 4px 0 0}
+.cc2chip:hover{border-color:#153A77;color:#153A77}
+.cc2chip.on{background:#153A77;color:#fff;border-color:#153A77}
+.cc2chip.add{background:#fff;border-style:dashed;color:#153A77}
 .rolechip .rk{position:absolute;top:-7px;right:-5px;background:#C41E2F;color:#fff;font-size:10px;font-weight:900;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center}
 .clause{font-size:12px;color:#4b5563;line-height:1.8;background:#f8fafc;border-radius:10px;padding:11px 14px;margin-top:11px}
 .sigwrap{border:1.5px dashed #b9cdec;border-radius:12px;background:repeating-linear-gradient(0deg,#fff,#fff 28px,#fbfdff 28px,#fbfdff 29px)}
@@ -252,7 +257,28 @@ function ageOf(birth){
 function ageState(r){
   const a=(r&&r.birth)?ageOf(r.birth):0;
   if(r&&r.birth&&a>0)return a<18?'minor':'adult';
+  // [성인표시] 생년월일이 비어 있어도, 성인 계정(일반·강사·교사 회원, 클럽의 성인 회원)으로
+  //   확인된 사람은 성인으로 봅니다. 예전에는 이런 분들이 전부 '생년월일 없음'으로만 떠서
+  //   성인인데도 확인 대상에 섞여 있었습니다. 힌트(adultAcct)는 신청 시 저장되고,
+  //   담당자 화면에서는 예전 신청 건도 회원 정보로 보강합니다(enrichAges).
+  if(r&&r.adultAcct===true)return 'adult';
   return 'unknown';
+}
+// [성인표시] 담당자 화면용 — 생년월일이 없는 개인 신청 건을 회원 문서로 보강합니다 (조회 권한자만).
+const _UCACHE={};
+async function enrichAges(list){
+  if(!isCompStaff())return;
+  const need=(list||[]).filter(c=>!c.team&&c.uid&&!c.birth&&c.adultAcct!==true);
+  await Promise.all(need.map(async c=>{
+    try{
+      if(!_UCACHE[c.uid]){const d=await DB.collection('users').doc(c.uid).get();_UCACHE[c.uid]=d.exists?(d.data()||{}):{};}
+      const u=_UCACHE[c.uid];
+      if(!c.kid){                       // 자녀 참가는 보호자 계정 정보로 판단할 수 없으므로 제외
+        if(u.birth)c.birth=u.birth;
+        else if(u.memberGroup&&u.memberGroup!=='student'&&u.accountType!=='student')c.adultAcct=true;
+      }
+    }catch(e){}
+  }));
 }
 // 학교명으로 미성년을 강하게 추정 (생년월일이 없을 때 담당자 판단을 돕기 위한 참고 표시)
 function looksMinorSchool(s){
@@ -507,6 +533,53 @@ function mname(n){
   return n[0]+'*'.repeat(n.length-2)+n[n.length-1];
 }
 // 유효 신청 목록 (키별 최신 항목)
+// ══════════ [명단제공] 참가자 명단 엑셀(CSV) — 주최기관 제출용 ══════════
+//  · 팀 신청은 팀원 한 명이 한 행, 개인 신청은 한 행.
+//  · 연락처·주소는 "명단 제공 동의" 가 있는 참가자만 채웁니다(개인은 본인 동의, 팀은 인솔자 확인).
+//    동의가 없으면 그 칸은 비우고 '동의' 열에 X 로 남겨, 담당자가 따로 확인할 수 있게 합니다.
+//  · 회원 계정인데 연락처·주소가 비어 있으면(예전 신청 건) 조회 권한자에 한해 회원 정보에서 보충합니다.
+async function exportRosterCsv(id){
+  if(!isCompStaff()){alert('담당자만 내려받을 수 있습니다.');return}
+  const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
+  const s=doc.data();
+  const list=compClaimList(s);
+  await enrichAges(list);
+  const stLbl=st=>st==='adult'?'성인':(st==='minor'?'미성년':'확인필요');
+  const rows=[];
+  for(const c of list){
+    if(c.team){
+      const ok=!!c.pconsent;
+      (c.roster||[]).forEach(r=>{
+        rows.push({grp:'👥 '+(c.name||''),name:r.name||'',birth:r.birth||'',gender:r.gender||'',st:stLbl(ageState(r)),
+          org:r.school||c.teamOrg||'',phone:ok?(r.phone||''):'',addr:ok?(r.address||''):'',gphone:'',
+          part:(c.prefs||[]).join('·'),consent:ok?'O':'X',nonMember:r.nonMember?'비회원':'',leader:(c.leader||'')+(c.leaderPhone?' '+c.leaderPhone:'')});
+      });
+    }else{
+      const ok=!!c.pconsent;
+      let phone=c.phone||'',addr=c.address||'';
+      if(ok&&c.uid&&(!phone||!addr)){
+        // 동의는 했는데 신청 당시 저장이 없던 예전 건 — 회원 정보에서 보충 (조회 권한 없으면 비워 둠)
+        try{
+          if(!_UCACHE[c.uid]){const d=await DB.collection('users').doc(c.uid).get();_UCACHE[c.uid]=d.exists?(d.data()||{}):{};}
+          const u=_UCACHE[c.uid]; if(!phone&&!c.kid)phone=u.phone||''; if(!addr)addr=u.address||'';
+        }catch(e){}
+      }
+      rows.push({grp:'개인',name:c.name||'',birth:c.birth||'',gender:c.gender||'',st:stLbl(ageState(c)),
+        org:c.school||c.club||'',phone:ok?phone:'',addr:ok?addr:'',gphone:(ok&&c.kid)?(c.guardianPhone||''):'',
+        part:(c.prefs||[]).join('·'),consent:ok?'O':'X',nonMember:'',leader:''});
+    }
+  }
+  if(!rows.length){alert('내보낼 참가자가 없습니다.');return}
+  const head=['연번','구분(팀명)','성명','생년월일','성별','연령','소속(학교·클럽)','연락처','주소','보호자 연락처','부문','명단제공 동의','비고','인솔자'];
+  const csv='\ufeff'+[head].concat(rows.map((r,i)=>[i+1,r.grp,r.name,r.birth,r.gender,r.st,r.org,r.phone,r.addr,r.gphone,r.part,r.consent,r.nonMember,r.leader]))
+    .map(r=>r.map(x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=(s.title||'대회')+'_참가자명단_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  const noC=rows.filter(r=>r.consent==='X').length;
+  if(noC)alert('명단 '+rows.length+'명을 내려받았습니다.\n이 중 '+noC+'명은 명단 제공 동의가 없어 연락처·주소를 비워 두었습니다.');
+}
 function compClaimList(s){
   const keys=[...new Set((s.claimed||[]).map(ckey))].filter(k=>activeOfKey(s,k));
   return keys.map(k=>{
@@ -611,11 +684,12 @@ async function clearClaimReview(slotId,key){
     viewRoster(slotId);
   }catch(e){ alert('처리 실패: '+e.message); }
 }
-function viewRoster(id){
+async function viewRoster(id){
   const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
   const s=doc.data();
   const list=compClaimList(s);
   const staff=isCompStaff();
+  await enrichAges(list);   // [성인표시] 생년월일 없는 예전 신청 건도 회원 정보로 성인 여부를 채웁니다
   const entry=s.role==='참가';
   const confirmed=s.confirmed||[];
   const old=document.getElementById('rosterModal');if(old)old.remove();
@@ -730,6 +804,7 @@ function viewRoster(id){
         }).join('')
       +'</table></div></details>'):'')
     +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">'
+    +(staff&&entry?'<button class="cbtn" style="background:#153A77;color:#fff" onclick="exportRosterCsv(\''+id+'\')" title="주최기관 제출용 — 명단 제공에 동의한 참가자만 연락처·주소가 채워집니다">📥 참가자 명단 엑셀</button>':'')
     +(staff&&entry?'<button class="cbtn" style="background:#0f766e;color:#fff" onclick="document.getElementById(\'rosterModal\').remove();openTeamBuilder(\''+id+'\')">🧩 팀 구성 (개인 참가자)</button>':'')
     +'<button class="cbtn cbtn-ghost" onclick="document.getElementById(\'rosterModal\').remove()">닫기</button></div></div>';
   document.body.appendChild(div);
@@ -1014,7 +1089,10 @@ async function openRosterEdit(slotId,key){
       +'<div style="font-size:12.5px;font-weight:900;color:#153A77;margin-bottom:6px">➕ 인원 추가</div>'
       +'<input id="reName" placeholder="성명 *" style="width:100%;padding:9px 11px;border:1.5px solid #dfe5ee;border-radius:9px;margin-bottom:6px;font-family:inherit">'
       +'<input id="reBirth" placeholder="생년월일 (예: 2013-05-01)" style="width:100%;padding:9px 11px;border:1.5px solid #dfe5ee;border-radius:9px;margin-bottom:6px;font-family:inherit">'
-      +'<input id="reSchool" placeholder="학교·소속 (선택)" style="width:100%;padding:9px 11px;border:1.5px solid #dfe5ee;border-radius:9px;margin-bottom:8px;font-family:inherit">'
+      +'<input id="reSchool" placeholder="학교·소속 (선택)" style="width:100%;padding:9px 11px;border:1.5px solid #dfe5ee;border-radius:9px;margin-bottom:6px;font-family:inherit">'
+      +'<select id="reGender" style="width:100%;padding:9px 11px;border:1.5px solid #dfe5ee;border-radius:9px;margin-bottom:6px;font-family:inherit"><option value="">성별 (선택)</option><option>남</option><option>여</option></select>'
+      +'<input id="rePhone" placeholder="연락처 (명단 제출용)" style="width:100%;padding:9px 11px;border:1.5px solid #dfe5ee;border-radius:9px;margin-bottom:6px;font-family:inherit">'
+      +'<input id="reAddr" placeholder="주소 (명단 제출용)" style="width:100%;padding:9px 11px;border:1.5px solid #dfe5ee;border-radius:9px;margin-bottom:8px;font-family:inherit">'
       +'<button class="cbtn" style="background:#153A77;color:#fff;width:100%" onclick="reAdd()">➕ 명단에 추가</button>'
       +'<div style="font-size:11.5px;color:#8a919d;margin-top:8px;line-height:1.5">미성년 추가 인원은 보호자 동의(전자 승인 또는 수기 동의서 확인)가 필요합니다.</div></div>'
     +'</div>'
@@ -1121,8 +1199,8 @@ function reAdd(){
   const n=v('reName');if(!n){alert('성명을 입력해주세요');return}
   const b=v('reBirth');
   if(b&&!/^\d{4}-\d{2}-\d{2}$/.test(b)){alert('생년월일은 2013-05-01 형식으로 입력해주세요 (모르면 비워두세요)');return}
-  _RED.roster.push({name:n,birth:b,school:v('reSchool'),nonMember:true}); // [비회원뱃지] 명단수정에서 추가되는 인원은 회원계정 확인이 없으므로 항상 비회원으로 표시
-  document.getElementById('reName').value='';document.getElementById('reBirth').value='';document.getElementById('reSchool').value='';
+  _RED.roster.push({name:n,birth:b,school:v('reSchool'),gender:v('reGender'),phone:v('rePhone'),address:v('reAddr'),nonMember:true}); // [비회원뱃지] 명단수정에서 추가되는 인원은 회원계정 확인이 없으므로 항상 비회원으로 표시
+  ['reName','reBirth','reSchool','reGender','rePhone','reAddr'].forEach(function(k){const e=document.getElementById(k);if(e)e.value=''});
   document.getElementById('reName').focus();
   reRender();
 }
@@ -1220,10 +1298,12 @@ async function openTeamApply(id){
     +'<button type="button" class="cbtn cbtn-soft" id="taLoadClub" style="padding:6px 14px;font-size:12.5px;display:none" onclick="taLoadClubRoster()">📋 클럽 명단 불러오기</button></div>'
     +'<div style="font-size:13px;font-weight:800;margin:14px 0 4px">③ 보호자 동의 (미성년 팀원)</div>'
     +'<div style="background:#fff8ed;border:1.5px solid #ecd9b0;border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.8">'
-    +'만 18세 미만 팀원은 보호자 <b>서면 동의서</b>가 필요합니다. <a href="consent_guardian.html" target="_blank" style="color:#153A77;font-weight:800">📄 동의서 양식 열기·인쇄 →</a><br>'
+    +'만 18세 미만 팀원은 보호자 <b>서면 동의서</b>가 필요합니다. <a href="consent_guardian.html?form='+encodeURIComponent(s.consentForm||'basic')+'&t='+encodeURIComponent(s.title||'')+'&d='+encodeURIComponent(s.date||'')+'&p='+encodeURIComponent(s.place||'')+'" target="_blank" style="color:#153A77;font-weight:800">📄 동의서 양식 열기·인쇄 →</a><br>'
     +'인솔자가 전원분을 수합·보관하고, 아래에서 사진·스캔본을 업로드해 주세요. <b>지금 없으면 신청 후 [📎 동의서 업로드] 버튼으로 나중에 제출할 수 있습니다.</b>'
     +'<div style="margin-top:7px"><input id="taFiles" type="file" accept="image/*,.pdf" multiple style="font-size:12.5px"></div>'
-    +'<label style="display:flex;gap:7px;align-items:flex-start;margin-top:8px;font-weight:800;color:#153A77"><input type="checkbox" id="taPledge" style="width:auto;margin-top:3px"> 인솔자로서 미성년 팀원 전원의 보호자 동의를 받았으며(또는 대회 전까지 수합·제출하며), 명단이 사실임을 확인합니다.</label></div>'
+    +'<label style="display:flex;gap:7px;align-items:flex-start;margin-top:8px;font-weight:800;color:#153A77"><input type="checkbox" id="taPledge" style="width:auto;margin-top:3px"> 인솔자로서 미성년 팀원 전원의 보호자 동의를 받았으며(또는 대회 전까지 수합·제출하며), 명단이 사실임을 확인합니다.</label>'
+    // [명단제공] 팀원 연락처·주소를 주최기관 명단에 싣는 데 대한 동의 — 인솔자가 팀원 전원에게 받아 확인합니다.
+    +'<label style="display:flex;gap:7px;align-items:flex-start;margin-top:6px;font-weight:800;color:#153A77"><input type="checkbox" id="taPconsent" style="width:auto;margin-top:3px"> 팀원 전원으로부터 주최기관 참가자 명단(성명·생년월일·성별·연락처·주소) 제공 동의를 받았음을 확인합니다. <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 체크하지 않으면 명단에서 연락처·주소는 빠집니다</span></label></div>'
     +'<div style="font-size:13px;font-weight:800;margin:14px 0 4px">④ 인솔자 서명</div>'
     +'<div class="sigwrap"><canvas id="taSig" width="520" height="110" style="width:100%;height:110px;touch-action:none;display:block"></canvas></div>'
     +'<button type="button" class="cbtn cbtn-soft" style="padding:4px 12px;font-size:11.5px;margin-top:4px" onclick="taClearSig()">서명 지우기</button>'
@@ -1315,6 +1395,7 @@ function taPickMember(j){
     const g=empty.querySelector('.taR-g');if(g&&r.gender)g.value=r.gender;
     const s=empty.querySelector('.taR-school');if(s)s.value=r.school||'';
     empty.dataset.src='member'; // [비회원뱃지] 클럽 명단에서 선택된 회원임을 표시
+    empty.dataset.adult=(r.tag==='회원')?'1':'';   // [성인표시] 클럽 성인 회원
   }else taAddRow(r);
 }
 function taPickAll(){
@@ -1352,7 +1433,12 @@ function taAddRow(v){
     +'<input class="taR-birth" type="date" value="'+cesc(v.birth||'')+'" style="width:140px;padding:7px 9px;border:1px solid #d5dce8;border-radius:8px;font-size:13px">'
     +'<select class="taR-g" style="padding:7px 8px;border:1px solid #d5dce8;border-radius:8px;font-size:13px"><option value="">성별</option><option'+(v.gender==='남'?' selected':'')+'>남</option><option'+(v.gender==='여'?' selected':'')+'>여</option></select>'
     +'<input class="taR-school" placeholder="학교·소속" value="'+cesc(v.school||'')+'" style="flex:1;min-width:110px;padding:7px 9px;border:1px solid #d5dce8;border-radius:8px;font-size:13px">'
+    // [비회원] 주최기관 명단에 필요한 연락처·주소 — 비회원 팀원은 여기서 직접 적습니다.
+    +'<input class="taR-phone" placeholder="연락처" value="'+cesc(v.phone||'')+'" style="width:120px;padding:7px 9px;border:1px solid #d5dce8;border-radius:8px;font-size:13px">'
+    +'<input class="taR-addr" placeholder="주소" value="'+cesc(v.address||'')+'" style="flex:1.4;min-width:150px;padding:7px 9px;border:1px solid #d5dce8;border-radius:8px;font-size:13px">'
     +'<button type="button" onclick="this.parentNode.remove()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:7px;width:26px;height:26px;cursor:pointer;font-weight:900">×</button>';
+  // [성인표시] 클럽의 성인 회원(자녀 프로필이 아닌 회원 계정)은 생년월일이 없어도 성인으로 표시되게 표식을 남깁니다.
+  row.dataset.adult=(v.adult||v.tag==='회원')?'1':'';
   box.appendChild(row);
 }
 async function taLoadClubRoster(){
@@ -1363,7 +1449,8 @@ async function taLoadClubRoster(){
   const kids=(c.childMembers||[]);
   // 자녀형 멤버(생년·학교 보유) 우선 + 성인 멤버 이름만
   kids.forEach(k=>taAddRow({name:k.name,birth:k.birth||'',gender:k.gender||'',school:k.school||''}));
-  (c.members||[]).forEach(m=>{if(m.uid!==CME.uid)taAddRow({name:m.name||''});});
+  // [성인표시] 클럽 회원 계정은 성인입니다 — 생년월일·성별이 저장돼 있으면 함께 채웁니다.
+  (c.members||[]).forEach(m=>{if(m.uid!==CME.uid)taAddRow({name:m.name||'',birth:m.birth||'',gender:m.gender||'',adult:true});});
   if(!box.children.length)taAddRow();
   alert('클럽 명단 '+box.children.length+'명을 불러왔습니다. 참가하지 않는 인원은 ×로 지워주세요.');
 }
@@ -1423,6 +1510,9 @@ async function submitTeam(){
     birth:r.querySelector('.taR-birth').value,
     gender:r.querySelector('.taR-g').value,
     school:r.querySelector('.taR-school').value.trim(),
+    phone:(r.querySelector('.taR-phone')||{}).value||'',
+    address:(r.querySelector('.taR-addr')||{}).value||'',
+    adultAcct:r.dataset.adult==='1',          // [성인표시] 클럽 성인 회원 표식
     nonMember:r.dataset.src!=='member' // [비회원뱃지] 클럽 명단에서 선택하지 않고 직접 입력한 참가자
   })).filter(x=>x.name);
   if(!roster.length)return alert('팀원을 1명 이상 입력해주세요.');
@@ -1455,6 +1545,8 @@ async function submitTeam(){
         teamGender:(document.getElementById('taGender')?document.getElementById('taGender').value:''),
         leader:CMY.name||'',leaderRole:document.getElementById('taRole').value,leaderPhone:CMY.phone||'',
         roster:roster,rosterN:roster.length,prefs:[divName],consent:true,signed:true,
+        pconsent:!!(document.getElementById('taPconsent')&&document.getElementById('taPconsent').checked),   // [명단제공] 팀원 연락처·주소 제공 동의
+        leaderAddress:(CMY.address||''),
         consentFiles:files,at:new Date().toISOString()});
       tx.update(ref,{claimed:claimed});
     });
@@ -1544,6 +1636,31 @@ async function cc2LoadMine(){
     :'<div style="font-size:12.5px;color:#8a919d;margin-top:6px">등록한 대회가 없습니다. [+ 대회 공고 등록]으로 시작하세요.</div>';
   }catch(e){el.innerHTML='<div style="font-size:12.5px;color:#C41E2F">목록 불러오기 실패: '+cesc(e.message)+'</div>'}
 }
+// [버튼식] 공고 작성 프리셋 — 클릭으로 추가. 목록은 여기서만 고치면 됩니다.
+const CC2_SPORT_PRESET=['얼티미트','디스크골프','원반윷놀이','디스캐치','거리던지기','정확도던지기'];
+const CC2_DIV_PRESET=['남자','여자','혼성','초등부','중등부','고등부','일반부','성인부'];
+const CC2_FEE_PRESET=[{label:'일반',amount:''},{label:'학생',amount:''},{label:'클럽(팀)',amount:''},{label:'무료',amount:'무료'}];
+function cc2AddSport(kind,name){
+  if(CC2_ENTRY[kind].some(function(x){return String(x.name||'').trim()===name}))return;
+  const blank=CC2_ENTRY[kind].findIndex(function(x){return !String(x.name||'').trim()});
+  const item={name:name,divs:(kind==='team')?['남자','여자','혼성']:['남자부','여자부']};
+  if(blank>=0)CC2_ENTRY[kind][blank]=item; else CC2_ENTRY[kind].push(item);
+  cc2EntryRender();
+}
+function cc2AddDiv(kind,si,dv){
+  const sp=CC2_ENTRY[kind][si];if(!sp)return;
+  if(sp.divs.some(function(x){return String(x||'').trim()===dv}))return;
+  const blank=sp.divs.findIndex(function(x){return !String(x||'').trim()});
+  if(blank>=0)sp.divs[blank]=dv; else sp.divs.push(dv);
+  cc2EntryRender();
+}
+function cc2AddFee(label,amount){
+  if(CC2_ENTRY.fees.some(function(x){return String(x.label||'').trim()===label}))return;
+  const blank=CC2_ENTRY.fees.findIndex(function(x){return !String(x.label||'').trim()&&!String(x.amount||'').trim()});
+  const item={label:label,amount:amount||''};
+  if(blank>=0)CC2_ENTRY.fees[blank]=item; else CC2_ENTRY.fees.push(item);
+  cc2EntryRender();
+}
 function cc2EntryInit(c){
   const e=(c&&c.entry)||{};
   CC2_ENTRY={
@@ -1571,9 +1688,16 @@ function cc2EntryRender(){
       +'<button type="button" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:7px;padding:4px 10px;cursor:pointer;font-weight:800;font-size:11px" onclick="CC2_ENTRY.'+kind+'.splice('+si+',1);cc2EntryRender()">× 종목 삭제</button></div>'
       +'<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:6px"><span style="font-size:11.5px;font-weight:800;color:#8a919d">부문</span>'
       +sp.divs.map((dv,di)=>'<span style="display:inline-flex;align-items:center;gap:3px"><input value="'+cesc(dv)+'" placeholder="부문명" style="'+bi+';width:86px" oninput="CC2_ENTRY.'+kind+'['+si+'].divs['+di+']=this.value"><button type="button" onclick="CC2_ENTRY.'+kind+'['+si+'].divs.splice('+di+',1);cc2EntryRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:6px;width:20px;height:20px;cursor:pointer;font-weight:900">×</button></span>').join('')
-      +'<button type="button" style="border:none;background:#eef3fa;color:#153A77;border-radius:7px;padding:5px 11px;cursor:pointer;font-weight:800;font-size:11.5px" onclick="CC2_ENTRY.'+kind+'['+si+'].divs.push(\'\');cc2EntryRender()">+ 부문</button>'
+      +'<button type="button" style="border:none;background:#eef3fa;color:#153A77;border-radius:7px;padding:5px 11px;cursor:pointer;font-weight:800;font-size:11.5px" onclick="CC2_ENTRY.'+kind+'['+si+'].divs.push(\'\');cc2EntryRender()">+ 부문 직접</button>'
+      // [버튼식] 부문 프리셋 — 누르면 그 종목에 추가, 이미 있으면 ✓ 표시
+      +'<span style="flex-basis:100%"></span>'+CC2_DIV_PRESET.map(function(dv){const has=(sp.divs||[]).some(function(x){return String(x||'').trim()===dv});
+        return '<button type="button" class="cc2chip'+(has?' on':' add')+'" style="padding:4px 10px;font-size:11.5px" onclick="cc2AddDiv(\''+kind+'\','+si+',\''+cesc(dv)+'\')">'+(has?'✓ ':'+ ')+cesc(dv)+'</button>'}).join('')
       +'</div></div>').join('')
-    +'<button type="button" style="border:none;background:'+color+';color:#fff;border-radius:8px;padding:6px 13px;cursor:pointer;font-weight:800;font-size:12px;margin-top:6px" onclick="CC2_ENTRY.'+kind+'.push({name:\'\',divs:[\'\']});cc2EntryRender()">+ 종목 추가</button></div>';
+    // [버튼식] 자주 쓰는 종목은 클릭 한 번으로 추가 (이미 있으면 건너뜀). 직접 입력용 [+ 종목 직접 추가]도 그대로 둡니다.
+    +'<div style="display:flex;flex-wrap:wrap;align-items:center;margin-top:6px">'
+    +CC2_SPORT_PRESET.map(function(sp){const has=CC2_ENTRY[kind].some(function(x){return String(x.name||'').trim()===sp});
+      return '<button type="button" class="cc2chip'+(has?' on':' add')+'" onclick="cc2AddSport(\''+kind+'\',\''+cesc(sp)+'\')">'+(has?'✓ ':'+ ')+cesc(sp)+'</button>'}).join('')+'</div>'
+    +'<button type="button" style="border:none;background:'+color+';color:#fff;border-radius:8px;padding:6px 13px;cursor:pointer;font-weight:800;font-size:12px;margin-top:6px" onclick="CC2_ENTRY.'+kind+'.push({name:\'\',divs:[\'\']});cc2EntryRender()">+ 종목 직접 추가 추가</button></div>';
   const listBlock=(key,label,ph)=>'<div style="margin-top:12px"><b style="font-size:12.5px;color:#153A77">'+label+'</b>'
     +'<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:5px">'
     +CC2_ENTRY[key].map((v2,i)=>'<span style="display:inline-flex;align-items:center;gap:3px"><input value="'+cesc(v2)+'" placeholder="'+ph+'" style="'+bi+';width:112px" oninput="CC2_ENTRY.'+key+'['+i+']=this.value"><button type="button" onclick="CC2_ENTRY.'+key+'.splice('+i+',1);cc2EntryRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:6px;width:20px;height:20px;cursor:pointer;font-weight:900">×</button></span>').join('')
@@ -1587,7 +1711,10 @@ function cc2EntryRender(){
       +'<input value="'+cesc(f.label)+'" placeholder="구분 (예: 성인 선수)" style="'+bi+';width:150px" oninput="CC2_ENTRY.fees['+i+'].label=this.value">'
       +'<input value="'+cesc(f.amount)+'" placeholder="금액 (예: 30,000원 / 무료)" style="'+bi+';flex:1" oninput="CC2_ENTRY.fees['+i+'].amount=this.value">'
       +'<button type="button" onclick="CC2_ENTRY.fees.splice('+i+',1);cc2EntryRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:6px;width:22px;height:22px;cursor:pointer;font-weight:900">×</button></div>').join('')
-    +'<button type="button" style="border:none;background:#0f766e;color:#fff;border-radius:7px;padding:5px 11px;cursor:pointer;font-weight:800;font-size:11.5px;margin-top:5px" onclick="CC2_ENTRY.fees.push({label:\'\',amount:\'\'});cc2EntryRender()">+ 참가비 구분 추가</button></div>'
+    +'<div style="display:flex;flex-wrap:wrap;align-items:center;margin-top:4px">'
+    +CC2_FEE_PRESET.map(function(f){const has=CC2_ENTRY.fees.some(function(x){return String(x.label||'').trim()===f.label});
+      return '<button type="button" class="cc2chip'+(has?' on':' add')+'" style="padding:4px 10px;font-size:11.5px" onclick="cc2AddFee(\''+cesc(f.label)+'\',\''+cesc(f.amount)+'\')">'+(has?'✓ ':'+ ')+cesc(f.label)+(f.amount?' '+cesc(f.amount):'')+'</button>'}).join('')+'</div>'
+    +'<button type="button" style="border:none;background:#0f766e;color:#fff;border-radius:7px;padding:5px 11px;cursor:pointer;font-weight:800;font-size:11.5px;margin-top:5px" onclick="CC2_ENTRY.fees.push({label:\'\',amount:\'\'});cc2EntryRender()">+ 참가비 직접 구분 추가</button></div>'
     +listBlock('teamUnits','🏷 단체 신청 단위','단위명')
     +listBlock('teamGenders','🚻 단체(클럽) 구분','구분명');
 }
@@ -1686,6 +1813,25 @@ function cc2CImgRender(){
     +'<button type="button" onclick="CC2_CIMGS.splice('+i+',1);cc2CImgRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:6px;width:20px;height:20px;cursor:pointer;font-weight:900">×</button></span>').join('')
   :'<span style="font-size:12px;color:#8a919d">이미지 없음 (문안만 사용)</span>';
 }
+// [버튼식] 공고 작성 폼 칩 헬퍼 — 값은 숨은 입력칸(id)에 넣어 저장 코드는 그대로 둡니다.
+//   cc2Pick1: 하나만 고르는 칩(관할 시도·동의서 양식)  /  cc2Fill: 빈칸에 빠르게 채우는 칩(주최·시간 등, 수정 가능)
+function cc2Pick1(id,val,el){
+  const h=document.getElementById(id);if(h)h.value=val;
+  const box=el.parentNode;[].forEach.call(box.querySelectorAll('.cc2chip'),function(b){b.classList.toggle('on',b===el)});
+}
+function cc2Fill(id,val,el){
+  const i=document.getElementById(id);if(!i)return;
+  i.value=val;i.focus();
+  const box=el.parentNode;[].forEach.call(box.querySelectorAll('.cc2chip'),function(b){b.classList.toggle('on',b===el)});
+}
+function cc2ChipsPick(id,opts,cur){
+  return '<div style="display:flex;flex-wrap:wrap;margin-top:2px">'+opts.map(function(o){
+    return '<button type="button" class="cc2chip'+(cur===o?' on':'')+'" onclick="cc2Pick1(\''+id+'\',\''+cesc(o)+'\',this)">'+cesc(o)+'</button>'}).join('')+'</div>';
+}
+function cc2ChipsFill(id,opts){
+  return '<div style="display:flex;flex-wrap:wrap;margin-top:2px">'+opts.map(function(o){
+    return '<button type="button" class="cc2chip" onclick="cc2Fill(\''+id+'\',\''+cesc(o)+'\',this)">'+cesc(o)+'</button>'}).join('')+'</div>';
+}
 function cc2Open(editId){
   const c=editId?(CC2_LIST.find(x=>x.id===editId)||{}):{};
   CC2_EDIT=editId||null;
@@ -1705,6 +1851,9 @@ function cc2Open(editId){
       +'<div><label '+lb+'>후원</label><input id="cc2Spon" '+inp+' value="'+cesc(c.sponsor||'')+'"></div>'
       +'<div><label '+lb+'>협찬</label><input id="cc2Part" '+inp+' value="'+cesc(c.partner||'')+'"></div>'
       +'</div>'
+      // [버튼식] 자주 쓰는 기관명 — 누르면 칸에 채워지고, 그대로 고쳐 쓸 수 있습니다.
+      +'<div style="font-size:11.5px;font-weight:700;color:#8a919d;margin-top:8px">빠른 입력 — 주최</div>'+cc2ChipsFill('cc2Host',['사단법인 대한민국플라잉디스크연맹',(CMY.sido||'○○')+'플라잉디스크연맹','○○교육청','○○시·군·구청','○○시·군·구 체육회'])
+      +'<div style="font-size:11.5px;font-weight:700;color:#8a919d;margin-top:6px">빠른 입력 — 주관</div>'+cc2ChipsFill('cc2Org',['사단법인 대한민국플라잉디스크연맹',(CMY.sido||'○○')+'플라잉디스크연맹','○○플라잉디스크클럽','○○초·중·고등학교'])
       +'<label '+lb+'>대회 일자 * <span style="font-weight:600;color:#8a919d;font-size:11px">— 달력 클릭 선택 (‹ › 다음 달 이동)</span></label>'
       +'<div id="cc2CalBox" style="border:1.5px solid #dfe5ee;border-radius:11px;padding:10px;margin-top:5px"></div>'
       +'<div id="cc2DateSum" style="font-size:12.5px;font-weight:800;color:#153A77;margin-top:5px;min-height:16px"></div>'
@@ -1714,8 +1863,11 @@ function cc2Open(editId){
       +'<div><label '+lb+'>대회 시간</label><input id="cc2Time" '+inp+' value="'+cesc(c.time||'')+'" placeholder="예: 10:00~17:00"></div>'
       +'<div><label '+lb+'>대회 장소 *</label><input id="cc2Place" '+inp+' value="'+cesc(c.place||'')+'"></div>'
       +'</div>'
+      +'<div style="font-size:11.5px;font-weight:700;color:#8a919d;margin-top:8px">빠른 입력 — 개회식 시간 / 대회 시간</div>'
+      +'<div style="display:flex;gap:14px;flex-wrap:wrap">'+cc2ChipsFill('cc2OpT',['08:30','09:00','09:30','10:00'])+cc2ChipsFill('cc2Time',['08:00~13:00','09:00~13:00','09:00~17:00','10:00~17:00'])+'</div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
-      +'<div><label '+lb+'>관할 시도 <span style="font-weight:600;color:#8a919d;font-size:11px">(내부 분류용)</span></label><select id="cc2Sido" '+inp+'>'+CC2_SIDOS.map(x=>'<option'+((c.sido||CMY.sido)===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div>'
+      +'<div style="grid-column:1/-1"><label '+lb+'>관할 시도 <span style="font-weight:600;color:#8a919d;font-size:11px">(내부 분류용 — 클릭 선택)</span></label>'
+      +'<input type="hidden" id="cc2Sido" value="'+cesc(c.sido||CMY.sido||CC2_SIDOS[0]||'')+'">'+cc2ChipsPick('cc2Sido',CC2_SIDOS,(c.sido||CMY.sido||CC2_SIDOS[0]||''))+'</div>'
       +'<div><label '+lb+'>신청 마감일</label><input id="cc2DL" type="date" '+inp+' value="'+cesc(c.deadline||'')+'"></div>'
       +'</div>'
       +'<label '+lb+'>대회 안내문</label><textarea id="cc2Desc" rows="3" '+inp+'>'+cesc(c.desc||'')+'</textarea>')
@@ -1738,7 +1890,15 @@ function cc2Open(editId){
       +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer"><input type="checkbox" id="cc2NeedPay" style="width:auto"'+((c.extras&&c.extras.needPay)?' checked':'')+'> 💳 참가비 입금 확인 필요</label>'
       +'</div>')
     +sec('⑤ 신청서·동의서 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 조직위원회 명의, 전자서명 또는 인쇄 제출</span>',
-      '<label '+lb+'>명의 (조직위원회)</label><input id="cc2Cmte" '+inp+' value="'+cesc(c.committee||'')+'" placeholder="비우면 「대회명 조직위원회」 자동">'
+      // [동의서 양식] 서면 동의서를 어느 양식으로 낼지 고릅니다 — 연맹 기본(보호자 동의서) / 강서구청장배(참가 동의서).
+      //   팀 신청 화면의 [동의서 양식 열기·인쇄] 링크가 이 선택을 따라갑니다.
+      '<label '+lb+'>서면 동의서 양식 <span style="font-weight:600;color:#8a919d;font-size:11px">— 클릭 선택</span></label>'
+      +'<input type="hidden" id="cc2Form" value="'+cesc(c.consentForm||'basic')+'">'
+      +'<div style="display:flex;flex-wrap:wrap;margin-top:2px">'
+      +'<button type="button" class="cc2chip'+((c.consentForm||'basic')==='basic'?' on':'')+'" onclick="cc2Pick1(\'cc2Form\',\'basic\',this)">📄 연맹 기본 — 보호자 동의서</button>'
+      +'<button type="button" class="cc2chip'+(c.consentForm==='gangseo'?' on':'')+'" onclick="cc2Pick1(\'cc2Form\',\'gangseo\',this)">📄 강서구청장배 — 참가 동의서</button>'
+      +'<a href="consent_guardian.html?form=gangseo" target="_blank" style="align-self:center;font-size:12px;font-weight:800;color:#153A77;margin-left:6px">미리보기 →</a></div>'
+      +'<label '+lb+'>명의 (조직위원회)</label><input id="cc2Cmte" '+inp+' value="'+cesc(c.committee||'')+'" placeholder="비우면 「대회명 조직위원회」 자동">'
       +'<label '+lb+'>동의서 문안</label><textarea id="cc2CText" rows="4" '+inp+' placeholder="비우면 기본 문안 사용">'+cesc(c.consentText||'')+'</textarea>'
       +'<label '+lb+'>동의서 스캔 이미지 (선택 — 업로드 시 문안 대신 표시)</label>'
       +'<input type="file" id="cc2CImg" accept="image/*" multiple onchange="cc2PickFile(this,CC2_CIMGS,cc2CImgRender)">'
@@ -1808,7 +1968,7 @@ async function cc2Save(){
       opening:{time:v('cc2OpT'),place:v('cc2OpP')},time:v('cc2Time'),
       sports:sports,teamTypes:entry.teamUnits,fee:feeStr,deadline:v('cc2DL'),eligRegion:'',
       entry:entry,attachments:attachments,extras:extras,committee:committee,
-      consentText:v('cc2CText'),consentImgs:consentImgs,
+      consentText:v('cc2CText'),consentImgs:consentImgs,consentForm:(v('cc2Form')||'basic'),
       consentOverlays:prev.consentOverlays||{},status:'모집중'};
     // 참가 슬롯 roles 생성
     const roles=[],teamDivs=[];
@@ -1824,7 +1984,7 @@ async function cc2Save(){
       teamDivs:teamDivs,teamTypes:entry.teamUnits,teamGenders:entry.teamGenders,entry:entry,
       host:base.host,organizer:base.organizer,sponsor:base.sponsor,partner:base.partner,
       opening:base.opening,time:base.time,attachments:attachments,extras:extras,committee:committee,
-      consentText:base.consentText,consentImgs:consentImgs,consentOverlays:base.consentOverlays};
+      consentText:base.consentText,consentImgs:consentImgs,consentOverlays:base.consentOverlays,consentForm:base.consentForm};
     if(CC2_EDIT){
       await DB.collection('competitions').doc(CC2_EDIT).update(base);
       for(const sid of (prev.slotIds||[])){
@@ -2310,6 +2470,11 @@ async function openApply(id){
       +'※ 동의를 거부할 권리가 있으며, 거부 시 대회 참가에 제한이 있을 수 있습니다.</div>')
       +'<label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:800;color:#153A77">'
       +'<input type="checkbox" id="cConsent" style="width:auto">위 내용을 확인하였으며 동의합니다.</label>'
+      // [명단제공] 주최기관에 넘기는 참가자 명단(엑셀)에 연락처·주소를 넣을지는 본인 동의로 정합니다.
+      //   동의하지 않아도 참가는 되고, 명단에는 성명·생년월일·소속만 실립니다.
+      +'<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;font-weight:800;color:#153A77;margin-top:6px">'
+      +'<input type="checkbox" id="cConsent3" style="width:auto;margin-top:3px"><span>주최기관(대회 운영위원회)에 참가자 명단으로 <b>성명·생년월일·성별·연락처·주소</b>를 제공하는 데 동의합니다. '
+      +'<span style="font-weight:600;color:#8a919d;font-size:11.5px">— 동의하지 않으면 연락처·주소는 명단에서 빠집니다</span></span></label>'
       +'</div>'
       +'<div style="font-size:13px;font-weight:800;margin:4px 0 6px"><span id="sigLabel">③ 본인 서명</span> <span style="font-weight:600;color:#888;font-size:11.5px">(마우스·손가락 — 신청서와 동의서에 함께 날인)</span> <button type="button" class="cbtn cbtn-soft" style="padding:4px 12px;font-size:11.5px" onclick="clearSig()">지우기</button></div>'
       +'<div class="sigwrap"><canvas id="cSigPad" width="520" height="120" style="width:100%;height:120px;touch-action:none;display:block"></canvas></div>'
@@ -2483,6 +2648,11 @@ async function submitEntry(){
       const _newClaim={uid:CME.uid,pid:APPLY_PID,name:p.name,birth:p.birth||'',gender:p.gender||'',school:p.school||'',club:club||'',kid:!!p.kid,
         special:_specials,
         guardian:p.kid?(CMY.name||''):'',guardianPhone:p.kid?(CMY.phone||''):'',
+        // [성인표시] 본인 신청이고 학생회원이 아니면 성인 계정 — 생년월일이 비어 있어도 성인으로 표시됩니다.
+        adultAcct:(!p.kid&&CMY.memberGroup!=='student'&&CMY.accountType!=='student'),
+        // [명단제공] 동의 여부와, 동의 시 명단에 실을 연락처·주소를 신청 시점 값으로 함께 저장합니다.
+        pconsent:!!(document.getElementById('cConsent3')&&document.getElementById('cConsent3').checked),
+        phone:(p.kid?'':(CMY.phone||'')),address:(CMY.address||''),
         prefs:APPLY_SEL.slice(),consent:true,signed:true,at:new Date().toISOString()};
       // [수기동의 경로] 서면 동의서 제출 전제로 접수된 건 표시 — 명단에서 담당자가 바로 알아볼 수 있게 합니다.
       if(PAPER_MODE&&p.birth&&ageOf(p.birth)<18&&!p.kid)_newClaim.needPaper=true;
