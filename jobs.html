@@ -174,7 +174,7 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
       </div>
       <div class="card" style="cursor:default">
         <h3>🎪 권역별대회 운영요원</h3>
-        <p>기록·진행·안전관리 등 대회 운영 지원 · 행사 활동 15P/일</p>
+        <p>기록·진행·안전관리 등 대회 운영 지원 · 행사 활동 15P/일<br><b style="color:#0f766e">※ 자격증 불필요 — 학부모·일반회원 등 승인 회원 누구나 지원 가능</b></p>
         <button class="btn-sub" id="btnStaff" style="margin-top:14px" onclick="toggleApply('staff')">지원하기</button>
       </div>
     </div>
@@ -192,7 +192,7 @@ function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);
 
     <div class="sec-label" style="margin-top:48px">STEP 3</div>
     <h2 class="sec-title" style="font-size:24px">대회 심판·운영요원 신청</h2>
-    <div class="note" style="margin-bottom:0"><b>대회 메뉴로 이동했습니다</b> — 권역별대회 심판·운영요원 모집 확인과 신청(희망 임무 1~3순위 선택·신청 취소)은 <a href="competition.html#staff" style="color:var(--red);font-weight:900">대회 페이지 →</a>에서 진행합니다. 심판·운영 분야 지원(STEP 1)을 먼저 완료해야 신청할 수 있습니다.</div>
+    <div class="note" style="margin-bottom:0"><b>대회 메뉴로 이동했습니다</b> — 권역별대회 심판·운영요원 모집 확인과 신청(희망 임무 1~3순위 선택·신청 취소)은 <a href="competition.html#staff" style="color:var(--red);font-weight:900">대회 페이지 →</a> 또는 <a href="staff.html" style="color:var(--red);font-weight:900">심판·운영요원 모집 공고 →</a>에서 진행합니다. 승인된 회원은 회원 유형(학부모·일반회원 포함)과 관계없이 신청할 수 있으며, 심판 임무는 유효한 연맹 심판 자격증 보유자만 선택할 수 있습니다. STEP 1의 심판·운영 분야 지원을 함께 해 두면 대회 배정 검토에 우선 반영됩니다.</div>
 
     </div>
     <!-- [강사 공고] 선정학교 강사 모집 공고 (지명 게시판 복원 2026-08-24 — openSlots 기반) -->
@@ -436,12 +436,26 @@ function jMissing(d){
   if(!(d.affiliation&&d.affiliation.length))miss.push('소속');
   return miss;
 }
+// [대회요원 개방 2026-09-03] 심판·운영요원 지원은 강사 배정용 항목(거점·활동 범위·소속)을 요구하지 않습니다.
+//   학부모·서포터즈 등 간략 가입 일반회원은 그 항목이 없어 [지원하기]에서 막혔고, 그 결과 심판·운영요원
+//   공고에 참여할 수 없었습니다. 대회요원에게 실제로 필요한 것은 연락처·성별·생년월일·주소뿐입니다.
+//   (강사 분야 school/after 는 기존 jMissing 그대로 — 배정·위촉·물품 발송에 전 항목이 필요)
+const J_STAFF_KEYS=['referee','staff'];
+function jIsStaffKey(k){return J_STAFF_KEYS.indexOf(k)>=0}
+function jMissingStaff(d){
+  d=d||{};const miss=[];
+  if(!d.phone)miss.push('휴대전화');
+  if(!d.gender)miss.push('성별');
+  if(!d.birth)miss.push('생년월일');
+  if(!d.address)miss.push('집 주소');
+  return miss;
+}
 async function toggleApply(k){
   try{
     const f=Object.assign({},JMY.instructorFor||{});
     // 지원 취소가 아닌 '신규 지원'일 때만 프로필 완성 검사
     if(!f[k]){
-      const miss=jMissing(JMY);
+      const miss=jIsStaffKey(k)?jMissingStaff(JMY):jMissing(JMY);  // [대회요원 개방] 심판·운영요원은 최소 항목만 확인
       if(miss.length){
         alert('지원 전에 프로필을 완성해 주세요.\n\n미입력 항목:\n· '+miss.join('\n· ')
           +'\n\n배정·위촉·물품 발송에 반드시 필요한 정보입니다.\n[확인]을 누르면 프로필 작성 화면으로 이동합니다.');
@@ -453,7 +467,7 @@ async function toggleApply(k){
     if(!f[k]&&k==='referee'&&!confirm('연맹 심판 자격증을 보유하고 계십니까?\n대회 배정 확정 시 자격증 확인이 진행됩니다.'))return;
     // 지원 시 활동 거점 시군구 필수
     const upd={instructorFor:null,instructorAppliedAt:firebase.firestore.FieldValue.serverTimestamp()};
-    if(!f[k]&&!JMY.baseCity){
+    if(!f[k]&&!JMY.baseCity&&!jIsStaffKey(k)){  // [대회요원 개방] 거점 시군구는 강사 분야에만 필수
       const sido=document.getElementById('jSido').value,sig=document.getElementById('jSigungu').value.trim();
       if(sido&&sig){upd.baseCity=(sido+' '+sig).trim();}
       else{
