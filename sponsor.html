@@ -93,7 +93,7 @@
 <section><div class="wrap">
   <div class="sec-label">SPONSOR</div>
   <h2 class="sec-title">후원 안내</h2>
-  <div id="pageBody"><div class="bempty" style="padding:30px;text-align:center;color:#8a919d">불러오는 중…</div></div>
+  <div id="pageBody" data-cms-sections="sponsor"><div class="bempty" style="padding:30px;text-align:center;color:#8a919d">불러오는 중…</div></div>
 </div></section>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -112,14 +112,8 @@ const DEFAULT_SECTIONS=[
  {h:'🏦 후원 방법',body:'· 계좌 후원: (후원 계좌는 사무국으로 문의해 주세요)\n· 물품 후원: 스포츠 용품·차량·인쇄 등 현물 후원 환영\n· 재능 후원: 사진·영상·디자인·통역 등 전문 재능 기부\n· 문의: 031-984-3248 / kfdf60@hanmail.net'},
  {h:'🎖 후원자 예우',body:'· 연맹 홈페이지·대회 현수막 후원사 로고 게시\n· 연맹 주관 대회 초청 및 시상 참여\n· 후원 증서 발급\n· 기부금 영수증 관련 사항은 사무국으로 문의해 주세요'},
 ];
-(async function(){
-  let secs=DEFAULT_SECTIONS;
-  try{
-    const doc=await DB.collection('siteContent').doc('sponsor').get();
-    if(doc.exists&&doc.data().sections&&doc.data().sections.length)secs=doc.data().sections;
-  }catch(e){}
-  document.getElementById('pageBody').innerHTML=secs.map(s=>'<div class="seccard"><h3>'+pesc(s.h)+'</h3><div class="body">'+pesc(s.body)+'</div></div>').join('');
-})();
+// [페이지 편집] 카드 표시와 관리자 편집은 cms.js 가 맡습니다 (siteContent/sponsor.sections).
+window.CMS_SECTION_DEFAULTS=Object.assign(window.CMS_SECTION_DEFAULTS||{},{sponsor:DEFAULT_SECTIONS});
 </script>
 
 <footer><div class="wrap">
@@ -140,5 +134,6 @@ const DEFAULT_SECTIONS=[
   </div>
 </div></footer>
 <script src="auth_ui.js?v=20260828b"></script>
+<script src="cms.js?v=20260902a"></script>
 </body>
 </html>
