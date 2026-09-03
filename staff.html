@@ -1415,7 +1415,7 @@ async function exportPayReport(postId){
     shName=shName.replace(/[\\\/\?\*\[\]:]/g,'.').slice(0,28);
     const ws=wb.addWorksheet(shName);
     // [연락처] 타 시도·주최기관이 심판 연락처를 요청하는 일이 잦아 마지막 열(O)에 연락처를 넣습니다.
-    ws.columns=[{width:5},{width:24},{width:18},{width:9},{width:12},{width:5},{width:9},{width:9},{width:9},{width:10},{width:11},{width:17},{width:16},{width:14},{width:15}];
+    ws.columns=[{width:5},{width:24},{width:18},{width:9},{width:12},{width:5},{width:9},{width:9},{width:9},{width:10},{width:11},{width:17},{width:16},{width:15},{width:14}];
     const thin={style:'thin'};const bAll={top:thin,left:thin,bottom:thin,right:thin};
     // 제목
     ws.mergeCells('A1:O1');
@@ -1428,7 +1428,7 @@ async function exportPayReport(postId){
     ws.getCell('M2').value=fmtD(dd.date)+' ('+dowOf(dd.date)+')';ws.getCell('M2').font={size:10};
     ws.getCell('N2').value='(단위: 원)';ws.getCell('N2').font={size:9};ws.getCell('N2').alignment={horizontal:'right'};
     // 헤더 (3~4행)
-    [['A3','연번'],['B3','일시'],['C3','소  속'],['D3','성명'],['E3','수당종류'],['F3','횟수'],['G3','수당(A)'],['K3','은행명'],['L3','계좌번호'],['M3','주민등록번호'],['N3','서명'],['O3','연락처']].forEach(([c,v])=>{ws.getCell(c).value=v});
+    [['A3','연번'],['B3','일시'],['C3','소  속'],['D3','성명'],['E3','수당종류'],['F3','횟수'],['G3','수당(A)'],['K3','은행명'],['L3','계좌번호'],['M3','주민등록번호'],['N3','연락처'],['O3','서명']].forEach(([c,v])=>{ws.getCell(c).value=v});
     ws.mergeCells('G3:J3');
     ['A','B','C','D','E','F','K','L','M','N','O'].forEach(c=>ws.mergeCells(c+'3:'+c+'4'));
     [['G4','기본'],['H4','초과'],['I4','가산'],['J4','계']].forEach(([c,v])=>{ws.getCell(c).value=v});
@@ -1453,7 +1453,7 @@ async function exportPayReport(postId){
       row.getCell(11).value=pi.bank||_fb.bank||'';
       row.getCell(12).value=pi.account||_fb.account||'';
       row.getCell(13).value=pi.rrn||'';
-      row.getCell(15).value=a.phone||_fb.phone||'';   // [연락처] 신청 시 저장된 번호, 없으면 회원 정보
+      row.getCell(14).value=a.phone||_fb.phone||'';   // [연락처] 신청 시 저장된 번호, 없으면 회원 정보 (N열 — 서명은 맨 오른쪽 O열)
       for(let c=1;c<=15;c++){const cell=row.getCell(c);cell.border=bAll;cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};cell.font={size:10};}
       // 전자서명 이미지 (수당지급용 서명 우선, 없으면 신청 동의 서명)
       let sig=pi.signature||(a.agree&&a.agree.signature)||null;
@@ -1463,10 +1463,10 @@ async function exportPayReport(postId){
           const b64=sig.split(',')[1];
           const ext=sig.indexOf('image/jpeg')>=0?'jpeg':'png';
           const imgId=wb.addImage({base64:b64,extension:ext});
-          ws.addImage(imgId,{tl:{col:13.12,row:rIdx-1+0.12},ext:{width:82,height:28},editAs:'oneCell'});
+          ws.addImage(imgId,{tl:{col:14.12,row:rIdx-1+0.12},ext:{width:82,height:28},editAs:'oneCell'});
         }catch(e){}
       }else if(sig&&sig.indexOf('http')===0){
-        row.getCell(14).value='서명등록됨(링크)'; // [서명연동] 이미지 변환이 막힌 경우에도 서명 사실은 표기
+        row.getCell(15).value='서명등록됨(링크)'; // [서명연동] 이미지 변환이 막힌 경우에도 서명 사실은 표기
       }
       rIdx++;
     });
