@@ -2189,7 +2189,27 @@ function initSigPad(){
   sigCanvas.onmousedown=start;sigCanvas.onmousemove=move;window.onmouseup=end;
   sigCanvas.ontouchstart=start;sigCanvas.ontouchmove=move;sigCanvas.ontouchend=end;
 }
-function clearSigPad(){if(sigCtx){sigCtx.clearRect(0,0,sigCanvas.width,sigCanvas.height);SIGGED2=false;document.getElementById('sigHint').style.display='block'}}
+function clearSigPad(){if(sigCtx){sigCtx.clearRect(0,0,sigCanvas.width,sigCanvas.height);SIGGED2=false;SIG_URL_FALLBACK='';document.getElementById('sigHint').style.display='block'}}
+// [저장된 서명] 내 정보에 등록한 서명·도장 이미지를 계약서 서명 칸에 불러옵니다 (마우스 서명과 병행)
+let SIG_URL_FALLBACK='';
+async function useSavedSigPad(){
+  const url=(MYD&&MYD.signatureImg)||'';
+  const msg=document.getElementById('sigMsg');
+  if(!url){if(msg){msg.style.color='#C41E2F';msg.textContent='내 정보에서 서명·도장 이미지를 먼저 등록해 주세요.'}return}
+  if(!sigCtx)return;
+  if(msg){msg.style.color='#153A77';msg.textContent='불러오는 중…'}
+  try{
+    const img=await new Promise((ok,no)=>{const im=new Image();im.crossOrigin='anonymous';im.onload=()=>ok(im);im.onerror=()=>no(new Error('이미지 로드 실패'));im.src=url+(url.indexOf('?')>=0?'&':'?')+'cb='+Date.now()});
+    const dpr=window.devicePixelRatio||1;const W=sigCanvas.width/dpr,H=sigCanvas.height/dpr;
+    sigCtx.clearRect(0,0,W,H);
+    const r=Math.min(W/img.width,H/img.height)*0.9;const w=img.width*r,h=img.height*r;
+    sigCtx.drawImage(img,(W-w)/2,(H-h)/2,w,h);
+    sigCleanCanvas(sigCtx,sigCanvas.width,sigCanvas.height);
+    try{sigCanvas.toDataURL('image/png');SIG_URL_FALLBACK=''}catch(err){sigCtx.clearRect(0,0,W,H);SIG_URL_FALLBACK=url}
+    SIGGED2=true;document.getElementById('sigHint').style.display='none';
+    if(msg){msg.style.color='#0f766e';msg.textContent=SIG_URL_FALLBACK?'✓ 저장된 서명을 사용합니다 (등록 원본 연결)':'✓ 저장된 서명을 불러왔습니다. 덧그리거나 [✕ 다시]로 지울 수 있습니다.'}
+  }catch(e){SIG_URL_FALLBACK=url;SIGGED2=true;document.getElementById('sigHint').style.display='none';if(msg){msg.style.color='#0f766e';msg.textContent='✓ 저장된 서명을 사용합니다 (등록 원본 연결)'}}
+}
 function exportSignPad(){
   let sign='';
   try{
@@ -2208,10 +2228,10 @@ async function submitSign(){
     const c=Object.assign({},MYD.contracts||{});
     if(SIGTYPE==='school'){
       const a=MYASG.find(x=>x.id===SIGAPPID).data();
-      c[SIGAPPID]={type:'school',school:a.school,name:MYD.name||'',agreedAt:firebase.firestore.Timestamp.now(),sign:exportSignPad()};
+      c[SIGAPPID]={type:'school',school:a.school,name:MYD.name||'',agreedAt:firebase.firestore.Timestamp.now(),sign:(SIG_URL_FALLBACK||exportSignPad())};
     }else{
       const cs=MYCOMP.find(x=>x.id===SIGAPPID).data();
-      c['comp_'+SIGAPPID]={type:'comp',title:cs.title||'',role:cs.role||'',date:cs.date||'',region:cs.region||'',name:MYD.name||'',agreedAt:firebase.firestore.Timestamp.now(),sign:exportSignPad()};
+      c['comp_'+SIGAPPID]={type:'comp',title:cs.title||'',role:cs.role||'',date:cs.date||'',region:cs.region||'',name:MYD.name||'',agreedAt:firebase.firestore.Timestamp.now(),sign:(SIG_URL_FALLBACK||exportSignPad())};
     }
     await DB.collection('users').doc(AUTH.currentUser.uid).update({contracts:c});
     MYD.contracts=c;
@@ -2610,6 +2630,7 @@ async function printCert(){
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
       <span style="font-size:11.5px;color:#9aa1ad">서명자: <b id="sigName" style="color:#17171a"></b></span>
+      <button type="button" style="background:none;border:none;color:#0f766e;font-weight:800;font-size:13px;cursor:pointer" onclick="useSavedSigPad()">🖼 저장된 서명 사용</button>
       <button type="button" style="background:none;border:none;color:#C41E2F;font-weight:800;font-size:13px;cursor:pointer" onclick="clearSigPad()">✕ 다시</button>
     </div>
     <div style="display:flex;gap:8px;margin-top:14px">
