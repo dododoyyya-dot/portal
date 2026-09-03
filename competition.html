@@ -1856,10 +1856,95 @@ function cc2AttachRender(){
 }
 function cc2CImgRender(){
   const el=document.getElementById('cc2CImgList');if(!el)return;
-  el.innerHTML=CC2_CIMGS.length?CC2_CIMGS.map((x,i)=>'<span style="display:inline-flex;align-items:center;gap:4px;margin:4px 6px 0 0"><img src="'+cesc(x.url||x.dataUrl)+'" style="height:52px;border-radius:6px;border:1px solid #e2e7f0">'
-    +'<button type="button" onclick="CC2_CIMGS.splice('+i+',1);cc2CImgRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:6px;width:20px;height:20px;cursor:pointer;font-weight:900">×</button></span>').join('')
+  el.innerHTML=CC2_CIMGS.length?CC2_CIMGS.map((x,i)=>{
+    const n=(CC2_OVL[String(i)]||[]).length;
+    return '<div style="display:inline-flex;flex-direction:column;align-items:center;gap:4px;margin:6px 10px 0 0;padding:6px;border:1.5px solid #e2e7f0;border-radius:10px">'
+      +'<img src="'+cesc(x.url||x.dataUrl)+'" style="height:92px;border-radius:6px;border:1px solid #e2e7f0">'
+      +'<div style="display:flex;gap:4px">'
+      +'<button type="button" onclick="cc2OvlOpen('+i+')" style="border:none;background:'+(n?'#0f766e':'#7c3aed')+';color:#fff;border-radius:7px;padding:4px 10px;cursor:pointer;font-weight:800;font-size:12px">🎯 '+(n?'위치 '+n+'개 ✓':'서명·기입 위치 지정')+'</button>'
+      +'<button type="button" onclick="CC2_CIMGS.splice('+i+',1);cc2OvlShift('+i+');cc2CImgRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:7px;width:26px;cursor:pointer;font-weight:900">×</button></div></div>';
+  }).join('')
+  +'<div style="font-size:12px;color:#8a919d;margin-top:6px">각 장마다 [🎯]를 눌러 참가자 성명·생년월일·날짜·전자서명이 찍힐 자리를 정해두면, 신청서 출력 시 그 자리에 자동으로 기입됩니다.</div>'
   :'<span style="font-size:12px;color:#8a919d">이미지 없음 (문안만 사용)</span>';
 }
+// ══════════ [서명 위치] 동의서 이미지 위 기입 위치 지정 — 공고 작성자가 직접, 손가락·마우스 모두 지원 ══════════
+//  저장 형식은 consentOverlays = {"이미지번호":[{f:항목,x:0~1,y:0~1,fs:글자px(680px 폭 기준)}]} — 관리자 페이지 편집기·신청서 출력과 동일.
+const CC2_OVL_FIELDS={name:'성명',birth:'생년월일',gender:'성별',school:'소속(학교·클럽)',phone:'연락처',guardian:'보호자 성명',gphone:'보호자 연락처',date:'날짜',sign:'✍ 서명'};
+let CC2_OVL={},OVL_I=0,OVL_SEL=-1,OVL_DRAG=null,OVL_PICK='sign';
+function cc2OvlShift(removed){ // 이미지 삭제 시 뒤 장의 배치를 앞으로 당김
+  const o={};Object.keys(CC2_OVL).forEach(k=>{const i=+k;if(i<removed)o[k]=CC2_OVL[k];else if(i>removed)o[String(i-1)]=CC2_OVL[k]});CC2_OVL=o;
+}
+function cc2OvlArr(){CC2_OVL[String(OVL_I)]=CC2_OVL[String(OVL_I)]||[];return CC2_OVL[String(OVL_I)]}
+function cc2OvlPack(){const o={};Object.keys(CC2_OVL).forEach(k=>{if((CC2_OVL[k]||[]).length)o[k]=CC2_OVL[k].map(f=>({f:f.f,x:+f.x.toFixed(4),y:+f.y.toFixed(4),fs:f.fs}))});return o}
+function cc2OvlOpen(i){
+  OVL_I=i;OVL_SEL=-1;OVL_DRAG=null;
+  const x=CC2_CIMGS[i];if(!x)return;
+  const old=document.getElementById('ovlModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='ovlModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.7);z-index:1200;display:flex;align-items:flex-start;justify-content:center;padding:10px;overflow:auto';
+  const chip=(k,on)=>'<button type="button" class="ovlpick'+(on?' on':'')+'" data-f="'+k+'" onclick="cc2OvlPick(\''+k+'\',this)" style="border:1.5px solid '+(on?'#153A77':'#dfe5ee')+';background:'+(on?'#153A77':'#f6f8fb')+';color:'+(on?'#fff':'#333')+';border-radius:999px;padding:7px 13px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit">'+CC2_OVL_FIELDS[k]+'</button>';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:760px;width:100%;padding:16px 18px">'
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:16px">🎯 서명·기입 위치 지정 — '+(i+1)+'번 장</b><span style="flex:1"></span>'
+    +'<button type="button" onclick="cc2OvlDone()" style="border:none;background:#153A77;color:#fff;border-radius:9px;padding:9px 20px;font-weight:900;cursor:pointer;font-family:inherit">✓ 완료</button></div>'
+    +'<div style="background:#eef3fa;border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.7;margin:8px 0 10px"><b>① 항목을 고르고 ② 종이 위 자리를 톡 누르면</b> 표가 놓입니다. 표를 <b>끌어서</b> 옮기고, 표를 누른 뒤 <b>글자 ±</b>·<b>삭제</b>. 참가자 신청서를 출력하면 그 자리에 정보와 전자서명이 찍힙니다.</div>'
+    +'<div id="ovlPicks" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+Object.keys(CC2_OVL_FIELDS).map(k=>chip(k,k===OVL_PICK)).join('')+'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">'
+    +'<button type="button" onclick="cc2OvlAuto()" style="border:none;background:#0f766e;color:#fff;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;font-family:inherit">⚡ 기본 배치 (성명·생년월일·날짜·서명)</button>'
+    +'<button type="button" onclick="cc2OvlFont(-2)" style="border:1.5px solid #dfe5ee;background:#fff;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">글자 −</button>'
+    +'<button type="button" onclick="cc2OvlFont(2)" style="border:1.5px solid #dfe5ee;background:#fff;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">글자 ＋</button>'
+    +'<button type="button" onclick="cc2OvlDel()" style="border:1.5px solid #C41E2F;background:#fff;color:#C41E2F;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">선택 삭제</button>'
+    +'<button type="button" onclick="cc2OvlClear()" style="border:1.5px solid #dfe5ee;background:#fff;color:#555;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">모두 지우기</button>'
+    +(CC2_CIMGS.length>1?'<button type="button" onclick="cc2OvlCopy()" style="border:1.5px solid #dfe5ee;background:#fff;color:#555;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">📋 다른 장에도 같은 배치</button>':'')
+    +'</div>'
+    +'<div id="ovlBox" style="position:relative;width:680px;max-width:100%;margin:0 auto;cursor:crosshair;touch-action:none;user-select:none">'
+    +'<img id="ovlImg" src="'+cesc(x.url||x.dataUrl)+'" style="width:100%;display:block;border:1px solid #ccc" draggable="false"></div></div>';
+  document.body.appendChild(div);
+  const box=div.querySelector('#ovlBox');
+  box.addEventListener('pointerdown',cc2OvlDown);
+  box.addEventListener('pointermove',cc2OvlMove);
+  box.addEventListener('pointerup',cc2OvlUp);box.addEventListener('pointercancel',cc2OvlUp);
+  cc2OvlChips();
+}
+function cc2OvlPick(k,el){OVL_PICK=k;[].forEach.call(document.querySelectorAll('.ovlpick'),b=>{const on=b.dataset.f===k;b.style.background=on?'#153A77':'#f6f8fb';b.style.color=on?'#fff':'#333';b.style.borderColor=on?'#153A77':'#dfe5ee'})}
+function cc2OvlChips(){
+  const box=document.getElementById('ovlBox');if(!box)return;
+  box.querySelectorAll('.ovlchip').forEach(c=>c.remove());
+  cc2OvlArr().forEach((f,idx)=>{
+    const c=document.createElement('div');c.className='ovlchip';c.dataset.idx=idx;
+    const sel=idx===OVL_SEL;
+    c.style.cssText='position:absolute;left:'+(f.x*100)+'%;top:'+(f.y*100)+'%;font-size:'+f.fs+'px;font-weight:800;color:#1230c4;background:rgba(80,110,255,'+(sel?'.28':'.14')+');border:2px '+(sel?'solid #C41E2F':'dashed #4c6ef5')+';border-radius:6px;padding:2px 6px;white-space:nowrap;line-height:1.2;cursor:grab;touch-action:none';
+    c.textContent=(f.f==='sign'?'✍ 서명':(CC2_OVL_FIELDS[f.f]||f.f));
+    box.appendChild(c);
+  });
+}
+function cc2OvlDown(e){
+  const box=document.getElementById('ovlBox');const r=box.getBoundingClientRect();
+  const chip=e.target.closest('.ovlchip');
+  if(chip){OVL_SEL=parseInt(chip.dataset.idx);const cr=chip.getBoundingClientRect();OVL_DRAG={dx:e.clientX-cr.left,dy:e.clientY-cr.top};box.setPointerCapture&&box.setPointerCapture(e.pointerId);cc2OvlChips();e.preventDefault();return}
+  cc2OvlArr().push({f:OVL_PICK,x:Math.min(.95,Math.max(0,(e.clientX-r.left)/r.width)),y:Math.min(.97,Math.max(0,(e.clientY-r.top)/r.height)),fs:OVL_PICK==='sign'?30:14});
+  OVL_SEL=cc2OvlArr().length-1;cc2OvlChips();
+}
+function cc2OvlMove(e){
+  if(!OVL_DRAG||OVL_SEL<0)return;
+  const box=document.getElementById('ovlBox');const r=box.getBoundingClientRect();
+  const f=cc2OvlArr()[OVL_SEL];if(!f)return;
+  f.x=Math.min(.98,Math.max(0,(e.clientX-r.left-OVL_DRAG.dx)/r.width));
+  f.y=Math.min(.98,Math.max(0,(e.clientY-r.top-OVL_DRAG.dy)/r.height));
+  cc2OvlChips();
+}
+function cc2OvlUp(){OVL_DRAG=null}
+function cc2OvlFont(d){const f=cc2OvlArr()[OVL_SEL];if(!f){alert('먼저 옮길 표를 눌러 선택하세요.');return}f.fs=Math.min(60,Math.max(8,f.fs+d));cc2OvlChips()}
+function cc2OvlDel(){if(OVL_SEL<0){alert('삭제할 표를 먼저 누르세요.');return}cc2OvlArr().splice(OVL_SEL,1);OVL_SEL=-1;cc2OvlChips()}
+function cc2OvlClear(){if(!cc2OvlArr().length)return;if(!confirm('이 장의 배치를 모두 지울까요?'))return;CC2_OVL[String(OVL_I)]=[];OVL_SEL=-1;cc2OvlChips()}
+function cc2OvlCopy(){const src=cc2OvlArr().map(f=>Object.assign({},f));let n=0;CC2_CIMGS.forEach((x,i)=>{if(i!==OVL_I){CC2_OVL[String(i)]=src.map(f=>Object.assign({},f));n++}});alert('다른 '+n+'장에 같은 배치를 복사했습니다.')}
+function cc2OvlAuto(){
+  // 대부분의 동의서는 아래쪽에 날짜·성명·서명란이 있습니다 — 그 근처에 놓고, 끌어서 맞추게 합니다.
+  const a=cc2OvlArr();
+  const add=(f,x,y,fs)=>{if(!a.some(z=>z.f===f))a.push({f:f,x:x,y:y,fs:fs})};
+  add('name',0.22,0.88,14);add('birth',0.55,0.88,14);add('date',0.22,0.82,14);add('sign',0.62,0.905,30);
+  OVL_SEL=-1;cc2OvlChips();
+}
+function cc2OvlDone(){const m=document.getElementById('ovlModal');if(m)m.remove();cc2CImgRender()}
 // [버튼식] 공고 작성 폼 칩 헬퍼 — 값은 숨은 입력칸(id)에 넣어 저장 코드는 그대로 둡니다.
 //   cc2Pick1: 하나만 고르는 칩(관할 시도·동의서 양식)  /  cc2Fill: 빈칸에 빠르게 채우는 칩(주최·시간 등, 수정 가능)
 function cc2Pick1(id,val,el){
@@ -1968,6 +2053,7 @@ function cc2Open(editId){
   CC2_ATTACH=(c.attachments||[]).map(x=>({name:x.name||'',kind:x.kind||'기타',url:x.url||''}));
   cc2AttachRender();
   CC2_CIMGS=(c.consentImgs||[]).map(u=>({url:u}));
+  CC2_OVL={};Object.keys(c.consentOverlays||{}).forEach(k=>{CC2_OVL[k]=(c.consentOverlays[k]||[]).map(f=>Object.assign({},f))});   // [서명 위치] 수정 시 기존 배치 유지
   cc2CImgRender();
 }
 async function cc2Save(){
@@ -2016,7 +2102,7 @@ async function cc2Save(){
       sports:sports,teamTypes:entry.teamUnits,fee:feeStr,deadline:v('cc2DL'),eligRegion:'',
       entry:entry,attachments:attachments,extras:extras,committee:committee,
       consentText:v('cc2CText'),consentImgs:consentImgs,consentForm:(v('cc2Form')||'basic'),
-      consentOverlays:prev.consentOverlays||{},status:'모집중'};
+      consentOverlays:cc2OvlPack(),status:'모집중'};   // [서명 위치] 공고 작성자가 지정한 기입 위치
     // 참가 슬롯 roles 생성
     const roles=[],teamDivs=[];
     entry.indiv.forEach(sp=>{if(sp.divs.length)sp.divs.forEach(d2=>roles.push(sp.name+' '+d2));else roles.push(sp.name);});
@@ -2849,7 +2935,10 @@ function printMyEntryDocs(id,s){
     const dt=(ap.agreedAt||m.at||'').slice(0,10);
     const sig=ap.sign?'<img src="'+ap.sign+'" style="height:44px;vertical-align:middle">':(ap.agreedAt?'<b style="color:#C41E2F">⚠ 서명 저장 실패</b>':'(전자서명)');
     // 필드배치(오버레이) — 참가자·보호자 기준 값
-    const eVals={name:m.name||'',rrn:'',phone:CMY.phone||'',bank:'',acct:'',holder:m.kid?(m.guardian||CMY.name||''):(m.name||''),date:dt.replace(/-/g,'. ')+'.',sign:''};
+    // [서명 위치] 공고 작성자가 지정한 항목에 맞춰 채웁니다 — 성명·생년월일·성별·소속·연락처·보호자·보호자 연락처·날짜·서명
+    const eVals={name:m.name||'',birth:m.birth||'',gender:m.gender||'',school:m.school||m.club||'',rrn:'',phone:(m.kid?(m.guardianPhone||CMY.phone||''):(m.phone||CMY.phone||'')),
+      guardian:m.kid?(m.guardian||CMY.name||''):'',gphone:m.kid?(m.guardianPhone||CMY.phone||''):'',
+      bank:'',acct:'',holder:m.kid?(m.guardian||CMY.name||''):(m.name||''),date:dt.replace(/-/g,'. ')+'.',sign:''};
     const eOvl=i=>((s.consentOverlays&&s.consentOverlays[String(i)])||[]).map(f=>{
       const inner=f.f==='sign'?(ap.sign?'<img src="'+ap.sign+'" style="height:'+(f.fs||30)+'px;display:block">':(ap.agreedAt?'<b style="color:#C41E2F;font-size:11px">⚠서명실패</b>':'(서명)')):cesc(eVals[f.f]||'');
       return '<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:'+(f.fs||14)+'px;font-weight:700;color:#111;white-space:nowrap;line-height:1.3">'+inner+'</span>';

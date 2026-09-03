@@ -164,15 +164,18 @@
   }
 
   /* ── ③ 조직도 (data-cms-org) — 드래그로 옮기기 ── */
-  //  자료 형태: {tiers:[{nodes:[{t:'회장',s:'설명',c:'top|red|blue|'}],wide:false}]}
-  //  wide: 가로선으로 묶인 위원회 줄(hwrap). 줄 사이에는 세로 연결선이 자동으로 들어갑니다.
+  //  자료 형태: {tiers:[{nodes:[{t:'회장',s:'설명',c:'top|red|blue|'}],wide:false,line:'v'|'none'}]}
+  //  wide: 가로선으로 묶인 위원회 줄(hwrap). line: 이 줄 위에 오는 세로 연결선('v' 기본 / 'none' 없음).
+  //  선은 style.css 의 .vline·.hwrap::before 가 그립니다 — 줄(tier)의 크기를 편집 모드에서 바꾸지 않아야 선이 어긋나지 않습니다.
   function orgFromDom(box){
-    var tiers=[];
+    var tiers=[],prevLine=false;
     [].forEach.call(box.children,function(ch){
+      if(ch.classList.contains('vline')){prevLine=true;return}
       var wide=ch.classList.contains('hwrap');
       var tier=wide?ch.querySelector('.tier'):(ch.classList.contains('tier')?ch:null);
       if(!tier)return;
-      tiers.push({wide:wide,nodes:[].map.call(tier.querySelectorAll('.node'),function(n){
+      var line=(tiers.length===0||wide)?'v':(prevLine?'v':'none');prevLine=false;
+      tiers.push({wide:wide,line:line,nodes:[].map.call(tier.querySelectorAll('.node'),function(n){
         var s=n.querySelector('span');
         return {t:(s?n.childNodes[0].textContent:n.textContent).trim(),s:s?s.textContent.trim():'',
           c:n.classList.contains('n-top')?'top':(n.classList.contains('n-red')?'red':(n.classList.contains('n-blue')?'blue':''))};
@@ -186,7 +189,8 @@
         return '<div class="node'+(n.c==='top'?' n-top':n.c==='red'?' n-red':n.c==='blue'?' n-blue':'')+'" data-ti="'+ti+'" data-ni="'+ni+'">'+esc(n.t)+(n.s?'<span>'+esc(n.s)+'</span>':'')+'</div>';
       }).join('')+'</div>';
       var block=tier.wide?'<div class="hwrap">'+inner+'</div>':inner;
-      return (ti>0&&!tier.wide?'<div class="vline"></div>':'')+block;
+      var showV=(ti>0&&!tier.wide&&tier.line!=='none');
+      return (showV?'<div class="vline"></div>':'')+block;
     }).join('');
   }
   function applyOrg(){
@@ -218,13 +222,14 @@
           }});
       };
     });
-    // 줄(tier): 드롭 대상 + 상자 추가
+    // 줄(tier): 드롭 대상 + 상자 추가 + 줄 설정
+    //   ※ 줄에 padding·border 를 주면 세로선·가로선 기준이 틀어져 선이 삐뚤어집니다. 크기는 그대로 두고 outline 만 씁니다.
     [].forEach.call(box.querySelectorAll('.tier'),function(t){
-      t.style.minHeight='40px';t.style.padding='6px';t.style.border='1px dashed transparent';t.style.borderRadius='10px';
-      t.addEventListener('dragover',function(e){e.preventDefault();t.style.borderColor='#1F4E9C';t.style.background='#eef3fa'});
-      t.addEventListener('dragleave',function(){t.style.borderColor='transparent';t.style.background=''});
+      t.style.position='relative';t.style.minHeight='40px';t.style.outline='1px dashed transparent';t.style.outlineOffset='6px';t.style.borderRadius='10px';
+      t.addEventListener('dragover',function(e){e.preventDefault();t.style.outlineColor='#1F4E9C';t.style.background='#eef3fa'});
+      t.addEventListener('dragleave',function(){t.style.outlineColor='transparent';t.style.background=''});
       t.addEventListener('drop',function(e){
-        e.preventDefault();t.style.borderColor='transparent';t.style.background='';
+        e.preventDefault();t.style.outlineColor='transparent';t.style.background='';
         var p=(e.dataTransfer.getData('text/plain')||'').split(':');var fi=+p[0],ni=+p[1];if(isNaN(fi))return;
         var node=ORG.tiers[fi].nodes.splice(ni,1)[0];
         var ti=+t.dataset.ti;
@@ -236,16 +241,26 @@
         if(!ORG.tiers[fi].nodes.length){ORG.tiers.splice(fi,1)}
         ORG_DIRTY=true;decorateOrg();
       });
+      // 도구 버튼은 줄 바깥(오른쪽)에 띄워 줄 너비·선 위치에 영향을 주지 않게 합니다.
+      var tools=document.createElement('div');
+      tools.style.cssText='position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:12px;display:flex;flex-direction:column;gap:4px;z-index:2';
       var add=document.createElement('button');add.type='button';add.textContent='+';add.title='이 줄에 상자 추가';
-      add.style.cssText='border:1.5px dashed #1F4E9C;background:#fff;color:#1F4E9C;border-radius:10px;width:34px;font-weight:900;cursor:pointer;font-family:inherit';
+      add.style.cssText='border:1.5px dashed #1F4E9C;background:#fff;color:#1F4E9C;border-radius:10px;width:32px;height:30px;font-weight:900;cursor:pointer;font-family:inherit';
       add.onclick=function(){ORG.tiers[+t.dataset.ti].nodes.push({t:'새 조직',s:'',c:''});ORG_DIRTY=true;decorateOrg()};
-      t.appendChild(add);
+      var cfg=document.createElement('button');cfg.type='button';cfg.textContent='⚙';cfg.title='줄 설정 — 연결선 · 가로선 · 순서';
+      cfg.style.cssText='border:1.5px solid #dfe5ee;background:#fff;color:#4b5563;border-radius:10px;width:32px;height:30px;font-weight:900;cursor:pointer;font-family:inherit';
+      cfg.onclick=function(){orgTierSettings(+t.dataset.ti)};
+      tools.appendChild(add);tools.appendChild(cfg);
+      t.appendChild(tools);
     });
     // 하단 도구줄
     var bar=document.createElement('div');bar.className='cms-bar';
     bar.style.cssText='display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:18px';
     var mk=function(txt,bg,fn){var b=document.createElement('button');b.type='button';b.textContent=txt;b.onclick=fn;b.style.cssText='border:none;background:'+bg+';color:#fff;border-radius:9px;padding:9px 16px;font-weight:800;cursor:pointer;font-family:inherit';return b};
-    bar.appendChild(mk('+ 줄 추가','#8a919d',function(){ORG.tiers.push({wide:false,nodes:[{t:'새 조직',s:'',c:''}]});ORG_DIRTY=true;decorateOrg()}));
+    var hint=document.createElement('div');hint.style.cssText='flex-basis:100%;text-align:center;font-size:12px;color:#6b7280;margin-bottom:2px';
+    hint.textContent='상자는 끌어서 옮기고 눌러서 고칩니다 · 줄 오른쪽 [+]는 상자 추가, [⚙]는 연결선·가로선·줄 순서 설정';
+    bar.appendChild(hint);
+    bar.appendChild(mk('+ 줄 추가','#8a919d',function(){ORG.tiers.push({wide:false,line:'v',nodes:[{t:'새 조직',s:'',c:''}]});ORG_DIRTY=true;decorateOrg()}));
     bar.appendChild(mk('+ 위원회 줄 추가 (가로선)','#8a919d',function(){ORG.tiers.push({wide:true,nodes:[{t:'새 위원회',s:'',c:''}]});ORG_DIRTY=true;decorateOrg()}));
     bar.appendChild(mk('💾 조직도 저장','#153A77',async function(){
       try{await save({org:ORG});DATA.org=JSON.parse(JSON.stringify(ORG));ORG_DIRTY=false;toast('조직도를 저장했습니다')}catch(e){toast('저장 실패: '+e.message,true)}
@@ -256,6 +271,25 @@
     }));
     var oldBar=box.parentNode.querySelector('.cms-bar');if(oldBar)oldBar.remove();
     box.parentNode.insertBefore(bar,box.nextSibling);
+  }
+
+  // 줄 설정 — 위 연결선(세로선) 유무, 가로 묶음선(위원회 줄), 줄 순서 이동, 줄 삭제
+  function orgTierSettings(ti){
+    var tier=ORG.tiers[ti];if(!tier)return;
+    openEditor({title:'줄 설정 — '+(ti+1)+'번째 줄 ('+tier.nodes.map(function(n){return n.t}).join(' · ')+')',fields:[
+      {k:'line',label:'이 줄 위의 세로 연결선',type:'select',value:(tier.line==='none'?'none':'v'),options:[{v:'v',t:'세로선 표시 (기본)'},{v:'none',t:'선 없음'}]},
+      {k:'wide',label:'가로 묶음선 (위원회처럼 여러 상자를 한 선으로 묶음)',type:'select',value:tier.wide?'1':'',options:[{v:'',t:'끔'},{v:'1',t:'켬'}]},
+      {k:'move',label:'줄 순서',type:'select',value:'',options:[{v:'',t:'그대로'},{v:'up',t:'한 줄 위로'},{v:'down',t:'한 줄 아래로'}]},
+      {k:'del',label:'줄 삭제',type:'select',value:'',options:[{v:'',t:'유지'},{v:'1',t:'이 줄과 상자 모두 삭제'}]}],
+      onSave:function(o){
+        if(o.del==='1'){ORG.tiers.splice(ti,1);}
+        else{
+          tier.line=(o.line==='none')?'none':'v';tier.wide=(o.wide==='1');
+          if(o.move==='up'&&ti>0){ORG.tiers.splice(ti,1);ORG.tiers.splice(ti-1,0,tier)}
+          if(o.move==='down'&&ti<ORG.tiers.length-1){ORG.tiers.splice(ti,1);ORG.tiers.splice(ti+1,0,tier)}
+        }
+        ORG_DIRTY=true;decorateOrg();
+      }});
   }
 
   /* ── ④ 제목+본문 카드 목록 (data-cms-sections) — 종목소개·후원안내 ── */
