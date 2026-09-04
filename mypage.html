@@ -569,6 +569,9 @@ function orgChip(o,region,title,fed){
   </div>
   <div id="logBox" style="display:none;margin-top:44px">
     <h3 class="sub">회차 보고 (운영일지)</h3>
+    <!-- [위촉 서류] 선정 강사가 일지를 쓰는 같은 화면에서 서류를 처리 — 겸직 허가서 업로드 · 아동청소년 성범죄 경력조회 동의(전자동의) · 연맹 확인 상태 -->
+    <div id="hireDocsRow" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#fff8e6;border:1.5px solid #f1dfa6;border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:13px"></div>
+    <input type="file" id="hdMoonFile" accept="image/*,application/pdf" style="display:none" onchange="hdMoonUpload(this)">
     <div style="background:#eef3fa;border:1.5px solid #b9cdec;border-radius:12px;padding:13px 17px;margin-bottom:14px;font-size:13px;line-height:1.75;color:#1a2b4a">
       📋 <b>회차 보고 안내</b> — 수업일·회차·참여 인원과 아래 <b>안전 지도 점검</b>을 확인해 제출해 주세요. 강사수당 지급·실적보고의 기초자료가 됩니다. (미제출 회차는 수당 산정 제외 · 사진은 활동 장면 1~3장 권장)
     </div>
@@ -1946,6 +1949,7 @@ AUTH.onAuthStateChanged(async u=>{
       document.getElementById('lgDate').value=new Date().toISOString().slice(0,10);
       loadMyLogs();
       renderGoodsLinks();
+      renderHireDocs(d);
     }
   }catch(e){}
   try{
@@ -2225,6 +2229,58 @@ async function renderGoodsLinks(){
   }
   if(!rows.length){box.style.display='none';return}
   list.innerHTML=rows.join('');box.style.display='block';
+}
+// ══════════ [위촉 서류] 겸직 허가서 · 범죄경력 조회 동의 · 연맹 확인 — 운영일지와 같은 화면의 버튼 ══════════
+//  저장 위치: users/{uid}.submitDocs.moonlight = {url, name, at, status:'대기'|'확인'|'반려', note}
+//  범죄경력 조회 동의는 위촉 전자동의(consents.crimCheck)로 대체되고, 회신서 확인은 사무국이 crimDoc 으로 표시합니다.
+function hdBadge(t,c){return '<span style="font-size:11.5px;font-weight:900;color:#fff;background:'+c+';border-radius:999px;padding:3px 9px">'+t+'</span>'}
+function renderHireDocs(d){
+  const row=document.getElementById('hireDocsRow');if(!row)return;
+  const isTeacher=d.accountType==='teacher'||!!d.workSchool;
+  const m=(d.submitDocs||{}).moonlight||null;
+  const consented=!!(d.consents&&d.consents.agreedAt);
+  let h='<b style="margin-right:4px">📂 위촉 서류</b>';
+  // ① 겸직 허가서 (교원) — 학교장 결재 문서 사진·PDF
+  const mSt=!m?hdBadge('미제출','#C41E2F'):(m.status==='확인'?hdBadge('확인 완료','#0f766e'):(m.status==='반려'?hdBadge('반려','#C41E2F'):hdBadge('확인 대기','#b8860b')));
+  h+='<span style="display:inline-flex;align-items:center;gap:6px;border:1.5px solid #e2e7f0;background:#fff;border-radius:10px;padding:6px 10px">'
+    +'<span style="font-weight:800">🧑‍🏫 겸직 허가서'+(isTeacher?'':' <span style="font-weight:600;color:#8a919d;font-size:11px">(교원만)</span>')+'</span>'+mSt
+    +(m&&m.url?'<a href="'+m.url+'" target="_blank" style="font-size:12px;font-weight:800;color:#153A77">보기</a>':'')
+    +(m&&m.status==='반려'&&m.note?'<span style="font-size:11.5px;color:#C41E2F;font-weight:700">사유: '+esc(m.note)+'</span>':'')
+    +(m&&m.status==='확인'?'':'<button class="btn-sub" style="background:#153A77;padding:6px 12px;font-size:12px" onclick="document.getElementById(\'hdMoonFile\').click()">📎 '+(m?'다시 올리기':'올리기')+'</button>')
+    +'</span>';
+  // ② 아동·청소년 성범죄 경력 조회 — 동의(전자동의) + 연맹 확인
+  h+='<span style="display:inline-flex;align-items:center;gap:6px;border:1.5px solid #e2e7f0;background:#fff;border-radius:10px;padding:6px 10px">'
+    +'<span style="font-weight:800">🛡 성범죄 경력 조회</span>'
+    +(consented?hdBadge('동의 완료','#0f766e'):hdBadge('동의 필요','#C41E2F'))
+    +(d.crimDoc?hdBadge('연맹 확인 ✓','#0f766e'):'<span style="font-size:11.5px;color:#8a919d;font-weight:700">연맹 확인 대기</span>')
+    +(consented?'':'<button class="btn-sub" style="background:#C41E2F;padding:6px 12px;font-size:12px" onclick="var e=document.getElementById(\'consentWrap\');if(e){e.scrollIntoView({block:\'center\',behavior:\'smooth\'})}">✍ 전자동의 하러 가기</button>')
+    +'</span>';
+  h+='<span id="hdMsg" style="font-size:12px;font-weight:800;min-width:60px"></span>';
+  row.innerHTML=h;
+}
+async function hdMoonUpload(inp){
+  const f=inp.files&&inp.files[0];if(!f)return;
+  const msg=document.getElementById('hdMsg');const say=(t,bad)=>{if(msg){msg.textContent=t;msg.style.color=bad?'#C41E2F':'#0f766e'}};
+  if(f.size>8*1024*1024){say('8MB 이하 파일만 올릴 수 있습니다.',true);inp.value='';return}
+  say('올리는 중…');
+  try{
+    const uid=AUTH.currentUser.uid;const isPdf=/pdf$/i.test(f.type)||/\.pdf$/i.test(f.name);
+    let blob=f,ct=f.type||(isPdf?'application/pdf':'image/jpeg'),ext=isPdf?'pdf':'jpg';
+    if(!isPdf){try{blob=await compressImg(f);ct='image/jpeg'}catch(e){}}
+    let url='';
+    try{const ref=firebase.storage().ref('docs/'+uid+'/moonlight_'+Date.now()+'.'+ext);await ref.put(blob,{contentType:ct});url=await ref.getDownloadURL()}
+    catch(e){
+      // 서류 폴더 규칙(storage v6)이 아직 없으면 이미지는 기존 자격 사본 폴더로 올립니다
+      if(isPdf)throw new Error('PDF 업로드는 스토리지 규칙 갱신 후 가능합니다 — 사진으로 올려 주세요');
+      const ref=firebase.storage().ref('quals/'+uid+'/moonlight_'+Date.now()+'.jpg');await ref.put(blob,{contentType:'image/jpeg'});url=await ref.getDownloadURL();
+    }
+    const rec={url:url,name:f.name,at:new Date().toISOString(),status:'대기',note:''};
+    await DB.collection('users').doc(uid).set({submitDocs:{moonlight:rec}},{merge:true});
+    MYD.submitDocs=Object.assign({},MYD.submitDocs||{},{moonlight:rec});
+    renderHireDocs(MYD);
+    const m2=document.getElementById('hdMsg');if(m2){m2.textContent='✓ 올렸습니다 — 사무국 확인 후 완료로 바뀝니다.';m2.style.color='#0f766e'}
+  }catch(e){say('업로드 실패: '+(e&&e.message||e),true)}
+  inp.value='';
 }
 async function loadMyLogs(){
   const el=document.getElementById('lgList');

@@ -266,6 +266,8 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub ufl" data-f="staff" onclick="userFilter('staff',this)" style="background:#8a919d">🎪 운영 지원</button>
         <button class="btn-sub ufl" data-f="ncdoc" onclick="userFilter('ncdoc',this)" style="background:#8a919d">📎 자격 사본 미첨부</button>
         <button class="btn-sub" onclick="ncDocRemind()" style="background:#b8860b" title="사본 미첨부 회원 전원에게 첨부 요청 알림을 보냅니다">📣 사본 첨부 요청 알림</button>
+        <button class="btn-sub ufl" data-f="hdoc" onclick="userFilter('hdoc',this)" style="background:#8a919d" title="교원 회원 중 겸직 허가서가 없거나 반려된 회원, 확인 대기 중인 회원">🧑‍🏫 겸직 허가서 미비·대기</button>
+        <button class="btn-sub" onclick="moonDocRemind()" style="background:#b8860b" title="겸직 허가서 미제출·반려 교원에게 제출 요청 알림">📣 겸직 허가서 요청 알림</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
         <span style="font-size:12.5px;font-weight:800;color:#6b7280">보기 방식</span>
@@ -3601,6 +3603,7 @@ function showMemberModal(uid){
   const rows=[
     ['회원 유형',esc({instructor:'지도자·강사',teacher:'교사(교원)',natcert:'국가공인자격증 취득회원',athlete:'선수회원',general:'일반회원',student:'학생회원'}[v.accountType]||v.accountType||'-')+(v.memberClass?' <b style="font-size:11px;color:#8a5a00">· '+esc(v.memberClass)+'</b>':'')+(v.typeConvertedFrom?' <span style="font-size:11px;color:#8a919d">(전환 전: '+esc(v.typeConvertedFrom)+')</span>':'')],
     ['안전교육',(function(){if(!v.safetyEdu)return '<span style="color:#C41E2F;font-weight:800">미이수</span>';try{var t=v.safetyEduAt&&v.safetyEduAt.toDate?v.safetyEduAt.toDate():(v.safetyEduAt?new Date(v.safetyEduAt):null);if(!t)return '<b style="color:#0f766e">이수</b>';var ok=(Date.now()-t.getTime())<365*86400000;return (ok?'<b style="color:#0f766e">이수 ✓</b>':'<span style="color:#C41E2F;font-weight:800">만료</span>')+' <span style="font-size:11px;color:#8a919d">'+t.toISOString().slice(0,10)+'</span>';}catch(e){return '<b style="color:#0f766e">이수</b>'}})()],
+    ['위촉 서류',(function(){const m=(v.submitDocs||{}).moonlight;const ms=!m?'<span style="color:#C41E2F;font-weight:800">겸직 허가서 미제출</span>':('겸직 허가서 '+(m.status==='확인'?'<b style="color:#0f766e">확인 ✓</b>':(m.status==='반려'?'<b style="color:#C41E2F">반려</b>'+(m.note?' ('+esc(m.note)+')':''):'<b style="color:#b8860b">확인 대기</b>'))+' <a href="'+m.url+'" target="_blank" style="color:#153A77;font-weight:800">📎보기</a>'+(m.at?' <span class="mut">'+esc(String(m.at).slice(0,10))+'</span>':''));return ms+' · 범죄경력 조회 동의 '+((v.consents&&v.consents.crimCheck)?'<b style="color:#0f766e">✓</b>':'<span style="color:#C41E2F">미동의</span>')+' · 회신서 '+(v.crimDoc?'<b style="color:#0f766e">확인 ✓</b>':'<span class="mut">대기</span>')})()],
     ['이메일',esc(v.email||'-')],
     ['성별·생년월일',esc(v.gender||'-')+' · '+esc(v.birth||'-')],
     ['KFDF 자격번호',[v.qualNoLeader?'지도자 '+esc(v.qualNoLeader):'',v.qualNoReferee?'심판 '+esc(v.qualNoReferee):''].filter(Boolean).join(' · ')||'-'],
@@ -3670,6 +3673,7 @@ function showMemberModal(uid){
     '<button class="btn-sub" style="background:'+(v.crimDoc?'#0f766e':'#8a919d')+'" onclick="toggleCrim(\''+uid+'\')">'+(v.crimDoc?'경력확인 ✓':'경력확인 체크')+'</button>',
     '<button class="btn-sub" style="background:'+(v.certDoc?'#0f766e':'#8a919d')+'" onclick="toggleCert(\''+uid+'\')">'+(v.certDoc?'자격확인 ✓':'자격확인 체크')+'</button>',
     '<button class="btn-sub" style="background:'+(v.safetyEdu?'#0f766e':'#8a919d')+'" onclick="toggleSafety(\''+uid+'\')">'+(v.safetyEdu?'안전교육 ✓':'안전교육 처리')+'</button>',
+    ((v.submitDocs||{}).moonlight?'<button class="btn-sub" style="background:'+(((v.submitDocs||{}).moonlight||{}).status==='확인'?'#0f766e':'#8a919d')+'" onclick="moonDocSet(\''+uid+'\',\'확인\')">겸직허가서 '+(((v.submitDocs||{}).moonlight||{}).status==='확인'?'✓':'확인')+'</button><button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="moonDocSet(\''+uid+'\',\'반려\')">겸직허가서 반려</button>':''),
     '<button class="btn-sub" style="background:#7c3aed" onclick="resetMemberPw(\''+esc(v.email)+'\',\''+esc(v.name)+'\')">🔑 비밀번호 재설정메일</button>',
     '<button class="btn-sub" style="background:#b8860b" onclick="resetMemberPwManual(\''+uid+'\',\''+esc(v.name)+'\')">🔧 임시 비밀번호 직접 설정</button>',
     '<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delUser(\''+uid+'\',\''+esc(v.name)+'\');closeMemberModal()">🗑 삭제</button>'
@@ -3691,7 +3695,8 @@ function showMemberModal(uid){
 function uMatch(v){
   if(UFL==='pending'){if(v.status==='approved')return false}
   else if(UFL==='any'){const f=v.instructorFor||{};if(v.status!=='approved')return false;if(!(f.school||f.after||f.referee||f.staff))return false}
-  else if(UFL==='ncdoc'){if(!(v.natCertName&&!v.natCertDoc&&!v.natCertApproved))return false}   // [사본 미첨부] 자격 신고만 하고 사본이 없는 회원
+  else if(UFL==='ncdoc'){if(!(v.natCertName&&!v.natCertDoc&&!v.natCertApproved))return false}
+  else if(UFL==='hdoc'){const m=(v.submitDocs||{}).moonlight;const teacher=v.accountType==='teacher'||!!v.workSchool;if(!((teacher&&(!m||m.status==='반려'))||(m&&m.status==='대기')))return false}   // [위촉 서류] 겸직 허가서 미제출·반려(교원) 또는 확인 대기   // [사본 미첨부] 자격 신고만 하고 사본이 없는 회원
   else if(UFL!=='전체'){if(!(v.instructorFor&&v.instructorFor[UFL]))return false}
   // [관할] 시도연맹 임원은 '관할 회원' 과 '관할 미판정' 을 나눠 봅니다 (중앙 관리자는 해당 없음)
   if(typeof IS_SIDO!=='undefined'&&IS_SIDO){
@@ -6020,6 +6025,27 @@ async function toggleCert(uid){
   if(!confirm(now?('['+d.name+'] 체육지도자 또는 연맹 지도자 자격증을 확인했습니까? (수령·대조 완료)'):('['+d.name+'] 자격확인을 취소 처리할까요?')))return;
   await DB.collection('users').doc(uid).update({certDoc:now,certDocAt:firebase.firestore.FieldValue.serverTimestamp()});
   loadUsers();
+}
+// [위촉 서류] 겸직 허가서 확인·반려 — users.submitDocs.moonlight.status, 반려 시 사유를 회원 화면에 표시하고 알림
+async function moonDocSet(uid,st){
+  const doc=await DB.collection('users').doc(uid).get();const d=doc.data()||{};const m=(d.submitDocs||{}).moonlight;
+  if(!m){alert('제출된 겸직 허가서가 없습니다.');return}
+  let note='';
+  if(st==='반려'){note=prompt('['+d.name+'] 겸직 허가서 반려 사유 (회원에게 그대로 표시됩니다):','');if(note===null)return}
+  else if(m.status==='확인'){if(!confirm('['+d.name+'] 겸직 허가서 확인을 취소하고 대기로 되돌릴까요?'))return;st='대기'}
+  else if(!confirm('['+d.name+'] 겸직 허가서를 확인 완료로 처리할까요?'))return;
+  const rec=Object.assign({},m,{status:st,note:note||'',checkedAt:new Date().toISOString(),checkedBy:(firebase.auth().currentUser||{}).email||''});
+  await DB.collection('users').doc(uid).set({submitDocs:{moonlight:rec}},{merge:true});
+  if(st==='반려'){try{await KFDF.notify(uid,'🧑‍🏫 겸직 허가서가 반려되었습니다'+(note?' — '+note:'')+'. 마이페이지 회차 보고 화면에서 다시 올려 주세요','mypage.html')}catch(e){}}
+  if(st==='확인'){try{await KFDF.notify(uid,'✅ 겸직 허가서가 확인되었습니다','mypage.html')}catch(e){}}
+  loadUsers();
+}
+async function moonDocRemind(){
+  const list=USERS.filter(d=>{const v=d.data();const m=(v.submitDocs||{}).moonlight;const teacher=v.accountType==='teacher'||!!v.workSchool;return teacher&&v.status==='approved'&&(!m||m.status==='반려')});
+  if(!list.length){alert('겸직 허가서 미제출·반려 교원이 없습니다.');return}
+  if(!confirm('교원 '+list.length+'명에게 겸직 허가서 제출 요청 알림을 보낼까요?\n\n'+bulkNames(list.map(d=>({v:d.data()})))))return;
+  let n=0;for(const d of list){try{await KFDF.notify(d.id,'🧑‍🏫 겸직 허가서를 올려 주세요 — 마이페이지 회차 보고 화면의 [📂 위촉 서류]에서 사진·PDF로 제출','mypage.html');n++}catch(e){}}
+  alert('✓ '+n+'명에게 알림을 보냈습니다.');
 }
 async function toggleSafety(uid){
   const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
