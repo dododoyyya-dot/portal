@@ -1982,8 +1982,9 @@ AUTH.onAuthStateChanged(async u=>{
     }
   }catch(e){}
   try{
-    const careerSnap=await DB.collection('staffCareer').where('uid','==',u.uid).orderBy('date','desc').limit(500).get();
-    MYCAREER=careerSnap.docs.map(d2=>Object.assign({id:d2.id},d2.data()));
+    // [색인 수정] uid+date 정렬 조합은 Firestore 복합 색인이 필요해 failed-precondition 이 났음 → 정렬은 화면에서
+    const careerSnap=await DB.collection('staffCareer').where('uid','==',u.uid).limit(500).get();
+    MYCAREER=careerSnap.docs.map(d2=>Object.assign({id:d2.id},d2.data())).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
     renderCareer();
     if(false&&!careerSnap.empty){
       document.getElementById('staffCareerBox').style.display='block';
@@ -2312,7 +2313,7 @@ function renderCareer(){
   const box=document.getElementById('careerBox');if(!box||!window.CAREER)return;
   const recs=MYCAREER||[];
   box.style.display='block';
-  const errNote=CAREER_ERR?'<div style="font-size:12.5px;font-weight:800;color:#C41E2F;background:#fdf1f1;border:1.5px solid #f1c7cc;border-radius:10px;padding:8px 12px;margin-bottom:10px">경력 기록을 불러오지 못했습니다 ('+esc(CAREER_ERR.code||CAREER_ERR.message||'')+') — 보안규칙 v18(staffCareer)이 게시되면 표시됩니다.</div>':'';
+  const errNote=CAREER_ERR?'<div style="font-size:12.5px;font-weight:800;color:#C41E2F;background:#fdf1f1;border:1.5px solid #f1c7cc;border-radius:10px;padding:8px 12px;margin-bottom:10px">경력 기록을 불러오는 중 문제가 생겼습니다 ('+esc(CAREER_ERR.code||CAREER_ERR.message||'')+'). 잠시 후 다시 열어 주세요.</div>':'';
   const st=CAREER.stats(recs);const tier=st.tier;const bd=CAREER.badges(st);
   const G=CAREER.GROUP_ICON,C=CAREER.GROUP_COLOR,I=(n,o)=>CAREER.svg(n,o||{});
   const ti=document.getElementById('careerTitleIcon');if(ti)ti.innerHTML=I('gamepad',{size:22,color:'#153A77',stroke:2});
@@ -2339,14 +2340,16 @@ function renderCareer(){
   const hd=document.getElementById('careerBadgeHead');
   if(hd)hd.innerHTML='<span style="display:inline-flex;align-items:center;gap:5px">'+I('medal',{size:16,color:'#153A77',stroke:2.2})+'배지 <b style="color:#153A77">'+done.length+'</b> / '+bd.length+'</span>'
     +Object.keys(rOrder).map(r=>'<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#6b7280"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,'+RC[r][0]+','+RC[r][1]+')"></i>'+CAREER.RARITY_LABEL[r]+' '+bd.filter(b=>b.rarity===r&&b.done).length+'/'+bd.filter(b=>b.rarity===r).length+'</span>').join('');
+  window.CAREER_BD=bd;
   document.getElementById('careerBadges').innerHTML=sorted.map(b=>{const rc=RC[b.rarity]||RC.common;
-    return '<div title="'+esc(b.desc)+'" style="display:flex;gap:10px;align-items:center;border:1.5px solid '+(b.done?rc[0]:'#e2e7f0')+';background:'+(b.done?'linear-gradient(135deg,#fff,'+rc[0]+'22)':'#fafbfd')+';border-radius:14px;padding:9px 10px;position:relative;overflow:hidden">'
+    return '<div title="'+esc(b.desc)+(b.done?' — 눌러서 다시 보기':'')+'" '+(b.done?'onclick="badgePop(\''+b.id+'\')" ':'')+'style="display:flex;gap:10px;align-items:center;border:1.5px solid '+(b.done?rc[0]:'#e2e7f0')+';background:'+(b.done?'linear-gradient(135deg,#fff,'+rc[0]+'22)':'#fafbfd')+';border-radius:14px;padding:9px 10px;position:relative;overflow:hidden;cursor:'+(b.done?'pointer':'default')+'">'
       +CAREER.medal({icon:b.icon,rarity:b.rarity,locked:!b.done,size:54})
       +'<div style="min-width:0;flex:1"><div style="font-size:13px;font-weight:900;line-height:1.25;color:'+(b.done?'#111':'#4b5563')+'">'+esc(b.name)+'</div>'
       +'<div style="font-size:10.5px;font-weight:800;color:'+(b.done?rc[1]:'#8a919d')+';margin-top:1px">'+esc(b.rarityLabel)+(b.done?' · 획득':'')+'</div>'
       +'<div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.35">'+esc(b.desc)+'</div>'
       +(b.done?'':'<div style="height:5px;background:#eef1f5;border-radius:999px;margin-top:5px;overflow:hidden"><i style="display:block;height:100%;width:'+b.pct+'%;background:linear-gradient(90deg,'+rc[0]+','+rc[1]+')"></i></div><div style="font-size:10.5px;color:#8a919d;margin-top:2px">'+b.cur+' / '+b.need+'</div>')
       +'</div></div>'}).join('');
+  badgeCelebrate(bd);
   document.getElementById('careerNext').innerHTML='<span style="display:inline-flex;align-items:center;gap:5px">'+I('target',{size:15,color:'#8a5a00',stroke:2.2})+'<b>다음 도전</b></span> — '+(todo.length?todo.slice(0,3).map(b=>'<span style="display:inline-flex;align-items:center;gap:4px">'+I(b.icon,{size:14,color:'#8a5a00',stroke:2.2})+esc(b.name)+' ('+b.cur+'/'+b.need+')</span>').join(' · '):'모든 배지를 모았습니다!')
     +' <a href="staff.html" style="font-weight:800;color:#153A77;margin-left:6px">심판·운영요원 모집 보기 →</a> <a href="competition.html" style="font-weight:800;color:#153A77">대회 참가 →</a>'
     +(done.length?'<div style="margin-top:4px;color:#8a5a00">획득 배지 '+done.length+' / '+bd.length+'</div>':'');
@@ -2363,6 +2366,61 @@ function renderCareer(){
       +'<span style="font-size:12px;color:#6b7280">'+esc(c.location||'-')+'</span>'
       +'</div>'}).join('')).join('')
     :'<div class="bempty">아직 기록된 경력이 없습니다.</div>';
+}
+// ══════════ [배지 모션] 새로 획득한 배지를 팝업 모션으로 축하 — 마지막으로 본 획득 목록은 브라우저에 저장(kfdf_badges_{uid}) ══════════
+let BADGE_Q=[],BADGE_BUSY=false,BADGE_DONE_ONCE=false;
+function badgeStyle(){
+  if(document.getElementById('badgePopCss'))return;
+  const st=document.createElement('style');st.id='badgePopCss';
+  st.textContent='@keyframes bpIn{0%{transform:scale(.4) rotate(-12deg);opacity:0}60%{transform:scale(1.12) rotate(3deg);opacity:1}80%{transform:scale(.96)}100%{transform:scale(1) rotate(0)}}'
+    +'@keyframes bpRing{0%{transform:scale(.6);opacity:.9}100%{transform:scale(2.2);opacity:0}}'
+    +'@keyframes bpSpin{to{transform:rotate(360deg)}}'
+    +'@keyframes bpFade{0%{opacity:0}100%{opacity:1}}'
+    +'@keyframes bpUp{0%{transform:translateY(14px);opacity:0}100%{transform:translateY(0);opacity:1}}'
+    +'@keyframes bpP{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0}}'
+    +'.bp-wrap{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(7,14,30,.72);animation:bpFade .25s ease;cursor:pointer;padding:20px}'
+    +'.bp-card{position:relative;width:min(340px,92vw);background:linear-gradient(160deg,#0f2250,#153A77 55%,#1F4E9C);border-radius:24px;padding:28px 22px 22px;text-align:center;color:#fff;box-shadow:0 30px 80px rgba(0,0,0,.5);animation:bpIn .6s cubic-bezier(.2,1.4,.4,1);overflow:hidden}'
+    +'.bp-card:before{content:"";position:absolute;inset:-40%;background:conic-gradient(from 0deg,transparent 0 40%,rgba(255,255,255,.14) 50%,transparent 60% 100%);animation:bpSpin 6s linear infinite}'
+    +'.bp-medal{position:relative;width:132px;height:132px;margin:0 auto 10px}'
+    +'.bp-medal .ring{position:absolute;inset:0;border-radius:50%;border:3px solid rgba(255,255,255,.7);animation:bpRing 1.4s ease-out .3s 2}'
+    +'.bp-k{position:relative;font-size:12px;letter-spacing:3px;font-weight:900;opacity:.85;animation:bpUp .5s ease .2s both}'
+    +'.bp-n{position:relative;font-size:24px;font-weight:900;margin-top:4px;animation:bpUp .5s ease .3s both;word-break:keep-all}'
+    +'.bp-r{position:relative;display:inline-block;margin-top:6px;font-size:11.5px;font-weight:900;padding:3px 11px;border-radius:999px;background:rgba(255,255,255,.18);animation:bpUp .5s ease .4s both}'
+    +'.bp-d{position:relative;font-size:13px;opacity:.9;margin-top:10px;line-height:1.55;animation:bpUp .5s ease .5s both}'
+    +'.bp-t{position:relative;font-size:11px;opacity:.6;margin-top:14px}'
+    +'.bp-p{position:absolute;left:50%;top:38%;width:10px;height:10px;border-radius:3px;animation:bpP 1.1s ease-out forwards}';
+  document.head.appendChild(st);
+}
+function badgePop(id,cb){
+  const b=(window.CAREER_BD||[]).find(x=>x.id===id);if(!b||!window.CAREER)return;
+  badgeStyle();
+  const rc=CAREER.RARITY[b.rarity]||CAREER.RARITY.common;
+  const w=document.createElement('div');w.className='bp-wrap';
+  // 파티클: 희귀도 색 + 금색, 12~18개
+  const n=b.rarity==='legendary'?22:(b.rarity==='epic'?18:14);let parts='';
+  for(let i=0;i<n;i++){const a=(Math.PI*2*i)/n+Math.random()*.5;const d=90+Math.random()*90;parts+='<i class="bp-p" style="--dx:'+Math.round(Math.cos(a)*d)+'px;--dy:'+Math.round(Math.sin(a)*d-40)+'px;background:'+(i%3===0?'#ffd166':(i%3===1?rc[0]:'#fff'))+';animation-delay:'+(0.15+Math.random()*.25)+'s;transform:rotate('+Math.round(Math.random()*90)+'deg)"></i>'}
+  w.innerHTML='<div class="bp-card">'+parts
+    +'<div class="bp-medal"><span class="ring"></span>'+CAREER.medal({icon:b.icon,rarity:b.rarity,size:132})+'</div>'
+    +'<div class="bp-k">NEW BADGE</div><div class="bp-n">'+esc(b.name)+'</div>'
+    +'<div class="bp-r" style="color:'+rc[0]+'">'+esc(b.rarityLabel)+' 배지</div>'
+    +'<div class="bp-d">'+esc(b.desc)+'</div><div class="bp-t">화면을 누르면 닫힙니다</div></div>';
+  let closed=false;const close=()=>{if(closed)return;closed=true;w.style.transition='opacity .25s';w.style.opacity='0';setTimeout(()=>{w.remove();if(cb)cb()},260)};
+  w.onclick=close;document.body.appendChild(w);setTimeout(close,4200);
+}
+function badgeCelebrate(bd){
+  if(BADGE_DONE_ONCE)return;BADGE_DONE_ONCE=true;
+  const uid=(AUTH.currentUser||{}).uid;if(!uid)return;
+  const key='kfdf_badges_'+uid;let seen=null;
+  try{const raw=localStorage.getItem(key);seen=raw?JSON.parse(raw):null}catch(e){seen=null}
+  const done=bd.filter(b=>b.done);const order={legendary:0,epic:1,rare:2,uncommon:3,fun:4,common:5};
+  let fresh;
+  if(!seen)fresh=done.slice().sort((a,b)=>order[a.rarity]-order[b.rarity]).slice(0,3);   // 처음 보는 기기: 가장 귀한 배지 3개만 축하
+  else fresh=done.filter(b=>seen.indexOf(b.id)<0).sort((a,b)=>order[a.rarity]-order[b.rarity]).slice(0,5);
+  try{localStorage.setItem(key,JSON.stringify(done.map(b=>b.id)))}catch(e){}
+  if(!fresh.length)return;
+  BADGE_Q=fresh.map(b=>b.id);
+  const next=()=>{const id=BADGE_Q.shift();if(!id)return;badgePop(id,next)};
+  setTimeout(next,600);
 }
 function printCareerCert(){
   const d=MYD||{};const recs=(MYCAREER||[]).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
