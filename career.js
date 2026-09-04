@@ -296,7 +296,7 @@
       return chain.then(function(){return out});
     });
   }
-  window.CAREER={pdfPages:pdfPages,ROLES:ROLES,GROUP_ICON:GROUP_ICON,GROUP_GLYPH:GROUP_GLYPH,GROUP_COLOR:GROUP_COLOR,POINTS:POINTS,TIERS:TIERS,RARITY:RARITY,RARITY_LABEL:RARITY_LABEL,
+  window.CAREER={pdfPages:pdfPages,checkMark:function(px){px=px||18;return '<svg width="'+px+'" height="'+px+'" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M4 12.5l5 5L20 6"/></svg>'},ROLES:ROLES,GROUP_ICON:GROUP_ICON,GROUP_GLYPH:GROUP_GLYPH,GROUP_COLOR:GROUP_COLOR,POINTS:POINTS,TIERS:TIERS,RARITY:RARITY,RARITY_LABEL:RARITY_LABEL,
     group:careerGroup,tierOf:tierOf,stats:stats,badges:badges,BADGES:BADGES,write:write,galleryDraft:galleryDraft,roleChips:roleChips,groupTag:groupTag,key:key,
     svg:svg,medal:medal,emblem:emblem,ICONS:P};
 })();

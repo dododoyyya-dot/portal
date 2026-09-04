@@ -234,7 +234,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260821"></script>
-<script src="career.js?v=20260905c"></script>
+<script src="career.js?v=20260905d"></script>
 <script src="site_config.js"></script>
 <script>
 KFDF.initApp();
@@ -2011,13 +2011,13 @@ function cc2CImgRender(){
 }
 // ══════════ [서명 위치] 동의서 이미지 위 기입 위치 지정 — 공고 작성자가 직접, 손가락·마우스 모두 지원 ══════════
 //  저장 형식은 consentOverlays = {"이미지번호":[{f:항목,x:0~1,y:0~1,fs:글자px(680px 폭 기준)}]} — 관리자 페이지 편집기·신청서 출력과 동일.
-const CC2_OVL_FIELDS={name:'성명',birth:'생년월일',gender:'성별',school:'소속(학교·클럽)',phone:'연락처',guardian:'보호자 성명',gphone:'보호자 연락처',date:'날짜',sign:'✍ 서명'};
+const CC2_OVL_FIELDS={name:'성명',birth:'생년월일',gender:'성별',school:'소속(학교·클럽)',phone:'연락처',guardian:'보호자 성명',gphone:'보호자 연락처',date:'날짜',sign:'✍ 서명',check:'체크 표시',num:'숫자(직접 입력)'};   // check: 동의함 □ 칸에 ✓ / num: 학년·연도·금액 등 정해진 숫자·글자
 let CC2_OVL={},OVL_I=0,OVL_SEL=-1,OVL_DRAG=null,OVL_PICK='sign';
 function cc2OvlShift(removed){ // 이미지 삭제 시 뒤 장의 배치를 앞으로 당김
   const o={};Object.keys(CC2_OVL).forEach(k=>{const i=+k;if(i<removed)o[k]=CC2_OVL[k];else if(i>removed)o[String(i-1)]=CC2_OVL[k]});CC2_OVL=o;
 }
 function cc2OvlArr(){CC2_OVL[String(OVL_I)]=CC2_OVL[String(OVL_I)]||[];return CC2_OVL[String(OVL_I)]}
-function cc2OvlPack(){const o={};Object.keys(CC2_OVL).forEach(k=>{if((CC2_OVL[k]||[]).length)o[k]=CC2_OVL[k].map(f=>({f:f.f,x:+f.x.toFixed(4),y:+f.y.toFixed(4),fs:f.fs}))});return o}
+function cc2OvlPack(){const o={};Object.keys(CC2_OVL).forEach(k=>{if((CC2_OVL[k]||[]).length)o[k]=CC2_OVL[k].map(f=>Object.assign({f:f.f,x:+f.x.toFixed(4),y:+f.y.toFixed(4),fs:f.fs},f.v?{v:f.v}:{}))});return o}
 function cc2OvlOpen(i){
   OVL_I=i;OVL_SEL=-1;OVL_DRAG=null;
   const x=CC2_CIMGS[i];if(!x)return;
@@ -2057,7 +2057,8 @@ function cc2OvlChips(){
     const c=document.createElement('div');c.className='ovlchip';c.dataset.idx=idx;
     const sel=idx===OVL_SEL;
     c.style.cssText='position:absolute;left:'+(f.x*100)+'%;top:'+(f.y*100)+'%;font-size:'+f.fs+'px;font-weight:800;color:#1230c4;background:rgba(80,110,255,'+(sel?'.28':'.14')+');border:2px '+(sel?'solid #C41E2F':'dashed #4c6ef5')+';border-radius:6px;padding:2px 6px;white-space:nowrap;line-height:1.2;cursor:grab;touch-action:none';
-    c.textContent=(f.f==='sign'?'✍ 서명':(CC2_OVL_FIELDS[f.f]||f.f));
+    c.textContent=(f.f==='sign'?'✍ 서명':(f.f==='check'?'✓ 체크':(f.f==='num'?'# '+(f.v||''):(CC2_OVL_FIELDS[f.f]||f.f))));
+    if(f.f==='num'){c.title='두 번 눌러 숫자 수정';c.addEventListener('dblclick',function(ev){ev.stopPropagation();const v=prompt('기입할 숫자·글자',f.v||'');if(v!==null&&v.trim()){f.v=v.trim();cc2OvlChips()}})}
     box.appendChild(c);
   });
 }
@@ -2065,7 +2066,9 @@ function cc2OvlDown(e){
   const box=document.getElementById('ovlBox');const r=box.getBoundingClientRect();
   const chip=e.target.closest('.ovlchip');
   if(chip){OVL_SEL=parseInt(chip.dataset.idx);const cr=chip.getBoundingClientRect();OVL_DRAG={dx:e.clientX-cr.left,dy:e.clientY-cr.top};box.setPointerCapture&&box.setPointerCapture(e.pointerId);cc2OvlChips();e.preventDefault();return}
-  cc2OvlArr().push({f:OVL_PICK,x:Math.min(.95,Math.max(0,(e.clientX-r.left)/r.width)),y:Math.min(.97,Math.max(0,(e.clientY-r.top)/r.height)),fs:OVL_PICK==='sign'?30:14});
+  const nf={f:OVL_PICK,x:Math.min(.95,Math.max(0,(e.clientX-r.left)/r.width)),y:Math.min(.97,Math.max(0,(e.clientY-r.top)/r.height)),fs:OVL_PICK==='sign'?30:(OVL_PICK==='check'?18:14)};
+  if(OVL_PICK==='num'){const v=prompt('이 자리에 기입할 숫자(또는 짧은 글자)를 입력하세요\n예: 3 (학년), 2026, 50,000','');if(v===null||!v.trim())return;nf.v=v.trim()}
+  cc2OvlArr().push(nf);
   OVL_SEL=cc2OvlArr().length-1;cc2OvlChips();
 }
 function cc2OvlMove(e){
@@ -2722,8 +2725,8 @@ function consentImgsOf(s){return (s.consentImgs&&s.consentImgs.length)?s.consent
 function consentPreviewSpans(s,i){
   const flds=(s.consentOverlays&&s.consentOverlays[String(i)])||[];
   if(!flds.length)return '';
-  const vals={name:CMY.name||'성명',rrn:'주민등록번호(자동)',phone:CMY.phone||'연락처',bank:CMY.bank||'은행',acct:CMY.accountNum||'계좌번호',holder:CMY.accountHolder||CMY.name||'예금주',date:'제출일(자동)',sign:'✍ 서명 위치'};
-  return flds.map(f=>'<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:'+Math.min(f.fs||14,16)+'px;font-weight:800;color:#1230c4;background:rgba(80,110,255,.13);border:1px dashed #4c6ef5;border-radius:4px;padding:0 5px;white-space:nowrap;line-height:1.4">'+cesc(vals[f.f]||'')+'</span>').join('');
+  const vals={name:CMY.name||'성명',rrn:'주민등록번호(자동)',phone:CMY.phone||'연락처',bank:CMY.bank||'은행',acct:CMY.accountNum||'계좌번호',holder:CMY.accountHolder||CMY.name||'예금주',date:'제출일(자동)',sign:'✍ 서명 위치',check:'✓'};
+  return flds.map(f=>'<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:'+Math.min(f.fs||14,16)+'px;font-weight:800;color:#1230c4;background:rgba(80,110,255,.13);border:1px dashed #4c6ef5;border-radius:4px;padding:0 5px;white-space:nowrap;line-height:1.4">'+cesc(f.f==='num'?(f.v||'숫자'):(vals[f.f]||''))+'</span>').join('');
 }
 function consentBlockHtml(s,defHtml){
   // [대회v3] 조직위원회 명의 표기 + 오프라인 제출용 다운로드 버튼
@@ -3352,7 +3355,7 @@ async function printMyDocs(id){
   function ovlSpans(i){
     const flds=(s.consentOverlays&&s.consentOverlays[String(i)])||[];
     return flds.map(f=>{
-      const inner=f.f==='sign'
+      const inner=f.f==='check'?CAREER.checkMark(f.fs||18):f.f==='num'?cesc(f.v||''):f.f==='sign'
         ?(ap.sign?'<img src="'+ap.sign+'" style="height:'+(f.fs||30)+'px;display:block">':(ap.agreedAt?'<b style="color:#C41E2F;font-size:11px">⚠서명실패</b>':'(서명)'))
         :cesc(ovlVals[f.f]||'');
       return '<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:'+(f.fs||14)+'px;font-weight:700;color:#111;white-space:nowrap;line-height:1.3">'+inner+'</span>';
@@ -3399,7 +3402,7 @@ function printMyEntryDocs(id,s){
       guardian:m.kid?(m.guardian||CMY.name||''):'',gphone:m.kid?(m.guardianPhone||CMY.phone||''):'',
       bank:'',acct:'',holder:m.kid?(m.guardian||CMY.name||''):(m.name||''),date:dt.replace(/-/g,'. ')+'.',sign:''};
     const eOvl=i=>((s.consentOverlays&&s.consentOverlays[String(i)])||[]).map(f=>{
-      const inner=f.f==='sign'?(ap.sign?'<img src="'+ap.sign+'" style="height:'+(f.fs||30)+'px;display:block">':(ap.agreedAt?'<b style="color:#C41E2F;font-size:11px">⚠서명실패</b>':'(서명)')):cesc(eVals[f.f]||'');
+      const inner=f.f==='check'?CAREER.checkMark(f.fs||18):f.f==='num'?cesc(f.v||''):f.f==='sign'?(ap.sign?'<img src="'+ap.sign+'" style="height:'+(f.fs||30)+'px;display:block">':(ap.agreedAt?'<b style="color:#C41E2F;font-size:11px">⚠서명실패</b>':'(서명)')):cesc(eVals[f.f]||'');
       return '<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:'+(f.fs||14)+'px;font-weight:700;color:#111;white-space:nowrap;line-height:1.3">'+inner+'</span>';
     }).join('');
     pages.push('<div style="page-break-after:always;font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:30px 10px">'
