@@ -318,7 +318,7 @@
   var SIGN_SVG='<svg viewBox="0 0 120 40" preserveAspectRatio="xMinYMid meet" style="height:100%;width:auto;display:block"><path d="M6 30c8-18 14-22 16-14s-6 20 2 18 10-18 16-16-2 16 6 16 10-14 16-16 2 14 10 12 12-14 18-12 6 10 14 6" fill="none" stroke="#1a237e" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   function ovlFontCss(fs){return 'font-size:calc(var(--ovk,1)*'+(fs||14)+'px)'}
   window.CAREER={pdfPages:pdfPages,ovlFit:ovlFit,ovlWatch:ovlWatch,OVL_PRINT_JS:OVL_PRINT_JS,OVL_SAMPLE:OVL_SAMPLE,SIGN_SVG:SIGN_SVG,ovlFontCss:ovlFontCss,
-    checkMark:function(px){px=px||18;return '<svg viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="display:block;width:calc(var(--ovk,1)*'+px+'px);height:calc(var(--ovk,1)*'+px+'px)"><path d="M4 12.5l5 5L20 6"/></svg>'},ROLES:ROLES,GROUP_ICON:GROUP_ICON,GROUP_GLYPH:GROUP_GLYPH,GROUP_COLOR:GROUP_COLOR,POINTS:POINTS,TIERS:TIERS,RARITY:RARITY,RARITY_LABEL:RARITY_LABEL,
+    checkMark:function(px){px=px||18;return '<svg viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;width:calc(var(--ovk,1)*'+px+'px);height:calc(var(--ovk,1)*'+px+'px)"><path d="M4 12.5l5 5L20 6"/></svg>'},ROLES:ROLES,GROUP_ICON:GROUP_ICON,GROUP_GLYPH:GROUP_GLYPH,GROUP_COLOR:GROUP_COLOR,POINTS:POINTS,TIERS:TIERS,RARITY:RARITY,RARITY_LABEL:RARITY_LABEL,
     group:careerGroup,tierOf:tierOf,stats:stats,badges:badges,BADGES:BADGES,write:write,galleryDraft:galleryDraft,roleChips:roleChips,groupTag:groupTag,key:key,
     svg:svg,medal:medal,emblem:emblem,ICONS:P};
 })();
