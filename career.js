@@ -262,7 +262,41 @@
       +grp.list.map(function(r){return '<button type="button" class="crchip'+(r===cur?' on':'')+'" data-role="'+r+'" onclick="'+onclickFn+'(this)" style="border:1.5px solid '+(r===cur?GROUP_COLOR[grp.g]:'#dfe5ee')+';background:'+(r===cur?GROUP_COLOR[grp.g]:'#fff')+';color:'+(r===cur?'#fff':'#333')+';border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:800;cursor:pointer;font-family:inherit">'+r+'</button>'}).join('')+'</div>'}).join('');
   }
   function groupTag(g,label){return '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:900;color:#fff;background:'+(GROUP_COLOR[g]||'#153A77')+';border-radius:999px;padding:2px 9px 2px 7px">'+GROUP_ICON[g]+(label||g)+'</span>'}
-  window.CAREER={ROLES:ROLES,GROUP_ICON:GROUP_ICON,GROUP_GLYPH:GROUP_GLYPH,GROUP_COLOR:GROUP_COLOR,POINTS:POINTS,TIERS:TIERS,RARITY:RARITY,RARITY_LABEL:RARITY_LABEL,
+  /* ────────── 7. PDF → 페이지 이미지 (동의서를 PDF 로 올리면 장별 JPG 로 바꿔 좌표 지정·서명 기입이 되게) ────────── */
+  var PDFJS_URL='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',PDFJS_WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  function loadPdfjs(){
+    return new Promise(function(ok,no){
+      if(window.pdfjsLib){ok(window.pdfjsLib);return}
+      var s=document.createElement('script');s.src=PDFJS_URL;
+      s.onload=function(){try{window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS_WORKER;ok(window.pdfjsLib)}catch(e){no(e)}};
+      s.onerror=function(){no(new Error('PDF 변환 도구를 불러오지 못했습니다'))};
+      document.head.appendChild(s);
+    });
+  }
+  function pdfPages(file,opts){
+    opts=opts||{};var maxPx=opts.maxPx||1800,maxPages=opts.maxPages||10,quality=opts.quality||0.88;
+    return loadPdfjs().then(function(lib){
+      return new Promise(function(ok,no){var fr=new FileReader();fr.onload=function(){ok(fr.result)};fr.onerror=no;fr.readAsArrayBuffer(file)})
+        .then(function(buf){return lib.getDocument({data:buf}).promise});
+    }).then(function(pdf){
+      var n=Math.min(pdf.numPages,maxPages),out=[],base=String(file.name||'문서').replace(/\.pdf$/i,'');
+      var chain=Promise.resolve();
+      for(var i=1;i<=n;i++)(function(p){chain=chain.then(function(){return pdf.getPage(p)}).then(function(page){
+        var v1=page.getViewport({scale:1});var sc=Math.min(3,maxPx/Math.max(v1.width,v1.height));var vp=page.getViewport({scale:sc});
+        var c=document.createElement('canvas');c.width=Math.round(vp.width);c.height=Math.round(vp.height);var ctx=c.getContext('2d');
+        ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
+        // intent:'print' — 화면 갱신 신호(rAF)에 의존하지 않아 탭이 가려져 있어도 렌더가 끝남
+        return page.render({canvasContext:ctx,viewport:vp,intent:'print'}).promise.then(function(){
+          var dataUrl=c.toDataURL('image/jpeg',quality);
+          return new Promise(function(res){c.toBlob(function(b){res(b)},'image/jpeg',quality)}).then(function(blob){
+            out.push({dataUrl:dataUrl,blob:blob,name:base+'_p'+p+'.jpg',page:p,pages:pdf.numPages});
+          });
+        });
+      })})(i);
+      return chain.then(function(){return out});
+    });
+  }
+  window.CAREER={pdfPages:pdfPages,ROLES:ROLES,GROUP_ICON:GROUP_ICON,GROUP_GLYPH:GROUP_GLYPH,GROUP_COLOR:GROUP_COLOR,POINTS:POINTS,TIERS:TIERS,RARITY:RARITY,RARITY_LABEL:RARITY_LABEL,
     group:careerGroup,tierOf:tierOf,stats:stats,badges:badges,BADGES:BADGES,write:write,galleryDraft:galleryDraft,roleChips:roleChips,groupTag:groupTag,key:key,
     svg:svg,medal:medal,emblem:emblem,ICONS:P};
 })();

@@ -121,7 +121,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260821"></script>
-<script src="career.js?v=20260905"></script>
+<script src="career.js?v=20260905c"></script>
 <script src="site_config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
@@ -553,7 +553,8 @@ function openPostForm(editId){
     +'<div style="font-size:13.5px;font-weight:900;margin-bottom:4px">📄 동의서 · 서류 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 신청 화면 ② 동의서에 표시됩니다. 수당을 받는 심판·운영요원은 수당 지급용 개인정보 동의가 필요합니다.</span></div>'
     +'<label class="stlabel">동의서 문안</label><textarea id="pfCText" rows="3" class="stfield" placeholder="비우면 기본 동의 항목(개인정보·규정·안전)만 표시">'+esc(ed?(ed.consentText||''):'')+'</textarea>'
     +'<label class="stlabel">동의서 스캔 이미지 (선택 — 업로드 시 문안과 함께 표시)</label>'
-    +'<input type="file" id="pfCImg" accept="image/*" multiple style="display:block;margin-top:5px;font-size:13px" onchange="pfAddCImgs(this)">'
+    +'<input type="file" id="pfCImg" accept="image/*,.pdf" multiple style="display:block;margin-top:5px;font-size:13px" onchange="pfAddCImgs(this)">'
+    +'<div style="font-size:11.5px;color:#8a919d;margin-top:3px">사진·스캔 이미지 또는 PDF (PDF 는 장별 이미지로 자동 변환). 한글 파일은 [파일 → PDF로 저장] 후 올려 주세요.</div>'
     +'<div id="pfCImgList" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>'
     +'<label class="stlabel">📂 동의서 보관함 <span style="font-weight:600;color:#8a919d;font-size:11px">— 대회 공고와 같은 보관함</span></label>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
@@ -691,9 +692,21 @@ function pfDates(){
 // ══════════ [동의서·서류] 스캔 이미지 · 동의서 보관함 · 서면 양식 파일 보관함 (대회 공고와 같은 저장소 consentTemplates) ══════════
 function pfAddCImgs(input){
   const files=[...input.files];
-  if(PF_CIMGS.length+files.length>6){alert('동의서 이미지는 최대 6장까지 첨부할 수 있습니다.');input.value='';return}
-  files.forEach(f=>{const x={file:f,name:f.name};PF_CIMGS.push(x);
-    try{const fr=new FileReader();fr.onload=()=>{x.dataUrl=fr.result;pfRenderCImgs()};fr.readAsDataURL(f)}catch(e){}});   // 위치 지정 편집기에서 바로 보이도록
+  if(PF_CIMGS.length+files.length>10){alert('동의서 이미지는 최대 10장까지 첨부할 수 있습니다.');input.value='';return}
+  files.forEach(f=>{
+    const isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name);
+    if(/\.(hwp|hwpx|docx?)$/i.test(f.name)){alert(f.name+' — 한글·워드 파일은 브라우저가 열 수 없습니다.\n한글에서 [파일 → PDF로 저장] 한 뒤 그 PDF 를 올려 주세요.');return}
+    if(!isPdf&&!/^image\//.test(f.type)){alert(f.name+' — 이미지 또는 PDF 만 올릴 수 있습니다.');return}
+    if(isPdf){
+      // [PDF 동의서] 장별 JPG 로 변환해 넣음 → 좌표 지정·서명 기입 가능
+      const el=document.getElementById('pfCImgList');if(el)el.insertAdjacentHTML('beforeend','<div id="pfPdfBusy" style="font-size:12px;color:#153A77;font-weight:800">PDF 를 이미지로 변환 중… ('+esc(f.name)+')</div>');
+      CAREER.pdfPages(f,{maxPages:10}).then(pages=>{pages.forEach(p=>PF_CIMGS.push({file:p.blob,name:p.name,dataUrl:p.dataUrl}));pfRenderCImgs();if(pages.length&&pages[0].pages>10)alert('PDF 가 '+pages[0].pages+'장이라 앞 10장만 넣었습니다.')})
+        .catch(e=>{const b=document.getElementById('pfPdfBusy');if(b)b.remove();alert('PDF 변환 실패: '+(e&&e.message||e)+'\n이미지(JPG·PNG)로 저장해 올려 주세요.')});
+      return;
+    }
+    const x={file:f,name:f.name};PF_CIMGS.push(x);
+    try{const fr=new FileReader();fr.onload=()=>{x.dataUrl=fr.result;pfRenderCImgs()};fr.readAsDataURL(f)}catch(e){}   // 위치 지정 편집기에서 바로 보이도록
+  });
   input.value='';pfRenderCImgs();
 }
 // ══════════ [동의서 위치] 동의서 이미지 위 기입 위치 지정 + OCR 자동 배치 — 대회 공고(competition.html)의 편집기를 그대로 옮겨 이름만 바꾼 사본 ══════════
@@ -710,7 +723,7 @@ function pfOvlOpen(i){
   const x=PF_CIMGS[i];if(!x)return;
   const old=document.getElementById('ovlModal');if(old)old.remove();
   const div=document.createElement('div');div.id='ovlModal';
-  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.7);z-index:1200;display:flex;align-items:flex-start;justify-content:center;padding:10px;overflow:auto';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.7);z-index:100000;display:flex;align-items:flex-start;justify-content:center;padding:10px;overflow:auto';   // [층 수정] 공고 편집창(9999)보다 위
   const chip=(k,on)=>'<button type="button" class="ovlpick'+(on?' on':'')+'" data-f="'+k+'" onclick="pfOvlPick(\''+k+'\',this)" style="border:1.5px solid '+(on?'#153A77':'#dfe5ee')+';background:'+(on?'#153A77':'#f6f8fb')+';color:'+(on?'#fff':'#333')+';border-radius:999px;padding:7px 13px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit">'+PF_OVL_FIELDS[k]+'</button>';
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:760px;width:100%;padding:16px 18px">'
     +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:16px">🎯 서명·기입 위치 지정 — '+(i+1)+'번 장</b><span style="flex:1"></span>'
