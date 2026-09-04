@@ -1308,7 +1308,8 @@ async function openTeamApply(id){
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
     +'<select id="taType" '+inp+' onchange="taTypeUI()">'+tts.map(t=>'<option>'+t+'</option>').join('')+'</select>'
     +'<input id="taName" '+inp+' placeholder="팀명 (예: 신남FC)" style="flex:1;min-width:150px">'
-    +'<select id="taDiv" '+inp+'>'+(s.teamDivs||[]).map(x=>'<option value="'+cesc(x)+'">'+cesc(x)+(divDateLbl(s,x)?' (📅 '+cesc(divDateLbl(s,x))+')':'')+'</option>').join('')+'</select>'
+    +'<select id="taDiv" '+inp+' onchange="taDivUI()">'+(s.teamDivs||[]).map(x=>'<option value="'+cesc(x)+'">'+cesc(x)+(divDateLbl(s,x)?' (📅 '+cesc(divDateLbl(s,x))+')':'')+'</option>').join('')+'</select>'
+    // [팀 구분 자동] 부문명에 남/여/혼성이 들어 있으면 구분 선택을 숨기고 자동 적용 (taDivUI)
     +((s.teamGenders&&s.teamGenders.length)?'<select id="taGender" '+inp+' title="클럽(팀) 구분">'+s.teamGenders.map(x=>'<option>'+cesc(x)+'</option>').join('')+'</select>':'')+'</div>'
     +'<div id="taOrgRow" style="margin-top:8px"></div>'
     +'<div style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;font-weight:700">인솔자: '+cesc(CMY.name||'')+' <select id="taRole" '+inp+'><option>지도교사</option><option>클럽장</option><option>학부모</option><option>성인 인솔자</option></select><span style="font-size:11.5px;color:#8a919d">'+cesc(CMY.phone||'')+'</span></div>'
@@ -1459,9 +1460,30 @@ function taTypeUI(){
     row.innerHTML='소속 학교: <input id="taOrg" placeholder="예: 대한중학교" style="padding:8px 11px;border:1.5px solid #d5dce8;border-radius:9px;font-size:13px;width:220px">';
     if(lb)lb.style.display='none';
   }else{
-    row.innerHTML='소속(선택): <input id="taOrg" placeholder="단체·모임명 (없으면 비워두세요)" style="padding:8px 11px;border:1.5px solid #d5dce8;border-radius:9px;font-size:13px;width:220px">';
+    // [소속 중복 제거] 클럽팀·학교팀이 아니면 팀 유형 선택이 곧 소속이므로 별도 소속 칸을 두지 않습니다
+    row.innerHTML='';
     if(lb)lb.style.display='none';
   }
+  taDivUI();
+}
+// [팀 구분 자동] 부문명(예: 얼티미트70 남초부·여중부·혼성)에서 구분을 읽어 냅니다. 읽히면 선택칸을 숨기고 그 값을 저장합니다.
+function taGenderOf(name){
+  const n=String(name||'');
+  if(/혼성|혼합|남녀/.test(n))return '혼성';
+  if(/여/.test(n))return '여자';
+  if(/남/.test(n))return '남자';
+  return '';
+}
+function taDivUI(){
+  const dv=document.getElementById('taDiv'),g=document.getElementById('taGender');
+  if(!g)return;
+  const auto=taGenderOf(dv?dv.value:'');
+  if(auto){
+    g.style.display='none';
+    let opt=[...g.options].find(o=>o.value===auto||o.value.replace(/자$/,'')===auto.replace(/자$/,''));
+    if(!opt){opt=document.createElement('option');opt.value=auto;opt.textContent=auto;g.appendChild(opt)}
+    g.value=opt.value;
+  }else g.style.display='';
 }
 function taAddRow(v){
   v=v||{};
@@ -1586,7 +1608,7 @@ async function submitTeam(){
       if(dv&&dv.cap&&!sameDiv&&divActiveCount(s,dv.name)>=dv.cap)throw new Error('['+dv.name+'] 부문 정원이 마감되었습니다');
       const claimed=(s.claimed||[]).slice();
       claimed.push({uid:CME.uid,pid:pid,team:true,name:teamName,teamType:teamType,teamOrg:teamOrg,teamOrgId:teamOrgId,
-        teamGender:(document.getElementById('taGender')?document.getElementById('taGender').value:''),
+        teamGender:(function(){const g=document.getElementById('taGender');return (g&&g.value)||taGenderOf(divName)})(),   // [팀 구분 자동] 선택칸이 없어도 부문명에서 읽음
         leader:CMY.name||'',leaderRole:document.getElementById('taRole').value,leaderPhone:CMY.phone||'',
         roster:roster,rosterN:roster.length,prefs:[divName],consent:true,signed:true,
         pconsent:!!(document.getElementById('taPconsent')&&document.getElementById('taPconsent').checked),   // [명단제공] 팀원 연락처·주소 제공 동의
@@ -1911,6 +1933,8 @@ function cc2OvlOpen(i){
     +'<div id="ovlPicks" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+Object.keys(CC2_OVL_FIELDS).map(k=>chip(k,k===OVL_PICK)).join('')+'</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">'
     +'<button type="button" onclick="cc2OvlAuto()" style="border:none;background:#0f766e;color:#fff;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;font-family:inherit">⚡ 기본 배치 (성명·생년월일·날짜·서명)</button>'
+    +'<button type="button" onclick="cc2OvlOcr()" style="border:none;background:#7c3aed;color:#fff;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;font-family:inherit" title="이미지의 글자를 읽어 성명·생년월일·연락처·서명 등의 칸 옆에 자동으로 놓습니다">🔍 글자 읽어 자동 배치 (OCR)</button>'
+    +'<span id="ovlOcrSt" style="font-size:12px;font-weight:700;min-width:120px"></span>'
     +'<button type="button" onclick="cc2OvlFont(-2)" style="border:1.5px solid #dfe5ee;background:#fff;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">글자 −</button>'
     +'<button type="button" onclick="cc2OvlFont(2)" style="border:1.5px solid #dfe5ee;background:#fff;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">글자 ＋</button>'
     +'<button type="button" onclick="cc2OvlDel()" style="border:1.5px solid #C41E2F;background:#fff;color:#C41E2F;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">선택 삭제</button>'
@@ -1968,6 +1992,110 @@ function cc2OvlAuto(){
 function cc2OvlDone(){const m=document.getElementById('ovlModal');if(m)m.remove();cc2CImgRender()}
 // [버튼식] 공고 작성 폼 칩 헬퍼 — 값은 숨은 입력칸(id)에 넣어 저장 코드는 그대로 둡니다.
 //   cc2Pick1: 하나만 고르는 칩(관할 시도·동의서 양식)  /  cc2Fill: 빈칸에 빠르게 채우는 칩(주최·시간 등, 수정 가능)
+// ══════════ [보관함] 동의서 보관함 — consentTemplates {name, consentText, consentImgs[], consentOverlays, consentForm, committee} ══════════
+function cc2TplMsg(t,bad){const m=document.getElementById('cc2TplMsg');if(m){m.textContent=t||'';m.style.color=bad?'#C41E2F':'#0f766e'}}
+async function cc2TplFill(){
+  const sel=document.getElementById('cc2TplSel');if(!sel)return;
+  try{
+    const snap=await DB.collection('consentTemplates').orderBy('name').get();
+    window.CC2_TPLS=snap.docs.map(d=>({id:d.id,name:d.data().name||'(이름 없음)'}));
+    sel.innerHTML='<option value="">📂 보관함에서 선택…</option>'+window.CC2_TPLS.map(t=>'<option value="'+t.id+'">'+cesc(t.name)+'</option>').join('');
+    if(!window.CC2_TPLS.length)cc2TplMsg('아직 저장된 동의서가 없습니다 — 문안·이미지·기입 위치를 만든 뒤 [💾 지금 동의서 저장]을 누르세요.');
+  }catch(e){
+    sel.innerHTML='<option value="">보관함 사용 불가</option>';
+    cc2TplMsg('보관함을 읽을 수 없습니다 ('+(e.code||e.message)+') — 보안규칙에서 consentTemplates 를 시도임원에게 열어야 합니다.',true);
+  }
+}
+async function cc2TplLoad(){
+  const sel=document.getElementById('cc2TplSel');
+  if(!sel||!sel.value){cc2TplMsg('불러올 동의서를 먼저 고르세요.',true);return}
+  try{
+    const d=await DB.collection('consentTemplates').doc(sel.value).get();
+    if(!d.exists){cc2TplMsg('삭제된 항목입니다.',true);cc2TplFill();return}
+    const t=d.data();
+    const ta=document.getElementById('cc2CText');if(ta)ta.value=t.consentText||'';
+    if(t.committee){const cm=document.getElementById('cc2Cmte');if(cm&&!cm.value)cm.value=t.committee}
+    CC2_CIMGS=(t.consentImgs||[]).map(u=>({url:u}));
+    CC2_OVL={};Object.keys(t.consentOverlays||{}).forEach(k=>{CC2_OVL[k]=(t.consentOverlays[k]||[]).map(f=>Object.assign({},f))});
+    if(t.consentForm){const h=document.getElementById('cc2Form');if(h){h.value=t.consentForm;const box=h.nextElementSibling;if(box)[].forEach.call(box.querySelectorAll('.cc2chip'),b=>b.classList.toggle('on',(b.getAttribute('onclick')||'').indexOf("'"+t.consentForm+"'")>=0))}}
+    cc2CImgRender();
+    cc2TplMsg('✓ 불러왔습니다: '+(t.name||'')+' — 문안·이미지 '+CC2_CIMGS.length+'장·기입 위치가 이 공고에 적용됩니다.');
+  }catch(e){cc2TplMsg('불러오기 실패: '+(e.code||e.message),true)}
+}
+async function cc2TplSave(){
+  const text=(document.getElementById('cc2CText')||{}).value||'';
+  if(!text.trim()&&!CC2_CIMGS.length){cc2TplMsg('저장할 동의서(문안 또는 이미지)가 없습니다.',true);return}
+  const name=prompt('보관함에 저장할 이름 (예: 경남연맹 회장기 동의서, 강서구청장배 참가 동의서):');
+  if(!name||!name.trim())return;
+  cc2TplMsg('저장 중… (이미지 업로드 포함)');
+  try{
+    const uid=(AUTH.currentUser||{}).uid;const imgs=[];
+    for(const x of CC2_CIMGS){
+      if(x.url){imgs.push(x.url);continue}
+      const blob=await (await fetch(x.dataUrl)).blob();
+      const ref=firebase.storage().ref('quals/'+uid+'/compconsent_'+Date.now()+'_'+Math.floor(Math.random()*1e4)+'.jpg');
+      await ref.put(blob,{contentType:blob.type||'image/jpeg'});
+      const u=await ref.getDownloadURL();x.url=u;imgs.push(u);
+    }
+    await DB.collection('consentTemplates').add({name:name.trim(),consentText:text.trim(),consentImgs:imgs,consentOverlays:cc2OvlPack(),
+      consentForm:(document.getElementById('cc2Form')||{}).value||'basic',committee:(document.getElementById('cc2Cmte')||{}).value||'',
+      createdAt:firebase.firestore.FieldValue.serverTimestamp(),by:(AUTH.currentUser||{}).email||''});
+    await cc2TplFill();
+    const sel=document.getElementById('cc2TplSel');if(sel){const o=[...sel.options].find(o=>o.textContent===name.trim());if(o)sel.value=o.value}
+    cc2TplMsg('✓ 보관함에 저장했습니다: '+name.trim());
+  }catch(e){cc2TplMsg('저장 실패: '+(e.code||e.message),true)}
+}
+async function cc2TplDel(){
+  const sel=document.getElementById('cc2TplSel');
+  if(!sel||!sel.value){cc2TplMsg('삭제할 동의서를 먼저 고르세요.',true);return}
+  const nm=sel.options[sel.selectedIndex].textContent;
+  if(!confirm('보관함에서 「'+nm+'」을 삭제할까요? (이미 등록된 공고에는 영향 없음)'))return;
+  try{await DB.collection('consentTemplates').doc(sel.value).delete();await cc2TplFill();cc2TplMsg('삭제했습니다: '+nm)}
+  catch(e){cc2TplMsg('삭제 실패: '+(e.code||e.message),true)}
+}
+// ══════════ [OCR 자동 배치] 동의서 이미지의 글자를 읽어(테서랙트, 한국어+영어) 성명·생년월일·서명… 항목 옆에 기입 위치를 자동으로 놓습니다 ══════════
+//  라이브러리는 버튼을 눌렀을 때만 내려받습니다(첫 실행 시 한국어 인식 자료 약 15MB). 인식이 안 된 항목은 [⚡ 기본 배치]나 손으로 놓습니다.
+const CC2_OCR_KEYS=[
+  ['gphone',/보호자\s*(연락처|전화|휴대)/],['guardian',/보호자\s*(성명|이름)?/],
+  ['birth',/생년월일|생일/],['gender',/성\s*별/],['school',/소속|학교|클럽/],['phone',/연락처|전화|휴대폰|휴대전화/],
+  ['name',/성\s*명|이\s*름|참가자/],['date',/작성일|날\s*짜|년\s+월\s+일/],['sign',/서\s*명|\(인\)|싸인|사인/]];
+async function cc2OvlOcr(){
+  const x=CC2_CIMGS[OVL_I];if(!x)return;
+  const st=document.getElementById('ovlOcrSt');const say=(t,bad)=>{if(st){st.textContent=t;st.style.color=bad?'#C41E2F':'#0f766e'}};
+  try{
+    if(!window.Tesseract){say('글자 인식 도구 내려받는 중…');await new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=ok;s.onerror=()=>no(new Error('도구 로드 실패'));document.head.appendChild(s)})}
+    say('이미지 읽는 중… (첫 실행은 한국어 자료를 받느라 30초~1분 걸릴 수 있습니다)');
+    const im=await new Promise((ok,no)=>{const i=new Image();i.crossOrigin='anonymous';i.onload=()=>ok(i);i.onerror=()=>no(new Error('이미지 로드 실패'));i.src=x.url||x.dataUrl});
+    const W=im.naturalWidth||im.width,H=im.naturalHeight||im.height;
+    const worker=await Tesseract.createWorker('kor+eng',1,{logger:m=>{if(m&&m.status==='recognizing text')say('글자 인식 중… '+Math.round((m.progress||0)*100)+'%')}});
+    const res=await worker.recognize(im);await worker.terminate();
+    const lines=(res&&res.data&&res.data.lines)||[];
+    const arr=cc2OvlArr();const placed={};let n=0;
+    lines.forEach(ln=>{
+      const words=ln.words||[];const used={};
+      words.forEach((w,wi)=>{
+        if(used[wi])return;   // 앞 항목이 두 단어로 가져간 단어(보호자 연락처의 "연락처")는 건너뜀
+        const txt=(w.text||'').replace(/\s/g,'');if(!txt)return;
+        // 같은 줄에서 다음 단어까지 이어 붙여 두 단어 항목(보호자 연락처)도 잡습니다
+        const txt2=txt+((words[wi+1]&&words[wi+1].text)||'').replace(/\s/g,'');
+        for(const [key,re] of CC2_OCR_KEYS){
+          if(placed[key]&&key!=='sign')continue;
+          if(re.test(txt2)||re.test(txt)){
+            const two=re.test(txt2)&&!re.test(txt)&&words[wi+1];const last=two?words[wi+1]:w;if(two)used[wi+1]=1;
+            const bb=last.bbox||{};const bh=Math.max(10,(bb.y1-bb.y0)||16);
+            const fx=Math.min(0.92,((bb.x1||0)+bh*0.6)/W),fy=Math.max(0,((bb.y0||0)-bh*0.15)/H);
+            const fs=Math.max(10,Math.min(30,Math.round(bh*680/W*0.9)));
+            if(placed[key]){const p=arr[placed[key]-1];p.x=fx;p.y=fy;p.fs=(key==='sign'?Math.max(fs,26):fs)}
+            else{arr.push({f:key,x:+fx.toFixed(4),y:+fy.toFixed(4),fs:(key==='sign'?Math.max(fs,26):fs)});placed[key]=arr.length;n++}
+            break;
+          }
+        }
+      });
+    });
+    cc2OvlChips();
+    say(n?('✓ '+n+'개 항목을 글자 옆에 놓았습니다 ('+Object.keys(placed).map(k=>CC2_OVL_FIELDS[k]||k).join('·')+') — 위치가 어긋나면 끌어서 맞추세요.'):'항목 이름(성명·생년월일·서명…)을 찾지 못했습니다 — 이미지가 선명한지 확인하거나 [⚡ 기본 배치]를 쓰세요.',!n);
+  }catch(e){say('인식 실패: '+(e&&e.message||e),true)}
+}
 function cc2Pick1(id,val,el){
   const h=document.getElementById(id);if(h)h.value=val;
   const box=el.parentNode;[].forEach.call(box.querySelectorAll('.cc2chip'),function(b){b.classList.toggle('on',b===el)});
@@ -2055,13 +2183,23 @@ function cc2Open(editId){
       +'<label '+lb+'>동의서 문안</label><textarea id="cc2CText" rows="4" '+inp+' placeholder="비우면 기본 문안 사용">'+cesc(c.consentText||'')+'</textarea>'
       +'<label '+lb+'>동의서 스캔 이미지 (선택 — 업로드 시 문안 대신 표시)</label>'
       +'<input type="file" id="cc2CImg" accept="image/*" multiple onchange="cc2PickFile(this,CC2_CIMGS,cc2CImgRender)">'
-      +'<div id="cc2CImgList" style="margin-top:6px"></div>')
+      +'<div id="cc2CImgList" style="margin-top:6px"></div>'
+      // [보관함] 자주 쓰는 동의서(문안·스캔 이미지·기입 위치·양식)를 저장해 두고 다음 공고에서 골라 쓰는 곳 (consentTemplates)
+      +'<label '+lb+'>📂 동의서 보관함 <span style="font-weight:600;color:#8a919d;font-size:11px">— 저장해 둔 동의서를 골라 불러오거나, 지금 작성한 동의서를 저장</span></label>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+      +'<select id="cc2TplSel" '+inp+' style="min-width:220px;flex:1"><option value="">불러오는 중…</option></select>'
+      +'<button type="button" class="cc2chip" onclick="cc2TplLoad()">📥 불러오기</button>'
+      +'<button type="button" class="cc2chip" onclick="cc2TplSave()">💾 지금 동의서 저장</button>'
+      +'<button type="button" class="cc2chip" onclick="cc2TplDel()">🗑 삭제</button></div>'
+      +'<div id="cc2TplMsg" style="font-size:12px;font-weight:700;margin-top:4px;min-height:14px"></div>'
+      +'<div style="font-size:11.5px;color:#8a919d;margin-top:4px">원본 한글 서식: <a href="files/2026_강서구청장배_참가동의서.hwp" download style="color:#153A77;font-weight:800">강서구청장배 참가 동의서(HWP)</a> · <a href="files/거래처등록_개인정보동의서.hwp" download style="color:#153A77;font-weight:800">거래처 등록 개인정보 동의서(HWP)</a></div>')
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
     +'<button class="cbtn" style="background:#eceff4;color:#555" onclick="document.getElementById(\'cc2Modal\').remove()">닫기</button>'
     +'<button class="cbtn cbtn-main" id="cc2SaveBtn" onclick="cc2Save()">'+(editId?'💾 수정 저장':'🏆 공고 등록')+'</button></div>'
     +'</div>';
   document.body.appendChild(div);
   cc2EntryInit(c);
+  cc2TplFill();
   CC2_DATES=(c.dates&&c.dates.length)?c.dates.slice():[];
   if(!CC2_DATES.length&&c.dateStart){
     const fL=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -3068,7 +3206,7 @@ async function printMyDocs(id){
     +'</table>')
     +'<div style="text-align:right;margin-top:26px;font-size:14px">'+cesc(dt.replace(/-/g,'. '))+'.</div>'
     +'<div style="text-align:right;margin-top:8px;font-size:15px">본인&nbsp;&nbsp;<b>'+cesc(CMY.name||'')+'</b>&nbsp;&nbsp;'+sig+'</div>'
-    +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">'+cesc(s.title)+' 조직위원회 (사단법인 대한민국플라잉디스크연맹) 귀하</div></div>';
+    +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">'+cesc(s.title)+' 조직위원회 귀하</div></div>';
   const w=window.open('','_blank');
   w.document.write('<html><head><title>'+cesc(s.title)+' 신청서·동의서</title></head><body>'+page1+page2+'<script>setTimeout(function(){window.print()},600)<\/script></body></html>');
   w.document.close();
@@ -3115,7 +3253,7 @@ function printMyEntryDocs(id,s){
           +'<b>□ 개인정보 수집·이용 동의</b> — 항목: 참가자 성명·생년월일·성별·소속·보호자 성명·연락처 / 목적: 대회 참가 관리·단체보험·기록 관리 / 보유기간: 2026. 12. 31.까지 <b>동의함 ☑</b></div>'))
       +'<div style="text-align:right;margin-top:24px;font-size:14px">'+cesc(dt.replace(/-/g,'. '))+'.</div>'
       +'<div style="text-align:right;margin-top:8px;font-size:15px">'+(m.kid?'법정대리인&nbsp;&nbsp;<b>'+cesc(m.guardian||CMY.name||'')+'</b>':'신청인&nbsp;&nbsp;<b>'+cesc(m.name)+'</b>')+'&nbsp;&nbsp;'+sig+'</div>'
-      +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">'+cesc(s.title)+' 조직위원회 (사단법인 대한민국플라잉디스크연맹) 귀하</div></div>');
+      +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">'+cesc(s.title)+' 조직위원회 귀하</div></div>');
   });
   const w=window.open('','_blank');
   w.document.write('<html><head><title>'+cesc(s.title)+' 참가 신청서</title></head><body>'+pages.join('')+'<script>setTimeout(function(){window.print()},600)<\/script></body></html>');
