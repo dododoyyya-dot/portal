@@ -121,7 +121,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260821"></script>
-<script src="career.js?v=20260905d"></script>
+<script src="career.js?v=20260906"></script>
 <script src="site_config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
@@ -711,7 +711,7 @@ function pfAddCImgs(input){
 }
 // ══════════ [동의서 위치] 동의서 이미지 위 기입 위치 지정 + OCR 자동 배치 — 대회 공고(competition.html)의 편집기를 그대로 옮겨 이름만 바꾼 사본 ══════════
 //  저장 형식은 consentOverlays = {"이미지번호":[{f:항목,x:0~1,y:0~1,fs:글자px(680px 폭 기준)}]} 로 대회 공고와 같습니다.
-const PF_OVL_FIELDS={name:'성명',rrn:'주민등록번호',phone:'연락처',addr:'주소',bank:'은행',acct:'계좌번호',holder:'예금주',date:'날짜',sign:'서명',check:'체크 표시',num:'숫자(직접 입력)'};   // check: 동의함 □ 칸에 ✓ / num: 학년·연도·금액 등 정해진 숫자·글자   // [동의서 위치] 수당 지급 동의서용 항목
+const PF_OVL_FIELDS={name:'성명',rrn:'주민등록번호',phone:'연락처',addr:'주소',bank:'은행',acct:'계좌번호',holder:'예금주',date:'날짜',sign:'서명',check:'체크 표시',num:'숫자(직접 입력)'};   // [동의서 위치] 수당 지급 동의서용 항목
 let PF_OVL={},OVL_I=0,OVL_SEL=-1,OVL_DRAG=null,OVL_PICK='sign';
 function pfOvlShift(removed){ // 이미지 삭제 시 뒤 장의 배치를 앞으로 당김
   const o={};Object.keys(PF_OVL).forEach(k=>{const i=+k;if(i<removed)o[k]=PF_OVL[k];else if(i>removed)o[String(i-1)]=PF_OVL[k]});PF_OVL=o;
@@ -734,30 +734,68 @@ function pfOvlOpen(i){
     +'<button type="button" onclick="pfOvlAuto()" style="border:none;background:#0f766e;color:#fff;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;font-family:inherit">⚡ 기본 배치 (날짜·성명·주민번호·서명)</button>'
     +'<button type="button" onclick="pfOvlOcr()" style="border:none;background:#7c3aed;color:#fff;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;font-family:inherit" title="이미지의 글자를 읽어 성명·생년월일·연락처·서명 등의 칸 옆에 자동으로 놓습니다">🔍 글자 읽어 자동 배치 (OCR)</button>'
     +'<span id="ovlOcrSt" style="font-size:12px;font-weight:700;min-width:120px"></span>'
+    +'<button type="button" id="ovlPrevBtn" onclick="pfOvlPreview()" style="border:1.5px solid #153A77;background:#fff;color:#153A77;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit" title="출력될 때와 같은 글씨체·크기로 보여줍니다 (표시만 바뀌고 위치는 그대로)">실제 모양 보기</button>'
     +'<button type="button" onclick="pfOvlFont(-2)" style="border:1.5px solid #dfe5ee;background:#fff;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">글자 −</button>'
     +'<button type="button" onclick="pfOvlFont(2)" style="border:1.5px solid #dfe5ee;background:#fff;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">글자 ＋</button>'
     +'<button type="button" onclick="pfOvlDel()" style="border:1.5px solid #C41E2F;background:#fff;color:#C41E2F;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">선택 삭제</button>'
     +'<button type="button" onclick="pfOvlClear()" style="border:1.5px solid #dfe5ee;background:#fff;color:#555;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">모두 지우기</button>'
     +(PF_CIMGS.length>1?'<button type="button" onclick="pfOvlCopy()" style="border:1.5px solid #dfe5ee;background:#fff;color:#555;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">📋 다른 장에도 같은 배치</button>':'')
     +'</div>'
-    +'<div id="ovlBox" style="position:relative;width:680px;max-width:100%;margin:0 auto;cursor:crosshair;touch-action:none;user-select:none">'
+    +'<div id="ovlSt" style="font-size:12px;color:#374151;background:#f6f8fb;border-radius:8px;padding:6px 10px;margin-bottom:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span id="ovlStSel">표를 누르면 항목·글자 크기·위치가 여기에 표시됩니다</span><span style="color:#8a919d">· 끌면 다른 표와 줄이 맞을 때 자석처럼 붙습니다 · 방향키 1px, Shift+방향키 5px 이동</span></div>'
+    // [크기 비례] ovl-wrap: 실제 폭/680 을 --ovk 로 두고 글자 크기를 비례시킴 → 휴대폰·인쇄·미리보기가 같은 비율
+    +'<div id="ovlBox" class="ovl-wrap" style="position:relative;width:680px;max-width:100%;margin:0 auto;cursor:crosshair;touch-action:none;user-select:none">'
     +'<img id="ovlImg" src="'+esc(x.url||x.dataUrl)+'" style="width:100%;display:block;border:1px solid #ccc" draggable="false"></div></div>';
   document.body.appendChild(div);
   const box=div.querySelector('#ovlBox');
   box.addEventListener('pointerdown',pfOvlDown);
   box.addEventListener('pointermove',pfOvlMove);
   box.addEventListener('pointerup',pfOvlUp);box.addEventListener('pointercancel',pfOvlUp);
+  OVL_PREVIEW=false;OVL_SNAP=null;
+  document.addEventListener('keydown',pfOvlKey);
+  if(window.CAREER)CAREER.ovlFit();
   pfOvlChips();
+}
+let OVL_PREVIEW=false,OVL_SNAP=null;
+function pfOvlPreview(){OVL_PREVIEW=!OVL_PREVIEW;const b=document.getElementById('ovlPrevBtn');if(b){b.style.background=OVL_PREVIEW?'#153A77':'#fff';b.style.color=OVL_PREVIEW?'#fff':'#153A77';b.textContent=OVL_PREVIEW?'배치 표로 보기':'실제 모양 보기'}pfOvlChips()}
+function pfOvlKey(e){
+  if(!document.getElementById('ovlModal')){document.removeEventListener('keydown',pfOvlKey);return}
+  if(OVL_SEL<0||['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].indexOf(e.key)<0)return;
+  if(/input|textarea/i.test((e.target&&e.target.tagName)||''))return;
+  const f=pfOvlArr()[OVL_SEL];const box=document.getElementById('ovlBox');if(!f||!box)return;
+  const r=box.getBoundingClientRect();const st=(e.shiftKey?5:1);
+  if(e.key==='ArrowLeft')f.x=Math.max(0,f.x-st/r.width);if(e.key==='ArrowRight')f.x=Math.min(.98,f.x+st/r.width);
+  if(e.key==='ArrowUp')f.y=Math.max(0,f.y-st/r.height);if(e.key==='ArrowDown')f.y=Math.min(.98,f.y+st/r.height);
+  e.preventDefault();pfOvlChips();
+}
+function pfOvlSampleText(f){
+  if(f.f==='num')return f.v||'';if(f.f==='check')return '';
+  return (window.CAREER&&CAREER.OVL_SAMPLE&&CAREER.OVL_SAMPLE[f.f])||(PF_OVL_FIELDS[f.f]||f.f);
 }
 function pfOvlPick(k,el){OVL_PICK=k;[].forEach.call(document.querySelectorAll('.ovlpick'),b=>{const on=b.dataset.f===k;b.style.background=on?'#153A77':'#f6f8fb';b.style.color=on?'#fff':'#333';b.style.borderColor=on?'#153A77':'#dfe5ee'})}
 function pfOvlChips(){
   const box=document.getElementById('ovlBox');if(!box)return;
   box.querySelectorAll('.ovlchip').forEach(c=>c.remove());
-  pfOvlArr().forEach((f,idx)=>{
+  box.querySelectorAll('.ovlguide').forEach(c=>c.remove());
+  const arrAll=pfOvlArr();const selF=OVL_SEL>=0?arrAll[OVL_SEL]:null;
+  // [줄맞춤 가이드] 선택한 표의 왼쪽·위 기준선(빨강), 자석에 붙은 기준선(초록)
+  const guide=(axis,pos,color)=>{const g=document.createElement('div');g.className='ovlguide';g.style.cssText='position:absolute;pointer-events:none;'+(axis==='x'?('left:'+(pos*100)+'%;top:0;bottom:0;border-left:1.5px dashed '+color):('top:'+(pos*100)+'%;left:0;right:0;border-top:1.5px dashed '+color))+';opacity:.85';box.appendChild(g)};
+  if(selF){guide('x',selF.x,'#C41E2F');guide('y',selF.y,'#C41E2F')}
+  if(OVL_SNAP){if(OVL_SNAP.x!=null)guide('x',OVL_SNAP.x,'#0f766e');if(OVL_SNAP.y!=null)guide('y',OVL_SNAP.y,'#0f766e')}
+  const stEl=document.getElementById('ovlStSel');
+  if(stEl)stEl.innerHTML=selF?('<b>'+(selF.f==='sign'?'서명':(selF.f==='check'?'체크 표시':(selF.f==='num'?'숫자 "'+esc(selF.v||'')+'"':(PF_OVL_FIELDS[selF.f]||selF.f))))+'</b> · 글자 <b>'+selF.fs+'px</b>'+(selF.f==='sign'?' (서명 높이)':'')+' · 가로 '+(selF.x*100).toFixed(1)+'% · 세로 '+(selF.y*100).toFixed(1)+'%'):'표를 누르면 항목·글자 크기·위치가 여기에 표시됩니다';
+  arrAll.forEach((f,idx)=>{
     const c=document.createElement('div');c.className='ovlchip';c.dataset.idx=idx;
     const sel=idx===OVL_SEL;
-    c.style.cssText='position:absolute;left:'+(f.x*100)+'%;top:'+(f.y*100)+'%;font-size:'+f.fs+'px;font-weight:800;color:#1230c4;background:rgba(80,110,255,'+(sel?'.28':'.14')+');border:2px '+(sel?'solid #C41E2F':'dashed #4c6ef5')+';border-radius:6px;padding:2px 6px;white-space:nowrap;line-height:1.2;cursor:grab;touch-action:none';
-    c.textContent=(f.f==='sign'?'✍ 서명':(f.f==='check'?'✓ 체크':(f.f==='num'?'# '+(f.v||''):(PF_OVL_FIELDS[f.f]||f.f))));
+    if(OVL_PREVIEW){
+      // 출력과 같은 모양: 굵기 700·검정·배경 없음, 크기는 폭 비례. 선택된 표만 얇은 빨간 테두리
+      c.style.cssText='position:absolute;left:'+(f.x*100)+'%;top:'+(f.y*100)+'%;font-size:calc(var(--ovk,1)*'+f.fs+'px);font-weight:700;color:#111;white-space:nowrap;line-height:1.3;cursor:grab;touch-action:none;'+(sel?'outline:1.5px solid #C41E2F;outline-offset:1px;':'');
+      if(f.f==='sign')c.innerHTML='<div style="height:calc(var(--ovk,1)*'+(f.fs||30)+'px)">'+CAREER.SIGN_SVG+'</div>';
+      else if(f.f==='check')c.innerHTML=CAREER.checkMark(f.fs||18);
+      else c.textContent=pfOvlSampleText(f);
+    }else{
+      c.style.cssText='position:absolute;left:'+(f.x*100)+'%;top:'+(f.y*100)+'%;font-size:calc(var(--ovk,1)*'+f.fs+'px);font-weight:800;color:#1230c4;background:rgba(80,110,255,'+(sel?'.28':'.14')+');border:2px '+(sel?'solid #C41E2F':'dashed #4c6ef5')+';border-radius:6px;padding:2px 6px;white-space:nowrap;line-height:1.2;cursor:grab;touch-action:none';
+      c.textContent=(f.f==='sign'?'✍ 서명':(f.f==='check'?'✓ 체크':(f.f==='num'?'# '+(f.v||''):(PF_OVL_FIELDS[f.f]||f.f))));
+    }
     if(f.f==='num'){c.title='두 번 눌러 숫자 수정';c.addEventListener('dblclick',function(ev){ev.stopPropagation();const v=prompt('기입할 숫자·글자',f.v||'');if(v!==null&&v.trim()){f.v=v.trim();pfOvlChips()}})}
     box.appendChild(c);
   });
@@ -775,11 +813,20 @@ function pfOvlMove(e){
   if(!OVL_DRAG||OVL_SEL<0)return;
   const box=document.getElementById('ovlBox');const r=box.getBoundingClientRect();
   const f=pfOvlArr()[OVL_SEL];if(!f)return;
-  f.x=Math.min(.98,Math.max(0,(e.clientX-r.left-OVL_DRAG.dx)/r.width));
-  f.y=Math.min(.98,Math.max(0,(e.clientY-r.top-OVL_DRAG.dy)/r.height));
+  let nx=Math.min(.98,Math.max(0,(e.clientX-r.left-OVL_DRAG.dx)/r.width));
+  let ny=Math.min(.98,Math.max(0,(e.clientY-r.top-OVL_DRAG.dy)/r.height));
+  // [자석 정렬] 다른 표의 왼쪽선·윗선과 8px 안이면 그 선에 붙임 (Alt 누르면 자석 끔)
+  OVL_SNAP=null;
+  if(!e.altKey){
+    const others=pfOvlArr().filter((z,i)=>i!==OVL_SEL);let bx=null,by=null,dx=8/r.width,dy=8/r.height;
+    others.forEach(z=>{if(Math.abs(z.x-nx)<dx){dx=Math.abs(z.x-nx);bx=z.x}if(Math.abs(z.y-ny)<dy){dy=Math.abs(z.y-ny);by=z.y}});
+    if(bx!=null){nx=bx}if(by!=null){ny=by}
+    if(bx!=null||by!=null)OVL_SNAP={x:bx,y:by};
+  }
+  f.x=nx;f.y=ny;
   pfOvlChips();
 }
-function pfOvlUp(){OVL_DRAG=null}
+function pfOvlUp(){OVL_DRAG=null;if(OVL_SNAP){OVL_SNAP=null;pfOvlChips()}}
 function pfOvlFont(d){const f=pfOvlArr()[OVL_SEL];if(!f){alert('먼저 옮길 표를 눌러 선택하세요.');return}f.fs=Math.min(60,Math.max(8,f.fs+d));pfOvlChips()}
 function pfOvlDel(){if(OVL_SEL<0){alert('삭제할 표를 먼저 누르세요.');return}pfOvlArr().splice(OVL_SEL,1);OVL_SEL=-1;pfOvlChips()}
 function pfOvlClear(){if(!pfOvlArr().length)return;if(!confirm('이 장의 배치를 모두 지울까요?'))return;PF_OVL[String(OVL_I)]=[];OVL_SEL=-1;pfOvlChips()}
@@ -791,7 +838,7 @@ function pfOvlAuto(){
   add('date',0.22,0.80,14);add('name',0.22,0.88,14);add('rrn',0.55,0.88,13);add('sign',0.62,0.905,30);
   OVL_SEL=-1;pfOvlChips();
 }
-function pfOvlDone(){const m=document.getElementById('ovlModal');if(m)m.remove();pfRenderCImgs()}
+function pfOvlDone(){const m=document.getElementById('ovlModal');if(m)m.remove();document.removeEventListener('keydown',pfOvlKey);pfRenderCImgs()}
 const PF_OCR_KEYS=[
   ['acct',/계좌\s*번호|계좌/],['holder',/예금주/],['bank',/은\s*행|금융기관/],
   ['rrn',/주민\s*등록\s*번호|주민번호|생년월일/],['phone',/연락처|전화|휴대폰|휴대전화/],['addr',/주\s*소/],
@@ -1871,17 +1918,17 @@ async function printPayConsent(postId,onlyUid){
     const vals={name:a.name||u.name||'',rrn:pi.rrn||'',phone:a.phone||u.phone||'',addr:u.address||'',bank:pi.bank||u.bank||'',acct:pi.account||u.accountNum||'',holder:u.accountHolder||a.name||'',date:pcFmtDate(pi.at||new Date().toISOString()),sign:''};
     (p.consentImgs||[]).forEach((img,i)=>{
       const spans=((p.consentOverlays||{})[String(i)]||[]).map(f=>{
-        const inner=f.f==='check'?CAREER.checkMark(f.fs||18):f.f==='num'?esc(f.v||''):f.f==='sign'?(sign?'<img src="'+esc(sign)+'" style="height:'+(f.fs||30)+'px;display:block">':'(서명)'):esc(vals[f.f]||'');
-        return '<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:'+(f.fs||14)+'px;font-weight:700;color:#111;white-space:nowrap;line-height:1.3">'+inner+'</span>';
+        const inner=f.f==='check'?CAREER.checkMark(f.fs||18):f.f==='num'?esc(f.v||''):f.f==='sign'?(sign?'<img src="'+esc(sign)+'" style="height:calc(var(--ovk,1)*'+(f.fs||30)+'px);display:block">':'(서명)'):esc(vals[f.f]||'');
+        return '<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:calc(var(--ovk,1)*'+(f.fs||14)+'px);font-weight:700;color:#111;white-space:nowrap;line-height:1.3">'+inner+'</span>';
       }).join('');
       pages.push('<div style="page-break-after:always;font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:20px 10px">'
         +'<div style="font-size:11px;color:#666;margin-bottom:6px">'+esc(p.competitionName||'')+' · '+esc(a.name||'')+' · '+(i+1)+'/'+(p.consentImgs.length)+'</div>'
-        +'<div style="position:relative"><img src="'+esc(img)+'" style="width:100%;display:block;border:1px solid #999">'+spans+'</div></div>');
+        +'<div class="ovl-wrap" style="position:relative"><img src="'+esc(img)+'" style="width:100%;display:block;border:1px solid #999">'+spans+'</div></div>');
     });
   });
   const w=window.open('','_blank');
   if(!w){alert('팝업이 차단되어 인쇄 창을 열 수 없습니다. 주소창의 팝업 차단을 해제해주세요.');return}
-  w.document.write('<html><head><title>'+esc(p.competitionName||'')+' 수당 지급 동의서</title></head><body style="margin:0">'+pages.join('')+'<script>setTimeout(function(){window.print()},800)<\/script></body></html>');
+  w.document.write('<html><head><title>'+esc(p.competitionName||'')+' 수당 지급 동의서</title></head><body style="margin:0">'+pages.join('')+'<script>'+CAREER.OVL_PRINT_JS+'setTimeout(function(){window.print()},800)<\/script></body></html>');
   w.document.close();
 }
 async function exportPayReport(postId){
