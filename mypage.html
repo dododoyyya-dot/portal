@@ -552,6 +552,11 @@ function orgChip(o,region,title,fed){
     <div class="board" id="contractList"></div>
     <div class="note" style="margin-top:14px">계약서를 확인한 뒤 <b>화면에 직접 서명</b>하면 서면 서명을 대체하는 전자서명·동의 일시가 기록되며, 언제든 계약서를 인쇄·PDF 저장할 수 있습니다. 수당 지급 정보(계좌·주민등록번호)는 프로필에서 등록합니다.</div>
   </div>
+  <div id="goodsLinkBox" style="display:none;margin-top:44px">
+    <h3 class="sub">📦 학교 용품 수령 링크 (담당교사께 전달)</h3>
+    <div class="board" id="goodsLinkList"></div>
+    <div class="note" style="margin-top:14px">배정 학교의 <b>담당교사</b>가 이 링크에서 ① 배송지 입력 → ② 용품 도착 후 수령 확인을 합니다. 학교 방문 시 <b>[문자로 보내기]</b>를 누르거나 링크를 복사해 카톡으로 전달해 주세요. 담당교사는 로그인 없이 휴대폰에서 바로 처리할 수 있습니다.</div>
+  </div>
   <div id="compContractBox" style="display:none;margin-top:44px">
     <h3 class="sub">위촉 계약 (대회 심판·운영요원)</h3>
     <div class="board" id="compContractList"></div>
@@ -1854,6 +1859,7 @@ AUTH.onAuthStateChanged(async u=>{
       document.getElementById('lgApp').innerHTML=MYASG.map(x=>'<option value="'+x.id+'">'+esc(x.data().school)+' ('+esc(x.data().type)+')</option>').join('');
       document.getElementById('lgDate').value=new Date().toISOString().slice(0,10);
       loadMyLogs();
+      renderGoodsLinks();
     }
   }catch(e){}
   try{
@@ -2093,6 +2099,46 @@ async function submitLog(){
     loadMyLogs();
   }catch(e){m.textContent='제출 실패: '+e.message;m.className='msg err'}
   LGBUSY=false;
+}
+// [용품링크] 배정 학교마다 사무국이 만든 용품 수령 링크(goodsConfirms/{강습신청ID})를 보여주고, 담당교사에게 문자·복사로 전달
+function goodsLinkText(s,url){
+  return '[대한민국플라잉디스크연맹] '+(s.school||'')+' 강습 용품 수령 안내\n'
+    +(s.teacher?s.teacher+' 선생님, ':'담당교사님, ')+'아래 링크에서 ① 배송지 입력 → ② 용품 도착 후 수령 확인을 부탁드립니다. (휴대폰으로 바로 됩니다)\n'
+    +url+'\n문의 031-984-3248';
+}
+function goodsCopy(i){
+  const g=window._GL&&window._GL[i];if(!g)return;const t=goodsLinkText(g.s,g.url);
+  const done=()=>{const m=document.getElementById('glMsg'+i);if(m){m.style.color='#0f766e';m.textContent='✓ 문구를 복사했습니다 — 카톡에 붙여넣어 보내세요.'}};
+  const fb=()=>{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done()}catch(e){}document.body.removeChild(ta)};
+  if(navigator.clipboard)navigator.clipboard.writeText(t).then(done).catch(fb);else fb();
+}
+function goodsSms(i){
+  const g=window._GL&&window._GL[i];if(!g)return;
+  const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent);const mobile=ios||/Android/i.test(navigator.userAgent);
+  if(!mobile){goodsCopy(i);const m=document.getElementById('glMsg'+i);if(m)m.textContent='PC에서는 문자앱이 없어 문구를 복사했습니다 — 휴대폰에서 누르면 문자앱이 바로 열립니다.';return}
+  location.href='sms:'+String(g.s.phone||'').replace(/[^0-9+]/g,'')+(ios?'&':'?')+'body='+encodeURIComponent(goodsLinkText(g.s,g.url));
+}
+async function renderGoodsLinks(){
+  const box=document.getElementById('goodsLinkBox'),list=document.getElementById('goodsLinkList');if(!box||!list)return;
+  const rows=[];window._GL=[];
+  for(const x of MYASG){
+    const s=x.data();let gc=null;
+    try{const gd=await DB.collection('goodsConfirms').doc(x.id).get();if(gd.exists)gc=gd.data()}catch(e){}
+    if(!gc)continue;   // 사무국이 아직 링크를 만들지 않은 학교는 표시하지 않음
+    const url=new URL('confirm.html?goods='+x.id,location.href).href;
+    const i=window._GL.length;window._GL.push({s:s,url:url});
+    const st=gc.teacherConfirm?'<span style="color:#0f766e;font-weight:800">✅ 수령 확인 완료</span>':(gc.delivery?'<span style="color:#b8860b;font-weight:800">🚚 배송지 입력됨 · 수령 확인 대기</span>':'<span style="color:#C41E2F;font-weight:800">📮 배송지 입력 전 — 담당교사께 링크 전달 필요</span>');
+    rows.push('<div class="brow" style="padding:12px 14px">'
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center"><b style="font-size:14px">'+esc(s.school||'')+'</b><span style="font-size:12px;color:#6b7280">담당 '+esc(s.teacher||'-')+' · '+esc(s.phone||'-')+'</span>'+st+'</div>'
+      +(gc.teacherConfirm?'':'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'
+        +'<button class="btn-sub" style="background:#0f766e" onclick="goodsSms('+i+')">📱 문자로 보내기</button>'
+        +'<button class="btn-sub" style="background:#f7c600;color:#3b1e1e" onclick="goodsCopy('+i+')">💬 카톡 문구 복사</button>'
+        +'<a class="btn-sub" style="background:#153A77;text-decoration:none" href="'+url+'" target="_blank">🔗 링크 열기</a>'
+        +'</div><div id="glMsg'+i+'" style="font-size:12px;font-weight:800;margin-top:6px;min-height:14px"></div>')
+      +'</div>');
+  }
+  if(!rows.length){box.style.display='none';return}
+  list.innerHTML=rows.join('');box.style.display='block';
 }
 async function loadMyLogs(){
   const el=document.getElementById('lgList');

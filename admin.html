@@ -424,6 +424,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#0e7490" onclick="showSlotAdmin()">📢 학교 공고 관리</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="applyGateScan()">🚦 강습신청 접수 마감·재개</button>
         <button class="btn-sub" style="background:#b8860b" onclick="dlDeliveryCsv()">🚚 배송명단 CSV</button>
+        <button class="btn-sub" style="background:#0f766e" onclick="dlSmsCsv()" title="담당교사 휴대전화·링크·문자 문구 — 대량문자 서비스(알리고·뿌리오 등)에 올리는 용도">📱 용품링크 문자명단 CSV</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="dlSizesXlsx()">👕 강사복 사이즈 (엑셀·집계·그래프)</button>
         <button class="btn-sub" style="background:#153A77" onclick="dlGoodsCerts()">🧾 수령확인증 일괄 다운로드</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="showGigs()">🔎 단기공고 승인<span id="gigCntBadge" style="display:none;background:#C41E2F;border-radius:999px;padding:1px 7px;font-size:11px;margin-left:5px"></span></button>
@@ -6640,6 +6641,15 @@ async function givePt(){
       <button class="btn-sub" style="flex:1;background:#153A77" onclick="copyAgq()">🔗 링크 복사</button>
       <button class="btn-sub" style="flex:1;background:#8a919d" onclick="document.getElementById('agqModal').style.display='none'">닫기</button>
     </div>
+    <!-- [링크전달] 담당교사에게 바로 보내기 — 문자(휴대폰에서 문자앱 열림) · 카톡 문구 복사 · 메일(EmailJS) · 배정강사에게 전달 요청 -->
+    <div id="agqTeacher" style="margin-top:14px;padding:10px 12px;background:#f6f8fb;border-radius:10px;font-size:12.5px;text-align:left;line-height:1.6"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+      <button class="btn-sub" style="background:#0f766e" onclick="agqSms()">📱 문자 보내기</button>
+      <button class="btn-sub" style="background:#f7c600;color:#3b1e1e" onclick="agqKakao()">💬 카톡 문구 복사</button>
+      <button class="btn-sub" id="agqMailBtn" style="background:#1F4E9C" onclick="agqMail()">📧 메일 보내기</button>
+      <button class="btn-sub" id="agqInsBtn" style="background:#7c3aed" onclick="agqNotifyIns()">👤 배정강사에게 전달 요청</button>
+    </div>
+    <div id="agqMsg" style="font-size:12px;font-weight:800;margin-top:8px;min-height:16px"></div>
   </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -6661,12 +6671,91 @@ async function reqGoods(appId){
   }catch(e){alert('생성 실패: '+e.message);return}
   const url=new URL('confirm.html?goods='+appId,location.href).href;
   document.getElementById('agqLink').value=url;
+  window._AGQ={appId:appId,s:s,url:url};
+  agqRenderTeacher();
   const _gc=window.GOODS[appId]||{};
   document.getElementById('agqSub').textContent=s.school+' · '+(_gc.teacherConfirm?'✅ 수령 확인 완료':(_gc.delivery?'🚚 배송지 입력됨 · 수령 확인 대기':'배송지 입력 전'));
   const qr=document.getElementById('agqQr');qr.innerHTML='';
   if(window.QRCode){try{new QRCode(qr,{text:url,width:190,height:190,correctLevel:QRCode.CorrectLevel.M})}catch(e){qr.textContent='링크를 이용해주세요'}}
   else qr.innerHTML='<span style="font-size:12px;color:#999">QR 로딩 중 — 링크를 복사해 전달하세요</span>';
   document.getElementById('agqModal').style.display='flex';
+}
+// ══════════ [링크전달] 용품 수령 링크를 담당교사에게 보내는 수단 ══════════
+//  담당교사는 회원이 아닌 경우가 대부분 → 신청서의 휴대전화(필수)로 문자, 이메일(선택)로 메일, 배정강사 경유 알림.
+function agqText(){
+  const a=window._AGQ||{};const s=a.s||{};
+  return '[대한민국플라잉디스크연맹] '+(s.school||'')+' 강습 용품 수령 안내\n'
+    +(s.teacher?s.teacher+' 선생님, ':'담당교사님, ')+'아래 링크에서 ① 배송지 입력 → ② 용품 도착 후 수령 확인을 부탁드립니다. (휴대폰으로 바로 됩니다)\n'
+    +a.url+'\n문의 031-984-3248';
+}
+function agqRenderTeacher(){
+  const a=window._AGQ||{};const s=a.s||{};const el=document.getElementById('agqTeacher');if(!el)return;
+  el.innerHTML='<b>담당교사</b> '+esc(s.teacher||'-')+' · 📞 '+esc(s.phone||'-')+' · ✉ '+(s.email?esc(s.email):'<span style="color:#C41E2F">이메일 없음</span>')
+    +(s.assignedName?'<br><b>배정 강사</b> '+esc(s.assignedName):'<br><span style="color:#8a919d">배정 강사 없음</span>');
+  const mb=document.getElementById('agqMailBtn');if(mb){mb.disabled=!s.email;mb.style.opacity=s.email?'1':'.45'}
+  const ib=document.getElementById('agqInsBtn');if(ib){ib.disabled=!s.assignedUid;ib.style.opacity=s.assignedUid?'1':'.45'}
+  const m=document.getElementById('agqMsg');if(m)m.textContent='';
+}
+function agqSms(){
+  const a=window._AGQ||{};const s=a.s||{};const m=document.getElementById('agqMsg');
+  const num=String(s.phone||'').replace(/[^0-9+]/g,'');
+  const body=encodeURIComponent(agqText());
+  const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const mobile=ios||/Android/i.test(navigator.userAgent);
+  if(!mobile){
+    // PC에서는 문자앱이 없으므로 문구를 복사해 두고, 휴대폰에서 누르라고 안내
+    agqCopy(agqText(),m,'PC에서는 문자앱을 열 수 없어 문구를 복사했습니다 — 휴대폰 문자·카톡에 붙여넣거나, 휴대폰으로 관리자 페이지에 접속해 이 버튼을 누르세요.');return;
+  }
+  location.href='sms:'+num+(ios?'&':'?')+'body='+body;
+  if(m){m.style.color='#0f766e';m.textContent='문자앱이 열립니다 — 내용 확인 후 전송하세요.'}
+}
+function agqKakao(){agqCopy(agqText(),document.getElementById('agqMsg'),'✓ 문구를 복사했습니다 — 카카오톡 대화창에 붙여넣어 보내세요.')}
+function agqCopy(t,m,okMsg){
+  function done(){if(m){m.style.color='#0f766e';m.textContent=okMsg}}
+  function fb(){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done()}catch(e){if(m){m.style.color='#C41E2F';m.textContent='복사 실패 — 링크 칸을 길게 눌러 복사하세요.'}}document.body.removeChild(ta)}
+  if(navigator.clipboard)navigator.clipboard.writeText(t).then(done).catch(fb);else fb();
+}
+async function agqMail(){
+  const a=window._AGQ||{};const s=a.s||{};const m=document.getElementById('agqMsg');
+  if(!s.email){if(m){m.style.color='#C41E2F';m.textContent='신청서에 이메일이 없습니다 — 문자로 보내주세요.'}return}
+  if(!window.kfdfMail){if(m){m.style.color='#C41E2F';m.textContent='메일 발송 설정(EmailJS)이 없습니다.'}return}
+  if(!confirm(s.email+' 로 용품 수령 안내 메일을 보낼까요?'))return;
+  if(m){m.style.color='#8a919d';m.textContent='보내는 중…'}
+  try{await window.kfdfMail(s.email,'['+(s.school||'')+'] 강습 용품 배송지 입력·수령 확인 안내',agqText());if(m){m.style.color='#0f766e';m.textContent='✓ 메일을 보냈습니다.'}}
+  catch(e){if(m){m.style.color='#C41E2F';m.textContent='메일 실패: '+(e&&e.message||e)}}
+}
+async function agqNotifyIns(){
+  const a=window._AGQ||{};const s=a.s||{};const m=document.getElementById('agqMsg');
+  if(!s.assignedUid){if(m){m.style.color='#C41E2F';m.textContent='배정된 강사가 없습니다.'}return}
+  if(!confirm('배정 강사 '+(s.assignedName||'')+' 님에게 "담당교사께 용품 링크를 전달해 주세요" 알림을 보낼까요?\n(강사 마이페이지에 링크 복사·문자 버튼이 표시됩니다)'))return;
+  try{await KFDF.notify(s.assignedUid,'📦 ['+(s.school||'')+'] 담당교사께 용품 수령 링크를 전달해 주세요 — 마이페이지 [학교 용품 수령 링크]에서 복사·문자 전송','mypage.html#goodsLinkBox');
+    if(m){m.style.color='#0f766e';m.textContent='✓ 강사에게 알림을 보냈습니다.'}}
+  catch(e){if(m){m.style.color='#C41E2F';m.textContent='알림 실패: '+(e&&e.message||e)}}
+}
+// 대량 문자 발송용 명단 (알리고·뿌리오 등 대량문자 서비스에 올리는 CSV) — 선정·배정완료 학교 전체, 링크가 없는 학교는 먼저 만들어 줌
+async function dlSmsCsv(){
+  const targets=APPS.filter(d=>{const st=d.data().status;return st==='선정'||st==='배정완료'});
+  if(!targets.length){alert('선정·배정완료 학교가 없습니다.');return}
+  if(!confirm('선정·배정완료 학교 '+targets.length+'곳의 담당교사 문자 발송 명단(CSV)을 만들까요?\n아직 용품 링크가 없는 학교는 링크를 함께 생성합니다.'))return;
+  if(!window.GOODS)window.GOODS={};
+  let made=0;
+  for(const d of targets){
+    if(window.GOODS[d.id])continue;
+    const s=d.data();const items=(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' 강습 용품 세트 (50만원 상당)';
+    try{await DB.collection('goodsConfirms').doc(d.id).set({school:s.school,region:s.region||'',type:s.type||'',items:items,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      window.GOODS[d.id]={school:s.school,region:s.region,type:s.type,items:items};made++}catch(e){}
+  }
+  const rows=[['학교명','담당교사','휴대전화','이메일','배정강사','수령 상태','링크','문자 내용']];
+  targets.forEach(d=>{const s=d.data();const gc=window.GOODS[d.id]||{};
+    const url=new URL('confirm.html?goods='+d.id,location.href).href;
+    window._AGQ={appId:d.id,s:s,url:url};
+    rows.push([s.school||'',s.teacher||'',s.phone||'',s.email||'',s.assignedName||'',gc.teacherConfirm?'수령 확인 완료':(gc.delivery?'배송지 입력됨·수령 대기':'배송지 입력 전'),url,agqText().replace(/\n/g,' ')]);
+  });
+  window._AGQ=null;
+  const csv='\ufeff'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='용품링크_문자발송명단_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  if(made)alert('링크를 새로 만든 학교 '+made+'곳 포함, '+targets.length+'곳 명단을 내려받았습니다.');
 }
 function copyAgq(){var t=document.getElementById('agqLink').value;
   if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){alert('✓ 링크가 복사되었습니다.')}).catch(fb)}else fb();
