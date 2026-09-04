@@ -2017,7 +2017,7 @@ function cc2OvlShift(removed){ // 이미지 삭제 시 뒤 장의 배치를 앞�
   const o={};Object.keys(CC2_OVL).forEach(k=>{const i=+k;if(i<removed)o[k]=CC2_OVL[k];else if(i>removed)o[String(i-1)]=CC2_OVL[k]});CC2_OVL=o;
 }
 function cc2OvlArr(){CC2_OVL[String(OVL_I)]=CC2_OVL[String(OVL_I)]||[];return CC2_OVL[String(OVL_I)]}
-function cc2OvlPack(){const o={};Object.keys(CC2_OVL).forEach(k=>{if((CC2_OVL[k]||[]).length)o[k]=CC2_OVL[k].map(f=>Object.assign({f:f.f,x:+f.x.toFixed(4),y:+f.y.toFixed(4),fs:f.fs},f.v?{v:f.v}:{}))});return o}
+function cc2OvlPack(){const o={};Object.keys(CC2_OVL).forEach(k=>{if((CC2_OVL[k]||[]).length)o[k]=CC2_OVL[k].map(f=>Object.assign({f:f.f,x:+f.x.toFixed(4),y:+f.y.toFixed(4),fs:f.fs},f.v?{v:f.v}:{},f.a?{a:f.a}:{}))});return o}
 function cc2OvlOpen(i){
   OVL_I=i;OVL_SEL=-1;OVL_DRAG=null;
   const x=CC2_CIMGS[i];if(!x)return;
@@ -2028,7 +2028,7 @@ function cc2OvlOpen(i){
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:760px;width:100%;padding:16px 18px">'
     +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:16px">🎯 서명·기입 위치 지정 — '+(i+1)+'번 장</b><span style="flex:1"></span>'
     +'<button type="button" onclick="cc2OvlDone()" style="border:none;background:#153A77;color:#fff;border-radius:9px;padding:9px 20px;font-weight:900;cursor:pointer;font-family:inherit">✓ 완료</button></div>'
-    +'<div style="background:#eef3fa;border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.7;margin:8px 0 10px"><b>① 항목을 고르고 ② 종이 위 자리를 톡 누르면</b> 표가 놓입니다. <b style="color:#C41E2F">기준점은 표의 왼쪽 위 빨간 점</b> — 그 지점부터 오른쪽·아래로 글자가 써지므로 칸의 왼쪽 위 안쪽에 맞추세요. 표를 <b>끌어서</b> 옮기고, 표를 누른 뒤 <b>글자 ±</b>·<b>삭제</b>. 참가자 신청서를 출력하면 그 자리에 정보와 전자서명이 찍힙니다.</div>'
+    +'<div style="background:#eef3fa;border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.7;margin:8px 0 10px"><b>① 항목을 고르고 ② 종이 위 자리를 톡 누르면</b> 표가 놓입니다. <b style="color:#C41E2F">기준점은 표 중앙의 빨간 점</b> — 글자·서명이 그 점을 중심으로 놓이므로 칸의 한가운데를 누르면 됩니다. 표를 <b>끌어서</b> 옮기고, 표를 누른 뒤 <b>글자 ±</b>·<b>삭제</b>. 참가자 신청서를 출력하면 그 자리에 정보와 전자서명이 찍힙니다.</div>'
     +'<div id="ovlPicks" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+Object.keys(CC2_OVL_FIELDS).map(k=>chip(k,k===OVL_PICK)).join('')+'</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">'
     +'<button type="button" onclick="cc2OvlAuto()" style="border:none;background:#0f766e;color:#fff;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;font-family:inherit">⚡ 기본 배치 (성명·생년월일·날짜·서명)</button>'
@@ -2082,31 +2082,31 @@ function cc2OvlChips(){
   if(selF){guide('x',selF.x,'#C41E2F');guide('y',selF.y,'#C41E2F')}
   if(OVL_SNAP){if(OVL_SNAP.x!=null)guide('x',OVL_SNAP.x,'#0f766e');if(OVL_SNAP.y!=null)guide('y',OVL_SNAP.y,'#0f766e')}
   const stEl=document.getElementById('ovlStSel');
-  if(stEl)stEl.innerHTML=selF?('<b>'+(selF.f==='sign'?'서명':(selF.f==='check'?'체크 표시':(selF.f==='num'?'숫자 "'+cesc(selF.v||'')+'"':(CC2_OVL_FIELDS[selF.f]||selF.f))))+'</b> · 글자 <b>'+selF.fs+'px</b>'+(selF.f==='sign'?' (서명 높이)':'')+' · 가로 '+(selF.x*100).toFixed(1)+'% · 세로 '+(selF.y*100).toFixed(1)+'%'):'표를 누르면 항목·글자 크기·위치가 여기에 표시됩니다';
+  if(stEl)stEl.innerHTML=selF?('<b>'+(selF.f==='sign'?'서명':(selF.f==='check'?'체크 표시':(selF.f==='num'?'숫자 "'+cesc(selF.v||'')+'"':(CC2_OVL_FIELDS[selF.f]||selF.f))))+'</b> · 글자 <b>'+selF.fs+'px</b>'+(selF.f==='sign'?' (서명 높이)':'')+' · 가로 '+(selF.x*100).toFixed(1)+'% · 세로 '+(selF.y*100).toFixed(1)+'% · 기준 '+(selF.a==='c'?'중앙':'왼쪽 위(예전 방식)')):'표를 누르면 항목·글자 크기·위치가 여기에 표시됩니다';
   arrAll.forEach((f,idx)=>{
     const c=document.createElement('div');c.className='ovlchip';c.dataset.idx=idx;
     const sel=idx===OVL_SEL;
     if(OVL_PREVIEW){
       // 출력과 같은 모양: 굵기 700·검정·배경 없음, 크기는 폭 비례. 선택된 표만 얇은 빨간 테두리
-      c.style.cssText='position:absolute;left:'+(f.x*100)+'%;top:'+(f.y*100)+'%;font-size:calc(var(--ovk,1)*'+f.fs+'px);font-weight:700;color:#111;white-space:nowrap;line-height:1.3;cursor:grab;touch-action:none;'+(sel?'outline:1.5px solid #C41E2F;outline-offset:1px;':'');
+      c.style.cssText='position:absolute;left:'+(f.x*100)+'%;top:'+(f.y*100)+'%;font-size:calc(var(--ovk,1)*'+f.fs+'px);font-weight:700;color:#111;white-space:nowrap;line-height:1.3;cursor:grab;touch-action:none;'+(f.a==='c'?'transform:translate(-50%,-50%);':'')+(sel?'outline:1.5px solid #C41E2F;outline-offset:1px;':'');
       if(f.f==='sign')c.innerHTML='<div style="height:calc(var(--ovk,1)*'+(f.fs||30)+'px)">'+CAREER.SIGN_SVG+'</div>';
       else if(f.f==='check')c.innerHTML=CAREER.checkMark(f.fs||18);
       else c.textContent=cc2OvlSampleText(f);
     }else{
-      c.style.cssText='position:absolute;left:'+(f.x*100)+'%;top:'+(f.y*100)+'%;font-size:calc(var(--ovk,1)*'+f.fs+'px);font-weight:800;color:#1230c4;background:rgba(80,110,255,'+(sel?'.28':'.14')+');border:2px '+(sel?'solid #C41E2F':'dashed #4c6ef5')+';border-radius:6px;padding:2px 6px;white-space:nowrap;line-height:1.2;cursor:grab;touch-action:none';
+      c.style.cssText='position:absolute;left:'+(f.x*100)+'%;top:'+(f.y*100)+'%;font-size:calc(var(--ovk,1)*'+f.fs+'px);font-weight:800;color:#1230c4;background:rgba(80,110,255,'+(sel?'.28':'.14')+');border:2px '+(sel?'solid #C41E2F':'dashed #4c6ef5')+';border-radius:6px;padding:2px 6px;white-space:nowrap;line-height:1.2;cursor:grab;touch-action:none;'+(f.a==='c'?'transform:translate(-50%,-50%);':'');
       c.textContent=(f.f==='sign'?'✍ 서명':(f.f==='check'?'✓ 체크':(f.f==='num'?'# '+(f.v||''):(CC2_OVL_FIELDS[f.f]||f.f))));
     }
     if(f.f==='num'){c.title='두 번 눌러 숫자 수정';c.addEventListener('dblclick',function(ev){ev.stopPropagation();const v=prompt('기입할 숫자·글자',f.v||'');if(v!==null&&v.trim()){f.v=v.trim();cc2OvlChips()}})}
     // [기준점] 왼쪽 위 모서리가 글자가 시작되는 지점 — 빨간 점으로 표시
-    const dot=document.createElement('i');dot.style.cssText='position:absolute;left:-5px;top:-5px;width:9px;height:9px;border-radius:50%;background:#C41E2F;border:1.5px solid #fff;box-shadow:0 0 0 1px #C41E2F;pointer-events:none';c.appendChild(dot);
+    const dot=document.createElement('i');dot.style.cssText=(f.a==='c'?'position:absolute;left:50%;top:50%;margin:-4.5px 0 0 -4.5px;':'position:absolute;left:-5px;top:-5px;')+'width:9px;height:9px;border-radius:50%;background:#C41E2F;border:1.5px solid #fff;box-shadow:0 0 0 1px #C41E2F;pointer-events:none';c.appendChild(dot);
     box.appendChild(c);
   });
 }
 function cc2OvlDown(e){
   const box=document.getElementById('ovlBox');const r=box.getBoundingClientRect();
   const chip=e.target.closest('.ovlchip');
-  if(chip){OVL_SEL=parseInt(chip.dataset.idx);const cr=chip.getBoundingClientRect();OVL_DRAG={dx:e.clientX-cr.left,dy:e.clientY-cr.top};box.setPointerCapture&&box.setPointerCapture(e.pointerId);cc2OvlChips();e.preventDefault();return}
-  const nf={f:OVL_PICK,x:Math.min(.95,Math.max(0,(e.clientX-r.left)/r.width)),y:Math.min(.97,Math.max(0,(e.clientY-r.top)/r.height)),fs:OVL_PICK==='sign'?30:(OVL_PICK==='check'?18:14)};
+  if(chip){OVL_SEL=parseInt(chip.dataset.idx);const cr=chip.getBoundingClientRect();const fa=(cc2OvlArr()[OVL_SEL]||{}).a==='c';OVL_DRAG={dx:e.clientX-(fa?cr.left+cr.width/2:cr.left),dy:e.clientY-(fa?cr.top+cr.height/2:cr.top)};box.setPointerCapture&&box.setPointerCapture(e.pointerId);cc2OvlChips();e.preventDefault();return}
+  const nf={f:OVL_PICK,a:'c',x:Math.min(.98,Math.max(0.02,(e.clientX-r.left)/r.width)),y:Math.min(.98,Math.max(0.02,(e.clientY-r.top)/r.height)),fs:OVL_PICK==='sign'?30:(OVL_PICK==='check'?18:14)};   // a:'c' = 표의 중앙이 기준점 (옛 표는 왼쪽 위)
   if(OVL_PICK==='num'){const v=prompt('이 자리에 기입할 숫자(또는 짧은 글자)를 입력하세요\n예: 3 (학년), 2026, 50,000','');if(v===null||!v.trim())return;nf.v=v.trim()}
   cc2OvlArr().push(nf);
   OVL_SEL=cc2OvlArr().length-1;cc2OvlChips();
@@ -2775,7 +2775,7 @@ function consentPreviewSpans(s,i){
   const flds=(s.consentOverlays&&s.consentOverlays[String(i)])||[];
   if(!flds.length)return '';
   const vals={name:CMY.name||'성명',rrn:'주민등록번호(자동)',phone:CMY.phone||'연락처',bank:CMY.bank||'은행',acct:CMY.accountNum||'계좌번호',holder:CMY.accountHolder||CMY.name||'예금주',date:'제출일(자동)',sign:'✍ 서명 위치',check:'✓'};
-  return flds.map(f=>'<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:calc(var(--ovk,1)*'+(f.fs||14)+'px);font-weight:800;color:#1230c4;background:rgba(80,110,255,.13);border:1px dashed #4c6ef5;border-radius:4px;padding:0 5px;white-space:nowrap;line-height:1.4">'+cesc(f.f==='num'?(f.v||'숫자'):(vals[f.f]||''))+'</span>').join('');
+  return flds.map(f=>'<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:calc(var(--ovk,1)*'+(f.fs||14)+'px);font-weight:800;color:#1230c4;background:rgba(80,110,255,.13);border:1px dashed #4c6ef5;border-radius:4px;padding:0 5px;white-space:nowrap;line-height:1.4;'+(f.a==='c'?'transform:translate(-50%,-50%);':'')+'">'+cesc(f.f==='num'?(f.v||'숫자'):(vals[f.f]||''))+'</span>').join('');
 }
 function consentBlockHtml(s,defHtml){
   // [대회v3] 조직위원회 명의 표기 + 오프라인 제출용 다운로드 버튼
@@ -3407,7 +3407,7 @@ async function printMyDocs(id){
       const inner=f.f==='check'?CAREER.checkMark(f.fs||18):f.f==='num'?cesc(f.v||''):f.f==='sign'
         ?(ap.sign?'<img src="'+ap.sign+'" style="height:calc(var(--ovk,1)*'+(f.fs||30)+'px);display:block">':(ap.agreedAt?'<b style="color:#C41E2F;font-size:11px">⚠서명실패</b>':'(서명)'))
         :cesc(ovlVals[f.f]||'');
-      return '<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:calc(var(--ovk,1)*'+(f.fs||14)+'px);font-weight:700;color:#111;white-space:nowrap;line-height:1.3">'+inner+'</span>';
+      return '<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:calc(var(--ovk,1)*'+(f.fs||14)+'px);font-weight:700;color:#111;white-space:nowrap;line-height:1.3;'+(f.a==='c'?'transform:translate(-50%,-50%);':'')+'">'+inner+'</span>';
     }).join('');
   }
   const page2='<div style="font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:30px 10px">'
@@ -3452,7 +3452,7 @@ function printMyEntryDocs(id,s){
       bank:'',acct:'',holder:m.kid?(m.guardian||CMY.name||''):(m.name||''),date:dt.replace(/-/g,'. ')+'.',sign:''};
     const eOvl=i=>((s.consentOverlays&&s.consentOverlays[String(i)])||[]).map(f=>{
       const inner=f.f==='check'?CAREER.checkMark(f.fs||18):f.f==='num'?cesc(f.v||''):f.f==='sign'?(ap.sign?'<img src="'+ap.sign+'" style="height:calc(var(--ovk,1)*'+(f.fs||30)+'px);display:block">':(ap.agreedAt?'<b style="color:#C41E2F;font-size:11px">⚠서명실패</b>':'(서명)')):cesc(eVals[f.f]||'');
-      return '<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:calc(var(--ovk,1)*'+(f.fs||14)+'px);font-weight:700;color:#111;white-space:nowrap;line-height:1.3">'+inner+'</span>';
+      return '<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:calc(var(--ovk,1)*'+(f.fs||14)+'px);font-weight:700;color:#111;white-space:nowrap;line-height:1.3;'+(f.a==='c'?'transform:translate(-50%,-50%);':'')+'">'+inner+'</span>';
     }).join('');
     pages.push('<div style="page-break-after:always;font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:30px 10px">'
       +'<h2 style="text-align:center;letter-spacing:6px;border:2px solid #333;padding:12px">대 회 참 가 신 청 서</h2>'
