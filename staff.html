@@ -1183,7 +1183,7 @@ async function _renderDetailInner(isStale){
     // [UI 정리] '수당지급 엑셀'은 아래 '수당지급내역서(서식·서명)'와 내용이 중복되어 숨김 처리.
     //           함수(exportPayExcel)는 그대로 두어 필요 시 되살릴 수 있습니다.
     +((_decide&&payConsentReady(p))?'<button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #b9cdec" onclick="printPayConsent(\''+p.id+'\',\'\')" title="확정된 신청자의 수당 정보·전자서명이 기입된 동의서를 한 번에 인쇄">📄 수당 동의서 출력</button>':'')
-  +(_decide?'<button class="stbtn" style="background:'+(p.reportId?'#f0fdf4':'#f5f3ff')+';color:'+(p.reportId?'#0f766e':'#5b21b6')+';border:1.5px solid '+(p.reportId?'#a7f3d0':'#ddd6fe')+'" onclick="openStaffReport(\''+p.id+'\')" title="약식 종료 보고 — 기록 보관 + 갤러리 초안"><span style="display:inline-flex;align-items:center;gap:5px">'+CAREER.svg('doc',{size:14,stroke:2.2})+(p.reportId?'종료 보고 완료 (수정)':'종료 보고')+'</span></button>':'')
+  +(_decide?'<button class="stbtn" style="background:'+(p.reportId?'#f0fdf4':'#f5f3ff')+';color:'+(p.reportId?'#0f766e':'#5b21b6')+';border:1.5px solid '+(p.reportId?'#a7f3d0':'#ddd6fe')+'" onclick="openStaffReport(\''+p.id+'\')" title="약식 종료 보고 — 기록 보관 + 사진첩 초안"><span style="display:inline-flex;align-items:center;gap:5px">'+CAREER.svg('doc',{size:14,stroke:2.2})+(p.reportId?'종료 보고 완료 (수정)':'종료 보고')+'</span></button>':'')
   +(_decide?'<button class="stbtn" style="background:#fffbeb;color:#8a5a00;border:1.5px solid #fde68a" onclick="exportPayReport(\''+p.id+'\')">📄 수당지급내역서 (서식·서명)</button><button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="openNotifyModal(\''+p.id+'\')">📣 확정자 단체 알림</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="exportLicZip(\''+p.id+'\')">📦 자격증 일괄 다운로드</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
     +'<button class="stbtn stbtn-main" style="padding:11px 26px" onclick="openApplyForm(\''+p.id+'\')">✍️ 신청하기 (날짜 선택)</button>'
     +((payConsentReady(p)&&SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid&&a.payInfo))?'<button class="stbtn stbtn-soft" style="padding:11px 18px" onclick="printPayConsent(\''+p.id+'\',SME.uid)" title="내 수당 정보와 전자서명이 기입된 동의서">📄 내 수당 동의서 인쇄</button>':'')
@@ -1640,9 +1640,9 @@ async function mdFinish(){
   document.getElementById('mdModal').remove();
   const allDone=(p.dates||[]).every(d=>d.completed);
   loadPosts();
-  if(allDone&&!p.reportId&&confirm('모든 일정의 임무 완료 처리가 끝났습니다.\n지금 약식 종료 보고를 작성할까요? (참가 인원·결과 요약·사진 → 기록 보관 + 갤러리 초안 자동 생성)'))openStaffReport(MD.postId);
+  if(allDone&&!p.reportId&&confirm('모든 일정의 임무 완료 처리가 끝났습니다.\n지금 약식 종료 보고를 작성할까요? (참가 인원·결과 요약·사진 → 기록 보관 + 사진첩 초안 자동 생성)'))openStaffReport(MD.postId);
 }
-// ══════════ [종료 보고] 심판·운영 공고의 약식 보고 → eventReports + 갤러리 초안 ══════════
+// ══════════ [종료 보고] 심판·운영 공고의 약식 보고 → eventReports + 사진첩 초안 ══════════
 function openStaffReport(postId){
   const p=POSTS.find(x=>x.id===postId);if(!p)return;
   const apps=APPS[postId]||[];
@@ -1657,8 +1657,8 @@ function openStaffReport(postId){
     +'<label class="stlabel">운영 인원 (자동)</label><input id="rpStat" class="stfield" value="'+esc(stat||'-')+'">'
     +'<label class="stlabel">결과·운영 요약 *</label><textarea id="rpSum" rows="4" class="stfield" placeholder="예: 8개 팀 참가, 얼티미트 남초부·여중부 진행. 우천으로 오후 일정 30분 지연. 부상자 없음.">'+esc(p.report&&p.report.summary||'')+'</textarea>'
     +'<label class="stlabel">특이사항·건의</label><textarea id="rpNote" rows="2" class="stfield">'+esc(p.report&&p.report.note||'')+'</textarea>'
-    +'<label class="stlabel">현장 사진 (선택 — 갤러리 초안에 함께 들어갑니다)</label><input type="file" id="rpPhotos" accept="image/*" multiple style="display:block;margin-top:5px;font-size:13px">'
-    +'<label style="display:flex;gap:7px;align-items:center;font-weight:800;font-size:13px;margin-top:12px"><input type="checkbox" id="rpGallery" checked style="width:auto"> 갤러리 초안 자동 생성 (제목·일자·장소·요약이 채워진 비공개 초안 — 갤러리 페이지에서 사진을 더 올리고 공개)</label>'
+    +'<label class="stlabel">현장 사진 (선택 — 사진첩 초안에 함께 들어갑니다)</label><input type="file" id="rpPhotos" accept="image/*" multiple style="display:block;margin-top:5px;font-size:13px">'
+    +'<label style="display:flex;gap:7px;align-items:center;font-weight:800;font-size:13px;margin-top:12px"><input type="checkbox" id="rpGallery" checked style="width:auto"> 사진첩 초안 자동 생성 (제목·일자·장소·요약이 채워진 비공개 초안 — 사진첩 페이지에서 사진을 더 올리고 공개)</label>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="stbtn stbtn-ghost" onclick="document.getElementById(\'rpModal\').remove()">닫기</button><button class="stbtn stbtn-main" id="rpSaveBtn" onclick="rpSave(\''+postId+'\')">💾 보고 저장</button></div>'
     +'<div id="rpMsg" style="font-size:12.5px;font-weight:800;margin-top:6px"></div></div>';
   document.body.appendChild(div);
@@ -1681,7 +1681,7 @@ async function rpSave(postId){
     let gmsg='';
     if(document.getElementById('rpGallery').checked){
       const g=await CAREER.galleryDraft(DB,{title:p.competitionName||'',date:ds[0]||'',endDate:ds[ds.length-1]||'',place:p.location||'',sport:p.sport||'',summary:sum,refKind:'staff',refId:p.compId||postId,media:photos.map(u=>({type:'img',url:u,caption:''}))},(SMY&&SMY.name)||'');
-      gmsg='\n갤러리 초안이 '+(g.updated?'갱신':'생성')+'되었습니다 — 갤러리 페이지(📝 초안)에서 사진을 더 올리고 공개하세요.';
+      gmsg='\n사진첩 초안이 '+(g.updated?'갱신':'생성')+'되었습니다 — 사진첩 페이지(📝 초안)에서 사진을 더 올리고 공개하세요.';
     }
     document.getElementById('rpModal').remove();
     alert('✓ 종료 보고를 저장했습니다.'+gmsg);loadPosts();
@@ -2508,6 +2508,6 @@ async function copyRoster(id){
     <div style="font-size:12.5px">ⓒ Korea Flying Disc Federation. All rights reserved.</div>
   </div>
 </div></footer>
-<script src="auth_ui.js?v=20260905"></script>
+<script src="auth_ui.js?v=20260905b"></script>
 </body>
 </html>

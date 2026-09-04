@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="google-site-verification" content="sMiNgrZBGPS1NWfFR2JWjhrM25dn2Pq0LsDR2DbDrQc" />
 <meta name="naver-site-verification" content="f2bba301d1f9ca2d37efa24800dcad9676123d09" />
-<title>대회 갤러리 | 대한민국플라잉디스크연맹</title>
+<title>사진첩 | 대한민국플라잉디스크연맹</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <link rel="stylesheet" href="style.css?v=20260827m">
 </head>
@@ -83,8 +83,8 @@
   </nav>
 </div></header>
 <div class="phero"><div class="wrap">
-  <div class="crumb">HOME &nbsp;›&nbsp; <b>알림마당</b></div>
-  <h1>자료실</h1><p>신청서·동의서 등 각종 서식을 내려받을 수 있습니다.</p>
+  <div class="crumb">HOME &nbsp;›&nbsp; <b>대회</b></div>
+  <h1>사진첩</h1><p>대회·행사의 현장 사진과 영상을 모아 봅니다.</p>
 </div></div>
 <style>
 .gl-wrap{max-width:1180px;margin:0 auto;padding:0 20px}
@@ -114,13 +114,13 @@
 </style>
 <section style="padding:44px 0 70px"><div class="gl-wrap">
   <div class="sec-label">GALLERY</div>
-  <h2 class="sec-title" style="display:flex;align-items:center;gap:10px"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#153A77" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1zM12 17a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/></svg>대회 갤러리</h2>
-  <p class="sec-desc">대회·행사가 끝나면 종료 보고와 함께 갤러리 초안이 자동으로 만들어집니다. 사진·영상을 올려 공개하면 이곳과 홈 화면 배너에 표시됩니다.</p>
+  <h2 class="sec-title" style="display:flex;align-items:center;gap:10px"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#153A77" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1zM12 17a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/></svg>사진첩</h2>
+  <p class="sec-desc">대회·행사가 끝나면 종료 보고와 함께 사진첩 초안이 자동으로 만들어집니다. 사진·영상을 올려 공개하면 이곳과 홈 화면 배너에 표시됩니다.</p>
   <div id="glTop" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
     <span class="gl-chip on" data-f="all" onclick="glFilter('all',this)">전체</span>
     <span class="gl-chip" data-f="year" onclick="glFilter('year',this)">올해</span>
     <span id="glAdminChips" style="display:none"><span class="gl-chip" data-f="draft" onclick="glFilter('draft',this)" style="border-color:#b8860b;color:#8a5a00;display:inline-flex;align-items:center;gap:4px"><i data-ci="edit"></i>초안 <b id="glDraftN">0</b></span>
-      <button class="gl-btn gold" onclick="glNew()" style="display:inline-flex;align-items:center;gap:5px"><i data-ci="plus"></i>새 갤러리</button></span>
+      <button class="gl-btn gold" onclick="glNew()" style="display:inline-flex;align-items:center;gap:5px"><i data-ci="plus"></i>새 사진첩</button></span>
   </div>
   <div id="glList" class="gl-grid"><div class="bempty" style="grid-column:1/-1">불러오는 중…</div></div>
   <div id="glDetail" style="display:none;margin-top:10px"></div>
@@ -132,7 +132,7 @@
 <script src="kfdf.js?v=20260821"></script>
 <script src="career.js?v=20260905"></script>
 <script>
-// ══════════ 갤러리 — gallery/{id} {title,date,endDate,place,sport,summary,cover,media[{type:'img'|'yt',url,caption}],status:'draft'|'published',featured,refKind,refId} ══════════
+// ══════════ 사진첩 — gallery/{id} {title,date,endDate,place,sport,summary,cover,media[{type:'img'|'yt',url,caption}],status:'draft'|'published',featured,refKind,refId} ══════════
 //  공개 열람은 published 만, 관리자·시도임원은 초안(draft)도 보고 편집·공개·대표(배너) 지정을 합니다.
 KFDF.initApp();
 const DB=firebase.firestore(),AUTH=firebase.auth();
@@ -167,7 +167,7 @@ function glRender(){
   if(FILTER==='year')list=list.filter(x=>String(x.date||'').slice(0,4)==String(y));
   if(FILTER==='draft')list=list.filter(x=>x.status!=='published');
   if(FILTER==='all'&&CAN)list=list.filter(x=>x.status==='published'||true);
-  if(!list.length){el.innerHTML='<div class="bempty" style="grid-column:1/-1">'+(FILTER==='draft'?'초안이 없습니다.':'아직 공개된 갤러리가 없습니다. 대회가 끝나면 이곳에 올라옵니다.')+'</div>';return}
+  if(!list.length){el.innerHTML='<div class="bempty" style="grid-column:1/-1">'+(FILTER==='draft'?'초안이 없습니다.':'아직 공개된 사진첩가 없습니다. 대회가 끝나면 이곳에 올라옵니다.')+'</div>';return}
   el.innerHTML=list.map(x=>'<div class="gl-card" onclick="glOpen(\''+x.id+'\')">'
     +(x.cover?'<img class="gl-cover" src="'+esc(x.cover)+'" alt="">':'<div class="gl-nocover">'+CAREER.svg('disc',{size:56,color:'#ffd166',stroke:1.4})+'</div>')
     +(x.status!=='published'?'<span class="gl-badge" style="background:#b8860b;display:inline-flex;align-items:center;gap:4px">'+glIco('edit',{color:'#fff',size:12})+'초안</span>':(x.featured?'<span class="gl-badge" style="background:#C41E2F;display:inline-flex;align-items:center;gap:4px">'+glIco('star',{color:'#fff',size:12,fill:'#fff'})+'배너</span>':''))
@@ -186,7 +186,7 @@ function glOpen(id){
     return '<div style="position:relative"><img src="'+esc(m.url)+'" alt="'+esc(m.caption||'')+'" onclick="glLight(\''+esc(m.url)+'\')">'+(m.caption?'<div style="font-size:11.5px;color:#6b7280;margin-top:3px">'+esc(m.caption)+'</div>':'')+del+cov+'</div>';
   }).join('');
   d.innerHTML='<div style="background:#fff;border:1.5px solid #e2e7f0;border-radius:18px;padding:22px 24px">'
-    +'<a href="#" onclick="glClose();return false" style="font-weight:800;color:#153A77;font-size:13px">← 갤러리 목록</a>'
+    +'<a href="#" onclick="glClose();return false" style="font-weight:800;color:#153A77;font-size:13px">← 사진첩 목록</a>'
     +'<h3 style="font-size:22px;font-weight:900;margin:10px 0 4px;word-break:keep-all">'+esc(CUR.title||'')+(CUR.status!=='published'?' <span style="font-size:12px;color:#fff;background:#b8860b;border-radius:999px;padding:3px 9px;vertical-align:middle;display:inline-flex;align-items:center;gap:4px">'+glIco('lock',{color:'#fff',size:12})+'초안 — 비공개</span>':'')+'</h3>'
     +'<div style="font-size:13px;color:#6b7280">'+glIco('calendar',{size:13,color:'#6b7280'})+' '+esc(fmtRange(CUR.date,CUR.endDate))+(CUR.place?' · '+glIco('pin',{size:13,color:'#6b7280'})+' '+esc(CUR.place):'')+(CUR.sport?' · '+glIco('disc',{size:13,color:'#6b7280'})+' '+esc(CUR.sport):'')+'</div>'
     +(CUR.summary?'<div style="font-size:14px;line-height:1.85;margin-top:12px;white-space:pre-wrap;word-break:keep-all">'+esc(CUR.summary)+'</div>':'')
@@ -235,13 +235,13 @@ async function glUpload(inp){
 }
 function glCompress(file){return new Promise(res=>{const img=new Image();const u=URL.createObjectURL(file);img.onload=()=>{const MAX=1600;let w=img.width,h=img.height;if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r)}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);URL.revokeObjectURL(u);c.toBlob(b=>res(b||file),'image/jpeg',0.86)};img.onerror=()=>{URL.revokeObjectURL(u);res(file)};img.src=u})}
 function glAddYt(){const u=prompt('유튜브 영상 주소를 붙여 넣으세요');if(!u)return;if(!ytId(u)){alert('유튜브 주소가 아닙니다.');return}const media=(CUR.media||[]).concat([{type:'yt',url:u.trim(),caption:''}]);glSave({media:media})}
-function glDelMedia(i){const media=(CUR.media||[]).slice();const m=media[i];if(!m||!confirm('이 항목을 갤러리에서 뺄까요?'))return;media.splice(i,1);const upd={media:media};if(CUR.cover===m.url)upd.cover=(media.find(x=>x.type==='img')||{}).url||'';glSave(upd)}
+function glDelMedia(i){const media=(CUR.media||[]).slice();const m=media[i];if(!m||!confirm('이 항목을 사진첩에서 뺄까요?'))return;media.splice(i,1);const upd={media:media};if(CUR.cover===m.url)upd.cover=(media.find(x=>x.type==='img')||{}).url||'';glSave(upd)}
 function glSetCover(i){const m=(CUR.media||[])[i];if(!m)return;glSave({cover:m.url})}
 function glPublish(on){if(on&&!(CUR.media||[]).length&&!confirm('사진·영상이 없는데 공개할까요?'))return;glSave({status:on?'published':'draft'})}
 function glFeature(on){glSave({featured:!!on,status:on?'published':CUR.status})}
-async function glDelete(){if(!confirm('갤러리 「'+(CUR.title||'')+'」을 삭제할까요? (사진 파일은 남고 목록에서만 사라집니다)'))return;try{await DB.collection('gallery').doc(CUR.id).delete();glClose();await glLoad()}catch(e){alert('삭제 실패: '+e.message)}}
+async function glDelete(){if(!confirm('사진첩 「'+(CUR.title||'')+'」을 삭제할까요? (사진 파일은 남고 목록에서만 사라집니다)'))return;try{await DB.collection('gallery').doc(CUR.id).delete();glClose();await glLoad()}catch(e){alert('삭제 실패: '+e.message)}}
 async function glNew(){
-  const t=prompt('갤러리 제목 (예: 제2회 경남연맹 회장기 전국 플라잉디스크대회)');if(!t||!t.trim())return;
+  const t=prompt('사진첩 제목 (예: 제2회 경남연맹 회장기 전국 플라잉디스크대회)');if(!t||!t.trim())return;
   const dt=prompt('일자 (YYYY-MM-DD)',new Date().toISOString().slice(0,10))||'';
   try{const r=await DB.collection('gallery').add({title:t.trim(),date:dt.trim(),endDate:dt.trim(),place:'',sport:'',summary:'',cover:'',media:[],status:'draft',featured:false,refKind:'manual',refId:'',by:(ME||{}).email||'',at:firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});await glLoad();glOpen(r.id)}
   catch(e){alert('생성 실패: '+e.message)}
@@ -264,6 +264,6 @@ async function glNew(){
     © 2026 KOREA FLYING DISC FEDERATION. All rights reserved. &nbsp;|&nbsp; <a href="privacy.html" style="color:#9aa1ad">개인정보처리방침</a>
   </div>
 </div></footer>
-<script src="auth_ui.js?v=20260905"></script>
+<script src="auth_ui.js?v=20260905b"></script>
 </body>
 </html>

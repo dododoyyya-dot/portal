@@ -14,7 +14,7 @@
       ['방과후 · 늘봄','business.html#after'],['교원연수 · 교재개발','business.html#train'],['학교 강습 신청 →','apply.html']]},
     {t:'대회',h:'competition.html',d:[
       ['대회 일정 · 안내','competition.html'],['참가 신청 (선수)','competition.html'],
-      ['심판 · 운영요원 신청','competition.html#staff'],['연맹 일정 캘린더','calendar.html'],['📸 대회 갤러리','gallery.html']]},
+      ['심판 · 운영요원 신청','competition.html#staff'],['연맹 일정 캘린더','calendar.html'],['사진첩','gallery.html']]},
     {t:'클럽',h:'club.html',d:[
       ['클럽 찾기 · 가입','club.html'],['클럽 만들기 (클럽장)','club.html'],['내 클럽 · 가입 승인','club.html'],['⚔️ 클럽 교류전','club.html?tab=4']]},
     {t:'자격증',h:'license.html',d:[
@@ -26,7 +26,7 @@
       ['강사 활동 지원 (분야 등록)','jobs.html'],['단기 강사 구인 게시판','jobs.html#gigList'],
       ['강사 가이드 (일지·운영·유의사항)','guide.html'],['레벨업 (포인트) 시스템','leader.html']]},
     {t:'알림마당',h:'notice.html',d:[
-      ['공지사항 · 공고','notice.html'],['연맹 일정 캘린더','calendar.html'],['자료실 (서식 다운로드)','archive.html'],['📸 대회 갤러리','gallery.html'],['자주 묻는 질문','faq.html']]}
+      ['공지사항 · 공고','notice.html'],['연맹 일정 캘린더','calendar.html'],['자료실 (서식 다운로드)','archive.html'],['사진첩','gallery.html'],['자주 묻는 질문','faq.html']]}
   ];
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
   function renderNav(){
@@ -161,10 +161,18 @@
         var valid=false;
         if(v.safetyEdu){valid=true;var at=v.safetyEduAt;if(at){try{var t=at.toDate?at.toDate():new Date(at);valid=(Date.now()-t.getTime())<365*86400000}catch(e){}}}
         if(valid||document.getElementById('utilSafety'))return;
+        // [모바일 수정] 좁은 화면에서는 상단 줄에 넣으면 로그인·마이페이지 링크가 밀려 가려지므로, 화면 오른쪽 아래에 떠 있는 배지로 표시
+        var ICO='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M12 3l7 3v5c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6l7-3zM9 12l2 2 4-4"/></svg>';
         var a=document.createElement('a');a.id='utilSafety';a.href='safety.html';
-        a.textContent='🛡 안전교육 미이수';a.title='강습 활동 전 안전교육 영상을 시청해 주세요';
-        a.style.cssText='margin-left:10px;background:#C41E2F;color:#fff;font-weight:900;font-size:12px;padding:3px 10px;border-radius:999px;text-decoration:none;white-space:nowrap';
-        el.parentNode.insertBefore(a,el.nextSibling);
+        a.innerHTML=ICO+'안전교육 미이수';a.title='강습 활동 전 안전교육 영상을 시청해 주세요';
+        var mobile=window.innerWidth<=760;
+        if(mobile){
+          a.style.cssText='position:fixed;right:12px;bottom:18px;z-index:9990;background:#C41E2F;color:#fff;font-weight:900;font-size:12.5px;padding:9px 14px;border-radius:999px;text-decoration:none;white-space:nowrap;box-shadow:0 8px 22px rgba(196,30,47,.35);display:inline-flex;align-items:center';
+          document.body.appendChild(a);
+        }else{
+          a.style.cssText='margin-left:10px;background:#C41E2F;color:#fff;font-weight:900;font-size:12px;padding:3px 10px;border-radius:999px;text-decoration:none;white-space:nowrap;display:inline-flex;align-items:center';
+          el.parentNode.insertBefore(a,el.nextSibling);
+        }
       }).catch(function(){});
     }catch(e){}
   }
