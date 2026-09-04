@@ -126,6 +126,15 @@
   </div>
 </div></div>
 
+<!-- ── [갤러리 배너 틀] 대회 갤러리에서 ★배너로 지정한 항목(featured)을 최대 3개 표시 — 세부 구성은 추후 (지금은 틀) ── -->
+<section id="galleryBanner" style="display:none;background:#0b1a3a;padding:26px 0"><div class="wrap">
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+    <span style="background:#C41E2F;color:#fff;font-size:13px;font-weight:900;padding:5px 14px;border-radius:999px;display:inline-flex;align-items:center;gap:6px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1zM12 17a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/></svg>대회 갤러리</span>
+    <span style="font-size:13px;color:#c3c9d4;font-weight:600">최근 대회의 현장 사진·영상</span>
+    <a href="gallery.html" style="margin-left:auto;font-size:13px;font-weight:800;color:#ffd166">전체 보기 →</a>
+  </div>
+  <div id="gbList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
+</div></section>
 <!-- ── 접수 중인 공고 (라이브) ── -->
 <section id="liveNotices" style="display:none;background:#fdf8ee;border-bottom:2px solid #e6b422;padding:22px 0"><div class="wrap">
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
@@ -405,6 +414,20 @@
           +rows.map((r,i)=>'<div style="background:rgba(255,255,255,.08);border-radius:12px;padding:12px 20px;color:#fff;font-size:14px"><span style="font-size:18px">'+medal[i]+'</span> <b>'+esc(r.n)+'</b> <span style="color:#2dd4bf;font-weight:800">'+r.w+'승</span> <span style="color:#9aa1ad">'+r.d+'무</span> <span style="color:#ff7a5c">'+r.l+'패</span></div>').join('')+'</div>';
       }
     }).catch(e=>console.warn('matches',e));
+    // ── 📸 갤러리 배너 (대표 지정 항목만, 공개 열람) — 독립 실행(다른 블록과 무관)
+    (async function(){
+    try{
+      const gs=await DB.collection('gallery').where('featured','==',true).limit(6).get();
+      const items=gs.docs.map(d=>Object.assign({id:d.id},d.data())).filter(x=>x.status==='published').sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,3);
+      const sec=document.getElementById('galleryBanner'),lst=document.getElementById('gbList');
+      if(sec&&lst&&items.length){
+        lst.innerHTML=items.map(x=>'<a href="gallery.html?id='+x.id+'" style="display:block;position:relative;border-radius:14px;overflow:hidden;background:#153A77;text-decoration:none;color:#fff;min-height:150px">'
+          +(x.cover?'<img src="'+x.cover.replace(/"/g,'&quot;')+'" alt="" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block">':'<div style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c0-2.2 4-4 9-4s9 1.8 9 4-4 4-9 4-9-1.8-9-4zM8 12c0-.8 1.8-1.5 4-1.5s4 .7 4 1.5-1.8 1.5-4 1.5-4-.7-4-1.5z"/></svg></div>')
+          +'<div style="position:absolute;left:0;right:0;bottom:0;padding:26px 12px 10px;background:linear-gradient(transparent,rgba(0,0,0,.8))"><div style="font-size:14px;font-weight:900;line-height:1.35">'+String(x.title||'').replace(/</g,'&lt;')+'</div><div style="font-size:11.5px;color:#d7dce6;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d7dce6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M4 5h16a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM3 10h18M8 3v4M16 3v4"/></svg> '+String(x.date||'').replace(/-/g,'.')+(x.place?' · <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d7dce6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M12 21s-6-5.7-6-11a6 6 0 0 1 12 0c0 5.3-6 11-6 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg> '+String(x.place).replace(/</g,'&lt;'):'')+'</div></div></a>').join('');
+        sec.style.display='block';
+      }
+    }catch(e){}
+    })();
     // ── 🏟️ 합동 교류전 (모집중·완료 — 공개 열람) ──
     firebase.firestore().collection('clubMeets').orderBy('createdAt','desc').limit(30).get().then(snap=>{
       const all=snap.docs.map(d=>d.data());
@@ -508,6 +531,6 @@
   boot(0);
 })();
 </script>
-<script src="auth_ui.js?v=20260904"></script>
+<script src="auth_ui.js?v=20260905"></script>
 </body>
 </html>

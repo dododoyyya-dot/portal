@@ -14,7 +14,7 @@
       ['방과후 · 늘봄','business.html#after'],['교원연수 · 교재개발','business.html#train'],['학교 강습 신청 →','apply.html']]},
     {t:'대회',h:'competition.html',d:[
       ['대회 일정 · 안내','competition.html'],['참가 신청 (선수)','competition.html'],
-      ['심판 · 운영요원 신청','competition.html#staff'],['연맹 일정 캘린더','calendar.html']]},
+      ['심판 · 운영요원 신청','competition.html#staff'],['연맹 일정 캘린더','calendar.html'],['📸 대회 갤러리','gallery.html']]},
     {t:'클럽',h:'club.html',d:[
       ['클럽 찾기 · 가입','club.html'],['클럽 만들기 (클럽장)','club.html'],['내 클럽 · 가입 승인','club.html'],['⚔️ 클럽 교류전','club.html?tab=4']]},
     {t:'자격증',h:'license.html',d:[
@@ -26,7 +26,7 @@
       ['강사 활동 지원 (분야 등록)','jobs.html'],['단기 강사 구인 게시판','jobs.html#gigList'],
       ['강사 가이드 (일지·운영·유의사항)','guide.html'],['레벨업 (포인트) 시스템','leader.html']]},
     {t:'알림마당',h:'notice.html',d:[
-      ['공지사항 · 공고','notice.html'],['연맹 일정 캘린더','calendar.html'],['자료실 (서식 다운로드)','archive.html'],['자주 묻는 질문','faq.html']]}
+      ['공지사항 · 공고','notice.html'],['연맹 일정 캘린더','calendar.html'],['자료실 (서식 다운로드)','archive.html'],['📸 대회 갤러리','gallery.html'],['자주 묻는 질문','faq.html']]}
   ];
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
   function renderNav(){

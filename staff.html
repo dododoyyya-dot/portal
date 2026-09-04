@@ -121,6 +121,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260821"></script>
+<script src="career.js?v=20260905"></script>
 <script src="site_config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
@@ -496,6 +497,7 @@ function openPostForm(editId){
   PF_COMPID=(ed&&ed.compId)||'';
   PF_POSTERS=(ed&&ed.posters)?ed.posters.slice():[];
   PF_CIMGS=(ed&&ed.consentImgs)?ed.consentImgs.map(u=>({url:u})):[];
+  PF_OVL={};if(ed&&ed.consentOverlays)Object.keys(ed.consentOverlays).forEach(k=>{PF_OVL[k]=(ed.consentOverlays[k]||[]).map(f=>Object.assign({},f))});
   PF_DATES=(ed&&ed.dates)?ed.dates.map(d=>d.date).sort():[];
   const base=PF_DATES.length?new Date(PF_DATES[0]+'T00:00:00'):new Date();
   PF_CAL_Y=base.getFullYear();PF_CAL_M=base.getMonth();
@@ -575,6 +577,7 @@ function openPostForm(editId){
     +'</div>';
   document.body.appendChild(div);
   window.PF_ED=ed||null;
+  if(!ed)PF_OVL={};
   renderCal();pfDates();pfRenderPosters();
   pfRenderCImgs();pfTplFill();pfPaperChips();
   pfFillComps(ed);  // [v7] 상위 대회 목록 로드
@@ -689,17 +692,141 @@ function pfDates(){
 function pfAddCImgs(input){
   const files=[...input.files];
   if(PF_CIMGS.length+files.length>6){alert('동의서 이미지는 최대 6장까지 첨부할 수 있습니다.');input.value='';return}
-  files.forEach(f=>PF_CIMGS.push({file:f,name:f.name}));
+  files.forEach(f=>{const x={file:f,name:f.name};PF_CIMGS.push(x);
+    try{const fr=new FileReader();fr.onload=()=>{x.dataUrl=fr.result;pfRenderCImgs()};fr.readAsDataURL(f)}catch(e){}});   // 위치 지정 편집기에서 바로 보이도록
   input.value='';pfRenderCImgs();
+}
+// ══════════ [동의서 위치] 동의서 이미지 위 기입 위치 지정 + OCR 자동 배치 — 대회 공고(competition.html)의 편집기를 그대로 옮겨 이름만 바꾼 사본 ══════════
+//  저장 형식은 consentOverlays = {"이미지번호":[{f:항목,x:0~1,y:0~1,fs:글자px(680px 폭 기준)}]} 로 대회 공고와 같습니다.
+const PF_OVL_FIELDS={name:'성명',rrn:'주민등록번호',phone:'연락처',addr:'주소',bank:'은행',acct:'계좌번호',holder:'예금주',date:'날짜',sign:'서명'};   // [동의서 위치] 수당 지급 동의서용 항목
+let PF_OVL={},OVL_I=0,OVL_SEL=-1,OVL_DRAG=null,OVL_PICK='sign';
+function pfOvlShift(removed){ // 이미지 삭제 시 뒤 장의 배치를 앞으로 당김
+  const o={};Object.keys(PF_OVL).forEach(k=>{const i=+k;if(i<removed)o[k]=PF_OVL[k];else if(i>removed)o[String(i-1)]=PF_OVL[k]});PF_OVL=o;
+}
+function pfOvlArr(){PF_OVL[String(OVL_I)]=PF_OVL[String(OVL_I)]||[];return PF_OVL[String(OVL_I)]}
+function pfOvlPack(){const o={};Object.keys(PF_OVL).forEach(k=>{if((PF_OVL[k]||[]).length)o[k]=PF_OVL[k].map(f=>({f:f.f,x:+f.x.toFixed(4),y:+f.y.toFixed(4),fs:f.fs}))});return o}
+function pfOvlOpen(i){
+  OVL_I=i;OVL_SEL=-1;OVL_DRAG=null;
+  const x=PF_CIMGS[i];if(!x)return;
+  const old=document.getElementById('ovlModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='ovlModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.7);z-index:1200;display:flex;align-items:flex-start;justify-content:center;padding:10px;overflow:auto';
+  const chip=(k,on)=>'<button type="button" class="ovlpick'+(on?' on':'')+'" data-f="'+k+'" onclick="pfOvlPick(\''+k+'\',this)" style="border:1.5px solid '+(on?'#153A77':'#dfe5ee')+';background:'+(on?'#153A77':'#f6f8fb')+';color:'+(on?'#fff':'#333')+';border-radius:999px;padding:7px 13px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit">'+PF_OVL_FIELDS[k]+'</button>';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:760px;width:100%;padding:16px 18px">'
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:16px">🎯 서명·기입 위치 지정 — '+(i+1)+'번 장</b><span style="flex:1"></span>'
+    +'<button type="button" onclick="pfOvlDone()" style="border:none;background:#153A77;color:#fff;border-radius:9px;padding:9px 20px;font-weight:900;cursor:pointer;font-family:inherit">✓ 완료</button></div>'
+    +'<div style="background:#eef3fa;border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.7;margin:8px 0 10px"><b>① 항목을 고르고 ② 종이 위 자리를 톡 누르면</b> 표가 놓입니다. 표를 <b>끌어서</b> 옮기고, 표를 누른 뒤 <b>글자 ±</b>·<b>삭제</b>. 참가자 신청서를 출력하면 그 자리에 정보와 전자서명이 찍힙니다.</div>'
+    +'<div id="ovlPicks" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+Object.keys(PF_OVL_FIELDS).map(k=>chip(k,k===OVL_PICK)).join('')+'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">'
+    +'<button type="button" onclick="pfOvlAuto()" style="border:none;background:#0f766e;color:#fff;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;font-family:inherit">⚡ 기본 배치 (날짜·성명·주민번호·서명)</button>'
+    +'<button type="button" onclick="pfOvlOcr()" style="border:none;background:#7c3aed;color:#fff;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;font-family:inherit" title="이미지의 글자를 읽어 성명·생년월일·연락처·서명 등의 칸 옆에 자동으로 놓습니다">🔍 글자 읽어 자동 배치 (OCR)</button>'
+    +'<span id="ovlOcrSt" style="font-size:12px;font-weight:700;min-width:120px"></span>'
+    +'<button type="button" onclick="pfOvlFont(-2)" style="border:1.5px solid #dfe5ee;background:#fff;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">글자 −</button>'
+    +'<button type="button" onclick="pfOvlFont(2)" style="border:1.5px solid #dfe5ee;background:#fff;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">글자 ＋</button>'
+    +'<button type="button" onclick="pfOvlDel()" style="border:1.5px solid #C41E2F;background:#fff;color:#C41E2F;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">선택 삭제</button>'
+    +'<button type="button" onclick="pfOvlClear()" style="border:1.5px solid #dfe5ee;background:#fff;color:#555;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">모두 지우기</button>'
+    +(PF_CIMGS.length>1?'<button type="button" onclick="pfOvlCopy()" style="border:1.5px solid #dfe5ee;background:#fff;color:#555;border-radius:8px;padding:6px 11px;font-weight:800;cursor:pointer;font-family:inherit">📋 다른 장에도 같은 배치</button>':'')
+    +'</div>'
+    +'<div id="ovlBox" style="position:relative;width:680px;max-width:100%;margin:0 auto;cursor:crosshair;touch-action:none;user-select:none">'
+    +'<img id="ovlImg" src="'+esc(x.url||x.dataUrl)+'" style="width:100%;display:block;border:1px solid #ccc" draggable="false"></div></div>';
+  document.body.appendChild(div);
+  const box=div.querySelector('#ovlBox');
+  box.addEventListener('pointerdown',pfOvlDown);
+  box.addEventListener('pointermove',pfOvlMove);
+  box.addEventListener('pointerup',pfOvlUp);box.addEventListener('pointercancel',pfOvlUp);
+  pfOvlChips();
+}
+function pfOvlPick(k,el){OVL_PICK=k;[].forEach.call(document.querySelectorAll('.ovlpick'),b=>{const on=b.dataset.f===k;b.style.background=on?'#153A77':'#f6f8fb';b.style.color=on?'#fff':'#333';b.style.borderColor=on?'#153A77':'#dfe5ee'})}
+function pfOvlChips(){
+  const box=document.getElementById('ovlBox');if(!box)return;
+  box.querySelectorAll('.ovlchip').forEach(c=>c.remove());
+  pfOvlArr().forEach((f,idx)=>{
+    const c=document.createElement('div');c.className='ovlchip';c.dataset.idx=idx;
+    const sel=idx===OVL_SEL;
+    c.style.cssText='position:absolute;left:'+(f.x*100)+'%;top:'+(f.y*100)+'%;font-size:'+f.fs+'px;font-weight:800;color:#1230c4;background:rgba(80,110,255,'+(sel?'.28':'.14')+');border:2px '+(sel?'solid #C41E2F':'dashed #4c6ef5')+';border-radius:6px;padding:2px 6px;white-space:nowrap;line-height:1.2;cursor:grab;touch-action:none';
+    c.textContent=(f.f==='sign'?'✍ 서명':(PF_OVL_FIELDS[f.f]||f.f));
+    box.appendChild(c);
+  });
+}
+function pfOvlDown(e){
+  const box=document.getElementById('ovlBox');const r=box.getBoundingClientRect();
+  const chip=e.target.closest('.ovlchip');
+  if(chip){OVL_SEL=parseInt(chip.dataset.idx);const cr=chip.getBoundingClientRect();OVL_DRAG={dx:e.clientX-cr.left,dy:e.clientY-cr.top};box.setPointerCapture&&box.setPointerCapture(e.pointerId);pfOvlChips();e.preventDefault();return}
+  pfOvlArr().push({f:OVL_PICK,x:Math.min(.95,Math.max(0,(e.clientX-r.left)/r.width)),y:Math.min(.97,Math.max(0,(e.clientY-r.top)/r.height)),fs:OVL_PICK==='sign'?30:14});
+  OVL_SEL=pfOvlArr().length-1;pfOvlChips();
+}
+function pfOvlMove(e){
+  if(!OVL_DRAG||OVL_SEL<0)return;
+  const box=document.getElementById('ovlBox');const r=box.getBoundingClientRect();
+  const f=pfOvlArr()[OVL_SEL];if(!f)return;
+  f.x=Math.min(.98,Math.max(0,(e.clientX-r.left-OVL_DRAG.dx)/r.width));
+  f.y=Math.min(.98,Math.max(0,(e.clientY-r.top-OVL_DRAG.dy)/r.height));
+  pfOvlChips();
+}
+function pfOvlUp(){OVL_DRAG=null}
+function pfOvlFont(d){const f=pfOvlArr()[OVL_SEL];if(!f){alert('먼저 옮길 표를 눌러 선택하세요.');return}f.fs=Math.min(60,Math.max(8,f.fs+d));pfOvlChips()}
+function pfOvlDel(){if(OVL_SEL<0){alert('삭제할 표를 먼저 누르세요.');return}pfOvlArr().splice(OVL_SEL,1);OVL_SEL=-1;pfOvlChips()}
+function pfOvlClear(){if(!pfOvlArr().length)return;if(!confirm('이 장의 배치를 모두 지울까요?'))return;PF_OVL[String(OVL_I)]=[];OVL_SEL=-1;pfOvlChips()}
+function pfOvlCopy(){const src=pfOvlArr().map(f=>Object.assign({},f));let n=0;PF_CIMGS.forEach((x,i)=>{if(i!==OVL_I){PF_OVL[String(i)]=src.map(f=>Object.assign({},f));n++}});alert('다른 '+n+'장에 같은 배치를 복사했습니다.')}
+function pfOvlAuto(){
+  // 대부분의 동의서는 아래쪽에 날짜·성명·서명란이 있습니다 — 그 근처에 놓고, 끌어서 맞추게 합니다.
+  const a=pfOvlArr();
+  const add=(f,x,y,fs)=>{if(!a.some(z=>z.f===f))a.push({f:f,x:x,y:y,fs:fs})};
+  add('date',0.22,0.80,14);add('name',0.22,0.88,14);add('rrn',0.55,0.88,13);add('sign',0.62,0.905,30);
+  OVL_SEL=-1;pfOvlChips();
+}
+function pfOvlDone(){const m=document.getElementById('ovlModal');if(m)m.remove();pfRenderCImgs()}
+const PF_OCR_KEYS=[
+  ['acct',/계좌\s*번호|계좌/],['holder',/예금주/],['bank',/은\s*행|금융기관/],
+  ['rrn',/주민\s*등록\s*번호|주민번호|생년월일/],['phone',/연락처|전화|휴대폰|휴대전화/],['addr',/주\s*소/],
+  ['name',/성\s*명|이\s*름|본인/],['date',/작성일|날\s*짜|년\s+월\s+일/],['sign',/서\s*명|\(인\)|싸인|사인/]];
+async function pfOvlOcr(){
+  const x=PF_CIMGS[OVL_I];if(!x)return;
+  const st=document.getElementById('ovlOcrSt');const say=(t,bad)=>{if(st){st.textContent=t;st.style.color=bad?'#C41E2F':'#0f766e'}};
+  try{
+    if(!window.Tesseract){say('글자 인식 도구 내려받는 중…');await new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=ok;s.onerror=()=>no(new Error('도구 로드 실패'));document.head.appendChild(s)})}
+    say('이미지 읽는 중… (첫 실행은 한국어 자료를 받느라 30초~1분 걸릴 수 있습니다)');
+    const im=await new Promise((ok,no)=>{const i=new Image();i.crossOrigin='anonymous';i.onload=()=>ok(i);i.onerror=()=>no(new Error('이미지 로드 실패'));i.src=x.url||x.dataUrl});
+    const W=im.naturalWidth||im.width,H=im.naturalHeight||im.height;
+    const worker=await Tesseract.createWorker('kor+eng',1,{logger:m=>{if(m&&m.status==='recognizing text')say('글자 인식 중… '+Math.round((m.progress||0)*100)+'%')}});
+    const res=await worker.recognize(im);await worker.terminate();
+    const lines=(res&&res.data&&res.data.lines)||[];
+    const arr=pfOvlArr();const placed={};let n=0;
+    lines.forEach(ln=>{
+      const words=ln.words||[];const used={};
+      words.forEach((w,wi)=>{
+        if(used[wi])return;   // 앞 항목이 두 단어로 가져간 단어(보호자 연락처의 "연락처")는 건너뜀
+        const txt=(w.text||'').replace(/\s/g,'');if(!txt)return;
+        // 같은 줄에서 다음 단어까지 이어 붙여 두 단어 항목(보호자 연락처)도 잡습니다
+        const txt2=txt+((words[wi+1]&&words[wi+1].text)||'').replace(/\s/g,'');
+        for(const [key,re] of PF_OCR_KEYS){
+          if(placed[key]&&key!=='sign')continue;
+          if(re.test(txt2)||re.test(txt)){
+            const two=re.test(txt2)&&!re.test(txt)&&words[wi+1];const last=two?words[wi+1]:w;if(two)used[wi+1]=1;
+            const bb=last.bbox||{};const bh=Math.max(10,(bb.y1-bb.y0)||16);
+            const fx=Math.min(0.92,((bb.x1||0)+bh*0.6)/W),fy=Math.max(0,((bb.y0||0)-bh*0.15)/H);
+            const fs=Math.max(10,Math.min(30,Math.round(bh*680/W*0.9)));
+            if(placed[key]){const p=arr[placed[key]-1];p.x=fx;p.y=fy;p.fs=(key==='sign'?Math.max(fs,26):fs)}
+            else{arr.push({f:key,x:+fx.toFixed(4),y:+fy.toFixed(4),fs:(key==='sign'?Math.max(fs,26):fs)});placed[key]=arr.length;n++}
+            break;
+          }
+        }
+      });
+    });
+    pfOvlChips();
+    say(n?('✓ '+n+'개 항목을 글자 옆에 놓았습니다 ('+Object.keys(placed).map(k=>PF_OVL_FIELDS[k]||k).join('·')+') — 위치가 어긋나면 끌어서 맞추세요.'):'항목 이름(성명·생년월일·서명…)을 찾지 못했습니다 — 이미지가 선명한지 확인하거나 [⚡ 기본 배치]를 쓰세요.',!n);
+  }catch(e){say('인식 실패: '+(e&&e.message||e),true)}
 }
 function pfRenderCImgs(){
   const el=document.getElementById('pfCImgList');if(!el)return;
   el.innerHTML=PF_CIMGS.length?PF_CIMGS.map((p,i)=>{
-    const src=p.url||'';
-    return '<div style="position:relative">'
+    const src=p.url||p.dataUrl||'';const n=(PF_OVL[String(i)]||[]).length;
+    return '<div style="position:relative;display:inline-flex;flex-direction:column;align-items:center;gap:4px">'
       +(src?'<img class="stthumb" src="'+esc(src)+'" onclick="window.open(this.src)">':'<div class="stthumb" style="display:flex;align-items:center;justify-content:center;font-size:10px;color:#8a919d;background:#f6f8fb;padding:4px;text-align:center;word-break:break-all">'+esc(p.name||'이미지')+'</div>')
-      +'<button onclick="PF_CIMGS.splice('+i+',1);pfRenderCImgs()" style="position:absolute;top:-6px;right:-6px;border:none;background:#C41E2F;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;font-weight:900">×</button></div>';
-  }).join(''):'<span style="font-size:12px;color:#8a919d">이미지 없음 (문안만 사용)</span>';
+      +'<button type="button" onclick="pfOvlOpen('+i+')" style="border:none;background:'+(n?'#0f766e':'#7c3aed')+';color:#fff;border-radius:7px;padding:4px 10px;cursor:pointer;font-weight:800;font-size:11.5px" title="성명·주민번호·계좌·서명이 찍힐 자리를 지정">🎯 '+(n?'위치 '+n+'개':'위치 지정')+'</button>'
+      +'<button onclick="PF_CIMGS.splice('+i+',1);pfOvlShift('+i+');pfRenderCImgs()" style="position:absolute;top:-6px;right:-6px;border:none;background:#C41E2F;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;font-weight:900">×</button></div>';
+  }).join('')+'<div style="font-size:12px;color:#8a919d;width:100%;margin-top:4px">각 장의 [🎯]로 성명·주민번호·계좌·날짜·서명 자리를 정해 두면, 신청자의 수당 정보와 전자서명이 그 자리에 자동 기입된 동의서를 출력할 수 있습니다.</div>'
+  :'<span style="font-size:12px;color:#8a919d">이미지 없음 (문안만 사용)</span>';
 }
 function pfTplMsg(t,bad){const m=document.getElementById('pfTplMsg');if(m){m.textContent=t||'';m.style.color=bad?'#C41E2F':'#0f766e'}}
 async function pfTplFill(){
@@ -719,7 +846,9 @@ async function pfTplLoad(){
     if(!d.exists){pfTplMsg('삭제된 항목입니다.',true);pfTplFill();return}
     const t=d.data();
     const ta=document.getElementById('pfCText');if(ta)ta.value=t.consentText||'';
-    PF_CIMGS=(t.consentImgs||[]).map(u=>({url:u}));pfRenderCImgs();
+    PF_CIMGS=(t.consentImgs||[]).map(u=>({url:u}));
+    PF_OVL={};Object.keys(t.consentOverlays||{}).forEach(k=>{PF_OVL[k]=(t.consentOverlays[k]||[]).map(f=>Object.assign({},f))});
+    pfRenderCImgs();
     if(t.consentForm==='file'&&t.consentFormUrl)pfPaperSet('file',t.consentFormUrl,t.consentFormName||'');
     pfTplMsg('✓ 불러왔습니다: '+(t.name||'')+' — 문안·이미지 '+PF_CIMGS.length+'장이 이 공고에 적용됩니다.');
   }catch(e){pfTplMsg('불러오기 실패: '+(e.code||e.message),true)}
@@ -739,7 +868,7 @@ async function pfTplSave(){
       await ref.put(blob,{contentType:'image/jpeg'});const u=await ref.getDownloadURL();x.url=u;imgs.push(u);
     }
     const g=id=>(document.getElementById(id)||{}).value||'';
-    await DB.collection('consentTemplates').add({name:name.trim(),consentText:text,consentImgs:imgs,consentOverlays:{},consentForm:g('pfForm')||'none',consentFormUrl:g('pfFormUrl'),consentFormName:g('pfFormName'),
+    await DB.collection('consentTemplates').add({name:name.trim(),consentText:text,consentImgs:imgs,consentOverlays:pfOvlPack(),consentForm:g('pfForm')||'none',consentFormUrl:g('pfFormUrl'),consentFormName:g('pfFormName'),
       createdAt:firebase.firestore.FieldValue.serverTimestamp(),by:(AUTH.currentUser||{}).email||'',from:'staff'});
     await pfTplFill();
     const sel=document.getElementById('pfTplSel');if(sel){const o=[...sel.options].find(o=>o.textContent===name.trim());if(o)sel.value=o.value}
@@ -910,7 +1039,7 @@ async function savePost(editId){
       meal:(document.querySelector('input[name=pfMeal]:checked')||{}).value||'제공',
       uniform:uniform,lodging:lodging,
       supplies:supplies,posters:posters,description:v('pfDesc'),contactInfo:v('pfContact'),
-      consentText:v('pfCText'),consentImgs:consentImgs,consentForm:v('pfForm')||'none',consentFormUrl:v('pfFormUrl'),consentFormName:v('pfFormName'),   // [동의서·서류]
+      consentText:v('pfCText'),consentImgs:consentImgs,consentForm:v('pfForm')||'none',consentFormUrl:v('pfFormUrl'),consentFormName:v('pfFormName'),consentOverlays:pfOvlPack(),   // [동의서·서류]
       recruitType:(document.querySelector('input[name=pfRecruitType]:checked')||{}).value||'심판·운영요원',  // [모집유형 라벨] 대회참가자 모집과 구분
       compId:PF_COMPID||((editId&&(POSTS.find(x=>x.id===editId)||{}).compId)||''),  // [v7] 상위 대회 연결
       author:{uid:SME.uid,name:SMY.name||'',organization:(v('pfHost')||myOrg()),contact:SMY.phone||'',email:SMY.email||''},
@@ -1046,15 +1175,18 @@ async function _renderDetailInner(isStale){
     +((p.consentForm&&p.consentForm!=='none'&&p.consentFormUrl)?'<div style="font-size:13px;margin-top:5px"><b>서면 동의서 양식:</b> <a href="'+esc(p.consentFormUrl)+'" target="_blank" style="color:#153A77;font-weight:800">📎 '+esc(p.consentFormName||'내려받기')+' →</a></div>':'')
     +'<div style="font-size:13px;margin-top:12px"><b>👥 신청 현황 ('+dayApps.length+'명)</b></div>'+appsHtml
     +'</div>'
-    +confirmPanelHtml(dd,dayApps,_decide)   // [확정현황] 역할별 인원수·명단 패널
+    +confirmPanelHtml(Object.assign({_postId:p.id},dd),dayApps,_decide)   // [확정현황] 역할별 인원수·명단 패널 (+임무 완료 버튼)
     +'</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">'
     // [권한개선] 공고 수정·복사 = canManage / 수당엑셀·자격확인·경력등록 = canDecide
     +(manage?'<button class="stbtn stbtn-soft" onclick="document.getElementById(\'dtModal\').remove();openPostForm(\''+p.id+'\')">✏️ 공고 수정</button><button class="stbtn stbtn-ghost" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button>':'')
     // [UI 정리] '수당지급 엑셀'은 아래 '수당지급내역서(서식·서명)'와 내용이 중복되어 숨김 처리.
     //           함수(exportPayExcel)는 그대로 두어 필요 시 되살릴 수 있습니다.
-    +(_decide?'<button class="stbtn" style="background:#fffbeb;color:#8a5a00;border:1.5px solid #fde68a" onclick="exportPayReport(\''+p.id+'\')">📄 수당지급내역서 (서식·서명)</button><button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="openNotifyModal(\''+p.id+'\')">📣 확정자 단체 알림</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="exportLicZip(\''+p.id+'\')">📦 자격증 일괄 다운로드</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
+    +((_decide&&payConsentReady(p))?'<button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #b9cdec" onclick="printPayConsent(\''+p.id+'\',\'\')" title="확정된 신청자의 수당 정보·전자서명이 기입된 동의서를 한 번에 인쇄">📄 수당 동의서 출력</button>':'')
+  +(_decide?'<button class="stbtn" style="background:'+(p.reportId?'#f0fdf4':'#f5f3ff')+';color:'+(p.reportId?'#0f766e':'#5b21b6')+';border:1.5px solid '+(p.reportId?'#a7f3d0':'#ddd6fe')+'" onclick="openStaffReport(\''+p.id+'\')" title="약식 종료 보고 — 기록 보관 + 갤러리 초안"><span style="display:inline-flex;align-items:center;gap:5px">'+CAREER.svg('doc',{size:14,stroke:2.2})+(p.reportId?'종료 보고 완료 (수정)':'종료 보고')+'</span></button>':'')
+  +(_decide?'<button class="stbtn" style="background:#fffbeb;color:#8a5a00;border:1.5px solid #fde68a" onclick="exportPayReport(\''+p.id+'\')">📄 수당지급내역서 (서식·서명)</button><button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="openNotifyModal(\''+p.id+'\')">📣 확정자 단체 알림</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="exportLicZip(\''+p.id+'\')">📦 자격증 일괄 다운로드</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
     +'<button class="stbtn stbtn-main" style="padding:11px 26px" onclick="openApplyForm(\''+p.id+'\')">✍️ 신청하기 (날짜 선택)</button>'
+    +((payConsentReady(p)&&SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid&&a.payInfo))?'<button class="stbtn stbtn-soft" style="padding:11px 18px" onclick="printPayConsent(\''+p.id+'\',SME.uid)" title="내 수당 정보와 전자서명이 기입된 동의서">📄 내 수당 동의서 인쇄</button>':'')
     +'</div></div>';
   // div는 await 전에 이미 DOM에 추가됨 — innerHTML 설정만으로 내용 갱신
 }
@@ -1295,7 +1427,13 @@ function confirmPanelHtml(dd,dayApps,canDecideNow){
     +'<span style="font-size:11.5px;color:#6b7280">'+fmtD((dd.date||'').slice(5))+'</span>'
     +'<span style="flex:1"></span>'
     +'<b style="font-size:13px;color:#0f766e">'+conf.length+'명'+(totalQuota?' <span style="font-weight:600;color:#8a919d;font-size:11.5px">/ 정원 '+totalQuota+'</span>':'')+'</b>'
-    +'</div>'+rows+'</div>';
+    +'</div>'+rows
+    // [임무 완료] 경기 종료 후 확정 인원의 임무를 확인·기록 → 각자의 경력(staffCareer)에 남고 알림이 갑니다
+    +(canDecideNow&&conf.length?'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;border-top:1px solid #e8eef7;padding-top:9px;margin-top:6px">'
+      +(dd.completed?'<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;color:#0f766e">'+CAREER.svg('flag',{size:14,color:'#0f766e',stroke:2.2})+'임무 완료 처리됨 · '+esc(String(dd.completed.at||'').slice(0,10))+' · '+(dd.completed.count||0)+'명 경력 기록</span><button class="stbtn stbtn-soft" style="padding:4px 10px;font-size:11.5px" onclick="openMissionDone(\''+(dd._postId||'')+'\',\''+dd.date+'\')">다시 열기</button>'
+        :'<button class="stbtn" style="background:#7c3aed;padding:6px 12px;font-size:12px;display:inline-flex;align-items:center;gap:5px" onclick="openMissionDone(\''+(dd._postId||'')+'\',\''+dd.date+'\')">'+CAREER.svg('flag',{size:14,color:'#fff',stroke:2.2})+'임무 완료 · 경력 기록</button><span style="font-size:11.5px;color:#8a919d">경기가 끝나면 눌러 주세요 — 역할별로 이력이 남고 본인에게 알림이 갑니다</span>')
+      +'</div>':'')
+    +'</div>';
 }
 // ══════════════ [임무배정] 버튼형 선택 모달 ══════════════
 // 기존에는 prompt()로 임무·수당을 두 번 직접 타이핑해야 했습니다.
@@ -1411,7 +1549,147 @@ async function decideApp(appId,date,decision){
   await _applyDecision(appId,date,decision);
 }
 // ══════════════ 경력 일괄등록 ══════════════
-async function registerCareer(postId,date){
+// ══════════ [임무 완료] 경기 종료 후 확정 인원의 역할을 확인하고 경력(staffCareer)에 기록 ══════════
+//  · 배정된 임무(assign[date].duty)를 기본값으로, 역할 버튼(위원장·총괄·주심·부심·점수심·기록원·운영·봉사…)으로 바꿀 수 있음
+//  · 같은 사람·같은 날·같은 공고·같은 역할은 갱신(중복 없음) · 완료 후 본인에게 알림 · 공고 dates[i].completed 기록
+//  · 마지막 날짜까지 완료되면 종료 보고(약식) 입력창으로 이어짐
+let MD={};
+async function openMissionDone(postId,date){
+  const p=POSTS.find(x=>x.id===postId);if(!p)return;
+  const dd=(p.dates||[]).find(x=>x.date===date)||{};
+  const apps=(APPS[postId]||[]).filter(a=>(a.status||{})[date]==='확정');
+  if(!apps.length){alert('해당 날짜에 확정된 신청자가 없습니다.');return}
+  // 기본 역할 = 공고에서 확정·배정된 임무(assign[date].duty). 없으면 1지망, 그것도 없으면 '운영'
+  MD={postId:postId,date:date,open:-1,rows:apps.map(a=>{const asg=(a.assign||{})[date]||{};return {id:a.id,uid:a.uid,name:a.name||'',role:asg.duty||((a.prefs||{})[date]||[])[0]||'운영',assigned:asg.duty||'',done:false,recId:'',recRole:'',skip:false,busy:false}})};
+  // 이미 기록된 사람 표시 (다시 열었을 때)
+  try{
+    const q=await DB.collection('staffCareer').where('postId','==',postId).where('date','==',date).get();
+    q.docs.forEach(d=>{const c=d.data();const r=MD.rows.find(x=>x.uid===c.uid);if(r){r.done=true;r.recId=d.id;r.recRole=c.role||c.duty||'';r.role=r.recRole||r.role}});
+  }catch(e){console.warn('career read',e)}
+  const old=document.getElementById('mdModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='mdModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.65);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:680px;width:100%;padding:22px 24px;margin:10px 0">'
+    +'<b style="font-size:16px;display:inline-flex;align-items:center;gap:7px">'+CAREER.svg('flag',{size:20,color:'#7c3aed',stroke:2.2})+'임무 완료 · 경력 기록</b>'
+    +'<div style="font-size:12.5px;color:#6b7280;margin-top:3px">'+esc(p.competitionName||'')+' · '+fmtD(date)+' · 확정 '+apps.length+'명</div>'
+    +'<div style="background:#f6f8fb;border-radius:10px;padding:9px 12px;margin-top:10px;font-size:12.5px;line-height:1.7">역할은 <b>공고에서 확정·배정된 임무</b>가 기본값입니다. 당일 역할이 바뀌었으면 [역할 바꾸기]로 고친 뒤, <b>한 사람씩 [완료]</b>를 눌러 경력에 기록하세요. 못 온 사람은 [불참]으로 두면 기록되지 않습니다.</div>'
+    +'<div id="mdRows" style="margin-top:10px"></div>'
+    +'<div id="mdSum" style="font-size:12.5px;font-weight:800;margin-top:8px"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">'
+    +'<button class="stbtn stbtn-soft" onclick="mdAllRemain()">남은 인원 모두 완료</button>'
+    +'<button class="stbtn stbtn-main" onclick="mdFinish()">이 날짜 완료 확정 · 닫기</button></div></div>';
+  document.body.appendChild(div);mdRender();
+}
+function mdRender(){
+  const el=document.getElementById('mdRows');if(!el)return;
+  el.innerHTML=MD.rows.map((r,i)=>{
+    const g=CAREER.group(r.role);
+    const state=r.done?'<span style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:900;color:#0f766e">'+CAREER.svg('check',{size:14,color:'#0f766e',stroke:2.2})+'기록됨'+(r.recRole&&r.recRole!==r.role?' ('+esc(r.recRole)+' → 수정 필요)':'')+'</span>'
+      :(r.skip?'<span style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:900;color:#8a919d">'+CAREER.svg('x',{size:14,color:'#8a919d',stroke:2.2})+'불참 — 기록 안 함</span>':'<span style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:700;color:#b8860b">'+CAREER.svg('hourglass',{size:13,color:'#b8860b',stroke:2.2})+'대기</span>');
+    return '<div style="border:1.5px solid '+(r.done?'#cfe3d8':(r.skip?'#e2e7f0':'#f1dfa6'))+';background:'+(r.done?'#f7fbf9':(r.skip?'#fafbfd':'#fffdf5'))+';border-radius:10px;padding:9px 12px;margin-bottom:8px;opacity:'+(r.skip?'.6':'1')+'">'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+      +'<b style="font-size:13.5px">'+esc(r.name)+'</b>'
+      +CAREER.groupTag(g,esc(r.role))
+      +(r.assigned&&r.assigned!==r.role?'<span style="font-size:11px;color:#8a919d">공고 배정: '+esc(r.assigned)+'</span>':'')
+      +state+'<span style="flex:1"></span>'
+      +'<button type="button" class="stbtn stbtn-soft" style="padding:3px 9px;font-size:11px" onclick="MD.open=MD.open==='+i+'?-1:'+i+';mdRender()">'+(MD.open===i?'접기':'역할 바꾸기')+'</button>'
+      +(r.done?'<button type="button" class="stbtn stbtn-soft" style="padding:3px 9px;font-size:11px" onclick="mdOne('+i+')" '+(r.busy?'disabled':'')+'>다시 기록</button>'
+        :'<button type="button" class="stbtn" style="padding:4px 11px;font-size:11.5px;background:#0f766e;display:inline-flex;align-items:center;gap:4px" onclick="mdOne('+i+')" '+(r.busy?'disabled':'')+'>'+CAREER.svg('check',{size:13,color:'#fff',stroke:2.4})+'완료</button>')
+      +'<button type="button" class="stbtn" style="padding:3px 9px;font-size:11px;background:#fff;color:#C41E2F;border:1px solid #f1c7cc" onclick="mdSkip('+i+')" '+(r.busy?'disabled':'')+'>'+(r.skip?'불참 취소':'불참')+'</button>'
+      +'</div>'
+      +(MD.open===i?'<div style="margin-top:8px">'+CAREER.roleChips(r.role,'mdPick').replace(/onclick="mdPick\(this\)"/g,'onclick="mdPick(this,'+i+')"')
+        +'<div style="display:flex;gap:6px;align-items:center;margin-top:4px"><input class="stfield" style="width:200px" placeholder="목록에 없는 역할 직접 입력" onchange="MD.rows['+i+'].role=this.value.trim()||MD.rows['+i+'].role;MD.open=-1;mdRender()"></div></div>':'')
+      +'</div>';
+  }).join('');
+  const done=MD.rows.filter(r=>r.done).length,skip=MD.rows.filter(r=>r.skip).length;
+  const sm=document.getElementById('mdSum');if(sm)sm.innerHTML='기록 완료 <b style="color:#0f766e">'+done+'</b> / 불참 '+skip+' / 대기 '+(MD.rows.length-done-skip)+' (총 '+MD.rows.length+'명)';
+}
+function mdPick(btn,i){MD.rows[i].role=btn.dataset.role;MD.open=-1;mdRender()}
+async function mdOne(i){
+  const r=MD.rows[i];const p=POSTS.find(x=>x.id===MD.postId);if(!r||!p||r.busy)return;
+  r.busy=true;r.skip=false;mdRender();
+  try{
+    const w=await CAREER.write(DB,{uid:r.uid,name:r.name,date:MD.date,competitionName:p.competitionName||'',role:r.role,sport:p.sport||'',location:p.location||'',organizer:(p.author&&p.author.organization)||'',postId:MD.postId,source:'staff-complete'},(SMY&&SMY.name)||'');
+    // 역할이 바뀌어 다른 키로 새로 기록된 경우 예전 기록은 정리
+    if(r.recId&&w.id!==r.recId){try{await DB.collection('staffCareer').doc(r.recId).delete()}catch(e){}}
+    r.done=true;r.recId=w.id;r.recRole=r.role;
+    try{await KFDF.notify(r.uid,'🏅 ['+(p.competitionName||'')+'] '+r.role+' 임무 완료 — 경력에 기록되었습니다. 마이페이지 [경력 여정]에서 확인하세요','mypage.html#careerBox')}catch(e){}
+  }catch(e){alert('['+r.name+'] 기록 실패: '+(e.code||e.message)+'\n(보안규칙 v18 게시 여부를 확인하세요)')}
+  r.busy=false;mdRender();
+}
+async function mdSkip(i){
+  const r=MD.rows[i];if(!r||r.busy)return;
+  if(r.skip){r.skip=false;mdRender();return}
+  if(r.done){if(!confirm('['+r.name+'] 이미 기록된 경력을 지우고 불참 처리할까요?'))return;r.busy=true;mdRender();try{await DB.collection('staffCareer').doc(r.recId).delete();r.done=false;r.recId='';r.recRole=''}catch(e){alert('삭제 실패: '+(e.code||e.message))}r.busy=false}
+  r.skip=true;mdRender();
+}
+async function mdAllRemain(){
+  const rest=MD.rows.map((r,i)=>[r,i]).filter(x=>!x[0].done&&!x[0].skip);
+  if(!rest.length){alert('남은 인원이 없습니다.');return}
+  if(!confirm('남은 '+rest.length+'명을 현재 표시된 역할로 모두 완료 처리할까요?\n\n'+rest.map(x=>x[0].name+' — '+x[0].role).join('\n')))return;
+  for(const [,i] of rest)await mdOne(i);
+}
+async function mdFinish(){
+  const p=POSTS.find(x=>x.id===MD.postId);if(!p)return;
+  const done=MD.rows.filter(r=>r.done).length;
+  if(!done){if(confirm('아직 기록된 사람이 없습니다. 그냥 닫을까요?'))document.getElementById('mdModal').remove();return}
+  try{
+    const dates=(p.dates||[]).map(d=>d.date===MD.date?Object.assign({},d,{completed:{at:new Date().toISOString(),by:(SMY&&SMY.name)||'',count:done}}):d);
+    await DB.collection('competitionStaff').doc(MD.postId).update({dates:dates});p.dates=dates;
+  }catch(e){console.warn('completed flag',e)}
+  document.getElementById('mdModal').remove();
+  const allDone=(p.dates||[]).every(d=>d.completed);
+  loadPosts();
+  if(allDone&&!p.reportId&&confirm('모든 일정의 임무 완료 처리가 끝났습니다.\n지금 약식 종료 보고를 작성할까요? (참가 인원·결과 요약·사진 → 기록 보관 + 갤러리 초안 자동 생성)'))openStaffReport(MD.postId);
+}
+// ══════════ [종료 보고] 심판·운영 공고의 약식 보고 → eventReports + 갤러리 초안 ══════════
+function openStaffReport(postId){
+  const p=POSTS.find(x=>x.id===postId);if(!p)return;
+  const apps=APPS[postId]||[];
+  const conf={};(p.dates||[]).forEach(dd=>{apps.filter(a=>(a.status||{})[dd.date]==='확정').forEach(a=>{const duty=((a.assign||{})[dd.date]||{}).duty||'운영';const g=CAREER.group(duty);conf[g]=(conf[g]||0)+1})});
+  const stat=Object.keys(conf).map(g=>g+' '+conf[g]+'명').join(' · ');
+  const old=document.getElementById('rpModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='rpModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.65);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
+  const ds=(p.dates||[]).map(d=>d.date).sort();
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:640px;width:100%;padding:22px 24px;margin:10px 0">'
+    +'<b style="font-size:16px;display:inline-flex;align-items:center;gap:7px">'+CAREER.svg('doc',{size:20,color:'#153A77',stroke:2.2})+'종료 보고 (약식)</b><div style="font-size:12.5px;color:#6b7280;margin-top:3px">'+esc(p.competitionName||'')+' · '+esc(ds[0]||'')+(ds.length>1?' ~ '+esc(ds[ds.length-1]):'')+' · '+esc(p.location||'')+'</div>'
+    +'<label class="stlabel">운영 인원 (자동)</label><input id="rpStat" class="stfield" value="'+esc(stat||'-')+'">'
+    +'<label class="stlabel">결과·운영 요약 *</label><textarea id="rpSum" rows="4" class="stfield" placeholder="예: 8개 팀 참가, 얼티미트 남초부·여중부 진행. 우천으로 오후 일정 30분 지연. 부상자 없음.">'+esc(p.report&&p.report.summary||'')+'</textarea>'
+    +'<label class="stlabel">특이사항·건의</label><textarea id="rpNote" rows="2" class="stfield">'+esc(p.report&&p.report.note||'')+'</textarea>'
+    +'<label class="stlabel">현장 사진 (선택 — 갤러리 초안에 함께 들어갑니다)</label><input type="file" id="rpPhotos" accept="image/*" multiple style="display:block;margin-top:5px;font-size:13px">'
+    +'<label style="display:flex;gap:7px;align-items:center;font-weight:800;font-size:13px;margin-top:12px"><input type="checkbox" id="rpGallery" checked style="width:auto"> 갤러리 초안 자동 생성 (제목·일자·장소·요약이 채워진 비공개 초안 — 갤러리 페이지에서 사진을 더 올리고 공개)</label>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="stbtn stbtn-ghost" onclick="document.getElementById(\'rpModal\').remove()">닫기</button><button class="stbtn stbtn-main" id="rpSaveBtn" onclick="rpSave(\''+postId+'\')">💾 보고 저장</button></div>'
+    +'<div id="rpMsg" style="font-size:12.5px;font-weight:800;margin-top:6px"></div></div>';
+  document.body.appendChild(div);
+}
+async function rpSave(postId){
+  const p=POSTS.find(x=>x.id===postId);if(!p)return;
+  const sum=(document.getElementById('rpSum').value||'').trim();if(!sum){alert('결과·운영 요약을 입력해 주세요.');return}
+  const btn=document.getElementById('rpSaveBtn');btn.disabled=true;btn.textContent='저장 중…';
+  const msg=document.getElementById('rpMsg');
+  try{
+    const ds=(p.dates||[]).map(d=>d.date).sort();
+    const photos=[];const files=[...(document.getElementById('rpPhotos').files||[])];
+    for(const f of files){try{const blob=await stCompress(f);const ref=firebase.storage().ref('compdocs/'+SME.uid+'/report_'+Date.now()+'_'+photos.length+'.jpg');await ref.put(blob,{contentType:'image/jpeg'});photos.push(await ref.getDownloadURL())}catch(e){}}
+    const rep={kind:'staff',refId:postId,title:p.competitionName||'',date:ds[0]||'',endDate:ds[ds.length-1]||'',place:p.location||'',sport:p.sport||'',
+      stats:{staff:(document.getElementById('rpStat').value||'').trim()},summary:sum,note:(document.getElementById('rpNote').value||'').trim(),photos:photos,
+      by:(SMY&&SMY.name)||'',byUid:SME.uid,at:firebase.firestore.FieldValue.serverTimestamp()};
+    let rid=p.reportId;
+    if(rid){await DB.collection('eventReports').doc(rid).set(rep,{merge:true})}else{rid=(await DB.collection('eventReports').add(rep)).id}
+    await DB.collection('competitionStaff').doc(postId).update({reportId:rid,report:{summary:sum,note:rep.note,at:new Date().toISOString()}});
+    let gmsg='';
+    if(document.getElementById('rpGallery').checked){
+      const g=await CAREER.galleryDraft(DB,{title:p.competitionName||'',date:ds[0]||'',endDate:ds[ds.length-1]||'',place:p.location||'',sport:p.sport||'',summary:sum,refKind:'staff',refId:p.compId||postId,media:photos.map(u=>({type:'img',url:u,caption:''}))},(SMY&&SMY.name)||'');
+      gmsg='\n갤러리 초안이 '+(g.updated?'갱신':'생성')+'되었습니다 — 갤러리 페이지(📝 초안)에서 사진을 더 올리고 공개하세요.';
+    }
+    document.getElementById('rpModal').remove();
+    alert('✓ 종료 보고를 저장했습니다.'+gmsg);loadPosts();
+  }catch(e){btn.disabled=false;btn.textContent='💾 보고 저장';if(msg){msg.textContent='저장 실패: '+(e.code||e.message);msg.style.color='#C41E2F'}}
+}
+// 예전 [경력 일괄등록] 호출부 호환 — 임무 완료 창으로 연결
+async function registerCareer(postId,date){openMissionDone(postId,date)}
+async function _registerCareerOld(postId,date){
   const p=POSTS.find(x=>x.id===postId);if(!p)return;
   const dd=(p.dates||[]).find(x=>x.date===date)||{};
   const apps=(APPS[postId]||[]).filter(a=>(a.status||{})[date]==='확정');
@@ -1555,6 +1833,41 @@ function exportPayExcel(postId){
 }
 // ══════════════ [v4] 수당지급내역서 — 공문 서식 + 전자서명 이미지 삽입 (ExcelJS) ══════════════
 function _payNum(s){const n=parseInt(String(s||'').replace(/[^0-9]/g,''),10);return isNaN(n)?'':n}
+// ══════════ [동의서 출력] 공고의 동의서 이미지 + 지정 위치에 신청자의 수당 정보(성명·주민번호·연락처·계좌)와 전자서명을 기입해 인쇄 ══════════
+//  onlyUid 가 있으면 본인 것 한 장, 없으면 확정된 신청자 전원(수당 정보 입력자) — 한 사람당 동의서 장수만큼 페이지
+function payConsentReady(p){
+  return !!(p&&p.consentImgs&&p.consentImgs.length&&p.consentOverlays&&Object.keys(p.consentOverlays).some(k=>(p.consentOverlays[k]||[]).length));
+}
+function pcFmtDate(iso){try{const d=new Date(iso);if(isNaN(d))return String(iso||'').slice(0,10);return d.getFullYear()+'. '+String(d.getMonth()+1).padStart(2,'0')+'. '+String(d.getDate()).padStart(2,'0')+'.'}catch(e){return ''}}
+async function printPayConsent(postId,onlyUid){
+  const p=POSTS.find(x=>x.id===postId);if(!p||!payConsentReady(p))return;
+  let apps=(APPS[p.id]||[]).filter(a=>a.payInfo);
+  if(onlyUid)apps=apps.filter(a=>a.uid===onlyUid);
+  else apps=apps.filter(a=>Object.values(a.status||{}).indexOf('확정')>=0);
+  if(!apps.length){alert(onlyUid?'수당 지급 정보(④)를 입력한 신청이 없습니다.':'수당 정보를 입력한 확정 신청자가 없습니다.');return}
+  // 연락처·주소·예금주 보완용 회원 정보
+  const um={};
+  await Promise.all([...new Set(apps.map(a=>a.uid))].map(async uid=>{try{const d=await DB.collection('users').doc(uid).get();if(d.exists)um[uid]=d.data()}catch(e){}}));
+  const pages=[];
+  apps.forEach(a=>{
+    const pi=a.payInfo||{},u=um[a.uid]||{};
+    const sign=pi.signature||(a.agree&&a.agree.signature)||'';
+    const vals={name:a.name||u.name||'',rrn:pi.rrn||'',phone:a.phone||u.phone||'',addr:u.address||'',bank:pi.bank||u.bank||'',acct:pi.account||u.accountNum||'',holder:u.accountHolder||a.name||'',date:pcFmtDate(pi.at||new Date().toISOString()),sign:''};
+    (p.consentImgs||[]).forEach((img,i)=>{
+      const spans=((p.consentOverlays||{})[String(i)]||[]).map(f=>{
+        const inner=f.f==='sign'?(sign?'<img src="'+esc(sign)+'" style="height:'+(f.fs||30)+'px;display:block">':'(서명)'):esc(vals[f.f]||'');
+        return '<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:'+(f.fs||14)+'px;font-weight:700;color:#111;white-space:nowrap;line-height:1.3">'+inner+'</span>';
+      }).join('');
+      pages.push('<div style="page-break-after:always;font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:20px 10px">'
+        +'<div style="font-size:11px;color:#666;margin-bottom:6px">'+esc(p.competitionName||'')+' · '+esc(a.name||'')+' · '+(i+1)+'/'+(p.consentImgs.length)+'</div>'
+        +'<div style="position:relative"><img src="'+esc(img)+'" style="width:100%;display:block;border:1px solid #999">'+spans+'</div></div>');
+    });
+  });
+  const w=window.open('','_blank');
+  if(!w){alert('팝업이 차단되어 인쇄 창을 열 수 없습니다. 주소창의 팝업 차단을 해제해주세요.');return}
+  w.document.write('<html><head><title>'+esc(p.competitionName||'')+' 수당 지급 동의서</title></head><body style="margin:0">'+pages.join('')+'<script>setTimeout(function(){window.print()},800)<\/script></body></html>');
+  w.document.close();
+}
 async function exportPayReport(postId){
   if(typeof ExcelJS==='undefined'){alert('서식 엑셀 라이브러리 로딩 중입니다. 잠시 후 다시 눌러주세요.');return}
   const p=POSTS.find(x=>x.id===postId);if(!p)return;
@@ -2195,6 +2508,6 @@ async function copyRoster(id){
     <div style="font-size:12.5px">ⓒ Korea Flying Disc Federation. All rights reserved.</div>
   </div>
 </div></footer>
-<script src="auth_ui.js?v=20260904"></script>
+<script src="auth_ui.js?v=20260905"></script>
 </body>
 </html>

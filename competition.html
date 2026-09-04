@@ -234,6 +234,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260821"></script>
+<script src="career.js?v=20260905"></script>
 <script src="site_config.js"></script>
 <script>
 KFDF.initApp();
@@ -416,14 +417,15 @@ async function loadStaffEmbed(){
     const active=[],past=[];
     posts.forEach(p=>{
       const last=(p.dates||[]).map(d=>d.date||'').sort().pop()||p.endDate||p.startDate||'';
-      (last>=today?active:past).push(p);
+      // [마감 표시 수정] 관리자가 수동 마감(manualClosed)한 공고는 날짜가 남아 있어도 지난 공고로
+      ((last>=today&&!p.manualClosed)?active:past).push(p);
     });
     const card=p=>{
       const ds=(p.dates||[]).map(d=>d.date).filter(Boolean).sort();
       const first=ds[0]||p.startDate||'';
       const last2=ds[ds.length-1]||p.endDate||first;
       const dateTxt=first===last2?cDateFmt(first):cDateFmt(first)+' ~ '+cDateFmt(last2.slice(5));
-      const isDead=p.deadline&&p.deadline<today;
+      const isDead=!!p.manualClosed||(p.deadline&&p.deadline<today);   // [마감 표시 수정] 수동 마감도 '마감'으로
       const applied=myIds.has(p.id);
       const comp=(p.compId&&compMap[p.compId])||null;  // [연동공고 보강]
       // [모집유형 라벨] 대회 참가자 모집과 혼동되지 않도록 제목 앞에 항상 표시 — 등록 시 관리자가 선택(기본: 심판·운영요원)
@@ -684,6 +686,90 @@ async function clearClaimReview(slotId,key){
     viewRoster(slotId);
   }catch(e){ alert('처리 실패: '+e.message); }
 }
+// ══════════ [대회 종료] 참가자·팀의 참가 이력과 입상을 경력(staffCareer)에 기록 + 약식 종료 보고(eventReports) + 갤러리 초안 ══════════
+//  · 개인 참가자: 본인 uid 로 '선수' 기록 (미성년 자녀는 보호자 uid + kidName)
+//  · 단체(팀): 인솔자 uid 로 '인솔자' 기록 (팀원은 회원 계정이 없어 이름만 보고서에 집계). 팀 입상은 인솔자 기록의 result 에 팀명과 함께 저장
+//  · 입상은 별도 '입상' 기록으로 추가 — 배지·경력증명서의 입상 표에 사용
+let CF={};
+async function openCompFinish(id){
+  const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
+  const s=doc.data();const list=compClaimList(s).filter(c=>c.status!=='반려');
+  if(!list.length){alert('참가 신청자가 없습니다.');return}
+  const prev=s.results||{};
+  CF={id:id,rows:list.map(c=>{const key=c.pid||c.uid;const pv=prev[key]||{};return {key:key,uid:c.uid,name:c.name||'',team:!!c.team,teamType:c.teamType||'',members:(c.roster||[]).length,kid:!!c.kid,div:(c.prefs||[])[0]||'',on:pv.on!==false,award:pv.award||''}})};
+  const old=document.getElementById('cfModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='cfModal';div.className='cmodal-bg';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.65);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
+  const inp='style="padding:8px 10px;border:1.5px solid #d5dce8;border-radius:9px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box"';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:720px;width:100%;padding:22px 24px;margin:10px 0">'
+    +'<b style="font-size:16px;display:inline-flex;align-items:center;gap:7px">'+CAREER.svg('flag',{size:20,color:'#7c3aed',stroke:2.2})+'대회 종료 · 결과 입력</b><div style="font-size:12.5px;color:#6b7280;margin-top:3px">'+cesc(s.title||'')+' · '+cesc(s.date||'')+' · '+cesc(s.place||s.region||'')+'</div>'
+    +'<div style="background:#f6f8fb;border-radius:10px;padding:9px 12px;margin-top:10px;font-size:12.5px;line-height:1.7">참가한 사람은 체크, 입상자는 순위를 고르세요. [종료 처리]를 누르면 <b>참가·입상 이력</b>이 각자의 경력에 기록되고 알림이 가며, 아래 <b>약식 종료 보고</b>가 저장되고 <b>갤러리 초안</b>이 만들어집니다.</div>'
+    +'<div style="font-size:13px;font-weight:900;margin:12px 0 4px">① 참가·입상 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— '+list.length+'건</span></div>'
+    +'<div id="cfRows" style="max-height:340px;overflow:auto;border:1.5px solid #e2e7f0;border-radius:10px"></div>'
+    +'<div style="font-size:13px;font-weight:900;margin:14px 0 4px">② 약식 종료 보고</div>'
+    +'<label style="font-size:12px;font-weight:800;color:#555;display:block;margin-top:6px">결과·운영 요약 *</label><textarea id="cfSum" rows="4" '+inp+' placeholder="비우면 참가 인원·입상 결과로 자동 작성됩니다">'+cesc((s.report&&s.report.summary)||'')+'</textarea>'
+    +'<label style="font-size:12px;font-weight:800;color:#555;display:block;margin-top:6px">특이사항·건의</label><textarea id="cfNote" rows="2" '+inp+'>'+cesc((s.report&&s.report.note)||'')+'</textarea>'
+    +'<label style="font-size:12px;font-weight:800;color:#555;display:block;margin-top:6px">현장 사진 (선택 — 갤러리 초안에 들어갑니다)</label><input type="file" id="cfPhotos" accept="image/*" multiple style="font-size:13px">'
+    +'<label style="display:flex;gap:7px;align-items:center;font-weight:800;font-size:13px;margin-top:10px"><input type="checkbox" id="cfGallery" checked style="width:auto"> 갤러리 초안 자동 생성 (비공개 초안 — 갤러리 페이지에서 사진을 더 올리고 공개)</label>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap"><button class="cbtn cbtn-ghost" onclick="document.getElementById(\'cfModal\').remove()">닫기</button><button class="cbtn cbtn-main" id="cfSaveBtn" onclick="cfSave()" style="display:inline-flex;align-items:center;gap:6px">'+CAREER.svg('check',{size:15,color:'#fff',stroke:2.4})+'종료 처리 → 이력 기록 · 보고 저장</button></div>'
+    +'<div id="cfMsg" style="font-size:12.5px;font-weight:800;margin-top:6px"></div></div>';
+  document.body.appendChild(div);cfRender();
+}
+const CF_AWARDS=['','1위','2위','3위','우승','준우승','MVP','우수상','장려상'];
+function cfRender(){
+  const el=document.getElementById('cfRows');if(!el)return;
+  el.innerHTML=CF.rows.map((r,i)=>'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border-bottom:1px solid #eef1f5;opacity:'+(r.on?'1':'.5')+'">'
+    +'<label style="display:flex;gap:6px;align-items:center;font-weight:900;cursor:pointer;min-width:150px"><input type="checkbox" style="width:auto" '+(r.on?'checked':'')+' onchange="CF.rows['+i+'].on=this.checked;cfRender()">'+(r.team?CAREER.svg('users',{size:14,color:'#153A77',stroke:2.2})+' ':(r.kid?CAREER.svg('child',{size:14,color:'#0f766e',stroke:2.2})+' ':''))+cesc(r.name)+(r.team&&r.members?' <span style="font-size:11px;color:#8a919d">'+r.members+'명</span>':'')+'</label>'
+    +'<span style="font-size:11.5px;color:#374151;flex:1">'+cesc(r.div||'-')+'</span>'
+    +'<select onchange="CF.rows['+i+'].award=this.value" style="padding:5px 8px;border:1.5px solid '+(r.award?'#d97706':'#dfe5ee')+';border-radius:8px;font-family:inherit;font-size:12.5px;background:'+(r.award?'#fffbeb':'#fff')+'">'+CF_AWARDS.map(a=>'<option value="'+a+'"'+(a===r.award?' selected':'')+'>'+(a||'입상 없음')+'</option>').join('')+'</select>'
+    +'</div>').join('');
+}
+async function cfSave(){
+  const doc=CSLOTS.find(d=>d.id===CF.id);if(!doc)return;const s=doc.data();
+  const rows=CF.rows.filter(r=>r.on);
+  const awards=rows.filter(r=>r.award);
+  if(!confirm('참가 '+rows.length+'건(입상 '+awards.length+'건)을 이력에 기록하고 종료 처리할까요?'))return;
+  const btn=document.getElementById('cfSaveBtn');btn.disabled=true;btn.textContent='기록 중…';
+  const msg=document.getElementById('cfMsg');const say=(t,bad)=>{if(msg){msg.textContent=t;msg.style.color=bad?'#C41E2F':'#0f766e'}};
+  const sportOf=d=>String(d||'').split(' ')[0]||(s.title||'');
+  let ok=0,fail=0;
+  for(const r of rows){
+    if(!r.uid)continue;
+    const base={uid:r.uid,name:r.name,date:s.date||'',competitionName:s.title||'',sport:sportOf(r.div),location:(s.place||'')+(s.region?' ('+s.region+')':''),organizer:s.host||s.organizer||'',division:r.div,slotId:CF.id,source:'comp-complete',kidName:r.kid?r.name:''};
+    try{
+      await CAREER.write(DB,Object.assign({},base,{role:r.team?'인솔자':'선수',team:r.team?r.name:''}),(CMY&&CMY.name)||'');
+      if(r.award)await CAREER.write(DB,Object.assign({},base,{role:'입상',result:r.award+(r.team?' ('+r.name+')':''),team:r.team?r.name:''}),(CMY&&CMY.name)||'');
+      try{await KFDF.notify(r.uid,'🏅 ['+(s.title||'')+'] '+(r.team?'팀 인솔':'참가')+(r.award?' · '+r.award+' 입상 🏆':'')+' — 경력에 기록되었습니다. 마이페이지 [경력 여정]에서 확인하세요','mypage.html#careerBox')}catch(e){}
+      ok++;
+    }catch(e){fail++;console.warn('career',e)}
+  }
+  // 결과 저장 + 종료 표시
+  const results={};CF.rows.forEach(r=>{results[r.key]={on:r.on,award:r.award||''}});
+  const teams=rows.filter(r=>r.team),inds=rows.filter(r=>!r.team);const members=teams.reduce((n,r)=>n+(r.members||0),0);
+  const autoSum='참가 '+(teams.length?teams.length+'팀('+members+'명)':'')+(teams.length&&inds.length?' · ':'')+(inds.length?'개인 '+inds.length+'명':'')
+    +(awards.length?'\n입상: '+awards.map(r=>r.award+' '+r.name+(r.div?' ('+r.div+')':'')).join(', '):'');
+  const sum=(document.getElementById('cfSum').value||'').trim()||autoSum;
+  const note=(document.getElementById('cfNote').value||'').trim();
+  try{
+    say('보고 저장 중…');
+    const photos=[];const files=[...(document.getElementById('cfPhotos').files||[])];
+    for(const f of files){try{const blob=await (typeof cCompress==='function'?cCompress(f):Promise.resolve(f));const ref=firebase.storage().ref('compdocs/'+CME.uid+'/report_'+Date.now()+'_'+photos.length+'.jpg');await ref.put(blob,{contentType:blob.type||'image/jpeg'});photos.push(await ref.getDownloadURL())}catch(e){}}
+    const rep={kind:'comp',refId:CF.id,compId:s.compId||'',title:s.title||'',date:s.date||'',endDate:s.date||'',place:s.place||'',region:s.region||'',sport:(s.entry&&s.entry.indiv||[]).concat(s.entry&&s.entry.team||[]).map(x=>x.name).join(' · '),
+      stats:{teams:teams.length,members:members,individuals:inds.length,awards:awards.length},awards:awards.map(r=>({name:r.name,team:r.team,award:r.award,division:r.div})),
+      summary:sum,note:note,photos:photos,by:(CMY&&CMY.name)||'',byUid:CME.uid,at:firebase.firestore.FieldValue.serverTimestamp()};
+    let rid=s.reportId;
+    if(rid){await DB.collection('eventReports').doc(rid).set(rep,{merge:true})}else{rid=(await DB.collection('eventReports').add(rep)).id}
+    await DB.collection('compSlots').doc(CF.id).update({results:results,finished:{at:new Date().toISOString(),by:(CMY&&CMY.name)||'',count:ok},reportId:rid,report:{summary:sum,note:note,at:new Date().toISOString()}});
+    let gmsg='';
+    if(document.getElementById('cfGallery').checked){
+      const g=await CAREER.galleryDraft(DB,{title:s.title||'',date:s.date||'',endDate:s.date||'',place:s.place||'',sport:rep.sport,summary:sum,refKind:'comp',refId:s.compId||CF.id,media:photos.map(u=>({type:'img',url:u,caption:''}))},(CMY&&CMY.name)||'');
+      gmsg='\n갤러리 초안이 '+(g.updated?'갱신':'생성')+'되었습니다 — 갤러리 페이지(📝 초안)에서 사진을 더 올리고 공개하세요.';
+    }
+    document.getElementById('cfModal').remove();
+    alert('✅ 종료 처리 완료 — 이력 기록 '+ok+'명'+(fail?' / 실패 '+fail:'')+'\n종료 보고를 저장했습니다.'+gmsg);
+    loadSlots();
+  }catch(e){btn.disabled=false;btn.textContent='✅ 종료 처리 → 이력 기록 · 보고 저장';say('저장 실패: '+(e.code||e.message)+(ok?' (이력 '+ok+'명은 기록됨)':''),true)}
+}
 async function viewRoster(id){
   const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
   const s=doc.data();
@@ -806,6 +892,7 @@ async function viewRoster(id){
     +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">'
     +(staff&&entry?'<button class="cbtn" style="background:#153A77;color:#fff" onclick="exportRosterCsv(\''+id+'\')" title="주최기관 제출용 — 명단 제공에 동의한 참가자만 연락처·주소가 채워집니다">📥 참가자 명단 엑셀</button>':'')
     +(staff&&entry?'<button class="cbtn" style="background:#0f766e;color:#fff" onclick="document.getElementById(\'rosterModal\').remove();openTeamBuilder(\''+id+'\')">🧩 팀 구성 (개인 참가자)</button>':'')
+    +(staff&&entry?'<button class="cbtn" style="background:'+(s.finished?'#0f766e':'#7c3aed')+';color:#fff" onclick="document.getElementById(\'rosterModal\').remove();openCompFinish(\''+id+'\')" title="참가·입상 이력 기록 + 약식 종료 보고 + 갤러리 초안"><span style="display:inline-flex;align-items:center;gap:5px">'+CAREER.svg('flag',{size:14,color:'#fff',stroke:2.2})+(s.finished?'종료 처리됨 (결과 수정)':'대회 종료 · 결과 입력')+'</span></button>':'')
     +'<button class="cbtn cbtn-ghost" onclick="document.getElementById(\'rosterModal\').remove()">닫기</button></div></div>';
   document.body.appendChild(div);
 }
@@ -3557,6 +3644,6 @@ function tbRemoveMember(ti,mi){
     © 2026 KOREA FLYING DISC FEDERATION. All rights reserved. &nbsp;|&nbsp; <a href="privacy.html" style="color:#9aa1ad">개인정보처리방침</a>
   </div>
 </div></footer>
-<script src="auth_ui.js?v=20260904"></script>
+<script src="auth_ui.js?v=20260905"></script>
 </body>
 </html>
