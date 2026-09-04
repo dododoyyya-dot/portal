@@ -1995,7 +1995,7 @@ AUTH.onAuthStateChanged(async u=>{
         +'<span style="min-width:80px">날짜</span><span style="flex:1;min-width:120px">대회명</span><span>임무</span><span>지역</span><span>종목</span></div>'
         +rows;
     }
-  }catch(e){}
+  }catch(e){MYCAREER=[];CAREER_ERR=e;renderCareer()}   // [경력 여정] 조회가 거부되어도(규칙 미게시 등) 상자는 띄우고 이유를 표시
   // 계좌·주민번호 입력은 누구나 상시 가능(배정 여부 무관 — 2026-07-31 사용자 요청으로 재상시화). 전자동의는 배정(위촉)된 경우에만 노출.
   (function(){
     const assigned=(MYASG.length>0)||(MYCOMP.length>0);
@@ -2304,10 +2304,12 @@ async function hdMoonUpload(inp){
 }
 // ══════════ [경력 여정] 통계 · 등급 · 배지 · 다음 도전 · 타임라인 · 경력증명서 ══════════
 let MYCAREER=[];
+let CAREER_ERR=null;
 function renderCareer(){
   const box=document.getElementById('careerBox');if(!box||!window.CAREER)return;
   const recs=MYCAREER||[];
   box.style.display='block';
+  const errNote=CAREER_ERR?'<div style="font-size:12.5px;font-weight:800;color:#C41E2F;background:#fdf1f1;border:1.5px solid #f1c7cc;border-radius:10px;padding:8px 12px;margin-bottom:10px">경력 기록을 불러오지 못했습니다 ('+esc(CAREER_ERR.code||CAREER_ERR.message||'')+') — 보안규칙 v18(staffCareer)이 게시되면 표시됩니다.</div>':'';
   const st=CAREER.stats(recs);const tier=st.tier;const bd=CAREER.badges(st);
   const G=CAREER.GROUP_ICON,C=CAREER.GROUP_COLOR,I=(n,o)=>CAREER.svg(n,o||{});
   const ti=document.getElementById('careerTitleIcon');if(ti)ti.innerHTML=I('gamepad',{size:22,color:'#153A77',stroke:2});
@@ -2315,7 +2317,7 @@ function renderCareer(){
   const pb=document.getElementById('careerPrintBtn');if(pb&&!pb.dataset.ok){pb.dataset.ok='1';pb.insertAdjacentHTML('afterbegin',I('printer',{size:15,color:'#fff',stroke:2.2}))}
   const nextPct=tier.next?Math.round((st.points-tier.min)/(tier.next.min-tier.min)*100):100;
   const grp=['위원','심판','운영','봉사','지도','선수','입상'].filter(g=>st.byGroup[g]);
-  document.getElementById('careerHero').innerHTML=
+  document.getElementById('careerHero').innerHTML=errNote+
     '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">'
     +'<div>'+CAREER.emblem(tier,72)+'</div>'
     +'<div style="flex:1;min-width:200px"><div style="font-size:12px;opacity:.8;letter-spacing:.5px">CAREER TIER</div>'
