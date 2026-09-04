@@ -728,7 +728,7 @@ function pfOvlOpen(i){
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:760px;width:100%;padding:16px 18px">'
     +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:16px">🎯 서명·기입 위치 지정 — '+(i+1)+'번 장</b><span style="flex:1"></span>'
     +'<button type="button" onclick="pfOvlDone()" style="border:none;background:#153A77;color:#fff;border-radius:9px;padding:9px 20px;font-weight:900;cursor:pointer;font-family:inherit">✓ 완료</button></div>'
-    +'<div style="background:#eef3fa;border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.7;margin:8px 0 10px"><b>① 항목을 고르고 ② 종이 위 자리를 톡 누르면</b> 표가 놓입니다. 표를 <b>끌어서</b> 옮기고, 표를 누른 뒤 <b>글자 ±</b>·<b>삭제</b>. 참가자 신청서를 출력하면 그 자리에 정보와 전자서명이 찍힙니다.</div>'
+    +'<div style="background:#eef3fa;border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.7;margin:8px 0 10px"><b>① 항목을 고르고 ② 종이 위 자리를 톡 누르면</b> 표가 놓입니다. <b style="color:#C41E2F">기준점은 표의 왼쪽 위 빨간 점</b> — 그 지점부터 오른쪽·아래로 글자가 써지므로 칸의 왼쪽 위 안쪽에 맞추세요. 표를 <b>끌어서</b> 옮기고, 표를 누른 뒤 <b>글자 ±</b>·<b>삭제</b>. 참가자 신청서를 출력하면 그 자리에 정보와 전자서명이 찍힙니다.</div>'
     +'<div id="ovlPicks" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+Object.keys(PF_OVL_FIELDS).map(k=>chip(k,k===OVL_PICK)).join('')+'</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">'
     +'<button type="button" onclick="pfOvlAuto()" style="border:none;background:#0f766e;color:#fff;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;font-family:inherit">⚡ 기본 배치 (날짜·성명·주민번호·서명)</button>'
@@ -797,6 +797,8 @@ function pfOvlChips(){
       c.textContent=(f.f==='sign'?'✍ 서명':(f.f==='check'?'✓ 체크':(f.f==='num'?'# '+(f.v||''):(PF_OVL_FIELDS[f.f]||f.f))));
     }
     if(f.f==='num'){c.title='두 번 눌러 숫자 수정';c.addEventListener('dblclick',function(ev){ev.stopPropagation();const v=prompt('기입할 숫자·글자',f.v||'');if(v!==null&&v.trim()){f.v=v.trim();pfOvlChips()}})}
+    // [기준점] 왼쪽 위 모서리가 글자가 시작되는 지점 — 빨간 점으로 표시
+    const dot=document.createElement('i');dot.style.cssText='position:absolute;left:-5px;top:-5px;width:9px;height:9px;border-radius:50%;background:#C41E2F;border:1.5px solid #fff;box-shadow:0 0 0 1px #C41E2F;pointer-events:none';c.appendChild(dot);
     box.appendChild(c);
   });
 }
