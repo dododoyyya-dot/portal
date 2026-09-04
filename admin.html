@@ -264,6 +264,8 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub ufl" data-f="after" onclick="userFilter('after',this)" style="background:#8a919d">🌱 방과후·늘봄 지원</button>
         <button class="btn-sub ufl" data-f="referee" onclick="userFilter('referee',this)" style="background:#8a919d">🏁 심판 지원</button>
         <button class="btn-sub ufl" data-f="staff" onclick="userFilter('staff',this)" style="background:#8a919d">🎪 운영 지원</button>
+        <button class="btn-sub ufl" data-f="ncdoc" onclick="userFilter('ncdoc',this)" style="background:#8a919d">📎 자격 사본 미첨부</button>
+        <button class="btn-sub" onclick="ncDocRemind()" style="background:#b8860b" title="사본 미첨부 회원 전원에게 첨부 요청 알림을 보냅니다">📣 사본 첨부 요청 알림</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
         <span style="font-size:12.5px;font-weight:800;color:#6b7280">보기 방식</span>
@@ -387,6 +389,15 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <span id="pgMsg" style="font-size:13px;font-weight:700"></span>
       </div>
       <div id="pgEditor"></div>
+      <h3 style="margin-top:34px">🧩 가입 항목 설정</h3>
+      <div style="font-size:12.5px;color:var(--gray);margin-bottom:10px">회원 유형별로 가입 화면에서 <b>주민등록번호 · 피복 사이즈 · 수당 계좌 · 학력</b>을 받을지 정합니다. <b>필수</b> = 입력해야 가입 / <b>선택</b> = 칸은 보이되 비워도 됨 / <b>안 받음</b> = 칸 자체를 숨김. 저장 즉시 가입 화면에 반영되며, 숨긴 항목은 빈 값으로 저장되어 오류가 나지 않습니다.</div>
+      <div id="sfGrid" style="overflow-x:auto;margin-bottom:8px"></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn-sub" style="background:#153A77" onclick="sfSave()">💾 저장</button>
+        <button class="btn-sub" style="background:#8a919d" onclick="sfLoad()">🔄 다시 불러오기</button>
+        <button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="sfReset()">↩ 기본값으로</button>
+        <span id="sfMsg" style="font-size:13px;font-weight:700"></span>
+      </div>
       <h3 style="margin-top:34px">📅 캘린더 편집 권한</h3>
       <div style="font-size:12.5px;color:var(--gray);margin-bottom:10px">권한을 받은 회원(시도연맹 임원 등)은 <b>일정 캘린더</b>에서 연맹 행사를 직접 등록·수정할 수 있습니다. 본인이 등록한 일정만 수정 가능하며, 사무국은 전체 관리합니다.</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
@@ -3535,6 +3546,17 @@ function setSidoView(s,btn){
   document.querySelectorAll('.svw').forEach(function(b){b.style.background=(b.dataset.s===s)?'':'#8a919d'});
   renderUsers();
 }
+// [사본 미첨부] 자격 신고 후 사본을 첨부하지 않은 회원에게 알림을 보냅니다 (마이페이지 상단 배너와 함께 첨부를 유도)
+async function ncDocRemind(){
+  const list=USERS.filter(d=>{const v=d.data();return v.natCertName&&!v.natCertDoc&&!v.natCertApproved&&v.status!=='거절'});
+  if(!list.length){alert('사본 미첨부 회원이 없습니다.');return}
+  if(!confirm('자격 사본 미첨부 회원 '+list.length+'명에게 첨부 요청 알림을 보낼까요?\n\n'+bulkNames(list.map(d=>({v:d.data()})))))return;
+  let n=0;
+  for(const d of list){
+    try{await DB.collection('notifications').add({toUid:d.id,title:'📎 국가공인 자격증 사본을 첨부해 주세요 — 첨부 전까지 회원 승인이 보류됩니다',link:'mypage.html',read:false,createdAt:firebase.firestore.FieldValue.serverTimestamp()});n++}catch(e){}
+  }
+  alert('✓ '+n+'명에게 알림을 보냈습니다.');
+}
 function userFilter(f,btn){UFL=f;document.querySelectorAll('.ufl').forEach(b=>{b.style.background=b.dataset.f===f?'':'#8a919d'});renderUsers();}
 let VIEWMODE='table';
 function setView(m,btn){VIEWMODE=m;document.querySelectorAll('.vwl').forEach(b=>b.style.background=b.dataset.v===m?'':'#8a919d');renderUsers();}
@@ -3668,6 +3690,7 @@ function showMemberModal(uid){
 function uMatch(v){
   if(UFL==='pending'){if(v.status==='approved')return false}
   else if(UFL==='any'){const f=v.instructorFor||{};if(v.status!=='approved')return false;if(!(f.school||f.after||f.referee||f.staff))return false}
+  else if(UFL==='ncdoc'){if(!(v.natCertName&&!v.natCertDoc&&!v.natCertApproved))return false}   // [사본 미첨부] 자격 신고만 하고 사본이 없는 회원
   else if(UFL!=='전체'){if(!(v.instructorFor&&v.instructorFor[UFL]))return false}
   // [관할] 시도연맹 임원은 '관할 회원' 과 '관할 미판정' 을 나눠 봅니다 (중앙 관리자는 해당 없음)
   if(typeof IS_SIDO!=='undefined'&&IS_SIDO){
@@ -5226,6 +5249,45 @@ function renderPgEditor(){
 function pgAdd(){PG_SECS.push({h:'',body:''});renderPgEditor()}
 function pgDel(i){if(!confirm('이 섹션을 삭제할까요?'))return;PG_SECS.splice(i,1);renderPgEditor()}
 function pgMove(i,d){const t=PG_SECS[i];PG_SECS[i]=PG_SECS[i+d];PG_SECS[i+d]=t;renderPgEditor()}
+// ══════════ [항목설정] 가입 화면 입력 항목 — 유형 × 항목 (siteContent/signupFields) ══════════
+//  login.html 이 페이지를 열 때 이 문서를 읽어 기본값(MTYPE_CFG)을 덮어씁니다. 값: req(필수) / opt(선택) / off(안 받음)
+const SF_TYPES=[['instructor','KFDF공인 심판·지도자'],['teacher','교사(교원)'],['natcert','국가공인자격증 취득회원'],['athlete','선수회원'],['general','일반회원'],['student','학생회원']];
+const SF_FIELDS=[['rrn','주민등록번호'],['size','피복 사이즈'],['bank','수당 계좌'],['degree','학력']];
+// 기본값 = login.html 의 MTYPE_CFG 와 동일하게 유지
+const SF_DEFAULT={
+  instructor:{rrn:'req',size:'req',bank:'req',degree:'req'},
+  teacher:{rrn:'req',size:'req',bank:'req',degree:'req'},
+  natcert:{rrn:'req',size:'req',bank:'req',degree:'req'},
+  athlete:{rrn:'off',size:'off',bank:'off',degree:'off'},
+  general:{rrn:'off',size:'off',bank:'off',degree:'off'},
+  student:{rrn:'off',size:'off',bank:'off',degree:'off'}};
+let SF_CUR=null;
+function sfRender(){
+  const el=document.getElementById('sfGrid');if(!el)return;
+  const cur=SF_CUR||{};
+  const sel=(t,k)=>{const v=((cur[t]||{})[k])||SF_DEFAULT[t][k];
+    return '<select data-t="'+t+'" data-k="'+k+'" style="padding:6px 8px;border:1.5px solid #dfe5ee;border-radius:8px;font-family:inherit;font-size:12.5px">'
+      +[['req','필수'],['opt','선택'],['off','안 받음']].map(o=>'<option value="'+o[0]+'"'+(o[0]===v?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>'};
+  el.innerHTML='<table class="rtbl" style="width:100%;font-size:12.5px;min-width:520px"><thead><tr><th>회원 유형</th>'+SF_FIELDS.map(f=>'<th>'+f[1]+'</th>').join('')+'</tr></thead><tbody>'
+    +SF_TYPES.map(t=>'<tr><td><b>'+t[1]+'</b></td>'+SF_FIELDS.map(f=>'<td>'+sel(t[0],f[0])+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
+}
+async function sfLoad(){
+  const m=document.getElementById('sfMsg');
+  try{const d=await DB.collection('siteContent').doc('signupFields').get();SF_CUR=(d.exists&&d.data().types)||{};sfRender();if(m){m.textContent=d.exists?'현재 저장된 설정을 불러왔습니다':'저장된 설정이 없어 기본값을 표시합니다';m.style.color='#0f766e'}}
+  catch(e){if(m){m.textContent='불러오기 실패: '+e.message;m.style.color='#C41E2F'}}
+}
+async function sfSave(){
+  const m=document.getElementById('sfMsg');
+  const types={};
+  document.querySelectorAll('#sfGrid select[data-t]').forEach(s=>{(types[s.dataset.t]=types[s.dataset.t]||{})[s.dataset.k]=s.value});
+  try{await DB.collection('siteContent').doc('signupFields').set({types:types,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:(firebase.auth().currentUser||{}).email||''});SF_CUR=types;if(m){m.textContent='✓ 저장했습니다 — 가입 화면에 즉시 반영됩니다';m.style.color='#0f766e'}}
+  catch(e){if(m){m.textContent='저장 실패: '+e.message;m.style.color='#C41E2F'}}
+}
+async function sfReset(){
+  if(!confirm('가입 항목 설정을 기본값으로 되돌릴까요? (선수·학생·일반: 주민번호·피복·계좌·학력 안 받음 / 지도자·교사·자격증: 필수)'))return;
+  try{await DB.collection('siteContent').doc('signupFields').delete();SF_CUR={};sfRender();const m=document.getElementById('sfMsg');if(m){m.textContent='기본값으로 되돌렸습니다';m.style.color='#0f766e'}}catch(e){alert('실패: '+e.message)}
+}
+document.addEventListener('DOMContentLoaded',function(){if(document.getElementById('sfGrid'))setTimeout(sfLoad,1500)});
 async function pgSave(){
   const page=document.getElementById('pgSel').value;
   const m=document.getElementById('pgMsg');

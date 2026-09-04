@@ -451,11 +451,34 @@ const MTYPE_CFG={
   teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sSchoolBlock','sEmployBlock','sQualBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
   // [유형분리] 국가공인자격증 — 연맹 DB에 없는 자격이라 사본을 첨부해 신청 (그 외 항목은 기존 교사 탭과 동일)
   natcert:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
-  athlete:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sAffBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:false,size:false,degree:false,rrn:true}}, // [5부문] 선수군 — 자격증란 없음·주민번호 필수
+  athlete:   {show:['sAddrBlock','sAreaBlock','sAffBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:false,size:false,degree:false,rrn:false}}, // [5부문] 선수군 — 자격증란 없음. [항목설정] 주민번호·피복·계좌는 받지 않음(관리자 페이지에서 켤 수 있음)
   general:   {show:['sAddrBlock','sAreaBlock','sPledgeBox','sPrivacyBox'],req:{addr:false,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}, // [5부문] 일반 — 소속·자격증 블록 제거(간소화)
-  student:   {show:['sSchoolBlock','sAddrBlock','sAreaBlock','sStudentAffBlock','sSizeBlock','sBankBlock','sPrivacyBox'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}
+  student:   {show:['sSchoolBlock','sAddrBlock','sAreaBlock','sStudentAffBlock','sPrivacyBox'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}} // [항목설정] 학생은 피복·계좌를 받지 않음(관리자 페이지에서 켤 수 있음)
 };
+// [항목설정] 관리자 페이지 [가입 항목 설정] 저장값(siteContent/signupFields)으로 위 기본값을 덮어씁니다.
+//   항목: rrn(주민등록번호) · size(피복 사이즈) · bank(수당 계좌) · degree(학력)  값: 'req' 필수 / 'opt' 선택 / 'off' 받지 않음
+//   저장은 이미 보이는 칸만 읽고(숨은 칸은 빈 값), 주민번호는 입력했을 때만 별도 저장하므로 끄더라도 오류가 나지 않습니다.
+const SF_BLOCK={rrn:'sRrnBlock',size:'sSizeBlock',bank:'sBankBlock',degree:'sDegreeBlock'};
+function applySignupFields(cfgDoc){
+  const types=(cfgDoc&&cfgDoc.types)||{};
+  Object.keys(types).forEach(function(t){
+    const c=MTYPE_CFG[t];if(!c)return;
+    Object.keys(SF_BLOCK).forEach(function(k){
+      const v=types[t][k];if(!v)return;
+      const blk=SF_BLOCK[k];
+      c.show=c.show.filter(function(b){return b!==blk});
+      if(v!=='off')c.show.push(blk);
+      c.req[k]=(v==='req');
+    });
+  });
+}
 const MTYPE_ALL=['sRrnBlock','sAddrBlock','sAreaBlock','sOrgTypeBlock','sQualBlock','sNatCertBlock','sAffBlock','sSchoolBlock','sEmployBlock','sStudentAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'];
+(async function(){
+  try{
+    const d=await DB.collection('siteContent').doc('signupFields').get();
+    if(d.exists){applySignupFields(d.data());if(typeof SIGNUP_TYPE!=='undefined')setSignupType(SIGNUP_TYPE);}
+  }catch(e){}
+})();
 function setSignupType(t){
   // 생년월일 기준 유형 가드 — 미성년(만 18세 미만)은 학생회원만, 성인은 학생회원 불가
   var _bv=document.getElementById('sBirth')?document.getElementById('sBirth').value:'';
@@ -1097,7 +1120,7 @@ async function go(){
           await sref.put(blob,{contentType:'image/jpeg'});
           baseDoc.natCertDoc=await sref.getDownloadURL();
         }
-      }catch(e){console.warn('natcert upload',e)}
+      }catch(e){console.warn('natcert upload',e);window.__NC_UPLOAD_FAIL=true}
       // [유형분리] 재직증명서 업로드 (교사 유형)
       try{
         if(employFile){
@@ -1116,6 +1139,11 @@ async function go(){
           rrn:rrnRaw.slice(0,6)+'-'+rrnRaw.slice(6),name:name,
           updatedAt:firebase.firestore.FieldValue.serverTimestamp()
         },{merge:true}).catch(e=>{console.warn('rrn save failed',e)});
+      }
+      // [사본 미첨부] 자격을 신고했는데 사본이 없으면(첨부 안 함·업로드 실패) 본인에게 알림을 남겨 마이페이지에서 첨부하게 합니다.
+      if((baseDoc.natCertName||'')&&!baseDoc.natCertDoc){
+        try{await DB.collection('notifications').add({toUid:cred.user.uid,title:'📎 국가공인 자격증 사본을 첨부해 주세요 — 첨부 전까지 회원 승인이 보류됩니다',link:'mypage.html',read:false,createdAt:firebase.firestore.FieldValue.serverTimestamp()})}catch(e){}
+        if(window.__NC_UPLOAD_FAIL)alert('자격증 사본 업로드에 실패했습니다.\n가입은 완료되었으니, 마이페이지 → 내 정보에서 사본을 다시 첨부해 주세요. (첨부 전까지 승인 보류)');
       }
       if(SIGNUP_TYPE==='student'){
         say('가입 신청 완료! 사무국 승인 후 이용할 수 있습니다. 아래에서 보호자와 연동해주세요.',true);

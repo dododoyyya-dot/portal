@@ -552,7 +552,7 @@ async function exportRosterCsv(id){
       (c.roster||[]).forEach(r=>{
         rows.push({grp:'👥 '+(c.name||''),name:r.name||'',birth:r.birth||'',gender:r.gender||'',st:stLbl(ageState(r)),
           org:r.school||c.teamOrg||'',phone:r.phone||'',addr:r.address||'',gphone:'',
-          part:(c.prefs||[]).join('·'),consent:ok?'O':'X',nonMember:r.nonMember?'비회원':'',leader:(c.leader||'')+(c.leaderPhone?' '+c.leaderPhone:'')});
+          part:(c.prefs||[]).map(p=>p+(divDateLbl(s,p)?' ('+divDateLbl(s,p)+')':'')).join('·'),consent:ok?'O':'X',nonMember:r.nonMember?'비회원':'',leader:(c.leader||'')+(c.leaderPhone?' '+c.leaderPhone:'')});
       });
     }else{
       const ok=!!c.pconsent;
@@ -566,7 +566,7 @@ async function exportRosterCsv(id){
       }
       rows.push({grp:'개인',name:c.name||'',birth:c.birth||'',gender:c.gender||'',st:stLbl(ageState(c)),
         org:c.school||c.club||'',phone:phone,addr:addr,gphone:c.kid?(c.guardianPhone||''):'',
-        part:(c.prefs||[]).join('·'),consent:ok?'O':'X',nonMember:'',leader:''});
+        part:(c.prefs||[]).map(p=>p+(divDateLbl(s,p)?' ('+divDateLbl(s,p)+')':'')).join('·'),consent:ok?'O':'X',nonMember:'',leader:''});
     }
   }
   if(!rows.length){alert('내보낼 참가자가 없습니다.');return}
@@ -762,7 +762,7 @@ async function viewRoster(id){
       }
       return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b>'+tbadge(c)+consentBadge(c,ckey(c))+'</td>'
       +(entry?'<td '+td+'>'+cesc(c.birth||'-')+'</td><td '+td+'>'+cesc(c.gender||'-')+'</td><td '+td+'>'+cesc(c.school||c.club||'-')+'</td>':'')
-      +'<td '+td+'>'+cesc(entry?((c.prefs||[]).join(' · ')||'-'):((c.prefs||[]).map((p,j)=>(j+1)+'지망 '+p).join(' · ')||'-'))+'</td>'
+      +'<td '+td+'>'+cesc(entry?((c.prefs||[]).map(p=>p+(divDateLbl(s,p)?' ('+divDateLbl(s,p)+')':'')).join(' · ')||'-'):((c.prefs||[]).map((p,j)=>(j+1)+'지망 '+p).join(' · ')||'-'))+'</td>'
       +'<td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
       +'<td '+td+' style="text-align:center">'+stCell(c)+'</td>'
       +(entry?_payCell(id,c,td):'')+revCell(c)+'</tr>';
@@ -1308,7 +1308,7 @@ async function openTeamApply(id){
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
     +'<select id="taType" '+inp+' onchange="taTypeUI()">'+tts.map(t=>'<option>'+t+'</option>').join('')+'</select>'
     +'<input id="taName" '+inp+' placeholder="팀명 (예: 신남FC)" style="flex:1;min-width:150px">'
-    +'<select id="taDiv" '+inp+'>'+(s.teamDivs||[]).map(x=>'<option>'+cesc(x)+'</option>').join('')+'</select>'
+    +'<select id="taDiv" '+inp+'>'+(s.teamDivs||[]).map(x=>'<option value="'+cesc(x)+'">'+cesc(x)+(divDateLbl(s,x)?' (📅 '+cesc(divDateLbl(s,x))+')':'')+'</option>').join('')+'</select>'
     +((s.teamGenders&&s.teamGenders.length)?'<select id="taGender" '+inp+' title="클럽(팀) 구분">'+s.teamGenders.map(x=>'<option>'+cesc(x)+'</option>').join('')+'</select>':'')+'</div>'
     +'<div id="taOrgRow" style="margin-top:8px"></div>'
     +'<div style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;font-weight:700">인솔자: '+cesc(CMY.name||'')+' <select id="taRole" '+inp+'><option>지도교사</option><option>클럽장</option><option>학부모</option><option>성인 인솔자</option></select><span style="font-size:11.5px;color:#8a919d">'+cesc(CMY.phone||'')+'</span></div>'
@@ -1711,11 +1711,12 @@ function cc2AddFee(label,amount){
 function cc2EntryInit(c){
   const e=(c&&c.entry)||{};
   CC2_ENTRY={
-    indiv:(e.indiv&&e.indiv.length?e.indiv:[{name:'디스크골프',divs:['남자부','여자부']}]).map(x=>({name:x.name||'',divs:(x.divs||[]).slice()})),
+    // [날짜별 부문] divDates: {부문명: [날짜...]} — 비어 있으면 대회 전 일정에 열리는 부문
+    indiv:(e.indiv&&e.indiv.length?e.indiv:[{name:'디스크골프',divs:['남자부','여자부']}]).map(x=>({name:x.name||'',divs:(x.divs||[]).slice(),divDates:Object.assign({},x.divDates||{})})),
     team:(e.team&&e.team.length?e.team:[
       {name:'얼티미트',divs:['남자','여자','혼성']},
       {name:'디스크골프',divs:['남자','여자','혼성']},
-      {name:'원반윷놀이',divs:['남자','여자','혼성']}]).map(x=>({name:x.name||'',divs:(x.divs||[]).slice()})),
+      {name:'원반윷놀이',divs:['남자','여자','혼성']}]).map(x=>({name:x.name||'',divs:(x.divs||[]).slice(),divDates:Object.assign({},x.divDates||{})})),
     special:(e.special||[]).slice(), // [특수부문 제거] 기본값 자동 재생성 중단 — 이런 부문은 종목·부문 빌더에 직접 추가
     fees:(e.fees&&e.fees.length?e.fees:[{label:'일반',amount:''}]).map(x=>({label:x.label||'',amount:x.amount||''})),
     teamUnits:(e.teamUnits&&e.teamUnits.length?e.teamUnits:['시도연맹클럽','학교클럽','기타팀']).slice(),
@@ -1734,7 +1735,7 @@ function cc2EntryRender(){
       +'<span style="flex:1"></span>'
       +'<button type="button" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:7px;padding:4px 10px;cursor:pointer;font-weight:800;font-size:11px" onclick="CC2_ENTRY.'+kind+'.splice('+si+',1);cc2EntryRender()">× 종목 삭제</button></div>'
       +'<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:6px"><span style="font-size:11.5px;font-weight:800;color:#8a919d">부문</span>'
-      +sp.divs.map((dv,di)=>'<span style="display:inline-flex;align-items:center;gap:3px"><input value="'+cesc(dv)+'" placeholder="부문명" style="'+bi+';width:86px" oninput="CC2_ENTRY.'+kind+'['+si+'].divs['+di+']=this.value"><button type="button" onclick="CC2_ENTRY.'+kind+'['+si+'].divs.splice('+di+',1);cc2EntryRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:6px;width:20px;height:20px;cursor:pointer;font-weight:900">×</button></span>').join('')
+      +sp.divs.map((dv,di)=>'<span style="display:inline-flex;align-items:center;gap:3px;flex-wrap:wrap"><input value="'+cesc(dv)+'" placeholder="부문명" style="'+bi+';width:86px" oninput="CC2_ENTRY.'+kind+'['+si+'].divs['+di+']=this.value"><button type="button" onclick="CC2_ENTRY.'+kind+'['+si+'].divs.splice('+di+',1);cc2EntryRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:6px;width:20px;height:20px;cursor:pointer;font-weight:900">×</button>'+cc2DivDateChips(kind,si,dv)+'</span>').join('')
       +'<button type="button" style="border:none;background:#eef3fa;color:#153A77;border-radius:7px;padding:5px 11px;cursor:pointer;font-weight:800;font-size:11.5px" onclick="CC2_ENTRY.'+kind+'['+si+'].divs.push(\'\');cc2EntryRender()">+ 부문 직접</button>'
       // [버튼식] 부문 프리셋 — 누르면 그 종목에 추가, 이미 있으면 ✓ 표시
       +'<span style="flex-basis:100%"></span>'+CC2_DIV_PRESET.map(function(dv){const has=(sp.divs||[]).some(function(x){return String(x||'').trim()===dv});
@@ -1765,11 +1766,31 @@ function cc2EntryRender(){
     +listBlock('teamUnits','🏷 단체 신청 단위','단위명')
     +listBlock('teamGenders','🚻 단체(클럽) 구분','구분명');
 }
+// [날짜별 부문] 대회가 2일 이상이면 부문마다 열리는 날짜를 고릅니다 (심판 모집처럼 날짜별 운영).
+//   아무 날짜도 안 고르면 '전 일정' 입니다. 저장은 부문명 → 날짜 목록.
+function cc2FmtMD(d){const m=String(d).match(/^\d{4}-(\d{2})-(\d{2})$/);return m?(+m[1])+'/'+(+m[2]):d}
+function cc2DivDateChips(kind,si,dv){
+  const ds=(CC2_DATES||[]).slice().sort();
+  if(ds.length<2||!String(dv||'').trim())return '';
+  const sp=CC2_ENTRY[kind][si];sp.divDates=sp.divDates||{};
+  const cur=sp.divDates[dv]||[];
+  return '<span style="display:inline-flex;gap:3px;align-items:center;margin-left:2px"><span style="font-size:10.5px;color:#8a919d">📅</span>'
+    +ds.map(d=>'<button type="button" class="cc2chip'+(cur.indexOf(d)>=0?' on':'')+'" style="padding:2px 7px;font-size:11px;margin:0" title="이 부문이 열리는 날짜" onclick="cc2ToggleDivDate(\''+kind+'\','+si+',\''+cesc(dv)+'\',\''+d+'\')">'+cc2FmtMD(d)+'</button>').join('')
+    +(cur.length?'':'<span style="font-size:10.5px;color:#8a919d">전 일정</span>')+'</span>';
+}
+function cc2ToggleDivDate(kind,si,dv,d){
+  const sp=CC2_ENTRY[kind][si];sp.divDates=sp.divDates||{};
+  const arr=(sp.divDates[dv]||[]).slice();const i=arr.indexOf(d);
+  if(i>=0)arr.splice(i,1);else arr.push(d);
+  arr.sort();sp.divDates[dv]=arr;cc2EntryRender();
+}
 function cc2Data(){
   const trimArr=a=>a.map(t=>String(t||'').trim()).filter(Boolean);
+  // 부문 목록에 남아 있는 부문의 날짜만 저장 (지운 부문·빈 목록은 제외)
+  const pickDD=x=>{const o={};const dd=x.divDates||{};trimArr(x.divs).forEach(d=>{if((dd[d]||[]).length)o[d]=dd[d].slice().sort()});return o};
   return {
-    indiv:CC2_ENTRY.indiv.map(x=>({name:String(x.name||'').trim(),divs:trimArr(x.divs)})).filter(x=>x.name),
-    team:CC2_ENTRY.team.map(x=>({name:String(x.name||'').trim(),divs:trimArr(x.divs)})).filter(x=>x.name),
+    indiv:CC2_ENTRY.indiv.map(x=>({name:String(x.name||'').trim(),divs:trimArr(x.divs),divDates:pickDD(x)})).filter(x=>x.name),
+    team:CC2_ENTRY.team.map(x=>({name:String(x.name||'').trim(),divs:trimArr(x.divs),divDates:pickDD(x)})).filter(x=>x.name),
     special:trimArr(CC2_ENTRY.special),
     fees:CC2_ENTRY.fees.map(f=>({label:String(f.label||'').trim(),amount:String(f.amount||'').trim()})).filter(f=>f.label||f.amount),
     teamUnits:trimArr(CC2_ENTRY.teamUnits),
@@ -2104,7 +2125,9 @@ async function cc2Save(){
       consentText:v('cc2CText'),consentImgs:consentImgs,consentForm:(v('cc2Form')||'basic'),
       consentOverlays:cc2OvlPack(),status:'모집중'};   // [서명 위치] 공고 작성자가 지정한 기입 위치
     // 참가 슬롯 roles 생성
-    const roles=[],teamDivs=[];
+    const roles=[],teamDivs=[],divDates={};
+    // [날짜별 부문] 신청·명단 화면이 바로 쓰도록 '종목 부문' 이름 → 날짜 목록으로 펼쳐 저장
+    entry.indiv.concat(entry.team).forEach(sp=>{Object.keys(sp.divDates||{}).forEach(d2=>{if(sp.divs.indexOf(d2)>=0&&(sp.divDates[d2]||[]).length)divDates[sp.name+' '+d2]=sp.divDates[d2]})});
     entry.indiv.forEach(sp=>{if(sp.divs.length)sp.divs.forEach(d2=>roles.push(sp.name+' '+d2));else roles.push(sp.name);});
     entry.team.forEach(sp=>{
       if(sp.divs.length)sp.divs.forEach(d2=>{roles.push(sp.name+' '+d2);teamDivs.push(sp.name+' '+d2);});
@@ -2114,7 +2137,7 @@ async function cc2Save(){
     const slotBase={title:title,role:'참가',roles:roles,quota:999,date:base.dateStart,region:sido,
       place:place, // [장소표시] 대회 장소를 공고 슬롯에도 저장 — 카드·피드에 표시
       deadline:base.deadline||'',fee:feeStr,note:base.desc||'',eligRegion:'',
-      teamDivs:teamDivs,teamTypes:entry.teamUnits,teamGenders:entry.teamGenders,entry:entry,
+      teamDivs:teamDivs,teamTypes:entry.teamUnits,teamGenders:entry.teamGenders,entry:entry,divDates:divDates,
       host:base.host,organizer:base.organizer,sponsor:base.sponsor,partner:base.partner,
       opening:base.opening,time:base.time,attachments:attachments,extras:extras,committee:committee,
       consentText:base.consentText,consentImgs:consentImgs,consentOverlays:base.consentOverlays,consentForm:base.consentForm};
@@ -2341,8 +2364,8 @@ let RRN_OK=false;
 // ── [개인전·단체전 구분 표시] 부문 태그 렌더 — 참가 공고는 개인전/단체전 그룹 패널, 그 외(심판·운영·구형)는 기존 플랫 태그 유지 ──
 function divTagHtml(s,dv,entry){
   if(entry&&dv.cap){const c=divActiveCount(s,dv.name);
-    return '<span class="ctag'+(c>=dv.cap?' full':'')+'">'+cesc(dv.name)+' <b>'+c+'/'+dv.cap+'</b>'+(c>=dv.cap?' 마감':'')+'</span>';}
-  return '<span class="ctag">'+cesc(dv.name)+'</span>';
+    return '<span class="ctag'+(c>=dv.cap?' full':'')+'">'+cesc(dv.name)+divDateTag(s,dv.name)+' <b>'+c+'/'+dv.cap+'</b>'+(c>=dv.cap?' 마감':'')+'</span>';}
+  return '<span class="ctag">'+cesc(dv.name)+divDateTag(s,dv.name)+'</span>';
 }
 function divGroupsHtml(s,entry){
   const divs=slotDivs(s);
@@ -2365,6 +2388,9 @@ function divGroupsHtml(s,entry){
   return h+'</div>';
 }
 // 부문별 정원: 임무 목록에 "오픈부:16" 형식이면 부문 정원 16 (없으면 무제한)
+// [날짜별 부문] 부문에 지정된 날짜 표기 ('9/20·9/21'). 지정이 없거나 하루짜리 대회면 빈 문자열.
+function divDateLbl(s,name){const dd=(s&&s.divDates||{})[name];if(!dd||!dd.length)return '';return dd.map(d=>{const m=String(d).match(/^\d{4}-(\d{2})-(\d{2})$/);return m?(+m[1])+'/'+(+m[2]):d}).join('·')}
+function divDateTag(s,name){const l=divDateLbl(s,name);return l?' <span style="font-size:10.5px;font-weight:800;color:#0f766e;background:#e4f2ef;border-radius:6px;padding:1px 6px">📅 '+cesc(l)+'</span>':''}
 function parseDiv(r){const m=String(r).match(/^(.+?):(\d+)$/);return m?{name:m[1].trim(),cap:parseInt(m[2])}:{name:String(r).trim(),cap:0}}
 function slotDivs(s){const roles=(s.roles&&s.roles.length)?s.roles:(DEFAULT_ROLES[s.role]||[]);const seen={};return roles.map(parseDiv).filter(d=>seen[d.name]?false:(seen[d.name]=1,true))} // [중복부문 방지] 같은 이름 부문은 첫 항목만 표시
 // [포스터 슬라이드] 공고 카드 포스터 여러 장 ◀▶ 넘기기
@@ -2577,7 +2603,7 @@ async function openApply(id){
       // [개인전·단체전 구분 표시] 신청서 부문 선택도 그룹 패널로 — 버튼 동작(togRole·#cRoleBtns 셀렉터)은 그대로 유지
       +(function(){
           const mk=dv=>{const cnt=dv.cap?divActiveCount(s,dv.name):0;const full=dv.cap&&cnt>=dv.cap;
-            return '<button type="button" class="rolechip"'+(full?' disabled style="opacity:.4;cursor:not-allowed"':'')+' data-role="'+cesc(dv.name)+'" onclick="togRole(this)">'+cesc(dv.name)+(dv.cap?' <span style="font-size:11px;opacity:.75">'+(full?'마감':cnt+'/'+dv.cap)+'</span>':'')+'</button>';};
+            return '<button type="button" class="rolechip"'+(full?' disabled style="opacity:.4;cursor:not-allowed"':'')+' data-role="'+cesc(dv.name)+'" onclick="togRole(this)">'+cesc(dv.name)+divDateTag(s,dv.name)+(dv.cap?' <span style="font-size:11px;opacity:.75">'+(full?'마감':cnt+'/'+dv.cap)+'</span>':'')+'</button>';};
           const divsAll=slotDivs(s);
           const tset={};(s.teamDivs||[]).forEach(n=>tset[String(n).trim()]=1);
           if(!Object.keys(tset).length){
@@ -2629,7 +2655,7 @@ async function openApply(id){
       +'</table></div>'
       +'<div style="font-size:13px;font-weight:800;margin:13px 0 7px">희망 임무 <span style="font-weight:600;color:#888;font-size:11.5px">(누르는 순서 = 1→2→3지망, 최대 3개)</span></div>'
       +'<div id="cRoleBtns" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">'
-      +slotDivs(s).map(dv=>'<button type="button" class="rolechip" data-role="'+cesc(dv.name)+'" onclick="togRole(this)">'+cesc(dv.name)+'</button>').join('')
+      +slotDivs(s).map(dv=>'<button type="button" class="rolechip" data-role="'+cesc(dv.name)+'" onclick="togRole(this)">'+cesc(dv.name)+divDateTag(s,dv.name)+'</button>').join('')
       +'</div><div id="cSelTxt" style="font-size:12.5px;color:#0f766e;font-weight:800;min-height:18px"></div>'
       +'<div class="clause">① 본인은 위 대회 '+cesc(s.role)+'요원 위촉을 신청하며, 사무국 확정 통보 시 위촉 효력이 발생합니다.<br>'
       +'② 수당은 연맹 지급 기준에 따라 대회 종료 후 위 계좌로 일괄 지급됩니다(원천징수 세액 공제 후).<br>'

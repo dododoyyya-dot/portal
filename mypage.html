@@ -164,6 +164,7 @@ function orgChip(o,region,title,fed){
   <h1>마이페이지</h1><p>나의 레벨과 활동 이력을 확인하세요.</p>
 </div></div>
 <section><div class="wrap" style="max-width:900px">
+  <div id="ncBanner" class="pending-banner" style="display:none;background:#fdf1f1;border-color:#f1c7cc;color:#8a1f2b">📎 <b>국가공인 자격증 사본이 아직 없습니다</b> — 사본 확인 전까지 회원 승인이 보류됩니다. 아래 <b>[내 정보] → 국가공인 체육지도사 자격</b> 칸에서 사본을 첨부하고 저장해 주세요. <a href="#pfNatCertDoc" onclick="var e=document.getElementById('pfNatCertDoc');if(e){e.scrollIntoView({block:'center'});e.focus()}return false" style="font-weight:900;color:#C41E2F">첨부하러 가기 →</a></div>
   <div id="pendBox" class="pending-banner" style="display:none">⏳ <b>승인 대기 중</b> — 사무국이 연수 이수자 명단과 대조해 승인하면 커뮤니티 이용과 포인트 적립이 시작됩니다. <b>승인 전에도 아래 기입 내용을 수정할 수 있습니다.</b></div>
   <div id="safetyBanner" style="display:none;border-radius:12px;padding:14px 18px;margin-bottom:16px;font-size:14px;font-weight:700"></div>
   <div class="mycard" id="myCard" style="display:none">
@@ -975,6 +976,9 @@ function fillProfile(d){
   else if(d.natCertName){ncs.textContent='📎 사본 첨부 필요 — 첨부 전까지 승인 보류';ncs.style.color='#C41E2F';}
   else{ncs.textContent='';ncs.style.color='';}
   document.getElementById('pfNatCertLink').innerHTML=(d.natCertName&&d.natCertDoc)?'<a href="'+d.natCertDoc+'" target="_blank" style="font-weight:800;color:#153A77;background:#eef3fa;border:1px solid #d4e0f2;border-radius:8px;padding:4px 10px">📎 첨부한 자격증 사본 보기</a>':'';
+  // [사본 미첨부] 자격은 신고했는데 사본이 없는 회원에게 화면 맨 위에서 바로 알립니다
+  const ncb=document.getElementById('ncBanner');
+  if(ncb)ncb.style.display=(d.natCertName&&!d.natCertDoc&&!d.natCertApproved)?'block':'none';
   // [서명이미지] 등록된 서명 미리보기
   const sb=document.getElementById('pfSigImgBox');
   if(sb)sb.innerHTML=d.signatureImg
