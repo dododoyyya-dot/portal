@@ -211,7 +211,7 @@ function orgChip(o,region,title,fed){
     <button class="mytab on" data-pane="Profile" onclick="showMyTab('Profile')">👤 내 정보</button>
     <button class="mytab" data-pane="Alarm" onclick="showMyTab('Alarm')">🔔 알림·승인<span class="tbadge" id="tabAlarmBadge"></span></button>
     <button class="mytab" data-pane="Family" onclick="showMyTab('Family')">👨‍👧 자녀·가족</button>
-    <button class="mytab" data-pane="Career" onclick="showMyTab('Career')">🎓 자격·이수증</button>
+    <button class="mytab" data-pane="Career" onclick="showMyTab('Career')">🎓 자격·경력</button>
     <button class="mytab" data-pane="Work" onclick="showMyTab('Work')">💼 활동·계약</button>
   </div>
 
@@ -521,6 +521,23 @@ function orgChip(o,region,title,fed){
   </div>
 
   <div class="mypane" id="paneCareer">
+  <!-- [경력 여정] 임무 완료·대회 참가·입상 이력(staffCareer)을 통계·배지·타임라인으로 보여주고 경력증명서를 발급 -->
+  <div id="careerBox" style="display:none;margin-top:8px">
+    <h3 class="sub" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span id="careerTitleIcon"></span>나의 경력 여정 <span style="font-size:12px;font-weight:700;color:#8a919d">— 임무 완료·대회 참가·입상이 자동으로 쌓입니다</span></h3>
+    <div id="careerHero" style="border-radius:16px;padding:18px 20px;background:linear-gradient(135deg,#0b1a3a,#153A77 60%,#1F4E9C);color:#fff;margin-bottom:12px"></div>
+    <div id="careerBadgeHead" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 8px;font-size:12.5px;font-weight:800"></div>
+    <div id="careerBadges" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px;margin-bottom:12px"></div>
+    <div id="careerNext" style="font-size:12.5px;background:#fff8e6;border:1.5px solid #f1dfa6;border-radius:12px;padding:10px 14px;margin-bottom:12px;line-height:1.7"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+      <span id="careerCertIcon" style="font-size:13px;font-weight:900;display:inline-flex;align-items:center;gap:5px">경력증명서</span>
+      <label style="font-size:12.5px;font-weight:700"><input type="checkbox" class="crCat" value="위원,심판,운영,봉사,지도" checked style="width:auto"> 심판·운영·위원</label>
+      <label style="font-size:12.5px;font-weight:700"><input type="checkbox" class="crCat" value="선수" checked style="width:auto"> 선수(참가)</label>
+      <label style="font-size:12.5px;font-weight:700"><input type="checkbox" class="crCat" value="입상" checked style="width:auto"> 입상</label>
+      <button class="btn-sub" id="careerPrintBtn" style="background:#153A77;display:inline-flex;align-items:center;gap:6px" onclick="printCareerCert()">경력증명서 발급 (인쇄·PDF)</button>
+    </div>
+    <div class="board" id="careerList"></div>
+    <div class="note" style="margin-top:10px">이력은 대회 운영진이 <b>임무 완료·대회 종료 처리</b>를 하면 자동으로 기록됩니다. 누락된 경력은 kfdf60@hanmail.net 으로 대회명·일자·역할을 알려 주세요.</div>
+  </div>
   <div id="certBox" style="display:none;margin-top:44px">
     <h3 class="sub">이수증 온라인 발급</h3>
     <div style="background:#fffdf5;border:2px solid #e6b422;border-radius:16px;padding:26px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
@@ -562,23 +579,6 @@ function orgChip(o,region,title,fed){
     <h3 class="sub">위촉 계약 (대회 심판·운영요원)</h3>
     <div class="board" id="compContractList"></div>
     <div class="note" style="margin-top:14px">대회 심판·운영요원으로 확정되면 이곳에 표시됩니다. 계약서를 확인한 뒤 화면에 직접 서명하면 전자서명·동의 일시가 기록됩니다.</div>
-  </div>
-  <!-- [경력 여정] 임무 완료·대회 참가·입상 이력(staffCareer)을 통계·배지·타임라인으로 보여주고 경력증명서를 발급 -->
-  <div id="careerBox" style="display:none;margin-top:44px">
-    <h3 class="sub" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span id="careerTitleIcon"></span>나의 경력 여정 <span style="font-size:12px;font-weight:700;color:#8a919d">— 임무 완료·대회 참가·입상이 자동으로 쌓입니다</span></h3>
-    <div id="careerHero" style="border-radius:16px;padding:18px 20px;background:linear-gradient(135deg,#0b1a3a,#153A77 60%,#1F4E9C);color:#fff;margin-bottom:12px"></div>
-    <div id="careerBadgeHead" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 8px;font-size:12.5px;font-weight:800"></div>
-    <div id="careerBadges" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px;margin-bottom:12px"></div>
-    <div id="careerNext" style="font-size:12.5px;background:#fff8e6;border:1.5px solid #f1dfa6;border-radius:12px;padding:10px 14px;margin-bottom:12px;line-height:1.7"></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
-      <span id="careerCertIcon" style="font-size:13px;font-weight:900;display:inline-flex;align-items:center;gap:5px">경력증명서</span>
-      <label style="font-size:12.5px;font-weight:700"><input type="checkbox" class="crCat" value="위원,심판,운영,봉사,지도" checked style="width:auto"> 심판·운영·위원</label>
-      <label style="font-size:12.5px;font-weight:700"><input type="checkbox" class="crCat" value="선수" checked style="width:auto"> 선수(참가)</label>
-      <label style="font-size:12.5px;font-weight:700"><input type="checkbox" class="crCat" value="입상" checked style="width:auto"> 입상</label>
-      <button class="btn-sub" id="careerPrintBtn" style="background:#153A77;display:inline-flex;align-items:center;gap:6px" onclick="printCareerCert()">경력증명서 발급 (인쇄·PDF)</button>
-    </div>
-    <div class="board" id="careerList"></div>
-    <div class="note" style="margin-top:10px">이력은 대회 운영진이 <b>임무 완료·대회 종료 처리</b>를 하면 자동으로 기록됩니다. 누락된 경력은 kfdf60@hanmail.net 으로 대회명·일자·역할을 알려 주세요.</div>
   </div>
   <div id="staffCareerBox" style="display:none;margin-top:44px">
     <h3 class="sub">심판·운영요원 경력</h3>
@@ -1383,7 +1383,7 @@ function showMyTab(k){
   if(tb){const r=tb.getBoundingClientRect();if(r.top<0||r.top>window.innerHeight-80)tb.scrollIntoView({block:'start'});}
 }
 (function(){
-  const map={alarmBox:'Alarm',famReqBox:'Alarm',profileBox:'Profile',kidsBox:'Family',certBox:'Career',licBox:'Career',claimBox:'Career',contractBox:'Work',compContractBox:'Work',staffCareerBox:'Work',logBox:'Work',actList:'Work',consentBox:'Work'};
+  const map={alarmBox:'Alarm',famReqBox:'Alarm',profileBox:'Profile',kidsBox:'Family',certBox:'Career',licBox:'Career',claimBox:'Career',careerBox:'Career',contractBox:'Work',compContractBox:'Work',staffCareerBox:'Work',logBox:'Work',actList:'Work',consentBox:'Work'};
   const h=(location.hash||'').replace('#','');
   if(map[h]&&map[h]!=='Profile'){
     showMyTab(map[h]);
