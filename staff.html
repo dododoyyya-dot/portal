@@ -450,6 +450,8 @@ async function delPost(id){
 }
 // ══════════════ 공고 등록/수정 폼 ══════════════
 let PF_POSTERS=[],PF_DATES=[],PF_CAL_Y=0,PF_CAL_M=0;
+// [동의서·서류] 심판·운영요원 공고도 대회 공고처럼 동의서 문안·스캔 이미지·서면 양식 파일을 붙입니다 (보관함은 대회 공고와 공유: consentTemplates)
+let PF_CIMGS=[],PF_PAPERS=[];
 // [v7] 상위 대회 불러오기 (competitions 컬렉션 연동)
 let PF_COMPS=[],PF_COMPID='';
 async function pfFillComps(ed){
@@ -493,6 +495,7 @@ function openPostForm(editId){
   const ed=editId?POSTS.find(x=>x.id===editId):null;
   PF_COMPID=(ed&&ed.compId)||'';
   PF_POSTERS=(ed&&ed.posters)?ed.posters.slice():[];
+  PF_CIMGS=(ed&&ed.consentImgs)?ed.consentImgs.map(u=>({url:u})):[];
   PF_DATES=(ed&&ed.dates)?ed.dates.map(d=>d.date).sort():[];
   const base=PF_DATES.length?new Date(PF_DATES[0]+'T00:00:00'):new Date();
   PF_CAL_Y=base.getFullYear();PF_CAL_M=base.getMonth();
@@ -543,6 +546,29 @@ function openPostForm(editId){
     +'<textarea id="pfDesc" rows="4" class="stfield" placeholder="심판·운영진에게 필요한 내용을 적어주세요 (집결시간·담당구역·특이사항 등) — 대회 자체 안내문(참가 선수 대상)과는 별개입니다">'+esc(ed?ed.description:'')+'</textarea>'
     +'<label class="stlabel">문의처 <span style="font-weight:600;color:#8a919d;font-size:11px">— 담당자·연락처·이메일 등 (공고 하단에 표시)</span></label>'
     +'<input id="pfContact" class="stfield" value="'+esc(ed?(ed.contactInfo||''):'')+'" placeholder="예: 사무국 031-984-3248 / kfdf60@hanmail.net">'
+    // ── [동의서·서류] 대회 공고 ⑤와 같은 구성: 동의서 문안 · 스캔 이미지 · 동의서 보관함 · 서면 양식 파일(수당 지급용 거래처 등록 동의서 등) ──
+    +'<div style="margin-top:18px;padding:12px 14px;border:1.5px solid #e2e7f0;border-radius:12px;background:#fafbfd">'
+    +'<div style="font-size:13.5px;font-weight:900;margin-bottom:4px">📄 동의서 · 서류 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 신청 화면 ② 동의서에 표시됩니다. 수당을 받는 심판·운영요원은 수당 지급용 개인정보 동의가 필요합니다.</span></div>'
+    +'<label class="stlabel">동의서 문안</label><textarea id="pfCText" rows="3" class="stfield" placeholder="비우면 기본 동의 항목(개인정보·규정·안전)만 표시">'+esc(ed?(ed.consentText||''):'')+'</textarea>'
+    +'<label class="stlabel">동의서 스캔 이미지 (선택 — 업로드 시 문안과 함께 표시)</label>'
+    +'<input type="file" id="pfCImg" accept="image/*" multiple style="display:block;margin-top:5px;font-size:13px" onchange="pfAddCImgs(this)">'
+    +'<div id="pfCImgList" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>'
+    +'<label class="stlabel">📂 동의서 보관함 <span style="font-weight:600;color:#8a919d;font-size:11px">— 대회 공고와 같은 보관함</span></label>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+    +'<select id="pfTplSel" class="stfield" style="min-width:200px;flex:1"><option value="">불러오는 중…</option></select>'
+    +'<button type="button" class="stbtn stbtn-soft" style="padding:6px 12px;font-size:12px" onclick="pfTplLoad()">📥 불러오기</button>'
+    +'<button type="button" class="stbtn stbtn-soft" style="padding:6px 12px;font-size:12px" onclick="pfTplSave()">💾 지금 동의서 저장</button>'
+    +'<button type="button" class="stbtn stbtn-soft" style="padding:6px 12px;font-size:12px" onclick="pfTplDel()">🗑 삭제</button></div>'
+    +'<div id="pfTplMsg" style="font-size:12px;font-weight:700;margin-top:4px;min-height:14px"></div>'
+    +'<label class="stlabel">서면 동의서 양식 (내려받아 작성·제출하는 파일)</label>'
+    +'<input type="hidden" id="pfForm" value="'+esc(ed?(ed.consentForm||'none'):'pay')+'">'
+    +'<input type="hidden" id="pfFormUrl" value="'+esc(ed?(ed.consentFormUrl||''):'files/거래처등록_개인정보동의서.hwp')+'">'
+    +'<input type="hidden" id="pfFormName" value="'+esc(ed?(ed.consentFormName||''):'거래처 등록(수당지급) 개인정보 동의서')+'">'
+    +'<div id="pfPaperChips" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px"></div>'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">'
+    +'<label class="stbtn stbtn-soft" style="padding:6px 12px;font-size:12px;cursor:pointer;margin:0">📎 새 양식 올리기 (PDF·이미지·HWP)<input type="file" id="pfPaperFile" accept=".pdf,.hwp,.hwpx,.docx,image/*" style="display:none" onchange="pfPaperUpload(this)"></label>'
+    +'<span id="pfPaperMsg" style="font-size:12px;font-weight:700"></span></div>'
+    +'</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
     +'<button class="stbtn stbtn-ghost" onclick="document.getElementById(\'pfModal\').remove()">닫기</button>'
     +'<button class="stbtn stbtn-main" style="padding:11px 26px" id="pfSaveBtn" onclick="savePost(\''+(editId||'')+'\')">'+(ed?'💾 수정 저장':(isAdminU()||isSidoU()?'등록 (즉시 게시)':'등록 (관리자 승인 후 게시)'))+'</button></div>'
@@ -550,6 +576,7 @@ function openPostForm(editId){
   document.body.appendChild(div);
   window.PF_ED=ed||null;
   renderCal();pfDates();pfRenderPosters();
+  pfRenderCImgs();pfTplFill();pfPaperChips();
   pfFillComps(ed);  // [v7] 상위 대회 목록 로드
 }
 // 심판복 라디오 — "미제공" 선택 시 준비물 [심판복] 자동 체크
@@ -658,6 +685,137 @@ function pfDates(){
       :'<div style="margin-top:10px;font-size:12.5px;color:#C41E2F;font-weight:700">달력에서 날짜를 먼저 선택하면 날짜별 설정칸이 나타납니다.</div>';
   }
 }
+// ══════════ [동의서·서류] 스캔 이미지 · 동의서 보관함 · 서면 양식 파일 보관함 (대회 공고와 같은 저장소 consentTemplates) ══════════
+function pfAddCImgs(input){
+  const files=[...input.files];
+  if(PF_CIMGS.length+files.length>6){alert('동의서 이미지는 최대 6장까지 첨부할 수 있습니다.');input.value='';return}
+  files.forEach(f=>PF_CIMGS.push({file:f,name:f.name}));
+  input.value='';pfRenderCImgs();
+}
+function pfRenderCImgs(){
+  const el=document.getElementById('pfCImgList');if(!el)return;
+  el.innerHTML=PF_CIMGS.length?PF_CIMGS.map((p,i)=>{
+    const src=p.url||'';
+    return '<div style="position:relative">'
+      +(src?'<img class="stthumb" src="'+esc(src)+'" onclick="window.open(this.src)">':'<div class="stthumb" style="display:flex;align-items:center;justify-content:center;font-size:10px;color:#8a919d;background:#f6f8fb;padding:4px;text-align:center;word-break:break-all">'+esc(p.name||'이미지')+'</div>')
+      +'<button onclick="PF_CIMGS.splice('+i+',1);pfRenderCImgs()" style="position:absolute;top:-6px;right:-6px;border:none;background:#C41E2F;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;font-weight:900">×</button></div>';
+  }).join(''):'<span style="font-size:12px;color:#8a919d">이미지 없음 (문안만 사용)</span>';
+}
+function pfTplMsg(t,bad){const m=document.getElementById('pfTplMsg');if(m){m.textContent=t||'';m.style.color=bad?'#C41E2F':'#0f766e'}}
+async function pfTplFill(){
+  const sel=document.getElementById('pfTplSel');if(!sel)return;
+  try{
+    const snap=await DB.collection('consentTemplates').orderBy('name').get();
+    const list=snap.docs.filter(d=>d.data().kind!=='paperForm').map(d=>({id:d.id,name:d.data().name||'(이름 없음)'}));
+    sel.innerHTML='<option value="">📂 보관함에서 선택…</option>'+list.map(t=>'<option value="'+t.id+'">'+esc(t.name)+'</option>').join('');
+    if(!list.length)pfTplMsg('아직 저장된 동의서가 없습니다 — 문안·이미지를 만든 뒤 [💾 지금 동의서 저장]을 누르세요.');
+  }catch(e){sel.innerHTML='<option value="">보관함 사용 불가</option>';pfTplMsg('보관함을 읽을 수 없습니다 ('+(e.code||e.message)+')',true)}
+}
+async function pfTplLoad(){
+  const sel=document.getElementById('pfTplSel');
+  if(!sel||!sel.value){pfTplMsg('불러올 동의서를 먼저 고르세요.',true);return}
+  try{
+    const d=await DB.collection('consentTemplates').doc(sel.value).get();
+    if(!d.exists){pfTplMsg('삭제된 항목입니다.',true);pfTplFill();return}
+    const t=d.data();
+    const ta=document.getElementById('pfCText');if(ta)ta.value=t.consentText||'';
+    PF_CIMGS=(t.consentImgs||[]).map(u=>({url:u}));pfRenderCImgs();
+    if(t.consentForm==='file'&&t.consentFormUrl)pfPaperSet('file',t.consentFormUrl,t.consentFormName||'');
+    pfTplMsg('✓ 불러왔습니다: '+(t.name||'')+' — 문안·이미지 '+PF_CIMGS.length+'장이 이 공고에 적용됩니다.');
+  }catch(e){pfTplMsg('불러오기 실패: '+(e.code||e.message),true)}
+}
+async function pfTplSave(){
+  const text=((document.getElementById('pfCText')||{}).value||'').trim();
+  if(!text&&!PF_CIMGS.length){pfTplMsg('저장할 동의서(문안 또는 이미지)가 없습니다.',true);return}
+  const name=prompt('보관함에 저장할 이름 (예: 심판·운영요원 수당 동의서):');
+  if(!name||!name.trim())return;
+  pfTplMsg('저장 중… (이미지 업로드 포함)');
+  try{
+    const imgs=[];
+    for(const x of PF_CIMGS){
+      if(x.url){imgs.push(x.url);continue}
+      const blob=await stCompress(x.file);
+      const ref=firebase.storage().ref('quals/'+SME.uid+'/staffconsent_'+Date.now()+'_'+imgs.length+'.jpg');
+      await ref.put(blob,{contentType:'image/jpeg'});const u=await ref.getDownloadURL();x.url=u;imgs.push(u);
+    }
+    const g=id=>(document.getElementById(id)||{}).value||'';
+    await DB.collection('consentTemplates').add({name:name.trim(),consentText:text,consentImgs:imgs,consentOverlays:{},consentForm:g('pfForm')||'none',consentFormUrl:g('pfFormUrl'),consentFormName:g('pfFormName'),
+      createdAt:firebase.firestore.FieldValue.serverTimestamp(),by:(AUTH.currentUser||{}).email||'',from:'staff'});
+    await pfTplFill();
+    const sel=document.getElementById('pfTplSel');if(sel){const o=[...sel.options].find(o=>o.textContent===name.trim());if(o)sel.value=o.value}
+    pfTplMsg('✓ 보관함에 저장했습니다: '+name.trim());
+  }catch(e){pfTplMsg('저장 실패: '+(e.code||e.message),true)}
+}
+async function pfTplDel(){
+  const sel=document.getElementById('pfTplSel');
+  if(!sel||!sel.value){pfTplMsg('삭제할 동의서를 먼저 고르세요.',true);return}
+  const nm=sel.options[sel.selectedIndex].textContent;
+  if(!confirm('보관함에서 「'+nm+'」을 삭제할까요? (이미 등록된 공고에는 영향 없음)'))return;
+  try{await DB.collection('consentTemplates').doc(sel.value).delete();await pfTplFill();pfTplMsg('삭제했습니다: '+nm)}
+  catch(e){pfTplMsg('삭제 실패: '+(e.code||e.message),true)}
+}
+// 서면 양식 파일 — 기본: 선택 안 함 / 거래처 등록(수당지급) 동의서 HWP(사이트 파일) + 올려 둔 양식(consentTemplates kind:paperForm, 대회 공고와 공유)
+const PF_PAPER_BUILTIN=[['none','선택 안 함',''],['pay','📄 거래처 등록(수당지급) 개인정보 동의서 — HWP','files/거래처등록_개인정보동의서.hwp','거래처 등록(수당지급) 개인정보 동의서']];
+function pfPaperMsg(t,bad){const m=document.getElementById('pfPaperMsg');if(m){m.textContent=t||'';m.style.color=bad?'#C41E2F':'#0f766e'}}
+function pfPaperSet(form,url,name){
+  const h=document.getElementById('pfForm'),hu=document.getElementById('pfFormUrl'),hn=document.getElementById('pfFormName');
+  if(h)h.value=form||'none';if(hu)hu.value=url||'';if(hn)hn.value=name||'';
+  pfPaperDraw();
+}
+function pfPaperDraw(){
+  const box=document.getElementById('pfPaperChips');if(!box)return;
+  const form=(document.getElementById('pfForm')||{}).value||'none',url=(document.getElementById('pfFormUrl')||{}).value||'';
+  const chip=(on,onclick,label,title)=>'<button type="button" class="stbtn '+(on?'stbtn-main':'stbtn-soft')+'" style="padding:6px 12px;font-size:12px" onclick="'+onclick+'" title="'+esc(title||'')+'">'+label+'</button>';
+  let h=PF_PAPER_BUILTIN.map(b=>chip(form===b[0],"pfPaperSet('"+b[0]+"','"+esc(b[2])+"','"+esc(b[3]||'')+"')",b[1],b[2])).join('');
+  h+=PF_PAPERS.map(p=>'<span style="display:inline-flex;align-items:center">'+chip(form==='file'&&url===p.url,"pfPaperSet('file','"+esc(p.url)+"','"+esc(p.name)+"')",'📎 '+esc(p.name),p.fileName||'')
+    +'<button type="button" onclick="pfPaperDel(\''+p.id+'\',\''+esc(p.name)+'\')" title="보관함에서 삭제" style="border:none;background:none;color:#C41E2F;font-weight:900;cursor:pointer;margin:0 4px 0 -2px">×</button></span>').join('');
+  if(form!=='none'&&url)h+='<a href="'+esc(url)+'" target="_blank" style="font-size:12px;font-weight:800;color:#153A77;margin-left:4px">파일 열기 →</a>';
+  box.innerHTML=h;
+}
+async function pfPaperChips(){
+  try{const snap=await DB.collection('consentTemplates').where('kind','==','paperForm').get();
+    PF_PAPERS=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>String(a.name).localeCompare(String(b.name),'ko'))}
+  catch(e){PF_PAPERS=[];pfPaperMsg('올려 둔 양식 목록을 읽을 수 없습니다 ('+(e.code||e.message)+')',true)}
+  const url=(document.getElementById('pfFormUrl')||{}).value||'',nm=(document.getElementById('pfFormName')||{}).value||'',form=(document.getElementById('pfForm')||{}).value||'none';
+  if(form==='file'&&url&&!PF_PAPERS.some(p=>p.url===url))PF_PAPERS.push({id:'',name:nm||'이 공고의 양식',url:url,fileName:''});
+  pfPaperDraw();
+}
+function pfPaperMime(f){
+  const ext=(f.name.split('.').pop()||'').toLowerCase();
+  if(ext==='pdf')return 'application/pdf';
+  if(ext==='hwp')return 'application/x-hwp';
+  if(ext==='hwpx')return 'application/vnd.hancom.hwpx';
+  if(ext==='docx')return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  return f.type||'application/octet-stream';
+}
+async function pfPaperUpload(inp){
+  const f=inp.files&&inp.files[0];if(!f)return;
+  if(f.size>10*1024*1024){pfPaperMsg('10MB 이하 파일만 올릴 수 있습니다.',true);inp.value='';return}
+  const name=prompt('이 양식의 이름 (예: 경남연맹 심판 수당 동의서):',f.name.replace(/\.[^.]+$/,''));
+  if(!name||!name.trim()){inp.value='';return}
+  pfPaperMsg('올리는 중…');
+  try{
+    const uid=(AUTH.currentUser||{}).uid;const mime=pfPaperMime(f);const ext=(f.name.split('.').pop()||'bin').toLowerCase();
+    const ref=firebase.storage().ref('compdocs/'+uid+'/paperform_'+Date.now()+'.'+ext);
+    try{await ref.put(f,{contentType:mime})}
+    catch(e){throw new Error(/hwp|docx/.test(ext)?'HWP·DOCX 업로드는 스토리지 규칙(v7) 게시 후 가능합니다 — PDF로 저장해 올려 주세요':('업로드 실패: '+(e.code||e.message)))}
+    const url=await ref.getDownloadURL();
+    const doc=await DB.collection('consentTemplates').add({kind:'paperForm',name:name.trim(),url:url,fileName:f.name,mime:mime,createdAt:firebase.firestore.FieldValue.serverTimestamp(),by:(AUTH.currentUser||{}).email||''});
+    PF_PAPERS.push({id:doc.id,name:name.trim(),url:url,fileName:f.name,mime:mime});
+    pfPaperSet('file',url,name.trim());
+    pfPaperMsg('✓ 보관함에 저장하고 이 공고의 서면 양식으로 선택했습니다: '+name.trim());
+  }catch(e){pfPaperMsg(e&&e.message||String(e),true)}
+  inp.value='';
+}
+async function pfPaperDel(id,name){
+  if(!id){pfPaperMsg('이 항목은 이 공고에 저장된 양식입니다 — 다른 양식을 고르면 바뀝니다.',true);return}
+  if(!confirm('보관함에서 「'+name+'」 양식을 삭제할까요? (이미 등록된 공고는 그대로 열립니다)'))return;
+  try{await DB.collection('consentTemplates').doc(id).delete();PF_PAPERS=PF_PAPERS.filter(p=>p.id!==id);
+    const url=(document.getElementById('pfFormUrl')||{}).value||'';
+    if(!PF_PAPERS.some(p=>p.url===url))pfPaperSet('none','','');else pfPaperDraw();
+    pfPaperMsg('삭제했습니다: '+name)}
+  catch(e){pfPaperMsg('삭제 실패: '+(e.code||e.message),true)}
+}
 function pfAddPosters(input){
   const files=[...input.files];
   if(PF_POSTERS.length+files.length>10){alert('포스터는 최대 10개까지 첨부할 수 있습니다.');input.value='';return}
@@ -735,6 +893,15 @@ async function savePost(editId){
       await ref.put(blob,{contentType:'image/jpeg'});
       posters.push({url:await ref.getDownloadURL(),name:p.name||''});
     }
+    const consentImgs=[];
+    for(const x of PF_CIMGS){
+      if(x.url){consentImgs.push(x.url);continue}
+      btn.textContent='동의서 이미지 업로드 중… ('+(consentImgs.length+1)+')';
+      const blob=await stCompress(x.file);
+      const ref=firebase.storage().ref('quals/'+SME.uid+'/staffconsent_'+Date.now()+'_'+consentImgs.length+'.jpg');
+      await ref.put(blob,{contentType:'image/jpeg'});
+      consentImgs.push(await ref.getDownloadURL());
+    }
     const instant=isAdminU()||isSidoU();
     const data={
       competitionName:name,startDate:dates[0],endDate:dates[dates.length-1],dates:dateArr,
@@ -743,6 +910,7 @@ async function savePost(editId){
       meal:(document.querySelector('input[name=pfMeal]:checked')||{}).value||'제공',
       uniform:uniform,lodging:lodging,
       supplies:supplies,posters:posters,description:v('pfDesc'),contactInfo:v('pfContact'),
+      consentText:v('pfCText'),consentImgs:consentImgs,consentForm:v('pfForm')||'none',consentFormUrl:v('pfFormUrl'),consentFormName:v('pfFormName'),   // [동의서·서류]
       recruitType:(document.querySelector('input[name=pfRecruitType]:checked')||{}).value||'심판·운영요원',  // [모집유형 라벨] 대회참가자 모집과 구분
       compId:PF_COMPID||((editId&&(POSTS.find(x=>x.id===editId)||{}).compId)||''),  // [v7] 상위 대회 연결
       author:{uid:SME.uid,name:SMY.name||'',organization:(v('pfHost')||myOrg()),contact:SMY.phone||'',email:SMY.email||''},
@@ -875,6 +1043,7 @@ async function _renderDetailInner(isStale){
     +'<div style="font-size:13px"><b>모집 정원:</b> '+qTxt+'</div>'
     +'<div style="font-size:13px;margin-top:5px"><b>임무:</b> '+esc((dd.roles||[]).join(' · ')||'-')+'</div>'
     +'<div style="font-size:13px;margin-top:5px"><b>수당:</b> '+payHtml+'</div>'
+    +((p.consentForm&&p.consentForm!=='none'&&p.consentFormUrl)?'<div style="font-size:13px;margin-top:5px"><b>서면 동의서 양식:</b> <a href="'+esc(p.consentFormUrl)+'" target="_blank" style="color:#153A77;font-weight:800">📎 '+esc(p.consentFormName||'내려받기')+' →</a></div>':'')
     +'<div style="font-size:13px;margin-top:12px"><b>👥 신청 현황 ('+dayApps.length+'명)</b></div>'+appsHtml
     +'</div>'
     +confirmPanelHtml(dd,dayApps,_decide)   // [확정현황] 역할별 인원수·명단 패널
@@ -930,8 +1099,14 @@ function openApplyForm(id){
       +'</div></div>';
     }).join('')
     +'<div style="font-size:13px;font-weight:800;margin-top:16px">② 동의서</div>'
+    // [동의서·서류] 공고에 동의서 문안·이미지·서면 양식이 있으면 그대로 보여주고, 첫 동의 항목은 "위 내용을 확인·동의"로 바뀝니다
+    +((p.consentText||(p.consentImgs&&p.consentImgs.length))?'<div style="border:1.5px solid #e2e7f0;border-radius:10px;padding:10px 12px;margin-top:6px;background:#fff">'
+      +(p.consentText?'<div style="font-size:12.5px;line-height:1.8;white-space:pre-wrap">'+esc(p.consentText)+'</div>':'')
+      +(p.consentImgs||[]).map((u,i)=>'<img src="'+esc(u)+'" alt="동의서 '+(i+1)+'" style="width:100%;display:block;border:1px solid #e2e7f0;border-radius:8px;margin-top:8px">').join('')
+      +'</div>':'')
+    +((p.consentForm&&p.consentForm!=='none'&&p.consentFormUrl)?'<div style="margin-top:6px;font-size:12.5px;background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:8px 12px">📎 <b>서면 동의서 양식</b>: <a href="'+esc(p.consentFormUrl)+'" target="_blank" style="color:#153A77;font-weight:800">'+esc(p.consentFormName||'양식 내려받기')+' 내려받기·인쇄 →</a> — 작성·서명 후 대회 당일 제출하거나 사무국 안내에 따라 보내 주세요.</div>':'')
     +'<div style="font-size:12.5px;line-height:2.1;margin-top:5px">'
-    +'<label style="display:flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="apAg1" style="width:auto"> (필수) 개인정보 수집·이용에 동의합니다 — 성명·연락처·자격정보를 대회 운영 목적으로 이용</label>'
+    +'<label style="display:flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="apAg1" style="width:auto"> (필수) '+((p.consentText||(p.consentImgs&&p.consentImgs.length))?'위 동의서 내용을 확인하였으며 이에 동의합니다':'개인정보 수집·이용에 동의합니다 — 성명·연락처·자격정보를 대회 운영 목적으로 이용')+'</label>'
     +'<label style="display:flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="apAg2" style="width:auto"> (필수) 대회 참여 규정을 준수하겠습니다</label>'
     +'<label style="display:flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="apAg3" style="width:auto"> (필수) 안전 수칙을 준수하겠습니다</label>'
     +'</div>'
