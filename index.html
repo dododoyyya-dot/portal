@@ -580,7 +580,7 @@
     // ── 사진첩 (공개 항목 최신 4개 · ★배너 항목은 히어로 배경 슬라이드) — 독립 실행
     (async function(){
     try{
-      const gs=await DB.collection('gallery').where('status','==','published').limit(40).get();
+      const gs=await firebase.firestore().collection('gallery').where('status','==','published').limit(40).get();   // [수정] 이 블록에는 DB 가 없어 firebase.firestore() 직접 사용
       const pub=gs.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
       const sec=document.getElementById('galleryBanner'),lst=document.getElementById('gbList');
       const items=pub.slice(0,4);
@@ -594,10 +594,10 @@
       // [홈 배너 슬라이드] ★배너 항목의 대표 사진을 메인 배너(.hero) 배경에 — 설정 siteContent/homeBanner {enabled,interval,caption,kenburns,max}
       const all=pub.filter(x=>x.featured);
       if(all.length&&window.KFDF_BANNER){
-        let cfg={};try{const c=await DB.collection('siteContent').doc('homeBanner').get();if(c.exists)cfg=c.data()||{}}catch(e){}
+        let cfg={};try{const c=await firebase.firestore().collection('siteContent').doc('homeBanner').get();if(c.exists)cfg=c.data()||{}}catch(e){}
         if(cfg.enabled!==false){const hero=document.querySelector('.hero');if(hero)KFDF_BANNER.mount(hero,all.slice(0,Math.max(1,Math.min(10,+cfg.max||5))),{interval:+cfg.interval||3,caption:cfg.caption!==false,kenburns:cfg.kenburns!==false})}
       }
-    }catch(e){}
+    }catch(e){console.warn('gallery/banner',e)}
     })();
     // ── 🏟️ 합동 교류전 (모집중·완료 — 공개 열람) ──
     firebase.firestore().collection('clubMeets').orderBy('createdAt','desc').limit(30).get().then(snap=>{
