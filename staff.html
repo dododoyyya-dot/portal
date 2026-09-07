@@ -515,6 +515,8 @@ let PF_POSTERS=[],PF_DATES=[],PF_CAL_Y=0,PF_CAL_M=0;
 let PF_CIMGS=[],PF_PAPERS=[];
 // [v7] 상위 대회 불러오기 (competitions 컬렉션 연동)
 let PF_COMPS=[],PF_COMPID='';
+// [시간대 연결 2026-09-07] 상위 대회의 daySchedule{날짜:{sessions,gatherTime}} — 불러오기 후 날짜별 설정칸(시간대 줄·집합시간)에 자동 기입되는 값
+let PF_COMP_DAYS={};
 async function pfFillComps(ed){
   try{
     const snap=await DB.collection('competitions').orderBy('dateStart','desc').limit(20).get();
@@ -528,6 +530,9 @@ function pfLoadComp(){
   const sel=document.getElementById('pfCompSel');if(!sel||!sel.value){alert('불러올 대회를 선택해주세요.');return}
   const c=PF_COMPS.find(x=>x.id===sel.value);if(!c)return;
   PF_COMPID=c.id;
+  // [시간대 연결] 대회 공고에 날짜별 시간대가 있으면 그대로 담아 두고, 날짜별 모드로 전환해 칸에 채웁니다 (없으면 종전과 동일)
+  PF_COMP_DAYS={};const dsch=c.daySchedule||{};Object.keys(dsch).forEach(k=>{const v=dsch[k]||{};if((v.sessions&&v.sessions.length)||v.gatherTime)PF_COMP_DAYS[k]={sessions:(v.sessions||[]).map(x=>Object.assign({},x)),gatherTime:v.gatherTime||''}});
+  const hasDays=Object.keys(PF_COMP_DAYS).length>0;
   const set=(id,val)=>{const e=document.getElementById(id);if(e&&val)e.value=val};
   set('pfName',c.title||'');
   set('pfLoc',c.place||'');
@@ -548,13 +553,15 @@ function pfLoadComp(){
     PF_DATES=ds.slice(0,14);
     const b0=new Date(PF_DATES[0]+'T00:00:00');
     PF_CAL_Y=b0.getFullYear();PF_CAL_M=b0.getMonth();
+    if(hasDays){const sm=document.getElementById('pfSame');if(sm)sm.checked=false}   // [시간대 연결] 날짜별 모드로
     if(typeof pfDates==='function')pfDates();
   }
-  alert('✓ ['+(c.title||'')+'] 대회 정보를 불러왔습니다. 이어서 나머지 항목을 기입해주세요.');
+  alert('✓ ['+(c.title||'')+'] 대회 정보를 불러왔습니다.'+(hasDays?'\n날짜별 시간대 '+Object.keys(PF_COMP_DAYS).length+'일분을 날짜별 설정칸에 채웠습니다 — 심판·운영에 맞게 고쳐 쓰세요.':'')+'\n이어서 나머지 항목을 기입해주세요.');
 }
 function openPostForm(editId){
   const ed=editId?POSTS.find(x=>x.id===editId):null;
   PF_COMPID=(ed&&ed.compId)||'';
+  PF_COMP_DAYS={};   // [시간대 연결] 폼을 새로 열 때 초기화
   PF_POSTERS=(ed&&ed.posters)?ed.posters.slice():[];
   PF_CIMGS=(ed&&ed.consentImgs)?ed.consentImgs.map(u=>({url:u})):[];
   PF_OVL={};if(ed&&ed.consentOverlays)Object.keys(ed.consentOverlays).forEach(k=>{PF_OVL[k]=(ed.consentOverlays[k]||[]).map(f=>Object.assign({},f))});
@@ -748,7 +755,8 @@ function pfDates(){
   const same=document.getElementById('pfSame')?document.getElementById('pfSame').checked:true;
   const box=document.getElementById('pfDaySecs');if(!box)return;
   const ed=window.PF_ED;
-  const cfgOf=d=>{if(!ed||!ed.dates)return null;const f=ed.dates.find(x=>x.date===d);return f||null};
+  // [시간대 연결] 상위 대회에서 불러온 날짜별 시간대가 있으면 그 날짜 설정에 얹습니다 (정원·임무·수당은 기존 값 유지)
+  const cfgOf=d=>{const f=(ed&&ed.dates)?(ed.dates.find(x=>x.date===d)||null):null;const cd=((typeof PF_COMP_DAYS!=='undefined'&&PF_COMP_DAYS)||{})[d];return cd?Object.assign({},f||{},cd):f};
   if(same){
     // 공통 설정 — 날짜 선택 전에도 항상 표시 (정원·임무·수당 입력칸)
     box.innerHTML=daySecHtml('',0,(PF_DATES.length?cfgOf(PF_DATES[0]):(ed&&ed.dates&&ed.dates[0]))||undefined);
