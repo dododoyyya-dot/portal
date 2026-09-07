@@ -2048,6 +2048,8 @@ async function scApply(mode){
     }catch(e){fail.push(r.name+' — '+e.message)}
     b.innerHTML='반영 중… '+(done+held+fail.length)+' / '+base.length;
   }
+  // [결과 페이지] 대회·부문·학교(팀)별 공개 요약 갱신 — results.html 이 읽습니다 (이름 공개 범위는 페이지가 siteContent/results.nameMode 로 적용)
+  let pubMsg='';try{pubMsg=await scPublishEvents(base)}catch(e){pubMsg='결과 요약 갱신 실패: '+e.message;fail.push(pubMsg)}
   try{
     const ref=DB.collection('siteContent').doc('migrationLog');const c2=await ref.get();
     const arr=(((c2.exists&&c2.data())||{}).items||[]).slice(-199);
@@ -2056,10 +2058,31 @@ async function scApply(mode){
   }catch(e){}
   b.innerHTML='<b style="color:#0f766e;font-size:15px">✅ 반영 완료 — 경력 기록 '+done+'행 · 보류함 '+held+'행</b>'
     +'<div style="font-size:12.5px;color:#153A77;font-weight:700;margin-top:6px">업로드 ID: '+esc(SC_IMPORT_ID)+' — 되돌릴 때 이 ID를 씁니다</div>'
+    +(pubMsg?'<div style="font-size:12.5px;color:#0e7490;font-weight:700;margin-top:4px">'+esc(pubMsg)+' — <a href="results.html" target="_blank" style="color:#0e7490">대회 결과 페이지 보기 →</a></div>':'')
     +(fail.length?'<div style="margin-top:8px;color:#C41E2F;font-size:12.5px">⚠ 실패 '+fail.length+'건<br>'+fail.map(esc).join('<br>')+(/permission/i.test(fail.join(' '))?'<br><b>permission 오류는 보안 규칙에 schoolClubResults 절이 없을 때 납니다 — 규칙 문안(제안_D_규칙_v19)을 게시한 뒤 다시 적용하세요.</b>':'')+'</div>':'')
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'
     +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="scUndo()">↩ 이 업로드 되돌리기</button>'
     +'<button class="btn-sub" style="background:#1F4E9C" onclick="scPreview()">🔄 다시 미리보기</button></div>';
+}
+// 공개 요약: schoolClubEvents/{auto} {competitionName,organizer,date,sport,sido,divisions:{부문:{teams:{학교|팀:{school,team,result,members[이름]}}}},importIds[]} — 같은 대회(대회명+일자)는 합칩니다
+async function scPublishEvents(rows){
+  const groups={};rows.forEach(r=>{if(!r.comp||!r.date)return;(groups[r.comp+'|'+r.date]=groups[r.comp+'|'+r.date]||[]).push(r)});
+  const keys=Object.keys(groups);let n=0;
+  for(const k of keys){
+    const rs=groups[k];const comp=rs[0].comp,date=rs[0].date;
+    const q=await DB.collection('schoolClubEvents').where('competitionName','==',comp).where('date','==',date).limit(1).get();
+    const ex=q.empty?{}:(q.docs[0].data()||{});const divisions=JSON.parse(JSON.stringify(ex.divisions||{}));
+    rs.forEach(r=>{const dv=r.div||'전체';const tk=(r.school||'')+(r.team&&r.team!==r.school?'|'+r.team:'');if(!tk)return;
+      const D=divisions[dv]=divisions[dv]||{teams:{}};const T=D.teams[tk]=D.teams[tk]||{school:r.school||'',team:r.team||'',result:'',members:[]};
+      if(r.result&&(r.result!=='참가'||!T.result))T.result=r.result;
+      if(r.name&&T.members.indexOf(r.name)<0)T.members.push(r.name)});
+    const sidos={};rs.forEach(r=>{if(r.schoolSido)sidos[r.schoolSido]=(sidos[r.schoolSido]||0)+1});const sido=Object.keys(sidos).sort((a,b)=>sidos[b]-sidos[a])[0]||ex.sido||'';
+    const doc={competitionName:comp,organizer:rs.find(r=>r.org)?rs.find(r=>r.org).org:(ex.organizer||''),date:date,sport:Array.from(new Set(rs.map(r=>r.sport).filter(Boolean).concat(ex.sport?String(ex.sport).split(' · '):[]))).join(' · '),sido:sido,divisions:divisions,
+      importIds:Array.from(new Set((ex.importIds||[]).concat([SC_IMPORT_ID]))),status:'published',updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:(CMY&&CMY.name)||''};
+    if(q.empty){doc.createdAt=firebase.firestore.FieldValue.serverTimestamp();await DB.collection('schoolClubEvents').add(doc)}else await DB.collection('schoolClubEvents').doc(q.docs[0].id).set(doc,{merge:true});
+    n++;
+  }
+  return n?('대회 결과 페이지 요약 '+n+'개 대회 갱신'):'';
 }
 async function scUndo(){
   const id=prompt('되돌릴 업로드 ID를 입력하세요 (반영 완료 화면·백업 파일·이력에 표시됨):',SC_IMPORT_ID||'');
