@@ -134,7 +134,7 @@
     s.sorted=arr;
     arr.forEach(function(c,i){
       var g=c.group||careerGroup(c.role||c.duty);var d=+(c.days||1)||1;
-      s.total++;s.days+=d;s.points+=(POINTS[g]||5);
+      s.total++;s.days+=d;s.points+=(c.noPoints?0:(POINTS[g]||5));   // [점수 보류] 외부 주최(학교스포츠클럽) 가져오기 기록은 회장단 결정 전까지 점수 미부여
       s.byGroup[g]=(s.byGroup[g]||0)+1;
       var role=c.role||c.duty||'-';s.byRole[role]=(s.byRole[role]||0)+1;
       if(c.sport)String(c.sport).split(/[·,\/]/).forEach(function(x){x=x.trim();if(x)s.sports[x]=(s.sports[x]||0)+1});
@@ -239,6 +239,8 @@
       sport:rec.sport||'',location:rec.location||'',organizer:rec.organizer||'',division:rec.division||'',team:rec.team||'',result:rec.result||'',
       days:rec.days||1,postId:rec.postId||'',slotId:rec.slotId||'',source:rec.source||'manual',verified:true,kidName:rec.kidName||'',
       ckey:key(rec),by:by||'',registeredAt:firebase.firestore.FieldValue.serverTimestamp()};
+    // [가져오기] 엑셀 업로드·외부 주최 기록용 선택 필드 — 있을 때만 저장 (기존 호출은 영향 없음)
+    ['noPoints','importId','teamSchoolCode','schoolName','matchType','gender'].forEach(function(k){if(rec[k]!==undefined&&rec[k]!=='')doc[k]=rec[k]});
     return DB.collection('staffCareer').where('ckey','==',doc.ckey).limit(1).get().then(function(q){
       if(!q.empty){delete doc.registeredAt;doc.updatedAt=firebase.firestore.FieldValue.serverTimestamp();return DB.collection('staffCareer').doc(q.docs[0].id).update(doc).then(function(){return {id:q.docs[0].id,updated:true}})}
       return DB.collection('staffCareer').add(doc).then(function(r){return {id:r.id,updated:false}});

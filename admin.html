@@ -89,6 +89,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260821"></script>
+<script src="career.js?v=20260907a"></script>
 <script>
 KFDF.initApp();
 const AUTH = firebase.auth();
@@ -176,7 +177,23 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <button id="t5" onclick="tab(5)">단체 메일</button>
       <button id="t6" onclick="tab(6)">🪧 팝업 관리</button>
       <button id="t7" onclick="tab(7)">📄 동의서 보관함</button>
+      <button id="t8" onclick="tab(8)">🏫 학교스포츠클럽 결과</button>
       <a href="perm.html" style="margin-left:auto;display:inline-flex;align-items:center;padding:10px 20px;border-radius:10px;background:linear-gradient(135deg,#1F4E9C,#153A77);color:#fff;font-weight:800;font-size:14px;text-decoration:none;box-shadow:0 3px 10px rgba(21,58,119,.25)">🛡 권한 관리 센터 →</a>
+    </div>
+    <!-- ══════════ [학교스포츠클럽] v8: 교육청 등 외부 주최 대회 참가·입상 결과 업로드 → 회원 선수 경력 매칭 (2026-09-07) ══════════ -->
+    <div id="v8" style="display:none">
+      <div class="authbox" style="max-width:none;margin:0 0 14px">
+        <h3 style="margin:0 0 4px;font-size:17px">🏫 학교스포츠클럽 · 대회 결과 업로드</h3>
+        <div style="font-size:12.5px;color:var(--gray);line-height:1.7">교육청 등 외부 기관이 주최한 학교스포츠클럽 대회의 <b>참가·입상 명단(엑셀)</b>을 올리면 성명·생년월일·학교로 회원(또는 보호자 계정의 자녀)을 찾아 <b>선수 경력</b>에 기록합니다. 미가입 학생은 보류함에 두었다가 가입 후 본인이 [내 기록 찾기]로 가져갑니다.<br>양식을 내려받아 학교 선생님께 보내 채워 받으세요. 결과 열은 참가·우승·준우승·3위 등 자유롭게 적을 수 있고, 입상자는 참가 기록도 함께 남습니다.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+          <button class="btn-sub" style="background:#153A77" onclick="scTemplate()">📥 양식 내려받기 (.xlsx)</button>
+          <input type="file" id="scFile" accept=".xlsx" style="font-size:13px">
+          <button class="btn-sub" style="background:#0f766e" onclick="scPreview()">🔍 미리보기 (쓰기 0건)</button>
+          <button class="btn-sub" style="background:#8a919d" onclick="scPendingList()">⏳ 보류함 보기</button>
+          <button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="scUndo()">↩ 업로드 되돌리기</button>
+        </div>
+      </div>
+      <div id="scBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px"></div>
     </div>
     <!-- ══════════ [동의서 보관함] v7: 팀 신청 첨부 스캔본 + 수기 동의 확인 기록 ══════════ -->
     <div id="v7" style="display:none">
@@ -602,7 +619,7 @@ async function loadExtClubMap(){
   }catch(e){console.warn('extClubMap',e);}
 }
 function tab(n){
-  [1,2,3,4,5,6,7].forEach(i=>{
+  [1,2,3,4,5,6,7,8].forEach(i=>{
     document.getElementById('t'+i).classList.toggle('on',i===n);
     document.getElementById('v'+i).style.display=i===n?'block':'none';
   });
@@ -611,6 +628,7 @@ function tab(n){
   if(n===5){if(!USERS.length){loadUsers().then(()=>mpRender()).catch(()=>{});}else mpRender();}  // [단체발송] 회원 선택 목록
   if(n===6)loadPopups();  // [팝업] 신규 탭
   if(n===7)loadConsentBox();  // [동의서 보관함] 신규 탭
+  if(n===8)scInit();  // [학교스포츠클럽] 결과 업로드 탭
 }
 // ══════════ [단체발송] 회원 선택 + 단체 문자 ══════════
 let MP_SEL={},MP_F='전체';  // MP_SEL: uid → {name,email,phone}
@@ -1851,6 +1869,220 @@ function bulkNames(list){
   return ns.slice(0,8).join(', ')+(ns.length>8?(' 외 '+(ns.length-8)+'명'):'');
 }
 // 선택/전체 버튼 묶음
+// ══════════ [학교스포츠클럽·2026-09-07] 교육청 등 외부 주최 대회의 참가·입상 명단(엑셀) → 회원 선수 경력(staffCareer) 매칭 ══════════
+//  매칭 키 = 성명 + 생년월일 + 학교(대회 당시 학교를 스냅샷으로 저장). 전화번호·학년은 쓰지 않습니다(회장님 방침 2026-09-07).
+//  안전장치(CLAUDE.md 원칙 5): 미리보기(쓰기 0건) → 백업 JSON → 선택(1명) 시험 → 전체 적용 → 되돌리기(업로드 ID 단위)
+//  미가입 학생은 schoolClubResults 에 보류(pending) 저장 → 가입 후 마이페이지 [내 기록 찾기]로 본인이 가져갑니다.
+//  경력 점수: 회장님 결정으로 당분간 미부여(noPoints:true) — 기록·확인서에는 그대로 표시됩니다.
+//  권한: 중앙관리자 전체 · 시도임원은 자기 관할 시도 학교의 행만(학교코드 앞 3자리로 시도 판정).
+const SC_V=1;
+const SC_SIDO={S01:'서울',S02:'부산',S03:'대구',S04:'인천',S05:'광주',S06:'대전',S07:'울산',S08:'세종',S09:'경기',S10:'강원',S11:'충북',S12:'충남',S13:'전북',S14:'전남',S15:'경북',S16:'경남',S17:'제주'};
+const SC_HEAD=['대회명','주최기관','대회일자(YYYY-MM-DD)','종목','부문','학교명','학교코드(선택)','팀명(선택)','성명','생년월일(YYYY-MM-DD)','성별(선택)','결과','비고'];
+let SC_ROWS=[],SC_BACKED=false,SC_IMPORT_ID='',SC_PENDING=null,SC_FILE='';
+function scCanon(s){return String(s||'').trim().replace(/\s+/g,'').replace(/(초등학교|초교)$/,'초').replace(/(중학교)$/,'중').replace(/(고등학교|고교)$/,'고')}
+function scNorm(s){return String(s||'').replace(/\s+/g,'').trim()}
+function scDate(v){
+  if(v==null||v==='')return '';
+  if(v instanceof Date)return isNaN(v)?'':v.toISOString().slice(0,10);
+  if(typeof v==='number'){const d=new Date(Math.round((v-25569)*86400000));return isNaN(d)?'':d.toISOString().slice(0,10)}
+  const s=String(v).trim();
+  let m=s.match(/^(\d{4})(\d{2})(\d{2})$/);if(m)return m[1]+'-'+m[2]+'-'+m[3];   // 20150302
+  m=s.match(/^(\d{4})[.\-\/년\s]+(\d{1,2})[.\-\/월\s]+(\d{1,2})/);if(m)return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+  m=s.match(/^(\d{2})(\d{2})(\d{2})$/);if(m){return ((+m[1])>30?'19':'20')+m[1]+'-'+m[2]+'-'+m[3]}
+  return s;
+}
+function scCell(v){if(v==null)return '';if(v instanceof Date)return scDate(v);if(typeof v==='object'){if(v.richText)return v.richText.map(t=>t.text).join('').trim();if(v.text!=null)return String(v.text).trim();if(v.result!=null)return String(v.result).trim();return ''}return String(v).trim()}
+function scBoxEl(){const b=document.getElementById('scBox');b.style.display='block';return b}
+function scInit(){const b=document.getElementById('scBox');if(b&&!b.dataset.init){b.dataset.init='1'}}
+function scDownload(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click()}
+async function scTemplate(){
+  try{
+    const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet('결과');
+    ws.addRow(SC_HEAD);ws.getRow(1).font={bold:true};ws.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE8EEF8'}};
+    ws.addRow(['2026 부산광역시교육감배 학교스포츠클럽 대회','부산광역시교육청','2026-10-17','얼티미트','남초부','부산○○초등학교','','','홍길동','2015-03-02','남','우승','예시 행 — 지우고 입력하세요']);
+    ws.getRow(2).font={color:{argb:'FF8A919D'},italic:true};
+    ws.columns=[36,22,20,12,12,24,16,14,10,20,10,10,26].map(w=>({width:w}));
+    const g=wb.addWorksheet('작성 안내');
+    [['학교스포츠클럽 대회 결과 입력 안내'],[''],['· 1행(머리글)은 지우지 마세요. 2행 예시는 지우고 입력합니다.'],['· 한 줄에 한 명씩 적습니다. 단체전은 팀원 모두를 한 줄씩 적고 팀명(선택)에 같은 팀명을 적어 주세요.'],['· 생년월일은 2015-03-02 처럼 적습니다 (2015.03.02, 20150302 도 인식). 동명이인 구분에 꼭 필요합니다.'],['· 학교명은 정식 명칭(예: 부산○○초등학교)으로 적어 주세요. 학교코드는 몰라도 됩니다.'],['· 결과: 참가 / 우승 / 준우승 / 3위 / MVP / 우수상 등 자유롭게. 입상자는 참가 기록과 입상 기록이 함께 남습니다.'],['· 전화번호·학년은 받지 않습니다.'],[''],['문의: 대한민국플라잉디스크연맹 사무국 031-984-3248 / kfdf60@hanmail.net']].forEach(r=>g.addRow(r));
+    g.getColumn(1).width=100;g.getRow(1).font={bold:true,size:14};
+    const buf=await wb.xlsx.writeBuffer();
+    scDownload('학교스포츠클럽_대회결과_양식.xlsx',new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  }catch(e){alert('양식 생성 실패: '+e.message)}
+}
+async function scPreview(){
+  const inp=document.getElementById('scFile');const f=inp&&inp.files&&inp.files[0];
+  if(!f){alert('엑셀 파일(.xlsx)을 먼저 선택해 주세요.');return}
+  const b=scBoxEl();b.innerHTML='파일과 회원 목록을 읽는 중…';
+  try{
+    if(!USERS.length)await loadUsers();
+    await new Promise(res=>{try{KFDF.loadSchools(()=>res())}catch(e){res()}});
+    const wb=new ExcelJS.Workbook();await wb.xlsx.load(await f.arrayBuffer());
+    const ws=wb.worksheets[0];if(!ws)throw new Error('시트가 없습니다.');
+    let hdrRow=0,hdr=[];
+    ws.eachRow((row,n)=>{if(hdrRow)return;const vals=(row.values||[]).map(scCell);if(vals.some(v=>/^(성명|이름)/.test(v))&&vals.some(v=>/^대회명/.test(v))){hdrRow=n;hdr=vals}});
+    if(!hdrRow)throw new Error('머리글 행(대회명·성명 …)을 찾지 못했습니다. [양식 내려받기]의 양식을 사용해 주세요.');
+    const col=re=>{for(let i=0;i<hdr.length;i++)if(re.test(hdr[i]||''))return i;return -1};
+    const C={comp:col(/^대회명/),org:col(/^주최/),date:col(/^대회일자|^일자|^날짜/),sport:col(/^종목/),div:col(/^부문/),school:col(/^학교명|^학교$/),code:col(/^학교코드/),team:col(/^팀명/),name:col(/^성명|^이름/),birth:col(/^생년월일/),gender:col(/^성별/),result:col(/^결과|^입상|^순위/),note:col(/^비고/)};
+    const need=[['comp','대회명'],['date','대회일자'],['school','학교명'],['name','성명'],['birth','생년월일'],['result','결과']].filter(x=>C[x[0]]<0).map(x=>x[1]);
+    if(need.length)throw new Error('필수 열이 없습니다: '+need.join(', '));
+    SC_ROWS=[];
+    ws.eachRow((row,n)=>{
+      if(n<=hdrRow)return;const v=row.values||[];const g=k=>C[k]>=0?scCell(v[C[k]]):'';
+      const r={n:n,comp:g('comp'),org:g('org'),date:scDate(C.date>=0?v[C.date]:''),sport:g('sport'),div:g('div'),school:g('school'),code:g('code'),team:g('team'),name:g('name'),birth:scDate(C.birth>=0?v[C.birth]:''),gender:g('gender'),result:g('result')||'참가',note:g('note')};
+      if(!r.name&&!r.comp)return;
+      if(/예시 행/.test(r.note))return;
+      SC_ROWS.push(r);
+    });
+    if(!SC_ROWS.length)throw new Error('데이터 행이 없습니다.');
+    SC_PENDING=null;
+    try{const ps=await DB.collection('schoolClubResults').where('status','==','pending').limit(2000).get();SC_PENDING=ps.docs.map(d=>Object.assign({id:d.id},d.data()))}catch(e){SC_PENDING=[];SC_PENDING_ERR=e.message}
+    SC_ROWS.forEach(scMatchRow);
+    SC_IMPORT_ID='sc'+Date.now().toString(36);SC_FILE=f.name;SC_BACKED=false;
+    scRender();
+  }catch(e){b.innerHTML='<b style="color:#C41E2F">읽기 실패: '+esc(e.message)+'</b>'}
+}
+let SC_PENDING_ERR='';
+function scSchoolInfo(r){
+  let code=String(r.code||'').trim(),known=false;
+  const canon=scCanon(r.school);
+  let list=[];try{list=(KFDF.schoolSearch(r.school,60)||[])}catch(e){}
+  const hit=list.find(x=>scCanon(x.name)===canon)||(list.length===1?list[0]:null);
+  if(hit){known=true;if(!code)code=hit.code||''}
+  const sido=SC_SIDO[code.slice(0,3)]||'';
+  return {code:code,sido:sido,canon:canon,known:known};
+}
+function scMatchRow(r){
+  r.err='';r.warn='';r.cands=[];r.pick='';r.status='';r.dupPending=null;
+  if(!r.name)r.err='성명 없음';else if(!r.date)r.err='대회일자 없음·형식 오류';else if(!r.birth)r.warn='생년월일 없음';
+  const si=scSchoolInfo(r);r.schoolCode=si.code;r.schoolSido=si.sido;r.schoolKnown=si.known;r.canon=si.canon;
+  if(!r.err&&IS_SIDO&&si.sido&&CMY&&CMY.sido&&si.sido!==CMY.sido)r.err='관할 밖 학교('+si.sido+')';
+  if(IS_SIDO&&!si.sido)r.warn=(r.warn?r.warn+' · ':'')+'학교 시도 판정 불가';
+  const nm=scNorm(r.name);
+  const consider=(d,v,who,name,birth,school,schoolCode,kid)=>{
+    if(!name||scNorm(name)!==nm)return;
+    const sameBirth=!!birth&&!!r.birth&&birth===r.birth;
+    const sc=scCanon(school);const sameSchool=(!!schoolCode&&!!r.schoolCode&&schoolCode===r.schoolCode)||(!!sc&&sc===si.canon);
+    let kind='';if(sameBirth&&sameSchool)kind='exact';else if(sameBirth)kind='school';else if(sameSchool)kind='birth';else return;
+    r.cands.push({uid:d.id,who:who,kid:kid||'',name:name,birth:birth||'',school:school||'',kind:kind,status:v.status||''});
+  };
+  USERS.forEach(d=>{const v=d.data()||{};if(v.deleted)return;
+    consider(d,v,'본인',v.name,v.birth,v.school||v.workSchool||'',v.schoolCode||'','');
+    (v.children||[]).forEach(k=>consider(d,v,'자녀 · 보호자 '+(v.name||''),k.name,k.birth,k.school||'',k.schoolCode||'',k.name||''));
+  });
+  const exact=r.cands.filter(c=>c.kind==='exact');
+  if(r.err)r.status='err';
+  else if(exact.length===1){r.pick=exact[0].uid+'|'+exact[0].kid;r.status='auto'}
+  else if(exact.length>1)r.status='multi';
+  else if(r.cands.length)r.status='near';
+  else r.status='none';
+  if(SC_PENDING)r.dupPending=SC_PENDING.find(p=>scNorm(p.name)===nm&&(p.birth||'')===(r.birth||'')&&p.competitionName===r.comp&&p.date===r.date&&p.result===r.result)||null;
+}
+function scRender(){
+  const b=scBoxEl();
+  const cnt={auto:0,multi:0,near:0,none:0,err:0};SC_ROWS.forEach(r=>{cnt[r.status]=(cnt[r.status]||0)+1});
+  const KIND={exact:'✅ 일치',school:'⚠ 학교 다름',birth:'⚠ 생년월일 다름'};
+  const rows=SC_ROWS.map((r,i)=>{
+    const sel='<select onchange="SC_ROWS['+i+'].pick=this.value" style="max-width:280px;font-size:12px;padding:4px 6px;border:1.5px solid #dfe5ee;border-radius:7px"'+(r.status==='err'?' disabled':'')+'>'
+      +'<option value="">'+(r.cands.length?'— 연결 안 함 (보류함에 저장)':'미가입 — 보류함에 저장')+'</option>'
+      +r.cands.map(c=>{const val=c.uid+'|'+c.kid;return '<option value="'+esc(val)+'"'+(val===r.pick?' selected':'')+'>'+KIND[c.kind]+' · '+esc(c.name)+' '+esc(c.birth||'생년월일 없음')+' · '+esc(c.school||'학교 없음')+' · '+esc(c.who)+(c.status==='approved'?'':' (승인 전)')+'</option>'}).join('')
+      +'</select>';
+    const stTxt={auto:'<b style="color:#0f766e">✅ 자동 매칭</b>',multi:'<b style="color:#b45309">⚠ 동명이인 — 선택 필요</b>',near:'<b style="color:#b45309">⚠ 후보 확인 후 선택</b>',none:'<b style="color:#6b7280">⏳ 미가입 → 보류함</b>',err:'<b style="color:#C41E2F">✗ '+esc(r.err)+'</b>'}[r.status];
+    return '<tr'+(r.status==='err'?' style="opacity:.55"':'')+'><td><input type="checkbox" class="scChk" data-i="'+i+'"'+(r.status==='err'?' disabled':'')+'></td><td>'+(i+1)+'</td>'
+      +'<td><b>'+esc(r.name)+'</b><div style="font-size:11px;color:#6b7280">'+esc(r.birth||'생년월일 없음')+(r.gender?' · '+esc(r.gender):'')+'</div></td>'
+      +'<td>'+esc(r.school)+(r.schoolKnown?'':' <span style="font-size:10.5px;color:#b45309">(학교 DB에 없음)</span>')+(r.schoolSido||r.team?'<div style="font-size:11px;color:#6b7280">'+esc(r.schoolSido)+(r.team?' · 팀 '+esc(r.team):'')+'</div>':'')+'</td>'
+      +'<td>'+esc(r.comp)+'<div style="font-size:11px;color:#6b7280">'+esc(r.date)+(r.org?' · '+esc(r.org):'')+(r.sport?' · '+esc(r.sport):'')+(r.div?' · '+esc(r.div):'')+'</div></td>'
+      +'<td style="text-align:center"><b style="color:'+(r.result==='참가'?'#153A77':'#d97706')+'">'+esc(r.result)+'</b></td>'
+      +'<td>'+stTxt+(r.warn?'<div style="font-size:11px;color:#b45309">'+esc(r.warn)+'</div>':'')+(r.dupPending?'<div style="font-size:11px;color:#6b7280">보류함에 같은 기록 있음 → 갱신</div>':'')+'<div style="margin-top:3px">'+sel+'</div></td></tr>';
+  }).join('');
+  b.innerHTML='<div style="font-weight:900;font-size:15.5px;margin-bottom:6px">🏫 학교스포츠클럽 결과 미리보기 — '+SC_ROWS.length+'행 <span style="font-size:12.5px;color:#6b7280;font-weight:600">('+esc(SC_FILE)+' · 업로드 ID '+esc(SC_IMPORT_ID)+')</span></div>'
+    +'<div style="display:flex;gap:6px 14px;flex-wrap:wrap;font-size:12.5px;margin-bottom:8px"><span>✅ 자동 매칭 <b>'+cnt.auto+'</b></span><span>⚠ 확인 필요 <b>'+(cnt.multi+cnt.near)+'</b></span><span>⏳ 미가입(보류) <b>'+cnt.none+'</b></span><span style="color:#C41E2F">✗ 처리 불가 <b>'+cnt.err+'</b></span></div>'
+    +(SC_PENDING_ERR?'<div style="font-size:12px;color:#C41E2F;margin-bottom:6px">보류함(schoolClubResults) 조회 실패: '+esc(SC_PENDING_ERR)+' — 보안 규칙에 schoolClubResults 절이 아직 없으면 보류 저장이 실패합니다.</div>':'')
+    +'<div style="font-size:12.5px;color:#6b7280;margin-bottom:10px;line-height:1.7">성명·생년월일·학교가 모두 맞으면 자동 매칭됩니다. 생년월일이나 학교만 다른 후보는 선생님 오기입·전학일 수 있으니 확인 후 드롭다운에서 직접 고르세요. 미가입 학생은 <b>보류함</b>에 저장되어 가입 후 마이페이지 [내 기록 찾기]로 본인이 가져갑니다.<br>입상(우승·준우승·3위 등)은 <b>참가 기록과 입상 기록이 함께</b> 남으며, 대회 당시 학교가 팀(소속)으로 저장됩니다. 경력 점수는 현재 부여하지 않습니다(회장단 결정 전까지).</div>'
+    +'<div class="tblwrap"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:920px"><thead><tr><th style="width:34px"></th><th>#</th><th>성명·생년월일</th><th>학교</th><th>대회</th><th>결과</th><th>판정 · 연결할 회원</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +bulkBtns('scChk','scApply','scPreview','scBackup','scUndo');
+}
+function scBackup(){
+  if(!SC_ROWS.length){alert('먼저 [미리보기]를 실행해주세요.');return}
+  const data={job:'schoolClub',version:SC_V,importId:SC_IMPORT_ID,file:SC_FILE,at:new Date().toISOString(),count:SC_ROWS.length,
+    rows:SC_ROWS.map(r=>({n:r.n,name:r.name,birth:r.birth,school:r.school,schoolCode:r.schoolCode,comp:r.comp,org:r.org,date:r.date,sport:r.sport,div:r.div,team:r.team,result:r.result,status:r.status,pick:r.pick,cands:r.cands}))};
+  scDownload('학교스포츠클럽_업로드백업_'+SC_IMPORT_ID+'.json',new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));
+  SC_BACKED=true;
+  alert('💾 백업 파일을 내려받았습니다.\n\n파일이 실제로 저장됐는지 확인한 뒤 적용을 진행해주세요.');
+}
+async function scApply(mode){
+  if(!SC_ROWS.length){alert('먼저 [미리보기]를 실행해주세요.');return}
+  if(!SC_BACKED){alert('⚠ 먼저 [① 백업 내려받기]를 실행해주세요.\n회원 경력을 쓰는 작업이라 백업이 필수입니다.');return}
+  if(!window.CAREER||!CAREER.write){alert('경력 모듈(career.js)을 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.');return}
+  const base=(mode==='sel')?bulkPicked('scChk',SC_ROWS):SC_ROWS.filter(r=>r.status!=='err');
+  if(!base.length){alert((mode==='sel')?'선택된 행이 없습니다.\n위 표에서 처리할 행을 체크해주세요. (한 명만 체크하면 시험 적용)':'처리할 수 있는 행이 없습니다.');return}
+  const linked=base.filter(r=>r.pick),hold=base.filter(r=>!r.pick);
+  if(!confirm('학교스포츠클럽 결과 '+base.length+'행을 반영합니다.\n\n· 회원 경력에 기록: '+linked.length+'행'+(linked.length?' ('+linked.slice(0,6).map(r=>r.name).join(', ')+(linked.length>6?' …':'')+')':'')+'\n· 보류함 저장(미가입·미연결): '+hold.length+'행\n· 문제가 있으면 [↩ 되돌리기]로 이 업로드분(ID '+SC_IMPORT_ID+')만 지울 수 있습니다\n\n진행할까요?'))return;
+  const b=scBoxEl();let done=0,held=0;const fail=[];const by=(CMY&&CMY.name)||'관리자';
+  for(const r of base){
+    try{
+      if(r.pick){
+        const parts=r.pick.split('|');const uid=parts[0],kid=parts.slice(1).join('|');
+        const c=r.cands.find(x=>x.uid===uid&&(x.kid||'')===(kid||''));
+        const rec={uid:uid,name:(c&&c.name)||r.name,date:r.date,competitionName:r.comp,sport:r.sport,division:r.div,team:r.team||r.school,organizer:r.org,location:'',
+          slotId:'schoolclub:'+r.comp+':'+r.date+(kid?':'+kid:''),source:'schoolclub-import',kidName:kid||'',
+          importId:SC_IMPORT_ID,teamSchoolCode:r.schoolCode||'',schoolName:r.school||'',noPoints:true,matchType:(c&&c.kind==='exact')?'auto':'manual',gender:r.gender||''};
+        await CAREER.write(DB,Object.assign({},rec,{role:'참가자',group:'선수',kind:'athlete',result:''}),by);
+        if(r.result&&r.result!=='참가')await CAREER.write(DB,Object.assign({},rec,{role:'입상',group:'입상',kind:'award',result:r.result}),by);
+        done++;
+      }else{
+        const doc={competitionName:r.comp,organizer:r.org,date:r.date,sport:r.sport,division:r.div,school:r.school,schoolNorm:r.canon,schoolCode:r.schoolCode||'',schoolSido:r.schoolSido||'',team:r.team,
+          name:r.name,nameNorm:scNorm(r.name),birth:r.birth,gender:r.gender,result:r.result,note:r.note,status:'pending',importId:SC_IMPORT_ID,by:by,byUid:(AUTH.currentUser||{}).uid||'',at:new Date().toISOString()};
+        if(r.dupPending&&r.dupPending.id)await DB.collection('schoolClubResults').doc(r.dupPending.id).update(doc);
+        else await DB.collection('schoolClubResults').add(doc);
+        held++;
+      }
+    }catch(e){fail.push(r.name+' — '+e.message)}
+    b.innerHTML='반영 중… '+(done+held+fail.length)+' / '+base.length;
+  }
+  try{
+    const ref=DB.collection('siteContent').doc('migrationLog');const c2=await ref.get();
+    const arr=(((c2.exists&&c2.data())||{}).items||[]).slice(-199);
+    arr.push({job:'schoolClub',v:SC_V,at:new Date().toISOString(),by:by,importId:SC_IMPORT_ID,file:SC_FILE,ok:done,hold:held,fail:fail.length});
+    await ref.set({items:arr},{merge:true});
+  }catch(e){}
+  b.innerHTML='<b style="color:#0f766e;font-size:15px">✅ 반영 완료 — 경력 기록 '+done+'행 · 보류함 '+held+'행</b>'
+    +'<div style="font-size:12.5px;color:#153A77;font-weight:700;margin-top:6px">업로드 ID: '+esc(SC_IMPORT_ID)+' — 되돌릴 때 이 ID를 씁니다</div>'
+    +(fail.length?'<div style="margin-top:8px;color:#C41E2F;font-size:12.5px">⚠ 실패 '+fail.length+'건<br>'+fail.map(esc).join('<br>')+(/permission/i.test(fail.join(' '))?'<br><b>permission 오류는 보안 규칙에 schoolClubResults 절이 없을 때 납니다 — 규칙 문안(제안_D_규칙_v19)을 게시한 뒤 다시 적용하세요.</b>':'')+'</div>':'')
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'
+    +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="scUndo()">↩ 이 업로드 되돌리기</button>'
+    +'<button class="btn-sub" style="background:#1F4E9C" onclick="scPreview()">🔄 다시 미리보기</button></div>';
+}
+async function scUndo(){
+  const id=prompt('되돌릴 업로드 ID를 입력하세요 (반영 완료 화면·백업 파일·이력에 표시됨):',SC_IMPORT_ID||'');
+  if(id===null)return;const iid=id.trim();if(!iid){alert('업로드 ID가 필요합니다.');return}
+  if(!confirm('업로드 ID ['+iid+'] 로 기록된 경력(staffCareer)과 보류함(schoolClubResults) 문서를 모두 삭제합니다.\n\n진행할까요?'))return;
+  const b=scBoxEl();b.innerHTML='되돌리는 중…';
+  let n1=0,n2=0;const fail=[];
+  try{const s1=await DB.collection('staffCareer').where('importId','==',iid).limit(1000).get();for(const d of s1.docs){try{await d.ref.delete();n1++}catch(e){fail.push('경력 '+d.id+': '+e.message)}}}catch(e){fail.push('경력 조회: '+e.message)}
+  try{const s2=await DB.collection('schoolClubResults').where('importId','==',iid).limit(1000).get();for(const d of s2.docs){try{await d.ref.delete();n2++}catch(e){fail.push('보류함 '+d.id+': '+e.message)}}}catch(e){fail.push('보류함 조회: '+e.message)}
+  b.innerHTML='<b style="color:#0f766e">↩ 되돌리기 완료 — 경력 '+n1+'건 · 보류함 '+n2+'건 삭제</b>'+(fail.length?'<div style="margin-top:8px;color:#C41E2F;font-size:12.5px">'+fail.map(esc).join('<br>')+'</div>':'');
+}
+async function scPendingList(){
+  const b=scBoxEl();b.innerHTML='보류함을 불러오는 중…';
+  try{
+    const ps=await DB.collection('schoolClubResults').where('status','==','pending').limit(2000).get();
+    const list=ps.docs.map(d=>Object.assign({id:d.id},d.data())).filter(p=>!IS_SIDO||!p.schoolSido||!CMY||!CMY.sido||p.schoolSido===CMY.sido).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(a.school||'').localeCompare(String(b.school||'')));
+    if(!list.length){b.innerHTML='<b style="color:#0f766e">보류 중인 기록이 없습니다.</b>';return}
+    const byComp={};list.forEach(p=>{const k=(p.competitionName||'')+' ('+(p.date||'')+')';(byComp[k]=byComp[k]||[]).push(p)});
+    b.innerHTML='<div style="font-weight:900;font-size:15.5px;margin-bottom:6px">⏳ 보류함 — 미가입 학생 기록 '+list.length+'건</div>'
+      +'<div style="font-size:12.5px;color:#6b7280;margin-bottom:10px;line-height:1.7">아직 회원이 아닌 학생의 기록입니다. 가입 후 본인(또는 보호자)이 마이페이지 [내 기록 찾기]로 가져가면 여기서 빠집니다.</div>'
+      +Object.keys(byComp).map(k=>'<div style="font-weight:800;margin:10px 0 4px;color:#153A77">'+esc(k)+' — '+byComp[k].length+'명</div>'
+        +'<div class="tblwrap"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:640px"><thead><tr><th>성명</th><th>생년월일</th><th>학교</th><th>부문</th><th>결과</th><th>업로드</th><th></th></tr></thead><tbody>'
+        +byComp[k].map(p=>'<tr><td><b>'+esc(p.name)+'</b></td><td>'+esc(p.birth||'-')+'</td><td>'+esc(p.school||'')+(p.schoolSido?' <span style="color:#8a919d">('+esc(p.schoolSido)+')</span>':'')+'</td><td>'+esc(p.division||'-')+'</td><td>'+esc(p.result||'')+'</td><td style="font-size:11.5px;color:#6b7280">'+esc(p.importId||'')+'<br>'+esc(String(p.at||'').slice(0,10))+'</td>'
+          +'<td><button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F;padding:3px 9px;font-size:11.5px" onclick="scPendingDel(\''+p.id+'\')">삭제</button></td></tr>').join('')
+        +'</tbody></table></div>').join('');
+  }catch(e){b.innerHTML='<b style="color:#C41E2F">보류함 조회 실패: '+esc(e.message)+'</b><div style="font-size:12px;color:#6b7280;margin-top:4px">보안 규칙에 schoolClubResults 절이 아직 없으면 조회가 막힙니다.</div>'}
+}
+async function scPendingDel(id){
+  if(!confirm('이 보류 기록을 삭제할까요?'))return;
+  try{await DB.collection('schoolClubResults').doc(id).delete();scPendingList()}catch(e){alert('삭제 실패: '+e.message)}
+}
+
 function bulkBtns(cls,fnApply,fnScan,fnBackup,fnUndo){
   return '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'
     +'<button class="btn-sub" style="background:#153A77" onclick="'+fnBackup+'()">💾 ① 백업 내려받기 (필수)</button>'
