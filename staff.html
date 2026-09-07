@@ -1185,6 +1185,20 @@ async function _renderDetailInner(isStale){
   };
   let appsHtml;
   if(!dayApps.length)appsHtml='<div style="font-size:12.5px;color:#8a919d;padding:8px 0">이 날짜 신청자가 아직 없습니다.</div>';
+  else if(!manage){
+    // [비노출·2026-09-07] 관리 권한이 없는 회원에게는 다른 신청자의 행을 그리지 않습니다(마스킹 여부와 무관).
+    //   본인 신청이 있으면 본인 행만, 없으면 인원수 집계만. 관리자 화면(manage)은 아래 else 그대로.
+    const mine=SME?dayApps.filter(a=>a.uid===SME.uid):[];
+    if(!mine.length)appsHtml='<div style="font-size:12.5px;color:#6b7280;padding:8px 0">신청자 '+dayApps.length+'명 · 다른 신청자의 정보는 개인정보 보호를 위해 표시하지 않습니다.</div>';
+    else appsHtml='<div class="sttbl-wrap"><table class="sttbl" style="margin-top:6px"><tr><th>성명</th><th>자격증</th><th>희망 임무</th><th>상태</th></tr>'
+      +mine.map(a=>{
+        const st=(a.status&&a.status[dd.date])||'대기';
+        const asg=a.assign&&a.assign[dd.date];
+        const stHtml=st==='확정'?'<b style="color:#0f766e">✅ 확정'+(asg?' <span style="font-size:11px">('+esc(asg.duty)+')</span>':'')+'</b>':st==='거절'?'<b style="color:#C41E2F">❌ 거절</b>':st==='보류'?'<b style="color:#b8860b">⏳ 보류</b>':'<span style="color:#6b7280">대기</span>';
+        return '<tr><td><b>'+esc(a.name)+'</b> <span style="font-size:11px;color:#8a919d">(본인)</span></td><td>'+esc(topLic(a.lic||'-'))+'</td><td style="font-size:12px">'+esc(((a.prefs||{})[dd.date]||[]).join(', ')||'-')+'</td><td style="text-align:center;white-space:nowrap">'+stHtml+'</td></tr>';
+      }).join('')+'</table></div>'
+      +'<div style="font-size:11.5px;color:#8a919d;margin-top:4px">신청자 '+dayApps.length+'명 중 본인 신청만 표시됩니다.</div>';
+  }
   else{
     const today=new Date().toISOString().slice(0,10);
     appsHtml='<div class="sttbl-wrap"><table class="sttbl" style="margin-top:6px"><tr><th>번호</th><th>성명</th>'+(manage?'<th>연락처</th>':'')+(manage?'<th>심판 자격</th><th>지도자 자격</th>':'<th>자격증</th>')+'<th>희망 임무</th><th>상태</th>'+(manage?'<th>동의서</th>':'')+(manage?'<th>선정</th>':'')+'</tr>'
@@ -1238,7 +1252,7 @@ async function _renderDetailInner(isStale){
     +((p.consentForm&&p.consentForm!=='none'&&p.consentFormUrl)?'<div style="font-size:13px;margin-top:5px"><b>서면 동의서 양식:</b> <a href="'+esc(p.consentFormUrl)+'" target="_blank" style="color:#153A77;font-weight:800">📎 '+esc(p.consentFormName||'내려받기')+' →</a></div>':'')
     +'<div style="font-size:13px;margin-top:12px"><b>👥 신청 현황 ('+dayApps.length+'명)</b></div>'+appsHtml
     +'</div>'
-    +confirmPanelHtml(Object.assign({_postId:p.id},dd),dayApps,_decide)   // [확정현황] 역할별 인원수·명단 패널 (+임무 완료 버튼)
+    +confirmPanelHtml(Object.assign({_postId:p.id},dd),dayApps,_decide,manage)   // [확정현황] 역할별 인원수·명단 패널 (+임무 완료 버튼) · manage=false 면 인원수만
     +'</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">'
     // [권한개선] 공고 수정·복사 = canManage / 수당엑셀·자격확인·경력등록 = canDecide
@@ -1455,7 +1469,10 @@ async function submitApply(postId){
 }
 // ══════════════ [확정현황] 역할별 확정 인원수·명단 패널 ══════════════
 // copyRoster()가 쓰는 것과 동일한 방식으로 확정자를 임무별로 묶습니다.
-function confirmPanelHtml(dd,dayApps,canDecideNow){
+function confirmPanelHtml(dd,dayApps,canDecideNow,viewerManage){
+  // [비노출·2026-09-07] viewerManage===false(관리 권한 없는 회원)면 임무별 인원수만 — 이름·자격·수당 금액은 그리지 않습니다.
+  //   인자를 생략한 기존 호출은 종전과 동일하게 전체 명단을 그립니다.
+  const restricted=(viewerManage===false);
   const conf=(dayApps||[]).filter(a=>(a.status||{})[dd.date]==='확정');
   const byDuty={};
   conf.forEach(a=>{const duty=(a.assign&&a.assign[dd.date]&&a.assign[dd.date].duty)||'미지정';(byDuty[duty]=byDuty[duty]||[]).push(a)});
@@ -1474,14 +1491,16 @@ function confirmPanelHtml(dd,dayApps,canDecideNow){
         +'<b style="font-size:12.5px;color:#153A77">'+esc(duty)+'</b>'
         +'<span style="background:#153A77;color:#fff;font-size:11px;font-weight:900;border-radius:999px;padding:1px 8px">'+list.length+'명</span>'
         +'</div>'
-        +'<div style="margin-top:5px;display:flex;flex-direction:column;gap:3px">'
+        +(restricted?'':'<div style="margin-top:5px;display:flex;flex-direction:column;gap:3px">'
         +list.map(a=>'<div style="display:flex;align-items:center;gap:5px;font-size:12px">'
             +'<span style="flex:1">'+esc(a.name||'')+(a.lic?' <span style="color:#8a919d;font-size:11px">'+esc(a.lic)+'</span>':'')
             +((a.assign&&a.assign[dd.date]&&a.assign[dd.date].pay)?' <span style="color:#b8860b;font-size:11px;font-weight:800">'+esc(a.assign[dd.date].pay)+'</span>':'')+'</span>'
             +(canDecideNow?'<button class="stbtn" title="확정 취소" onclick="unconfirmApp(\''+a.id+'\',\''+dd.date+'\')" style="padding:2px 7px;font-size:10.5px;background:#fff;color:#C41E2F;border:1px solid #f1c7cc">취소</button>':'')
           +'</div>').join('')
-        +'</div></div>';
+        +'</div>')+'</div>';
     }).join('');
+    // 본인이 확정된 경우에만 내 배정 임무 한 줄
+    if(restricted&&SME){const me=conf.find(a=>a.uid===SME.uid);if(me){const md=(me.assign&&me.assign[dd.date]&&me.assign[dd.date].duty)||'미지정';rows+='<div style="border-top:1px solid #e8eef7;padding:9px 0;font-size:12.5px;font-weight:800;color:#0f766e">✅ 내 배정: '+esc(md)+'</div>'}}
   }
   const totalQuota=Object.keys(quota).reduce((s,k)=>s+(+quota[k]||0),0);
   return '<div class="dtside" style="border:1.5px solid #cfe3d8;border-radius:12px;padding:12px 14px;margin-top:10px;background:#f7fbf9">'
