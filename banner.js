@@ -15,7 +15,7 @@
       +'.kb-slide.on{opacity:1}'
       +'.kb-kb .kb-slide.on{animation:kbZoom var(--kb-dur,9s) ease-out forwards}'
       +'@keyframes kbZoom{from{transform:scale(1)}to{transform:scale(1.07)}}'
-      +'.kb-shade{position:absolute;inset:0;background:linear-gradient(100deg,rgba(15,16,19,.94) 0%,rgba(15,16,19,.8) 42%,rgba(15,16,19,.38) 100%)}'
+      +'.kb-shade{position:absolute;inset:0;background:linear-gradient(100deg,rgba(11,18,64,.62) 0%,rgba(11,18,64,.34) 46%,rgba(11,18,64,.04) 100%)}'   /* [2026-09-07] 사진이 잘 보이도록 필터를 크게 낮춤 */
       +'.kb-ui{position:absolute;left:0;right:0;bottom:0;z-index:2;pointer-events:none}'
       +'.kb-cap{position:absolute;right:22px;bottom:16px;pointer-events:auto;display:inline-flex;align-items:center;gap:8px;max-width:min(60%,420px);background:rgba(11,26,58,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:8px 12px;color:#fff;text-decoration:none;font-size:12.5px;line-height:1.35;transition:opacity .4s}'
       +'.kb-cap b{display:block;font-size:13px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
@@ -24,7 +24,7 @@
       +'.kb-dots{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:6px;pointer-events:auto}'
       +'.kb-dot{width:8px;height:8px;border-radius:999px;background:rgba(255,255,255,.4);border:0;padding:0;cursor:pointer;transition:all .3s}'
       +'.kb-dot.on{background:#ffd166;width:22px}'
-      +'@media(max-width:760px){.kb-cap{right:10px;bottom:10px;max-width:70%;padding:6px 9px}.kb-cap b{font-size:12px}.kb-shade{background:linear-gradient(180deg,rgba(15,16,19,.82) 0%,rgba(15,16,19,.86) 100%)}}';
+      +'@media(max-width:760px){.kb-cap{right:10px;bottom:10px;max-width:70%;padding:6px 9px}.kb-cap b{font-size:12px}.kb-shade{background:linear-gradient(180deg,rgba(11,18,64,.5) 0%,rgba(11,18,64,.6) 100%)}}';
     document.head.appendChild(st);
   }
   function camIcon(){return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1zM12 17a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/></svg>'}
