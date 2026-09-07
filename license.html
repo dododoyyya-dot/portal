@@ -1600,7 +1600,81 @@ async function loadLics(){
   LICS=docs.sort((a,b)=>(b.data().issuedAt||'').localeCompare(a.data().issuedAt||''));
   renderLics();
 }
-// ── 대장 성명 정정 (개명·오기) ──
+// ── 대장 정보 수정 (성명 정정 기능 통합) ──
+//    성명·종류·급수·발급일·상태·발급연맹·비고: 관할 연맹(시도임원)·권역·중앙.
+//    유효기간: 규칙상 시도임원은 직접 못 바꿈(갱신 요청→중앙 승인) → 중앙·권역만 입력 가능, 시도임원엔 잠금 표시.
+//    소속(region)은 번호 재발번이 따르므로 여기서 다루지 않고 [↪ 소속 이관](중앙)으로 안내.
+//    바뀐 항목만 기록하고, editLog[] 에 누가·언제·무엇을·왜 바꿨는지 남깁니다.
+const LC_ICO_EDIT='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M4 20h4l11-11-4-4L4 16v4z"/><path d="M13 7l4 4"/></svg>';
+const LC_EDIT_FIELDS=[
+  ['name','성명','text','자격증 출력물에 표시되는 이름 — 개명·오기 정정 시에만 (타인 명의 변경 금지)'],
+  ['type','종류','select',['지도자','심판']],
+  ['grade','급수','select',['1급','2급','3급']],
+  ['issuedAt','발급일','date',''],
+  ['expireAt','유효기간','date','만료일 — 시도연맹은 갱신 요청으로 처리(중앙 승인)'],
+  ['status','상태','select',['유효','만료']],
+  ['issuer','발급연맹','text','예: 경기연맹 · 중앙연맹'],
+  ['memo','비고','text','내부 메모 (출력물에 표시되지 않음)']
+];
+function closeEditLic(){const o=document.getElementById('lcEditOv');if(o)o.remove()}
+function editLic(id){
+  const doc=LICS.find(d=>d.id===id);if(!doc)return;
+  const l=doc.data();
+  if(!(LICWRITE&&inJurL(l.region))){alert('타 관할 자격은 조회만 가능합니다.');return}
+  if(l.status==='이관'){alert('이관 처리된 옛 번호는 수정하지 않습니다. 새 번호('+(l.movedTo||'')+')에서 수정해 주세요.');return}
+  const canExp=!!LICCLAIMS;   // 유효기간 직접 수정 = 중앙·권역만
+  closeEditLic();
+  const ov=document.createElement('div');ov.id='lcEditOv';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:100001;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.addEventListener('click',e=>{if(e.target===ov)closeEditLic()});
+  const cur=k=>k==='name'?(l.name||l.maskName||''):(l[k]||'');
+  const f=LC_EDIT_FIELDS.map(([k,lab,ty,opt])=>{
+    const lock=(k==='expireAt'&&!canExp);
+    let inp='';
+    if(ty==='select')inp='<select id="le_'+k+'" class="lcin"'+(lock?' disabled':'')+'>'+(opt.indexOf(cur(k))<0&&cur(k)?'<option selected>'+esc(cur(k))+'</option>':'')+opt.map(o=>'<option'+(o===cur(k)?' selected':'')+'>'+o+'</option>').join('')+'</select>';
+    else inp='<input id="le_'+k+'" class="lcin" type="'+ty+'" value="'+esc(cur(k))+'"'+(lock?' disabled style="background:#f1f4f8;color:#8a919d"':'')+'>';
+    return '<label style="display:block"><span style="display:block;font-size:12px;font-weight:800;color:#153A77;margin-bottom:4px">'+lab+(lock?' <span style="color:#8a919d;font-weight:700">· 잠김(중앙·권역만)</span>':'')+'</span>'+inp
+      +(ty!=='select'&&opt?'<span style="display:block;font-size:11.5px;color:#8a919d;margin-top:3px;line-height:1.45">'+opt+'</span>':'')+'</label>'}).join('');
+  ov.innerHTML='<div style="background:#fff;border-radius:18px;max-width:560px;width:100%;max-height:92vh;overflow:auto;box-shadow:0 24px 60px rgba(0,0,0,.35);padding:22px 24px">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px"><b style="font-size:17px;flex:1">'+LC_ICO_EDIT+'자격 정보 수정 — '+esc(id)+'</b><button class="lcbtn g" onclick="closeEditLic()">닫기</button></div>'
+    +'<div style="font-size:12.5px;color:#6b7280;margin-bottom:14px;line-height:1.6">소속: <b style="color:#111">'+esc(l.region||'미지정')+'</b>'+(l.uid?' · 회원 연결됨':' · 회원 미연결')+'<br>바뀐 항목만 저장되고 수정 이력(누가·언제·무엇을)이 대장에 남습니다. 소속 변경은 번호가 바뀌므로 '+(CENTRAL?'[↪ 소속 이관]':'중앙(소속 이관)')+'에서 처리합니다.</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 14px">'+f+'</div>'
+    +'<label style="display:block;margin-top:14px"><span style="display:block;font-size:12px;font-weight:800;color:#153A77;margin-bottom:4px">수정 사유 <span style="color:#8a919d;font-weight:700">(이력에 기록 · 권장)</span></span><input id="le_reason" class="lcin" placeholder="예: 개명 반영 / 발급일 오기 정정 / 대장 이기 오류"></label>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button class="lcbtn g" onclick="closeEditLic()">취소</button><button class="lcbtn p" onclick="saveEditLic(\''+esc(id)+'\')">저장</button></div></div>';
+  document.body.appendChild(ov);
+}
+async function saveEditLic(id){
+  const doc=LICS.find(d=>d.id===id);if(!doc)return;
+  const l=doc.data();const canExp=!!LICCLAIMS;
+  const v=k=>{const e=document.getElementById('le_'+k);return e?String(e.value||'').trim():''};
+  const patch={},log={};
+  for(const [k,lab,ty] of LC_EDIT_FIELDS){
+    if(k==='expireAt'&&!canExp)continue;
+    const before=(k==='name'?(l.name||l.maskName||''):(l[k]||''));const after=v(k);
+    if(after===before)continue;
+    if(k==='name'&&!after){alert('성명을 입력해주세요.');return}
+    if(ty==='date'&&after&&!/^\d{4}-\d{2}-\d{2}$/.test(after)){alert(lab+' 형식이 올바르지 않습니다 (YYYY-MM-DD).');return}
+    patch[k]=after;log[k]=[before,after];
+  }
+  if(patch.issuedAt!==undefined||patch.expireAt!==undefined){const ia=patch.issuedAt!==undefined?patch.issuedAt:(l.issuedAt||''),ea=patch.expireAt!==undefined?patch.expireAt:(l.expireAt||'');if(ia&&ea&&ea<ia){alert('유효기간이 발급일보다 앞설 수 없습니다.');return}}
+  const keys=Object.keys(patch);
+  if(!keys.length){alert('바뀐 항목이 없습니다.');return}
+  if(patch.name!==undefined){patch.maskName=patch.name;patch.nameFixedFrom=log.name[0];patch.nameFixedAt=firebase.firestore.FieldValue.serverTimestamp()}
+  const reason=v('reason');
+  const labOf=k=>(LC_EDIT_FIELDS.find(x=>x[0]===k)||[k,k])[1];
+  if(!confirm('['+id+'] 다음 항목을 수정합니다.\n\n'+keys.map(k=>'· '+labOf(k)+': 「'+(log[k][0]||'-')+'」 → 「'+(log[k][1]||'-')+'」').join('\n')+(reason?'\n\n사유: '+reason:'')+'\n\n계속할까요?'))return;
+  const entry={at:new Date().toISOString(),by:((LME&&LME.uid)||''),byName:((LMY&&LMY.name)||''),reason:reason,changes:log};
+  patch.editLog=firebase.firestore.FieldValue.arrayUnion(entry);
+  patch.editedAt=firebase.firestore.FieldValue.serverTimestamp();
+  try{
+    await DB.collection('licenses').doc(id).update(patch);
+    if(l.uid){try{await addHist(l.uid,'[자격] 대장 정보 수정 — '+keys.map(k=>labOf(k)+' '+(log[k][0]||'-')+'→'+(log[k][1]||'-')).join(', ')+' ('+id+')'+(reason?' · '+reason:''))}catch(e){}}
+    closeEditLic();
+    alert('✓ 수정되었습니다: '+keys.map(labOf).join(', '));
+    loadLics();
+  }catch(e){alert('실패: '+e.message+(/permission/i.test(e.message)?'\n(관할이 아니거나 시도연맹이 유효기간을 직접 바꾸려 한 경우 규칙에 막힙니다)':''))}
+}
+// ── (구) 대장 성명 정정 — editLic 으로 통합됨. 직접 호출용으로만 남김 ──
 async function renameLic(id){
   const doc=LICS.find(d=>d.id===id);if(!doc)return;
   const l=doc.data();
@@ -1724,7 +1798,7 @@ function renderLics(){
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
       +(LC_PRINTABLE(l)?'<label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#153A77;cursor:pointer"><input type="checkbox" class="lcsel" value="'+esc(d.id)+'" style="width:auto;margin:0"> 선택</label>'
         +'<button class="lcbtn p" onclick="printLicCerts(\''+d.id+'\')" title="이 자격증을 인쇄·PDF 저장">'+LC_ICO_PRINT+'자격증 출력</button>':'')
-      +((LICWRITE&&inJurL(l.region))?'<button class="lcbtn b" onclick="renameLic(\''+d.id+'\')">✏️ 성명 수정</button>':'')
+      +((LICWRITE&&inJurL(l.region))?'<button class="lcbtn b" onclick="editLic(\''+d.id+'\')" title="성명·종류·급수·발급일·유효기간·상태·발급연맹 수정">'+LC_ICO_EDIT+'정보 수정</button>':'')
       +(l.uid?'<button class="lcbtn ghost" onclick="showLicMember(\''+d.id+'\')">👤 연결회원</button>':((LICWRITE&&inJurL(l.region))?'<button class="lcbtn s" onclick="linkLic(\''+d.id+'\')">🔗 회원 연동</button>':''))
       +((l.uid&&LICWRITE&&inJurL(l.region))?'<button class="lcbtn d" onclick="unlinkLic(\''+d.id+'\')">🔗 연결 해제</button>':'')
       +(CENTRAL?'<button class="lcbtn g" onclick="moveLic(\''+d.id+'\')">↪ 소속 이관</button>':'')
