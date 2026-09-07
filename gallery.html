@@ -120,7 +120,7 @@
     <span class="gl-chip on" data-f="all" onclick="glFilter('all',this)">전체</span>
     <span class="gl-chip" data-f="year" onclick="glFilter('year',this)">올해</span>
     <span id="glAdminChips" style="display:none"><span class="gl-chip" data-f="draft" onclick="glFilter('draft',this)" style="border-color:#b8860b;color:#8a5a00;display:inline-flex;align-items:center;gap:4px"><i data-ci="edit"></i>초안 <b id="glDraftN">0</b></span>
-      <button class="gl-btn gold" onclick="glNew()" style="display:inline-flex;align-items:center;gap:5px"><i data-ci="plus"></i>새 사진첩</button></span>
+      <button class="gl-btn gold" onclick="glNew()" style="display:inline-flex;align-items:center;gap:5px"><i data-ci="plus"></i>새 사진첩</button> <button class="gl-btn" onclick="hbOpen()" style="display:inline-flex;align-items:center;gap:5px;background:#0b1a3a" title="홈 화면 메인 배너에 ★배너 항목을 슬라이드로 보여주는 설정과 미리보기"><i data-ci="home"></i>홈 배너 설정·미리보기</button></span>
   </div>
   <div id="glList" class="gl-grid"><div class="bempty" style="grid-column:1/-1">불러오는 중…</div></div>
   <div id="glDetail" style="display:none;margin-top:10px"></div>
@@ -131,6 +131,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260821"></script>
 <script src="career.js?v=20260907a"></script>
+<script src="banner.js?v=20260907"></script>
 <script>
 // ══════════ 사진첩 — gallery/{id} {title,date,endDate,place,sport,summary,cover,media[{type:'img'|'yt',url,caption}],status:'draft'|'published',featured,refKind,refId} ══════════
 //  공개 열람은 published 만, 관리자·시도임원은 초안(draft)도 보고 편집·공개·대표(배너) 지정을 합니다.
@@ -143,6 +144,7 @@ function fmtRange(a,b){if(!a)return '';return a.replace(/-/g,'.')+(b&&b!==a?' ~ 
 KFDF.ready(async function(user,me){
   ME=user;MY=me;CAN=!!(me&&(KFDF.isAdmin(me)||KFDF.isSidoOfficer(me)));
   document.getElementById('glAdminChips').style.display=CAN?'':'none';
+  HB_ADMIN=!!(me&&KFDF.isAdmin(me));   // [홈 배너] 설정 저장은 중앙관리자만(siteContent 규칙), 미리보기는 임원 모두
   await glLoad();
   const id=new URLSearchParams(location.search).get('id');
   if(id)glOpen(id);
@@ -197,6 +199,52 @@ function glOpen(id){
 }
 function glClose(){document.getElementById('glDetail').style.display='none';history.replaceState(null,'','gallery.html');CUR=null}
 function glLight(u){const l=document.createElement('div');l.className='gl-light';l.innerHTML='<img src="'+esc(u)+'">';l.onclick=()=>l.remove();document.body.appendChild(l)}
+// ══════════ [홈 배너 설정·미리보기·2026-09-07] siteContent/homeBanner {enabled,interval(초),caption,kenburns,max} — index.html 메인 배너가 읽음 ══════════
+let HB_ADMIN=false,HB_CFG=null,HB_CTRL=null;
+function hbItems(){return ITEMS.filter(x=>x.featured&&x.status==='published'&&x.cover).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))}
+function hbRead(){const v=id=>document.getElementById(id);return {enabled:v('hbOn').checked,interval:Math.max(1,Math.min(30,+v('hbInt').value||3)),caption:v('hbCap').checked,kenburns:v('hbKb').checked,max:Math.max(1,Math.min(10,+v('hbMax').value||5))}}
+async function hbOpen(){
+  if(!HB_CFG){HB_CFG={};try{const c=await DB.collection('siteContent').doc('homeBanner').get();if(c.exists)HB_CFG=c.data()||{}}catch(e){}}
+  const cfg=HB_CFG;const items=hbItems();
+  const old=document.getElementById('hbModal');if(old)old.remove();
+  const m=document.createElement('div');m.id='hbModal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.65);z-index:9998;display:flex;align-items:flex-start;justify-content:center;padding:14px;overflow:auto';
+  const chk=(id,lab,on)=>'<label style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:800;cursor:pointer"><input type="checkbox" id="'+id+'"'+(on?' checked':'')+' onchange="hbPreview()" style="width:auto"> '+lab+'</label>';
+  m.innerHTML='<div style="background:#fff;border-radius:18px;max-width:1080px;width:100%;margin:8px 0;padding:20px 22px">'
+    +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b style="font-size:17px;display:inline-flex;align-items:center;gap:6px">'+glIco('home',{size:18,color:'#153A77'})+'홈 메인 배너 설정 · 미리보기</b><span style="flex:1"></span><button class="gl-btn soft" onclick="hbClose()">닫기 ✕</button></div>'
+    +'<div style="font-size:12.5px;color:#6b7280;margin-top:4px;line-height:1.6">사진첩에서 <b>배너에 올리기</b>한 항목(공개·대표 사진 있음)이 홈 화면 맨 위 배너 배경에 슬라이드로 나옵니다. 지금 배너 항목 <b style="color:#153A77">'+items.length+'개</b>'+(items.length?' — '+items.map(x=>esc(x.title||'')).join(' · '):' (사진첩 상세에서 [배너에 올리기]를 눌러 추가)')+'</div>'
+    +'<div style="display:flex;gap:10px 16px;flex-wrap:wrap;align-items:center;background:#f6f8fb;border-radius:12px;padding:10px 14px;margin-top:12px">'
+    +chk('hbOn','홈 배너 켜기',cfg.enabled!==false)
+    +'<label style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:800">넘김 간격 <input id="hbInt" type="number" min="1" max="30" value="'+(+cfg.interval||3)+'" oninput="hbPreview()" style="width:58px;padding:5px 7px;border:1.5px solid #dfe5ee;border-radius:8px;font-family:inherit"> 초</label>'
+    +'<label style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:800">최대 <input id="hbMax" type="number" min="1" max="10" value="'+(+cfg.max||5)+'" oninput="hbPreview()" style="width:52px;padding:5px 7px;border:1.5px solid #dfe5ee;border-radius:8px;font-family:inherit"> 장 (최신순)</label>'
+    +chk('hbCap','사진 제목·날짜 표시',cfg.caption!==false)+chk('hbKb','천천히 확대되는 효과',cfg.kenburns!==false)
+    +'<span style="flex:1"></span><button class="gl-btn soft" onclick="hbMobile()" id="hbMobBtn">휴대폰 화면으로 보기</button>'
+    +(HB_ADMIN?'<button class="gl-btn green" onclick="hbSave()">저장 (홈 화면에 적용)</button>':'<span style="font-size:12px;color:#8a5a00;font-weight:700">저장은 중앙관리자만 할 수 있습니다</span>')
+    +'<span id="hbMsg" style="font-size:12.5px;font-weight:800"></span></div>'
+    +'<div style="font-size:12px;color:#6b7280;margin-top:10px">아래는 홈 화면 맨 위 배너를 그대로 본뜬 미리보기입니다. 값을 바꾸면 바로 반영됩니다.</div>'
+    +'<div id="hbStage" style="margin:8px auto 0;max-width:100%;transition:max-width .3s"><div id="hbHero" class="hb-hero"><div class="hb-wrap"><span class="hb-tag">KOREA FLYING DISC FEDERATION</span><h1>대한민국 플라잉디스크의<br><span style="color:#7EB8E8">중심</span>에서, 세계로.</h1><p>대한민국플라잉디스크연맹은 플라잉디스크 종목을 관리·통할하는 유일한 단체로서, 유소년부터 성인까지 모두가 즐기는 친환경 참여형 스포츠의 저변을 넓혀갑니다.</p><div class="hb-btns"><span class="hb-btn" style="background:#C41E2F">학교체육 유형 참여학교 신청</span><span class="hb-btn" style="background:#0f766e">방과후·늘봄 유형 참여학교 신청</span><span class="hb-btn" style="background:#1F4E9C">강사신청</span></div></div></div></div>'
+    +'</div>';
+  if(!document.getElementById('hbCss')){const st=document.createElement('style');st.id='hbCss';st.textContent='.hb-hero{position:relative;overflow:hidden;border-radius:14px;background:linear-gradient(120deg,#0f1013 0%,#1a1c22 55%,#1F4E9C 140%);color:#fff;min-height:300px}.hb-wrap{position:relative;z-index:1;padding:54px 34px 62px;max-width:760px}.hb-tag{display:inline-block;background:#C41E2F;font-size:11px;font-weight:700;padding:4px 11px;border-radius:999px;margin-bottom:14px}.hb-hero h1{font-size:clamp(22px,3.2vw,38px);font-weight:900;letter-spacing:-1px;line-height:1.22;margin:0}.hb-hero p{margin-top:12px;font-size:13.5px;color:#c3c9d4;line-height:1.7}.hb-btns{margin-top:20px;display:flex;gap:8px;flex-wrap:wrap}.hb-btn{padding:9px 16px;border-radius:9px;font-weight:800;font-size:12.5px;color:#fff}#hbStage.mob{max-width:390px}#hbStage.mob .hb-wrap{padding:34px 18px 56px}#hbStage.mob .hb-hero h1{font-size:24px}#hbStage.mob .hb-btn{width:100%;text-align:center}';document.head.appendChild(st)}
+  document.body.appendChild(m);hbPreview();
+}
+function hbPreview(){
+  const host=document.getElementById('hbHero');if(!host||!window.KFDF_BANNER)return;
+  if(HB_CTRL&&HB_CTRL.stop)HB_CTRL.stop();HB_CTRL=null;
+  const o=hbRead();const items=hbItems().slice(0,o.max);
+  [].forEach.call(host.querySelectorAll('.kb-layer,.kb-ui'),e=>e.remove());
+  const msg=document.getElementById('hbMsg');
+  if(!o.enabled){if(msg){msg.textContent='홈 배너 꺼짐 — 기본 배경만 보입니다';msg.style.color='#8a919d'}return}
+  if(!items.length){if(msg){msg.textContent='배너 항목이 없습니다 — 사진첩에서 [배너에 올리기]';msg.style.color='#C41E2F'}return}
+  HB_CTRL=KFDF_BANNER.mount(host,items,{interval:o.interval,caption:o.caption,kenburns:o.kenburns,link:false});
+  if(msg){msg.textContent=items.length+'장 · '+o.interval+'초 간격'+(items.length>1?' 슬라이드':' (한 장이라 고정)');msg.style.color='#0f766e'}
+}
+function hbMobile(){const st=document.getElementById('hbStage');const b=document.getElementById('hbMobBtn');if(!st)return;st.classList.toggle('mob');if(b)b.textContent=st.classList.contains('mob')?'PC 화면으로 보기':'휴대폰 화면으로 보기';hbPreview()}
+function hbClose(){if(HB_CTRL&&HB_CTRL.stop)HB_CTRL.stop();HB_CTRL=null;const m=document.getElementById('hbModal');if(m)m.remove()}
+async function hbSave(){
+  const o=hbRead();const msg=document.getElementById('hbMsg');
+  try{await DB.collection('siteContent').doc('homeBanner').set(Object.assign({},o,{updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:(ME||{}).email||''}),{merge:true});HB_CFG=o;if(msg){msg.textContent='✓ 저장했습니다 — 홈 화면을 새로고침하면 반영됩니다';msg.style.color='#0f766e'}}
+  catch(e){if(msg){msg.textContent='저장 실패: '+(e.code||e.message);msg.style.color='#C41E2F'}}
+}
 // ── 관리자 도구 ──
 function glToolsHtml(){
   const B=(cls,ico,label,attrs)=>'<button class="gl-btn '+cls+'" '+attrs+' style="display:inline-flex;align-items:center;gap:5px">'+glIco(ico,{color:cls.indexOf('soft')>=0?'#333':'#fff',size:14})+label+'</button>';
