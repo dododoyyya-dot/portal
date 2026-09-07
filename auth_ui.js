@@ -51,8 +51,58 @@
       nav.addEventListener('mouseleave',close);mega.addEventListener('mouseleave',close);
       header.addEventListener('mouseleave',close);
     }catch(e){}
+    try{renderSubnav(nav.closest('header'))}catch(e){}
+  }
+  // [서브 내비 2026-09-07] 체육회 서브 화면처럼 헤더 바로 아래에 현재 분야의 하위 메뉴 줄을 둡니다 (홈·메뉴에 없는 페이지는 생략)
+  function renderSubnav(header){
+    if(!header||document.querySelector('.subnav'))return;
+    var here=(location.pathname.split('/').pop()||'index.html').toLowerCase();
+    if(here==='index.html'||here==='')return;
+    var grp=null;
+    MENU.forEach(function(m){if(grp)return;var hit=(m.h.split('#')[0].toLowerCase()===here)||m.d.some(function(x){return x[1].split('#')[0].toLowerCase()===here});if(hit)grp=m});
+    if(!grp)return;
+    var seen={},marked=false;
+    var links=grp.d.filter(function(x){if(seen[x[1]])return false;seen[x[1]]=1;return true});
+    var sn=document.createElement('div');sn.className='subnav';
+    sn.innerHTML='<div class="wrap"><a class="sn-home" href="index.html" aria-label="홈"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></a>'
+      +'<a class="sn-grp" href="'+grp.h+'">'+esc(grp.t)+'</a><div class="sn-links">'
+      +links.map(function(x){var f=x[1].split('#')[0].toLowerCase(),h=x[1].indexOf('#')>=0?x[1].slice(x[1].indexOf('#')):'';var on=!marked&&f===here&&(!h||h===location.hash||!location.hash);if(on)marked=true;return '<a href="'+x[1]+'"'+(on?' class="on"':'')+'>'+esc(x[0])+'</a>'}).join('')+'</div></div>';
+    header.insertAdjacentElement('afterend',sn);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',renderNav);else renderNav();
+  // ══ [사이트 설정 2026-09-07] 관리자 페이지 [사이트 설정]에서 저장한 siteContent/site 를 모든 페이지에 적용 ══
+  //   · 상단 연락처(.util) · 푸터(footer .bottom / .links) · 관련 사이트(.rel) · 홈 히어로(문구·버튼)
+  //   · 문서가 없거나 항목이 비어 있으면 HTML 에 적힌 기본값을 그대로 둡니다 (실패해도 화면 영향 없음)
+  function applySiteContent(){
+    try{
+      if(!window.firebase||!firebase.apps||!firebase.apps.length||!firebase.firestore)return;
+      firebase.firestore().collection('siteContent').doc('site').get().then(function(d){
+        if(!d.exists)return;var c=d.data()||{};
+        var cont=c.contact||{};
+        // 상단 유틸 바 연락처
+        try{var ua=document.querySelector('.util a[href^="mailto:"]');if(ua&&cont.email){ua.href='mailto:'+cont.email;ua.textContent=cont.email}
+          if(ua&&cont.tel){var box=ua.parentNode;box.innerHTML=box.innerHTML.replace(/\d{2,4}-\d{3,4}-\d{4}/,esc(cont.tel))}
+          var ub=document.querySelector('.util .wrap > div:first-child');if(ub&&cont.brandLine)ub.innerHTML='<b>'+esc(cont.org||'대한민국플라잉디스크연맹')+'</b> · '+esc(cont.brandLine);}catch(e){}
+        // 푸터
+        try{var f=c.footer||{};var fb=document.querySelector('footer .bottom');
+          if(fb&&(f.org||cont.org)){fb.innerHTML=(f.notice?'<span style="display:inline-block;margin-bottom:8px;padding:4px 14px;background:rgba(255,255,255,.08);border-radius:999px;font-size:12px;font-weight:700;color:#c3c9d4">'+esc(f.notice)+'</span><br>':'')
+            +'<b>'+esc(f.org||cont.org)+'</b>'+(f.addr?' &nbsp;|&nbsp; '+esc(f.addr):'')+'<br>'
+            +(cont.tel?'TEL '+esc(cont.tel):'')+(cont.tel&&cont.email?' &nbsp;|&nbsp; ':'')+(cont.email?'EMAIL '+esc(cont.email):'')+'<br>'
+            +esc(f.copy||'© 2026 KOREA FLYING DISC FEDERATION. All rights reserved.')+' &nbsp;|&nbsp; <a href="privacy.html" style="color:#9aa1ad">개인정보처리방침</a>'}
+          var fl=document.querySelector('footer .links');if(fl&&f.links&&f.links.length)fl.innerHTML=f.links.filter(function(x){return x&&x.t&&x.h}).map(function(x){return '<a href="'+esc(x.h)+'">'+esc(x.t)+'</a>'}).join('');
+          var fbrand=document.querySelector('footer .f-brand b');if(fbrand&&(f.org||cont.org))fbrand.textContent=(f.org||cont.org).replace(/^사단법인\s*/,'');}catch(e){}
+        // 관련 사이트
+        try{var rel=document.querySelector('.rel .wrap');if(rel&&c.relSites&&c.relSites.length)rel.innerHTML='<b>관련 사이트</b>'+c.relSites.filter(function(x){return x&&x.name&&x.url}).map(function(x){return '<a href="'+esc(x.url)+'" target="_blank" rel="noopener">'+esc(x.name)+'</a>'}).join('')}catch(e){}
+        // 홈 히어로
+        try{var h=c.hero||{};var se=document.querySelector('.hero .slogan-en');if(se&&h.slogan)se.innerHTML=esc(h.slogan)+(h.sloganEm?' <em>'+esc(h.sloganEm)+'</em>':'');
+          var h1=document.querySelector('.hero h1');if(h1&&h.title){var t=esc(h.title);if(h.titleHi&&h.title.indexOf(h.titleHi)>=0)t=t.replace(esc(h.titleHi),'<span class="pt">'+esc(h.titleHi)+'</span>');h1.innerHTML=t}
+          var hp=document.querySelector('.hero .h-grid p');if(hp&&h.desc)hp.textContent=h.desc;
+          var bs=document.querySelectorAll('.hero .hcta a');(h.buttons||[]).forEach(function(b,i){var a=bs[i];if(!a||!b||!b.t)return;var svg=a.querySelector('svg');a.innerHTML=(svg?svg.outerHTML:'')+esc(b.t);if(b.h)a.setAttribute('href',b.h)});
+          var tg=document.querySelector('.hero .tag');if(tg&&h.tag)tg.textContent=h.tag;}catch(e){}
+      }).catch(function(){});
+    }catch(e){}
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',applySiteContent);else applySiteContent();
 
   // ══════════ 업데이트 NEW 배지 (자동 감지) ══════════
   // 공개 조회가 허용된 컬렉션의 '가장 최근 등록 시각'만 읽어, 회원이 마지막으로 본 시점보다

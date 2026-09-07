@@ -7,7 +7,7 @@
 <meta name="naver-site-verification" content="f2bba301d1f9ca2d37efa24800dcad9676123d09" />
 <title>관리자 | 대한민국플라잉디스크연맹</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="style.css?v=20260907b">
+<link rel="stylesheet" href="style.css?v=20260907c">
 <script src="site_config.js"></script>
 </head>
 <body>
@@ -178,9 +178,24 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <button id="t6" onclick="tab(6)">🪧 팝업 관리</button>
       <button id="t7" onclick="tab(7)">📄 동의서 보관함</button>
       <button id="t8" onclick="tab(8)">🏫 경력 엑셀 업로드</button>
+      <button id="t9" onclick="tab(9)">사이트 설정</button>
       <a href="perm.html" style="margin-left:auto;display:inline-flex;align-items:center;padding:10px 20px;border-radius:10px;background:linear-gradient(135deg,#1F4E9C,#153A77);color:#fff;font-weight:800;font-size:14px;text-decoration:none;box-shadow:0 3px 10px rgba(21,58,119,.25)">🛡 권한 관리 센터 →</a>
     </div>
     <!-- ══════════ [학교스포츠클럽] v8: 교육청 등 외부 주최 대회 참가·입상 결과 업로드 → 회원 선수 경력 매칭 (2026-09-07) ══════════ -->
+    <!-- ══════════ [사이트 설정] v9: 홈 문구·버튼, 관련 사이트, 연락처, 푸터를 화면에서 직접 수정 (siteContent/site → auth_ui.js 가 모든 페이지에 적용) ══════════ -->
+    <div id="v9" style="display:none">
+      <div class="authbox" style="max-width:none;margin:0 0 14px">
+        <h3 style="margin:0 0 4px;font-size:17px">사이트 설정</h3>
+        <div style="font-size:12.5px;color:var(--gray);line-height:1.7">홈 화면 문구와 버튼, 관련 사이트, 상단 연락처, 푸터를 여기서 바꾸면 <b>모든 페이지에 바로 적용</b>됩니다. 비워 둔 항목은 지금 화면에 적힌 기본값이 그대로 쓰입니다. 홈 배너 사진·간격은 사진첩의 [홈 배너 설정]에서, 팝업은 [팝업 관리]에서 다룹니다.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <button class="btn-sub" style="background:#153A77" onclick="siteSave()">저장</button>
+          <button class="btn-sub" style="background:#8a919d" onclick="siteInit(true)">다시 불러오기</button>
+          <a class="btn-sub" style="background:#068081;text-decoration:none" href="index.html" target="_blank">홈에서 확인</a>
+          <span id="siteMsg" style="font-size:12.5px;font-weight:700;align-self:center"></span>
+        </div>
+      </div>
+      <div id="siteBox" style="background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px"></div>
+    </div>
     <div id="v8" style="display:none">
       <div class="authbox" style="max-width:none;margin:0 0 14px">
         <h3 style="margin:0 0 4px;font-size:17px" id="scHead">🏫 학교스포츠클럽 · 대회 결과 업로드</h3>
@@ -633,7 +648,7 @@ async function loadExtClubMap(){
   }catch(e){console.warn('extClubMap',e);}
 }
 function tab(n){
-  [1,2,3,4,5,6,7,8].forEach(i=>{
+  [1,2,3,4,5,6,7,8,9].forEach(i=>{
     document.getElementById('t'+i).classList.toggle('on',i===n);
     document.getElementById('v'+i).style.display=i===n?'block':'none';
   });
@@ -643,6 +658,61 @@ function tab(n){
   if(n===6)loadPopups();  // [팝업] 신규 탭
   if(n===7)loadConsentBox();  // [동의서 보관함] 신규 탭
   if(n===8)scInit();  // [학교스포츠클럽] 결과 업로드 탭
+  if(n===9)siteInit();  // [사이트 설정] 신규 탭
+}
+// ══════════ [사이트 설정 2026-09-07] siteContent/site — 홈 히어로·버튼·관련 사이트·연락처·푸터 ══════════
+//   화면 기본값(HTML)은 그대로 두고, 여기서 저장한 값만 auth_ui.js 가 페이지 로드 때 덮어씁니다.
+let SITE=null;
+const SITE_DEF={
+  hero:{tag:'KOREA FLYING DISC FEDERATION',slogan:'PLAY THE DISC,',sloganEm:'MOVE TOGETHER',title:'모두가 즐기는 원반 스포츠, 함께 만드는 대한민국플라잉디스크연맹',titleHi:'함께 만드는',
+    desc:'대한민국플라잉디스크연맹은 플라잉디스크 종목을 관리·통할하는 국내 유일의 단체입니다. 학교체육에서 국제무대까지, 유소년부터 성인까지 누구나 즐기는 친환경 참여형 스포츠의 기반을 넓혀 갑니다.',
+    buttons:[{t:'학교 강습 신청',h:'apply.html?type=school'},{t:'강사 신청',h:'jobs.html'},{t:'대회 참가',h:'competition.html'},{t:'안전교육',h:'safety.html'}]},
+  contact:{org:'사단법인 대한민국플라잉디스크연맹',brandLine:'대한체육회 인정단체',tel:'031-984-3248',email:'kfdf60@hanmail.net'},
+  footer:{org:'사단법인 대한민국플라잉디스크연맹',addr:'경기도 김포시 홍도평로 72-22 가동 2층',notice:'유소년 스포츠 기반구축사업은 문화체육관광부 · 국민체육진흥공단 · 대한체육회가 후원하며 국민체육진흥기금을 지원받아 운영됩니다',copy:'© 2026 KOREA FLYING DISC FEDERATION. All rights reserved.',
+    links:[{t:'연맹소개',h:'about.html'},{t:'사업안내',h:'business.html'},{t:'알림마당',h:'notice.html'},{t:'자료실',h:'archive.html'},{t:'학교 강습 신청',h:'apply.html'},{t:'후원안내',h:'sponsor.html'}]},
+  relSites:[{name:'문화체육관광부',url:'https://www.mcst.go.kr'},{name:'국민체육진흥공단',url:'https://www.kspo.or.kr'},{name:'대한체육회',url:'https://www.sports.or.kr'},{name:'체육지도자연수원',url:'https://sqms.kspo.or.kr'},{name:'세계플라잉디스크연맹 WFDF',url:'https://wfdf.sport'},{name:'스포츠윤리센터',url:'https://www.k-sec.or.kr'},{name:'스포츠안전재단',url:'https://www.sportsafety.or.kr'}]
+};
+function siteMsg(t,bad){const m=document.getElementById('siteMsg');if(m){m.textContent=t||'';m.style.color=bad?'#C41E2F':'#0f766e'}}
+async function siteInit(force){
+  if(SITE&&!force){siteRender();return}
+  siteMsg('불러오는 중…');
+  try{const d=await DB.collection('siteContent').doc('site').get();SITE=d.exists?(d.data()||{}):{};siteMsg(d.exists?'저장된 설정을 불러왔습니다':'저장된 설정이 없어 기본값을 보여줍니다')}catch(e){SITE={};siteMsg('불러오기 실패: '+(e.code||e.message),true)}
+  siteRender();
+}
+function siteVal(path){const parts=path.split('.');let a=SITE||{},b=SITE_DEF;for(const p of parts){a=(a&&a[p]!=null)?a[p]:undefined;b=(b&&b[p]!=null)?b[p]:undefined}return a!=null&&a!==''?a:(b!=null?b:'')}
+function siteRender(){
+  const box=document.getElementById('siteBox');if(!box)return;
+  const inp='style="width:100%;padding:8px 11px;border:1.5px solid #dfe5ee;border-radius:9px;font-family:inherit;font-size:13px;margin-top:3px"';
+  const lb='style="font-size:12.5px;font-weight:800;display:block;margin-top:10px"';
+  const sec=(t,inner)=>'<details open style="border:1px solid #e6eaf2;border-radius:12px;padding:0 14px 12px;margin-top:10px"><summary style="cursor:pointer;font-weight:900;color:#153A77;padding:11px 0 0">'+t+'</summary>'+inner+'</details>';
+  const F=(id,label,path,ph)=>'<label '+lb+'>'+label+'</label><input id="'+id+'" '+inp+' value="'+esc(siteVal(path))+'"'+(ph?' placeholder="'+esc(ph)+'"':'')+'>';
+  const T=(id,label,path)=>'<label '+lb+'>'+label+'</label><textarea id="'+id+'" rows="3" '+inp+'>'+esc(siteVal(path))+'</textarea>';
+  const rows=(id,list,cols)=>'<div id="'+id+'">'+list.map(x=>siteRow(id,x,cols)).join('')+'</div><button type="button" class="btn-sub" style="background:#8a919d;margin-top:6px;padding:5px 12px;font-size:12px" onclick="siteRowAdd(\''+id+'\')">+ 추가</button>';
+  const btns=siteVal('hero.buttons'),links=siteVal('footer.links'),rel=siteVal('relSites');
+  box.innerHTML=sec('홈 히어로 (첫 화면 문구)',
+      F('stTag','작은 라벨 (영문)','hero.tag')+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div>'+F('stSlogan','슬로건 앞부분','hero.slogan')+'</div><div>'+F('stSloganEm','슬로건 강조부분 (파란 글씨)','hero.sloganEm')+'</div></div>'
+      +F('stTitle','제목','hero.title')+F('stTitleHi','제목에서 강조할 구절 (제목 안에 있는 글자 그대로)','hero.titleHi')+T('stDesc','소개 문단','hero.desc')
+      +'<label '+lb+'>히어로 버튼 4개 <span style="font-weight:600;color:#8a919d">— 이름 · 링크 (아이콘은 유지)</span></label>'+rows('stBtns',btns.slice(0,4),['t','h']))
+    +sec('관련 사이트 (홈 하단)','<label '+lb+'>이름 · 주소</label>'+rows('stRel',rel,['name','url']))
+    +sec('연락처 (상단 바·푸터 공통)','<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div>'+F('stOrg','단체명','contact.org')+'</div><div>'+F('stBrand','상단 바 문구 (단체명 옆)','contact.brandLine')+'</div><div>'+F('stTel','전화','contact.tel')+'</div><div>'+F('stEmail','이메일','contact.email')+'</div></div>')
+    +sec('푸터',F('stAddr','주소','footer.addr')+T('stNotice','지원 안내 문구 (알약 배지)','footer.notice')+F('stCopy','저작권 표기','footer.copy')+'<label '+lb+'>푸터 바로가기 <span style="font-weight:600;color:#8a919d">— 이름 · 링크</span></label>'+rows('stLinks',links,['t','h']));
+}
+function siteRow(id,x,cols){x=x||{};return '<div class="strow" data-cols="'+cols.join(',')+'" style="display:flex;gap:6px;margin-top:5px;align-items:center"><input class="c0" placeholder="이름" value="'+esc(x[cols[0]]||'')+'" style="flex:1;padding:7px 10px;border:1px solid #d5dce8;border-radius:8px;font-size:13px"><input class="c1" placeholder="링크 (예: about.html 또는 https://…)" value="'+esc(x[cols[1]]||'')+'" style="flex:1.6;padding:7px 10px;border:1px solid #d5dce8;border-radius:8px;font-size:13px"><button type="button" onclick="this.parentNode.remove()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:7px;width:26px;height:26px;cursor:pointer;font-weight:900">×</button></div>'}
+function siteRowAdd(id){const box=document.getElementById(id);if(!box)return;const cols=(box.firstElementChild&&box.firstElementChild.dataset.cols)?box.firstElementChild.dataset.cols.split(','):(id==='stRel'?['name','url']:['t','h']);const w=document.createElement('div');w.innerHTML=siteRow(id,{},cols);box.appendChild(w.firstChild)}
+function siteRows(id){const box=document.getElementById(id);if(!box)return [];return [...box.querySelectorAll('.strow')].map(r=>{const cols=r.dataset.cols.split(',');const o={};o[cols[0]]=(r.querySelector('.c0').value||'').trim();o[cols[1]]=(r.querySelector('.c1').value||'').trim();return o}).filter(o=>Object.values(o).some(Boolean))}
+async function siteSave(){
+  const v=id=>{const e=document.getElementById(id);return e?(e.value||'').trim():''};
+  const data={
+    hero:{tag:v('stTag'),slogan:v('stSlogan'),sloganEm:v('stSloganEm'),title:v('stTitle'),titleHi:v('stTitleHi'),desc:v('stDesc'),buttons:siteRows('stBtns')},
+    contact:{org:v('stOrg'),brandLine:v('stBrand'),tel:v('stTel'),email:v('stEmail')},
+    footer:{org:v('stOrg'),addr:v('stAddr'),notice:v('stNotice'),copy:v('stCopy'),links:siteRows('stLinks')},
+    relSites:siteRows('stRel'),
+    updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:(firebase.auth().currentUser||{}).email||''
+  };
+  const bad=(data.relSites||[]).find(x=>x.url&&!/^(https?:\/\/|[\w.-]+\.html)/i.test(x.url));
+  if(bad&&!confirm('관련 사이트 주소 형식을 확인하세요: '+bad.url+'\n그래도 저장할까요?'))return;
+  siteMsg('저장 중…');
+  try{await DB.collection('siteContent').doc('site').set(data,{merge:true});SITE=Object.assign({},SITE||{},data);siteMsg('저장되었습니다 — 각 페이지를 새로고침하면 반영됩니다')}catch(e){siteMsg('저장 실패: '+(e.code||e.message),true)}
 }
 // ══════════ [단체발송] 회원 선택 + 단체 문자 ══════════
 let MP_SEL={},MP_F='전체';  // MP_SEL: uid → {name,email,phone}
@@ -7454,6 +7524,6 @@ async function dlGoodsCerts(){
   a.download='용품수령확인증_'+n+'개교_'+new Date().toISOString().slice(0,10)+'.zip';a.click();
 }
 </script>
-<script src="auth_ui.js?v=20260907b"></script>
+<script src="auth_ui.js?v=20260907c"></script>
 </body>
 </html>
