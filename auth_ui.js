@@ -2,31 +2,29 @@
 (function(){
   var CFG={apiKey:"AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",authDomain:"koreaflyingdiscfederation.firebaseapp.com",projectId:"koreaflyingdiscfederation",appId:"1:1081847355343:web:ca40ed9a52e13f607f64ba"};
 
-  // ── 메뉴 구성 (2026-08 A안: 역할별 7개 상단) ──
+  // ── 메뉴 구성 (2026-09-07 정리: 이모지·중복·화살표 제거, 항목명 간결화. 자격증 → 안전교육은 강사·활동에만) ──
   var MENU=[
     {t:'연맹소개',h:'about.html',d:[
       ['인사말 · 미션','about.html#greet'],['CI 소개','about.html#ci'],['조직도','about.html#org'],
-      ['정관 · 규정','about.html#rule'],['시도연맹 · 권역','about.html#region'],['후원안내','sponsor.html'],['오시는 길','about.html#way']]},
+      ['정관 · 규정','about.html#rule'],['시도연맹 · 권역','about.html#region'],['후원 안내','sponsor.html'],['오시는 길','about.html#way']]},
     {t:'종목소개',h:'sports.html',d:[
       ['얼티미트','sports.html'],['디스크골프','sports.html'],['원반윷놀이 · 기타 종목','sports.html'],['경기 규칙','sports.html']]},
     {t:'사업안내',h:'business.html',d:[
-      ['2026 유소년 스포츠기반구축사업','business.html#youth'],['학교체육 강습','business.html#school'],
-      ['방과후 · 늘봄','business.html#after'],['교원연수 · 교재개발','business.html#train'],['학교 강습 신청 →','apply.html']]},
+      ['유소년 스포츠 기반구축사업','business.html#youth'],['학교체육 강습','business.html#school'],
+      ['방과후 · 늘봄','business.html#after'],['교원연수 · 교재개발','business.html#train'],['학교 강습 신청','apply.html']]},
     {t:'대회',h:'competition.html',d:[
-      ['대회 일정 · 안내','competition.html'],['참가 신청 (선수)','competition.html'],
-      ['심판 · 운영요원 신청','competition.html#staff'],['연맹 일정 캘린더','calendar.html'],['사진첩','gallery.html']]},
+      ['대회 일정 · 안내','competition.html'],['참가 신청','competition.html#staff'],
+      ['심판 · 운영요원 모집','staff.html'],['대회 결과','results.html'],['사진첩','gallery.html']]},
     {t:'클럽',h:'club.html',d:[
-      ['클럽 찾기 · 가입','club.html'],['클럽 만들기 (클럽장)','club.html'],['내 클럽 · 가입 승인','club.html'],['⚔️ 클럽 교류전','club.html?tab=4']]},
+      ['클럽 찾기 · 가입','club.html'],['클럽 만들기','club.html'],['내 클럽 · 가입 승인','club.html'],['클럽 교류전','club.html?tab=4']]},
     {t:'자격증',h:'license.html',d:[
-      ['연맹 자격증 신청 (지도자·심판)','license.html'],
-      ['이수증 · 자격 진위확인','verify.html'],['🛡 안전교육 이수 (영상)','safety.html','color:#C41E2F;font-weight:800'],
-      ['체육지도자 실기·구술 검정 (연 1회)','certification.html']]},
+      ['연맹 자격증 신청 (지도자 · 심판)','license.html'],['자격 · 이수증 진위확인','verify.html'],
+      ['체육지도자 자격검정 (국가자격)','certification.html']]},
     {t:'강사·활동',h:'jobs.html',d:[
-      ['🛡 안전교육 이수 (영상 시청 · 위촉 전 필수)','safety.html','color:#C41E2F;font-weight:800'],
-      ['강사 활동 지원 (분야 등록)','jobs.html'],['단기 강사 구인 게시판','jobs.html#gigList'],
-      ['강사 가이드 (일지·운영·유의사항)','guide.html'],['레벨업 (포인트) 시스템','leader.html']]},
+      ['강사 활동 지원 · 지명','jobs.html'],['단기 강사 구인','jobs.html#gigList'],['안전교육 이수 (위촉 전 필수)','safety.html'],
+      ['강사 가이드','guide.html'],['리더 레벨 시스템','leader.html']]},
     {t:'알림마당',h:'notice.html',d:[
-      ['공지사항 · 공고','notice.html'],['연맹 일정 캘린더','calendar.html'],['자료실 (서식 다운로드)','archive.html'],['사진첩','gallery.html'],['자주 묻는 질문','faq.html']]}
+      ['공지사항 · 공고','notice.html'],['연맹 일정 캘린더','calendar.html'],['자료실 (서식 다운로드)','archive.html'],['자주 묻는 질문','faq.html']]}
   ];
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
   function renderNav(){
