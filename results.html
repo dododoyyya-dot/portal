@@ -187,6 +187,8 @@ function rsOpen(id){
   CUR=ITEMS.find(x=>x.id===id);if(!CUR)return;
   const d=document.getElementById('rsDetail');d.style.display='block';
   try{history.replaceState(null,'','results.html?id='+id)}catch(e){}
+  // [개별 페이지] 상세를 열면 목록·필터는 감추고(닫으면 복귀)
+  const l=document.getElementById('rsList');if(l)l.style.display='none';const t=document.querySelector('.rs-top');if(t)t.style.display='none';
   let body='';
   if(CUR.src==='school'){
     const divs=Object.keys(CUR.divisions||{}).sort();
@@ -214,7 +216,7 @@ function rsOpen(id){
     +body+'</div>';
   d.scrollIntoView({behavior:'smooth',block:'start'});
 }
-function rsClose(){document.getElementById('rsDetail').style.display='none';try{history.replaceState(null,'','results.html')}catch(e){}CUR=null}
+function rsClose(){document.getElementById('rsDetail').style.display='none';try{history.replaceState(null,'','results.html')}catch(e){}CUR=null;const l=document.getElementById('rsList');if(l)l.style.display='';const t=document.querySelector('.rs-top');if(t)t.style.display='';try{window.scrollTo(0,0)}catch(e){}}
 </script>
 <footer><div class="wrap">
   <div class="top">

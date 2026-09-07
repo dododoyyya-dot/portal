@@ -181,6 +181,8 @@ function glOpen(id){
   CUR=ITEMS.find(x=>x.id===id);if(!CUR)return;
   const d=document.getElementById('glDetail');d.style.display='block';
   history.replaceState(null,'','gallery.html?id='+id);
+  // [개별 페이지] 상세를 열면 목록·필터는 감추고(닫으면 복귀) 상세만 보여줍니다
+  ['glList','glTop'].forEach(k=>{const e=document.getElementById(k);if(e)e.style.display='none'});
   const media=(CUR.media||[]).map((m,i)=>{
     const del=CAN?'<button class="gl-btn red" style="position:absolute;top:6px;right:6px;padding:3px 8px;font-size:11px" onclick="event.stopPropagation();glDelMedia('+i+')">×</button>':'';
     const cov=CAN&&m.type==='img'?'<button class="gl-btn soft" style="position:absolute;bottom:6px;left:6px;padding:3px 8px;font-size:11px" onclick="event.stopPropagation();glSetCover('+i+')">'+(CUR.cover===m.url?'★ 대표':'대표로')+'</button>':'';
@@ -197,7 +199,7 @@ function glOpen(id){
     +'</div>';
   d.scrollIntoView({behavior:'smooth',block:'start'});
 }
-function glClose(){document.getElementById('glDetail').style.display='none';history.replaceState(null,'','gallery.html');CUR=null}
+function glClose(){document.getElementById('glDetail').style.display='none';history.replaceState(null,'','gallery.html');CUR=null;const l=document.getElementById('glList');if(l)l.style.display='';const t=document.getElementById('glTop');if(t)t.style.display='';try{window.scrollTo(0,0)}catch(e){}}
 function glLight(u){const l=document.createElement('div');l.className='gl-light';l.innerHTML='<img src="'+esc(u)+'">';l.onclick=()=>l.remove();document.body.appendChild(l)}
 // ══════════ [홈 배너 설정·미리보기·2026-09-07] siteContent/homeBanner {enabled,interval(초),caption,kenburns,max} — index.html 메인 배너가 읽음 ══════════
 let HB_ADMIN=false,HB_CFG=null,HB_CTRL=null;

@@ -31,9 +31,19 @@
 .dtcols .dtmain{flex:1 1 auto;min-width:0}
 .dtcols .dtside{flex:0 0 232px;max-height:420px;overflow-y:auto}
 /* [1공고 1상세·모바일 2026-09-07] ?post= 로 공고 하나만 볼 때, 휴대폰에서는 공고 등록 상자를 숨겨 상세가 첫 화면에 오게 (PC 변경 없음) */
-body.onepost #stWriteBox{display:none!important}
-@media (min-width:761px){body.onepost #stWriteBox{display:block!important}}
+body.onepost #stWriteBox{display:none!important}   /* [1공고 1상세] PC 에서도 공고 등록 상자는 숨기고 상세만 */
+/* [공고 폼 정리 2026-09-07] 접이식 4묶음 */
+.pfsec{border:1.5px solid #dfe5ee;border-radius:14px;padding:0 16px 14px;margin-top:12px;background:#fff}
+.pfsec>summary{cursor:pointer;font-weight:900;font-size:14.5px;color:#153A77;padding:13px 0;list-style:none;display:flex;align-items:center;gap:8px}
+.pfsec>summary::-webkit-details-marker{display:none}
+.pfsec>summary::before{content:'';width:8px;height:8px;border-right:2px solid #153A77;border-bottom:2px solid #153A77;transform:rotate(-45deg);transition:.15s;margin-right:2px}
+.pfsec[open]>summary::before{transform:rotate(45deg)}
+.pfsec>summary small{font-weight:600;color:#8a919d;font-size:11.5px}
+.pfSess{display:grid;grid-template-columns:96px 1.2fr 1.1fr .8fr 30px;gap:6px;margin-top:5px;align-items:center}
+.pfSess .stfield{margin-top:0}
 @media (max-width:760px){
+  .pfSess{grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto}
+  .pfSess .psN{grid-column:1/3}
   body.onepost .phero{padding-top:18px;padding-bottom:18px}
   .dtcols{display:block}
   .dtcols .dtside{width:100%;max-height:none}
@@ -246,7 +256,7 @@ async function loadPosts(){
     }catch(e){}
     // [1공고 1상세] 목록에서 특정 공고를 눌러 들어오면(?post=id) 그 공고 하나만 보여줍니다.
     const _qp=new URLSearchParams(location.search).get('post');
-    if(_qp){renderPostDetail(_qp);if(window.innerWidth<=760){try{window.scrollTo(0,0)}catch(e){}}}else renderList();   // [1공고 1상세·모바일] 휴대폰은 맨 위로
+    if(_qp){renderPostDetail(_qp);try{window.scrollTo(0,0)}catch(e){}}else renderList();   // [1공고 1상세] 상세만 · 맨 위로
   }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+esc(e.message)+'</div>'}
 }
 function postTotals(p){
@@ -268,9 +278,9 @@ function periodTxt(p){
 }
 // ══════════ [날짜별 정보·2026-09-07] dates[i] 의 title(종목·부문)·location·time·gatherTime — 비어 있으면 공고 단위 값으로 폴백 ══════════
 //   기존 공고(날짜별 값 없음)는 own=false 라 화면·복사문·알림문이 종전과 완전히 같습니다.
-function dayInfo(p,dd){p=p||{};dd=dd||{};return {title:dd.title||'',location:dd.location||p.location||'',time:dd.time||p.time||'',gatherTime:dd.gatherTime||p.gatherTime||'',own:!!(dd.title||dd.location||dd.time||dd.gatherTime)}}
-function hasDayInfo(p){return ((p&&p.dates)||[]).some(d=>d&&(d.title||d.location||d.time||d.gatherTime))}
-function dayInfoTxt(p,dd){const di=dayInfo(p,dd);return [di.title,di.time?'경기 '+di.time:'',di.location].filter(Boolean).join(' · ')+(di.gatherTime?' · 집합 '+di.gatherTime:'')}
+function dayInfo(p,dd){p=p||{};dd=dd||{};return {title:dd.title||'',location:dd.location||p.location||'',time:dd.time||p.time||'',gatherTime:dd.gatherTime||p.gatherTime||'',own:!!(dd.title||dd.location||dd.time||dd.gatherTime||(dd.sessions&&dd.sessions.length))}}
+function hasDayInfo(p){return ((p&&p.dates)||[]).some(d=>d&&(d.title||d.location||d.time||d.gatherTime||(d.sessions&&d.sessions.length)))}
+function dayInfoTxt(p,dd){const di=dayInfo(p,dd);if(dd&&dd.sessions&&dd.sessions.length)return dd.sessions.map(s=>[s.time,s.title,s.location].filter(Boolean).join(' ')).join(' / ')+(di.gatherTime?' · 집합 '+di.gatherTime:'');return [di.title,di.time?'경기 '+di.time:'',di.location].filter(Boolean).join(' · ')+(di.gatherTime?' · 집합 '+di.gatherTime:'')}
 function dayLine(p,dd){return fmtD((dd.date||'').slice(5))+'('+(dd.dayOfWeek||dowOf(dd.date))+') '+dayInfoTxt(p,dd)}
 // 상세 화면: 날짜 탭 바로 아래 — 그 날짜의 종목·장소·시간을 크게
 function dayInfoBlockHtml(p,dd){
@@ -278,11 +288,14 @@ function dayInfoBlockHtml(p,dd){
   const I=(n,c)=>CAREER.svg(n,{size:15,color:c||'#153A77',stroke:2.2});
   return '<div style="margin-top:10px;border:1.5px solid #b9cdec;background:#eef3fa;border-radius:12px;padding:12px 16px;font-size:13.5px;line-height:1.9">'
     +'<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><b style="font-size:15.5px;color:#153A77">'+fmtD((dd.date||'').slice(5))+' ('+(dd.dayOfWeek||dowOf(dd.date))+')</b>'+(di.title?'<span style="display:inline-flex;align-items:center;gap:5px;background:#153A77;color:#fff;font-weight:800;font-size:12.5px;border-radius:999px;padding:3px 12px">'+I('disc','#fff')+esc(di.title)+'</span>':'')+'</div>'
-    +'<div style="display:flex;gap:6px 18px;flex-wrap:wrap;margin-top:4px">'
+    +((dd.sessions&&dd.sessions.length)
+      ?'<div style="margin-top:6px;display:grid;gap:4px">'+dd.sessions.map(s=>'<div style="display:flex;gap:10px;align-items:center;background:#fff;border:1px solid #d3e0f2;border-radius:9px;padding:6px 10px"><b style="min-width:52px;color:#153A77">'+esc(s.time||'-')+'</b><span style="flex:1"><b>'+esc(s.title||'')+'</b>'+(s.location?' <span style="color:#4b5563">· '+esc(s.location)+'</span>':'')+(s.note?' <span style="color:#8a919d;font-size:12px">('+esc(s.note)+')</span>':'')+'</span></div>').join('')
+        +(di.gatherTime?'<div style="font-size:12.5px;display:inline-flex;align-items:center;gap:5px">'+I('users')+'집합 <b>'+esc(di.gatherTime)+'</b></div>':'')+'</div>'
+      :'<div style="display:flex;gap:6px 18px;flex-wrap:wrap;margin-top:4px">'
     +'<span style="display:inline-flex;align-items:center;gap:5px">'+I('pin')+'<b>'+esc(di.location)+'</b></span>'
     +'<span style="display:inline-flex;align-items:center;gap:5px">'+I('clock')+'경기 <b>'+esc(di.time)+'</b></span>'
     +(di.gatherTime?'<span style="display:inline-flex;align-items:center;gap:5px">'+I('users')+'집합 <b>'+esc(di.gatherTime)+'</b></span>':'')
-    +'</div></div>';
+    +'</div>')+'</div>';
 }
 // 목록·단독 상세: 날짜당 한 줄 요약
 function dayListHtml(p,small){
@@ -291,14 +304,19 @@ function dayListHtml(p,small){
     +(p.dates||[]).map(dd=>'<span style="display:block">'+esc(dayLine(p,dd))+'</span>').join('')+'</div>';
 }
 // 공고 폼: 날짜별 섹션 상단 4칸 (공통 설정 모드에서는 그리지 않음)
+// [시간대 2026-09-07] 날짜별 시간대 줄 단위 편집 — 시간 · 종목(부문) · 장소 · 비고. 저장 시 sessions[] 와 함께 title/time/location 요약을 자동 기록해 기존 화면·복사문·경력 기록이 그대로 동작
+function pfSessRow(s){
+  s=s||{};
+  return '<div class="pfSess"><input class="stfield psT" placeholder="09:00" value="'+esc(s.time||'')+'"><input class="stfield psN" placeholder="종목·부문 (예: 장애인 디스크골프)" value="'+esc(s.title||'')+'"><input class="stfield psL" placeholder="장소 (비우면 공고 장소)" value="'+esc(s.location||'')+'"><input class="stfield psM" placeholder="비고" value="'+esc(s.note||'')+'"><button type="button" class="stbtn stbtn-ghost" style="padding:6px 8px" title="이 줄 삭제" onclick="this.parentElement.remove()">✕</button></div>';
+}
+function pfSessAdd(btn){const box=btn.previousElementSibling;if(!box)return;box.insertAdjacentHTML('beforeend',pfSessRow({}));const last=box.lastElementChild;if(last){const t=last.querySelector('.psT');if(t)t.focus()}}
 function dayInfoFormHtml(cfg){
   cfg=cfg||{};
-  const f=(cls,lab,ph,val)=>'<div><label style="font-size:11px;font-weight:700;color:#6b7280">'+lab+'</label><input class="stfield '+cls+'" style="margin-top:2px" placeholder="'+ph+'" value="'+esc(val||'')+'"></div>';
-  return '<div style="font-size:12px;font-weight:800;margin-top:9px">이 날짜의 종목·장소·시간 <span style="font-weight:600;color:#8a919d;font-size:11px">— 비워 두면 위의 공고 단위 장소·시간을 씁니다 (날짜마다 종목·장소가 다를 때만 입력)</span></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">'
-    +f('pfDTitle','종목·부문','예: 장애인 디스크골프',cfg.title)+f('pfDLoc','장소','예: ○○공원 디스크골프장',cfg.location)
-    +f('pfDTime','경기 시간','예: 09:00~12:00',cfg.time)+f('pfDGather','집합 시간','예: 08:30',cfg.gatherTime)
-    +'</div>';
+  const rows=(cfg.sessions&&cfg.sessions.length)?cfg.sessions:((cfg.title||cfg.time||cfg.location)?[{time:cfg.time,title:cfg.title,location:cfg.location}]:[{}]);
+  return '<div style="font-size:12px;font-weight:800;margin-top:9px">이 날짜의 시간대별 구성 <span style="font-weight:600;color:#8a919d;font-size:11px">— 한 줄에 한 시간대. 오전·오후에 종목이나 장소가 다르면 줄을 추가하세요. 비워 두면 공고 단위 장소·시간을 씁니다</span></div>'
+    +'<div class="pfSessBox">'+rows.map(pfSessRow).join('')+'</div>'
+    +'<button type="button" class="stbtn stbtn-soft" style="padding:5px 12px;font-size:12px;margin-top:6px" onclick="pfSessAdd(this)">+ 시간대 추가</button>'
+    +'<div style="display:flex;gap:8px;align-items:center;margin-top:8px"><label style="font-size:11px;font-weight:700;color:#6b7280;white-space:nowrap">이 날짜 집합 시간</label><input class="stfield pfDGather" style="margin-top:0;max-width:200px" placeholder="예: 08:30" value="'+esc(cfg.gatherTime||'')+'"></div>';
 }
 function postStatus(p){
   const today=new Date().toISOString().slice(0,10);
@@ -549,6 +567,7 @@ function openPostForm(editId){
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:660px;width:100%;padding:24px 26px;margin:10px 0">'
     +'<b style="font-size:17px">🛠 '+(ed?'공고 수정':'심판·운영요원 모집 공고 등록')+'</b>'
     +'<div style="font-size:12px;color:#8a919d;margin-top:3px">작성자: <b>'+esc(myOrg())+'</b>'+(SMY.phone?' · '+esc(mphone(SMY.phone)):'')+(SMY.email?' · '+esc(SMY.email):'')+' — 등록 후에도 목록·상세의 [✏️ 수정]으로 언제든 수정할 수 있습니다</div>'
+    +'<details class="pfsec" open><summary>① 기본 정보 <small>모집 기관 · 공고명 · 일자 · 장소 · 종목 · 마감</small></summary>'
     +'<label class="stlabel">모집 기관 (표시명) * <span style="font-weight:600;color:#8a919d;font-size:11px">— 공고에 "모집 기관: ○○"로 표시됩니다. 교육청·시도연맹·조직위 등 이번 모집을 주관하는 기관명을 그대로 입력하세요</span></label>'
     +'<input id="pfHost" class="stfield" value="'+esc(ed?((ed.author&&ed.author.organization)||''):myOrg())+'" placeholder="예: ○○교육청 / ○○시연맹 / ○○대회 조직위">'
     +'<label class="stlabel">🔗 상위 대회 불러오기 <span style="font-weight:600;color:#8a919d;font-size:11px">— 관리자 대회 등록의 대회를 선택하면 정보가 자동 기입되고 서로 연결됩니다</span></label>'
@@ -569,10 +588,14 @@ function openPostForm(editId){
     +'<input id="pfSportEtc" class="stfield" style="margin-top:6px" placeholder="기타 종목 직접 입력 (쉼표 구분)" value="'+esc(ed?(ed.sports||String(ed.sport||'').split(' · ')).filter(function(x){return ['얼티미트','디스크골프','윷놀이'].indexOf(x)<0}).join(', '):'')+'">'
     +'</div></div>'
     +'<div><label class="stlabel">모집 마감일 *</label><input id="pfDL" type="date" class="stfield" value="'+esc(ed?ed.deadline:'')+'"></div></div>'
-    +'<div style="margin-top:16px;padding:12px 14px;background:#f6f8fb;border-radius:12px">'
+    +'</details>'
+    +'<details class="pfsec" open><summary>② 날짜별 모집 구성 <small>정원 · 임무 · 수당 · 시간대(종목·장소)</small></summary>'
+    +'<div style="margin-top:4px;padding:12px 14px;background:#f6f8fb;border-radius:12px">'
     +'<label style="display:flex;gap:7px;align-items:center;font-weight:800;font-size:13px"><input type="checkbox" id="pfSame" checked onchange="pfDates()" style="width:auto"> 모든 날짜 동일 설정 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 해제하면 선택한 날짜별로 정원·임무·수당을 따로 설정합니다 (심판은 날짜마다 다를 수 있음)</span></label>'
     +'</div>'
     +'<div id="pfDaySecs"></div>'
+    +'</details>'
+    +'<details class="pfsec" open><summary>③ 지원 · 준비물 · 안내 <small>교통비 · 식사 · 심판복 · 숙박 · 준비물 · 집합시간 · 포스터 · 안내문 · 문의처</small></summary>'
     +'<label class="stlabel">교통비 지원</label><div style="margin-top:4px">'+['제공','미제공','안내문 참조'].map(function(o){var cur=(ed&&ed.transportation)||'미제공';var legacy=(ed&&(ed.transportation==='지원 (거리별 차등)'||ed.transportation==='심판비 포함')&&o==='제공')||(ed&&ed.transportation==='없음'&&o==='미제공')||(ed&&ed.transportation==='별도 안내'&&o==='안내문 참조');var on=(cur===o||legacy);return '<label class="chipck'+(on?' on':'')+'"><input type="radio" name="pfTrans" value="'+o+'"'+(on?' checked':'')+' onchange="[...document.querySelectorAll(\'input[name=pfTrans]\')].forEach(function(r){r.parentElement.classList.toggle(\'on\',r.checked)})"> '+o+'</label>'}).join('')+'</div>'
     +'<label class="stlabel">식사 제공</label><div style="margin-top:4px">'+['제공','미제공','안내문 참조'].map(function(o){var cur=(ed&&ed.meal)||'제공';var legacy=(ed&&ed.meal==='수당 포함'&&o==='제공')||(ed&&ed.meal==='없음'&&o==='미제공')||(ed&&ed.meal==='별도 안내'&&o==='안내문 참조');var on=(cur===o||legacy);return '<label class="chipck'+(on?' on':'')+'"><input type="radio" name="pfMeal" value="'+o+'"'+(on?' checked':'')+' onchange="[...document.querySelectorAll(\'input[name=pfMeal]\')].forEach(function(r){r.parentElement.classList.toggle(\'on\',r.checked)})"> '+o+'</label>'}).join('')+'</div>'
     +'<label class="stlabel">심판복 제공 여부</label><div id="pfUniformRow" style="margin-top:4px">'
@@ -590,6 +613,8 @@ function openPostForm(editId){
     +'<textarea id="pfDesc" rows="4" class="stfield" placeholder="심판·운영진에게 필요한 내용을 적어주세요 (집결시간·담당구역·특이사항 등) — 대회 자체 안내문(참가 선수 대상)과는 별개입니다">'+esc(ed?ed.description:'')+'</textarea>'
     +'<label class="stlabel">문의처 <span style="font-weight:600;color:#8a919d;font-size:11px">— 담당자·연락처·이메일 등 (공고 하단에 표시)</span></label>'
     +'<input id="pfContact" class="stfield" value="'+esc(ed?(ed.contactInfo||''):'')+'" placeholder="예: 사무국 031-984-3248 / kfdf60@hanmail.net">'
+    +'</details>'
+    +'<details class="pfsec"><summary>④ 동의서 · 서류 <small>동의서 문안 · 스캔 이미지 · 보관함 · 서면 양식 · 서명 위치</small></summary>'
     // ── [동의서·서류] 대회 공고 ⑤와 같은 구성: 동의서 문안 · 스캔 이미지 · 동의서 보관함 · 서면 양식 파일(수당 지급용 거래처 등록 동의서 등) ──
     +'<div style="margin-top:18px;padding:12px 14px;border:1.5px solid #e2e7f0;border-radius:12px;background:#fafbfd">'
     +'<div style="font-size:13.5px;font-weight:900;margin-bottom:4px">📄 동의서 · 서류 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 신청 화면 ② 동의서에 표시됩니다. 수당을 받는 심판·운영요원은 수당 지급용 개인정보 동의가 필요합니다.</span></div>'
@@ -614,6 +639,7 @@ function openPostForm(editId){
     +'<label class="stbtn stbtn-soft" style="padding:6px 12px;font-size:12px;cursor:pointer;margin:0">📎 새 양식 올리기 (PDF·이미지·HWP)<input type="file" id="pfPaperFile" accept=".pdf,.hwp,.hwpx,.docx,image/*" style="display:none" onchange="pfPaperUpload(this)"></label>'
     +'<span id="pfPaperMsg" style="font-size:12px;font-weight:700"></span></div>'
     +'</div>'
+    +'</details>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
     +'<button class="stbtn stbtn-ghost" onclick="document.getElementById(\'pfModal\').remove()">닫기</button>'
     +'<button class="stbtn stbtn-main" style="padding:11px 26px" id="pfSaveBtn" onclick="savePost(\''+(editId||'')+'\')">'+(ed?'💾 수정 저장':(isAdminU()||isSidoU()?'등록 (즉시 게시)':'등록 (관리자 승인 후 게시)'))+'</button></div>'
@@ -1094,7 +1120,16 @@ function readDaySec(sec){
   }).filter(x=>x.role):[];
   const out={quota:quota,roles:duties.concat(etc),allowance:{mode:mode,items:items}};
   // [날짜별 정보] 날짜별 섹션의 종목·장소·시간·집합 — 입력된 것만 저장 (비면 공고 단위 값 폴백)
-  [['pfDTitle','title'],['pfDLoc','location'],['pfDTime','time'],['pfDGather','gatherTime']].forEach(([cls,k])=>{const e=sec.querySelector('.'+cls);const val=e?(e.value||'').trim():'';if(val)out[k]=val});
+  // [시간대] 줄 단위 세션 → sessions[] + title/time/location 요약 (비면 공고 단위 값 폴백)
+  const gv=(r,c)=>{const e=r.querySelector(c);return e?(e.value||'').trim():''};
+  const sess=[...sec.querySelectorAll('.pfSess')].map(r=>({time:gv(r,'.psT'),title:gv(r,'.psN'),location:gv(r,'.psL'),note:gv(r,'.psM')})).filter(x=>x.time||x.title||x.location||x.note);
+  if(sess.length){
+    out.sessions=sess;
+    const ts=sess.map(x=>x.time).filter(Boolean);if(ts.length)out.time=ts.length>1?(ts[0]+' ~ '+ts[ts.length-1]):ts[0];
+    const nm=[...new Set(sess.map(x=>x.title).filter(Boolean))];if(nm.length)out.title=nm.join(' · ');
+    const lc=[...new Set(sess.map(x=>x.location).filter(Boolean))];if(lc.length)out.location=lc.join(' / ');
+  }
+  const ge=sec.querySelector('.pfDGather');const gval=ge?(ge.value||'').trim():'';if(gval)out.gatherTime=gval;
   return out;
 }
 async function savePost(editId){
