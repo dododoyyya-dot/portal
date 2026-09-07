@@ -783,12 +783,23 @@ async function cfSave(){
     loadSlots();
   }catch(e){btn.disabled=false;btn.textContent='✅ 종료 처리 → 이력 기록 · 보고 저장';say('저장 실패: '+(e.code||e.message)+(ok?' (이력 '+ok+'명은 기록됨)':''),true)}
 }
+// [학교스포츠클럽 연동] 주최 측 참가 명단 집합 — schoolClubResults(성명|생년월일, 보류·이관 모두) + staffCareer 가져오기 기록(성명만). 연동 공고가 아니거나 관리자가 아니면 null(배지 없음)
+async function rosterSet(s,staff){
+  if(!staff||!s||s.compKind!=='schoolclub')return null;
+  const set=new Set();const nm=x=>String(x||'').replace(/\s+/g,'');
+  try{const a=await DB.collection('schoolClubResults').where('competitionName','==',s.title||'').limit(1000).get();a.docs.forEach(d=>{const x=d.data();set.add((x.nameNorm||nm(x.name))+'|'+(x.birth||''));set.add((x.nameNorm||nm(x.name))+'|')})}catch(e){}
+  try{const b=await DB.collection('staffCareer').where('competitionName','==',s.title||'').limit(1000).get();b.docs.forEach(d=>{const x=d.data();if(/schoolclub/.test(x.source||''))set.add(nm(x.name)+'|')})}catch(e){}
+  return set;
+}
 async function viewRoster(id){
   const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
   const s=doc.data();
   const list=compClaimList(s);
   const staff=isCompStaff();
   await enrichAges(list);   // [성인표시] 생년월일 없는 예전 신청 건도 회원 정보로 성인 여부를 채웁니다
+  // [학교스포츠클럽 연동] 관리자가 [경력 엑셀 업로드]로 먼저 올린 참가 명단과 신청자를 성명+생년월일로 대조 (연동 공고·관리자만)
+  const ROSTER_SET=await rosterSet(s,staff);
+  const rosterMark=(name,birth)=>{if(!ROSTER_SET)return '';const nm=String(name||'').replace(/\s+/g,'');return (ROSTER_SET.has(nm+'|'+(birth||''))||ROSTER_SET.has(nm+'|'))?' <b style="color:#0f766e;font-size:10.5px" title="주최 측 참가 명단과 일치">✓ 명단 확인</b>':' <b style="color:#b45309;font-size:10.5px" title="올려 둔 참가 명단에 없음 — 확인 필요 (신청을 막지는 않습니다)">⚠ 명단에 없음</b>'};
   const entry=s.role==='참가';
   const confirmed=s.confirmed||[];
   const old=document.getElementById('rosterModal');if(old)old.remove();
@@ -842,7 +853,7 @@ async function viewRoster(id){
       if(c.team){
         return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+' colspan="'+(entry?'4':'1')+'"><b>👥 '+cesc(c.name)+'</b> <span style="font-size:11.5px;color:#8a919d">'+cesc(c.teamType||'팀')+(c.teamOrg?' · '+cesc(c.teamOrg):'')+' · 인솔 '+cesc(c.leader||'')+'('+cesc(c.leaderRole||'')+')'+(c.leaderPhone?' '+cesc(c.leaderPhone):'')+'</span>'
           +'<details style="margin-top:4px"><summary style="cursor:pointer;font-size:12px;font-weight:800;color:#153A77">명단 '+(c.rosterN||0)+'명'+((c.consentFiles&&c.consentFiles.length)?' · 📎동의서 '+c.consentFiles.length:'')+'</summary>'
-          +'<div style="font-size:12px;color:#4b5563;margin-top:4px">'+(c.roster||[]).map((r,j)=>(j+1)+'. '+cesc(r.name)+(r.birth?' ('+cesc(r.birth)+')':'')+(r.school?' · '+cesc(r.school):'')+(r.nonMember?' <b style="color:#8a5a00;font-size:10.5px">🧾 비회원 참가자</b>':'')
+          +'<div style="font-size:12px;color:#4b5563;margin-top:4px">'+(c.roster||[]).map((r,j)=>(j+1)+'. '+cesc(r.name)+(r.birth?' ('+cesc(r.birth)+')':'')+(r.school?' · '+cesc(r.school):'')+rosterMark(r.name,r.birth)+(r.nonMember?' <b style="color:#8a5a00;font-size:10.5px">🧾 비회원 참가자</b>':'')
             +(function(){
               // [연령확인] 미성년 + '생년월일 없음' 둘 다 확인 대상으로 표시합니다.
               const st=ageState(r), pk=pcRec(paper,ckey(c),c.roster,j);
@@ -859,7 +870,7 @@ async function viewRoster(id){
           +'<td '+td+' style="text-align:center">'+stCell(c)+'</td>'
           +(entry?_payCell(id,c,td):'')+revCell(c)+'</tr>';
       }
-      return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b>'+tbadge(c)+consentBadge(c,ckey(c))+'</td>'
+      return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b>'+tbadge(c)+consentBadge(c,ckey(c))+rosterMark(c.name,c.birth)+'</td>'
       +(entry?'<td '+td+'>'+cesc(c.birth||'-')+'</td><td '+td+'>'+cesc(c.gender||'-')+'</td><td '+td+'>'+cesc(c.school||c.club||'-')+'</td>':'')
       +'<td '+td+'>'+cesc(entry?((c.prefs||[]).map(p=>p+(divDateLbl(s,p)?' ('+divDateLbl(s,p)+')':'')).join(' · ')||'-'):((c.prefs||[]).map((p,j)=>(j+1)+'지망 '+p).join(' · ')||'-'))+'</td>'
       +'<td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
@@ -1561,6 +1572,8 @@ function taTypeUI(){
     if(lb)lb.style.display=cl.length?'':'none';
   }else if(t==='학교팀'){
     row.innerHTML='소속 학교: <input id="taOrg" placeholder="예: 대한중학교" style="padding:8px 11px;border:1.5px solid #d5dce8;border-radius:9px;font-size:13px;width:220px">';
+    // [학교 자동완성·2026-09-07] 전국 학교 표준 DB에서 골라 정식 명칭과 학교코드를 함께 저장 (직접 입력도 그대로 허용)
+    setTimeout(function(){const e=document.getElementById('taOrg');if(!e||!window.KFDF||!KFDF.schoolAuto)return;try{KFDF.schoolAuto(e,function(nm){try{const hit=(KFDF.schoolSearch(nm,10)||[]).find(x=>x.name===nm);e.dataset.code=hit?(hit.code||''):''}catch(err){}});e.addEventListener('input',function(){e.dataset.code=''})}catch(err){}},0);
     if(lb)lb.style.display='none';
   }else{
     // [소속 중복 제거] 클럽팀·학교팀이 아니면 팀 유형 선택이 곧 소속이므로 별도 소속 칸을 두지 않습니다
@@ -1654,7 +1667,7 @@ async function submitTeam(){
   const divName=document.getElementById('taDiv').value;
   if(!teamName)return alert('팀명을 입력해주세요.');
   const orgEl=document.getElementById('taOrg');
-  let teamOrg='',teamOrgId='';
+  let teamOrg='',teamOrgId='',teamSchoolCode='';
   if(teamType==='클럽팀'){
     if(!orgEl||!orgEl.value)return alert('소속 클럽을 선택해주세요.');
     teamOrgId=orgEl.value;
@@ -1671,6 +1684,7 @@ async function submitTeam(){
   }else{
     teamOrg=orgEl?orgEl.value.trim():'';
     if(teamType==='학교팀'&&!teamOrg)return alert('소속 학교를 입력해주세요.');
+    teamSchoolCode=(teamType==='학교팀'&&orgEl&&orgEl.dataset&&orgEl.dataset.code)||'';   // [학교 자동완성] 학교코드(있을 때만)
   }
   const roster=[...document.querySelectorAll('#taRosterBox > div')].map(r=>({
     name:r.querySelector('.taR-name').value.trim(),
@@ -1710,7 +1724,7 @@ async function submitTeam(){
       const sameDiv=!!(TA_EDIT&&((TA_EDIT.prefs||[])[0]===divName));
       if(dv&&dv.cap&&!sameDiv&&divActiveCount(s,dv.name)>=dv.cap)throw new Error('['+dv.name+'] 부문 정원이 마감되었습니다');
       const claimed=(s.claimed||[]).slice();
-      claimed.push({uid:CME.uid,pid:pid,team:true,name:teamName,teamType:teamType,teamOrg:teamOrg,teamOrgId:teamOrgId,
+      claimed.push({uid:CME.uid,pid:pid,team:true,name:teamName,teamType:teamType,teamOrg:teamOrg,teamOrgId:teamOrgId,teamSchoolCode:teamSchoolCode,
         teamGender:(function(){const g=document.getElementById('taGender');return (g&&g.value)||taGenderOf(divName)})(),   // [팀 구분 자동] 선택칸이 없어도 부문명에서 읽음
         leader:CMY.name||'',leaderRole:document.getElementById('taRole').value,leaderPhone:CMY.phone||'',
         roster:roster,rosterN:roster.length,prefs:[divName],consent:true,signed:true,
@@ -2355,6 +2369,9 @@ function cc2Open(editId){
     +'<div style="display:flex;align-items:center;gap:8px"><b style="font-size:17px">🏆 '+(editId?'대회 공고 수정':'대회 참가모집 공고 등록')+'</b><span style="flex:1"></span><button class="cbtn cbtn-ghost" onclick="document.getElementById(\'cc2Modal\').remove()">닫기 ✕</button></div>'
     +sec('① 기본 정보',
       '<label '+lb+'>대회명 *</label><input id="cc2Title" '+inp+' value="'+cesc(c.title||'')+'" placeholder="예: 2026 전국 플라잉디스크대회">'
+      // [학교스포츠클럽 연동·2026-09-07] 외부(교육청 등) 주최 대회를 연맹 홈페이지에서 참가 등록·결과 기록만 받는 공고
+      +'<label '+lb+'>대회 성격</label><select id="cc2Kind" '+inp+' onchange="document.getElementById(\'cc2KindNote\').style.display=this.value===\'schoolclub\'?\'block\':\'none\'"><option value="fed"'+(c.compKind!=='schoolclub'?' selected':'')+'>연맹 주최·주관 대회</option><option value="schoolclub"'+(c.compKind==='schoolclub'?' selected':'')+'>학교스포츠클럽 연동 — 교육청 등 외부 주최 (참가 등록·결과 기록용)</option></select>'
+      +'<div id="cc2KindNote" style="display:'+(c.compKind==='schoolclub'?'block':'none')+';font-size:12px;color:#8a5a00;background:#fff8e6;border:1.5px solid #f1dfa6;border-radius:9px;padding:8px 11px;margin-top:6px;line-height:1.6">외부 주최 대회입니다. <b>주최</b>에 교육청 등 주최기관을 꼭 적어 주세요(선수 경력 확인서에 주최로 표시됩니다). 참가비는 보통 0원, 동의서 양식은 생략할 수 있습니다.<br>관리자 [경력 엑셀 업로드]로 교육청 제출 <b>참가 신청서 명단</b>을 먼저 올려 두면, 신청 현황에서 신청자와 명단이 자동 대조(✓ 명단 확인 / ⚠ 명단에 없음)됩니다. 종료 처리 시 입상을 입력하면 선수 경력에 자동 기록됩니다.</div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
       +'<div><label '+lb+'>주최</label><input id="cc2Host" '+inp+' value="'+cesc(c.host||'')+'"></div>'
       +'<div><label '+lb+'>주관</label><input id="cc2Org" '+inp+' value="'+cesc(c.organizer||'')+'"></div>'
@@ -2489,6 +2506,7 @@ async function cc2Save(){
     const prev=CC2_EDIT?(CC2_LIST.find(x=>x.id===CC2_EDIT)||{}):{};
     const sports=[...new Set(entry.indiv.concat(entry.team).map(x=>x.name))].map(n=>({name:n,mode:'일반'}));
     const base={title:title,dateStart:ds[0],dateEnd:ds[ds.length-1],dates:ds,place:place,sido:sido,desc:v('cc2Desc'),
+      compKind:(v('cc2Kind')==='schoolclub'?'schoolclub':'fed'),   // [학교스포츠클럽 연동] 대회 성격
       host:v('cc2Host'),organizer:v('cc2Org'),sponsor:v('cc2Spon'),partner:v('cc2Part'),
       opening:{time:v('cc2OpT'),place:v('cc2OpP')},time:v('cc2Time'),
       sports:sports,teamTypes:entry.teamUnits,fee:feeStr,deadline:v('cc2DL'),eligRegion:'',
@@ -2650,7 +2668,7 @@ function slotCardCompact(d,today){
   return '<div class="cslot" style="cursor:pointer" onclick="location.href=\'competition.html?slot='+d.id+'\'">'
     +'<div class="chead">'+(s.host?'<span style="font-size:12px;font-weight:800;color:#6b7280">'+cesc(s.host)+' · </span>':'')+'<span class="ctitle">'+cesc(s.title)+'</span><span class="rbadge" style="background:'+rc+'">'+cesc(s.role)+(s.role==='참가'?' (선수)':'요원')+'</span>'
     +(closed?'<span class="rbadge" style="background:#8a919d">마감</span>':'')
-    +(applied?'<span class="rbadge" style="background:#0f766e">✓ 신청함</span>':'')
+    +(applied?'<span class="rbadge" style="background:#0f766e">✓ 신청함</span>':'')+(s.compKind==='schoolclub'?'<span class="rbadge" style="background:#0e7490">학교스포츠클럽</span>':'')
     +'</div>'
     +'<div class="cmeta"><span style="font-size:14.5px;font-weight:800">📍 <b>'+cesc(s.region)+(s.place?' · '+cesc(s.place):'')+'</b></span><span>📅 <b>'+cesc(s.date)+'</b></span><span>👥 신청 <b>'+act+'/'+s.quota+'</b></span>'+(s.deadline?'<span>⏳ 마감 <b>'+cesc(s.deadline)+'</b></span>':'')+'</div>'
     +'<div style="text-align:right;margin-top:2px"><span style="font-size:12.5px;font-weight:800;color:var(--blue)">자세히 보기 →</span></div>'
