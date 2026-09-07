@@ -97,83 +97,289 @@
   </nav>
 </div></header>
 
+<style id="homeCss">
+/* ══════════ [홈 개편 2026-09-07] 대한체육회 메인 구조를 참고한 홈 화면 — 히어로(전면 사진 슬라이드·통계·D-day) → 분야별 바로가기 → 소식 탭 → 대회일정 → 사진첩 → 서비스 → 주요사업 → 현황 → 관련 사이트 ══════════ */
+.hero{min-height:min(760px,calc(100vh - 118px));display:flex;align-items:center}
+.hero .wrap{padding:72px 32px 64px;width:100%}
+.hero .h-grid{display:grid;grid-template-columns:1.25fr .75fr;gap:40px;align-items:end}
+.hero .slogan-en{font-size:clamp(28px,4vw,52px);font-weight:900;letter-spacing:-1px;line-height:1.05;color:#fff;font-style:italic}
+.hero .slogan-en em{font-style:italic;color:#7EB8E8}
+.hero h1{margin-top:14px;font-size:clamp(22px,2.6vw,34px);letter-spacing:-.5px;line-height:1.3}
+.hero p{font-size:16px;max-width:600px;margin-top:14px}
+.hero .hcta{margin-top:26px;display:flex;gap:10px;flex-wrap:wrap}
+.hero .hcta a{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;border-radius:999px;font-weight:800;font-size:14.5px;background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.28);color:#fff;backdrop-filter:blur(6px);transition:.15s}
+.hero .hcta a:hover{background:#fff;color:#153A77}
+.hero .hcta a.main{background:var(--red);border-color:var(--red)}
+.hero .hcta a.main:hover{background:#fff;color:var(--red)}
+.hero .kpis{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}
+.hero .kpi{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(8px);border-radius:14px;padding:12px 16px;min-width:170px}
+.hero .kpi svg{flex:none}
+.hero .kpi b{display:block;font-size:24px;font-weight:900;line-height:1.1}
+.hero .kpi span{font-size:12px;color:#c3c9d4}
+.hero .side{display:flex;flex-direction:column;gap:12px}
+.evcard{display:block;background:rgba(11,26,58,.72);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.18);border-radius:18px;padding:20px 22px;color:#fff;text-decoration:none;transition:.15s}
+.evcard:hover{border-color:#ffd166;transform:translateY(-3px)}
+.evcard .k{font-size:11.5px;font-weight:900;color:#ffd166;letter-spacing:.5px;display:flex;align-items:center;gap:6px}
+.evcard b{display:block;font-size:17px;line-height:1.4;margin-top:8px;word-break:keep-all}
+.evcard .m{font-size:12.5px;color:#c3c9d4;margin-top:6px}
+.evcard .dd{display:inline-block;margin-top:12px;font-size:26px;font-weight:900;color:#fff;letter-spacing:-.5px}
+.evcard .go{display:inline-block;margin-top:10px;font-size:12.5px;font-weight:900;color:#ff8a76}
+#heroNotice{position:static!important;width:auto!important;opacity:1!important;right:auto;top:auto}
+/* 분야별 바로가기 */
+.qm{background:#fff;padding:64px 0}
+.qm-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.qm-tile{position:relative;border:1.5px solid var(--line);border-radius:20px;padding:26px 24px 22px;background:#fff;cursor:pointer;transition:.2s;min-height:196px;display:flex;flex-direction:column}
+.qm-tile:hover,.qm-tile.on{border-color:var(--blue);box-shadow:0 18px 40px rgba(21,58,119,.12);transform:translateY(-3px)}
+.qm-tile .ic{width:54px;height:54px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:#eef3fa}
+.qm-tile h3{font-size:19px;font-weight:900;margin-top:16px;color:var(--black)}
+.qm-tile .d{font-size:13px;color:var(--gray);margin-top:4px;flex:1}
+.qm-tile .n{font-size:12px;font-weight:800;color:var(--blue);margin-top:12px;display:inline-flex;align-items:center;gap:4px}
+.qm-list{display:none;list-style:none;margin-top:14px;border-top:1px dashed var(--line);padding-top:12px}
+.qm-tile.on .qm-list{display:block}
+.qm-tile.on .n{display:none}
+.qm-list li a{display:flex;align-items:center;gap:8px;padding:7px 2px;font-size:14px;font-weight:700;color:#26262b;border-radius:8px}
+.qm-list li a:hover{color:var(--red)}
+.qm-list li a::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--red);flex:none}
+/* 소식 탭 */
+.nw{background:var(--bg-soft);padding:64px 0}
+.nw-head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.nw-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.ntab{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:8px 16px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;color:#4b5563}
+.ntab.on{background:var(--black);color:#fff;border-color:var(--black)}
+.nw-list{display:grid;grid-template-columns:1fr 1fr;gap:10px 22px}
+.nrow{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 18px;text-decoration:none;color:inherit;transition:.15s}
+.nrow:hover{border-color:#b9cdec;box-shadow:0 10px 24px rgba(21,58,119,.08)}
+.nrow .c{flex:none;font-size:11.5px;font-weight:900;padding:4px 10px;border-radius:999px;color:#fff;background:var(--blue);min-width:64px;text-align:center}
+.nrow .t{flex:1;min-width:0;font-size:14.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nrow .t i{font-style:normal;display:inline-block;background:var(--red);color:#fff;font-size:10px;font-weight:900;padding:1px 5px;border-radius:4px;margin-left:6px;vertical-align:2px}
+.nrow .dt{flex:none;font-size:12.5px;color:#8a919d;font-weight:600}
+/* 대회일정 */
+.sch{padding:64px 0}
+.sch-months{display:flex;gap:4px;flex-wrap:wrap;margin:8px 0 14px}
+.sch-months button{border:none;background:none;font-family:inherit;font-weight:800;font-size:14px;color:#8a919d;padding:8px 12px;border-radius:10px;cursor:pointer}
+.sch-months button.on{background:var(--black);color:#fff}
+.sch-types{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.sch-types button{border:1.5px solid var(--line);background:#fff;font-family:inherit;font-weight:800;font-size:12.5px;padding:6px 13px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.sch-types button.on{border-color:var(--blue);color:var(--blue);background:#eef3fa}
+.sch-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.scard{border:1.5px solid var(--line);border-radius:18px;padding:18px 20px;background:#fff;text-decoration:none;color:inherit;display:flex;gap:16px;align-items:flex-start;transition:.15s}
+.scard:hover{border-color:#b9cdec;transform:translateY(-3px);box-shadow:0 14px 30px rgba(21,58,119,.1)}
+.scard .day{flex:none;width:60px;text-align:center;border-radius:12px;background:var(--black);color:#fff;padding:8px 0}
+.scard .day b{display:block;font-size:24px;font-weight:900;line-height:1}
+.scard .day span{font-size:11px;color:#c3c9d4;font-weight:700}
+.scard .b{flex:1;min-width:0}
+.scard .ty{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:900;color:#fff;border-radius:999px;padding:2px 9px}
+.scard h4{font-size:15px;font-weight:900;margin-top:6px;line-height:1.4;word-break:keep-all}
+.scard .m{font-size:12.5px;color:var(--gray);margin-top:4px}
+.scard .st{display:inline-block;margin-top:8px;font-size:11.5px;font-weight:900;padding:3px 9px;border-radius:6px;background:#eef3fa;color:var(--blue)}
+.scard .st.live{background:#fbedee;color:var(--red)}.scard .st.done{background:#f1f3f6;color:#8a919d}
+/* 사진첩 */
+.ph{background:#0b1a3a;padding:64px 0;color:#fff}
+.ph .sec-title{color:#fff}.ph .sec-desc{color:#c3c9d4}
+/* 서비스 */
+.sv{padding:64px 0;background:#f8f8f5}
+.sv-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.svc{background:#fff;border:1.5px solid var(--line);border-radius:18px;padding:22px 20px;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:8px;transition:.15s;min-height:150px}
+.svc:hover{border-color:var(--red);transform:translateY(-3px);box-shadow:0 14px 30px rgba(196,30,47,.1)}
+.svc .ic{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#fbedee}
+.svc b{font-size:16px;font-weight:900}
+.svc span{font-size:13px;color:var(--gray);flex:1}
+.svc i{font-style:normal;font-size:12.5px;font-weight:800;color:var(--red)}
+/* 관련 사이트 */
+.rel{background:#fff;border-top:1px solid var(--line);padding:26px 0}
+.rel .wrap{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.rel b{font-size:13px;color:#4b5563;margin-right:8px}
+.rel a{font-size:13px;font-weight:800;color:#26262b;border:1.5px solid var(--line);border-radius:999px;padding:8px 16px;transition:.15s}
+.rel a:hover{border-color:var(--blue);color:var(--blue)}
+@media(max-width:1080px){
+  .hero{min-height:0}.hero .wrap{padding:52px 18px 40px}.hero .h-grid{grid-template-columns:1fr;gap:20px}.hero .kpi{min-width:0;flex:1 1 44%;padding:10px 12px}.hero .kpi b{font-size:20px}
+  .qm-grid{grid-template-columns:1fr 1fr}.qm-tile{min-height:0;padding:18px 16px}.qm-tile h3{font-size:16px}
+  .nw-list{grid-template-columns:1fr}.nrow .dt{display:none}
+  .sv-grid{grid-template-columns:1fr 1fr}.svc{min-height:0;padding:16px 14px}
+  .qm,.nw,.sch,.ph,.sv{padding:44px 0}
+}
+@media(max-width:480px){.qm-grid{grid-template-columns:1fr}.hero .slogan-en{font-size:30px}.hero h1{font-size:21px}}
+</style>
 <div class="hero"><div class="wrap">
-  <a id="heroNotice" href="license.html" style="display:none;position:absolute;right:32px;top:96px;width:300px;background:rgba(255,255,255,.07);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(230,180,34,.35);border-radius:16px;padding:18px 20px;text-decoration:none;color:#fff;opacity:.82;transition:.25s;z-index:2">
-    <span style="font-size:11.5px;font-weight:900;color:#e6b422;letter-spacing:.5px">📢 접수 중인 공고</span>
-    <b id="hnTitle" style="display:block;font-size:15px;line-height:1.5;margin-top:8px"></b>
-    <span id="hnMeta" style="display:block;font-size:12.5px;color:#c3c9d4;margin-top:6px"></span>
-    <span style="display:inline-block;margin-top:10px;font-size:12.5px;font-weight:900;color:#ff8a76">신청하기 →</span>
-  </a>
-  <span class="tag">KOREA FLYING DISC FEDERATION</span>
-  <h1>대한민국 플라잉디스크의<br><span class="pt">중심</span>에서, 세계로.</h1>
-  <p>대한민국플라잉디스크연맹은 플라잉디스크 종목을 관리·통할하는 유일한 단체로서,
-     유소년부터 성인까지 모두가 즐기는 친환경 참여형 스포츠의 저변을 넓혀갑니다.</p>
-  <div style="margin-top:32px;display:inline-block;background:rgba(255,255,255,.06);border:1.5px solid rgba(230,180,34,.5);border-radius:16px;padding:16px 20px 20px">
-    <div style="font-size:13.5px;font-weight:800;color:#e6b422;margin-bottom:14px;letter-spacing:.2px">🎯 2026 유소년 스포츠 기반구축사업 · 참여신청 <span style="font-weight:600;color:#c3c9d4">— 아래 3가지는 모두 본 사업의 일환입니다</span></div>
-    <div class="btns" style="margin-top:0">
-      <a class="b-red" href="apply.html?type=school">🏫 학교체육 유형 참여학교 신청</a>
-      <a class="b-red" style="background:#0f766e" href="apply.html?type=after">🌱 방과후·늘봄 유형 참여학교 신청</a>
-      <a class="b-red" href="jobs.html" style="background:#1F4E9C;position:relative;box-shadow:0 0 0 2px rgba(255,255,255,.25),0 6px 18px rgba(31,78,156,.55);animation:kfdfPulse 2.2s ease-in-out infinite">👟 강사신청 <span style="display:inline-block;margin-left:6px;background:#e6b422;color:#1a1c22;font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px;vertical-align:2px">NEW</span></a>
+  <div class="h-grid">
+    <div>
+      <span class="tag">KOREA FLYING DISC FEDERATION</span>
+      <div class="slogan-en">NO DISC <em>NO FUN</em></div>
+      <h1>대한민국 플라잉디스크의 <span class="pt">중심</span>에서, 세계로.</h1>
+      <p>대한민국플라잉디스크연맹은 플라잉디스크 종목을 관리·통할하는 유일한 단체로서, 유소년부터 성인까지 모두가 즐기는 친환경 참여형 스포츠의 저변을 넓혀갑니다.</p>
+      <div class="hcta">
+        <a class="main" href="apply.html?type=school"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>학교 강습 신청</a>
+        <a href="jobs.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>강사 신청</a>
+        <a href="competition.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M5 4h14v4a7 7 0 0 1-14 0V4zM5 6H3a3 3 0 0 0 3 3M19 6h2a3 3 0 0 1-3 3"/></svg>대회 참가</a>
+        <a href="safety.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg>안전교육</a>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><circle cx="16.5" cy="9" r="2.6"/><path d="M3.5 19c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5M15 19c0-2.4 1.6-4.3 4-4.3s3 1.6 3 3.6"/></svg><div><b id="hsMembers">115</b><span>리더·회원 활동 중</span></div></div>
+        <div class="kpi"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg><div><b id="hsSchools">100</b><span>학교·방과후 강습 지원</span></div></div>
+        <div class="kpi"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="8" ry="3"/></svg><div><b id="hsSessions">권역별</b><span>유소년 올림피아드 · 전국대회</span></div></div>
+      </div>
+      <div id="dday" style="display:none;margin-top:18px"><span style="display:inline-block;background:rgba(196,30,47,.9);color:#fff;font-weight:900;font-size:14px;padding:8px 20px;border-radius:14px;line-height:1.5" id="ddayTxt"></span></div>
     </div>
-  </div>
-  <div style="margin-top:14px;font-size:13.5px;font-weight:800"><a href="safety.html" style="color:#ffd166;text-decoration:none">🛡 강습강사 안전교육 영상 시청 · 이수 (위촉 전 필수) →</a></div>
-  <div id="dday" style="display:none;margin-top:18px"><span style="background:rgba(196,30,47,.9);color:#fff;font-weight:900;font-size:15px;padding:8px 22px;border-radius:999px" id="ddayTxt"></span></div>
-  <div class="stats">
-    <div class="stat"><b>115명</b><span>2026 교원·지도자 자율연수 이수</span></div>
-    <div class="stat"><b>100개교</b><span>학교·방과후 강습 무상 지원</span></div>
-    <div class="stat"><b>권역별</b><span>유소년 올림피아드 개최</span></div>
-    <div class="stat"><b>국가공인</b><span>체육지도자 자격검정 주관</span></div>
+    <div class="side">
+      <a id="heroEvent" class="evcard" href="competition.html" style="display:none">
+        <span class="k"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M5 4h14v4a7 7 0 0 1-14 0V4z"/></svg>다가오는 대회</span>
+        <b id="heTitle"></b><span class="m" id="heMeta"></span>
+        <span class="dd" id="heDday"></span>
+        <span class="go">대회 안내 · 신청 →</span>
+      </a>
+      <a id="heroNotice" class="evcard" href="license.html" style="display:none">
+        <span class="k"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/></svg>접수 중인 공고</span>
+        <b id="hnTitle"></b><span class="m" id="hnMeta"></span>
+        <span class="go">신청하기 →</span>
+      </a>
+    </div>
   </div>
 </div></div>
 
-<!-- ── [사진첩 배너 틀] 사진첩에서 ★배너로 지정한 항목(featured)을 최대 3개 표시 — 세부 구성은 추후 (지금은 틀) ── -->
-<section id="galleryBanner" style="display:none;background:#0b1a3a;padding:26px 0"><div class="wrap">
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-    <span style="background:#C41E2F;color:#fff;font-size:13px;font-weight:900;padding:5px 14px;border-radius:999px;display:inline-flex;align-items:center;gap:6px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1zM12 17a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/></svg>사진첩</span>
-    <span style="font-size:13px;color:#c3c9d4;font-weight:600">최근 대회의 현장 사진·영상</span>
-    <a href="gallery.html" style="margin-left:auto;font-size:13px;font-weight:800;color:#ffd166">전체 보기 →</a>
+<!-- ── 분야별 바로가기 (누르면 세부 항목) ── -->
+<section class="qm"><div class="wrap">
+  <div class="sec-label">QUICK MENU</div>
+  <h2 class="sec-title">궁금한 분야를 눌러 보세요</h2>
+  <p class="sec-desc" style="margin-bottom:26px">각 분야의 세부 항목이 펼쳐집니다.</p>
+  <div class="qm-grid" id="qmGrid">
+    <div class="qm-tile" onclick="qmToggle(this)">
+      <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#153A77" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg></div>
+      <h3>참여·신청</h3><div class="d">학교 강습, 강사 활동, 클럽 가입</div>
+      <span class="n">세부 항목 보기 ▾</span>
+      <ul class="qm-list">
+        <li><a href="apply.html?type=school">학교체육 유형 참여학교 신청</a></li>
+        <li><a href="apply.html?type=after">방과후·늘봄 유형 참여학교 신청</a></li>
+        <li><a href="jobs.html">강사 활동 지원 · 지명</a></li>
+        <li><a href="login.html">리더 회원가입</a></li>
+        <li><a href="club.html">클럽 찾기 · 만들기</a></li>
+        <li><a href="guide.html">강사 가이드</a></li>
+      </ul>
+    </div>
+    <div class="qm-tile" onclick="qmToggle(this)">
+      <div class="ic" style="background:#fbedee"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#C41E2F" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M5 4h14v4a7 7 0 0 1-14 0V4zM5 6H3a3 3 0 0 0 3 3M19 6h2a3 3 0 0 1-3 3"/></svg></div>
+      <h3>대회·경기</h3><div class="d">대회 일정, 참가·심판 신청, 결과</div>
+      <span class="n">세부 항목 보기 ▾</span>
+      <ul class="qm-list">
+        <li><a href="competition.html">대회 일정 · 안내</a></li>
+        <li><a href="competition.html#staff">대회 참가 신청 (선수)</a></li>
+        <li><a href="staff.html">심판·운영요원 모집</a></li>
+        <li><a href="results.html">대회 결과</a></li>
+        <li><a href="gallery.html">사진첩</a></li>
+        <li><a href="calendar.html">연맹 일정 캘린더</a></li>
+      </ul>
+    </div>
+    <div class="qm-tile" onclick="qmToggle(this)">
+      <div class="ic" style="background:#fff8e6"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#b8860b" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="17" height="12" rx="2"/><path d="M7 8.5h6M7 11.5h4"/><circle cx="16.5" cy="11" r="1.8"/><path d="M15.2 12.6l-.9 5 2.2-1.3 2.2 1.3-.9-5"/></svg></div>
+      <h3>자격·발급</h3><div class="d">자격증, 이수증, 경력증명서</div>
+      <span class="n">세부 항목 보기 ▾</span>
+      <ul class="qm-list">
+        <li><a href="certification.html">체육지도자 자격검정 (국가자격)</a></li>
+        <li><a href="license.html">연맹 자격증 (지도자·심판)</a></li>
+        <li><a href="verify.html">이수증·자격증 진위확인</a></li>
+        <li><a href="mypage.html">자격증·경력증명서 발급 (마이페이지)</a></li>
+        <li><a href="leader.html">리더 레벨 시스템</a></li>
+      </ul>
+    </div>
+    <div class="qm-tile" onclick="qmToggle(this)">
+      <div class="ic" style="background:#e0f2ef"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v.5M12 11v5"/></svg></div>
+      <h3>정보·안내</h3><div class="d">공지, 자료실, 안전교육, 연맹 소개</div>
+      <span class="n">세부 항목 보기 ▾</span>
+      <ul class="qm-list">
+        <li><a href="notice.html">공지사항 · 공고</a></li>
+        <li><a href="archive.html">자료실 (서식 다운로드)</a></li>
+        <li><a href="safety.html">안전교육 이수</a></li>
+        <li><a href="faq.html">자주 묻는 질문</a></li>
+        <li><a href="about.html">연맹 소개 · 조직도 · 시도연맹</a></li>
+        <li><a href="sponsor.html">후원 안내</a></li>
+      </ul>
+    </div>
   </div>
-  <div id="gbList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
 </div></section>
-<!-- ── 접수 중인 공고 (라이브) ── -->
+
+<!-- ── 접수 중인 공고 (라이브 · 기존 블록 유지) ── -->
 <section id="liveNotices" style="display:none;background:#fdf8ee;border-bottom:2px solid #e6b422;padding:22px 0"><div class="wrap">
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-    <span style="background:#C41E2F;color:#fff;font-size:13px;font-weight:900;padding:5px 14px;border-radius:999px">📢 접수 중인 공고</span>
+    <span style="background:#C41E2F;color:#fff;font-size:13px;font-weight:900;padding:5px 14px;border-radius:999px">접수 중인 공고</span>
     <span style="font-size:13px;color:#5b6472;font-weight:600">연수·자격검정 신청은 로그인 후 공고에서 바로 접수됩니다</span>
   </div>
   <div id="lnList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px"></div>
 </div></section>
 
-<section style="padding:64px 0"><div class="wrap">
-  <div class="sec-label">APPLY</div>
-  <h2 class="sec-title">2026 유소년 스포츠 기반구축사업 · 참여신청</h2>
-  <p class="sec-desc">아래 신청은 모두 <b>2026 유소년 스포츠 기반구축사업</b>의 일환입니다. 학교체육 유형과 방과후·늘봄 유형은 별개 유형이라 한 학교가 둘 다 신청할 수 있습니다. 참여학교 신청은 회원가입 없이 가능하며, 강사지원은 리더 회원 전용입니다.</p>
+<!-- ── 소식 (탭) ── -->
+<section class="nw" id="news"><div class="wrap">
+  <div class="nw-head">
+    <div><div class="sec-label">NEWS</div><h2 class="sec-title" style="margin-bottom:0">KFDF 소식</h2></div>
+    <div class="nw-tabs" id="nwTabs">
+      <button class="ntab on" data-t="all" onclick="nwTab('all',this)">전체</button>
+      <button class="ntab" data-t="recruit" onclick="nwTab('recruit',this)">모집·접수 공고</button>
+      <button class="ntab" data-t="comp" onclick="nwTab('comp',this)">대회·심판</button>
+      <button class="ntab" data-t="news" onclick="nwTab('news',this)">사업 소식</button>
+    </div>
+  </div>
+  <div class="nw-list" id="nwList"></div>
+  <div style="text-align:right;margin-top:14px"><a href="notice.html" style="font-weight:800;color:var(--blue);font-size:14px">전체 소식 보기 →</a></div>
+</div></section>
+
+<!-- ── 대회일정 ── -->
+<section class="sch" id="schedule"><div class="wrap">
+  <div class="sec-label">SCHEDULE</div>
+  <h2 class="sec-title">대회 · 행사 일정 <a href="calendar.html" style="font-size:14px;font-weight:800;color:var(--blue);margin-left:10px">캘린더 전체 →</a></h2>
+  <div class="sch-months" id="schMonths"></div>
+  <div class="sch-types" id="schTypes"></div>
+  <div class="sch-grid" id="schGrid"><div class="bempty" style="grid-column:1/-1">불러오는 중…</div></div>
+</div></section>
+
+<!-- ── 사진첩 (사진첩에서 공개한 항목 · 기존 갤러리 블록 id 유지) ── -->
+<section id="galleryBanner" class="ph" style="display:none"><div class="wrap">
+  <div class="sec-label" style="color:#ffd166">GALLERY</div>
+  <h2 class="sec-title">사진첩 <a href="gallery.html" style="font-size:14px;font-weight:800;color:#ffd166;margin-left:10px">전체 보기 →</a></h2>
+  <p class="sec-desc" style="margin-bottom:22px">최근 대회·행사의 현장 사진과 영상</p>
+  <div id="gbList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px"></div>
+</div></section>
+
+<!-- ── 서비스 안내 ── -->
+<section class="sv"><div class="wrap">
+  <div class="sec-label">SERVICE</div>
+  <h2 class="sec-title">회원 서비스</h2>
+  <p class="sec-desc" style="margin-bottom:22px">회원과 지도자·심판·선수를 위한 온라인 서비스입니다.</p>
+  <div class="sv-grid">
+    <a class="svc" href="mypage.html"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#C41E2F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg></div><b>마이페이지</b><span>내 정보, 경력 여정, 자격증·경력증명서 발급</span><i>바로가기 →</i></a>
+    <a class="svc" href="license.html"><div class="ic" style="background:#eef3fa"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#153A77" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="17" height="12" rx="2"/><path d="M7 8.5h6M7 11.5h4"/><circle cx="16.5" cy="11" r="1.8"/><path d="M15.2 12.6l-.9 5 2.2-1.3 2.2 1.3-.9-5"/></svg></div><b>연맹 자격증</b><span>지도자·심판 자격 검정 공고, 신청, 대장</span><i>바로가기 →</i></a>
+    <a class="svc" href="verify.html"><div class="ic" style="background:#e0f2ef"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg></div><b>진위확인</b><span>이수증·자격증 번호로 발급 사실 확인</span><i>바로가기 →</i></a>
+    <a class="svc" href="results.html"><div class="ic" style="background:#fff8e6"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#b8860b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M5 4h14v4a7 7 0 0 1-14 0V4z"/></svg></div><b>대회 결과</b><span>연맹 대회·학교스포츠클럽 대회 입상·참가 기록</span><i>바로가기 →</i></a>
+    <a class="svc" href="gallery.html"><div class="ic" style="background:#eef3fa"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#153A77" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg></div><b>사진첩</b><span>대회·행사 현장 사진과 영상</span><i>바로가기 →</i></a>
+    <a class="svc" href="safety.html"><div class="ic" style="background:#fbedee"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#C41E2F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M12 8v5M12 16v.5"/></svg></div><b>안전교육</b><span>강습강사 안전교육 영상 시청·이수 (위촉 전 필수)</span><i>바로가기 →</i></a>
+    <a class="svc" href="club.html"><div class="ic" style="background:#e0f2ef"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><circle cx="16.5" cy="9" r="2.6"/><path d="M3.5 19c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5M15 19c0-2.4 1.6-4.3 4-4.3s3 1.6 3 3.6"/></svg></div><b>클럽</b><span>클럽 찾기·가입, 클럽 만들기, 교류전</span><i>바로가기 →</i></a>
+    <a class="svc" href="archive.html"><div class="ic" style="background:#f1f3f6"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg></div><b>자료실</b><span>서식·규정·안내문 다운로드</span><i>바로가기 →</i></a>
+  </div>
+</div></section>
+
+<section class="biz" id="biz"><div class="wrap">
+  <div class="sec-label">BUSINESS</div>
+  <h2 class="sec-title">연맹 주요사업</h2>
+  <p class="sec-desc">학교에서 대회까지, 플라잉디스크 생태계를 만듭니다.</p>
   <div class="biz-grid">
-    <a class="card" href="apply.html?type=school" style="border-color:#f3c2c7">
-      <span class="chip c-red" style="align-self:flex-start;margin-bottom:10px">유형 ③ · 추가 접수 중</span>
-      <h3>🏫 학교체육 유형 참여학교 신청</h3>
-      <p>정규 체육수업·학교스포츠클럽 연계 24회차. 전문 지도자 파견 + 용품 50만원 무상지원, 로그인 없이 3분 접수.</p>
-      <span class="go">지금 신청하기 →</span></a>
-    <a class="card" href="apply.html?type=after" style="border-color:#b9e2da">
-      <span class="chip" style="align-self:flex-start;margin-bottom:10px;background:#e0f2ef;color:#0f766e">유형 ⑤ · 추가 접수 중</span>
-      <h3>🌱 방과후·늘봄 유형 참여학교 신청</h3>
-      <p>방과후·늘봄·돌봄교실 24회차 프로그램. 전문 강사 파견 + 용품 50만원 무상지원, 별도 신청서로 접수.</p>
-      <span class="go">지금 신청하기 →</span></a>
-    <a class="card" href="jobs.html">
-      <span class="chip c-blue" style="align-self:flex-start;margin-bottom:10px">선정학교 · 리더</span>
-      <h3>👟 선정학교 강사지원 신청</h3>
-      <p>리더 회원 전용. 선정된 학교 중 내 권역의 미배정 학교에 지명 신청해 강사로 활동하세요. 먼저 신청하면 배정 검토 시 우선 반영됩니다. (시간당 5만원 · 2시간 기준 1일 10만원 · 강습 10P/회차)</p>
-      <span class="go">배정 가능 학교 보기 →</span></a>
-    <a class="card" href="login.html">
-      <span class="chip c-dark" style="align-self:flex-start;margin-bottom:10px">연수 이수자</span>
-      <h3>🥏 리더 회원가입</h3>
-      <p>자율연수 이수자는 가입 승인 즉시 🎓이수 뱃지 + 50P를 받고, 마이페이지에서 이수증을 발급할 수 있습니다.</p>
-      <span class="go">가입하러 가기 →</span></a>
+    <a class="card" href="business.html#youth"><span class="num">01</span>
+      <h3>유소년 스포츠 기반구축사업</h3>
+      <p>교육 프로그램·교재 개발 → 교원 연수 → 학교체육 강습 → 참여학교 권역별 대회 → 방과후·늘봄으로 이어지는 5개 유형 사업.</p>
+      <span class="go">자세히 보기 →</span></a>
+    <a class="card" href="certification.html"><span class="num">02</span>
+      <h3>체육지도자 자격검정</h3>
+      <p>국가공인 스포츠지도사(전문·생활·유소년) 플라잉디스크 실기·구술 자격검정 주관 시행.</p>
+      <span class="go">검정 안내 →</span></a>
+    <a class="card" href="competition.html"><span class="num">03</span>
+      <h3>전국대회 · 권역별 올림피아드</h3>
+      <p>얼티미트·거츠 등 전국 규모 대회와 권역별 유소년 올림피아드 개최, 심판·기록원 양성.</p>
+      <span class="go">대회 안내 →</span></a>
+    <a class="card" href="leader.html"><span class="num">04</span>
+      <h3>지도자 연수 · 리더 시스템</h3>
+      <p>교원·지도자 자율연수 운영과 연맹 리더 자격등급, 참여 기반 5단계 레벨 시스템 운영.</p>
+      <span class="go">제도 안내 →</span></a>
   </div>
 </div></section>
 
 <script src="region_map.js?v=20260726d"></script>
-<script src="banner.js?v=20260907"></script>
+
 <section id="liveStats" style="display:none;background:linear-gradient(120deg,#0f1013,#1a1c22 60%,#153A77);padding:64px 0"><div class="wrap">
   <div class="sec-label" style="color:#e6b422">LIVE</div>
   <h2 class="sec-title" style="color:#fff">사업 현황 <span id="lsTime" style="font-size:14px;font-weight:700;color:#9aa1ad"></span></h2>
@@ -229,58 +435,6 @@
   <div id="cbRank" style="margin-top:24px"></div>
 </div></section>
 
-<section id="news"><div class="wrap">
-  <div class="sec-label">NOTICE</div>
-  <h2 class="sec-title">소식 · 공고</h2>
-  <p class="sec-desc">연맹의 최신 공고와 소식을 확인하세요. <a href="notice.html" style="color:var(--blue);font-weight:700">전체보기 →</a></p>
-  <div class="news-grid">
-    <a class="news" href="apply.html">
-      <span class="chip c-red">모집공고</span>
-      <h3>학교체육·방과후 강습 참여학교 모집 (100개교)</h3>
-      <p>전문 지도자 파견 + 50만원 용품 무상지원. 이 홈페이지에서 바로 신청하세요.</p>
-      <span class="date">추가 접수 진행 중 (수시 선정) →</span></a>
-    <a class="news" href="notice.html">
-      <span class="chip c-red">모집공고</span>
-      <h3>학교강습·방과후 강사 모집</h3>
-      <p>시간당 50,000원 · 거주 권역 배정 · 연수 이수 리더 우선 선발.</p>
-      <span class="date">상시 모집 (결원 시 수시 위촉)</span></a>
-    <a class="news" href="notice.html">
-      <span class="chip c-blue">자격검정</span>
-      <h3>2026 하계 체육지도자 실기·구술 합격자 발표</h3>
-      <p>스포츠지도사(전문·생활·유소년) 실기구술 자격검정 합격자 발표.</p>
-      <span class="date">2026. 7. 15.</span></a>
-    <a class="news" href="notice.html">
-      <span class="chip c-dark">사업소식</span>
-      <h3>교원·지도자 자율연수 115명 이수 — 리더 제도 출범</h3>
-      <p>KT대전인재개발원 1박 2일 자율연수 성료. 이수자 전원에게 이수 인증 뱃지·온라인 이수증·리더 포인트 50P가 부여됩니다.</p>
-      <span class="date">2026. 7. 5.</span></a>
-  </div>
-</div></section>
-
-<section class="biz" id="biz"><div class="wrap">
-  <div class="sec-label">BUSINESS</div>
-  <h2 class="sec-title">연맹 주요사업</h2>
-  <p class="sec-desc">학교에서 대회까지, 플라잉디스크 생태계를 만듭니다.</p>
-  <div class="biz-grid">
-    <a class="card" href="business.html#youth"><span class="num">01</span>
-      <h3>유소년 스포츠 기반구축사업</h3>
-      <p>교육 프로그램·교재 개발 → 교원 연수 → 학교체육 강습 → 참여학교 권역별 대회 → 방과후·늘봄으로 이어지는 5개 유형 사업.</p>
-      <span class="go">자세히 보기 →</span></a>
-    <a class="card" href="certification.html"><span class="num">02</span>
-      <h3>체육지도자 자격검정</h3>
-      <p>국가공인 스포츠지도사(전문·생활·유소년) 플라잉디스크 실기·구술 자격검정 주관 시행.</p>
-      <span class="go">검정 안내 →</span></a>
-    <a class="card" href="competition.html"><span class="num">03</span>
-      <h3>전국대회 · 권역별 올림피아드</h3>
-      <p>얼티미트·거츠 등 전국 규모 대회와 권역별 유소년 올림피아드 개최, 심판·기록원 양성.</p>
-      <span class="go">대회 안내 →</span></a>
-    <a class="card" href="leader.html"><span class="num">04</span>
-      <h3>지도자 연수 · 리더 시스템</h3>
-      <p>교원·교원·지도자 자율연수 운영과 연맹 리더 자격등급, 참여 기반 5단계 레벨 시스템 운영.</p>
-      <span class="go">제도 안내 →</span></a>
-  </div>
-</div></section>
-
 <div class="ml"><div class="wrap">
   <div>
     <h2><span class="y">리더 레벨 시스템</span> 실시간 운영 중 🏆</h2>
@@ -305,6 +459,9 @@
   </div>
   <div class="logo-box"><img src="kfdf_logo.png" alt="KFDF 엠블럼"></div>
 </div></section>
+
+<!-- ── 관련 사이트 ── -->
+<div class="rel"><div class="wrap"><b>관련 사이트</b><a href="https://www.mcst.go.kr" target="_blank" rel="noopener">문화체육관광부</a><a href="https://www.kspo.or.kr" target="_blank" rel="noopener">국민체육진흥공단</a><a href="https://www.sports.or.kr" target="_blank" rel="noopener">대한체육회</a><a href="https://sqms.kspo.or.kr" target="_blank" rel="noopener">체육지도자연수원</a><a href="https://wfdf.sport" target="_blank" rel="noopener">세계플라잉디스크연맹 WFDF</a><a href="https://www.k-sec.or.kr" target="_blank" rel="noopener">스포츠윤리센터</a></div></div>
 
 <footer><div class="wrap">
   <div class="top">
@@ -349,7 +506,7 @@
       document.getElementById('liveNotices').style.display='block';
       // 히어로 고스트 카드 — 최신 1건만
       const h=open[0];
-      if(h&&window.innerWidth>1080){
+      if(h){
         document.getElementById('hnTitle').textContent=h.title||'';
         document.getElementById('hnMeta').textContent=(h.date||'')+(h.until?' · 마감 '+h.until:'');
         document.getElementById('heroNotice').style.display='block';
@@ -363,6 +520,10 @@
       countUp('lsSchool',d.schoolRecv!=null?d.schoolRecv:(d.schoolSel||0));countUp('lsAfter',d.afterRecv!=null?d.afterRecv:(d.afterSel||0));
       countUp('lsSchoolSel',d.schoolSel||0);countUp('lsAfterSel',d.afterSel||0);
       countUp('lsInst',d.instructors||0);countUp('lsMembers',d.members||0);countUp('lsSessions',d.sessions||0);
+      // [홈 개편] 히어로 통계 칩
+      if(d.members&&document.getElementById('hsMembers'))countUp('hsMembers',d.members);
+      if(((d.schoolSel||0)+(d.afterSel||0))>0&&document.getElementById('hsSchools'))countUp('hsSchools',(d.schoolSel||0)+(d.afterSel||0));
+      if(d.sessions&&document.getElementById('hsSessions')){countUp('hsSessions',d.sessions);const l=document.getElementById('hsSessions').nextElementSibling;if(l)l.textContent='누적 강습 회차'}
       setTimeout(()=>{
         document.getElementById('lsSchoolBar').style.width=Math.min(100,((d.schoolRecv!=null?d.schoolRecv:d.schoolSel)||0)/(d.schoolQuota||70)*100)+'%';
         document.getElementById('lsAfterBar').style.width=Math.min(100,((d.afterRecv!=null?d.afterRecv:d.afterSel)||0)/(d.afterQuota||30)*100)+'%';
@@ -415,20 +576,22 @@
           +rows.map((r,i)=>'<div style="background:rgba(255,255,255,.08);border-radius:12px;padding:12px 20px;color:#fff;font-size:14px"><span style="font-size:18px">'+medal[i]+'</span> <b>'+esc(r.n)+'</b> <span style="color:#2dd4bf;font-weight:800">'+r.w+'승</span> <span style="color:#9aa1ad">'+r.d+'무</span> <span style="color:#ff7a5c">'+r.l+'패</span></div>').join('')+'</div>';
       }
     }).catch(e=>console.warn('matches',e));
-    // ── 📸 사진첩 배너 (대표 지정 항목만, 공개 열람) — 독립 실행(다른 블록과 무관)
+    // ── 사진첩 (공개 항목 최신 4개 · ★배너 항목은 히어로 배경 슬라이드) — 독립 실행
     (async function(){
     try{
-      const gs=await DB.collection('gallery').where('featured','==',true).limit(6).get();
-      const all=gs.docs.map(d=>Object.assign({id:d.id},d.data())).filter(x=>x.status==='published').sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
-      const items=all.slice(0,3);
+      const gs=await DB.collection('gallery').where('status','==','published').limit(40).get();
+      const pub=gs.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
       const sec=document.getElementById('galleryBanner'),lst=document.getElementById('gbList');
+      const items=pub.slice(0,4);
       if(sec&&lst&&items.length){
-        lst.innerHTML=items.map(x=>'<a href="gallery.html?id='+x.id+'" style="display:block;position:relative;border-radius:14px;overflow:hidden;background:#153A77;text-decoration:none;color:#fff;min-height:150px">'
-          +(x.cover?'<img src="'+x.cover.replace(/"/g,'&quot;')+'" alt="" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block">':'<div style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c0-2.2 4-4 9-4s9 1.8 9 4-4 4-9 4-9-1.8-9-4zM8 12c0-.8 1.8-1.5 4-1.5s4 .7 4 1.5-1.8 1.5-4 1.5-4-.7-4-1.5z"/></svg></div>')
-          +'<div style="position:absolute;left:0;right:0;bottom:0;padding:26px 12px 10px;background:linear-gradient(transparent,rgba(0,0,0,.8))"><div style="font-size:14px;font-weight:900;line-height:1.35">'+String(x.title||'').replace(/</g,'&lt;')+'</div><div style="font-size:11.5px;color:#d7dce6;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d7dce6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M4 5h16a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM3 10h18M8 3v4M16 3v4"/></svg> '+String(x.date||'').replace(/-/g,'.')+(x.place?' · <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d7dce6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M12 21s-6-5.7-6-11a6 6 0 0 1 12 0c0 5.3-6 11-6 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg> '+String(x.place).replace(/</g,'&lt;'):'')+'</div></div></a>').join('');
+        lst.innerHTML=items.map(x=>'<a href="gallery.html?id='+x.id+'" style="display:block;position:relative;border-radius:16px;overflow:hidden;background:#153A77;text-decoration:none;color:#fff;min-height:150px">'
+          +(x.cover?'<img src="'+x.cover.replace(/"/g,'&quot;')+'" alt="" style="width:100%;aspect-ratio:16/10;object-fit:cover;display:block">':'<div style="aspect-ratio:16/10;display:flex;align-items:center;justify-content:center"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="8" ry="3"/></svg></div>')
+          +(x.featured?'<span style="position:absolute;top:10px;left:10px;font-size:11px;font-weight:900;color:#fff;background:#C41E2F;border-radius:999px;padding:3px 9px">배너</span>':'')
+          +'<div style="position:absolute;left:0;right:0;bottom:0;padding:26px 12px 10px;background:linear-gradient(transparent,rgba(0,0,0,.8))"><div style="font-size:14px;font-weight:900;line-height:1.35">'+String(x.title||'').replace(/</g,'&lt;')+'</div><div style="font-size:11.5px;color:#d7dce6;margin-top:3px">'+String(x.date||'').replace(/-/g,'.')+(x.place?' · '+String(x.place).replace(/</g,'&lt;'):'')+(x.media&&x.media.length?' · '+x.media.length+'장':'')+'</div></div></a>').join('');
         sec.style.display='block';
       }
-      // [홈 배너 슬라이드·2026-09-07] ★배너 항목의 대표 사진을 메인 배너(.hero) 배경에 슬라이드로 — 설정은 siteContent/homeBanner {enabled,interval,caption,kenburns,max}
+      // [홈 배너 슬라이드] ★배너 항목의 대표 사진을 메인 배너(.hero) 배경에 — 설정 siteContent/homeBanner {enabled,interval,caption,kenburns,max}
+      const all=pub.filter(x=>x.featured);
       if(all.length&&window.KFDF_BANNER){
         let cfg={};try{const c=await DB.collection('siteContent').doc('homeBanner').get();if(c.exists)cfg=c.data()||{}}catch(e){}
         if(cfg.enabled!==false){const hero=document.querySelector('.hero');if(hero)KFDF_BANNER.mount(hero,all.slice(0,Math.max(1,Math.min(10,+cfg.max||5))),{interval:+cfg.interval||3,caption:cfg.caption!==false,kenburns:cfg.kenburns!==false})}
@@ -479,6 +642,84 @@
   }
 })();
 </script>
+<script>
+/* ══════════ [홈 개편 2026-09-07] 분야별 바로가기 · 소식 탭 · 대회일정 · 다가오는 대회 카드 ══════════
+ *  공개 열람 가능한 것만 읽습니다(licenseNotices·events·gallery). 로그인이 필요한 컬렉션(compSlots·competitionStaff)은 읽히면 보태고, 막히면 조용히 건너뜁니다.
+ */
+(function(){
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const today=new Date().toISOString().slice(0,10);
+  const dot=s=>String(s||'').replace(/-/g,'.');
+  // ── 분야별 바로가기 ──
+  window.qmToggle=function(el){const on=el.classList.contains('on');document.querySelectorAll('.qm-tile').forEach(t=>t.classList.remove('on'));if(!on)el.classList.add('on')};
+  // ── 소식 ──
+  const STATIC_NEWS=[
+    {t:'news',cat:'사업소식',title:'교원·지도자 자율연수 115명 이수 — 리더 제도 출범',date:'2026-07-05',href:'notice.html'},
+    {t:'news',cat:'자격검정',title:'2026 하계 체육지도자 실기·구술 자격검정 합격자 발표',date:'2026-07-15',href:'notice.html'},
+    {t:'recruit',cat:'모집공고',title:'학교체육·방과후 강습 참여학교 모집 (100개교) — 추가 접수 중',date:'2026-08-25',href:'apply.html'},
+    {t:'recruit',cat:'모집공고',title:'학교강습·방과후 강사 상시 모집 (시간당 50,000원)',date:'2026-08-25',href:'jobs.html'},
+    {t:'comp',cat:'대회',title:'권역별 유소년 올림피아드 개최 계획 안내 (9~11월)',date:'2026-06-20',href:'competition.html'}
+  ];
+  let NEWS=STATIC_NEWS.slice(),NT='all';
+  const CATC={'모집공고':'#C41E2F','공고':'#C41E2F','접수':'#b8860b','대회':'#0f766e','심판':'#153A77','사업소식':'#3a3a40','자격검정':'#7c3aed','연수':'#b8860b'};
+  function nwRender(){
+    const el=document.getElementById('nwList');if(!el)return;
+    const list=NEWS.filter(x=>NT==='all'||x.t===NT).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,8);
+    if(!list.length){el.innerHTML='<div class="bempty" style="grid-column:1/-1">등록된 소식이 없습니다.</div>';return}
+    el.innerHTML=list.map(x=>{const isNew=x.date&&(new Date()-new Date(x.date))/864e5<14;
+      return '<a class="nrow" href="'+esc(x.href||'notice.html')+'"><span class="c" style="background:'+(CATC[x.cat]||'#153A77')+'">'+esc(x.cat)+'</span><span class="t">'+esc(x.title)+(isNew?'<i>N</i>':'')+'</span><span class="dt">'+esc(dot(x.date))+'</span></a>'}).join('');
+  }
+  window.nwTab=function(t,btn){NT=t;document.querySelectorAll('#nwTabs .ntab').forEach(b=>b.classList.toggle('on',b===btn));nwRender()};
+  // ── 일정 ──
+  const TYPES={'대회':'#0f766e','자격검정':'#7c3aed','연수':'#b8860b','행사':'#1F4E9C','회의':'#8a919d'};
+  let EV=[],SM=new Date().getMonth()+1,ST='';
+  const Y=new Date().getFullYear();
+  function stOf(e){const s=e.start||'',en=e.end||e.start||'';if(en&&en<today)return ['done','종료'];if(s&&s<=today&&today<=en)return ['live','진행 중'];const d=Math.ceil((new Date(s)-new Date(today))/864e5);return ['',d===0?'오늘':'D-'+d]}
+  function scard(e){const st=stOf(e);const d=new Date((e.start||today)+'T00:00:00');
+    return '<a class="scard" href="'+esc(e.href||'calendar.html')+'"><div class="day"><b>'+d.getDate()+'</b><span>'+(d.getMonth()+1)+'월 '+['일','월','화','수','목','금','토'][d.getDay()]+'</span></div><div class="b"><span class="ty" style="background:'+(TYPES[e.type]||'#153A77')+'">'+esc(e.type||'행사')+'</span><h4>'+esc(e.title)+'</h4><div class="m">'+esc(dot(e.start))+(e.end&&e.end!==e.start?' ~ '+esc(dot(e.end).slice(5)):'')+(e.place||e.sido?' · '+esc([e.sido,e.place].filter(Boolean).join(' ')):'')+'</div><span class="st '+st[0]+'">'+st[1]+'</span></div></a>'}
+  function schRender(){
+    const mEl=document.getElementById('schMonths'),tEl=document.getElementById('schTypes'),g=document.getElementById('schGrid');if(!g)return;
+    mEl.innerHTML=Array.from({length:12},(_,i)=>'<button class="'+(i+1===SM?'on':'')+'" onclick="schMonth('+(i+1)+')">'+(i+1)+'월</button>').join('');
+    tEl.innerHTML=['','대회','자격검정','연수','행사'].map(t=>'<button class="'+(ST===t?'on':'')+'" onclick="schType(\''+t+'\')">'+(t?'<i style="width:8px;height:8px;border-radius:50%;background:'+TYPES[t]+';display:inline-block"></i>':'')+(t||'전체')+'</button>').join('');
+    const mm=Y+'-'+String(SM).padStart(2,'0');
+    const list=EV.filter(e=>(!ST||e.type===ST)&&((e.start||'').slice(0,7)<=mm&&(e.end||e.start||'').slice(0,7)>=mm)).sort((a,b)=>String(a.start||'').localeCompare(String(b.start||'')));
+    if(list.length){g.innerHTML=list.slice(0,9).map(scard).join('');return}
+    const up=EV.filter(e=>(!ST||e.type===ST)&&(e.end||e.start||'')>=today).sort((a,b)=>String(a.start||'').localeCompare(String(b.start||''))).slice(0,6);
+    g.innerHTML='<div class="bempty" style="grid-column:1/-1">'+SM+'월에 등록된 일정이 없습니다.'+(up.length?' 다가오는 일정을 보여드립니다.':'')+'</div>'+up.map(scard).join('');
+  }
+  window.schMonth=function(m){SM=m;schRender()};window.schType=function(t){ST=t;schRender()};
+  // ── 다가오는 대회 카드 (히어로) ──
+  function heroEvent(){
+    const list=EV.filter(e=>e.type==='대회'&&(e.end||e.start||'')>=today).sort((a,b)=>String(a.start||'').localeCompare(String(b.start||'')));
+    const e=list[0];const box=document.getElementById('heroEvent');if(!e||!box)return;
+    const d=Math.ceil((new Date(e.start)-new Date(today))/864e5);
+    document.getElementById('heTitle').textContent=e.title||'';
+    document.getElementById('heMeta').textContent=dot(e.start)+(e.end&&e.end!==e.start?' ~ '+dot(e.end):'')+([e.sido,e.place].filter(Boolean).length?' · '+[e.sido,e.place].filter(Boolean).join(' '):'');
+    document.getElementById('heDday').textContent=d<=0?(d===0?'D-DAY':'진행 중'):'D-'+d;
+    box.href=e.href||'competition.html';box.style.display='block';
+  }
+  async function load(){
+    const DB=firebase.firestore();
+    nwRender();schRender();
+    // 접수 공고 → 소식
+    try{const s=await DB.collection('licenseNotices').orderBy('createdAt','desc').limit(12).get();
+      s.forEach(d=>{const n=d.data();if((n.approval===undefined||n.approval==='승인')&&n.status==='접수중')NEWS.push({t:'recruit',cat:(n.type||'').indexOf('갱신')>=0?'접수':'공고',title:n.title||'',date:n.date||'',href:'license.html'})});nwRender()}catch(e){}
+    // 캘린더 일정 (공개)
+    try{const s=await DB.collection('events').orderBy('start').limit(400).get();EV=EV.concat(s.docs.map(d=>Object.assign({id:d.id},d.data())))}catch(e){}
+    // 대회 공고 (읽히면 보탬)
+    try{const s=await DB.collection('compSlots').orderBy('date').limit(60).get();
+      s.docs.forEach(d=>{const x=d.data();if(x.compId||x.role!=='참가')return;const e={title:x.title||'',type:'대회',start:x.date||'',end:x.date||'',sido:x.region||'',place:x.place||'',href:'competition.html?slot='+d.id};
+        if(!EV.some(v=>v.title===e.title&&v.start===e.start))EV.push(e);
+        NEWS.push({t:'comp',cat:'대회',title:(x.host?x.host+' · ':'')+e.title+' 참가 모집',date:x.createdAt&&x.createdAt.toDate?x.createdAt.toDate().toISOString().slice(0,10):e.start,href:e.href})});nwRender()}catch(e){}
+    try{const s=await DB.collection('competitionStaff').limit(30).get();
+      s.docs.forEach(d=>{const x=d.data();if(!x.approved)return;NEWS.push({t:'comp',cat:'심판',title:(x.recruitType||'심판·운영요원')+' 모집 · '+(x.competitionName||''),date:x.startDate||'',href:'staff.html?post='+d.id})});nwRender()}catch(e){}
+    schRender();heroEvent();
+  }
+  function boot(n){if(window.firebase&&firebase.apps&&firebase.apps.length&&firebase.firestore){load();return}if(n>40)return;setTimeout(()=>boot(n+1),250)}
+  boot(0);
+})();
+</script>
+
 <script>
 /* ══════════ [팝업] 관리자 등록 팝업 표시 (게시 기간 내, 위치·연결페이지 지원) ══════════ */
 (function(){
