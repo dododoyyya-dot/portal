@@ -1608,6 +1608,7 @@ async function loadLics(){
 const LC_ICO_EDIT='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M4 20h4l11-11-4-4L4 16v4z"/><path d="M13 7l4 4"/></svg>';
 const LC_EDIT_FIELDS=[
   ['name','성명','text','자격증 출력물에 표시되는 이름 — 개명·오기 정정 시에만 (타인 명의 변경 금지)'],
+  ['birth','생년월일','date','자격증 출력물에 표시 — 회원 미연결이거나 회원 정보에 없을 때 입력 (여기 값이 회원 정보보다 우선)'],
   ['type','종류','select',['지도자','심판']],
   ['grade','급수','select',['1급','2급','3급']],
   ['issuedAt','발급일','date',''],
@@ -1642,6 +1643,7 @@ function editLic(id){
     +'<label style="display:block;margin-top:14px"><span style="display:block;font-size:12px;font-weight:800;color:#153A77;margin-bottom:4px">수정 사유 <span style="color:#8a919d;font-weight:700">(이력에 기록 · 권장)</span></span><input id="le_reason" class="lcin" placeholder="예: 개명 반영 / 발급일 오기 정정 / 대장 이기 오류"></label>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button class="lcbtn g" onclick="closeEditLic()">취소</button><button class="lcbtn p" onclick="saveEditLic(\''+esc(id)+'\')">저장</button></div></div>';
   document.body.appendChild(ov);
+  if(!l.birth&&l.uid){lcMemberOf(l.uid).then(m=>{const b=document.getElementById('le_birth');if(!b||b.value)return;const hint=b.parentNode&&b.parentNode.querySelector('span:last-child');if(hint)hint.innerHTML=(m.birth?'회원 정보의 생년월일 <b>'+esc(m.birth)+'</b>이 출력에 쓰입니다. 다르면 여기에 입력하세요.':'<b style="color:#C41E2F">연결 회원 정보에도 생년월일이 없습니다</b> — 여기에 입력하면 출력물에 표시됩니다.')}).catch(()=>{})}
 }
 async function saveEditLic(id){
   const doc=LICS.find(d=>d.id===id);if(!doc)return;
@@ -1938,7 +1940,7 @@ async function printLicCerts(which){
   const pages=[],noBirth=[];
   for(const d of docs){
     const l=d.data();const m=await lcMemberOf(l.uid);
-    const birth=m.birth||'';if(!birth)noBirth.push(d.id+' '+(l.name||l.maskName||''));
+    const birth=l.birth||m.birth||'';if(!birth)noBirth.push(d.id+' '+(l.name||l.maskName||''));   // 대장에 직접 입력한 생년월일이 우선
     const bg=new URL('files/'+(String(l.type||'').indexOf('심판')>=0?'cert_bg_referee.jpg':'cert_bg_leader.jpg'),location.href).href;
     pages.push('<div class="paper"><img class="bgimg" src="'+bg+'">'
       +'<div class="f" style="left:39.7%;top:33.6%;font-size:8.6mm">'+esc(l.grade||'')+'</div>'
@@ -1959,7 +1961,7 @@ async function printLicCerts(which){
   +'@media print{body{background:#fff}.paper{margin:0}}</style></head><body>'+pages.join('')
   +'<scr'+'ipt>window.onload=function(){var imgs=[].slice.call(document.images),n=imgs.length,done=false;function go(){if(done)return;done=true;window.print()}function one(){if(--n<=0)go()}if(!n)go();imgs.forEach(function(i){if(i.complete)one();else{i.onload=one;i.onerror=one}});setTimeout(go,4000)}</scr'+'ipt></body></html>');
   w.document.close();
-  if(noBirth.length)setTimeout(()=>alert('생년월일을 확인하지 못한 자격증 '+noBirth.length+'건은 생년월일 칸이 비어 있습니다.\n(회원 미연결 또는 회원 정보에 생년월일 없음 — 필요하면 [🔗 회원 연동] 후 다시 출력)\n\n'+noBirth.join('\n')),400);
+  if(noBirth.length)setTimeout(()=>alert('생년월일을 확인하지 못한 자격증 '+noBirth.length+'건은 생년월일 칸이 비어 있습니다.\n(회원 미연결 또는 회원 정보에 생년월일 없음 — [정보 수정]에서 생년월일을 입력하거나 [🔗 회원 연동] 후 다시 출력)\n\n'+noBirth.join('\n')),400);
 }
 function exportLics(){
   const rows=[['자격번호','성명','종류','급수','발급일','유효기간','상태','소속','발급연맹','회원연결']];
