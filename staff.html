@@ -260,6 +260,40 @@ function periodTxt(p){
   const shown=ds.slice(0,4).map(d=>fmtD(d.slice(5))+'('+dowOf(d)+')').join(' · ');
   return ds[0].slice(0,4)+'년 '+shown+(ds.length>4?' 외 '+(ds.length-4)+'일':'')+' — 총 '+ds.length+'일';
 }
+// ══════════ [날짜별 정보·2026-09-07] dates[i] 의 title(종목·부문)·location·time·gatherTime — 비어 있으면 공고 단위 값으로 폴백 ══════════
+//   기존 공고(날짜별 값 없음)는 own=false 라 화면·복사문·알림문이 종전과 완전히 같습니다.
+function dayInfo(p,dd){p=p||{};dd=dd||{};return {title:dd.title||'',location:dd.location||p.location||'',time:dd.time||p.time||'',gatherTime:dd.gatherTime||p.gatherTime||'',own:!!(dd.title||dd.location||dd.time||dd.gatherTime)}}
+function hasDayInfo(p){return ((p&&p.dates)||[]).some(d=>d&&(d.title||d.location||d.time||d.gatherTime))}
+function dayInfoTxt(p,dd){const di=dayInfo(p,dd);return [di.title,di.time?'경기 '+di.time:'',di.location].filter(Boolean).join(' · ')+(di.gatherTime?' · 집합 '+di.gatherTime:'')}
+function dayLine(p,dd){return fmtD((dd.date||'').slice(5))+'('+(dd.dayOfWeek||dowOf(dd.date))+') '+dayInfoTxt(p,dd)}
+// 상세 화면: 날짜 탭 바로 아래 — 그 날짜의 종목·장소·시간을 크게
+function dayInfoBlockHtml(p,dd){
+  const di=dayInfo(p,dd);if(!di.own)return '';
+  const I=(n,c)=>CAREER.svg(n,{size:15,color:c||'#153A77',stroke:2.2});
+  return '<div style="margin-top:10px;border:1.5px solid #b9cdec;background:#eef3fa;border-radius:12px;padding:12px 16px;font-size:13.5px;line-height:1.9">'
+    +'<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><b style="font-size:15.5px;color:#153A77">'+fmtD((dd.date||'').slice(5))+' ('+(dd.dayOfWeek||dowOf(dd.date))+')</b>'+(di.title?'<span style="display:inline-flex;align-items:center;gap:5px;background:#153A77;color:#fff;font-weight:800;font-size:12.5px;border-radius:999px;padding:3px 12px">'+I('disc','#fff')+esc(di.title)+'</span>':'')+'</div>'
+    +'<div style="display:flex;gap:6px 18px;flex-wrap:wrap;margin-top:4px">'
+    +'<span style="display:inline-flex;align-items:center;gap:5px">'+I('pin')+'<b>'+esc(di.location)+'</b></span>'
+    +'<span style="display:inline-flex;align-items:center;gap:5px">'+I('clock')+'경기 <b>'+esc(di.time)+'</b></span>'
+    +(di.gatherTime?'<span style="display:inline-flex;align-items:center;gap:5px">'+I('users')+'집합 <b>'+esc(di.gatherTime)+'</b></span>':'')
+    +'</div></div>';
+}
+// 목록·단독 상세: 날짜당 한 줄 요약
+function dayListHtml(p,small){
+  if(!hasDayInfo(p))return '';
+  return '<div style="margin:'+(small?'2px 15px 9px':'0 0 8px')+';font-size:'+(small?'12px':'12.5px')+';line-height:1.7;color:#374151">'+(small?'':'<b style="color:#153A77">'+CAREER.svg('calendar',{size:13,color:'#153A77',stroke:2.2})+' 날짜별 일정</b><br>')
+    +(p.dates||[]).map(dd=>'<span style="display:block">'+esc(dayLine(p,dd))+'</span>').join('')+'</div>';
+}
+// 공고 폼: 날짜별 섹션 상단 4칸 (공통 설정 모드에서는 그리지 않음)
+function dayInfoFormHtml(cfg){
+  cfg=cfg||{};
+  const f=(cls,lab,ph,val)=>'<div><label style="font-size:11px;font-weight:700;color:#6b7280">'+lab+'</label><input class="stfield '+cls+'" style="margin-top:2px" placeholder="'+ph+'" value="'+esc(val||'')+'"></div>';
+  return '<div style="font-size:12px;font-weight:800;margin-top:9px">이 날짜의 종목·장소·시간 <span style="font-weight:600;color:#8a919d;font-size:11px">— 비워 두면 위의 공고 단위 장소·시간을 씁니다 (날짜마다 종목·장소가 다를 때만 입력)</span></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">'
+    +f('pfDTitle','종목·부문','예: 장애인 디스크골프',cfg.title)+f('pfDLoc','장소','예: ○○공원 디스크골프장',cfg.location)
+    +f('pfDTime','경기 시간','예: 09:00~12:00',cfg.time)+f('pfDGather','집합 시간','예: 08:30',cfg.gatherTime)
+    +'</div>';
+}
 function postStatus(p){
   const today=new Date().toISOString().slice(0,10);
   if(p.manualClosed)return ['마감','#8a919d'];  // [v6] 관리자 수동 마감
@@ -284,6 +318,7 @@ function rowHtml(p){
     +'<span class="strowend">마감 '+fmtD(p.deadline||'')+' · <b>'+t.applied+'/'+t.quota+'명</b></span>'
     +'<span class="strowangl">자세히 ›</span>'
     +'</div>'
+    +dayListHtml(p,true)   // [날짜별 정보] 날짜별 값이 있는 공고만 한 줄씩
     +'</div>';
 }
 // [1공고 1상세] 목록에서 공고 하나를 눌렀을 때, 그 공고만 단독으로 보여줍니다 (staff.html?post=공고ID)
@@ -344,6 +379,7 @@ function expandRowHtml(p){
     +'<span>🕐 <b>경기시간:</b> '+esc(p.time||'')+'</span>'
     +'<span>🏅 <b>종목:</b> '+esc(p.sport||'')+'</span>'
     +'</div>'
+    +dayListHtml(p)   // [날짜별 정보]
     +rolesHtml
     +'<div style="margin-bottom:6px">'
     +'<span style="font-weight:800">교통비</span> '+esc(p.transportation||'미정')
@@ -637,6 +673,7 @@ function daySecHtml(date,i,cfg){
   const head=date?('📅 '+fmtD(date)+' ('+dowOf(date)+')'):'👥 공통 모집 설정 <span style="font-weight:600;color:#8a919d;font-size:11px">— 선택한 모든 날짜에 동일 적용</span>';
   let h='<div class="pfDaySec" data-date="'+(date||'')+'" style="margin-top:12px;border:1.5px solid #d3e0f2;border-radius:12px;padding:14px 16px;background:#fbfdff">'
     +'<b style="font-size:13.5px;color:#153A77">'+head+'</b>'
+    +(date?dayInfoFormHtml(cfg):'')   // [날짜별 정보] 날짜별 모드에서만
     +'<div style="font-size:12px;font-weight:800;margin-top:9px">모집 정원</div>'
     +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px">'
     +QUOTA_KEYS.map(([k,lb])=>'<div><label style="font-size:11px;font-weight:700;color:#6b7280">'+lb+'</label><input type="number" min="0" class="stfield pfQ_'+k+'" style="margin-top:2px" value="'+(q[k]||0)+'"></div>').join('')
@@ -1049,7 +1086,10 @@ function readDaySec(sec){
   const items=mode==='직접입력'?[...sec.querySelectorAll('.pfPayRow')].map(r=>{
     const [a,b]=r.querySelectorAll('input');return {role:a.value.trim(),amount:b.value.trim()};
   }).filter(x=>x.role):[];
-  return {quota:quota,roles:duties.concat(etc),allowance:{mode:mode,items:items}};
+  const out={quota:quota,roles:duties.concat(etc),allowance:{mode:mode,items:items}};
+  // [날짜별 정보] 날짜별 섹션의 종목·장소·시간·집합 — 입력된 것만 저장 (비면 공고 단위 값 폴백)
+  [['pfDTitle','title'],['pfDLoc','location'],['pfDTime','time'],['pfDGather','gatherTime']].forEach(([cls,k])=>{const e=sec.querySelector('.'+cls);const val=e?(e.value||'').trim():'';if(val)out[k]=val});
+  return out;
 }
 async function savePost(editId){
   const v=id=>{const e=document.getElementById(id);return e?(e.value||'').trim():''};
@@ -1067,6 +1107,8 @@ async function savePost(editId){
   }else{
     dateArr=secs.filter(s2=>s2.dataset.date).map(sec=>Object.assign({date:sec.dataset.date,dayOfWeek:dowOf(sec.dataset.date)},readDaySec(sec)));
   }
+  // [보존] 공고 수정 시 날짜별 임무 완료 기록(completed)은 폼에 없으므로 기존 문서에서 이어받습니다
+  if(editId){const ed0=POSTS.find(x=>x.id===editId);if(ed0&&ed0.dates)dateArr.forEach(d=>{const o=ed0.dates.find(x=>x.date===d.date);if(o&&o.completed)d.completed=o.completed})}
   const SPORTS=[...document.querySelectorAll('.pfSportCk:checked')].map(x=>x.value)
     .concat((v('pfSportEtc')||'').split(',').map(x=>x.trim()).filter(Boolean));
   if(!SPORTS.length){alert('대회 종목을 1개 이상 선택해주세요.');return}
@@ -1231,7 +1273,7 @@ async function _renderDetailInner(isStale){
     +'<span style="flex:1"></span><button class="stbtn stbtn-ghost" onclick="document.getElementById(\'dtModal\').remove()">닫기 ✕</button></div>'
     +'<div style="font-size:13px;color:#4b5563;margin-top:8px;line-height:1.9">'
     +'📅 '+periodTxt(p)
-    +' &nbsp;·&nbsp; 📍 '+esc(p.location||'')+' &nbsp;·&nbsp; 🕐 경기 '+esc(p.time||'')+(p.gatherTime?' &nbsp;·&nbsp; 🕘 집합 '+esc(p.gatherTime):'')+' &nbsp;·&nbsp; 🥏 '+esc(p.sport||'')
+    +' &nbsp;·&nbsp; 📍 '+esc(p.location||'')+' &nbsp;·&nbsp; 🕐 경기 '+esc(p.time||'')+(p.gatherTime?' &nbsp;·&nbsp; 🕘 집합 '+esc(p.gatherTime):'')+' &nbsp;·&nbsp; 🥏 '+esc(p.sport||'')+(hasDayInfo(p)?' <span class="stpill" style="background:#b8860b;font-size:11px;padding:2px 9px">날짜별 상이 — 아래 날짜 탭 확인</span>':'')
     +'<br>🗓 모집 마감: <b>'+fmtD(p.deadline)+'</b>'
     +' &nbsp;·&nbsp; 🚌 교통비: '+esc(p.transportation||'-')+' &nbsp;·&nbsp; 🍱 식사: '+esc(p.meal||'-')
     +'<br>🥋 심판복: '+esc(p.uniform||'-')+' &nbsp;·&nbsp; 🛏 숙박: '+esc(p.lodging||'-')
@@ -1244,6 +1286,7 @@ async function _renderDetailInner(isStale){
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:16px">'
     +dates.map((d2,i)=>'<button class="daytab'+(i===DT_DAY?' on':'')+'" onclick="DT_DAY='+i+';renderDetail()">'+fmtD((d2.date||'').slice(5))+' ('+(d2.dayOfWeek||dowOf(d2.date))+')</button>').join('')
     +'</div>'
+    +dayInfoBlockHtml(p,dd)   // [날짜별 정보] 그 날짜의 종목·장소·시간 (값이 있을 때만)
     +'<div class="dtcols">'
     +'<div class="dtmain" style="border:1.5px solid #d3e0f2;border-radius:12px;padding:14px 16px;margin-top:10px;background:#fbfdff">'
     +'<div style="font-size:13px"><b>모집 정원:</b> '+qTxt+'</div>'
@@ -1296,7 +1339,7 @@ function openApplyForm(id){
       const checked=my&&(my.days||[]).indexOf(d2.date)>=0;
       const myPrefs=my&&my.prefs&&my.prefs[d2.date]||[];
       return '<div style="border:1.5px solid #e3e9f2;border-radius:11px;padding:10px 13px;margin-top:8px">'
-      +'<label style="display:flex;gap:7px;align-items:center;font-weight:800;font-size:13.5px;cursor:pointer"><input type="checkbox" class="apDay" value="'+d2.date+'"'+(checked?' checked':'')+' onchange="this.closest(\'div\').querySelector(\'.apPrefWrap\').style.display=this.checked?\'block\':\'none\'" style="width:auto"> '+fmtD(d2.date)+' ('+(d2.dayOfWeek||dowOf(d2.date))+')</label>'
+      +'<label style="display:flex;gap:7px;align-items:center;font-weight:800;font-size:13.5px;cursor:pointer"><input type="checkbox" class="apDay" value="'+d2.date+'"'+(checked?' checked':'')+' onchange="this.closest(\'div\').querySelector(\'.apPrefWrap\').style.display=this.checked?\'block\':\'none\'" style="width:auto"> '+fmtD(d2.date)+' ('+(d2.dayOfWeek||dowOf(d2.date))+')'+(dayInfo(p,d2).own?'<span style="font-weight:600;font-size:11.5px;color:#153A77;margin-left:4px">'+esc(dayInfoTxt(p,d2))+'</span>':'')+'</label>'
       +'<div class="apPrefWrap" style="display:'+(checked?'block':'none')+';margin-top:7px">'
       +'<div style="font-size:11.5px;color:#8a919d;margin-bottom:3px">이 날짜 희망 임무 (복수 선택)</div>'
       +(d2.roles||[]).map(r=>{
@@ -1689,9 +1732,10 @@ function mdRender(){
 function mdPick(btn,i){MD.rows[i].role=btn.dataset.role;MD.open=-1;mdRender()}
 async function mdOne(i){
   const r=MD.rows[i];const p=POSTS.find(x=>x.id===MD.postId);if(!r||!p||r.busy)return;
+  const di=dayInfo(p,(p.dates||[]).find(x=>x.date===MD.date)||{});   // [날짜별 정보] 그 날짜의 종목·장소
   r.busy=true;r.skip=false;mdRender();
   try{
-    const w=await CAREER.write(DB,{uid:r.uid,name:r.name,date:MD.date,competitionName:p.competitionName||'',role:r.role,sport:p.sport||'',location:p.location||'',organizer:(p.author&&p.author.organization)||'',postId:MD.postId,source:'staff-complete'},(SMY&&SMY.name)||'');
+    const w=await CAREER.write(DB,{uid:r.uid,name:r.name,date:MD.date,competitionName:p.competitionName||'',role:r.role,sport:(di.title||p.sport||''),location:di.location||'',organizer:(p.author&&p.author.organization)||'',postId:MD.postId,source:'staff-complete'},(SMY&&SMY.name)||'');
     // 역할이 바뀌어 다른 키로 새로 기록된 경우 예전 기록은 정리
     if(r.recId&&w.id!==r.recId){try{await DB.collection('staffCareer').doc(r.recId).delete()}catch(e){}}
     r.done=true;r.recId=w.id;r.recRole=r.role;
@@ -1796,8 +1840,8 @@ async function _registerCareerOld(postId,date){
         competitionName:p.competitionName||'',
         date:date,
         duty:assign.duty||((app.prefs||{})[date]||[]).join(', ')||'-',
-        location:p.location||'',
-        sport:p.sport||'',
+        location:dayInfo(p,(p.dates||[]).find(x=>x.date===date)||{}).location,   // [날짜별 정보]
+        sport:(dayInfo(p,(p.dates||[]).find(x=>x.date===date)||{}).title||p.sport||''),
         organizer:(p.author&&p.author.organization)||'',
         registeredAt:firebase.firestore.FieldValue.serverTimestamp()
       });
@@ -2011,7 +2055,7 @@ async function exportPayReport(postId){
       const row=ws.getRow(rIdx);
       row.height=30;
       row.getCell(1).value=i+1;
-      row.getCell(2).value=fmtD(dd.date)+' '+(p.time||'');
+      row.getCell(2).value=fmtD(dd.date)+' '+(dayInfo(p,dd).time||'');   // [날짜별 정보] 날짜별 시간 우선
       row.getCell(3).value='';  // 소속 — 관리자 수기 기입
       row.getCell(4).value=a.name||'';
       row.getCell(5).value=asg.duty||(((a.prefs||{})[dd.date]||[]).join(', '))||'';
@@ -2164,6 +2208,7 @@ async function openNotifyModal(postId){
   const defBody='['+(p.competitionName||'대회')+'] 심판·운영요원 확정 안내\n\n'
     +'일시: '+fmtD(p.startDate)+(p.endDate&&p.endDate!==p.startDate?' ~ '+fmtD(p.endDate):'')+(p.time?' '+p.time:'')+'\n'
     +'장소: '+(p.location||'')+'\n'
+    +(hasDayInfo(p)?'날짜별 일정:\n'+(p.dates||[]).map(dd=>' - '+dayLine(p,dd)).join('\n')+'\n':'')   // [날짜별 정보]
     +(p.uniform?'심판복: '+p.uniform+'\n':'')
     +(p.supplies&&p.supplies.length?'준비물: '+p.supplies.join(', ')+'\n':'')
     +(p.gatherTime?'집합시간: '+p.gatherTime+'\n':'')
@@ -2566,6 +2611,7 @@ async function copyRoster(id){
     const conf=apps.filter(a=>a.status&&a.status[dd.date]==='확정');
     if(!conf.length)return;
     txt+='\n【'+fmtD((dd.date||'').slice(5))+' ('+(dd.dayOfWeek||dowOf(dd.date))+')】\n';
+    if(dayInfo(p,dd).own)txt+='· '+dayInfoTxt(p,dd)+'\n';   // [날짜별 정보]
     const byDuty={};
     conf.forEach(a=>{const duty=(a.assign&&a.assign[dd.date]&&a.assign[dd.date].duty)||'미지정';(byDuty[duty]=byDuty[duty]||[]).push(a)});
     Object.keys(byDuty).forEach(duty=>{
