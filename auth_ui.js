@@ -37,9 +37,22 @@
       return '<div><a href="'+m.h+'" class="top'+(act?' active':'')+'">'+esc(m.t)+'</a>'
         +'<div class="drop">'+m.d.map(function(x){return '<a href="'+x[1]+'"'+(x[2]?' style="'+x[2]+'"':'')+'>'+esc(x[0])+'</a>'}).join('')+'</div></div>';
     }).join('');
-    html+='<a href="apply.html" class="cta">강습 신청</a>'
-        +'<a href="jobs.html" class="cta" style="background:#1F4E9C;margin-left:8px">강사신청</a>';
+    // [체육회 스타일 2026-09-07] 우측 알약 버튼 묶음 (색은 style.css .navcta)
+    html+='<div class="navcta"><a href="apply.html" class="cta">강습 신청</a><a href="jobs.html" class="cta cta2">강사신청</a></div>';
     nav.innerHTML=html;
+    // [메가메뉴] 메뉴에 마우스를 올리면 헤더 아래로 전 분야가 한 번에 펼쳐집니다 (PC). 휴대폰은 종전 접이식 그대로.
+    try{
+      var header=nav.closest('header');if(!header||header.querySelector('.mega'))return;
+      var mega=document.createElement('div');mega.className='mega';
+      mega.innerHTML='<div class="wrap mega-in">'+MENU.map(function(m){return '<div class="mcol"><a class="mh" href="'+m.h+'">'+esc(m.t)+'</a>'+m.d.map(function(x){return '<a href="'+x[1]+'"'+(x[2]?' style="'+x[2]+'"':'')+'>'+esc(x[0])+'</a>'}).join('')+'</div>'}).join('')+'</div>';
+      header.appendChild(mega);
+      var tm=null;
+      function open(){if(window.innerWidth<=1080)return;clearTimeout(tm);header.classList.add('mega-open')}
+      function close(){clearTimeout(tm);tm=setTimeout(function(){header.classList.remove('mega-open')},120)}
+      nav.addEventListener('mouseenter',open);mega.addEventListener('mouseenter',open);
+      nav.addEventListener('mouseleave',close);mega.addEventListener('mouseleave',close);
+      header.addEventListener('mouseleave',close);
+    }catch(e){}
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',renderNav);else renderNav();
 
