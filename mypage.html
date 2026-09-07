@@ -557,13 +557,18 @@ function orgChip(o,region,title,fed){
     <div id="careerBadges" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px;margin-bottom:12px"></div>
     <div id="careerNext" style="font-size:12.5px;background:#fff8e6;border:1.5px solid #f1dfa6;border-radius:12px;padding:10px 14px;margin-bottom:12px;line-height:1.7"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
-      <span id="careerCertIcon" style="font-size:13px;font-weight:900;display:inline-flex;align-items:center;gap:5px">경력증명서</span>
-      <label style="font-size:12.5px;font-weight:700"><input type="checkbox" class="crCat" value="위원,심판,운영,봉사,지도" checked style="width:auto"> 심판·운영·위원</label>
-      <label style="font-size:12.5px;font-weight:700"><input type="checkbox" class="crCat" value="선수" checked style="width:auto"> 선수(참가)</label>
-      <label style="font-size:12.5px;font-weight:700"><input type="checkbox" class="crCat" value="입상" checked style="width:auto"> 입상</label>
-      <button class="btn-sub" id="careerPrintBtn" style="background:#153A77;display:inline-flex;align-items:center;gap:6px" onclick="printCareerCert()">경력증명서 발급 (인쇄·PDF)</button>
+      <span id="careerCertIcon" style="font-size:13px;font-weight:900;display:inline-flex;align-items:center;gap:5px">경력증명서 발급 (인쇄·PDF)</span>
+      <button class="btn-sub" id="careerPrintBtn" style="background:#153A77;display:inline-flex;align-items:center;gap:6px" onclick="printCareerCert('staff')">심판·운영 경력증명서</button>
+      <button class="btn-sub" style="background:#0e7490" onclick="printCareerCert('coach')">지도자 경력증명서</button>
+      <button class="btn-sub" style="background:#C41E2F" onclick="printCareerCert('athlete')">선수 경력 확인서</button>
     </div>
     <div class="board" id="careerList"></div>
+    <!-- [선수 경력] 대회 참가·입상(학교스포츠클럽 포함) — 심판·운영 이력과 분리된 별도 상자. 보류함(schoolClubResults)에서 내 기록 찾기 -->
+    <div id="athBox" style="margin-top:14px;border:1.5px solid #f1c7cc;background:#fff7f7;border-radius:14px;padding:14px 16px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b id="athTitle" style="font-size:14.5px;display:inline-flex;align-items:center;gap:6px">나의 선수 경력</b><span style="font-size:12px;color:#6b7280">— 대회 참가·입상 (학교스포츠클럽 포함)</span><span style="flex:1"></span><button class="btn-sub" id="athFindBtn" style="background:#C41E2F;display:inline-flex;align-items:center;gap:6px" onclick="athFind()" title="학교에서 올린 참가·입상 명단 중 내(자녀) 기록을 찾아 가져옵니다">내 기록 찾기</button></div>
+      <div id="athFound" style="display:none;margin-top:10px"></div>
+      <div id="athList" style="margin-top:10px"></div>
+    </div>
     <div class="note" style="margin-top:10px">이력은 대회 운영진이 <b>임무 완료·대회 종료 처리</b>를 하면 자동으로 기록됩니다. 누락된 경력은 kfdf60@hanmail.net 으로 대회명·일자·역할을 알려 주세요.</div>
   </div>
   </div>
@@ -1986,6 +1991,7 @@ AUTH.onAuthStateChanged(async u=>{
     const careerSnap=await DB.collection('staffCareer').where('uid','==',u.uid).limit(500).get();
     MYCAREER=careerSnap.docs.map(d2=>Object.assign({id:d2.id},d2.data())).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
     renderCareer();
+    try{athSyncChildKeys();athFind(true)}catch(e){}   // [선수 경력] 보호자 자녀 키 저장 · 가져올 기록이 있으면 조용히 표시
     if(false&&!careerSnap.empty){
       document.getElementById('staffCareerBox').style.display='block';
       const rows=careerSnap.docs.map(d2=>{const c=d2.data();return '<div class="brow" style="display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;padding:10px 14px">'
@@ -2366,6 +2372,7 @@ function renderCareer(){
       +'<span style="font-size:12px;color:#6b7280">'+esc(c.location||'-')+'</span>'
       +'</div>'}).join('')).join('')
     :'<div class="bempty">아직 기록된 경력이 없습니다.</div>';
+  renderAthlete();   // [선수 경력] 별도 상자
 }
 // ══════════ [배지 모션] 새로 획득한 배지를 팝업 모션으로 축하 — 마지막으로 본 획득 목록은 브라우저에 저장(kfdf_badges_{uid}) ══════════
 let BADGE_Q=[],BADGE_BUSY=false,BADGE_DONE_ONCE=false;
@@ -2422,34 +2429,109 @@ function badgeCelebrate(bd){
   const next=()=>{const id=BADGE_Q.shift();if(!id)return;badgePop(id,next)};
   setTimeout(next,600);
 }
-function printCareerCert(){
+// ══════════ [선수 경력·2026-09-07] 나의 선수 경력(대회 참가·입상, 학교스포츠클럽 포함) + 내 기록 찾기(보류함 schoolClubResults → 본인 경력) + 경력증명서 3종 ══════════
+//  · 기록 소스: staffCareer 중 group 선수·입상 (연맹 대회 comp-complete, 학교스포츠클럽 schoolclub-import / schoolclub-claim)
+//  · 내 기록 찾기: 성명(공백 제거)+생년월일(+보호자 계정은 자녀 이름·생년월일)로 보류함을 조회 → 본인이 "내 기록 맞음"을 누르면 경력으로 이관
+//    (보안 규칙 v19 필요: schoolClubResults 본인 조회·claimed 갱신, staffCareer 본인 source schoolclub-claim 생성, users.childKeys 자가 저장)
+//  · 경력 점수: 학교스포츠클럽 기록은 회장단 결정 전까지 미부여(noPoints)
+let ATH_FOUND=[];
+function athNorm(s){return String(s||'').replace(/\s+/g,'').trim()}
+function athIsAth(c){const g=c.group||CAREER.group(c.role||c.duty);return g==='선수'||g==='입상'}
+function renderAthlete(){
+  const box=document.getElementById('athBox'),list=document.getElementById('athList');if(!box||!list||!window.CAREER)return;
+  const I=(n,o)=>CAREER.svg(n,o||{});
+  const tt=document.getElementById('athTitle');if(tt)tt.innerHTML=I('disc',{size:17,color:'#C41E2F',stroke:2.2})+'나의 선수 경력';
+  const fb=document.getElementById('athFindBtn');if(fb&&!fb.dataset.ok){fb.dataset.ok='1';fb.insertAdjacentHTML('afterbegin',I('target',{size:14,color:'#fff',stroke:2.4}))}
+  const recs=(MYCAREER||[]).filter(athIsAth);
+  // 같은 대회·같은 사람(자녀)·같은 팀의 참가/입상 기록을 한 줄로
+  const rows={};recs.forEach(c=>{const k=[c.competitionName,c.date,c.kidName||'',c.team||''].join('|');const r=rows[k]=rows[k]||{date:c.date||'',comp:c.competitionName||'',org:c.organizer||'',sport:c.sport||'',div:c.division||'',team:c.team||c.schoolName||'',kid:c.kidName||'',results:[],ext:!!(c.source&&/schoolclub/.test(c.source))};
+    const g=c.group||CAREER.group(c.role||c.duty);if(g==='입상')r.results.push(c.result||c.role||'입상');else r.results.unshift('참가')});
+  const arr=Object.values(rows).sort((a,b)=>b.date.localeCompare(a.date));
+  if(!arr.length){list.innerHTML='<div style="font-size:12.5px;color:#6b7280;padding:6px 0">아직 기록된 대회 참가·입상이 없습니다. 연맹 대회는 종료 처리 시 자동으로, 학교스포츠클럽 대회는 결과 업로드 후 [내 기록 찾기]로 가져올 수 있습니다.</div>';return}
+  list.innerHTML='<div class="tblwrap"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:620px"><thead><tr><th>대회일</th><th>대회명</th><th>주최</th><th>종목·부문</th><th>당시 소속(학교·팀)</th><th>결과</th></tr></thead><tbody>'
+    +arr.map(r=>'<tr><td style="white-space:nowrap">'+esc(r.date)+'</td><td class="l"><b>'+esc(r.comp)+'</b>'+(r.kid?' <span style="font-size:11px;color:#8a919d">('+esc(r.kid)+')</span>':'')+(r.ext?' <span style="font-size:10.5px;color:#fff;background:#0e7490;border-radius:999px;padding:1px 7px">학교스포츠클럽</span>':'')+'</td><td>'+esc(r.org||'-')+'</td><td>'+esc([r.sport,r.div].filter(Boolean).join(' · ')||'-')+'</td><td>'+esc(r.team||'-')+'</td>'
+      +'<td style="white-space:nowrap">'+r.results.map(x=>x==='참가'?'<span style="font-size:11.5px;font-weight:800;color:#153A77">참가</span>':'<span style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:900;color:#d97706">'+I('trophy',{size:13,color:'#d97706',stroke:2.2})+esc(x)+'</span>').join(' · ')+'</td></tr>').join('')
+    +'</tbody></table></div><div style="font-size:11.5px;color:#8a919d;margin-top:6px">학교스포츠클럽 등 외부 주최 대회 기록은 각 주최기관의 결과를 연맹이 기록·관리한 것입니다. 당시 학교가 소속으로 저장되어 진학·전학 후에도 그대로 남습니다.</div>';
+}
+// 보호자 계정: 자녀 검색 키(성명|생년월일) 자가 저장 — 규칙이 자녀 기록 열람을 판정할 수 있게 (규칙 v19 전에는 조용히 실패)
+async function athSyncChildKeys(){
+  try{
+    const kids=((MYD&&MYD.children)||[]).filter(k=>k&&k.name&&k.birth);
+    const keys=kids.map(k=>athNorm(k.name)+'|'+k.birth).sort();
+    const cur=((MYD&&MYD.childKeys)||[]).slice().sort();
+    if(JSON.stringify(keys)===JSON.stringify(cur))return;
+    await DB.collection('users').doc(AUTH.currentUser.uid).update({childKeys:keys});MYD.childKeys=keys;
+  }catch(e){}
+}
+async function athFind(quiet){
+  const out=document.getElementById('athFound');if(!out||!MYD)return;
+  const targets=[];
+  if(MYD.name&&MYD.birth)targets.push({kid:'',name:MYD.name,birth:MYD.birth});
+  ((MYD.children)||[]).forEach(k=>{if(k&&k.name&&k.birth)targets.push({kid:k.name,name:k.name,birth:k.birth})});
+  if(!targets.length){if(!quiet)alert('생년월일이 없어 기록을 찾을 수 없습니다.\n[내 정보]에서 생년월일을 먼저 입력해 주세요. (동명이인 구분에 필요합니다)');return}
+  if(!quiet){out.style.display='block';out.innerHTML='<div style="font-size:12.5px;color:#6b7280">보류함에서 내 기록을 찾는 중…</div>'}
+  ATH_FOUND=[];let err='';
+  for(const tg of targets){
+    try{
+      const snap=await DB.collection('schoolClubResults').where('status','==','pending').where('nameNorm','==',athNorm(tg.name)).where('birth','==',tg.birth).limit(50).get();
+      snap.docs.forEach(d=>{ATH_FOUND.push(Object.assign({id:d.id,_kid:tg.kid},d.data()))});
+    }catch(e){err=e.message}
+  }
+  if(!ATH_FOUND.length){
+    if(quiet){out.style.display='none';return}
+    out.innerHTML='<div style="font-size:12.5px;font-weight:700;color:'+(err?'#C41E2F':'#0f766e')+'">'+(err?('조회할 수 없습니다: '+esc(err)+' — 보안 규칙(v19)이 아직 게시되지 않았을 수 있습니다. 사무국에 문의해 주세요.'):'가져올 수 있는 대회 기록이 없습니다. (학교에서 명단이 아직 올라오지 않았거나, 성명·생년월일·학교가 명단과 다를 수 있습니다 — 사무국 031-984-3248)')+'</div>';
+    return;
+  }
+  out.style.display='block';
+  out.innerHTML='<div style="border:1.5px solid #f1dfa6;background:#fff8e6;border-radius:12px;padding:12px 14px">'
+    +'<div style="font-size:13.5px;font-weight:900;color:#8a5a00;display:inline-flex;align-items:center;gap:6px">'+CAREER.svg('sparkle',{size:16,color:'#b8860b',stroke:2.2})+'가져올 수 있는 대회 기록 '+ATH_FOUND.length+'건</div>'
+    +'<div style="font-size:12px;color:#6b7280;margin:4px 0 8px">학교에서 올린 명단과 성명·생년월일이 일치하는 기록입니다. 본인(또는 자녀)의 기록이 맞으면 체크하고 [가져오기]를 누르세요.</div>'
+    +ATH_FOUND.map((f,i)=>'<label style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-top:1px solid #f1e5c4;cursor:pointer;font-size:13px"><input type="checkbox" class="athPick" value="'+i+'" checked style="width:auto;margin-top:3px"><span><b>'+esc(f.competitionName||'')+'</b> <span style="color:#6b7280">'+esc(f.date||'')+(f.organizer?' · '+esc(f.organizer):'')+'</span><br><span style="font-size:12px;color:#374151">'+esc([f.sport,f.division].filter(Boolean).join(' · '))+(f.school?' · '+esc(f.school):'')+' · <b style="color:'+(f.result==='참가'?'#153A77':'#d97706')+'">'+esc(f.result||'참가')+'</b>'+(f._kid?' · 자녀 '+esc(f._kid):'')+'</span></span></label>').join('')
+    +'<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn-sub" style="background:#0f766e" onclick="athClaim()">✓ 내 기록 맞음 — 가져오기</button><button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'athFound\').style.display=\'none\'">닫기</button></div></div>';
+}
+async function athClaim(){
+  const picks=[...document.querySelectorAll('.athPick:checked')].map(x=>ATH_FOUND[+x.value]).filter(Boolean);
+  if(!picks.length){alert('가져올 기록을 체크해 주세요.');return}
+  if(!confirm(picks.length+'건을 내 선수 경력으로 가져옵니다. 본인(자녀)의 기록이 맞습니까?\n\n※ 타인의 기록을 가져오면 기록이 취소되고 이용이 제한될 수 있습니다.'))return;
+  const uid=AUTH.currentUser.uid;let ok=0;const fail=[];
+  for(const f of picks){
+    try{
+      const rec={uid:uid,name:f._kid||MYD.name||'',date:f.date||'',competitionName:f.competitionName||'',sport:f.sport||'',division:f.division||'',team:f.team||f.school||'',organizer:f.organizer||'',location:'',
+        slotId:'schoolclub:'+(f.competitionName||'')+':'+(f.date||'')+(f._kid?':'+f._kid:''),source:'schoolclub-claim',kidName:f._kid||'',importId:f.importId||'',teamSchoolCode:f.schoolCode||'',schoolName:f.school||'',noPoints:true,matchType:'self',gender:f.gender||''};
+      await CAREER.write(DB,Object.assign({},rec,{role:'참가자',group:'선수',kind:'athlete',result:''}),MYD.name||'');
+      if(f.result&&f.result!=='참가')await CAREER.write(DB,Object.assign({},rec,{role:'입상',group:'입상',kind:'award',result:f.result}),MYD.name||'');
+      await DB.collection('schoolClubResults').doc(f.id).update({status:'claimed',claimedUid:uid,claimedKid:f._kid||'',claimedAt:new Date().toISOString()});
+      ok++;
+    }catch(e){fail.push((f.competitionName||'')+' — '+e.message)}
+  }
+  alert(ok?('✓ '+ok+'건을 선수 경력에 기록했습니다.'+(fail.length?'\n\n실패 '+fail.length+'건:\n'+fail.join('\n'):'')):('가져오지 못했습니다.\n'+fail.join('\n')+'\n\n보안 규칙(v19)이 아직 게시되지 않았을 수 있습니다. 사무국에 문의해 주세요.'));
+  if(ok){try{const cs=await DB.collection('staffCareer').where('uid','==',uid).limit(500).get();MYCAREER=cs.docs.map(d2=>Object.assign({id:d2.id},d2.data())).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));renderCareer()}catch(e){}
+    const out=document.getElementById('athFound');if(out)out.style.display='none'}
+}
+// ── 경력증명서 3종: staff(심판·운영·위원·봉사) / coach(지도) / athlete(선수·입상 — 별도 서식·확인 문구) ──
+const CERT_GROUPS={staff:['위원','심판','운영','봉사'],coach:['지도'],athlete:['선수','입상']};
+function printCareerCert(kind){
   const d=MYD||{};const recs=(MYCAREER||[]).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
-  const cats=[...document.querySelectorAll('.crCat:checked')].map(x=>x.value.split(','));const allowed=new Set([].concat(...cats));
+  const allowed=new Set(CERT_GROUPS[kind]||['위원','심판','운영','봉사','지도','선수','입상']);
   const sel=recs.filter(c=>allowed.has(c.group||CAREER.group(c.role||c.duty)));
-  if(!sel.length){alert('선택한 범위에 기록된 경력이 없습니다.');return}
+  if(!sel.length){alert(({staff:'심판·운영·위원·봉사',coach:'지도자',athlete:'선수(참가·입상)'}[kind]||'선택한 범위')+' 경력이 아직 없습니다.');return}
+  if(kind==='athlete')return printAthleteCert(sel);
   const st=CAREER.stats(sel);const G={};Object.keys(CAREER.GROUP_COLOR).forEach(g=>G[g]='');
   const now=new Date();const pad=n=>String(n).padStart(2,'0');
-  const no='KFDF-CR-'+now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+'-'+String((AUTH.currentUser||{}).uid||'').slice(0,6).toUpperCase();
+  const no='KFDF-'+(kind==='coach'?'CC':'CR')+'-'+now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+'-'+String((AUTH.currentUser||{}).uid||'').slice(0,6).toUpperCase();
   const dateStr=now.getFullYear()+'년 '+(now.getMonth()+1)+'월 '+now.getDate()+'일';
   const lics=((typeof MYLICS!=='undefined'&&MYLICS)||[]).map(x=>x.data?x.data():x).map(l=>[(l.type||l.kind||l.category||'연맹 자격'),(l.grade||l.level||''),(l.no||l.number||''),(l.issuedAt||l.issued||'')].filter(Boolean).join(' · ')).filter(Boolean);
   const stamp=new URL('직인.png',location.href).href,logo=new URL('kfdf_logo.png',location.href).href;
   const grpRows=['위원','심판','운영','봉사','지도','선수','입상'].filter(g=>st.byGroup[g]).map(g=>'<tr><td>'+G[g]+' '+g+'</td><td style="text-align:right">'+st.byGroup[g]+'건</td><td style="text-align:right">'+sel.filter(c=>(c.group||CAREER.group(c.role||c.duty))===g).reduce((n,c)=>n+(+(c.days||1)||1),0)+'일</td></tr>').join('');
-  const detail=sel.filter(c=>(c.group||CAREER.group(c.role||c.duty))!=='입상').map((c,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(c.date||'')+'</td><td class="l">'+esc(c.competitionName||'')+(c.kidName?' ('+esc(c.kidName)+')':'')+'</td><td>'+esc(c.organizer||'-')+'</td><td>'+esc(c.location||'-')+'</td><td>'+esc(c.sport||'-')+'</td><td><b>'+esc(c.role||c.duty||'')+'</b>'+(c.division?'<br><span style="font-size:9.5px;color:#555">'+esc(c.division)+'</span>':'')+'</td><td>'+(c.verified!==false?'확인':'')+'</td></tr>').join('');
-  const awards=sel.filter(c=>(c.group||CAREER.group(c.role||c.duty))==='입상').map((c,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(c.date||'')+'</td><td class="l">'+esc(c.competitionName||'')+'</td><td>'+esc(c.division||'-')+'</td><td><b>'+esc(c.result||c.role||'입상')+'</b></td><td>'+esc(c.organizer||'-')+'</td></tr>').join('');
+  const detail=sel.filter(c=>(c.group||CAREER.group(c.role||c.duty))!=='입상').map((c,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(c.date||'')+'</td><td class="l">'+esc(c.competitionName||'')+(c.kidName?' ('+esc(c.kidName)+')':'')+'</td><td>'+esc(c.organizer||'-')+'</td><td>'+esc(c.location||'-')+'</td><td>'+esc(c.sport||'-')+'</td><td>'+esc(c.role||c.duty||'-')+'</td><td>'+(c.verified?'✓':'')+'</td></tr>').join('');
+  const title=kind==='coach'?'지 도 자 경 력 증 명 서':'경 력 증 명 서';
+  const what=kind==='coach'?'지도자(감독·코치·인솔자)로 활동한 사실':'활동한 사실';
   const w=window.open('','_blank');
   if(!w){alert('팝업이 차단되어 증명서 창을 열 수 없습니다. 주소창의 팝업 차단을 해제해주세요.');return}
-  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>경력증명서 '+esc(d.name||'')+'</title>'
-    +'<style>@page{size:A4;margin:14mm}body{margin:0;font-family:"Malgun Gothic","Noto Sans KR",sans-serif;color:#111;font-size:11.5px}'
-    +'.sheet{max-width:182mm;margin:0 auto}.hd{display:flex;align-items:center;justify-content:space-between;border-bottom:3px double #153A77;padding-bottom:8px}'
-    +'.hd img{height:34px}.no{font-size:10.5px;color:#555}h1{text-align:center;font-size:26px;letter-spacing:14px;margin:18px 0 10px;font-weight:900}'
-    +'table{width:100%;border-collapse:collapse;margin-top:6px}th,td{border:1px solid #555;padding:4px 6px;text-align:center;font-size:10.5px}th{background:#f2f4f8;font-weight:900}td.l{text-align:left}'
-    +'.sec{font-size:13px;font-weight:900;margin:14px 0 4px;color:#153A77}.info td{text-align:left}.info th{width:24%}'
-    +'.foot{margin-top:18px;text-align:center;font-size:12px;line-height:2}.sig{position:relative;display:inline-block;margin-top:8px;font-size:17px;font-weight:900;letter-spacing:4px}'
-    +'.sig img{position:absolute;right:-58px;top:-26px;height:66px;opacity:.9}.small{font-size:9.5px;color:#666;margin-top:10px;line-height:1.6;text-align:left;border-top:1px dashed #aaa;padding-top:6px}'
-    +'.sum{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}.sum div{flex:1;min-width:110px;border:1px solid #ccd3df;border-radius:8px;padding:6px 8px;text-align:center}.sum b{display:block;font-size:16px}'
-    +'@media print{.noprint{display:none}}</style></head><body><div class="sheet">'
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title.replace(/ /g,'')+' '+esc(d.name||'')+'</title>'
+    +certCss()+'</head><body><div class="sheet">'
     +'<div class="hd"><img src="'+logo+'"><div class="no">발급번호 '+no+'<br>발급일 '+dateStr+'</div></div>'
-    +'<h1>경 력 증 명 서</h1>'
+    +'<h1>'+title+'</h1>'
     +'<table class="info"><tr><th>성 명</th><td>'+esc(d.name||'')+'</td><th>생년월일</th><td>'+esc(d.birth||'-')+'</td></tr>'
     +'<tr><th>회원 구분</th><td>'+esc({instructor:'지도자·강사',teacher:'교사(교원)',natcert:'국가공인자격 회원',athlete:'선수회원',general:'일반회원',student:'학생회원'}[d.accountType]||d.accountType||'-')+'</td><th>소속·지역</th><td>'+esc([d.affiliation||d.school||'',d.sido||d.region||''].filter(Boolean).join(' · ')||'-')+'</td></tr>'
     +'<tr><th>보유 자격</th><td colspan="3" style="text-align:left">'+(lics.length?lics.map(esc).join('<br>'):[d.qualNoLeader?'지도자 '+esc(d.qualNoLeader):'',d.qualNoReferee?'심판 '+esc(d.qualNoReferee):''].filter(Boolean).join(' · ')||'-')+'</td></tr></table>'
@@ -2457,13 +2539,65 @@ function printCareerCert(){
     +'<div class="sum"><div>총 활동<b>'+st.total+'건</b></div><div>활동 일수<b>'+st.days+'일</b></div><div>대회 수<b>'+st.eventCount+'개</b></div><div>종목<b>'+st.sportCount+'</b></div><div>활동 지역<b>'+st.placeCount+'</b></div><div>활동 기간<b style="font-size:11px">'+esc(st.first||'')+' ~ '+esc(st.last||'')+'</b></div></div>'
     +'<table style="margin-top:8px"><tr><th>구분</th><th>건수</th><th>일수</th></tr>'+grpRows+'</table>'
     +(detail?'<div class="sec">Ⅱ. 활동 상세</div><table><tr><th style="width:5%">번호</th><th style="width:11%">일자</th><th>대회·행사명</th><th style="width:14%">주최</th><th style="width:14%">장소</th><th style="width:10%">종목</th><th style="width:11%">역할</th><th style="width:6%">확인</th></tr>'+detail+'</table>':'')
-    +(awards?'<div class="sec">Ⅲ. 입상 기록</div><table><tr><th style="width:5%">번호</th><th style="width:11%">일자</th><th>대회명</th><th style="width:18%">부문</th><th style="width:14%">입상</th><th style="width:16%">주최</th></tr>'+awards+'</table>':'')
-    +'<div class="foot">위와 같이 대한민국플라잉디스크연맹이 주최·주관·승인한 대회 및 행사에서<br>활동한 사실을 증명합니다.<br><br>'+dateStr+'<br>'
+    +'<div class="foot">위와 같이 대한민국플라잉디스크연맹이 주최·주관·승인한 대회 및 행사에서<br>'+what+'을 증명합니다.<br><br>'+dateStr+'<br>'
     +'<div class="sig">사단법인 대한민국플라잉디스크연맹 회장<img src="'+stamp+'" alt="직인"></div></div>'
     +'<div class="small">· 본 증명서는 연맹 홈페이지에서 회원 본인이 발급한 것으로, 기록은 각 대회 운영진의 임무 완료·종료 처리로 등록된 이력에 근거합니다.<br>· 진위 확인: 사무국 031-984-3248 / kfdf60@hanmail.net (발급번호 '+no+')</div>'
     +'</div><script>window.onload=function(){setTimeout(function(){window.print()},400)}<'+'/script></body></html>');
   w.document.close();
 }
+function certCss(){
+  return '<style>@page{size:A4;margin:14mm}html,body{-webkit-text-size-adjust:100%;text-size-adjust:100%}body{margin:0;font-family:"Malgun Gothic","Noto Sans KR",sans-serif;color:#111;font-size:11.5px}'
+    +'.sheet{max-width:182mm;margin:0 auto}.hd{display:flex;align-items:center;justify-content:space-between;border-bottom:3px double #153A77;padding-bottom:8px}'
+    +'.hd img{height:34px}.no{font-size:10.5px;color:#555}h1{text-align:center;font-size:26px;letter-spacing:14px;margin:18px 0 10px;font-weight:900}h1.t2{letter-spacing:6px;font-size:24px}'
+    +'table{width:100%;border-collapse:collapse;margin-top:6px}th,td{border:1px solid #555;padding:4px 6px;text-align:center;font-size:10.5px}th{background:#f2f4f8;font-weight:900}td.l{text-align:left}'
+    +'.sec{font-size:13px;font-weight:900;margin:14px 0 4px;color:#153A77}.info td{text-align:left}.info th{width:24%}'
+    +'.foot{margin-top:18px;text-align:center;font-size:12px;line-height:2}.sig{position:relative;display:inline-block;margin-top:8px;font-size:17px;font-weight:900;letter-spacing:4px}'
+    +'.sig img{position:absolute;right:-58px;top:-26px;height:66px;opacity:.9}.small{font-size:9.5px;color:#666;margin-top:10px;line-height:1.6;text-align:left;border-top:1px dashed #aaa;padding-top:6px}'
+    +'.sum{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}.sum div{flex:1;min-width:110px;border:1px solid #ccd3df;border-radius:8px;padding:6px 8px;text-align:center}.sum b{display:block;font-size:16px}'
+    +'.conf{margin:14px 0 0;padding:10px 12px;border:1.5px solid #153A77;border-radius:8px;font-size:11px;line-height:1.75;text-align:left;background:#f7f9fc}'
+    +'@media print{.noprint{display:none}}</style>';
+}
+// 선수 경력 확인서 — 연맹 주최가 아닌 대회(교육청 등)가 섞이므로 "증명"이 아니라 "기록 관리 사실의 확인" 서식. 직인은 관리자 설정(siteContent/careerCert.athleteSeal, 기본 찍음)
+function printAthleteCert(sel){
+  const d=MYD||{};
+  const w=window.open('','_blank');
+  if(!w){alert('팝업이 차단되어 확인서 창을 열 수 없습니다. 주소창의 팝업 차단을 해제해주세요.');return}
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>선수 경력 확인서</title></head><body style="font-family:sans-serif;padding:40px;color:#334">확인서를 준비하는 중…</body></html>');
+  (async()=>{
+    let seal=true;try{const s=await DB.collection('siteContent').doc('careerCert').get();if(s.exists&&s.data().athleteSeal===false)seal=false}catch(e){}
+    const now=new Date();const pad=n=>String(n).padStart(2,'0');
+    const no='KFDF-AC-'+now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+'-'+String((AUTH.currentUser||{}).uid||'').slice(0,6).toUpperCase();
+    const dateStr=now.getFullYear()+'년 '+(now.getMonth()+1)+'월 '+now.getDate()+'일';
+    const stamp=new URL('직인.png',location.href).href,logo=new URL('kfdf_logo.png',location.href).href;
+    // 같은 대회·같은 사람의 참가/입상을 한 줄로
+    const rows={};sel.forEach(c=>{const k=[c.competitionName,c.date,c.kidName||'',c.team||''].join('|');const r=rows[k]=rows[k]||{date:c.date||'',comp:c.competitionName||'',org:c.organizer||'',sport:c.sport||'',div:c.division||'',team:c.team||c.schoolName||'',kid:c.kidName||'',results:[],fed:!(c.source&&/schoolclub/.test(c.source))};
+      const g=c.group||CAREER.group(c.role||c.duty);if(g==='입상')r.results.push(c.result||c.role||'입상');else r.results.unshift('참가')});
+    const arr=Object.values(rows).sort((a,b)=>a.date.localeCompare(b.date));
+    const awards=sel.filter(c=>(c.group||CAREER.group(c.role||c.duty))==='입상').length;
+    const events=new Set(arr.map(r=>r.comp+'|'+r.date)).size;
+    const orgs=Array.from(new Set(arr.map(r=>r.org).filter(Boolean)));
+    const ext=orgs.filter(o=>!/플라잉디스크연맹/.test(o));
+    const kids=Array.from(new Set(arr.map(r=>r.kid).filter(Boolean)));
+    const who=kids.length?(esc(d.name||'')+' (보호자) · 자녀 '+kids.map(esc).join(', ')):esc(d.name||'');
+    const detail=arr.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(r.date)+'</td><td class="l">'+esc(r.comp)+(r.kid?' <span style="color:#555">('+esc(r.kid)+')</span>':'')+'</td><td>'+esc(r.org||'-')+'</td><td>'+esc([r.sport,r.div].filter(Boolean).join(' · ')||'-')+'</td><td>'+esc(r.team||'-')+'</td><td><b>'+r.results.map(esc).join(' · ')+'</b></td></tr>').join('');
+    w.document.open();
+    w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>선수 경력 확인서 '+esc(d.name||'')+'</title>'+certCss()+'</head><body><div class="sheet">'
+      +'<div class="hd"><img src="'+logo+'"><div class="no">발급번호 '+no+'<br>발급일 '+dateStr+'</div></div>'
+      +'<h1 class="t2">선 수 경 력 확 인 서</h1>'
+      +'<table class="info"><tr><th>성 명</th><td>'+who+'</td><th>생년월일</th><td>'+esc(d.birth||'-')+'</td></tr>'
+      +'<tr><th>회원 구분</th><td>'+esc({instructor:'지도자·강사',teacher:'교사(교원)',natcert:'국가공인자격 회원',athlete:'선수회원',general:'일반회원',student:'학생회원'}[d.accountType]||d.accountType||'-')+'</td><th>현재 소속·학교</th><td>'+esc([d.school||d.affiliation||'',d.sido||d.region||''].filter(Boolean).join(' · ')||'-')+'</td></tr></table>'
+      +'<div class="sec">Ⅰ. 요약</div>'
+      +'<div class="sum"><div>대회 참가<b>'+events+'회</b></div><div>입상<b>'+awards+'건</b></div><div>주최기관<b>'+orgs.length+'곳</b></div><div>기간<b style="font-size:11px">'+esc(arr[0].date)+' ~ '+esc(arr[arr.length-1].date)+'</b></div></div>'
+      +'<div class="sec">Ⅱ. 대회 참가·입상 기록</div><table><tr><th style="width:5%">번호</th><th style="width:11%">일자</th><th>대회명</th><th style="width:17%">주최기관</th><th style="width:15%">종목·부문</th><th style="width:16%">당시 소속(학교·팀)</th><th style="width:11%">결과</th></tr>'+detail+'</table>'
+      +'<div class="conf">위 내용은 사단법인 대한민국플라잉디스크연맹이 주최·주관한 대회의 결과와, 각 주최기관'+(ext.length?'('+ext.map(esc).join(', ')+')':'(교육청 등)')+'이 개최한 대회의 결과를 연맹이 기록·관리한 것으로, 연맹은 위 기록의 <b>관리 사실을 확인</b>합니다.'
+      +(ext.length?'<br>※ 주최기관이 연맹이 아닌 대회의 기록은 해당 주최기관이 제공한 결과(참가·입상 명단)에 근거하며, 결과의 원본은 각 주최기관이 보관합니다.':'')+'</div>'
+      +'<div class="foot">'+dateStr+'<br><div class="sig">사단법인 대한민국플라잉디스크연맹 회장'+(seal?'<img src="'+stamp+'" alt="직인">':'')+'</div>'+(seal?'':'<div style="font-size:10.5px;color:#666">(직인 생략)</div>')+'</div>'
+      +'<div class="small">· 본 확인서는 연맹 홈페이지에서 회원 본인(보호자)이 발급한 것으로, 학교스포츠클럽 등 외부 대회 기록은 주최기관 명단을 연맹이 대조·등록한 것입니다.<br>· 진위 확인: 사무국 031-984-3248 / kfdf60@hanmail.net (발급번호 '+no+')</div>'
+      +'</div><script>window.onload=function(){setTimeout(function(){window.print()},400)}<'+'/script></body></html>');
+    w.document.close();
+  })();
+}
+
 async function loadMyLogs(){
   const el=document.getElementById('lgList');
   try{

@@ -417,6 +417,15 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="sfReset()">↩ 기본값으로</button>
         <span id="sfMsg" style="font-size:13px;font-weight:700"></span>
       </div>
+      <h3 style="margin-top:34px">🏅 선수 경력 확인서 · 대회 결과 공개 설정</h3>
+      <div style="font-size:12.5px;color:var(--gray);margin-bottom:10px">회원이 마이페이지에서 발급하는 <b>선수 경력 확인서</b>의 직인 표시와, 대회 결과 페이지의 <b>학생 이름 공개 범위</b>입니다. 학교스포츠클럽 등 외부 주최 대회는 연맹이 "기록·관리 사실을 확인"하는 문구가 함께 들어갑니다.</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <label style="font-size:13px;font-weight:800">확인서 직인 <select id="ccSeal" style="padding:6px 8px;border:1.5px solid #dfe5ee;border-radius:8px;font-family:inherit;font-size:12.5px"><option value="on">찍음 (기본)</option><option value="off">생략</option></select></label>
+        <label style="font-size:13px;font-weight:800">결과 페이지 이름 <select id="ccName" style="padding:6px 8px;border:1.5px solid #dfe5ee;border-radius:8px;font-family:inherit;font-size:12.5px"><option value="masked">홍*동 (기본)</option><option value="full">실명</option><option value="hidden">비공개(팀·학교만)</option></select></label>
+        <button class="btn-sub" style="background:#153A77" onclick="ccSave()">💾 저장</button>
+        <button class="btn-sub" style="background:#8a919d" onclick="ccLoad()">🔄 다시 불러오기</button>
+        <span id="ccMsg" style="font-size:13px;font-weight:700"></span>
+      </div>
       <h3 style="margin-top:34px">📅 캘린더 편집 권한</h3>
       <div style="font-size:12.5px;color:var(--gray);margin-bottom:10px">권한을 받은 회원(시도연맹 임원 등)은 <b>일정 캘린더</b>에서 연맹 행사를 직접 등록·수정할 수 있습니다. 본인이 등록한 일정만 수정 가능하며, 사무국은 전체 관리합니다.</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
@@ -5527,6 +5536,25 @@ async function sfReset(){
   try{await DB.collection('siteContent').doc('signupFields').delete();SF_CUR={};sfRender();const m=document.getElementById('sfMsg');if(m){m.textContent='기본값으로 되돌렸습니다';m.style.color='#0f766e'}}catch(e){alert('실패: '+e.message)}
 }
 document.addEventListener('DOMContentLoaded',function(){if(document.getElementById('sfGrid'))setTimeout(sfLoad,1500)});
+// ══════════ [확인서·결과 설정] siteContent/careerCert {athleteSeal} · siteContent/results {nameMode} (2026-09-07) ══════════
+async function ccLoad(){
+  const m=document.getElementById('ccMsg');
+  try{const [a,b]=await Promise.all([DB.collection('siteContent').doc('careerCert').get(),DB.collection('siteContent').doc('results').get()]);
+    const seal=document.getElementById('ccSeal'),nm=document.getElementById('ccName');
+    if(seal)seal.value=(a.exists&&a.data().athleteSeal===false)?'off':'on';
+    if(nm)nm.value=(b.exists&&b.data().nameMode)||'masked';
+    if(m){m.textContent='현재 설정을 불러왔습니다';m.style.color='#0f766e'}
+  }catch(e){if(m){m.textContent='불러오기 실패: '+e.message;m.style.color='#C41E2F'}}
+}
+async function ccSave(){
+  const m=document.getElementById('ccMsg');const by=(firebase.auth().currentUser||{}).email||'';
+  try{
+    await DB.collection('siteContent').doc('careerCert').set({athleteSeal:document.getElementById('ccSeal').value!=='off',updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:by},{merge:true});
+    await DB.collection('siteContent').doc('results').set({nameMode:document.getElementById('ccName').value||'masked',updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:by},{merge:true});
+    if(m){m.textContent='✓ 저장했습니다';m.style.color='#0f766e'}
+  }catch(e){if(m){m.textContent='저장 실패: '+e.message;m.style.color='#C41E2F'}}
+}
+document.addEventListener('DOMContentLoaded',function(){if(document.getElementById('ccSeal'))setTimeout(ccLoad,1800)});
 async function pgSave(){
   const page=document.getElementById('pgSel').value;
   const m=document.getElementById('pgMsg');
