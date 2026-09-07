@@ -3,6 +3,8 @@
   var CFG={apiKey:"AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",authDomain:"koreaflyingdiscfederation.firebaseapp.com",projectId:"koreaflyingdiscfederation",appId:"1:1081847355343:web:ca40ed9a52e13f607f64ba"};
 
   // ── 메뉴 구성 (2026-09-07 정리: 이모지·중복·화살표 제거, 항목명 간결화. 자격증 → 안전교육은 강사·활동에만) ──
+  // [아이콘 2026-09-07] 이모지를 체육회 스타일 선 아이콘으로 바꿔 그리는 icons.js 를 모든 페이지에서 불러옵니다 (페이지 파일 무수정)
+  try{if(!document.querySelector('script[src^="icons.js"]')){var _ic=document.createElement('script');_ic.src='icons.js?v=20260907';document.head.appendChild(_ic)}}catch(e){}
   var MENU=[
     {t:'연맹소개',h:'about.html',d:[
       ['인사말 · 미션','about.html#greet'],['CI 소개','about.html#ci'],['조직도','about.html#org'],
