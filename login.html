@@ -147,7 +147,7 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
       <div id="typeBtns" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px">
         <button type="button" class="mtypebtn on" data-t="instructor" onclick="setSignupType('instructor')">🧑‍🏫 KFDF공인 심판·지도자<span>연맹 자격증 보유·취득 예정</span></button>
         <button type="button" class="mtypebtn" data-t="teacher" onclick="setSignupType('teacher')">🎓 교사 (교원)<span>학교 재직 교원 · 재직증명서 첨부</span></button>
-        <button type="button" class="mtypebtn" data-t="natcert" onclick="setSignupType('natcert')">🏅 국가공인자격증 취득회원<span>체육지도사 등 · 자격증 사본 첨부</span></button>
+        <button type="button" class="mtypebtn" data-t="natcert" onclick="setSignupType('natcert')">🏅 국가공인자격증 취득회원<span>유소년스포츠지도사(플라잉디스크) 전용 · 자격증 사본 첨부</span></button>
         <button type="button" class="mtypebtn" data-t="athlete" onclick="setSignupType('athlete')">🏃 선수회원<span>성인 선수 · 연맹/타소속 동호인</span></button>
         <button type="button" class="mtypebtn" data-t="general" onclick="setSignupType('general')">👥 일반회원<span>학부모·서포터즈·협력기관</span></button>
         <button type="button" class="mtypebtn" data-t="student" onclick="setSignupType('student')">🧒 학생회원<span>만 18세 미만 본인</span></button>
@@ -245,8 +245,9 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
       <div id="sNatCertBlock" style="margin-top:14px;padding:14px 16px;background:#f4f7fb;border:1.5px solid #d7e2f2;border-radius:12px">
         <label style="display:flex;gap:7px;align-items:flex-start;margin:0;font-weight:800;font-size:13.5px;color:#153A77"><input type="checkbox" id="sHasNatCert" style="width:auto;margin-top:2px" onchange="document.getElementById('sNatCertSub').style.display=this.checked?'block':'none'"> 🏅 국가공인 체육지도사 자격 보유 <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 문화체육관광부 발급 국가자격 (예: 유소년스포츠지도사·생활스포츠지도사 등). 연맹(KFDF) 자격증과는 별개입니다.</span></label>
         <div id="sNatCertSub" style="display:none;margin-top:10px">
+          <div id="sNatOnlyNote" style="display:none;margin-bottom:10px;padding:9px 12px;background:#fff;border:1.5px solid #153A77;border-radius:10px;font-size:12.5px;line-height:1.6;color:#153A77;font-weight:700">이 유형은 <b>유소년스포츠지도사(플라잉디스크)</b> 자격 보유자만 가입할 수 있습니다. 보디빌딩·축구 등 <b>다른 종목</b>의 체육지도자 자격은 인정되지 않으니 [👥 일반회원] 또는 [🏃 선수회원]으로 가입해 주세요.</div>
           <label style="font-size:12px;font-weight:800">자격 종류 · 등급 <span style="color:#C41E2F">*</span></label>
-          <input id="sNatCertName" placeholder="예: 유소년스포츠지도사(플라잉디스크) 2급">
+          <input id="sNatCertName" placeholder="예: 유소년스포츠지도사(플라잉디스크), 생활스포츠지도사 2급(플라잉디스크)">
           <label style="font-size:12px;font-weight:800;display:block;margin-top:10px">📎 자격증 사본 첨부 <span style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11px">— 이미지 파일 (자동 압축 업로드)</span></label>
           <input type="file" id="sNatCertFile" accept="image/*" style="display:block;margin-top:5px;font-size:13px">
           <div style="font-size:11.5px;color:#153A77;margin-top:6px;font-weight:700">사무국이 첨부된 사본을 확인한 뒤 회원가입 승인이 완료됩니다. (지금 첨부가 어려우면 가입 후 마이페이지에서도 첨부할 수 있으나, 첨부 전까지 승인이 보류됩니다)</div>
@@ -436,7 +437,7 @@ const MTYPE_INFO={
   teacher:{bg:'#f0f7f4',bd:'1.5px solid #cfe3d8',fg:'#0f766e',
     html:'🎓 <b>교사 (교원)</b> — 초·중·고 학교에 재직 중인 교원입니다. <b>재직 학교</b>를 검색해 선택하고 <b>재직증명서</b>를 첨부해 주세요. 체육 전공이시면 함께 체크해 주시면 됩니다. 지도자군으로 관리되어 강습·대회 운영에 배정됩니다. <b>수당 계좌·피복 사이즈·학력</b>이 필수입니다.<br><span style="font-weight:700">※ 대회 심판은 KFDF공인 자격 보유자만 신청 가능합니다 — 이 유형은 대회 운영요원으로 신청하실 수 있습니다.</span>'},
   natcert:{bg:'#f4f7fb',bd:'1.5px solid #d7e2f2',fg:'#153A77',
-    html:'🏅 <b>국가공인자격증 취득회원</b> — 문화체육관광부 발급 <b>체육지도자 국가자격</b>(유소년·생활스포츠지도사 등) 보유 회원입니다. 연맹(KFDF) 자격증과 달리 <b>연맹 자격 대장에 없는 자격</b>이므로, 아래에서 <b>자격증 사본을 첨부</b>해 신청해 주세요. 사무국이 사본을 확인한 뒤 승인됩니다.<br><span style="font-weight:700">※ 대회 심판은 KFDF공인 자격 보유자만 신청 가능합니다 — 이 유형은 대회 운영요원으로 신청하실 수 있습니다.</span>'},
+    html:'🏅 <b>국가공인자격증 취득회원</b> — 문화체육관광부 발급 <b>유소년스포츠지도사(플라잉디스크)</b> 국가자격 보유자 <b>전용</b> 유형입니다. <b style="color:#C41E2F">다른 종목(보디빌딩·축구·수영 등)의 체육지도자 자격으로는 가입할 수 없습니다</b> — 그 경우 [👥 일반회원] 또는 [🏃 선수회원]으로 가입해 주세요. 연맹(KFDF) 자격증과 달리 <b>연맹 자격 대장에 없는 자격</b>이므로, 아래에서 <b>자격증 사본을 첨부</b>해 신청해 주세요. 사무국이 사본을 확인한 뒤 승인됩니다.<br><span style="font-weight:700">※ 대회 심판은 KFDF공인 자격 보유자만 신청 가능합니다 — 이 유형은 대회 운영요원으로 신청하실 수 있습니다.</span>'},
   athlete:{bg:'#f0f5ff',bd:'1.5px solid #c7d7f5',fg:'#1e3a8a',
     html:'🏃 <b>선수회원</b> — 대회에 선수로 참가하거나 클럽에서 활동하는 <b>성인 동호인</b>(연맹 소속·타 단체·무소속)입니다. 대회 접수·보험 처리를 위해 <b>주민등록번호</b>가 필요하며(암호화 분리 보관), 자격증 정보는 받지 않습니다.<br>지도자 자격을 보유하셨다면 [🧑‍🏫 KFDF공인 심판·지도자] 유형으로 가입해주세요.'},
   general:{bg:'#fbf7f0',bd:'1.5px solid #e8dcc8',fg:'#8a5a00',
@@ -537,6 +538,10 @@ function setSignupType(t){
     }
   })();
   // [유형분리] 국가공인자격증 유형은 자격 입력란을 기본으로 펼쳐 둡니다
+  // [전용] 국가공인자격증 유형은 자격명을 유소년스포츠지도사(플라잉디스크)로 고정(수정 불가) — 다른 종목 자격 가입 차단
+  (function(){const nn=document.getElementById('sNatCertName'),no=document.getElementById('sNatOnlyNote');const FIX='유소년스포츠지도사(플라잉디스크)';
+    if(t==='natcert'){if(nn){nn.value=FIX;nn.readOnly=true;nn.style.background='#eef3fa';nn.style.fontWeight='800';nn.style.color='#153A77'}if(no)no.style.display='block'}
+    else{if(nn){nn.readOnly=false;nn.style.background='';nn.style.fontWeight='';nn.style.color='';if(nn.value===FIX)nn.value=''}if(no)no.style.display='none'}})();
   if(t==='natcert'){
     const hn=document.getElementById('sHasNatCert'), sub=document.getElementById('sNatCertSub');
     if(hn){hn.checked=true;}
@@ -999,6 +1004,8 @@ async function go(){
       }
       // [유형분리] 국가공인자격증 유형은 자격 정보 자체가 필수
       if(SIGNUP_TYPE==='natcert'&&!natCertName)return say('국가공인자격 종류·등급을 입력하고 사본을 첨부해주세요.');
+      // [전용] 국가공인자격증 취득회원 = 유소년스포츠지도사(플라잉디스크) 보유자만 (다른 종목 자격으로 가입하는 사례 차단)
+      if(SIGNUP_TYPE==='natcert'&&natCertName.indexOf('플라잉디스크')<0)return say('국가공인자격증 취득회원은 유소년스포츠지도사(플라잉디스크) 자격 보유자만 가입할 수 있습니다. 다른 종목 자격은 [일반회원] 또는 [선수회원]으로 가입해 주세요.');
       // [유형분리] 교사(교원) — 재직 학교 + 재직증명서 필수
       let employFile=null;
       if(SIGNUP_TYPE==='teacher'){

@@ -2265,13 +2265,13 @@ function renderHireDocs(d){
   const consented=!!(d.consents&&d.consents.agreedAt);
   let h='<b style="margin-right:4px">📂 위촉 서류</b>';
   // ① 겸직 허가서 (교원) — 학교장 결재 문서 사진·PDF
-  const mSt=!m?hdBadge('미제출','#C41E2F'):(m.status==='확인'?hdBadge('확인 완료','#0f766e'):(m.status==='반려'?hdBadge('반려','#C41E2F'):hdBadge('확인 대기','#b8860b')));
+  if(isTeacher){const mSt=!m?hdBadge('미제출','#C41E2F'):(m.status==='확인'?hdBadge('확인 완료','#0f766e'):(m.status==='반려'?hdBadge('반려','#C41E2F'):hdBadge('확인 대기','#b8860b')));
   h+='<span style="display:inline-flex;align-items:center;gap:6px;border:1.5px solid #e2e7f0;background:#fff;border-radius:10px;padding:6px 10px">'
     +'<span style="font-weight:800">🧑‍🏫 겸직 허가서'+(isTeacher?'':' <span style="font-weight:600;color:#8a919d;font-size:11px">(교원만)</span>')+'</span>'+mSt
     +(m&&m.url?'<a href="'+m.url+'" target="_blank" style="font-size:12px;font-weight:800;color:#153A77">보기</a>':'')
     +(m&&m.status==='반려'&&m.note?'<span style="font-size:11.5px;color:#C41E2F;font-weight:700">사유: '+esc(m.note)+'</span>':'')
     +(m&&m.status==='확인'?'':'<button class="btn-sub" style="background:#153A77;padding:6px 12px;font-size:12px" onclick="document.getElementById(\'hdMoonFile\').click()">📎 '+(m?'다시 올리기':'올리기')+'</button>')
-    +'</span>';
+    +'</span>';}
   // ② 아동·청소년 성범죄 경력 조회 — 동의(전자동의) + 연맹 확인
   h+='<span style="display:inline-flex;align-items:center;gap:6px;border:1.5px solid #e2e7f0;background:#fff;border-radius:10px;padding:6px 10px">'
     +'<span style="font-weight:800">🛡 성범죄 경력 조회</span>'

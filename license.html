@@ -250,7 +250,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
       <div class="lcbar">
         <select id="lsRegion" class="lcin" style="width:auto" onchange="renderLics()">
           <option value="">지역 전체</option>
-          <option>서울</option><option>부산</option><option>대구</option><option>인천</option><option>광주</option><option>대전</option><option>울산</option><option>경기</option><option>강원</option><option>충북</option><option>충남</option><option>전북</option><option>전남</option><option>경북</option><option>경남</option><option>제주</option><option>세종</option><option>전남광주</option><option>중앙</option>
+          <option>서울</option><option>부산</option><option>대구</option><option>인천</option><option>대전</option><option>울산</option><option>경기</option><option>강원</option><option>충북</option><option>충남</option><option>전북</option><option value="전남광주">전남광주 (통합)</option><option>경북</option><option>경남</option><option>제주</option><option>세종</option><option>중앙</option>
         </select>
         <select id="lsStatus" class="lcin" style="width:auto" onchange="renderLics()">
           <option value="">상태 전체</option><option>유효</option><option>만료</option>
@@ -265,6 +265,9 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
           <option value="">연도 전체</option><option>2026</option><option>2025</option><option>2024</option><option>2023</option><option>2022</option><option>2021</option>
         </select>
         <input id="lsSearch" class="lcin" style="flex:1;min-width:180px" oninput="renderLics()" placeholder="🔍 자격번호·성명 검색">
+        <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:#153A77;cursor:pointer;white-space:nowrap"><input type="checkbox" id="lsSelAll" style="width:auto;margin:0" onchange="document.querySelectorAll('.lcsel').forEach(c=>{c.checked=this.checked})"> 전체 선택</label>
+        <button class="lcbtn p" onclick="printLicCerts('sel')" title="체크한 자격증을 한 번에 인쇄·PDF 저장 (취합 제출용)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M6 9V4h12v5"/><rect x="3" y="9" width="18" height="9" rx="2"/><path d="M7 14h10v6H7z"/></svg>선택 출력</button>
+        <button class="lcbtn s" onclick="printLicCerts('all')" title="현재 목록의 관할 자격증 전체를 한 번에 인쇄·PDF 저장"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M6 9V4h12v5"/><rect x="3" y="9" width="18" height="9" rx="2"/><path d="M7 14h10v6H7z"/></svg>목록 전체 출력</button>
         <button class="lcbtn b" onclick="exportLics()">⬇ CSV</button>
         <button class="lcbtn w" onclick="expireCleanup()" id="lsCleanBtn" title="유효기간 정보가 없는 과거 자격을 일괄 정리">⏳ 기한미상 만료 정리</button>
         <span id="lsCount" style="font-size:13px;font-weight:800;color:#153A77"></span>
@@ -1113,7 +1116,7 @@ async function transferApp(id){
 // 지도자: {급수2}{지역2}-{년2}{월2}{순번4}  예) 0301-09080001
 // 심판  : {급수2}-{년2}{순번4}              예) 01-230001
 const REGION_CODE={'서울':'01','부산':'02','대구':'03','인천':'04','광주':'05','대전':'06','울산':'07','경기':'08','강원':'09','충북':'10','충남':'11','전북':'12','전남':'13','경북':'14','경남':'15','제주':'16','세종':'17','해외':'20','전남광주':'05','광주전남':'05','중앙':'01'};
-const REGION_MENU='1=서울 2=부산 3=대구 4=인천 5=광주 6=대전 7=울산 8=경기 9=강원 10=충북 11=충남 12=전북 13=전남 14=경북 15=경남 16=제주 17=세종 20=해외';
+const REGION_MENU='1=서울 2=부산 3=대구 4=인천 5=전남광주(광주·전남 통합) 6=대전 7=울산 8=경기 9=강원 10=충북 11=충남 12=전북 14=경북 15=경남 16=제주 17=세종 20=해외';
 async function nextSeq(key){
   const ref=DB.collection('counters').doc(key);
   let n=0;
@@ -1208,7 +1211,8 @@ async function issueLic(appId){
   if(types.indexOf('지도자')>=0&&(!rname||!REGION_CODE[rname])){
     const rn=prompt(a.name+' 님의 소속 지역 번호를 입력하세요:\n'+REGION_MENU,' ');
     if(rn===null)return;
-    rname=Object.keys(REGION_CODE).find(k=>REGION_CODE[k]===String(parseInt(rn.trim(),10)).padStart(2,'0'));
+    const cd=String(parseInt(rn.trim(),10)).padStart(2,'0');
+    rname=(cd==='05'||cd==='13')?'전남광주':Object.keys(REGION_CODE).find(k=>REGION_CODE[k]===cd);   // [통합] 광주(05)·전남(13) → 전남광주
     if(!rname){alert('지역 번호가 올바르지 않습니다.');return}
   }
   if(!confirm(a.name+' 님에게 ['+types.join('+')+' '+a.grade+'급] 자격을 발급할까요?\n'+(types.length>1?'※ 신청하신 '+types.length+'개 자격이 각각 개별 발급됩니다.\n':'')+'유효기간: 오늘부터 4년'))return;
@@ -1691,7 +1695,8 @@ function renderLics(){
   const today=new Date().toISOString().slice(0,10);
   const docs=LICS.filter(d=>{
     const v=d.data();
-    if(fr&&(v.region||'')!==fr)return false;
+    // [통합] 전남광주 필터는 옛 표기(광주·전남·광주전남)로 등록된 자격도 함께 보여줍니다
+    if(fr){const grp=(fr==='전남광주')?FED_GROUPS['전남광주']:[fr];if(grp.indexOf(String(v.region||''))<0)return false}
     const ft=(document.getElementById('lsType')||{}).value||'';
     const fg=(document.getElementById('lsGrade')||{}).value||'';
     const fy=(document.getElementById('lsYear')||{}).value||'';
@@ -1716,7 +1721,9 @@ function renderLics(){
       +(l.status==='이관'?' <span class="lctag" style="background:#8a919d">이관→'+esc(l.movedTo||'')+'</span>':' <span class="lctag" style="background:'+(expired?'#C41E2F':'#0f766e')+'">'+(expired?'만료':'유효')+'</span>')
       +'<div style="font-size:12px;color:var(--gray)">발급 '+esc(l.issuedAt)+' · 유효 ~'+esc(l.expireAt)+' · '+esc(l.issuer||'')+(l.uid?' · 회원연결됨':'')
       +(l.regionMovedFrom?' · 이관: '+esc(l.regionMovedFrom)+'→'+esc(l.region):'')+'</div></div>'
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+      +(LC_PRINTABLE(l)?'<label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#153A77;cursor:pointer"><input type="checkbox" class="lcsel" value="'+esc(d.id)+'" style="width:auto;margin:0"> 선택</label>'
+        +'<button class="lcbtn p" onclick="printLicCerts(\''+d.id+'\')" title="이 자격증을 인쇄·PDF 저장">'+LC_ICO_PRINT+'자격증 출력</button>':'')
       +((LICWRITE&&inJurL(l.region))?'<button class="lcbtn b" onclick="renameLic(\''+d.id+'\')">✏️ 성명 수정</button>':'')
       +(l.uid?'<button class="lcbtn ghost" onclick="showLicMember(\''+d.id+'\')">👤 연결회원</button>':((LICWRITE&&inJurL(l.region))?'<button class="lcbtn s" onclick="linkLic(\''+d.id+'\')">🔗 회원 연동</button>':''))
       +((l.uid&&LICWRITE&&inJurL(l.region))?'<button class="lcbtn d" onclick="unlinkLic(\''+d.id+'\')">🔗 연결 해제</button>':'')
@@ -1769,7 +1776,7 @@ async function delLic(no){
 async function moveLic(no){
   const doc=LICS.find(d=>d.id===no);if(!doc)return;
   const l=doc.data();
-  const T=['서울','부산','대구','인천','광주','대전','울산','경기','강원','충북','충남','전북','전남','경북','경남','제주','세종','전남광주','중앙'];
+  const T=['서울','부산','대구','인천','대전','울산','경기','강원','충북','충남','전북','경북','경남','제주','세종','전남광주','중앙'];   // [통합] 광주·전남 → 전남광주
   const tn=prompt(no+' ('+(l.name||l.maskName)+' · '+l.type+' '+l.grade+')\n현재 소속: '+(l.region||'미지정')+'\n\n이관할 소속(시도/연맹) 번호를 입력하세요:\n'+T.map((s,i)=>(i+1)+'='+s).join(' '),' ');
   if(tn===null)return;
   const target=T[parseInt(tn.trim(),10)-1];
@@ -1829,6 +1836,56 @@ async function expireCleanup(){
   }
   alert('정리 완료: '+n+'건');
   loadLics();
+}
+// ── 자격증 출력(관리자) — 관할 시도 회원의 자격증을 사무국·시도연맹이 인쇄·PDF 저장(취합 제출용).
+//    본인 출력(mypage.html printLicense)과 같은 공식 양식·좌표. 여러 장을 고르면 A4 한 장씩 한 창에 이어서 출력합니다.
+//    생년월일은 회원 문서(단건 조회)에서, 성명은 대장 성명(없으면 회원 성명)을 씁니다.
+const LC_ICO_PRINT='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M6 9V4h12v5"/><rect x="3" y="9" width="18" height="9" rx="2"/><path d="M7 14h10v6H7z"/></svg>';
+function LC_PRINTABLE(l){return !!l&&l.status!=='이관'&&(CENTRAL||inJurL(l.region))}
+const LC_MEM={};
+async function lcMemberOf(uid){
+  if(!uid)return {};
+  if(LC_MEM[uid])return LC_MEM[uid];
+  try{const u=await DB.collection('users').doc(uid).get();const v=u.exists?(u.data()||{}):{};LC_MEM[uid]={birth:v.birth||'',name:v.name||''}}catch(e){LC_MEM[uid]={}}
+  return LC_MEM[uid];
+}
+async function printLicCerts(which){
+  let nos=[];
+  if(which==='sel')nos=Array.from(document.querySelectorAll('.lcsel:checked')).map(c=>c.value);
+  else if(which==='all')nos=Array.from(document.querySelectorAll('.lcsel')).map(c=>c.value);   // 현재 필터로 보이는 목록
+  else nos=[which];
+  const docs=nos.map(n=>LICS.find(d=>d.id===n)).filter(d=>d&&LC_PRINTABLE(d.data()));
+  if(!docs.length){alert(which==='sel'?'출력할 자격증을 먼저 체크해 주세요.':'출력할 수 있는(관할) 자격증이 목록에 없습니다.');return}
+  if(docs.length>1&&!confirm('자격증 '+docs.length+'장을 한 번에 출력합니다.\n· A4 한 장에 한 명씩 이어서 나옵니다.\n· 인쇄 대화상자에서 "PDF로 저장"을 선택하면 파일로 저장됩니다.\n\n진행할까요?'))return;
+  const w=window.open('','_blank');
+  if(!w){alert('팝업이 차단되어 자격증 창을 열 수 없습니다.\n주소창 오른쪽의 팝업 차단 아이콘을 눌러 "허용"으로 바꾼 뒤 다시 시도해주세요.');return}
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>자격증 준비 중</title></head><body style="font-family:sans-serif;padding:40px;color:#334">자격증 '+docs.length+'장을 준비하는 중입니다… (회원 정보 확인)</body></html>');
+  const dot=s=>String(s||'').replace(/-/g,'.');
+  const pages=[],noBirth=[];
+  for(const d of docs){
+    const l=d.data();const m=await lcMemberOf(l.uid);
+    const birth=m.birth||'';if(!birth)noBirth.push(d.id+' '+(l.name||l.maskName||''));
+    const bg=new URL('files/'+(String(l.type||'').indexOf('심판')>=0?'cert_bg_referee.jpg':'cert_bg_leader.jpg'),location.href).href;
+    pages.push('<div class="paper"><img class="bgimg" src="'+bg+'">'
+      +'<div class="f" style="left:39.7%;top:33.6%;font-size:8.6mm">'+esc(l.grade||'')+'</div>'
+      +'<div class="f" style="left:31.8%;top:40.5%;font-size:9.2mm;border-bottom:0.6mm solid #111;padding:0 3mm 1mm 1mm">'+esc(l.name||m.name||l.maskName||'')+'</div>'
+      +'<div class="f" style="left:68.2%;top:33.75%;font-size:4.9mm">'+esc(d.id)+'</div>'
+      +'<div class="f" style="left:68.2%;top:35.85%;font-size:4.9mm">'+esc(dot(l.expireAt))+'</div>'
+      +'<div class="f" style="left:68.2%;top:37.95%;font-size:4.9mm">'+esc(dot(birth))+'</div>'
+      +'<div class="f" style="left:68.2%;top:40.05%;font-size:4.9mm">'+esc(l.region||'')+'</div>'
+      +'<div class="f" style="left:36.6%;top:70.65%;font-size:6.2mm">'+esc(dot(l.issuedAt))+'</div></div>');
+  }
+  w.document.open();
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>자격증 '+(docs.length===1?docs[0].id:docs.length+'장')+'</title>'
+  +'<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">'
+  +'<style>@page{size:A4 portrait;margin:0}html,body{margin:0;padding:0;background:#eee}*{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
+  +'.paper{width:210mm;height:296.5mm;margin:0 auto 6mm;position:relative;background:#fff;font-family:Pretendard,"Noto Sans KR",sans-serif;overflow:hidden;page-break-after:always}.paper:last-child{page-break-after:auto;margin-bottom:0}'
+  +'.bgimg{position:absolute;left:0;top:0;width:210mm;height:296.5mm;object-fit:cover;z-index:0}'
+  +'.f{position:absolute;font-weight:600;color:#111;white-space:nowrap;z-index:1}'
+  +'@media print{body{background:#fff}.paper{margin:0}}</style></head><body>'+pages.join('')
+  +'<scr'+'ipt>window.onload=function(){var imgs=[].slice.call(document.images),n=imgs.length,done=false;function go(){if(done)return;done=true;window.print()}function one(){if(--n<=0)go()}if(!n)go();imgs.forEach(function(i){if(i.complete)one();else{i.onload=one;i.onerror=one}});setTimeout(go,4000)}</scr'+'ipt></body></html>');
+  w.document.close();
+  if(noBirth.length)setTimeout(()=>alert('생년월일을 확인하지 못한 자격증 '+noBirth.length+'건은 생년월일 칸이 비어 있습니다.\n(회원 미연결 또는 회원 정보에 생년월일 없음 — 필요하면 [🔗 회원 연동] 후 다시 출력)\n\n'+noBirth.join('\n')),400);
 }
 function exportLics(){
   const rows=[['자격번호','성명','종류','급수','발급일','유효기간','상태','소속','발급연맹','회원연결']];
