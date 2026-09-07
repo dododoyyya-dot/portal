@@ -7002,9 +7002,12 @@ async function approve(uid){
   // 회원가입 화면에서 자율연수 자기신고 항목을 없앴으므로(혼란 유발), 이제는 내장 명단(EDU_ROSTER) 일치 여부로
   // 시스템이 자동 판단하는 것이 원칙. d.edu2026는 과거(자기신고 방식) 가입자와의 하위호환용으로만 남겨둠.
   const onRoster=inRoster(d.name);
+  // [관할키 자동·2026-09-07] 승인 시 sidoKey 가 비어 있으면 거점·활동범위·주소·근무학교로 판정해 함께 저장 (매일 수동 도구를 누르지 않아도 되게). 판정 불가면 건드리지 않음.
+  const _sk=(!d.sidoKey&&kfdfSidoKey(d))||'';
+  const skPatch=_sk?{sidoKey:_sk,sidoKeyV:SIDOKEY_V,sidoKeyAt:firebase.firestore.FieldValue.serverTimestamp()}:{};
   if(onRoster){
     if(!confirm('📋 명단 일치 — ['+d.name+'] 연수 이수자 명단에 있습니다.\n이수 인증(🎓뱃지 + 50P + 이수증 발급)과 함께 승인할까요?'))return;
-    await DB.collection('users').doc(uid).update({status:'approved',edu2026:true,points:50});
+    await DB.collection('users').doc(uid).update(Object.assign({status:'approved',edu2026:true,points:50},skPatch));
     await DB.collection('users').doc(uid).collection('activities').add({
       label:'2026 교원·지도자 자율연수 이수 인증',date:'2026.07.05',points:50,
       addedAt:firebase.firestore.FieldValue.serverTimestamp()});
@@ -7012,16 +7015,16 @@ async function approve(uid){
   }else if(d.edu2026){
     // 과거 자기신고 데이터가 남아있는데 명단엔 없는 경우 — 사무국 확인 후 예외 처리
     if(confirm('⚠ ['+d.name+'] 연수 이수로 표시되어 있으나 명단엔 없습니다!\n\n[확인] = 그래도 이수 인증으로 승인 (명단 누락 등 직접 확인한 경우만)\n[취소] = 이수 인증 없이 일반 승인')){
-      await DB.collection('users').doc(uid).update({status:'approved',points:50});
+      await DB.collection('users').doc(uid).update(Object.assign({status:'approved',points:50},skPatch));
       await DB.collection('users').doc(uid).collection('activities').add({
         label:'2026 교원·지도자 자율연수 이수 인증',date:'2026.07.05',points:50,
         addedAt:firebase.firestore.FieldValue.serverTimestamp()});
       await makeCert(uid,d.name);
     }else{
-      await DB.collection('users').doc(uid).update({status:'approved',edu2026:false});
+      await DB.collection('users').doc(uid).update(Object.assign({status:'approved',edu2026:false},skPatch));
     }
   }else{
-    await DB.collection('users').doc(uid).update({status:'approved'});
+    await DB.collection('users').doc(uid).update(Object.assign({status:'approved'},skPatch));
   }
   const d2=(await DB.collection('users').doc(uid).get()).data();
   updateLeaderboard();
