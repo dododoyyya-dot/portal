@@ -30,7 +30,11 @@
 .dtcols{display:flex;gap:12px;align-items:flex-start}
 .dtcols .dtmain{flex:1 1 auto;min-width:0}
 .dtcols .dtside{flex:0 0 232px;max-height:420px;overflow-y:auto}
+/* [1공고 1상세·모바일 2026-09-07] ?post= 로 공고 하나만 볼 때, 휴대폰에서는 공고 등록 상자를 숨겨 상세가 첫 화면에 오게 (PC 변경 없음) */
+body.onepost #stWriteBox{display:none!important}
+@media (min-width:761px){body.onepost #stWriteBox{display:block!important}}
 @media (max-width:760px){
+  body.onepost .phero{padding-top:18px;padding-bottom:18px}
   .dtcols{display:block}
   .dtcols .dtside{width:100%;max-height:none}
 }
@@ -129,6 +133,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 KFDF.initApp();
+// [1공고 1상세·모바일] ?post= 이면 단독 상세 모드 — 휴대폰에서 공고 등록 상자를 숨기고 상세를 첫 화면에
+if(new URLSearchParams(location.search).get('post'))document.body.classList.add('onepost');
 const AUTH=firebase.auth(),DB=firebase.firestore();
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function mname(n){n=String(n||'');if(n.length<2)return n;if(n.length===2)return n[0]+'*';return n[0]+'*'.repeat(n.length-2)+n[n.length-1]}
@@ -240,7 +246,7 @@ async function loadPosts(){
     }catch(e){}
     // [1공고 1상세] 목록에서 특정 공고를 눌러 들어오면(?post=id) 그 공고 하나만 보여줍니다.
     const _qp=new URLSearchParams(location.search).get('post');
-    if(_qp)renderPostDetail(_qp);else renderList();
+    if(_qp){renderPostDetail(_qp);if(window.innerWidth<=760){try{window.scrollTo(0,0)}catch(e){}}}else renderList();   // [1공고 1상세·모바일] 휴대폰은 맨 위로
   }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+esc(e.message)+'</div>'}
 }
 function postTotals(p){
