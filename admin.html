@@ -2065,16 +2065,29 @@ async function scTemplate(){
 }
 // [읽기 오류 대응 2026-09-09] ExcelJS 4.4 는 docProps/app.xml 의 구조가 다르면(한셀·구글시트·타 도구 저장본) "reading 'company'" 오류로 멈춥니다.
 //   그 경우 JSZip 으로 docProps/app.xml·core.xml 만 빼낸 사본을 만들어 다시 읽습니다 (표 내용은 그대로).
+// [읽기 오류 대응 2026-09-09] ExcelJS 4.4 가 못 읽는 파일 두 종류를 고쳐서 다시 읽습니다 (표 내용은 그대로).
+//   ① docProps/app.xml 구조가 다름 → "reading 'company'" : 속성 파일을 빼고 재시도
+//   ② spreadsheetml 요소에 접두어(x:sst, x:si …)가 붙음(한셀 등) → "Unexpected xml node in parseOpen" : xl/ 안의 XML 에서 그 접두어를 벗기고 기본 네임스페이스로 바꿔 재시도
 async function scLoadXlsx(buf){
-  const wb=new ExcelJS.Workbook();
-  try{await wb.xlsx.load(buf);return wb}
+  const tryLoad=async b=>{const wb=new ExcelJS.Workbook();await wb.xlsx.load(b);return wb};
+  try{return await tryLoad(buf)}
   catch(e){
-    const msg=String(e&&e.message||e);
-    if(!/company|manager|docProps|reading '\w+'/.test(msg)||typeof JSZip==='undefined')throw e;
+    if(typeof JSZip==='undefined')throw e;
     const zip=await JSZip.loadAsync(buf);
     ['docProps/app.xml','docProps/core.xml','docProps/custom.xml'].forEach(p=>{if(zip.file(p))zip.remove(p)});
-    const buf2=await zip.generateAsync({type:'arraybuffer'});
-    const wb2=new ExcelJS.Workbook();await wb2.xlsx.load(buf2);return wb2;
+    const MAIN='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+    const names=Object.keys(zip.files).filter(p=>/^xl\/.*\.xml$/i.test(p)&&!zip.files[p].dir);
+    for(const p of names){
+      let t=await zip.file(p).async('string');
+      const m=t.match(new RegExp('xmlns:([A-Za-z_][\\w.-]*)="'+MAIN.replace(/[.*+?^${}()|[\]\\/]/g,'\\$&')+'"'));
+      if(!m)continue;
+      const px=m[1];
+      t=t.replace(new RegExp('<(/?)'+px+':','g'),'<$1');
+      t=t.replace(new RegExp('\\s+xmlns:'+px+'="[^"]*"'),t.indexOf('xmlns="')>=0?'':' xmlns="'+MAIN+'"');
+      zip.file(p,t);
+    }
+    const buf2=await zip.generateAsync({type:(typeof Buffer!=='undefined'&&Buffer.isBuffer&&Buffer.isBuffer(buf))?'nodebuffer':'arraybuffer'});
+    return await tryLoad(buf2);
   }
 }
 async function scPreview(){
