@@ -2526,7 +2526,7 @@ function renderAthlete(){
   if(!arr.length){list.innerHTML='<div style="font-size:12.5px;color:#6b7280;padding:6px 0">아직 기록된 대회 참가·입상이 없습니다. 연맹 대회는 종료 처리 시 자동으로, 학교스포츠클럽 대회는 결과 업로드 후 [내 기록 찾기]로 가져올 수 있습니다.</div>';return}
   list.innerHTML='<div class="tblwrap"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:620px"><thead><tr><th>대회일</th><th>대회명</th><th>주최</th><th>종목·부문</th><th>당시 소속(학교·팀)</th><th>결과</th></tr></thead><tbody>'
     +arr.map(r=>'<tr><td style="white-space:nowrap">'+esc(r.date)+'</td><td class="l"><b>'+esc(r.comp)+'</b>'+(r.kid?' <span style="font-size:11px;color:#8a919d">('+esc(r.kid)+')</span>':'')+(r.ext?' <span style="font-size:10.5px;color:#fff;background:#0e7490;border-radius:999px;padding:1px 7px">학교스포츠클럽</span>':'')+'</td><td>'+esc(r.org||'-')+'</td><td>'+esc([r.sport,r.div].filter(Boolean).join(' · ')||'-')+'</td><td>'+esc(r.team||'-')+'</td>'
-      +'<td style="white-space:nowrap">'+r.results.map(x=>x==='참가'?'<span style="font-size:11.5px;font-weight:800;color:#153A77">참가</span>':'<span style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:900;color:#d97706">'+I('trophy',{size:13,color:'#d97706',stroke:2.2})+esc(x)+'</span>').join(' · ')+'</td></tr>').join('')
+      +'<td style="white-space:nowrap">'+r.results.filter(x=>x!=='참가'||!r.results.some(y=>y!=='참가')).map(x=>x==='참가'?'<span style="font-size:11.5px;font-weight:800;color:#153A77">참가</span>':'<span style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:900;color:#d97706">'+I('trophy',{size:13,color:'#d97706',stroke:2.2})+esc(x)+'</span>').join(' · ')+'</td></tr>').join('')
     +'</tbody></table></div><div style="font-size:11.5px;color:#8a919d;margin-top:6px">학교스포츠클럽 등 외부 주최 대회 기록은 각 주최기관의 결과를 연맹이 기록·관리한 것입니다. 당시 학교가 소속으로 저장되어 진학·전학 후에도 그대로 남습니다.</div>';
 }
 // ══════════ [입상 기록 등록 신청 2026-09-09] 선수(또는 보호자가 자녀) 본인이 대회 참가·입상 기록을 증빙과 함께 올리면 연맹(관리자·시도임원)이 승인해 경력에 기록 ══════════
@@ -2734,7 +2734,7 @@ function printAthleteCert(sel){
     const ext=orgs.filter(o=>!/플라잉디스크연맹/.test(o));
     const kids=Array.from(new Set(arr.map(r=>r.kid).filter(Boolean)));
     const who=kids.length?(esc(d.name||'')+' (보호자) · 자녀 '+kids.map(esc).join(', ')):esc(d.name||'');
-    const detail=arr.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(r.date)+'</td><td class="l">'+esc(r.comp)+(r.kid?' <span style="color:#555">('+esc(r.kid)+')</span>':'')+'</td><td>'+esc(r.org||'-')+'</td><td>'+esc([r.sport,r.div].filter(Boolean).join(' · ')||'-')+'</td><td>'+esc(r.team||'-')+'</td><td><b>'+r.results.map(esc).join(' · ')+'</b></td></tr>').join('');
+    const detail=arr.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(r.date)+'</td><td class="l">'+esc(r.comp)+(r.kid?' <span style="color:#555">('+esc(r.kid)+')</span>':'')+'</td><td>'+esc(r.org||'-')+'</td><td>'+esc([r.sport,r.div].filter(Boolean).join(' · ')||'-')+'</td><td>'+esc(r.team||'-')+'</td><td><b>'+r.results.filter(x=>x!=='참가'||!r.results.some(y=>y!=='참가')).map(esc).join(' · ')+'</b></td></tr>').join('');
     w.document.open();
     w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>선수 경력 확인서 '+esc(d.name||'')+'</title>'+certCss()+'</head><body><div class="sheet">'
       +'<div class="hd"><img src="'+logo+'"><div class="no">발급번호 '+no+'<br>발급일 '+dateStr+'</div></div>'
