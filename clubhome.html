@@ -125,6 +125,7 @@
   <div id="chBody" style="display:none">
 
     <div class="clubcard" id="chHeader"></div>
+    <div class="clubcard" id="chAwards" style="margin-top:12px;display:none"></div>
 
     <div id="chPublicArea" style="display:none">
       <div class="teaserbox">
@@ -217,6 +218,7 @@ async function loadClub(){
     document.getElementById('chGate').style.display='none';
     document.getElementById('chBody').style.display='block';
     renderHeader();
+    loadClubAwards().catch(e=>console.warn('clubAwards',e));
     if(CH_IS_MEMBER){
       document.getElementById('chMemberArea').style.display='block';
       document.getElementById('chPublicArea').style.display='none';
@@ -255,6 +257,28 @@ function renderHeader(){
     +(c.rulesText?'<details style="margin-top:10px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">클럽 내규 보기</summary><div style="font-size:12.5px;color:#4b5563;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:10px 13px;margin-top:6px">'+kesc(c.rulesText)+'</div></details>':'');
 }
 
+// [클럽 입상 2026-09-09] 클럽 입상 기록 — 연맹 대회 종료 처리·입상 신청 승인 시 자동 등록(clubAwards). 누구나 열람
+async function loadClubAwards(){
+  const el=document.getElementById('chAwards');if(!el)return;
+  const q=await DB.collection('clubAwards').where('clubId','==',CID).limit(300).get();
+  const list=q.docs.map(d=>d.data()).filter(a=>a.clubId===CID).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  el.style.display='block';
+  const TRO='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b8860b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"/></svg>';
+  const head='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="display:inline-flex">'+TRO+'</span><b style="font-size:16px">클럽 입상 기록</b><span style="font-size:12.5px;color:#8a919d;font-weight:700">'+list.length+'건</span>'
+    +'<span style="flex:1"></span><span style="font-size:11.5px;color:#8a919d">연맹 대회 종료 처리·입상 신청 승인 시 자동 등록</span></div>';
+  if(!list.length){el.innerHTML=head+'<div style="font-size:12.5px;color:#8a919d;margin-top:8px">아직 등록된 입상 기록이 없습니다. 연맹 대회에서 입상하면 자동으로 표시되고, 다른 대회 입상은 마이페이지 [입상 기록 신청]으로 등록할 수 있습니다.</div>';return}
+  const byYear={};list.forEach(a=>{const y=String(a.date||'').slice(0,4)||'기타';(byYear[y]=byYear[y]||[]).push(a)});
+  const years=Object.keys(byYear).sort((a,b)=>b.localeCompare(a));
+  const row=a=>{const who=a.kind==='team'?((a.teamName?kesc(a.teamName)+' ':'')+((a.members||[]).length?'('+(a.members||[]).slice(0,6).map(kesc).join(', ')+((a.members||[]).length>6?' 외 '+((a.members||[]).length-6)+'명':'')+')':'')):(a.members||[]).map(kesc).join(', ');
+    const title=a.slotId&&/comp/.test(a.source||'')?'<a href="competition.html?slot='+encodeURIComponent(a.slotId)+'" style="color:#141d51;text-decoration:none;font-weight:800">'+kesc(a.competitionName||'')+'</a>':'<b>'+kesc(a.competitionName||'')+'</b>';
+    return '<tr><td style="white-space:nowrap;color:#6b7280">'+kesc(a.date||'')+'</td><td style="text-align:left">'+title+(a.division?' <span style="color:#6b7280;font-size:12px">'+kesc(a.division)+'</span>':'')+'</td>'
+      +'<td><span style="background:#fff8e6;color:#8a5a00;border:1px solid #ecd9b0;border-radius:999px;padding:2px 10px;font-weight:900;font-size:12px;white-space:nowrap">'+kesc(a.result||'')+'</span></td>'
+      +'<td style="text-align:left;font-size:12.5px;color:#374151">'+(a.kind==='team'?'<span style="font-size:11px;color:#1f5fb2;font-weight:800">단체</span> ':'<span style="font-size:11px;color:#0f766e;font-weight:800">개인</span> ')+who+'</td></tr>'};
+  el.innerHTML=head+'<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:520px">'
+    +'<thead><tr style="background:#f5f8fd"><th style="padding:8px;text-align:left;font-size:12px;color:#6b7280">일자</th><th style="padding:8px;text-align:left;font-size:12px;color:#6b7280">대회 · 부문</th><th style="padding:8px;font-size:12px;color:#6b7280">결과</th><th style="padding:8px;text-align:left;font-size:12px;color:#6b7280">선수</th></tr></thead>'
+    +years.map(y=>'<tbody><tr><td colspan="4" style="padding:8px 8px 4px;font-weight:900;color:#141d51;border-top:1px solid #eef1f6">'+kesc(y)+'년 · '+byYear[y].length+'건</td></tr>'+byYear[y].map(a=>row(a).replace(/<td/g,'<td style="padding:7px 8px;border-top:1px solid #f1f3f7"').replace(/style="padding:7px 8px;border-top:1px solid #f1f3f7" style="/g,'style="padding:7px 8px;border-top:1px solid #f1f3f7;')).join('')+'</tbody>').join('')
+    +'</table></div>';
+}
 function showChTab(k){
   ['1','2','3'].forEach(n=>{const p=document.getElementById('chPane'+n);if(p)p.style.display=(n===k?'':'none')});
   document.querySelectorAll('#chTabs .st').forEach(b=>b.classList.toggle('on',b.dataset.s===k));

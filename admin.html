@@ -736,10 +736,16 @@ async function acWriteCareer(c,me){
   const base={uid:c.uid,name:c.name||'',date:c.date||'',competitionName:c.competitionName||'',sport:c.sport||'',location:'',organizer:org,division:c.division||'',team:c.team||'',source:'award-claim',kidName:c.kidName||'',importId:'award:'+c.id};
   await CAREER.write(DB,Object.assign({},base,{role:'선수'}),me);
   if(c.result&&c.result!=='참가')await CAREER.write(DB,Object.assign({},base,{role:'입상',result:c.result}),me);
+  // [클럽 입상] 소속(팀명=클럽명) 또는 본인이 속한 클럽의 클럽 페이지에 입상 기록
+  if(c.result&&c.result!=='참가'&&CAREER.clubAward){try{
+    const clubs=await CAREER.findClubs(DB,c.team?{name:c.team,uid:c.uid}:{uid:c.uid});
+    for(const k of clubs)await CAREER.clubAward(DB,{clubId:k.id,clubName:k.name,date:c.date||'',competitionName:c.competitionName||'',sport:c.sport||'',division:c.division||'',result:c.result,kind:'member',members:[c.kidName||c.name||''],teamName:c.team||'',source:'award-claim',importId:'award:'+c.id,organizer:org,byUid:(AUTH.currentUser||{}).uid||''},me);
+  }catch(e){console.warn('clubAward',e)}}
 }
 async function acEraseCareer(id){
   const q=await DB.collection('staffCareer').where('importId','==','award:'+id).limit(20).get();
   for(const d of q.docs){await DB.collection('staffCareer').doc(d.id).delete()}
+  try{const a=await DB.collection('clubAwards').where('importId','==','award:'+id).limit(20).get();for(const d of a.docs)await DB.collection('clubAwards').doc(d.id).delete()}catch(e){console.warn('clubAwards erase',e)}
   return q.size;
 }
 async function acDecide(id,ok){

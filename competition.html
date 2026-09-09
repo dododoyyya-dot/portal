@@ -805,6 +805,14 @@ async function cfMatchMember(m,r){
   try{const q=await scope(DB.collection('users').where('childKeys','array-contains',nn+'|'+m.birth)).limit(3).get();if(q.size===1)return {uid:q.docs[0].id,kidName:nm}}catch(e){}
   return null;
 }
+// [클럽 입상 2026-09-09] 입상한 팀(팀명=클럽명 또는 인솔자가 클럽장인 클럽)·개인(소속 클럽)의 클럽 페이지에 입상 기록을 남깁니다
+async function cfClubAward(r,s,base){
+  if(!window.CAREER||!CAREER.clubAward)return;
+  const clubs=await CAREER.findClubs(DB,r.team?{name:r.name,uid:r.uid}:{uid:r.uid});
+  if(!clubs.length)return;
+  const members=r.team?(r.roster||[]).map(m=>m&&m.name).filter(Boolean):[base.name||r.name||''];
+  for(const k of clubs)await CAREER.clubAward(DB,{clubId:k.id,clubName:k.name,date:s.date||'',competitionName:s.title||'',sport:base.sport||'',division:r.div||'',result:r.award,kind:r.team?'team':'member',members:members,teamName:r.team?r.name:'',slotId:CF.id,source:'comp-complete',host:s.host||'',organizer:s.organizer||'',byUid:CME.uid},(CMY&&CMY.name)||'');
+}
 async function cfSave(){
   const doc=CSLOTS.find(d=>d.id===CF.id);if(!doc)return;const s=doc.data();
   const rows=CF.rows.filter(r=>r.on);
@@ -840,6 +848,7 @@ async function cfSave(){
         }
       }
       if(r.award)await CAREER.write(DB,Object.assign({},base,{role:'입상',result:r.award+(r.team?' ('+r.name+')':''),team:r.team?r.name:''}),(CMY&&CMY.name)||'');
+      if(r.award)try{await cfClubAward(r,s,base)}catch(e){console.warn('clubAward',e)}   // [클럽 입상] 클럽 페이지용 공개 요약
       try{await KFDF.notify(r.uid,'🏅 ['+(s.title||'')+'] '+(r.team?'팀 인솔':'참가')+(r.award?' · '+r.award+' 입상 🏆':'')+' — 경력에 기록되었습니다. 마이페이지 [경력 여정]에서 확인하세요','mypage.html#careerBox')}catch(e){}
       ok++;
     }catch(e){fail++;console.warn('career',e)}

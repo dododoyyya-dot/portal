@@ -233,6 +233,25 @@
   /* ────────── 6. 경력 문서 쓰기 / 갤러리 초안 ────────── */
   // [주최·주관 2026-09-09] 기록의 주최(host)·주최/주관(organizer)·주관(coorganizer)을 중복 없이 ' / '로 합쳐 표기
   function orgText(c){var a=[c&&c.host,c&&c.organizer,c&&c.coorganizer].map(function(x){return String(x||'').trim()}).filter(Boolean);var out=[];a.forEach(function(x){x.split(/\s*\/\s*/).forEach(function(y){if(y&&out.indexOf(y)<0)out.push(y)})});return out.join(' / ')}
+  /* [클럽 입상 2026-09-09] 클럽 단위 입상 기록(clubAwards) — 개인 경력(staffCareer)은 본인만 읽을 수 있으므로 클럽 페이지용 공개 요약을 따로 둡니다 */
+  function findClubs(DB,o){
+    var out=[],seen={};o=o||{};
+    var push=function(q){q.docs.forEach(function(d){if(seen[d.id])return;seen[d.id]=1;var v=d.data()||{};out.push({id:d.id,name:v.name||''})})};
+    var p=Promise.resolve();
+    if(o.name)p=p.then(function(){return DB.collection('clubs').where('name','==',String(o.name).trim()).limit(2).get().then(push)}).catch(function(){});
+    if(o.uid)p=p.then(function(){if(out.length&&o.name)return;
+      var byRole=o.name?DB.collection('clubs').where('ownerUid','==',o.uid).limit(2):DB.collection('clubs').where('memberUids','array-contains',o.uid).limit(3);
+      return byRole.get().then(push)}).catch(function(){});
+    return p.then(function(){return out});
+  }
+  function clubAward(DB,a,by){
+    if(!a||!a.clubId)return Promise.resolve(null);
+    var kind=a.kind||'team',members=(a.members||[]).map(function(x){return String(x||'').trim()}).filter(Boolean);
+    var id=[a.clubId,a.slotId||a.importId||a.date||'',a.division||'',a.result||'',kind,kind==='member'?members.join(','):''].join('_').replace(/[\/\s#?\[\]]+/g,'_').slice(0,300);
+    var doc={clubId:a.clubId,clubName:a.clubName||'',date:a.date||'',competitionName:a.competitionName||'',sport:a.sport||'',division:a.division||'',result:a.result||'',kind:kind,members:members,
+      teamName:a.teamName||'',slotId:a.slotId||'',source:a.source||'',importId:a.importId||'',host:a.host||'',organizer:a.organizer||'',byUid:a.byUid||'',by:by||'',updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+    return DB.collection('clubAwards').doc(id).set(doc,{merge:true}).then(function(){return {id:id}});
+  }
   function key(rec){return [rec.uid,rec.date,rec.postId||rec.slotId||rec.competitionName||'',rec.role||''].join('|')}
   function write(DB,rec,by){
     var g=rec.group||careerGroup(rec.role);
@@ -321,7 +340,7 @@
   var OVL_SAMPLE={name:'홍길동',birth:'2013-05-01',gender:'남',school:'대한초등학교',phone:'010-1234-5678',guardian:'김보호',gphone:'010-9876-5432',date:'2026. 09. 20.',rrn:'900101-1234567',addr:'서울시 강서구 화곡로 12',bank:'농협',acct:'123-4567-8901-23',holder:'홍길동'};
   var SIGN_SVG='<svg viewBox="0 0 120 40" preserveAspectRatio="xMinYMid meet" style="height:100%;width:auto;display:block"><path d="M6 30c8-18 14-22 16-14s-6 20 2 18 10-18 16-16-2 16 6 16 10-14 16-16 2 14 10 12 12-14 18-12 6 10 14 6" fill="none" stroke="#1a237e" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   function ovlFontCss(fs){return 'font-size:calc(var(--ovk,1)*'+(fs||14)+'px)'}
-  window.CAREER={orgText:orgText,pdfPages:pdfPages,ovlFit:ovlFit,ovlWatch:ovlWatch,OVL_PRINT_JS:OVL_PRINT_JS,OVL_SAMPLE:OVL_SAMPLE,SIGN_SVG:SIGN_SVG,ovlFontCss:ovlFontCss,
+  window.CAREER={findClubs:findClubs,clubAward:clubAward,orgText:orgText,pdfPages:pdfPages,ovlFit:ovlFit,ovlWatch:ovlWatch,OVL_PRINT_JS:OVL_PRINT_JS,OVL_SAMPLE:OVL_SAMPLE,SIGN_SVG:SIGN_SVG,ovlFontCss:ovlFontCss,
     checkMark:function(px){px=px||18;return '<svg viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;width:calc(var(--ovk,1)*'+px+'px);height:calc(var(--ovk,1)*'+px+'px)"><path d="M4 12.5l5 5L20 6"/></svg>'},ROLES:ROLES,GROUP_ICON:GROUP_ICON,GROUP_GLYPH:GROUP_GLYPH,GROUP_COLOR:GROUP_COLOR,POINTS:POINTS,TIERS:TIERS,RARITY:RARITY,RARITY_LABEL:RARITY_LABEL,
     group:careerGroup,tierOf:tierOf,stats:stats,badges:badges,BADGES:BADGES,write:write,galleryDraft:galleryDraft,roleChips:roleChips,groupTag:groupTag,key:key,
     svg:svg,medal:medal,emblem:emblem,ICONS:P};
