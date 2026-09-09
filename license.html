@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>연맹 자격증 (지도자·심판) | 대한민국플라잉디스크연맹</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="style.css?v=20260909a">
+<link rel="stylesheet" href="style.css?v=20260909b">
 <style>
 .lcbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
 .lcchip{border:1.5px solid #dfe5ee;background:#fff;color:#5b6472;font-weight:800;font-size:13px;padding:8px 15px;border-radius:999px;cursor:pointer;transition:.15s}
@@ -133,6 +133,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
 
 <section><div class="wrap" style="max-width:1280px">
 
+  <div id="ntSec">
   <div class="lcinfo">
     <b>연맹 지도자·심판 자격</b> — 민간자격 등록번호 <b>제 2020-002410 호</b> (등록기관: 사단법인 대한플라잉디스크연맹 · 국가공인 아님) · <b>유효기간 4년</b>, 만료 전 갱신·보수(역량강화) 교육으로 4년 갱신<br>
     신청은 <b>통합 접수</b> — 소속 연맹을 선택하면 해당 연맹이 배정·처리하며, <b>교육 참석은 타 지역 교차 지원 가능</b>합니다.
@@ -147,15 +148,17 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
   <div class="sec-label">NOTICES</div>
   <h2 class="sec-title" style="font-size:24px">공고</h2>
   <div class="board" id="ntList"><div class="bempty">불러오는 중…</div></div>
-
-  <div id="myApps" style="display:none;margin-top:40px">
+  </div>
+  <div id="myNote" class="bempty">로그인하면 내 신청 현황이 표시됩니다. <a href="login.html" style="font-weight:800;color:var(--blue)">로그인 →</a></div>
+  <div id="myApps" style="display:none;margin-top:0">
     <div class="sec-label">MY</div>
     <h2 class="sec-title" style="font-size:24px">내 신청 현황</h2>
     <div class="board" id="myAppList"></div>
   </div>
 
   <!-- ── 관리 패널 (중앙연맹 admin · 권한받은 시도연맹 regionAdmin) ── -->
-  <div id="adminPanel" style="display:none;margin-top:48px">
+  <div id="adminNote" class="bempty">자격 관리는 중앙·시도연맹 관리자에게만 열립니다.</div>
+  <div id="adminPanel" style="display:none;margin-top:0">
     <div class="sec-label" style="color:#7c3aed">MANAGE</div>
     <h2 class="sec-title" style="font-size:24px">자격 관리 <span id="mgrBadge" style="font-size:14px;color:#7c3aed"></span></h2>
 
@@ -334,7 +337,7 @@ AUTH.onAuthStateChanged(async u=>{
     MSIDOS=CENTRAL?[]:(Array.isArray(_ms)?_ms.slice():(_ms?[_ms]:[]));
     MFEDS=MSIDOS.filter(s=>FED_LIST.indexOf(s)>=0); // 연맹 단위(공고 주관·신청 배정용)
     if(ISMGR){
-      document.getElementById('adminPanel').style.display='block';
+      document.getElementById('adminPanel').style.display='block';try{const n=document.getElementById('adminNote');if(n)n.style.display='none';if(window.KFDF_VIEW)KFDF_VIEW.showAdminLinks()}catch(e){}
       document.getElementById('mgrBadge').textContent='— '+(CENTRAL?'중앙연맹 (전체 관할)':(MFEDS.join('·')+'연맹 (관할: '+MSIDOS.join('·')+')'));
       if(!CENTRAL){
         const ns=document.getElementById('nSido');
@@ -763,7 +766,7 @@ async function loadMyApps(){
   if(!LME)return;
   const snap=await DB.collection('licenseApps').where('uid','==',LME.uid).get();
   if(snap.empty)return;
-  document.getElementById('myApps').style.display='block';
+  document.getElementById('myApps').style.display='block';try{const n=document.getElementById('myNote');if(n)n.style.display='none'}catch(e){}
   const stc={'접수':'#b8860b','접수완료':'#8a919d','합격':'#1F4E9C','발급완료':'#0f766e','불합격':'#C41E2F'};
   const stl={'접수':'신청 접수','접수완료':'시도 1차 검토 완료','합격':'중앙 최종 발급 승인','불합격':'심사 반려','발급완료':'발급 완료'};
   MYAPPS=snap.docs.filter(d=>!d.data().deleted);
@@ -1985,6 +1988,11 @@ function exportLics(){
     © 2026 KOREA FLYING DISC FEDERATION. All rights reserved.
   </div>
 </div></footer>
-<script src="auth_ui.js?v=20260909d"></script>
+<script>
+// [개별 화면] 주소 ?view= 에 따라 화면 하나만 (KFDF_VIEW — auth_ui.js)
+function _kfdfBind(){try{if(!window.KFDF_VIEW)return;KFDF_VIEW.apply({def:'notices',menu:'자격증',menuHref:'license.html?view=notices',sections:{notices:'#ntSec',my:['#myApps','#myNote'],admin:['#adminPanel','#adminNote']},views:{notices:{title:'연맹 자격증 신청',desc:'지도자·심판 자격 검정·갱신 공고를 확인하고 신청합니다.'},my:{title:'내 자격 신청 현황',desc:'내가 신청한 검정·갱신 건의 접수·납부·발급 상태입니다.'},admin:{title:'자격 관리',desc:'공고 등록·관리, 신청 처리·발급, 자격 연결 요청 (관리자 전용).'}}});}catch(e){console.warn("view",e)}}
+if(window.KFDF_VIEW)_kfdfBind();else document.addEventListener("DOMContentLoaded",_kfdfBind);
+</script>
+<script src="auth_ui.js?v=20260909e"></script>
 </body>
 </html>

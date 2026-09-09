@@ -7,7 +7,7 @@
 <meta name="naver-site-verification" content="f2bba301d1f9ca2d37efa24800dcad9676123d09" />
 <title>공지사항 · 공고 | 대한민국플라잉디스크연맹</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="style.css?v=20260909a">
+<link rel="stylesheet" href="style.css?v=20260909b">
 </head>
 <body>
 <div class="util"><div class="wrap">
@@ -86,6 +86,7 @@
   <div class="crumb">HOME &nbsp;›&nbsp; <b>알림마당</b></div>
   <h1>공지사항 · 공고</h1><p>연맹의 모든 공고와 소식을 이곳에서 확인하세요.</p>
 </div></div>
+<div id="selNote" class="bempty" style="padding:40px 0">현재 게시된 참여학교 선정 결과가 없습니다. 선정이 진행되면 이곳에 학교명·권역만 공개됩니다.</div>
 <section id="selNotice" style="display:none;background:var(--bg-soft)"><div class="wrap">
   <div id="lnStrip" style="display:none;background:#fdf8ee;border:2px solid #e6b422;border-radius:14px;padding:16px 18px;margin-bottom:26px">
     <b style="font-size:14.5px;color:#8a6d1f">📢 접수 중인 연수·검정 공고</b>
@@ -203,7 +204,7 @@ render();
       if(!doc.exists)return;
       const d=doc.data();const schools=d.schools||[];
       if(!schools.length)return;
-      document.getElementById('selNotice').style.display='block';
+      (function(){const n=document.getElementById('selNote');if(n)n.style.display='none'})();document.getElementById('selNotice').style.display='block';
       if(d.updatedAt)document.getElementById('snTime').textContent='· '+new Date(d.updatedAt.toDate()).toLocaleDateString('ko-KR')+' 기준';
       const byR={};schools.forEach(x=>{(byR[x.r]=byR[x.r]||[]).push(x)});
       document.getElementById('snBody').innerHTML=
@@ -227,6 +228,11 @@ render();
   boot(0);
 })();
 </script>
-<script src="auth_ui.js?v=20260909d"></script>
+<script>
+// [개별 화면] 주소 ?view= 에 따라 화면 하나만 (KFDF_VIEW — auth_ui.js)
+function _kfdfBind(){try{if(!window.KFDF_VIEW)return;const board=[...document.querySelectorAll('.phero~section')].find(s=>s.id!=='selNotice');KFDF_VIEW.apply({def:'board',menu:'알림마당',menuHref:'notice.html?view=board',sections:{board:board,selection:['#selNotice','#selNote']},views:{board:{title:'공지사항 · 공고',desc:'연맹의 공지와 공고를 확인합니다.'},selection:{title:'참여학교 선정 결과',desc:'유소년 스포츠 기반구축사업 참여학교 선정 결과 공고입니다.'}}});}catch(e){console.warn("view",e)}}
+if(window.KFDF_VIEW)_kfdfBind();else document.addEventListener("DOMContentLoaded",_kfdfBind);
+</script>
+<script src="auth_ui.js?v=20260909e"></script>
 </body>
 </html>

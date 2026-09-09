@@ -23,28 +23,26 @@
     return {norm:norm,valid:valid,enc:enc,dec:dec,resolve:resolve,lookup:lookup,DOM_MEMBER:DOM_MEMBER,DOM_KIDS:DOM_KIDS};
   })();
   var MENU=[
-    {t:'연맹소개',h:'about.html',d:[
-      ['인사말 · 미션','about.html#greet'],['CI 소개','about.html#ci'],['조직도','about.html#org'],
-      ['정관 · 규정','about.html#rule'],['시도연맹 · 권역','about.html#region'],['후원 안내','sponsor.html'],['오시는 길','about.html#way']]},
-    {t:'종목소개',h:'sports.html',d:[
-      ['얼티미트','sports.html'],['디스크골프','sports.html'],['원반윷놀이 · 기타 종목','sports.html'],['경기 규칙','sports.html']]},
-    {t:'사업안내',h:'business.html',d:[
-      ['유소년 스포츠 기반구축사업','business.html#youth'],['학교체육 강습','business.html#school'],
-      ['방과후 · 늘봄','business.html#after'],['교원연수 · 교재개발','business.html#train'],['학교 강습 신청','apply.html']]},
+    {t:'연맹소개',h:'about.html?view=greet',d:[
+      ['인사말 · 미션','about.html?view=greet'],['CI 소개','about.html?view=ci'],['조직도','about.html?view=org'],
+      ['정관 · 규정','about.html?view=rule'],['시도연맹 · 권역','about.html?view=region'],['후원 안내','sponsor.html'],['오시는 길','about.html?view=way']]},
+    {t:'종목소개',h:'sports.html?view=intro',d:[
+      ['플라잉디스크란','sports.html?view=intro'],['얼티미트','sports.html?view=ultimate'],['디스크골프','sports.html?view=discgolf'],['원반윷놀이 · 기타 종목','sports.html?view=yut'],['경기 규칙','sports.html?view=rules']]},
+    {t:'사업안내',h:'business.html?view=youth',d:[
+      ['유소년 스포츠 기반구축사업','business.html?view=youth'],['학교체육 강습','business.html?view=school'],
+      ['방과후 · 늘봄','business.html?view=after'],['교원연수 · 교재개발','business.html?view=train'],['학교 강습 신청','apply.html']]},
     {t:'대회',h:'competition.html?view=list',d:[
       ['대회 일정 · 안내','competition.html?view=list'],['참가 신청','competition.html?view=entry'],
       ['심판 · 운영요원 모집','staff.html'],['대회 결과','results.html'],['사진첩','gallery.html'],
       ['공고 등록 · 관리','competition.html?view=manage','','admin']]},
-    {t:'클럽',h:'club.html',d:[
-      ['클럽 찾기 · 가입','club.html'],['클럽 만들기','club.html'],['내 클럽 · 가입 승인','club.html'],['클럽 교류전','club.html?tab=4']]},
-    {t:'자격증',h:'license.html',d:[
-      ['연맹 자격증 신청 (지도자 · 심판)','license.html'],['자격 · 이수증 진위확인','verify.html'],
-      ['체육지도자 자격검정 (국가자격)','certification.html']]},
-    {t:'강사·활동',h:'jobs.html',d:[
-      ['강사 활동 지원 · 지명','jobs.html'],['단기 강사 구인','jobs.html#gigList'],['안전교육 이수 (위촉 전 필수)','safety.html'],
-      ['강사 가이드','guide.html'],['리더 레벨 시스템','leader.html']]},
-    {t:'알림마당',h:'notice.html',d:[
-      ['공지사항 · 공고','notice.html'],['연맹 일정 캘린더','calendar.html'],['자료실 (서식 다운로드)','archive.html'],['자주 묻는 질문','faq.html']]}
+    {t:'클럽',h:'club.html?view=find',d:[
+      ['클럽 찾기 · 가입','club.html?view=find'],['클럽 만들기','club.html?view=create'],['내 클럽 · 가입 승인','club.html?view=mine'],['클럽 교류전','club.html?view=meet']]},
+    {t:'자격증',h:'license.html?view=notices',d:[
+      ['연맹 자격증 신청 (지도자 · 심판)','license.html?view=notices'],['내 신청 현황','license.html?view=my'],['자격 · 이수증 진위확인','verify.html'],['체육지도자 자격검정 (국가자격)','certification.html'],['자격 관리','license.html?view=admin','','admin']]},
+    {t:'강사·활동',h:'jobs.html?view=apply',d:[
+      ['강사 활동 지원 · 지명','jobs.html?view=apply'],['선정학교 강사 모집 공고','jobs.html?view=recruit'],['단기 강사 구인','jobs.html?view=shortjobs'],['안전교육 이수 (위촉 전 필수)','safety.html'],['강사 가이드','guide.html?view=safety'],['리더 레벨 시스템','leader.html?view=rank']]},
+    {t:'알림마당',h:'notice.html?view=board',d:[
+      ['공지사항 · 공고','notice.html?view=board'],['참여학교 선정 결과','notice.html?view=selection'],['연맹 일정 캘린더','calendar.html'],['자료실 (서식 다운로드)','archive.html'],['자주 묻는 질문','faq.html?view=school']]}
   ];
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
   // [개별 화면] 링크의 부가 속성 — x[2]: 인라인 스타일, x[3]==='admin': 권한자에게만(페이지가 .sn-admin 을 켬)
@@ -52,7 +50,7 @@
   function fileOf(h){return String(h||'').split('#')[0].split('?')[0].split('/').pop().toLowerCase()}
   function viewOf(h){var m=String(h||'').match(/[?&]view=([^&#]+)/);return m?m[1]:''}
   // 화면 기본값(뷰 이름이 없는 링크가 가리키는 화면)
-  var VIEW_DEF={'competition.html':'list'};
+  var VIEW_DEF={'competition.html':'list','club.html':'find','license.html':'notices','jobs.html':'apply','about.html':'greet','sports.html':'intro','business.html':'youth','guide.html':'safety','faq.html':'school','leader.html':'rank','notice.html':'board'};
   function curView(here){var v=(new URLSearchParams(location.search)).get('view')||'';if(!v){var h=(location.hash||'').replace('#','');if(h&&window.KFDF_VIEW&&KFDF_VIEW.hashMap&&KFDF_VIEW.hashMap[h])v=KFDF_VIEW.hashMap[h]}return v||VIEW_DEF[here]||''}
   function renderNav(){
     var nav=document.querySelector('header .menu');if(!nav)return;
@@ -108,6 +106,9 @@
       var v=get(cfg.def);if(!cfg.views||!cfg.views[v])v=cfg.def;
       document.body.setAttribute('data-view',v);
       var V=(cfg.views&&cfg.views[v])||{};
+      // 구역 표시/숨김: sections {이름: 선택자|요소|배열}
+      try{var secs=(typeof cfg.sections==='function')?cfg.sections():(cfg.sections||{});Object.keys(secs).forEach(function(n){var it=secs[n];var els=[];(Array.isArray(it)?it:[it]).forEach(function(x){if(!x)return;if(typeof x==='string')document.querySelectorAll(x).forEach(function(e){els.push(e)});else els.push(x)});els.forEach(function(e){e.classList.toggle('kv-hide',n!==v)})})}catch(e){}
+      try{if(cfg.onView)cfg.onView(v)}catch(e){}
       try{
         var h1=document.querySelector('.phero h1'),p=document.querySelector('.phero p'),cr=document.querySelector('.phero .crumb');
         if(V.title){if(h1)h1.textContent=V.title;document.title=V.title+' | 대한민국플라잉디스크연맹'}
@@ -121,7 +122,9 @@
     }
     // 권한자 전용 링크(sn-admin) 켜기 — 페이지가 권한을 확인한 뒤 호출
     function showAdminLinks(){try{document.querySelectorAll('[data-admin="1"]').forEach(function(a){a.hidden=false;a.style.display=''})}catch(e){}}
-    return {get:get,apply:apply,showAdminLinks:showAdminLinks,hashMap:hashMap};
+    // 연속 구역 묶기: container 의 자식들을 startSel(예: .sec-label, h2.sec-title)마다 새 묶음으로 감싸 names 순서대로 이름 붙임 (첫 시작 앞의 요소는 첫 묶음)
+    function groupRuns(container,startSel,names){var c=(typeof container==='string')?document.querySelector(container):container;var out={};if(!c)return out;var kids=Array.prototype.slice.call(c.children),groups=[],cur=null;kids.forEach(function(k){var isStart=k.matches(startSel);if(!cur||(isStart&&cur.hasStart)){cur=document.createElement('div');cur.className='kv-sec';cur.hasStart=false;groups.push(cur)}if(isStart)cur.hasStart=true;cur.appendChild(k)});groups.forEach(function(g,i){c.appendChild(g);var n=names[i]||('g'+i);g.setAttribute('data-sec',n);out[n]=g});return out}
+    return {get:get,apply:apply,showAdminLinks:showAdminLinks,groupRuns:groupRuns,hashMap:hashMap};
   })();
   // ══ [사이트 설정 2026-09-07] 관리자 페이지 [사이트 설정]에서 저장한 siteContent/site 를 모든 페이지에 적용 ══
   //   · 상단 연락처(.util) · 푸터(footer .bottom / .links) · 관련 사이트(.rel) · 홈 히어로(문구·버튼)
@@ -169,8 +172,8 @@
     {menu:'대회',link:'gallery.html',col:'gallery',where:['status','==','published'],time:['at','updatedAt'],limit:40,params:['id']},
     {menu:'대회',link:'results.html',col:'eventReports',where:['kind','==','comp'],time:['createdAt','at','updatedAt'],limit:40,params:['id']},
     {menu:'대회',link:'results.html',col:'schoolClubEvents',time:['createdAt','updatedAt'],limit:40,params:['id']},
-    {menu:'자격증',link:'license.html',col:'licenseNotices',field:'createdAt',limit:12,pageSeen:true},
-    {menu:'알림마당',link:'notice.html',col:'licenseNotices',field:'createdAt',limit:12,pageSeen:true},
+    {menu:'자격증',link:'license.html?view=notices',col:'licenseNotices',field:'createdAt',limit:12,pageSeen:true},
+    {menu:'알림마당',link:'notice.html?view=board',col:'licenseNotices',field:'createdAt',limit:12,pageSeen:true},
     {menu:'알림마당',link:'calendar.html',col:'events',field:'createdAt',limit:20,pageSeen:true},
     {menu:'클럽',link:'club.html',col:'clubMeets',field:'createdAt',limit:20,pageSeen:true}
   ];
