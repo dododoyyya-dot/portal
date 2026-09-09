@@ -816,7 +816,7 @@ async function cfSave(){
   let ok=0,fail=0,teamOk=0,teamHold=0,teamFail=0;   // [팀원 경력 연동] 팀원 기록·보류·실패 건수
   for(const r of rows){
     if(!r.uid)continue;
-    const base={uid:r.uid,name:r.name,date:s.date||'',competitionName:s.title||'',sport:sportOf(r.div),location:(s.place||'')+(s.region?' ('+s.region+')':''),organizer:s.host||s.organizer||'',division:r.div,slotId:CF.id,source:'comp-complete',kidName:r.kid?r.name:''};
+    const base={uid:r.uid,name:r.name,date:s.date||'',competitionName:s.title||'',sport:sportOf(r.div),location:(s.place||'')+(s.region?' ('+s.region+')':''),host:s.host||'',organizer:s.organizer||s.host||'',coorganizer:s.organizer||'',division:r.div,slotId:CF.id,source:'comp-complete',kidName:r.kid?r.name:''};
     try{
       await CAREER.write(DB,Object.assign({},base,{role:r.team?'인솔자':'선수',team:r.team?r.name:''}),(CMY&&CMY.name)||'');
       if(r.team&&r.selfPlays)await CAREER.write(DB,Object.assign({},base,{role:'선수',team:r.name}),(CMY&&CMY.name)||'');   // [클럽장 본인 참가] 인솔자가 선수로도 뛴 경우 '선수' 이력도 함께
@@ -4061,6 +4061,6 @@ function tbRemoveMember(ti,mi){
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="region_map.js?v=20260909b"></script>
-<script src="auth_ui.js?v=20260909e"></script>
+<script src="auth_ui.js?v=20260909f"></script>
 </body>
 </html>

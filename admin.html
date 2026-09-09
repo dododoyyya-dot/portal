@@ -2089,11 +2089,11 @@ function bulkNames(list){
 //  권한: 중앙관리자 전체 · 시도임원은 자기 관할 시도 학교의 행만(학교코드 앞 3자리로 시도 판정).
 const SC_V=1;
 const SC_SIDO={S01:'서울',S02:'부산',S03:'대구',S04:'인천',S05:'광주',S06:'대전',S07:'울산',S08:'세종',S09:'경기',S10:'강원',S11:'충북',S12:'충남',S13:'전북',S14:'전남',S15:'경북',S16:'경남',S17:'제주'};
-const SC_HEAD=['대회명','주최기관','대회일자(YYYY-MM-DD)','종목','부문','학교명','학교코드(선택)','팀명(선택)','성명','생년월일(YYYY-MM-DD)','성별(선택)','결과','비고'];
+const SC_HEAD=['대회명','주최기관','주관기관','장소','대회일자(YYYY-MM-DD)','종목','부문','학교명','학교코드(선택)','팀명(선택)','성명','생년월일(YYYY-MM-DD)','성별(선택)','결과','비고'];
 let SC_ROWS=[],SC_BACKED=false,SC_IMPORT_ID='',SC_PENDING=null,SC_FILE='';
 // [E·2026-09-07] 모드: school(학교스포츠클럽 참가·입상) | staff(심판·운영 경력 소급 등록)
 let SC_MODE='school';
-const SC_HEAD_STAFF=['대회명','주최기관','대회일자(YYYY-MM-DD)','종목','담당 임무','성명','생년월일(YYYY-MM-DD)','회원번호(선택)','이메일(선택)','비고'];
+const SC_HEAD_STAFF=['대회명','주최기관','주관기관','장소','대회일자(YYYY-MM-DD)','종목','담당 임무','성명','생년월일(YYYY-MM-DD)','회원번호(선택)','이메일(선택)','비고'];
 function scSetMode(m){SC_MODE=(m==='staff')?'staff':'school';SC_ROWS=[];SC_BACKED=false;
   const h=document.getElementById('scHead');if(h)h.textContent=SC_MODE==='staff'?'🏁 심판·운영 경력 엑셀 일괄 등록':'🏫 학교스포츠클럽 · 대회 결과 업로드';
   const a=document.getElementById('scDescSchool'),b=document.getElementById('scDescStaff'),p=document.getElementById('scPendBtn');
@@ -2122,15 +2122,15 @@ async function scTemplate(){
     const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet(SC_MODE==='staff'?'경력':'결과');
     if(SC_MODE==='staff'){
       ws.addRow(SC_HEAD_STAFF);ws.getRow(1).font={bold:true};ws.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE8EEF8'}};
-      ws.addRow(['2025 부산광역시장배 플라잉디스크대회','부산광역시플라잉디스크연맹','2025-05-17','얼티미트','주심','홍길동','1990-01-02','','','예시 행 — 지우고 입력하세요']);
-      ws.getRow(2).font={color:{argb:'FF8A919D'},italic:true};ws.columns=[36,26,20,12,14,10,20,12,26,26].map(w=>({width:w}));
-      const g2=wb.addWorksheet('작성 안내');[['심판·운영 경력 일괄 등록 안내'],[''],['· 1행(머리글)은 지우지 마세요. 2행 예시는 지우고 입력합니다.'],['· 한 줄에 한 명·한 대회·한 임무씩. 같은 사람이 이틀 심판을 봤으면 날짜별로 두 줄.'],['· 담당 임무: 주심 / 부심 / 심판 / 기록원 / 운영요원 / 안전요원 / 심판위원장 / 감독관 등 — 경력증명서의 역할 열에 그대로 표시됩니다.'],['· 회원번호(마이페이지 표시) 또는 이메일이 있으면 정확히 찾습니다. 없으면 성명+생년월일로 찾습니다.'],['· 이미 홈페이지에서 임무 완료 처리된 대회는 다시 올리지 마세요(같은 대회·일자·임무는 건너뜁니다).'],[''],['문의: 대한민국플라잉디스크연맹 사무국 031-984-3248 / kfdf60@hanmail.net']].forEach(r=>g2.addRow(r));g2.getColumn(1).width=100;g2.getRow(1).font={bold:true,size:14};
+      ws.addRow(['2025 부산광역시장배 플라잉디스크대회','부산광역시','부산광역시플라잉디스크연맹','부경대학교 축구장','2025-05-17','얼티미트','주심','홍길동','1990-01-02','','','예시 행 — 지우고 입력하세요']);
+      ws.getRow(2).font={color:{argb:'FF8A919D'},italic:true};ws.columns=[36,22,26,22,20,12,14,10,20,12,26,26].map(w=>({width:w}));
+      const g2=wb.addWorksheet('작성 안내');[['심판·운영 경력 일괄 등록 안내'],[''],['· 1행(머리글)은 지우지 마세요. 2행 예시는 지우고 입력합니다.'],['· 한 줄에 한 명·한 대회·한 임무씩. 같은 사람이 이틀 심판을 봤으면 날짜별로 두 줄.'],['· 주최기관·주관기관·장소는 경력 증명서의 「주최·주관」·「장소」 칸에 그대로 인쇄됩니다. 주최와 주관이 같으면 둘 다 적어도 한 번만 표기됩니다.'],['· 담당 임무: 주심 / 부심 / 심판 / 기록원 / 운영요원 / 안전요원 / 심판위원장 / 감독관 등 — 경력증명서의 역할 열에 그대로 표시됩니다.'],['· 회원번호(마이페이지 표시) 또는 이메일이 있으면 정확히 찾습니다. 없으면 성명+생년월일로 찾습니다.'],['· 이미 홈페이지에서 임무 완료 처리된 대회는 다시 올리지 마세요(같은 대회·일자·임무는 건너뜁니다).'],[''],['문의: 대한민국플라잉디스크연맹 사무국 031-984-3248 / kfdf60@hanmail.net']].forEach(r=>g2.addRow(r));g2.getColumn(1).width=100;g2.getRow(1).font={bold:true,size:14};
       const buf2=await wb.xlsx.writeBuffer();scDownload('심판운영_경력_일괄등록_양식.xlsx',new Blob([buf2],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));return;
     }
     ws.addRow(SC_HEAD);ws.getRow(1).font={bold:true};ws.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE8EEF8'}};
-    ws.addRow(['2026 부산광역시교육감배 학교스포츠클럽 대회','부산광역시교육청','2026-10-17','얼티미트','남초부','부산○○초등학교','','','홍길동','2015-03-02','남','우승','예시 행 — 지우고 입력하세요']);
+    ws.addRow(['2026 부산광역시교육감배 학교스포츠클럽 대회','부산광역시교육청','부산광역시플라잉디스크연맹','부경대학교 축구장','2026-10-17','얼티미트','남초부','부산○○초등학교','','','홍길동','2015-03-02','남','우승','예시 행 — 지우고 입력하세요']);
     ws.getRow(2).font={color:{argb:'FF8A919D'},italic:true};
-    ws.columns=[36,22,20,12,12,24,16,14,10,20,10,10,26].map(w=>({width:w}));
+    ws.columns=[36,22,26,22,20,12,12,24,16,14,10,20,10,10,26].map(w=>({width:w}));
     const g=wb.addWorksheet('작성 안내');
     [['학교스포츠클럽 대회 결과 입력 안내'],[''],['· 1행(머리글)은 지우지 마세요. 2행 예시는 지우고 입력합니다.'],['· 한 줄에 한 명씩 적습니다. 단체전은 팀원 모두를 한 줄씩 적고 팀명(선택)에 같은 팀명을 적어 주세요.'],['· 생년월일은 2015-03-02 처럼 적습니다 (2015.03.02, 20150302 도 인식). 동명이인 구분에 꼭 필요합니다.'],['· 학교명은 정식 명칭(예: 부산○○초등학교)으로 적어 주세요. 학교코드는 몰라도 됩니다.'],['· 결과: 참가 / 우승 / 준우승 / 3위 / MVP / 우수상 등 자유롭게. 입상자는 참가 기록과 입상 기록이 함께 남습니다.'],['· 전화번호·학년은 받지 않습니다.'],[''],['문의: 대한민국플라잉디스크연맹 사무국 031-984-3248 / kfdf60@hanmail.net']].forEach(r=>g.addRow(r));
     g.getColumn(1).width=100;g.getRow(1).font={bold:true,size:14};
@@ -2178,14 +2178,14 @@ async function scPreview(){
     ws.eachRow((row,n)=>{if(hdrRow)return;const vals=(row.values||[]).map(scCell);if(vals.some(v=>/^(성명|이름)/.test(v))&&vals.some(v=>/^대회명/.test(v))){hdrRow=n;hdr=vals}});
     if(!hdrRow)throw new Error('머리글 행(대회명·성명 …)을 찾지 못했습니다. [양식 내려받기]의 양식을 사용해 주세요.');
     const col=re=>{for(let i=0;i<hdr.length;i++)if(re.test(hdr[i]||''))return i;return -1};
-    const C={comp:col(/^대회명/),org:col(/^주최/),date:col(/^대회일자|^일자|^날짜/),sport:col(/^종목/),div:col(/^부문/),school:col(/^학교명|^학교$/),code:col(/^학교코드/),team:col(/^팀명/),name:col(/^성명|^이름/),birth:col(/^생년월일/),gender:col(/^성별/),result:col(/^결과|^입상|^순위/),note:col(/^비고/),
+    const C={comp:col(/^대회명/),org:col(/^주최/),coorg:col(/^주관/),loc:col(/^장소|^개최 ?장소|^개최지|^경기장/),date:col(/^대회일자|^일자|^날짜/),sport:col(/^종목/),div:col(/^부문/),school:col(/^학교명|^학교$/),code:col(/^학교코드/),team:col(/^팀명/),name:col(/^성명|^이름/),birth:col(/^생년월일/),gender:col(/^성별/),result:col(/^결과|^입상|^순위/),note:col(/^비고/),
       duty:col(/^담당 임무|^임무|^역할/),memberNo:col(/^회원번호/),email:col(/^이메일|^메일/)};   // [E] 심판·운영 모드 열
     const need=(SC_MODE==='staff'?[['comp','대회명'],['date','대회일자'],['duty','담당 임무'],['name','성명']]:[['comp','대회명'],['date','대회일자'],['school','학교명'],['name','성명'],['birth','생년월일'],['result','결과']]).filter(x=>C[x[0]]<0).map(x=>x[1]);
     if(need.length)throw new Error('필수 열이 없습니다: '+need.join(', '));
     SC_ROWS=[];
     ws.eachRow((row,n)=>{
       if(n<=hdrRow)return;const v=row.values||[];const g=k=>C[k]>=0?scCell(v[C[k]]):'';
-      const r={n:n,comp:g('comp'),org:g('org'),date:scDate(C.date>=0?v[C.date]:''),sport:g('sport'),div:g('div'),school:g('school'),code:g('code'),team:g('team'),name:g('name'),birth:scDate(C.birth>=0?v[C.birth]:''),gender:g('gender'),result:g('result')||'참가',note:g('note'),
+      const r={n:n,comp:g('comp'),org:g('org'),coorg:g('coorg'),loc:g('loc'),date:scDate(C.date>=0?v[C.date]:''),sport:g('sport'),div:g('div'),school:g('school'),code:g('code'),team:g('team'),name:g('name'),birth:scDate(C.birth>=0?v[C.birth]:''),gender:g('gender'),result:g('result')||'참가',note:g('note'),
         duty:g('duty'),memberNo:String(g('memberNo')||'').replace(/\.0$/,''),email:String(g('email')||'').toLowerCase()};
       if(!r.name&&!r.comp)return;
       if(/예시 행/.test(r.note))return;
@@ -2306,14 +2306,14 @@ async function scApply(mode){
       if(r.pick){
         const parts=r.pick.split('|');const uid=parts[0],kid=parts.slice(1).join('|');
         const c=r.cands.find(x=>x.uid===uid&&(x.kid||'')===(kid||''));
-        const rec={uid:uid,name:(c&&c.name)||r.name,date:r.date,competitionName:r.comp,sport:r.sport,division:r.div,team:r.team||r.school,organizer:r.org,location:'',
+        const rec={uid:uid,name:(c&&c.name)||r.name,date:r.date,competitionName:r.comp,sport:r.sport,division:r.div,team:r.team||r.school,organizer:r.org,coorganizer:r.coorg||'',location:r.loc||'',
           slotId:'schoolclub:'+r.comp+':'+r.date+(kid?':'+kid:''),source:'schoolclub-import',kidName:kid||'',
           importId:SC_IMPORT_ID,teamSchoolCode:r.schoolCode||'',schoolName:r.school||'',noPoints:true,matchType:(c&&c.kind==='exact')?'auto':'manual',gender:r.gender||''};
         await CAREER.write(DB,Object.assign({},rec,{role:'참가자',group:'선수',kind:'athlete',result:''}),by);
         if(r.result&&r.result!=='참가')await CAREER.write(DB,Object.assign({},rec,{role:'입상',group:'입상',kind:'award',result:r.result}),by);
         done++;
       }else{
-        const doc={competitionName:r.comp,organizer:r.org,date:r.date,sport:r.sport,division:r.div,school:r.school,schoolNorm:r.canon,schoolCode:r.schoolCode||'',schoolSido:r.schoolSido||'',team:r.team,
+        const doc={competitionName:r.comp,organizer:r.org,coorganizer:r.coorg||'',location:r.loc||'',date:r.date,sport:r.sport,division:r.div,school:r.school,schoolNorm:r.canon,schoolCode:r.schoolCode||'',schoolSido:r.schoolSido||'',team:r.team,
           name:r.name,nameNorm:scNorm(r.name),birth:r.birth,gender:r.gender,result:r.result,note:r.note,status:'pending',importId:SC_IMPORT_ID,by:by,byUid:(AUTH.currentUser||{}).uid||'',at:new Date().toISOString()};
         if(r.dupPending&&r.dupPending.id)await DB.collection('schoolClubResults').doc(r.dupPending.id).update(doc);
         else await DB.collection('schoolClubResults').add(doc);
@@ -2349,7 +2349,7 @@ async function scApplyStaff(base,linked,hold){
       if(!EXIST[uid]){try{const s=await DB.collection('staffCareer').where('uid','==',uid).limit(500).get();EXIST[uid]=s.docs.map(d=>d.data())}catch(e){EXIST[uid]=[]}}
       const has=EXIST[uid].some(x=>x.date===r.date&&norm(x.role||x.duty)===norm(r.duty)&&norm(x.competitionName)===norm(r.comp));
       if(has){dup++;r.note2='이미 기록됨';continue}
-      const w=await CAREER.write(DB,{uid:uid,name:(c&&c.name)||r.name,date:r.date,competitionName:r.comp,role:r.duty,group:CAREER.group(r.duty),kind:'staff',sport:r.sport,organizer:r.org,location:'',
+      const w=await CAREER.write(DB,{uid:uid,name:(c&&c.name)||r.name,date:r.date,competitionName:r.comp,role:r.duty,group:CAREER.group(r.duty),kind:'staff',sport:r.sport,organizer:r.org,coorganizer:r.coorg||'',location:r.loc||'',
         slotId:'excel:'+r.comp+':'+r.date,source:'excel-import',importId:SC_IMPORT_ID,matchType:(c&&c.kind==='nameonly')?'manual':'auto'},by);
       EXIST[uid].push({date:r.date,role:r.duty,competitionName:r.comp});done++;
     }catch(e){fail.push(r.name+' — '+e.message)}
@@ -7684,6 +7684,6 @@ async function dlGoodsCerts(){
   a.download='용품수령확인증_'+n+'개교_'+new Date().toISOString().slice(0,10)+'.zip';a.click();
 }
 </script>
-<script src="auth_ui.js?v=20260909e"></script>
+<script src="auth_ui.js?v=20260909f"></script>
 </body>
 </html>

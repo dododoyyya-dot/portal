@@ -915,7 +915,7 @@ async function rejectJoin(id,uid){
   }catch(e){alert('거절 실패: '+e.message)}
 }
 // ── 클럽 심볼(엠블럼) 업로드 ──
-function cavHtml(c){return '<span class="cav">'+(c.symbol?'<img src="'+kesc(c.symbol)+'" alt="심볼">':kesc((c.name||'?').charAt(0)))+'</span>';}
+function cavHtml(c){return c.symbol?'<span class="cav" style="cursor:zoom-in" title="엠블럼 크게 보기" data-n="'+kesc(c.name||'')+'" onclick="if(window.KFDF_ZOOM)KFDF_ZOOM(this.firstChild.src,this.dataset.n)"><img src="'+kesc(c.symbol)+'" alt="심볼"></span>':'<span class="cav">'+kesc((c.name||'?').charAt(0))+'</span>';}
 function previewSymbol(inp,pid){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=function(e){document.getElementById(pid).innerHTML='<img src="'+e.target.result+'">';};r.readAsDataURL(f);}
 function shrinkImg(file,max){return new Promise(function(res,rej){
   const img=new Image();
@@ -1643,6 +1643,6 @@ function cmVsCard(m,done){
 function _kfdfBind(){try{if(!window.KFDF_VIEW)return;const tq=new URLSearchParams(location.search).get('tab');const byTab={'1':'mine','2':'find','3':'create','4':'meet'};const toTab={find:'2',create:'3',mine:'1',meet:'4'};KFDF_VIEW.apply({def:byTab[tq]||'find',menu:'클럽',menuHref:'club.html?view=find',views:{find:{title:'클럽 찾기 · 가입',desc:'시도·시군구별 클럽을 찾아 가입 신청합니다. 가입 승인은 클럽장이 합니다.'},create:{title:'클럽 만들기',desc:'승인 회원이면 클럽을 만들 수 있습니다. 연맹 승인 후 정식 클럽이 됩니다.'},mine:{title:'내 클럽 · 가입 승인',desc:'내가 속한 클럽과 가입 신청 현황을 관리합니다. 클럽장은 가입 승인·구성원 관리를 합니다.'},meet:{title:'클럽 교류전',desc:'클럽 간 교류전 도전장·결과·전적을 기록합니다.'}},onView:function(v){const t=document.getElementById('clTabs');if(t)t.classList.add('kv-tabs');if(typeof showClTab==='function')showClTab(toTab[v]||'2')}});}catch(e){console.warn("view",e)}}
 if(window.KFDF_VIEW)_kfdfBind();else document.addEventListener("DOMContentLoaded",_kfdfBind);
 </script>
-<script src="auth_ui.js?v=20260909e"></script>
+<script src="auth_ui.js?v=20260909f"></script>
 </body>
 </html>

@@ -1838,7 +1838,7 @@ async function mdOne(i){
   const di=dayInfo(p,(p.dates||[]).find(x=>x.date===MD.date)||{});   // [날짜별 정보] 그 날짜의 종목·장소
   r.busy=true;r.skip=false;mdRender();
   try{
-    const w=await CAREER.write(DB,{uid:r.uid,name:r.name,date:MD.date,competitionName:p.competitionName||'',role:r.role,sport:(di.title||p.sport||''),location:di.location||'',organizer:(p.author&&p.author.organization)||'',postId:MD.postId,source:'staff-complete'},(SMY&&SMY.name)||'');
+    const w=await CAREER.write(DB,{uid:r.uid,name:r.name,date:MD.date,competitionName:p.competitionName||'',role:r.role,sport:(di.title||p.sport||''),location:di.location||'',host:((p.compId&&COMPMAP[p.compId])||{}).host||'',coorganizer:((p.compId&&COMPMAP[p.compId])||{}).organizer||'',organizer:((p.compId&&COMPMAP[p.compId])||{}).organizer||(p.author&&p.author.organization)||'',postId:MD.postId,source:'staff-complete'},(SMY&&SMY.name)||'');
     // 역할이 바뀌어 다른 키로 새로 기록된 경우 예전 기록은 정리
     if(r.recId&&w.id!==r.recId){try{await DB.collection('staffCareer').doc(r.recId).delete()}catch(e){}}
     r.done=true;r.recId=w.id;r.recRole=r.role;
@@ -1945,7 +1945,7 @@ async function _registerCareerOld(postId,date){
         duty:assign.duty||((app.prefs||{})[date]||[]).join(', ')||'-',
         location:dayInfo(p,(p.dates||[]).find(x=>x.date===date)||{}).location,   // [날짜별 정보]
         sport:(dayInfo(p,(p.dates||[]).find(x=>x.date===date)||{}).title||p.sport||''),
-        organizer:(p.author&&p.author.organization)||'',
+        host:((p.compId&&COMPMAP[p.compId])||{}).host||'',coorganizer:((p.compId&&COMPMAP[p.compId])||{}).organizer||'',organizer:((p.compId&&COMPMAP[p.compId])||{}).organizer||(p.author&&p.author.organization)||'',
         registeredAt:firebase.firestore.FieldValue.serverTimestamp()
       });
       added++;
@@ -2740,6 +2740,6 @@ async function copyRoster(id){
   </div>
 </div></footer>
 <script src="region_map.js?v=20260909b"></script>
-<script src="auth_ui.js?v=20260909e"></script>
+<script src="auth_ui.js?v=20260909f"></script>
 </body>
 </html>

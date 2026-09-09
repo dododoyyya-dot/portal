@@ -1,4 +1,4 @@
-// 전 페이지 공용: ① 상단 메뉴 일괄 렌더(A안) ② 로그인/로그아웃 전환 ③ 알림 배지
+// v20260909f · 전 페이지 공용: ① 상단 메뉴 일괄 렌더(A안) ② 로그인/로그아웃 전환 ③ 알림 배지
 (function(){
   var CFG={apiKey:"AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",authDomain:"koreaflyingdiscfederation.firebaseapp.com",projectId:"koreaflyingdiscfederation",appId:"1:1081847355343:web:ca40ed9a52e13f607f64ba"};
 
@@ -335,4 +335,20 @@
     s2.onload=ready;document.head.appendChild(s2);
   };
   document.head.appendChild(s1);
+})();
+
+// [엠블럼 확대 2026-09-09] 클럽 로고·이미지 확대 보기 — KFDF_ZOOM(src, caption). 배경 클릭·닫기 버튼·Esc 로 닫힘
+(function(){
+  window.KFDF_ZOOM=function(src,cap){
+    if(!src)return;var old=document.getElementById('kfdfZoom');if(old)old.remove();
+    var ov=document.createElement('div');ov.id='kfdfZoom';
+    ov.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(10,14,30,.82);display:flex;align-items:center;justify-content:center;flex-direction:column;padding:24px;cursor:zoom-out;animation:kfdfZoomIn .16s ease-out';
+    ov.innerHTML='<style>@keyframes kfdfZoomIn{from{opacity:0}to{opacity:1}}#kfdfZoom img{max-width:min(90vw,560px);max-height:70vh;border-radius:20px;background:#fff;box-shadow:0 24px 60px rgba(0,0,0,.45);object-fit:contain;padding:12px}#kfdfZoom .cap{margin-top:14px;color:#fff;font-weight:900;font-size:16px;letter-spacing:-.2px;text-align:center;word-break:keep-all}#kfdfZoom .x{position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;border:none;font-size:22px;line-height:40px;cursor:pointer;font-family:inherit}</style>'
+      +'<button type="button" class="x" aria-label="닫기">\u00d7</button><img alt="확대 이미지"><div class="cap"></div>';
+    ov.querySelector('img').src=src;ov.querySelector('.cap').textContent=cap||'';
+    function close(){ov.remove();document.removeEventListener('keydown',onKey)}
+    function onKey(e){if(e.key==='Escape')close()}
+    ov.addEventListener('click',close);document.addEventListener('keydown',onKey);
+    document.body.appendChild(ov);
+  };
 })();

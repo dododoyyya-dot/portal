@@ -2522,11 +2522,11 @@ function renderAthlete(){
   const fb=document.getElementById('athFindBtn');if(fb&&!fb.dataset.ok){fb.dataset.ok='1';fb.insertAdjacentHTML('afterbegin',I('target',{size:14,color:'#fff',stroke:2.4}))}
   const recs=(MYCAREER||[]).filter(athIsAth);
   // 같은 대회·같은 사람(자녀)·같은 팀의 참가/입상 기록을 한 줄로
-  const rows={};recs.forEach(c=>{const k=[c.competitionName,c.date,c.kidName||'',c.team||''].join('|');const r=rows[k]=rows[k]||{date:c.date||'',comp:c.competitionName||'',org:c.organizer||'',sport:c.sport||'',div:c.division||'',team:c.team||c.schoolName||'',kid:c.kidName||'',results:[],ext:!!(c.source&&/schoolclub/.test(c.source))};
+  const rows={};recs.forEach(c=>{const k=[c.competitionName,c.date,c.kidName||'',c.team||''].join('|');const r=rows[k]=rows[k]||{date:c.date||'',comp:c.competitionName||'',org:CAREER.orgText(c),sport:c.sport||'',div:c.division||'',team:c.team||c.schoolName||'',kid:c.kidName||'',results:[],ext:!!(c.source&&/schoolclub/.test(c.source))};
     const g=c.group||CAREER.group(c.role||c.duty);if(g==='입상')r.results.push(c.result||c.role||'입상');else r.results.unshift('참가')});
   const arr=Object.values(rows).sort((a,b)=>b.date.localeCompare(a.date));
   if(!arr.length){list.innerHTML='<div style="font-size:12.5px;color:#6b7280;padding:6px 0">아직 기록된 대회 참가·입상이 없습니다. 연맹 대회는 종료 처리 시 자동으로, 학교스포츠클럽 대회는 결과 업로드 후 [내 기록 찾기]로 가져올 수 있습니다.</div>';return}
-  list.innerHTML='<div class="tblwrap"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:620px"><thead><tr><th>대회일</th><th>대회명</th><th>주최</th><th>종목·부문</th><th>당시 소속(학교·팀)</th><th>결과</th></tr></thead><tbody>'
+  list.innerHTML='<div class="tblwrap"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:620px"><thead><tr><th>대회일</th><th>대회명</th><th>주최·주관</th><th>종목·부문</th><th>당시 소속(학교·팀)</th><th>결과</th></tr></thead><tbody>'
     +arr.map(r=>'<tr><td style="white-space:nowrap">'+esc(r.date)+'</td><td class="l"><b>'+esc(r.comp)+'</b>'+(r.kid?' <span style="font-size:11px;color:#8a919d">('+esc(r.kid)+')</span>':'')+(r.ext?' <span style="font-size:10.5px;color:#fff;background:#0e7490;border-radius:999px;padding:1px 7px">학교스포츠클럽</span>':'')+'</td><td>'+esc(r.org||'-')+'</td><td>'+esc([r.sport,r.div].filter(Boolean).join(' · ')||'-')+'</td><td>'+esc(r.team||'-')+'</td>'
       +'<td style="white-space:nowrap">'+r.results.filter(x=>x!=='참가'||!r.results.some(y=>y!=='참가')).map(x=>x==='참가'?'<span style="font-size:11.5px;font-weight:800;color:#153A77">참가</span>':'<span style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:900;color:#d97706">'+I('trophy',{size:13,color:'#d97706',stroke:2.2})+esc(x)+'</span>').join(' · ')+'</td></tr>').join('')
     +'</tbody></table></div><div style="font-size:11.5px;color:#8a919d;margin-top:6px">학교스포츠클럽 등 외부 주최 대회 기록은 각 주최기관의 결과를 연맹이 기록·관리한 것입니다. 당시 학교가 소속으로 저장되어 진학·전학 후에도 그대로 남습니다.</div>';
@@ -2701,7 +2701,7 @@ function printCareerCert(kind){
   const lics=((typeof MYLICS!=='undefined'&&MYLICS)||[]).map(x=>x.data?x.data():x).map(l=>[(l.type||l.kind||l.category||'연맹 자격'),(l.grade||l.level||''),(l.no||l.number||''),(l.issuedAt||l.issued||'')].filter(Boolean).join(' · ')).filter(Boolean);
   const stamp=new URL('직인.png',location.href).href,logo=new URL('kfdf_logo.png',location.href).href;
   const grpRows=['위원','심판','운영','봉사','지도','선수','입상'].filter(g=>st.byGroup[g]).map(g=>'<tr><td>'+G[g]+' '+g+'</td><td style="text-align:right">'+st.byGroup[g]+'건</td><td style="text-align:right">'+sel.filter(c=>(c.group||CAREER.group(c.role||c.duty))===g).reduce((n,c)=>n+(+(c.days||1)||1),0)+'일</td></tr>').join('');
-  const detail=sel.filter(c=>(c.group||CAREER.group(c.role||c.duty))!=='입상').map((c,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(c.date||'')+'</td><td class="l">'+esc(c.competitionName||'')+(c.kidName?' ('+esc(c.kidName)+')':'')+'</td><td>'+esc(c.organizer||'-')+'</td><td>'+esc(c.location||'-')+'</td><td>'+esc(c.sport||'-')+'</td><td>'+esc(c.role||c.duty||'-')+'</td><td>'+(c.verified?'✓':'')+'</td></tr>').join('');
+  const detail=sel.filter(c=>(c.group||CAREER.group(c.role||c.duty))!=='입상').map((c,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(c.date||'')+'</td><td class="l">'+esc(c.competitionName||'')+(c.kidName?' ('+esc(c.kidName)+')':'')+'</td><td>'+esc(CAREER.orgText(c)||'-')+'</td><td>'+esc(c.location||'-')+'</td><td>'+esc(c.sport||'-')+'</td><td>'+esc(c.role||c.duty||'-')+'</td><td>'+(c.verified?'✓':'')+'</td></tr>').join('');
   const title=kind==='coach'?'지 도 자 경 력 증 명 서':'경 력 증 명 서';
   const what=kind==='coach'?'지도자(감독·코치·인솔자)로 활동한 사실':'활동한 사실';
   const w=window.open('','_blank');
@@ -2716,7 +2716,7 @@ function printCareerCert(kind){
     +'<div class="sec">Ⅰ. 경력 요약</div>'
     +'<div class="sum"><div>총 활동<b>'+st.total+'건</b></div><div>활동 일수<b>'+st.days+'일</b></div><div>대회 수<b>'+st.eventCount+'개</b></div><div>종목<b>'+st.sportCount+'</b></div><div>활동 지역<b>'+st.placeCount+'</b></div><div>활동 기간<b style="font-size:11px">'+esc(st.first||'')+' ~ '+esc(st.last||'')+'</b></div></div>'
     +'<table style="margin-top:8px"><tr><th>구분</th><th>건수</th><th>일수</th></tr>'+grpRows+'</table>'
-    +(detail?'<div class="sec">Ⅱ. 활동 상세</div><table><tr><th style="width:5%">번호</th><th style="width:11%">일자</th><th>대회·행사명</th><th style="width:14%">주최</th><th style="width:14%">장소</th><th style="width:10%">종목</th><th style="width:11%">역할</th><th style="width:6%">확인</th></tr>'+detail+'</table>':'')
+    +(detail?'<div class="sec">Ⅱ. 활동 상세</div><table><tr><th style="width:5%">번호</th><th style="width:11%">일자</th><th>대회·행사명</th><th style="width:16%">주최·주관</th><th style="width:13%">장소</th><th style="width:10%">종목</th><th style="width:11%">역할</th><th style="width:6%">확인</th></tr>'+detail+'</table>':'')
     +'<div class="foot">위와 같이 대한민국플라잉디스크연맹이 주최·주관·승인한 대회 및 행사에서<br>'+what+'을 증명합니다.<br><br>'+dateStr+'<br>'
     +'<div class="sig">사단법인 대한민국플라잉디스크연맹 회장<img src="'+stamp+'" alt="직인"></div></div>'
     +'<div class="small">· 본 증명서는 연맹 홈페이지에서 회원 본인이 발급한 것으로, 기록은 각 대회 운영진의 임무 완료·종료 처리로 등록된 이력에 근거합니다.<br>· 진위 확인: 사무국 031-984-3248 / kfdf60@hanmail.net (발급번호 '+no+')</div>'
@@ -2748,7 +2748,7 @@ function printAthleteCert(sel){
     const dateStr=now.getFullYear()+'년 '+(now.getMonth()+1)+'월 '+now.getDate()+'일';
     const stamp=new URL('직인.png',location.href).href,logo=new URL('kfdf_logo.png',location.href).href;
     // 같은 대회·같은 사람의 참가/입상을 한 줄로
-    const rows={};sel.forEach(c=>{const k=[c.competitionName,c.date,c.kidName||'',c.team||''].join('|');const r=rows[k]=rows[k]||{date:c.date||'',comp:c.competitionName||'',org:c.organizer||'',sport:c.sport||'',div:c.division||'',team:c.team||c.schoolName||'',kid:c.kidName||'',results:[],fed:!(c.source&&/schoolclub/.test(c.source))};
+    const rows={};sel.forEach(c=>{const k=[c.competitionName,c.date,c.kidName||'',c.team||''].join('|');const r=rows[k]=rows[k]||{date:c.date||'',comp:c.competitionName||'',org:CAREER.orgText(c),sport:c.sport||'',div:c.division||'',team:c.team||c.schoolName||'',kid:c.kidName||'',results:[],fed:!(c.source&&/schoolclub/.test(c.source))};
       const g=c.group||CAREER.group(c.role||c.duty);if(g==='입상')r.results.push(c.result||c.role||'입상');else r.results.unshift('참가')});
     const arr=Object.values(rows).sort((a,b)=>a.date.localeCompare(b.date));
     const awards=sel.filter(c=>(c.group||CAREER.group(c.role||c.duty))==='입상').length;
@@ -2766,7 +2766,7 @@ function printAthleteCert(sel){
       +'<tr><th>회원 구분</th><td>'+esc({instructor:'지도자·강사',teacher:'교사(교원)',natcert:'국가공인자격 회원',athlete:'선수회원',general:'일반회원',student:'학생회원'}[d.accountType]||d.accountType||'-')+'</td><th>현재 소속·학교</th><td>'+esc([d.school||d.affiliation||'',d.sido||d.region||''].filter(Boolean).join(' · ')||'-')+'</td></tr></table>'
       +'<div class="sec">Ⅰ. 요약</div>'
       +'<div class="sum"><div>대회 참가<b>'+events+'회</b></div><div>입상<b>'+awards+'건</b></div><div>주최기관<b>'+orgs.length+'곳</b></div><div>기간<b style="font-size:11px">'+esc(arr[0].date)+' ~ '+esc(arr[arr.length-1].date)+'</b></div></div>'
-      +'<div class="sec">Ⅱ. 대회 참가·입상 기록</div><table><tr><th style="width:5%">번호</th><th style="width:11%">일자</th><th>대회명</th><th style="width:17%">주최기관</th><th style="width:15%">종목·부문</th><th style="width:16%">당시 소속(학교·팀)</th><th style="width:11%">결과</th></tr>'+detail+'</table>'
+      +'<div class="sec">Ⅱ. 대회 참가·입상 기록</div><table><tr><th style="width:5%">번호</th><th style="width:11%">일자</th><th>대회명</th><th style="width:18%">주최·주관 기관</th><th style="width:15%">종목·부문</th><th style="width:16%">당시 소속(학교·팀)</th><th style="width:11%">결과</th></tr>'+detail+'</table>'
       +'<div class="conf">위 내용은 사단법인 대한민국플라잉디스크연맹이 주최·주관한 대회의 결과와, 각 주최기관'+(ext.length?'('+ext.map(esc).join(', ')+')':'(교육청 등)')+'이 개최한 대회의 결과를 연맹이 기록·관리한 것으로, 연맹은 위 기록의 <b>관리 사실을 확인</b>합니다.'
       +(ext.length?'<br>※ 주최기관이 연맹이 아닌 대회의 기록은 해당 주최기관이 제공한 결과(참가·입상 명단)에 근거하며, 결과의 원본은 각 주최기관이 보관합니다.':'')+'</div>'
       +'<div class="foot">'+dateStr+'<br><div class="sig">사단법인 대한민국플라잉디스크연맹 회장'+(seal?'<img src="'+stamp+'" alt="직인">':'')+'</div>'+(seal?'':'<div style="font-size:10.5px;color:#666">(직인 생략)</div>')+'</div>'
@@ -3350,6 +3350,6 @@ function copyCfm(){var t=document.getElementById('cfmLink').value;
 document.getElementById('cfmModal').addEventListener('click',function(e){if(e.target===this)closeCfm()});
 document.getElementById('sigModal').addEventListener('click',function(e){if(e.target===this)closeSigModal()});
 </script>
-<script src="auth_ui.js?v=20260909e"></script>
+<script src="auth_ui.js?v=20260909f"></script>
 </body>
 </html>
