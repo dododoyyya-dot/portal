@@ -2856,7 +2856,7 @@ function compRow(r,today){
   const chips=(past?'<span class="chip closed">종료</span>':compDday(r,today))+(r.applied?'<span class="chip mine">신청함</span>':'')+(r.team?'<span class="chip team">단체전</span>':'');
   const meta=[r.place,r.host].filter(Boolean).join(' · ');
   const tag=r.href?'a':'div';
-  return '<'+tag+' class="crow'+(past?' past':'')+(r.href?'':' static')+'"'+(r.href?' href="'+r.href+'"':'')+(r.key?' data-newkey="'+cesc(r.key)+'"':'')+' data-reg="'+compRegOf(r.region)+'">'+badge
+  return '<'+tag+' class="crow'+(past?' past':'')+(r.href?'':' static')+'"'+(r.href?' href="'+r.href+'"':'')+(r.key?' data-newkey="'+cesc(r.key)+'"':'')+' data-reg="'+compRegOf(r.region)+'" data-sido="'+cesc((window.KFDF_MAP?KFDF_MAP.sidoOf(r.region+' '+(r.place||'')):'')||'')+'">'+badge
     +'<div class="cbody"><div class="ctitle">'+cesc(r.title)+'</div>'+(meta?'<div class="cmeta">'+cesc(meta)+'</div>':'')+'</div>'
     +'<div class="cchips">'+chips+'</div>'+(r.href?'<span class="cgo">›</span>':'')+'</'+tag+'>';
 }
@@ -2898,11 +2898,11 @@ function renderMyEntryBox(){
     return compRow({key:'',href:'competition.html?slot='+d.id,date:s.date||'',end:s.date||'',title:s.title||'',place:names.join(' · '),host:'',region:s.region||'',deadline:s.deadline||'',closed:!!(s.deadline&&s.deadline<today),applied:true,team:!!(myEntries(s).some(m=>m.team))},today)}).join('')+'</div>';
 }
 // ══ [권역 지도 2026-09-09] 공고 목록을 권역별로 — 시도명(경남 등)·지역 문자열을 6개 권역으로 묶어 지도에 건수를 표시하고, 누르면 그 권역만 남김 ══
-let COMP_REG='';
+let COMP_REG='',COMP_SIDO='';
 function compRegOf(s){try{return (window.KFDF_MAP?KFDF_MAP.guessRegion(String(s||'')):'')||''}catch(e){return ''}}
 function compMapFilter(){
-  document.querySelectorAll('#liveComps [data-reg]').forEach(x=>{x.style.display=(!COMP_REG||x.getAttribute('data-reg')===COMP_REG)?'':'none'});
-  const lab=document.getElementById('compMapLab');if(lab)lab.textContent=COMP_REG?(COMP_REG+' 권역 공고만 표시 중 — 지도를 다시 누르면 전체'):'권역을 누르면 그 권역 공고만 보입니다';
+  document.querySelectorAll('#liveComps [data-reg]').forEach(x=>{x.style.display=((!COMP_REG||x.getAttribute('data-reg')===COMP_REG)&&(!COMP_SIDO||x.getAttribute('data-sido')===COMP_SIDO))?'':'none'});
+  const lab=document.getElementById('compMapLab');if(lab)lab.textContent=COMP_SIDO?(COMP_SIDO+' 공고만 표시 중 — 시도를 다시 누르면 권역 전체'):(COMP_REG?(COMP_REG+' 권역 공고만 표시 중 — 아래 시도를 누르면 더 좁혀 보고, 지도를 다시 누르면 전체'):'권역을 누르면 그 권역 공고만 보이고, 시도별 건수가 나타납니다');
 }
 function compMapRender(){
   const wrap=document.getElementById('compMapWrap'),host=document.getElementById('compMap');if(!wrap||!host||!window.KFDF_MAP)return;
@@ -2911,8 +2911,10 @@ function compMapRender(){
   if(!items.length){wrap.style.display='none';return}
   const counts={};KFDF_MAP.REGIONS.forEach(r=>counts[r]=0);items.forEach(x=>{const r=x.getAttribute('data-reg');if(counts[r]!=null)counts[r]++});
   const c2={};Object.keys(counts).forEach(r=>c2[r]='공고 '+counts[r]+'건');
+  // 권역별 → 시도별 건수
+  const sub={};items.forEach(x=>{const r=x.getAttribute('data-reg'),s=x.getAttribute('data-sido');if(!r||!s)return;sub[r]=sub[r]||{};sub[r][s]=(sub[r][s]||0)+1});
   wrap.style.display='';
-  window.__compMap=KFDF_MAP.render('compMap',{mode:'single',selected:COMP_REG?[COMP_REG]:[],counts:c2,onChange:sel=>{const r=sel[0]||'';COMP_REG=(r===COMP_REG)?'':r;if(!COMP_REG&&window.__compMap)window.__compMap.set([]);compMapFilter()}});
+  window.__compMap=KFDF_MAP.render('compMap',{mode:'single',selected:COMP_REG?[COMP_REG]:[],counts:c2,subCounts:sub,sub:COMP_SIDO,onChange:sel=>{const r=sel[0]||'';COMP_REG=(r===COMP_REG)?'':r;COMP_SIDO='';if(!COMP_REG&&window.__compMap)window.__compMap.set([]);compMapFilter()},onSub:k=>{COMP_SIDO=k||'';compMapFilter()}});
   compMapFilter();
 }
 async function loadSlots(){
@@ -4058,7 +4060,7 @@ function tbRemoveMember(ti,mi){
 </div></footer>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
-<script src="region_map.js?v=20260907a"></script>
+<script src="region_map.js?v=20260909a"></script>
 <script src="auth_ui.js?v=20260909e"></script>
 </body>
 </html>

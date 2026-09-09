@@ -627,6 +627,7 @@ AUTH.onAuthStateChanged(async u=>{
   IS_OWNER=md.owner===true;
   VIEWER_IS_ADMIN=isAdmin;
   document.getElementById('adminBody').style.display='block';loadDash();
+  try{const _t=parseInt(new URLSearchParams(location.search).get('tab')||'',10);if(_t>=1&&_t<=10)tab(_t)}catch(e){}   // [화면 주소] admin.html?tab=번호 로 바로 열기
   // [관할] 시도연맹 임원에게만 조회 범위 전환(관할 / 미판정)을 보여줍니다.
   //   ※ 예전에 넣었던 '첫 화면을 관할 시도로 미리 선택' 은 지웠습니다.
   //     그 필터는 거점(baseCity)이 비어 있는 회원을 모두 걸러내서, 명단이 통째로 비어 보였습니다.
@@ -659,6 +660,7 @@ async function loadExtClubMap(){
   }catch(e){console.warn('extClubMap',e);}
 }
 function tab(n){
+  try{const u=new URL(location.href);u.searchParams.set('tab',String(n));history.replaceState(null,'',u.toString())}catch(e){}   // [화면 주소] 탭 주소 고정 (뒤로가기·공유·알림 링크)
   [1,2,3,4,5,6,7,8,9,10].forEach(i=>{
     document.getElementById('t'+i).classList.toggle('on',i===n);
     document.getElementById('v'+i).style.display=i===n?'block':'none';

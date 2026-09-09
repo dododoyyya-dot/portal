@@ -88,7 +88,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260821"></script>
 <script src="career.js?v=20260907a"></script>
-<script src="region_map.js?v=20260907a"></script>
+<script src="region_map.js?v=20260909a"></script>
 <script>
 KFDF.initApp();
 const AUTH = firebase.auth();
@@ -2005,6 +2005,8 @@ AUTH.onAuthStateChanged(async u=>{
   try{ await pfAutoAdult(u.uid,d); }catch(e){ console.warn('adult convert',e); }
   document.getElementById('myCard').style.display='block';
   document.getElementById('myName').textContent=d.name;
+  // [화면 주소] mypage.html#상자ID 로 들어오면(알림 링크 등) 자료가 채워진 뒤 그 상자로 이동하고 잠시 강조
+  (function(){try{const h=(location.hash||'').replace('#','');if(!h)return;setTimeout(function(){const el=document.getElementById(h);if(!el)return;el.scrollIntoView({block:'start'});el.style.transition='box-shadow .3s';el.style.boxShadow='0 0 0 4px #ffd166';setTimeout(function(){el.style.boxShadow=''},2600)},700)}catch(e){}})();
   (function(){const b=document.getElementById('loginIdBtn');if(b)b.textContent=d.loginId?('아이디 '+d.loginId+' · 변경'):'아이디 설정'})();   // [아이디 로그인]
   (function(){const av=document.getElementById('myAvatar');if(av)av.textContent=String(d.name||'').trim().slice(0,1)})();   // [프로필] 아바타 첫 글자
   document.getElementById('mySub').textContent=d.region+' 권역 · '+(d.edu2026?'2026 자율연수 이수':'연수 미이수')+' · '+(/@(member|kids)\.kfdf\.local$/.test(d.email||'')?(d.contactEmail||'이메일 없음'):d.email)+(d.pendingEmail?' (변경 확인 대기: '+d.pendingEmail+')':'');

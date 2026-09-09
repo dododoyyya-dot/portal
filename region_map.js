@@ -16,6 +16,9 @@
   // 남한 해안선 근사 (경도·위도 → x=(lon-125.9)*88, y=(38.75-lat)*92) · viewBox 340x480
   var LAND='M66,89 L92,74 L106,64 L136,41 L176,40 L211,18 L224,14 L238,51 L264,87 L282,115 L304,147 L308,184 L312,216 L321,248 L304,276 L312,299 L299,327 L277,340 L255,345 L238,359 L220,368 L189,354 L172,368 L158,377 L141,382 L123,396 L97,391 L75,409 L53,396 L35,373 L44,345 L40,317 L57,290 L75,267 L57,248 L53,221 L26,198 L44,179 L75,175 L92,156 L70,138 L57,120 Z';
   var JEJU={cx:62,cy:452,rx:30,ry:13};
+  // [섬 2026-09-09] 본토 밖 섬 — 실제 위치(같은 투영) · 울릉도·독도는 실제 위치가 지도 밖(동쪽)이라 우상단 확대 상자로 표시
+  var ISLES=[{n:'강화',x:48,y:97,r:6},{n:'거제',x:236,y:358,r:8},{n:'남해',x:176,y:364,r:6},{n:'완도',x:74,y:410,r:5},{n:'진도',x:34,y:394,r:6}];
+  var INSET={x:236,y:8,w:98,h:70};
   // 권역 표식 위치(대략 중심)와 포인트 색
   var PIN={
     '서울·경기':{x:96,y:118,c:'#1f5fb2'},
@@ -25,11 +28,19 @@
     '경상':{x:240,y:258,c:'#7c3aed'},
     '제주':{x:104,y:452,c:'#c41e2f'}
   };
+  // 문자열에서 시도 이름(경남·부산 등)을 찾음 — 시도별 집계·필터용
+  var FULL={'서울특별시':'서울','인천광역시':'인천','경기도':'경기','강원특별자치도':'강원','강원도':'강원','대전광역시':'대전','세종특별자치시':'세종','충청북도':'충북','충청남도':'충남','광주광역시':'광주','전북특별자치도':'전북','전라북도':'전북','전라남도':'전남','부산광역시':'부산','대구광역시':'대구','울산광역시':'울산','경상북도':'경북','경상남도':'경남','제주특별자치도':'제주','제주도':'제주'};
+  function sidoOf(str){str=String(str||'');var best='',bi=-1;
+    for(var f in FULL){var i=str.indexOf(f);if(i>=0&&(bi<0||i<bi)){best=FULL[f];bi=i}}
+    if(best)return best;
+    for(var k in SIDO){if(k==='충청'||k==='전라'||k==='경상')continue;var j=str.indexOf(k);if(j>=0&&(bi<0||j<bi)){best=k;bi=j}}
+    return best;
+  }
   function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
   function tw(s){var n=0;for(var i=0;i<s.length;i++)n+=(s.charCodeAt(i)>255?1:0.55);return n}
 
   window.KFDF_MAP={
-    REGIONS:REGIONS,
+    REGIONS:REGIONS,SIDO:SIDO,sidoOf:sidoOf,
     // 주소·시도 문자열에서 권역 추정 ('경기도 김포시' → '서울·경기')
     guessRegion:function(str){
       if(!str)return '';
@@ -51,7 +62,16 @@
           +'<filter id="'+uid+'s" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#141d51" flood-opacity=".18"/></filter></defs>'
           +'<path d="'+LAND+'" fill="url(#'+uid+'l)" stroke="#9db8dd" stroke-width="2" stroke-linejoin="round"/>'
           +'<ellipse cx="'+JEJU.cx+'" cy="'+JEJU.cy+'" rx="'+JEJU.rx+'" ry="'+JEJU.ry+'" fill="url(#'+uid+'l)" stroke="#9db8dd" stroke-width="2"/>'
-          +'<text x="298" y="470" font-size="10" fill="#9db8dd" font-weight="700" letter-spacing="1">KOREA</text>';
+          +ISLES.map(function(i){return '<ellipse cx="'+i.x+'" cy="'+i.y+'" rx="'+i.r+'" ry="'+Math.max(3,i.r*0.7)+'" fill="url(#'+uid+'l)" stroke="#9db8dd" stroke-width="1.5"/>'}).join('')
+          // 울릉도·독도 확대 상자 (우상단)
+          +'<rect x="'+INSET.x+'" y="'+INSET.y+'" width="'+INSET.w+'" height="'+INSET.h+'" rx="8" fill="#fff" stroke="#c9d5e8" stroke-width="1.2" opacity=".92"/>'
+          +'<ellipse cx="'+(INSET.x+30)+'" cy="'+(INSET.y+34)+'" rx="9" ry="7" fill="url(#'+uid+'l)" stroke="#9db8dd" stroke-width="1.5"/>'
+          +'<text x="'+(INSET.x+30)+'" y="'+(INSET.y+56)+'" text-anchor="middle" font-size="9.5" font-weight="800" fill="#374151">울릉도</text>'
+          +'<ellipse cx="'+(INSET.x+72)+'" cy="'+(INSET.y+30)+'" rx="3.2" ry="2.4" fill="#1f5fb2" stroke="#1f5fb2"/><ellipse cx="'+(INSET.x+78)+'" cy="'+(INSET.y+33)+'" rx="2.2" ry="1.8" fill="#1f5fb2" stroke="#1f5fb2"/>'
+          +'<text x="'+(INSET.x+74)+'" y="'+(INSET.y+50)+'" text-anchor="middle" font-size="9.5" font-weight="900" fill="#141d51">독도</text>'
+          +'<text x="'+(INSET.x+INSET.w/2)+'" y="'+(INSET.y+13)+'" text-anchor="middle" font-size="8.5" font-weight="700" fill="#6b7280">동해 · 울릉도 · 독도</text>'
+          +'<text x="298" y="470" font-size="10" fill="#9db8dd" font-weight="700" letter-spacing="1">KOREA</text>'
+          +'<text x="'+(JEJU.cx)+'" y="'+(JEJU.cy+26)+'" text-anchor="middle" font-size="9.5" font-weight="800" fill="#374151">제주도</text>';
         REGIONS.forEach(function(r){
           var p=PIN[r],on=sel.indexOf(r)>=0;
           var cnt=(opts.counts&&opts.counts[r]!=null)?String(opts.counts[r]):'';
@@ -68,7 +88,12 @@
             +'</g>';
         });
         svg+='</svg>';
-        el.innerHTML=svg;
+        // [세부 지역] 권역이 선택되면 그 권역의 시도별 건수 칩을 지도 아래에 표시 (opts.subCounts {권역:{시도:건수}}, 칩 클릭 → opts.onSub(시도))
+        var subHtml='';
+        if(opts.subCounts&&sel.length===1&&opts.subCounts[sel[0]]){var sc=opts.subCounts[sel[0]];var keys=Object.keys(sc);
+          if(keys.length)subHtml='<div class="km-sub" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:8px">'+keys.map(function(k){var on=opts.sub===k;return '<button type="button" data-sub="'+esc(k)+'" style="border:1.5px solid '+(on?'#1f5fb2':'#dfe5ee')+';background:'+(on?'#1f5fb2':'#fff')+';color:'+(on?'#fff':'#141d51')+';border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:800;font-family:inherit;cursor:pointer">'+esc(k)+' <span style="font-weight:700;opacity:.8">'+esc(sc[k])+'</span></button>'}).join('')+'</div>'}
+        el.innerHTML=svg+subHtml;
+        el.querySelectorAll('.km-sub button').forEach(function(b){b.addEventListener('click',function(){var k=b.getAttribute('data-sub');opts.sub=(opts.sub===k)?'':k;draw();if(opts.onSub)opts.onSub(opts.sub)})});
         if(mode!=='display'){
           el.querySelectorAll('g[data-r]').forEach(function(g){
             g.addEventListener('click',function(){
@@ -87,6 +112,7 @@
       draw();
       return {
         get:function(){return sel.slice()},
+        setSub:function(k){opts.sub=k||'';draw()},
         set:function(arr){sel=(arr||[]).slice();draw()},
         setCounts:function(c){opts.counts=c;draw()}
       };
