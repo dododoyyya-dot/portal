@@ -916,10 +916,18 @@ async function go(){
   if(M==='L'){if(!email||!pw)return say('아이디(또는 이메일)와 비밀번호를 입력하세요')}
   else{if(!pw)return say('비밀번호를 입력하세요');if(pw.length<6)return say('비밀번호는 6자 이상이어야 합니다')}
   // [아이디 로그인] @ 가 없으면 아이디 → loginIds(비밀번호로 잠근 이메일 / 합성 주소) → 없으면 자녀 계정 도메인
-  if(M==='L'&&email.indexOf('@')<0){const r=await KFDF_IDLOGIN.resolve(DB,email,pw);if(!r)return say('아이디 또는 비밀번호가 올바르지 않습니다');email=r}
+  let _idn='',_idDoc=null;
+  if(M==='L'&&email.indexOf('@')<0){_idn=KFDF_IDLOGIN.norm(email);const r=await KFDF_IDLOGIN.lookup(DB,_idn,pw);_idDoc=r.data;if(!r.email)return say('아이디 또는 비밀번호가 올바르지 않습니다');email=r.email}
   try{
     if(M==='L'){
-      await AUTH.signInWithEmailAndPassword(email,pw);
+      try{await AUTH.signInWithEmailAndPassword(email,pw)}
+      catch(e0){
+        // [이메일 변경] 확인 링크로 이메일이 바뀐 뒤 처음 아이디 로그인 — 변경 예정 이메일(encNext)로 재시도하고 성공하면 매핑 승격
+        const nx=(_idDoc&&_idDoc.encNext)?await KFDF_IDLOGIN.dec(_idn,pw,_idDoc.encNext).catch(()=>null):null;
+        if(!nx)throw e0;
+        await AUTH.signInWithEmailAndPassword(nx,pw);
+        try{await DB.collection('loginIds').doc(_idn).update({enc:_idDoc.encNext,encNext:firebase.firestore.FieldValue.delete()})}catch(_){}
+      }
       location.href='mypage.html';
     }else{
       const name=document.getElementById('sName').value.trim();
@@ -1290,6 +1298,6 @@ function pickSchoolInto(id){
     © 2026 KOREA FLYING DISC FEDERATION. All rights reserved. &nbsp;|&nbsp; <a href="privacy.html" style="color:#9aa1ad">개인정보처리방침</a>
   </div>
 </div></footer>
-<script src="auth_ui.js?v=20260909a"></script>
+<script src="auth_ui.js?v=20260909b"></script>
 </body>
 </html>

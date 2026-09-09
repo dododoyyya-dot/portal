@@ -17,8 +17,10 @@
     function enc(id,pw,email){return key(id,pw).then(function(k){var iv=crypto.getRandomValues(new Uint8Array(12));return crypto.subtle.encrypt({name:'AES-GCM',iv:iv},k,new TextEncoder().encode(email)).then(function(ct){return b64(iv)+'.'+b64(ct)})})}
     function dec(id,pw,blob){var p=String(blob||'').split('.');return key(id,pw).then(function(k){return crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(p[0])},k,unb64(p[1]))}).then(function(pt){return new TextDecoder().decode(pt)})}
     // 아이디+비밀번호 → 로그인용 이메일. 문서가 없으면 자녀 계정 도메인, 비밀번호가 틀리면 null
-    function resolve(DB,id,pw){id=norm(id);return DB.collection('loginIds').doc(id).get().then(function(d){if(!d.exists)return id+DOM_KIDS;var x=d.data()||{};if(x.enc)return dec(id,pw,x.enc).catch(function(){return null});return x.email||(id+DOM_MEMBER)})}
-    return {norm:norm,valid:valid,enc:enc,dec:dec,resolve:resolve,DOM_MEMBER:DOM_MEMBER,DOM_KIDS:DOM_KIDS};
+    // lookup: {email, data} — data 는 loginIds 문서(없으면 null). email 은 resolve 와 같은 규칙
+    function lookup(DB,id,pw){id=norm(id);return DB.collection('loginIds').doc(id).get().then(function(d){if(!d.exists)return {email:id+DOM_KIDS,data:null};var x=d.data()||{};if(x.enc)return dec(id,pw,x.enc).then(function(e){return {email:e,data:x}}).catch(function(){return {email:null,data:x}});return {email:x.email||(id+DOM_MEMBER),data:x}})}
+    function resolve(DB,id,pw){return lookup(DB,id,pw).then(function(r){return r.email})}
+    return {norm:norm,valid:valid,enc:enc,dec:dec,resolve:resolve,lookup:lookup,DOM_MEMBER:DOM_MEMBER,DOM_KIDS:DOM_KIDS};
   })();
   var MENU=[
     {t:'연맹소개',h:'about.html',d:[
