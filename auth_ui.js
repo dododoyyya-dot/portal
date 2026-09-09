@@ -123,87 +123,100 @@
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',applySiteContent);else applySiteContent();
 
-  // ══════════ 업데이트 NEW 배지 (자동 감지) ══════════
-  // 공개 조회가 허용된 컬렉션의 '가장 최근 등록 시각'만 읽어, 회원이 마지막으로 본 시점보다
-  // 새 글이 있으면 상단 메뉴에 빨간 N 배지를 붙입니다. 해당 메뉴를 방문하면 그 배지만 사라집니다.
-  // · 읽는 값은 각 컬렉션에서 1건뿐이고, 결과는 10분간 브라우저에 캐시합니다.
-  // · 읽기 권한이 없거나 오류가 나면 조용히 넘어갑니다 (배지만 안 붙고 화면은 그대로).
-  var UPD_SRC=[
-    {menu:'대회',     col:'competitions',   field:'createdAt'},
-    {menu:'자격증',   col:'licenseNotices', field:'createdAt'},
-    {menu:'알림마당', col:'licenseNotices', field:'createdAt'},
-    {menu:'클럽',     col:'clubMeets',      field:'createdAt'}
+  // ══════════ [NEW 배지 2026-09-09] 항목 단위 추적 ══════════
+  //  · 공개 조회가 되는 컬렉션에서 최근 항목을 읽어(10분 캐시), 읽지 않은 항목이 있으면 상단 메뉴 → 하위 메뉴 → 목록의 그 항목에 N 배지를 붙입니다.
+  //  · 항목을 열면(목록에서 클릭, 또는 ?slot= ?post= ?id= 상세 주소로 진입) 그 항목만 읽음 처리되고, 하위·상단 배지의 숫자가 줄어듭니다. 모두 읽으면 배지가 사라집니다.
+  //  · 상세 페이지가 없는 항목(자격 공고·일정·교류전)은 그 목록 페이지를 보면 읽음 처리합니다(pageSeen).
+  //  · 목록 페이지는 행 요소에 data-newkey="항목ID" 만 붙이면 됩니다 (competition·staff·gallery·results 적용). 읽기 권한이 없거나 오류면 조용히 넘어갑니다.
+  //  · 처음 방문한 사람에게는 최근 14일치만 새 항목으로 봅니다. 읽음 표시는 이 브라우저(localStorage)에 저장됩니다.
+  var NEW_SRC=[
+    {menu:'대회',link:'competition.html',col:'competitions',field:'createdAt',limit:20,keys:function(d,id){return (d.slotIds&&d.slotIds.length)?d.slotIds:[id]},params:['slot']},
+    {menu:'대회',link:'staff.html',col:'competitionStaff',field:'createdAt',limit:20,params:['post']},
+    {menu:'대회',link:'gallery.html',col:'gallery',where:['status','==','published'],time:['at','updatedAt'],limit:40,params:['id']},
+    {menu:'대회',link:'results.html',col:'eventReports',where:['kind','==','comp'],time:['createdAt','at','updatedAt'],limit:40,params:['id']},
+    {menu:'대회',link:'results.html',col:'schoolClubEvents',time:['createdAt','updatedAt'],limit:40,params:['id']},
+    {menu:'자격증',link:'license.html',col:'licenseNotices',field:'createdAt',limit:12,pageSeen:true},
+    {menu:'알림마당',link:'notice.html',col:'licenseNotices',field:'createdAt',limit:12,pageSeen:true},
+    {menu:'알림마당',link:'calendar.html',col:'events',field:'createdAt',limit:20,pageSeen:true},
+    {menu:'클럽',link:'club.html',col:'clubMeets',field:'createdAt',limit:20,pageSeen:true}
   ];
-  var UPD_TTL=10*60*1000;          // 최신 등록시각 캐시 10분
-  var UPD_FIRST=14*24*60*60*1000;  // 처음 방문한 사람에게는 최근 14일치만 새 글로 봄
-  function updGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
-  function updSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
-  function updMs(v){
-    try{
-      if(!v)return 0;
-      if(v.toDate)return v.toDate().getTime();
-      if(v.seconds)return v.seconds*1000;
-      var t=Date.parse(v); return isNaN(t)?0:t;
-    }catch(e){return 0}
-  }
-  function updKeys(){
-    var seen={},out=[];
-    UPD_SRC.forEach(function(s){var k=s.col+'|'+s.field;if(!seen[k]){seen[k]=1;out.push(k)}});
-    return out;
-  }
-  function updFetch(cb){
-    var c=updGet('kfdfUpdCache');
-    if(c){try{var o=JSON.parse(c);if(o&&o.at&&(Date.now()-o.at)<UPD_TTL&&o.v){cb(o.v);return}}catch(e){}}
+  var NEW_TTL=10*60*1000,NEW_FIRST=14*24*60*60*1000,NEW_ITEMS=[];
+  function nGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+  function nSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+  function nMs(v){try{if(!v)return 0;if(v.toDate)return v.toDate().getTime();if(v.seconds)return v.seconds*1000;var t=Date.parse(v);return isNaN(t)?0:t}catch(e){return 0}}
+  function nHere(){return (location.pathname.split('/').pop()||'index.html').toLowerCase()}
+  function nSeen(){try{return JSON.parse(nGet('kfdfNewSeen')||'{}')||{}}catch(e){return {}}}
+  function nSaveSeen(o){var ks=Object.keys(o);if(ks.length>600){ks.sort(function(x,y){return (o[x]||0)-(o[y]||0)});ks.slice(0,ks.length-600).forEach(function(k){delete o[k]})}nSet('kfdfNewSeen',JSON.stringify(o))}
+  function nFirst(){var f=parseInt(nGet('kfdfNewFirst')||'0',10);if(!f){f=Date.now();nSet('kfdfNewFirst',String(f))}return f}
+  function nFetch(cb){
+    var c=nGet('kfdfNewCache');
+    if(c){try{var o=JSON.parse(c);if(o&&o.at&&(Date.now()-o.at)<NEW_TTL&&o.items){cb(o.items);return}}catch(e){}}
     if(!window.firebase||!firebase.firestore||!firebase.apps.length)return;
-    var db,keys=updKeys(),res={},left=keys.length;
-    try{db=firebase.firestore()}catch(e){return}
-    keys.forEach(function(k){
-      var p=k.split('|'),done=function(){if(--left===0){updSet('kfdfUpdCache',JSON.stringify({at:Date.now(),v:res}));cb(res)}};
+    var db;try{db=firebase.firestore()}catch(e){return}
+    var items=[],left=NEW_SRC.length;
+    function done(){if(--left===0){nSet('kfdfNewCache',JSON.stringify({at:Date.now(),items:items}));cb(items)}}
+    NEW_SRC.forEach(function(s){
       try{
-        db.collection(p[0]).orderBy(p[1],'desc').limit(1).get().then(function(sn){
-          res[k]=sn.size?updMs(sn.docs[0].data()[p[1]]):0;done();
-        },function(){res[k]=0;done()});
-      }catch(e){res[k]=0;done()}
+        var q=db.collection(s.col);
+        if(s.where)q=q.where(s.where[0],s.where[1],s.where[2]);
+        if(s.field)q=q.orderBy(s.field,'desc');
+        q.limit(s.limit||20).get().then(function(sn){
+          sn.forEach(function(doc){
+            var d=doc.data()||{},t=0;
+            if(s.field)t=nMs(d[s.field]);else (s.time||[]).some(function(f){t=nMs(d[f]);return t>0});
+            if(!t)return;
+            (s.keys?s.keys(d,doc.id):[doc.id]).forEach(function(k){items.push({k:String(k),t:t,link:s.link,menu:s.menu,page:!!s.pageSeen})});
+          });done();
+        },function(){done()});
+      }catch(e){done()}
     });
   }
-  function updHere(menuTitle){
-    var here=(location.pathname.split('/').pop()||'index.html').toLowerCase(),m=null;
-    for(var i=0;i<MENU.length;i++)if(MENU[i].t===menuTitle){m=MENU[i];break}
-    if(!m)return false;
-    if(m.h.toLowerCase()===here)return true;
-    return m.d.some(function(x){return x[1].split('#')[0].toLowerCase()===here});
+  function nUnread(){var seen=nSeen(),base=nFirst()-NEW_FIRST;return NEW_ITEMS.filter(function(it){return it.t>base&&!seen[it.k]})}
+  function nBadge(n,small){var b=document.createElement('span');b.className='kfdfNew';b.textContent=n>1?String(n):'N';b.title='새로 올라온 내용 '+(n||1)+'건';
+    b.style.cssText='display:inline-block;min-width:14px;height:14px;line-height:14px;margin-left:4px;padding:0 4px;border-radius:999px;background:#C41E2F;color:#fff;font-size:9.5px;font-weight:900;letter-spacing:0;text-align:center;vertical-align:top'+(small?';font-size:9px;height:13px;line-height:13px;min-width:13px':'');return b}
+  function nFile(href){return String(href||'').split('#')[0].split('?')[0].split('/').pop().toLowerCase()}
+  function nRender(){
+    var un=nUnread(),byMenu={},byLink={},byKey={};
+    un.forEach(function(it){byMenu[it.menu]=(byMenu[it.menu]||0)+1;byLink[it.link]=(byLink[it.link]||0)+1;byKey[it.k]=1});
+    document.querySelectorAll('.kfdfNew').forEach(function(b){b.parentNode&&b.parentNode.removeChild(b)});
+    // 상단 메뉴
+    document.querySelectorAll('header .menu a.top').forEach(function(a){var t=a.textContent.trim();if(byMenu[t])a.appendChild(nBadge(byMenu[t]))});
+    // 하위 메뉴(드롭다운·메가메뉴·서브 내비) — 같은 파일을 가리키는 첫 링크에만
+    var done={};
+    ['header .menu .drop a','header .mega .mcol a:not(.mh)','.subnav .sn-links a'].forEach(function(sel){var seenIn={};
+      document.querySelectorAll(sel).forEach(function(a){var f=nFile(a.getAttribute('href'));if(!byLink[f]||seenIn[f])return;seenIn[f]=1;a.appendChild(nBadge(byLink[f],true))})});
+    // 목록 행
+    document.querySelectorAll('[data-newkey]').forEach(function(el){var k=el.getAttribute('data-newkey');if(!byKey[k])return;var host=el.querySelector('.ctitle,.strowname,.gl-title,.rs-title,h3,b')||el;host.appendChild(nBadge(1,true))});
   }
-  function updApply(res){
-    var nav=document.querySelector('header .menu');if(!nav)return;
-    var tops=nav.querySelectorAll('a.top');
-    UPD_SRC.forEach(function(s){
-      var latest=res[s.col+'|'+s.field]||0;if(!latest)return;
-      // 지금 보고 있는 메뉴는 '읽음' 처리하고 배지를 붙이지 않습니다
-      if(updHere(s.menu)){updSet('kfdfSeen_'+s.menu,String(latest));return}
-      var raw=updGet('kfdfSeen_'+s.menu);
-      var seen=raw?parseInt(raw,10):(Date.now()-UPD_FIRST);
-      if(!(latest>seen))return;
-      for(var i=0;i<tops.length;i++){
-        if(tops[i].textContent.trim()!==s.menu)continue;
-        if(tops[i].querySelector('.kfdfNew'))break;
-        var b=document.createElement('span');
-        b.className='kfdfNew';b.textContent='N';b.title='새로 올라온 내용이 있습니다';
-        b.style.cssText='display:inline-block;min-width:14px;height:14px;line-height:14px;'
-          +'margin-left:4px;padding:0 4px;border-radius:999px;background:#C41E2F;color:#fff;'
-          +'font-size:9.5px;font-weight:900;letter-spacing:0;text-align:center;vertical-align:top';
-        tops[i].appendChild(b);
-        break;
-      }
-    });
+  function nMark(keys){if(!keys||!keys.length)return;var seen=nSeen(),ch=false;keys.forEach(function(k){if(k&&!seen[k]){seen[k]=Date.now();ch=true}});if(ch){nSaveSeen(seen);nRender()}}
+  function nCheckUrl(){
+    try{var here=nHere(),qs=new URLSearchParams(location.search),ks=[];
+      NEW_SRC.forEach(function(s){if(s.link!==here)return;
+        if(s.pageSeen){NEW_ITEMS.forEach(function(it){if(it.link===here)ks.push(it.k)});return}
+        (s.params||[]).forEach(function(p){var v=qs.get(p);if(v)ks.push(v)});
+      });
+      nMark(ks);
+    }catch(e){}
   }
-  function updStart(tries){
+  function nStart(tries){
     if(!document.querySelector('header .menu'))return;
-    if(window.firebase&&firebase.firestore&&firebase.apps.length){updFetch(updApply);return}
-    if((tries||0)>14)return;                       // 최대 약 7초까지만 기다림
-    setTimeout(function(){updStart((tries||0)+1)},500);
+    if(window.firebase&&firebase.firestore&&firebase.apps.length){
+      nFetch(function(items){NEW_ITEMS=items||[];nCheckUrl();nRender();
+        try{
+          // 목록에 나중에 그려지는 행(data-newkey)에도 배지를 붙입니다
+          var mo=new MutationObserver(function(muts){for(var i=0;i<muts.length;i++){for(var j=0;j<muts[i].addedNodes.length;j++){var n=muts[i].addedNodes[j];if(n.nodeType===1&&(n.hasAttribute&&n.hasAttribute('data-newkey')||n.querySelector&&n.querySelector('[data-newkey]'))){nRender();return}}}});
+          mo.observe(document.body,{childList:true,subtree:true});
+        }catch(e){}
+      });return}
+    if((tries||0)>14)return;
+    setTimeout(function(){nStart((tries||0)+1)},500);
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){updStart(0)});
-  else updStart(0);
+  // 항목을 열면 읽음: 목록 행 클릭 · 상세 주소로 바뀔 때(replaceState) · 페이지 진입
+  document.addEventListener('click',function(e){try{var el=e.target&&e.target.closest?e.target.closest('[data-newkey]'):null;if(el)nMark([el.getAttribute('data-newkey')])}catch(x){}},true);
+  try{var _rs=history.replaceState;history.replaceState=function(){var r=_rs.apply(history,arguments);try{nCheckUrl()}catch(e){}return r}}catch(e){}
+  window.KFDF_NEW={isNew:function(k){return nUnread().some(function(it){return it.k===String(k)})},markSeen:function(k){nMark([].concat(k))},refresh:nRender,unread:nUnread};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){nStart(0)});
+  else nStart(0);
 
   // ── 로그인 전환 + 알림 배지 ──
   function badge(u){
