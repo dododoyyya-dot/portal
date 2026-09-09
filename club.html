@@ -7,27 +7,90 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <link rel="stylesheet" href="style.css?v=20260909b">
 <style>
-.clubcard{background:#fff;border:1px solid #e6eaf2;border-radius:18px;padding:18px 20px;margin-bottom:12px;box-shadow:0 1px 4px rgba(15,25,60,.04);transition:transform .18s,box-shadow .18s,border-color .18s}
-.clubcard:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(21,58,119,.12);border-color:#c9d8ef}
-.clubcard .cname{font-size:16px;font-weight:900;letter-spacing:-.2px}
+/* [클럽 UI 2026-09-09] 체육회 스타일 — 카드 그리드·KPI·권역 지도·2단 양식 */
+.clubcard{background:#fff;border:1px solid #e5e9f2;border-radius:16px;padding:0;margin:0;box-shadow:0 2px 10px rgba(20,29,81,.04);transition:transform .18s,box-shadow .18s,border-color .18s;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.clubcard:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(20,29,81,.10);border-color:#c9d8ef}
+.clubcard .cname{font-size:16px;font-weight:900;letter-spacing:-.2px;color:#141d51}
 .clubcard .cmeta2{font-size:12.5px;color:#6b7280;margin-top:6px;line-height:1.65}
-.cav{flex:0 0 46px;width:46px;height:46px;border-radius:14px;object-fit:cover;background:linear-gradient(135deg,#153A77,#1F4E9C);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:19px;overflow:hidden;box-shadow:0 3px 8px rgba(21,58,119,.18)}
+.clubcard .ct{display:flex;align-items:center;gap:12px;padding:16px 18px 10px}
+.clubcard .ct .ttl{min-width:0;flex:1}
+.clubcard .ct .cname{display:block;font-size:16.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.clubcard .ct .cname a{color:inherit;text-decoration:none}
+.clubcard .ct .loc{display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:700;color:#1f5fb2;margin-top:3px}
+.clubcard .ct .loc svg{flex:none}
+.clubcard .cchips{display:flex;gap:5px;flex-wrap:wrap;padding:0 18px}
+.clubcard .cintro{font-size:13px;color:#4b5563;line-height:1.65;padding:10px 18px 0;word-break:keep-all}
+.clubcard .cbody{padding:2px 18px 0}
+.clubcard .cbody details{margin-top:8px}
+.clubcard .cfoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 18px 14px;margin-top:auto;border-top:1px solid #eef1f6;background:#fafbfd}
+.clubcard .cfoot .who{font-size:12px;color:#6b7280;font-weight:700;flex:1;min-width:0;line-height:1.6}
+.clubcard .cfoot .who b{color:#141d51}
+.clubcard .cfoot .cbtn{padding:7px 13px;font-size:12.5px}
+.cav{flex:0 0 52px;width:52px;height:52px;border-radius:14px;object-fit:cover;background:linear-gradient(135deg,#141d51,#1f5fb2);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:20px;overflow:hidden;box-shadow:0 3px 8px rgba(20,29,81,.18)}
 .cav img{width:100%;height:100%;object-fit:cover;display:block}
 .cbtn{border:none;cursor:pointer;font-family:inherit;font-weight:800;font-size:13px;padding:9px 18px;border-radius:11px;transition:filter .15s,transform .1s}
 .cbtn:hover{filter:brightness(1.08)}
 .cbtn:active{transform:scale(.97)}
-.cbtn-main{background:linear-gradient(135deg,#1F4E9C,#153A77);color:#fff;box-shadow:0 3px 10px rgba(21,58,119,.25)}
-.cbtn-soft{background:#eef2f9;color:#153A77}
+.cbtn-main{background:linear-gradient(135deg,#1f5fb2,#141d51);color:#fff;box-shadow:0 3px 10px rgba(20,29,81,.25)}
+.cbtn-soft{background:#eef2f9;color:#141d51}
 .cbtn-teal{background:#0f766e;color:#fff}
-.cpill2{font-size:11.5px;font-weight:800;padding:3.5px 12px;border-radius:999px;color:#fff;letter-spacing:.1px}
-.sidochip{border:1.5px solid #d7e1f0;background:#fff;color:#3b5a86;font-weight:800;font-size:12.5px;padding:7px 15px;border-radius:999px;cursor:pointer;font-family:inherit;transition:.15s}
-.sidochip:hover{border-color:#153A77;color:#153A77}
-.sidochip.on{background:#153A77;color:#fff;border-color:#153A77;box-shadow:0 3px 8px rgba(21,58,119,.25)}
-.cfield{width:100%;padding:11px 14px;border:1.5px solid #dfe5ee;border-radius:11px;font-size:14px;font-family:inherit;margin-top:5px;transition:border-color .15s}
-.cfield:focus{outline:none;border-color:#1F4E9C}
+.cpill2{font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px;color:#fff;letter-spacing:.1px}
+.cpill2.o{background:#fff!important;color:#1f5fb2;border:1.5px solid #c9d8ef}
+.sidochip{border:1.5px solid #d7e1f0;background:#fff;color:#3b5a86;font-weight:800;font-size:12px;padding:5px 11px;border-radius:999px;cursor:pointer;font-family:inherit;transition:.15s}
+.sidochip:hover{border-color:#1f5fb2;color:#1f5fb2}
+.sidochip.on{background:#141d51;color:#fff;border-color:#141d51;box-shadow:0 3px 8px rgba(20,29,81,.25)}
+.cfield{width:100%;padding:11px 14px;border:1.5px solid #dfe5ee;border-radius:11px;font-size:14px;font-family:inherit;margin-top:5px;transition:border-color .15s,box-shadow .15s;background:#fff}
+.cfield:focus{outline:none;border-color:#1f5fb2;box-shadow:0 0 0 3px rgba(31,95,178,.12)}
 .clabel{display:block;font-size:13px;font-weight:800;color:#374151;margin-top:14px}
-.csec{background:#fff;border:1px solid #e6eaf2;border-radius:18px;padding:22px 24px;box-shadow:0 1px 4px rgba(15,25,60,.04)}
-</style>
+.csec{background:#fff;border:1px solid #e5e9f2;border-radius:16px;padding:22px 24px;box-shadow:0 2px 10px rgba(20,29,81,.04)}
+body[data-view] #clBody h3.sub{display:none}
+body[data-view] #clHead{display:none}
+.cl-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:0 0 18px}
+.cl-kpi>div{background:#fff;border:1px solid #e5e9f2;border-radius:14px;padding:16px 18px 14px 20px;box-shadow:0 2px 10px rgba(20,29,81,.04);position:relative;overflow:hidden}
+.cl-kpi>div::after{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--kc,#1f5fb2)}
+.cl-kpi i{font-style:normal;display:block;font-size:12px;font-weight:800;color:#6b7280;letter-spacing:.3px}
+.cl-kpi b{display:block;font-size:26px;font-weight:900;color:#141d51;letter-spacing:-.5px;line-height:1.15;margin-top:4px}
+.cl-kpi b small{font-size:13px;font-weight:800;color:#6b7280;margin-left:2px}
+@media(max-width:760px){.cl-kpi{grid-template-columns:repeat(2,1fr);gap:8px}.cl-kpi>div{padding:12px 14px 10px 16px}.cl-kpi b{font-size:21px}}
+.cl-find{display:grid;grid-template-columns:400px minmax(0,1fr);gap:20px;align-items:start}
+.cl-aside{position:sticky;top:76px}
+@media(max-width:980px){.cl-find{grid-template-columns:1fr}.cl-aside{position:static}}
+.cl-map{background:#fff;border:1px solid #e5e9f2;border-radius:16px;padding:12px 10px 8px;box-shadow:0 2px 10px rgba(20,29,81,.04)}
+.cl-map .lab{text-align:center;font-size:12px;color:#6b7280;font-weight:700;margin-top:6px;min-height:18px}
+#sidoChips{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.cl-panel{background:#fff;border:1px solid #e5e9f2;border-radius:16px;padding:18px 20px;box-shadow:0 2px 10px rgba(20,29,81,.04)}
+.cl-panel .ph{display:flex;align-items:center;gap:8px;font-size:14.5px;font-weight:900;color:#141d51;margin-bottom:6px}
+.cl-panel .ph::before{content:"";width:4px;height:16px;border-radius:2px;background:#1f5fb2;flex:none}
+.cl-panel .pd{font-size:12.5px;color:#6b7280;line-height:1.7;margin-bottom:10px}
+.cl-panel.gold .ph::before{background:#e6b422}.cl-panel.teal .ph::before{background:#0f766e}.cl-panel.navy{background:#f5f8fd}
+.cl-search{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #dfe5ee;border-radius:12px;padding:0 14px;height:46px;margin-bottom:10px;transition:border-color .15s,box-shadow .15s}
+.cl-search:focus-within{border-color:#1f5fb2;box-shadow:0 0 0 3px rgba(31,95,178,.12)}
+.cl-search svg{flex:none;color:#1f5fb2}
+.cl-search input{flex:1;border:none;outline:none;font:inherit;font-size:14.5px;min-width:0;background:transparent}
+.cl-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;min-height:26px}
+.cl-tools .stat{font-size:12.5px;font-weight:800;color:#6b7280}
+.cl-tools .fchip{display:inline-flex;align-items:center;gap:6px;background:#141d51;color:#fff;font-size:12px;font-weight:800;padding:4px 6px 4px 12px;border-radius:999px;border:none;font-family:inherit;cursor:pointer}
+.cl-tools .fchip i{font-style:normal;background:rgba(255,255,255,.2);border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:11px}
+#clubList.board{border-top:none;background:transparent;border-radius:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;align-items:start}
+#clubList .bempty{grid-column:1/-1;background:#fff;border:1px dashed #d7e1f0;border-radius:16px}
+#myClubList.board{border-top:none;background:transparent;border-radius:0;display:grid;gap:14px}
+#myClubList .clubcard{padding:18px 20px;display:block}
+#myClubList .bempty{background:#fff;border:1px dashed #d7e1f0;border-radius:16px}
+.cl-create{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+@media(max-width:900px){.cl-create{grid-template-columns:1fr}}
+.cl-form{background:#fff;border:1px solid #e5e9f2;border-radius:16px;padding:24px 26px;box-shadow:0 2px 10px rgba(20,29,81,.04)}
+.cl-steps{position:sticky;top:76px}
+.cl-steps .st{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #eef1f6;align-items:flex-start}
+.cl-steps .st:last-child{border-bottom:none;padding-bottom:0}
+.cl-steps .n{flex:none;width:28px;height:28px;border-radius:50%;background:#1f5fb2;color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center}
+.cl-steps .st b{display:block;font-size:13.5px;color:#141d51}
+.cl-steps .st span{font-size:12px;color:#6b7280;line-height:1.6;word-break:keep-all}
+.cl-meet{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:20px;align-items:start}
+@media(max-width:900px){.cl-meet{grid-template-columns:1fr}}
+#clPane4 .clubcard{padding:14px 16px;display:block}
+#clGate.gbox{text-align:center;font-weight:700}
+@media(max-width:760px){.clubcard .ct{padding:14px 14px 8px}.clubcard .cchips,.clubcard .cintro,.clubcard .cbody{padding-left:14px;padding-right:14px}.clubcard .cfoot{padding:10px 14px 12px}}
+</style></style>
 </head>
 <body>
 <div class="util"><div class="wrap">
@@ -107,9 +170,11 @@
   <h1>클럽</h1><p>시도 → 시군구 → 클럽으로 이어지는 연맹 공식 클럽 체계입니다. 클럽을 찾고, 가입하고, 직접 만들어 보세요.</p>
 </div></div>
 <section><div class="wrap">
+  <div id="clHead">
   <div class="sec-label">CLUB</div>
   <h2 class="sec-title">클럽 찾기 · 가입 · 만들기</h2>
   <p class="sec-desc">클럽 생성은 사무국(중앙) 승인 후 목록에 게시됩니다. 가입 신청은 클럽 관리자(클럽장) 승인으로 완료되며, 승인된 소속은 대회 참가 신청 시 자동으로 연동됩니다.</p>
+  </div>
   <div class="gbox" id="clGate" style="display:none"></div>
   <div id="clBody" style="display:none">
     <style>
@@ -127,10 +192,10 @@
 
     <div id="clPane1">
     <h3 class="sub">🏠 내 클럽</h3>
-    <div style="background:#f6f8fb;border:1.5px solid #dfe5ee;border-radius:12px;padding:14px 16px;margin-bottom:14px">
-      <b style="font-size:13px">🔑 내 초대 코드 받기</b>
-      <span style="color:#6b7280;font-size:12.5px"> — 클럽장에게 알려주면 클럽원으로 초대받을 수 있습니다 (48시간 유효 · 1회용)</span>
-      <div style="margin-top:6px"><button class="cbtn cbtn-soft" style="padding:5px 12px;font-size:12px" onclick="issueClubInviteCode()">코드 발급</button>
+    <div class="cl-panel gold" style="margin-bottom:14px">
+      <div class="ph">내 초대 코드 받기</div>
+      <div class="pd">클럽장에게 알려주면 클럽원으로 초대받을 수 있습니다 (48시간 유효 · 1회용)</div>
+      <div><button class="cbtn cbtn-soft" style="padding:5px 12px;font-size:12px" onclick="issueClubInviteCode()">코드 발급</button>
       <span id="myInviteCodeBox" style="margin-left:8px;font-size:13px;font-weight:700"></span></div>
     </div>
     <div id="myClubList" class="board"><div class="bempty">불러오는 중…</div></div>
@@ -138,13 +203,28 @@
     </div>
     <div id="clPane2" style="display:none">
     <h3 class="sub">🔍 클럽 찾기 <span id="clubStat" style="font-size:12.5px;font-weight:700;color:#8a919d;margin-left:8px"></span></h3>
-    <div id="sidoChips" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px"></div>
-    <input id="clSearch" oninput="renderClubs()" placeholder="🔍 클럽명 · 시군구 · 소개로 검색" style="width:100%;max-width:420px;padding:10px 14px;border:1.5px solid #dfe5ee;border-radius:10px;margin-bottom:12px;font-family:inherit;font-size:14px">
+    <div class="cl-kpi" id="clKpi">
+      <div style="--kc:#1f5fb2"><i>전국 정식 클럽</i><b><span id="kpiClubs">-</span><small>개</small></b></div>
+      <div style="--kc:#0f766e"><i>등록 인원</i><b><span id="kpiMembers">-</span><small>명</small></b></div>
+      <div style="--kc:#e6b422"><i>활동 시·도</i><b><span id="kpiSidos">-</span><small>곳</small></b></div>
+      <div style="--kc:#c41e2f"><i>내 소속 클럽</i><b><span id="kpiMine">-</span><small>개</small></b></div>
+    </div>
+    <div class="cl-find">
+      <aside class="cl-aside">
+        <div class="cl-map"><div id="clMap" style="max-width:470px;margin:0 auto"></div><div class="lab" id="clMapLab">권역을 누르면 시·도별 클럽 수가 표시됩니다</div></div>
+        <div id="sidoChips"></div>
+      </aside>
+      <div>
+        <div class="cl-search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="clSearch" oninput="renderClubs()" placeholder="클럽명 · 시군구 · 소개로 검색"></div>
+        <div class="cl-tools"><span class="stat" id="clubStat"></span><span id="clFilterChip"></span></div>
+        <div id="clubList" class="board"><div class="bempty">불러오는 중…</div></div>
+      </div>
+    </div>
     <div id="clubList" class="board"><div class="bempty">불러오는 중…</div></div>
 
-    <div style="margin-top:26px;background:#f6f8fb;border:1.5px solid #dfe5ee;border-radius:14px;padding:18px 20px">
-      <b style="font-size:14.5px">🔑 클럽 코드로 찾기 · 가입</b>
-      <div style="font-size:12.5px;color:#6b7280;margin:4px 0 10px;line-height:1.7">모든 클럽에는 생성 시 연맹이 발급하는 <b>클럽 코드</b>(예: 0001)가 부여됩니다. 코드를 알고 있다면 목록을 찾지 않고 바로 가입 신청할 수 있습니다.<br>KFDF 소속이 아닌 <b>타 단체(사단체) 클럽의 선수</b>도 연맹에서 발급받은 단체 코드를 입력해 회원으로 가입 신청할 수 있습니다.</div>
+    <div class="cl-panel navy" style="margin-top:20px">
+      <div class="ph">클럽 코드로 찾기 · 가입</div>
+      <div class="pd">모든 클럽에는 생성 시 연맹이 발급하는 <b>클럽 코드</b>(예: 0001)가 부여됩니다. 코드를 알고 있다면 목록을 찾지 않고 바로 가입 신청할 수 있습니다.<br>KFDF 소속이 아닌 <b>타 단체(사단체) 클럽의 선수</b>도 연맹에서 발급받은 단체 코드를 입력해 회원으로 가입 신청할 수 있습니다.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <input id="codeInput" placeholder="클럽 코드 입력 (예: 0001)" class="cfield" style="max-width:240px;margin-top:0;text-transform:uppercase">
         <button class="cbtn cbtn-teal" onclick="joinByCode()">코드로 가입 신청</button>
@@ -152,24 +232,24 @@
       <div id="codeMsg" style="font-size:13px;font-weight:700;margin-top:8px"></div>
     </div>
 
-    <div id="officerBox" style="display:none;margin-top:26px;background:#f3f6fb;border:1.5px solid #d3e0f2;border-radius:14px;padding:18px 22px">
-      <b style="font-size:14.5px;color:#153A77">🏛 연맹 임원 등록</b>
-      <div style="font-size:12.5px;color:#6b7280;margin:5px 0 12px;line-height:1.7">시도연맹·구군연맹 임원으로 등록하면 관할 지역의 클럽을 승인·관리할 수 있습니다. 신청 후 <b>상위 연맹(시도연맹 임원)</b> 또는 <b>사무국</b> 승인으로 확정됩니다.</div>
+    <div id="officerBox" class="cl-panel" style="display:none;margin-top:20px">
+      <div class="ph">연맹 임원 등록</div>
+      <div class="pd">시도연맹·구군연맹 임원으로 등록하면 관할 지역의 클럽을 승인·관리할 수 있습니다. 신청 후 <b>상위 연맹(시도연맹 임원)</b> 또는 <b>사무국</b> 승인으로 확정됩니다.</div>
       <div id="officerStatus"></div>
       <div id="officerApply" style="margin-top:10px"></div>
       <div id="officerApprovals" style="margin-top:12px"></div>
     </div>
 
-    <div id="sidoApproveBox" style="display:none;margin-top:20px;background:#fff8ed;border:1.5px solid #ecd9b0;border-radius:14px;padding:18px 22px">
-      <b style="font-size:14.5px">🛡 관할 클럽 승인 <span id="saSido" style="color:#b8860b"></span></b>
-      <div style="font-size:12.5px;color:#6b7280;margin:4px 0 10px">관할 지역의 클럽 생성 신청을 검토해 승인·반려합니다.</div>
+    <div id="sidoApproveBox" class="cl-panel gold" style="display:none;margin-top:20px">
+      <div class="ph">관할 클럽 승인 <span id="saSido" style="color:#b8860b"></span></div>
+      <div class="pd">관할 지역의 클럽 생성 신청을 검토해 승인·반려합니다.</div>
       <div id="sidoApproveList"></div>
     </div>
 
     </div>
     <div id="clPane3" style="display:none">
     <h3 class="sub">➕ 클럽 만들기</h3>
-    <div style="background:#fff;border:1.5px solid #dfe5ee;border-radius:14px;padding:22px 24px;max-width:640px">
+    <div class="cl-create"><div class="cl-form">
       <div style="display:flex;gap:8px;margin-bottom:16px">
         <label style="flex:1;cursor:pointer;border:2px solid #1F4E9C;background:#eef3fa;border-radius:12px;padding:12px 14px;display:block" id="ncTypeFedLbl">
           <input type="radio" name="ncType" value="federation" checked onchange="ncTypeChange()" style="width:auto;margin-right:6px">
@@ -215,14 +295,24 @@
       <button class="cbtn cbtn-main" style="margin-top:12px" onclick="createClub()">클럽 생성 신청</button>
       <span id="ncMsg" style="font-size:13px;font-weight:700;margin-left:8px"></span>
     </div>
+    <aside class="cl-panel cl-steps">
+      <div class="ph">클럽 등록 절차</div>
+      <div class="st"><span class="n">1</span><div><b>신청서 작성</b><span>클럽명·거점 시군구·소개·내규를 입력해 신청합니다. 신청 즉시 본인이 클럽장이 됩니다.</span></div></div>
+      <div class="st"><span class="n">2</span><div><b>사무국 · 시도연맹 승인</b><span>관할 시도연맹 임원 또는 사무국이 검토해 승인합니다. 승인 전에는 목록에 게시되지 않습니다.</span></div></div>
+      <div class="st"><span class="n">3</span><div><b>게시 · 회원 모집</b><span>승인 후 클럽 코드가 발급되고 목록에 게시됩니다. 코드·초대코드로 회원을 모을 수 있습니다.</span></div></div>
+      <div class="st"><span class="n">4</span><div><b>대회 참가 연동</b><span>승인된 소속은 대회 참가 신청 시 자동으로 연동되며, 클럽 홈에서 구성원을 관리합니다.</span></div></div>
+    </aside></div>
     </div>
     <div id="clPane4" style="display:none">
     <h3 class="sub">⚔️ 클럽 교류전</h3>
     <p style="font-size:13px;color:#6b7280;margin:0 0 16px;line-height:1.7"><b>1:1 도전장</b> — 클럽장이 다른 클럽에 도전장을 보내고, 상대가 수락하면 교류전이 성사됩니다. 결과를 기록하면 <b>클럽 전적(승·무·패)</b>이 쌓이고 랭킹에 반영됩니다.<br><b>🏟️ 합동 교류전</b> — 여러 클럽·여러 인원이 한자리에 모이는 친선 리그입니다. 클럽장이 개최하면 다른 클럽들이 팀 단위로 참가 신청할 수 있어요.</p>
+    <div class="cl-meet"><div>
     <div id="cmMine"></div>
-    <div id="cmMeets" style="margin-top:26px"></div>
-    <div id="cmRank" style="margin-top:22px"></div>
+    <div id="cmMeets" style="margin-top:22px"></div>
+    </div><div>
+    <div id="cmRank"></div>
     <div id="cmRecent" style="margin-top:22px"></div>
+    </div></div>
     </div>
   </div>
 </div></section>
@@ -233,6 +323,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260821"></script>
 <script src="site_config.js"></script>
+<script src="region_map.js?v=20260909b"></script>
 <script>
 KFDF.initApp();
 const AUTH=firebase.auth(),DB=firebase.firestore();
@@ -314,8 +405,36 @@ AUTH.onAuthStateChanged(async u=>{
 function renderSido(){
   document.getElementById('sidoChips').innerHTML=['전체'].concat(SIDOS).map(s=>{
     const v=s==='전체'?'':s;
-    return '<button type="button" class="sidochip'+(SIDO_F===v?' on':'')+'" onclick="SIDO_F=\''+v+'\';renderSido();renderClubs()">'+s+'</button>';
+    return '<button type="button" class="sidochip'+(SIDO_F===v?' on':'')+'" onclick="clPickSido(\''+v+'\')">'+s+'</button>';
   }).join('');
+}
+// [클럽 UI] 시도 칩 ↔ 권역 지도 동기화
+let REG_F='';
+function clPickSido(v){
+  SIDO_F=v||'';
+  REG_F=(v&&window.KFDF_MAP)?(KFDF_MAP.SIDO[v]||''):'';
+  renderSido();renderClubs();
+  if(window.__clMap){__clMap.set(REG_F?[REG_F]:[]);__clMap.setSub(SIDO_F)}
+  clMapLab();
+}
+function clMapLab(){
+  const l=document.getElementById('clMapLab');if(!l)return;
+  l.textContent=SIDO_F?(SIDO_F+' 클럽만 표시 중'):REG_F?(REG_F+' 권역 — 시·도를 눌러 좁힐 수 있습니다'):'권역을 누르면 시·도별 클럽 수가 표시됩니다';
+}
+function clMapRender(){
+  if(!window.KFDF_MAP||!document.getElementById('clMap'))return;
+  const cnt={},sub={};
+  ALLCLUBS.forEach(d=>{const c=d.data();if(c.hidden||c.clubType==='external'||c.status!=='승인')return;
+    const r=KFDF_MAP.SIDO[c.sido]||'';if(!r)return;cnt[r]=(cnt[r]||0)+1;sub[r]=sub[r]||{};sub[r][c.sido]=(sub[r][c.sido]||0)+1});
+  window.__clMap=KFDF_MAP.render('clMap',{mode:'single',selected:REG_F?[REG_F]:[],counts:cnt,subCounts:sub,sub:SIDO_F,
+    onChange:sel=>{REG_F=(sel&&sel[0])||'';if(!REG_F||(SIDO_F&&KFDF_MAP.SIDO[SIDO_F]!==REG_F))SIDO_F='';if(window.__clMap)__clMap.setSub(SIDO_F);renderSido();renderClubs();clMapLab()},
+    onSub:k=>{SIDO_F=k||'';renderSido();renderClubs();clMapLab()}});
+  clMapLab();
+}
+function clFilterChip(){
+  const el=document.getElementById('clFilterChip');if(!el)return;
+  const t=SIDO_F||REG_F;
+  el.innerHTML=t?'<button type="button" class="fchip" onclick="clPickSido(\'\')" title="필터 해제">'+kesc(t)+' <i>×</i></button>':'';
 }
 async function loadClubs(){
   try{
@@ -323,9 +442,11 @@ async function loadClubs(){
     ALLCLUBS=snap.docs;
     // 전국 집계 (숨김 클럽 포함, 승인 기준 — 임시클럽 제외)
     const tot=snap.docs.filter(d=>d.data().status==='승인').reduce((a,d)=>{a.c++;a.m+=(d.data().memberUids||[]).length;return a},{c:0,m:0});
-    const st=document.getElementById('clubStat');
-    if(st)st.textContent='— 전국 '+tot.c+'개 클럽 · '+tot.m+'명 등록';
+    const kp=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
+    kp('kpiClubs',tot.c);kp('kpiMembers',tot.m);
+    kp('kpiSidos',new Set(snap.docs.filter(d=>d.data().status==='승인'&&!d.data().hidden&&d.data().clubType!=='external').map(d=>d.data().sido).filter(Boolean)).size);
     renderClubs();
+    clMapRender();
   }catch(e){document.getElementById('clubList').innerHTML='<div class="bempty">불러오기 실패: '+kesc(e.message)+'</div>'}
 }
 function clubStatusOf(c){
@@ -338,26 +459,35 @@ function renderClubs(){
   const q=((document.getElementById('clSearch')||{}).value||'').trim().toLowerCase();
   const docs=ALLCLUBS.filter(d=>{const c=d.data();
     if(c.hidden||c.clubType==='external'||(SIDO_F&&c.sido!==SIDO_F))return false;
+    if(REG_F&&!SIDO_F&&window.KFDF_MAP&&(KFDF_MAP.SIDO[c.sido]||'')!==REG_F)return false;
     if(q&&[c.name,c.sido,c.gugun,c.intro].map(x=>String(x||'').toLowerCase()).join(' ').indexOf(q)<0)return false;
     return true});
-  el.innerHTML=!docs.length?'<div class="bempty">'+(SIDO_F?SIDO_F+' 지역에 ':'')+'등록된 클럽이 없습니다. 첫 클럽을 만들어 보세요!</div>'
+  const stEl=document.getElementById('clubStat');if(stEl)stEl.textContent=docs.length+'개 클럽'+(SIDO_F||REG_F?' (필터 적용)':'');
+  clFilterChip();
+  const PIN='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.3-6-11a6 6 0 0 1 12 0c0 5.7-6 11-6 11z"/><circle cx="12" cy="10" r="2.3"/></svg>';
+  el.innerHTML=!docs.length?'<div class="bempty">'+(SIDO_F?SIDO_F+' 지역에 ':REG_F?REG_F+' 권역에 ':'')+'등록된 클럽이 없습니다. 첫 클럽을 만들어 보세요!</div>'
     :docs.map(d=>{
       const c=d.data();const st=clubStatusOf(c);
       let act='';
-      if(st==='member')act='<span class="cpill2" style="background:#0f766e">✓ 소속</span>';
+      if(st==='member')act='<span class="cpill2" style="background:#0f766e">소속</span>';
       else if(st==='pending')act='<span class="cpill2" style="background:#b8860b">승인 대기</span>';
-      else act='<button class="cbtn cbtn-main" onclick="joinClub(\''+d.id+'\')">본인 가입</button>';
+      else act='<button class="cbtn cbtn-main" style="padding:8px 14px;font-size:12.5px;flex:none" onclick="joinClub(\''+d.id+'\')">가입 신청</button>';
       const cnt=(c.memberUids||[]).length+((c.childMembers||[]).length);
-      return '<div class="clubcard"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+cavHtml(c)+'<a href="clubhome.html?id='+d.id+'" style="text-decoration:none;color:inherit"><span class="cname">'+kesc(c.name)+'</span></a>'
-        +(c.status==='임시'?'<span class="cpill2" style="background:#b8860b" title="학생들이 만든 임시클럽 — 성인 회장 인수 후 정식 승인됩니다">🧪 임시클럽</span>':'')
-        +(c.clubType==='external'?'<span class="cpill2" style="background:#7c3aed" title="타 단체 소속 클럽 — 연맹 정식 클럽이 아닙니다">🔗 타단체'+(c.orgName?': '+kesc(c.orgName):'')+'</span>':'')
-        +'<span class="cpill2" style="background:#153A77">'+(c.clubType==='external'?'📍거점 ':'')+kesc(c.sido)+' '+kesc(c.gugun||'')+'</span>'
-        +'<span style="font-size:12px;color:#8a919d;font-weight:700">회원 '+cnt+'명 · 👑 '+kesc(c.ownerName||'')
-        +((c.temp||c.status==='임시')?' <b style="color:#8a5a00;font-size:11px">🧒학생(임시)</b>':' <b style="color:#0f766e;font-size:11px">✓성인</b>')+'</span>'
-        +'<span style="flex:1"></span><a class="cbtn cbtn-soft" style="padding:7px 14px;text-decoration:none;display:inline-block" href="clubhome.html?id='+d.id+'">🏠 클럽 홈</a>'+childJoinBtn(c,d.id)+act+'</div>'
-        +(c.intro?'<div class="cmeta2">'+kesc(c.intro)+'</div>':'')
-        +clubInfoHtml(c)
-        +(c.rulesText?'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">클럽 내규 보기</summary><div style="font-size:12.5px;color:#4b5563;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:10px 13px;margin-top:6px">'+kesc(c.rulesText)+'</div></details>':'')
+      const temp=(c.temp||c.status==='임시');
+      const chips=(c.status==='임시'?'<span class="cpill2" style="background:#b8860b" title="학생들이 만든 임시클럽 — 성인 회장 인수 후 정식 승인됩니다">임시클럽</span>':'<span class="cpill2 o">연맹 정식 클럽</span>')
+        +(c.clubType==='external'?'<span class="cpill2" style="background:#7c3aed" title="타 단체 소속 클럽 — 연맹 정식 클럽이 아닙니다">타단체'+(c.orgName?': '+kesc(c.orgName):'')+'</span>':'')
+        +(c.code?'<span class="cpill2 o" title="클럽 코드">코드 '+kesc(c.code)+'</span>':'');
+      return '<div class="clubcard" data-sido="'+kesc(c.sido||'')+'"><div class="ct">'+cavHtml(c)
+        +'<div class="ttl"><span class="cname"><a href="clubhome.html?id='+d.id+'">'+kesc(c.name)+'</a></span>'
+        +'<span class="loc">'+PIN+kesc(c.sido)+' '+kesc(c.gugun||'')+(c.clubType==='external'?' (활동 거점)':'')+'</span></div>'+act+'</div>'
+        +'<div class="cchips">'+chips+'</div>'
+        +(c.intro?'<div class="cintro">'+kesc(c.intro)+'</div>':'')
+        +'<div class="cbody">'+clubInfoHtml(c)
+        +(c.rulesText?'<details><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#153A77">클럽 내규 보기</summary><div style="font-size:12.5px;color:#4b5563;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:10px 13px;margin-top:6px">'+kesc(c.rulesText)+'</div></details>':'')
+        +'</div>'
+        +'<div class="cfoot"><span class="who">회원 <b>'+cnt+'</b>명 · 클럽장 <b>'+kesc(c.ownerName||'')+'</b>'
+        +(temp?' <span style="color:#8a5a00">학생(임시)</span>':' <span style="color:#0f766e">성인</span>')+'</span>'
+        +'<a class="cbtn cbtn-soft" style="text-decoration:none;display:inline-block" href="clubhome.html?id='+d.id+'">클럽 홈</a>'+childJoinBtn(c,d.id)+'</div>'
         +'</div>';
     }).join('');
 }
@@ -604,6 +734,7 @@ async function loadMyClubs(){
     const seen={};const items=[];
     own.docs.concat(mem.docs).concat(pend.docs).concat(inv.docs).forEach(d=>{if(seen[d.id])return;seen[d.id]=1;items.push(d)});
     MYCLUB_CACHE=items;
+    try{const kpm=document.getElementById('kpiMine');if(kpm)kpm.textContent=items.filter(d=>{const c=d.data();return c.ownerUid===KME.uid||(c.memberUids||[]).indexOf(KME.uid)>=0}).length}catch(e){}
     if(!items.length){el.innerHTML='<div class="bempty">소속된 클럽이 없습니다. 아래에서 클럽을 찾거나 직접 만들어 보세요.</div>';return}
     el.innerHTML=items.map(d=>{
       const c=d.data();
