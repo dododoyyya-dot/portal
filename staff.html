@@ -22,6 +22,14 @@
 .stprog>div{height:100%;background:linear-gradient(90deg,#1F4E9C,#0f766e);border-radius:999px}
 .daytab{border:1.5px solid #dfe5ee;background:#fff;border-radius:10px;padding:8px 16px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit}
 .daytab.on{background:#153A77;color:#fff;border-color:#153A77}
+/* [공고 시인성 2026-09-09] 핵심 정보 표(라벨·값) — 한눈에 읽히도록 2열, 휴대폰 1열 */
+.ckv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 28px;margin-top:12px;border-top:2px solid #141d51;border-bottom:1px solid #e5e9f2}
+.ckv>div{display:flex;gap:12px;padding:9px 2px;border-bottom:1px solid #eef1f6;font-size:13.5px;align-items:flex-start;min-width:0}
+.ckv>div>i{flex:none;width:64px;font-style:normal;font-weight:800;color:#141d51;font-size:12.5px;padding-top:1px}
+.ckv>div>span{color:#374151;font-weight:600;word-break:keep-all;line-height:1.6;min-width:0}
+.ckv>div.full{grid-column:1/-1}
+.ckv b{color:#111}
+@media (max-width:760px){.ckv{grid-template-columns:1fr;gap:0}.ckv>div>i{width:58px}}
 .stthumb{width:74px;height:74px;object-fit:cover;border-radius:10px;border:1px solid #dfe5ee;cursor:pointer}
 .sttbl{width:100%;border-collapse:collapse;font-size:12.5px}
 .sttbl th{border:1px solid #dfe5ee;padding:7px 9px;background:#f6f8fb;white-space:nowrap}
@@ -1320,14 +1328,17 @@ async function _renderDetailInner(isStale){
     +'<span class="stpill" style="background:#7c3aed">모집 기관: '+esc((p.author&&p.author.organization)||'')+'</span>'
     +'<b style="font-size:17px">'+esc(p.competitionName)+'</b>'
     +'<span style="flex:1"></span><button class="stbtn stbtn-ghost" onclick="document.getElementById(\'dtModal\').remove()">닫기 ✕</button></div>'
-    +'<div style="font-size:13px;color:#4b5563;margin-top:8px;line-height:1.9">'
-    +'📅 '+periodTxt(p)
-    +' &nbsp;·&nbsp; 📍 '+esc(p.location||'')+' &nbsp;·&nbsp; 🕐 경기 '+esc(p.time||'')+(p.gatherTime?' &nbsp;·&nbsp; 🕘 집합 '+esc(p.gatherTime):'')+' &nbsp;·&nbsp; 🥏 '+esc(p.sport||'')+(hasDayInfo(p)?' <span class="stpill" style="background:#b8860b;font-size:11px;padding:2px 9px">날짜별 상이 — 아래 날짜 탭 확인</span>':'')
-    +'<br>🗓 모집 마감: <b>'+fmtD(p.deadline)+'</b>'
-    +' &nbsp;·&nbsp; 🚌 교통비: '+esc(p.transportation||'-')+' &nbsp;·&nbsp; 🍱 식사: '+esc(p.meal||'-')
-    +'<br>🥋 심판복: '+esc(p.uniform||'-')+' &nbsp;·&nbsp; 🛏 숙박: '+esc(p.lodging||'-')
-    +'<br>🎒 준비물: '+esc((p.supplies||[]).join(', ')||'-')
-    +'<br>👤 담당: '+esc((p.author&&p.author.organization)||'')+(p.author&&p.author.contact?' · '+esc(mphone(p.author.contact)):'')+(manage&&p.author&&p.author.email?' · '+esc(p.author.email):'')
+    // [공고 시인성 2026-09-09] 이모지 나열 문단 → 라벨·값 표(.ckv). 항목은 종전과 동일(일정·장소·시간·집합·종목·마감·교통·식사·심판복·숙박·준비물·담당)
+    +'<div class="ckv">'
+    +'<div><i>일정</i><span><b>'+periodTxt(p)+'</b>'+(hasDayInfo(p)?' <span class="stpill" style="background:#b8860b;font-size:11px;padding:2px 9px">날짜별 상이 — 아래 날짜 탭 확인</span>':'')+'</span></div>'
+    +'<div><i>장소</i><span><b>'+esc(p.location||'')+'</b></span></div>'
+    +'<div><i>시간</i><span>경기 <b>'+esc(p.time||'-')+'</b>'+(p.gatherTime?' · 집합 <b>'+esc(p.gatherTime)+'</b>':'')+'</span></div>'
+    +'<div><i>종목</i><span>'+esc(p.sport||'-')+'</span></div>'
+    +'<div><i>모집 마감</i><span><b>'+fmtD(p.deadline)+'</b></span></div>'
+    +'<div><i>담당</i><span>'+esc((p.author&&p.author.organization)||'')+(p.author&&p.author.contact?' · '+esc(mphone(p.author.contact)):'')+(manage&&p.author&&p.author.email?' · '+esc(p.author.email):'')+'</span></div>'
+    +'<div><i>교통·식사</i><span>교통비 '+esc(p.transportation||'-')+' · 식사 '+esc(p.meal||'-')+'</span></div>'
+    +'<div><i>복장·숙박</i><span>심판복 '+esc(p.uniform||'-')+' · 숙박 '+esc(p.lodging||'-')+'</span></div>'
+    +'<div class="full"><i>준비물</i><span>'+esc((p.supplies||[]).join(', ')||'-')+'</span></div>'
     +'</div>'
     +((p.posters||[]).length?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+(p.posters||[]).map(ps=>'<img class="stthumb" src="'+esc(ps.url)+'" title="'+esc(ps.name||'')+'" onclick="window.open(this.src)">').join('')+'</div>':'')
     +(p.description?'<div style="font-size:13px;color:#374151;white-space:pre-wrap;background:#f8fafc;border-radius:10px;padding:11px 14px;margin-top:10px;line-height:1.7"><b style="font-size:12px;color:#153A77">📢 안내사항</b><br>'+esc(p.description)+'</div>':'')

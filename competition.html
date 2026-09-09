@@ -90,6 +90,22 @@ details.ccsec[open]>summary::after{content:'접기'}
 .cc2day{border:1px solid #e2e7f0;border-radius:10px;padding:8px 10px;margin-top:6px;background:#fafbfd}
 .cc2day>summary{cursor:pointer;font-weight:800;font-size:12.5px;color:#141d51}
 .cc2Sess input{padding:6px 8px;border:1px solid #d5dce8;border-radius:8px;font-size:12.5px;font-family:inherit}
+/* [공고 시인성 2026-09-09] 핵심 정보 표(라벨·값) — 한눈에 읽히도록 2열, 휴대폰 1열 */
+.ckv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 28px;margin-top:12px;border-top:2px solid #141d51;border-bottom:1px solid #e5e9f2}
+.ckv>div{display:flex;gap:12px;padding:9px 2px;border-bottom:1px solid #eef1f6;font-size:13.5px;align-items:flex-start;min-width:0}
+.ckv>div>i{flex:none;width:64px;font-style:normal;font-weight:800;color:#141d51;font-size:12.5px;padding-top:1px}
+.ckv>div>span{color:#374151;font-weight:600;word-break:keep-all;line-height:1.6;min-width:0}
+.ckv>div.full{grid-column:1/-1}
+.ckv b{color:#111}
+@media (max-width:760px){.ckv{grid-template-columns:1fr;gap:0}.ckv>div>i{width:58px}}
+.cday{display:block!important;width:100%;box-sizing:border-box;margin-top:10px}
+/* 목록 행: 날짜 배지 + 제목 + 메타 */
+.crow{display:flex;gap:14px;align-items:center;padding:14px 18px}
+.crow .cdate{flex:none;width:62px;text-align:center;background:#141d51;color:#fff;border-radius:12px;padding:7px 0 6px;line-height:1.15}
+.crow .cdate b{display:block;font-size:17px;font-weight:900}.crow .cdate span{font-size:11px;opacity:.85}
+.crow .cbody{flex:1;min-width:0}.crow .cbody .cmeta{margin-top:5px}
+.crow .cgo{flex:none;font-size:12.5px;font-weight:800;color:var(--blue);white-space:nowrap}
+@media (max-width:760px){.crow{gap:10px;padding:12px 14px}.crow .cdate{width:54px}.crow .cgo{display:none}}
 @media (max-width:560px){
   /* 일정/장소 열의 고정폭을 풀고, 표는 최소폭 확보 후 가로 스크롤 */
   table.tbl{min-width:520px;font-size:13.5px}
@@ -2036,7 +2052,7 @@ function compDayHtml(s){
   const ds=(s&&s.daySchedule)||{};const keys=Object.keys(ds).filter(d=>ds[d]&&(((ds[d].sessions||[]).length)||ds[d].gatherTime)).sort();
   if(!keys.length)return '';
   const one=document.body.classList.contains('oneslot');
-  return '<details class="cnote" style="background:#f6f8fb;border-color:#dfe5ee;color:#374151"'+(one||keys.length===1?' open':'')+'><summary style="cursor:pointer;font-weight:900;color:#153A77">일정 세부 <span style="font-weight:600;color:#8a919d;font-size:12px">— '+keys.length+'일 · 시간대별 종목·장소</span></summary>'
+  return '<details class="cnote cday" style="background:#f6f8fb;border-color:#dfe5ee;color:#374151"'+(one||keys.length===1?' open':'')+'><summary style="cursor:pointer;font-weight:900;color:#153A77">일정 세부 <span style="font-weight:600;color:#8a919d;font-size:12px">— '+keys.length+'일 · 시간대별 종목·장소</span></summary>'
     +keys.map(d=>'<div style="margin-top:8px"><b style="color:#141d51">'+cesc(d.slice(5).replace('-','.'))+(cc2DowOf(d)?'('+cc2DowOf(d)+')':'')+'</b>'+(ds[d].gatherTime?' <span style="font-size:12px;color:#8a919d">집합 <b>'+cesc(ds[d].gatherTime)+'</b></span>':'')
       +(ds[d].sessions||[]).map(x=>'<div style="display:flex;gap:8px;font-size:13px;margin-top:3px;padding-left:4px"><b style="min-width:52px;color:#1f5fb2">'+cesc(x.time||'-')+'</b><span>'+cesc(x.title||'')+(x.location?' <span style="color:#6b7280">· '+cesc(x.location)+'</span>':'')+(x.note?' <span style="color:#8a919d">('+cesc(x.note)+')</span>':'')+'</span></div>').join('')+'</div>').join('')+'</details>';
 }
@@ -2748,13 +2764,16 @@ function slotCardCompact(d,today){
   const closed=(s.deadline&&today>s.deadline)||act>=s.quota;
   const rc=ROLE_COLOR[s.role]||'#153A77';
   const applied=myEntries(s).length>0;
-  return '<div class="cslot" style="cursor:pointer" onclick="location.href=\'competition.html?slot='+d.id+'\'">'
+  // [공고 시인성] 날짜 배지 + 제목 + 메타 한 줄 (항목은 종전과 동일)
+  const dm=String(s.date||'').match(/^\d{4}-(\d{2})-(\d{2})$/);
+  const dateBadge='<div class="cdate"><b>'+(dm?(+dm[1])+'.'+dm[2]:'-')+'</b><span>'+(dm?cc2DowOf(s.date):'')+'</span></div>';
+  return '<div class="cslot crow" style="cursor:pointer" onclick="location.href=\'competition.html?slot='+d.id+'\'">'+dateBadge+'<div class="cbody">'
     +'<div class="chead">'+(s.host?'<span style="font-size:12px;font-weight:800;color:#6b7280">'+cesc(s.host)+' · </span>':'')+'<span class="ctitle">'+cesc(s.title)+'</span><span class="rbadge" style="background:'+rc+'">'+cesc(s.role)+(s.role==='참가'?' (선수)':'요원')+'</span>'
     +(closed?'<span class="rbadge" style="background:#8a919d">마감</span>':'')
     +(applied?'<span class="rbadge" style="background:#0f766e">✓ 신청함</span>':'')+(s.compKind==='schoolclub'?'<span class="rbadge" style="background:#0e7490">학교스포츠클럽</span>':'')
     +'</div>'
     +'<div class="cmeta"><span style="font-size:14.5px;font-weight:800">📍 <b>'+cesc(s.region)+(s.place?' · '+cesc(s.place):'')+'</b></span><span>📅 <b>'+cesc(s.date)+'</b></span><span>👥 신청 <b>'+act+'/'+s.quota+'</b></span>'+(s.deadline?'<span>⏳ 마감 <b>'+cesc(s.deadline)+'</b></span>':'')+'</div>'
-    +'<div style="text-align:right;margin-top:2px"><span style="font-size:12.5px;font-weight:800;color:var(--blue)">자세히 보기 →</span></div>'
+    +'</div><div class="cgo">자세히 보기 →</div>'
     +'</div>';
 }
 function slotCard(d,today){
@@ -2788,17 +2807,25 @@ function slotCard(d,today){
       else if(closed)action='<span class="cpill" style="background:#8a919d;color:#fff">마감</span>';
       else if(!eligible)action='<span style="color:#8a919d;font-size:12.5px;font-weight:700">'+(s.role==='심판'?'심판':'운영')+'요원 분야 지원 후 신청 가능 — <a href="jobs.html" style="color:var(--blue);font-weight:800">강사 활동 지원 →</a></span>';
       else action='<button class="cbtn cbtn-main" onclick="openApply(\''+d.id+'\')">'+(entry?'🏃 개인전 참가 신청':'✍ 신청하기')+'</button>';
+      // [공고 시인성 2026-09-09] 핵심 정보를 라벨·값 표(.ckv)로 — 일시·장소·신청/마감·개회식·참가비·주최/주관·후원/협찬. 참가비는 한 곳에만(종전엔 상단 메타와 아래 상자에 중복 표기)
+      const feeTxt=(s.entry&&s.entry.fees&&s.entry.fees.length)?s.entry.fees.map(f=>cesc(f.label+(f.amount?' '+f.amount:''))).join(' · '):(s.fee?cesc(s.fee):'');
+      const kv=(lab,val,full)=>val?'<div'+(full?' class="full"':'')+'><i>'+lab+'</i><span>'+val+'</span></div>':'';
+      const opn=(s.opening&&(s.opening.time||s.opening.place))?cesc(((s.opening.time||'')+(s.opening.place?' · '+s.opening.place:'')).trim()):'';
+      const sep='<span style="color:#9aa5b5"> · </span>';
+      const orgs=[s.host?'주최 <b>'+cesc(s.host)+'</b>':'',s.organizer?'주관 <b>'+cesc(s.organizer)+'</b>':''].filter(Boolean).join(sep);
+      const spons=[s.sponsor?'후원 <b>'+cesc(s.sponsor)+'</b>':'',s.partner?'협찬 <b>'+cesc(s.partner)+'</b>':''].filter(Boolean).join(sep);
       return '<div class="cslot"><div class="chead"><span class="ctitle">'+cesc(s.title)+'</span><span class="rbadge" style="background:'+rc+'">'+cesc(s.role)+(entry?' (선수)':'요원')+'</span>'
         +(closed&&!mines.length?'<span class="rbadge" style="background:#8a919d">마감</span>':'')+'</div>'
-        +'<div class="cmeta"><span style="font-size:14.5px;font-weight:800">📍 <b>'+cesc(s.region)+(s.place?' · '+cesc(s.place):'')+'</b></span><span>📅 <b>'+cesc(s.date)+'</b></span><span>👥 신청 <b>'+act+'/'+s.quota+'</b></span>'+(s.deadline?'<span>⏳ 마감 <b>'+cesc(s.deadline)+'</b></span>':'')+(s.fee?'<span>💰 <b>'+cesc(s.fee)+'</b></span>':'')+'</div>'
-        // [v3] 참가 지역제한 표기·제한 제거 (전국 누구나 신청 가능)
-        // [대회v2] 주최·주관·후원·협찬 / 개회식·대회 시간장소 / 참가비 구분 / 특수 부문
-        // [모바일 줄바꿈] 주최·주관·후원·협찬은 항목 단위로 묶어 줄바꿈 (라벨과 기관명이 분리되지 않게)
-        +((s.host||s.organizer||s.sponsor||s.partner)?'<div class="cnote" style="background:#f6f8fb;border-color:#dfe5ee;color:#374151">'+[s.host?'<span style="display:inline-block">주최 <b>'+cesc(s.host)+'</b></span>':'',s.organizer?'<span style="display:inline-block">주관 <b>'+cesc(s.organizer)+'</b></span>':'',s.sponsor?'<span style="display:inline-block">후원 <b>'+cesc(s.sponsor)+'</b></span>':'',s.partner?'<span style="display:inline-block">협찬 <b>'+cesc(s.partner)+'</b></span>':''].filter(Boolean).join('<span style="color:#9aa5b5">&nbsp;·&nbsp;</span>')+'</div>':'')
-        // [모바일 줄바꿈] 개회식·대회 시간도 항목 단위로 묶어 줄바꿈
-        +(((s.opening&&(s.opening.time||s.opening.place))||s.time)?'<div class="cnote" style="background:#f6f8fb;border-color:#dfe5ee;color:#374151">'+((s.opening&&(s.opening.time||s.opening.place))?'<span style="display:inline-block">🎪 개회식 <b>'+cesc(((s.opening.time||'')+(s.opening.place?' · '+s.opening.place:'')).trim())+'</b></span>':'')+(s.time?(((s.opening&&(s.opening.time||s.opening.place))?'<span style="color:#9aa5b5">&nbsp;·&nbsp;</span>':'')+'<span style="display:inline-block">🏟 대회시간 <b>'+cesc(s.time)+'</b></span>'):'')+'</div>':'')
-        +compDayHtml(s)   // [일자별 시간대] 날짜별 시간대 타임라인
-        +(s.entry&&s.entry.fees&&s.entry.fees.length?'<div class="cnote" style="background:#f0fdf4;border-color:#a7f3d0;color:#0f5132">💰 참가비: '+s.entry.fees.map(f=>cesc(f.label+(f.amount?' '+f.amount:''))).join(' · ')+'</div>':'')
+        +'<div class="ckv">'
+        +kv('일시','<b>'+cesc(s.date)+'</b>'+(s.time?' <span style="color:#6b7280">'+cesc(s.time)+'</span>':''))
+        +kv('장소','<b>'+cesc(s.region)+(s.place?' · '+cesc(s.place):'')+'</b>')
+        +kv('신청','<b>'+act+'/'+s.quota+'</b>'+(s.deadline?' <span style="color:#6b7280">· 마감 <b>'+cesc(s.deadline)+'</b></span>':''))
+        +kv('개회식',opn)
+        +kv('참가비',feeTxt,true)
+        +kv('주최·주관',orgs,true)
+        +kv('후원·협찬',spons,true)
+        +'</div>'
+        +compDayHtml(s)   // [일자별 시간대] 날짜별 시간대 타임라인 (전폭 블록 — 휴대폰에서도 표 바로 아래)
         /* [특수부문 제거] 🏷 선택 부문 안내 상자 미표시 (기존 데이터는 보존, 표출만 중단) */
         // [대회v3] 첨부자료(포스터·대진표·일정표) + 기타안내(시상품·기념품·보험)
         // [배치 개편 v2] 좌: 📌 안내문(넓게) / 우: 포스터 크게 + (여러 장이면 ◀▶ 슬라이드) + 그 아래 🏆 시상품 박스 — 좁은 화면 자동 세로

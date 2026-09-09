@@ -179,10 +179,19 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <button id="t7" onclick="tab(7)">📄 동의서 보관함</button>
       <button id="t8" onclick="tab(8)">🏫 경력 엑셀 업로드</button>
       <button id="t9" onclick="tab(9)">사이트 설정</button>
+      <button id="t10" onclick="tab(10)">입상 기록 승인</button>
       <a href="perm.html" style="margin-left:auto;display:inline-flex;align-items:center;padding:10px 20px;border-radius:10px;background:linear-gradient(135deg,#1F4E9C,#153A77);color:#fff;font-weight:800;font-size:14px;text-decoration:none;box-shadow:0 3px 10px rgba(21,58,119,.25)">🛡 권한 관리 센터 →</a>
     </div>
     <!-- ══════════ [학교스포츠클럽] v8: 교육청 등 외부 주최 대회 참가·입상 결과 업로드 → 회원 선수 경력 매칭 (2026-09-07) ══════════ -->
     <!-- ══════════ [사이트 설정] v9: 홈 문구·버튼, 관련 사이트, 연락처, 푸터를 화면에서 직접 수정 (siteContent/site → auth_ui.js 가 모든 페이지에 적용) ══════════ -->
+    <!-- ══════════ [입상 기록 승인] v10: 회원이 올린 입상·참가 기록 신청(awardClaims)을 검토해 경력에 기록 ══════════ -->
+    <div id="v10" style="display:none">
+      <div class="authbox" style="max-width:none;margin:0 0 14px">
+        <h3 style="margin:0 0 4px;font-size:17px">입상 기록 승인</h3>
+        <div style="font-size:12.5px;color:var(--gray);line-height:1.7">회원(또는 보호자가 자녀)이 마이페이지에서 증빙과 함께 올린 대회 참가·입상 기록입니다. 증빙을 확인하고 <b>승인</b>하면 그 회원의 경력에 참가(선수)·입상 기록이 남고 알림이 갑니다. 반려 시 사유가 전달됩니다. (보안 규칙 v20 필요)</div>
+      </div>
+      <div id="acBox" style="background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px"></div>
+    </div>
     <div id="v9" style="display:none">
       <div class="authbox" style="max-width:none;margin:0 0 14px">
         <h3 style="margin:0 0 4px;font-size:17px">사이트 설정</h3>
@@ -648,7 +657,7 @@ async function loadExtClubMap(){
   }catch(e){console.warn('extClubMap',e);}
 }
 function tab(n){
-  [1,2,3,4,5,6,7,8,9].forEach(i=>{
+  [1,2,3,4,5,6,7,8,9,10].forEach(i=>{
     document.getElementById('t'+i).classList.toggle('on',i===n);
     document.getElementById('v'+i).style.display=i===n?'block':'none';
   });
@@ -659,6 +668,48 @@ function tab(n){
   if(n===7)loadConsentBox();  // [동의서 보관함] 신규 탭
   if(n===8)scInit();  // [학교스포츠클럽] 결과 업로드 탭
   if(n===9)siteInit();  // [사이트 설정] 신규 탭
+  if(n===10)acAdminLoad();  // [입상 기록 승인] 신규 탭
+}
+// ══════════ [입상 기록 승인 2026-09-09] awardClaims 검토 — 승인 시 staffCareer 에 참가(선수)+입상 기록 (source 'award-claim') ══════════
+let AC_LIST=[],AC_FILTER='pending';
+async function acAdminLoad(f){
+  if(f)AC_FILTER=f;const box=document.getElementById('acBox');if(!box)return;box.innerHTML='<div style="color:#8a919d;font-size:13px">불러오는 중…</div>';
+  try{const q=await DB.collection('awardClaims').where('status','==',AC_FILTER).limit(200).get();AC_LIST=q.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))}catch(e){box.innerHTML='<div style="color:#C41E2F">불러오기 실패: '+esc(e.code||e.message)+' (보안 규칙 v20 게시 필요)</div>';return}
+  const dstr=t=>(t&&t.toDate)?t.toDate().toISOString().slice(0,10):'';
+  const tabs=[['pending','검토 대기'],['approved','승인됨'],['rejected','반려됨']].map(([k,l])=>'<button class="btn-sub" style="background:'+(AC_FILTER===k?'#153A77':'#8a919d')+';padding:5px 12px;font-size:12px" onclick="acAdminLoad(\''+k+'\')">'+l+'</button>').join(' ');
+  box.innerHTML='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">'+tabs+'<span style="font-size:12.5px;color:#6b7280">'+AC_LIST.length+'건</span></div>'
+    +(AC_LIST.length?'<div style="overflow:auto"><table class="tbl" style="font-size:12.5px;min-width:860px"><tr><th>신청일</th><th>신청 계정</th><th>대상</th><th>대회</th><th>종목·부문</th><th>결과</th><th>증빙</th><th>처리</th></tr>'
+      +AC_LIST.map(c=>'<tr><td style="white-space:nowrap">'+esc(dstr(c.createdAt))+'</td>'
+        +'<td>'+esc(c.email||'')+'<br><span style="color:#6b7280">'+esc(c.sido||'')+'</span></td>'
+        +'<td><b>'+esc(c.name||'')+'</b>'+(c.kidName?' <span style="font-size:11px;color:#8a919d">(자녀)</span>':'')+'<br><span style="color:#6b7280">'+esc(c.birth||'')+'</span></td>'
+        +'<td><b>'+esc(c.competitionName||'')+'</b><br><span style="color:#6b7280">'+esc(c.date||'')+(c.organizer?' · '+esc(c.organizer):'')+(c.team?' · '+esc(c.team):'')+'</span>'+(c.note?'<br><span style="color:#8a919d">'+esc(c.note)+'</span>':'')+'</td>'
+        +'<td>'+esc([c.sport,c.division].filter(Boolean).join(' '))+'</td><td><b style="color:#d97706">'+esc(c.result||'')+'</b></td>'
+        +'<td style="white-space:nowrap">'+(c.files||[]).map((f,i)=>'<a href="'+esc(f.url)+'" target="_blank" style="color:#153A77;font-weight:800">증빙'+(i+1)+'</a>').join(' ')+'</td>'
+        +'<td style="white-space:nowrap">'+(c.status==='pending'?'<button class="btn-sub" style="background:#0f766e;padding:4px 10px;font-size:12px" onclick="acDecide(\''+c.id+'\',true)">승인 · 경력 기록</button> <button class="btn-sub" style="background:#fff;color:#C41E2F;border:1px solid #f1c7cc;padding:4px 10px;font-size:12px" onclick="acDecide(\''+c.id+'\',false)">반려</button>'
+          :('<span style="color:#6b7280">'+esc(c.reviewedBy||'')+'<br>'+esc(dstr(c.reviewedAt))+(c.reason?'<br>사유: '+esc(c.reason):'')+'</span>'))+'</td></tr>').join('')
+      +'</table></div>':'<div style="color:#8a919d;font-size:13px">해당 건이 없습니다.</div>');
+}
+async function acDecide(id,ok){
+  const c=AC_LIST.find(x=>x.id===id);if(!c)return;
+  const me=(firebase.auth().currentUser||{}).email||'';
+  if(ok){
+    if(!window.CAREER||!CAREER.write){alert('경력 모듈(career.js)을 불러오지 못했습니다. 새로고침 후 다시 시도하세요.');return}
+    const isAward=c.result&&c.result!=='참가';
+    if(!confirm('['+(c.name||'')+'] '+(c.competitionName||'')+' · '+(c.result||'')+'\n승인하고 경력(참가'+(isAward?' + 입상':'')+')에 기록할까요?'))return;
+    try{
+      const base={uid:c.uid,name:c.name||'',date:c.date||'',competitionName:c.competitionName||'',sport:c.sport||'',location:'',organizer:c.organizer||'',division:c.division||'',team:c.team||'',source:'award-claim',kidName:c.kidName||'',importId:'award:'+c.id};
+      await CAREER.write(DB,Object.assign({},base,{role:'선수'}),me);
+      if(isAward)await CAREER.write(DB,Object.assign({},base,{role:'입상',result:c.result}),me);
+      await DB.collection('awardClaims').doc(id).update({status:'approved',reviewedBy:me,reviewedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      try{KFDF.notify(c.uid,'['+(c.competitionName||'')+'] 입상 기록 등록이 승인되어 경력에 기록되었습니다 — 마이페이지 [나의 선수 경력]에서 확인하세요','mypage.html#athBox')}catch(e){}
+    }catch(e){alert('승인 실패: '+(e.code||e.message));return}
+  }else{
+    const r=prompt('반려 사유 (신청자에게 전달됩니다)');if(r===null)return;
+    try{await DB.collection('awardClaims').doc(id).update({status:'rejected',reason:r,reviewedBy:me,reviewedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      try{KFDF.notify(c.uid,'['+(c.competitionName||'')+'] 입상 기록 등록이 반려되었습니다 — '+r,'mypage.html#athBox')}catch(e){}
+    }catch(e){alert('반려 실패: '+(e.code||e.message));return}
+  }
+  acAdminLoad();
 }
 // ══════════ [사이트 설정 2026-09-07] siteContent/site — 홈 히어로·버튼·관련 사이트·연락처·푸터 ══════════
 //   화면 기본값(HTML)은 그대로 두고, 여기서 저장한 값만 auth_ui.js 가 페이지 로드 때 덮어씁니다.
