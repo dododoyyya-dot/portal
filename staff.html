@@ -83,6 +83,24 @@ body.onepost #stWriteBox{display:none!important}   /* [1공고 1상세] PC 에�
 .strowitem:last-child>.strow{border-bottom:none}
 .strowitem.open>.strow{background:#f0f5ff;border-bottom:1px solid #d3e0f2}
 .strowitem:last-child>.strowbody{border-bottom:none}
+/* [공고 목록 행 2026-09-09] 날짜 배지 + 제목 + 상태 칩 — 체육회 게시판형 (긴 카드 대신 한 줄) */
+.crow{display:flex;gap:14px;align-items:center;padding:13px 16px;background:#fff;border:1px solid #e5e9f2;border-radius:14px;margin-bottom:8px;text-decoration:none;color:inherit;transition:border-color .15s,box-shadow .15s,transform .15s;cursor:pointer}
+.crow:hover{border-color:#1f5fb2;box-shadow:0 8px 22px rgba(20,29,81,.08);transform:translateY(-1px)}
+.crow.past{opacity:.7}
+.crow .cdate{flex:none;width:58px;text-align:center;background:#141d51;color:#fff;border-radius:12px;padding:7px 0 6px;line-height:1.1}
+.crow .cdate b{display:block;font-size:16px;font-weight:900;letter-spacing:-.3px}.crow .cdate span{font-size:10.5px;opacity:.8}
+.crow.past .cdate{background:#8a94a8}
+.crow .cbody{flex:1;min-width:0}
+.crow .ctitle{font-size:15.5px;font-weight:800;color:#141d51;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.crow .cmeta{font-size:12.5px;color:#6b7280;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crow .cchips{display:flex;gap:6px;flex:none;align-items:center}
+.chip{display:inline-block;font-size:11.5px;font-weight:800;border-radius:999px;padding:4px 10px;white-space:nowrap}
+.chip.open{background:#e0f2f1;color:#068081}.chip.soon{background:#fdeeee;color:#C41E2F}.chip.closed{background:#eef1f5;color:#6b7280}.chip.mine{background:#e6f4ea;color:#2f7d4a}.chip.wait{background:#fff6e0;color:#8a5a00}.chip.link{background:#f3eefc;color:#7c3aed}.chip.team{background:#eef3fa;color:#1f5fb2}
+.crow .cgo{flex:none;color:#aab3c0;font-size:18px}
+.crow.static{cursor:default}.crow.static:hover{border-color:#e5e9f2;box-shadow:none;transform:none}
+@media (max-width:760px){.crow{flex-wrap:wrap;gap:10px;padding:12px 12px}.crow .cdate{width:52px}.crow .cbody{flex:1 1 60%}.crow .cchips{flex-basis:100%;padding-left:62px;flex-wrap:wrap}.crow .cgo{display:none}}
+.strowlist{border:none;background:transparent;overflow:visible}
+.strhead{background:transparent;border:none;padding:8px 2px;font-size:13px;color:#5b6472}
 </style>
 </head>
 <body>
@@ -337,22 +355,25 @@ function postStatus(p){
   return ['모집 중','#0f766e'];
 }
 function rowHtml(p){
+  // [공고 목록 행 2026-09-09] 날짜 배지 + 제목 + 상태 칩 한 줄 (상세 내용은 공고 화면에서)
   const t=postTotals(p);
   const [stTxt,stCol]=postStatus(p);
-  const period=periodTxt(p);
-  // [목록간소화] 목록에는 요약만 표시합니다. 클릭하면 이 공고 하나만 보여주는 단독 상세 페이지(staff.html?post=id)로 이동합니다.
-  //   본문(expandRowHtml — 포스터 이미지 등)은 목록 DOM에 아예 넣지 않아, 공고가 많아도 목록 페이지 길이가 늘어나지 않습니다.
+  const ds=(p.dates||[]).map(x=>x.date).filter(Boolean).sort();
+  const d0=ds[0]||p.startDate||'',d1=ds[ds.length-1]||p.endDate||d0;
+  const today=new Date().toISOString().slice(0,10);
+  const past=!!(d1&&d1<today)||!!p.manualClosed;
+  const dm=String(d0).match(/^\d{4}-(\d{2})-(\d{2})$/);
+  const dow=d0?['일','월','화','수','목','금','토'][new Date(d0+'T00:00:00').getDay()]:'';
+  const meta=[(p.author&&p.author.organization)||'',periodTxt(p),p.location||''].filter(Boolean).join(' · ');
+  const chips='<span class="chip" style="background:'+stCol+'22;color:'+stCol+'">'+esc(stTxt)+'</span>'
+    +(!p.approved?'<span class="chip wait">승인대기</span>':'')
+    +(p.compId?'<span class="chip link">대회 연동</span>':'')
+    +'<span class="chip" style="background:#eef1f5;color:#374151">마감 '+esc(fmtD(p.deadline||'').slice(5)||'-')+' · '+t.applied+'/'+t.quota+'명</span>';
   return '<div class="strowitem" id="row_'+p.id+'" data-reg="'+stRegOf(p)+'">'
-    +'<div class="strow" data-newkey="'+p.id+'" onclick="location.href=\'staff.html?post='+p.id+'\'" style="cursor:pointer">'
-    +'<span class="stpill" style="background:'+stCol+';font-size:11px;padding:2px 9px">'+stTxt+'</span>'
-    +(!p.approved?'<span class="stpill" style="background:#C41E2F;font-size:11px;padding:2px 9px">승인대기</span>':'')
-    +(p.compId?'<span class="stpill" style="background:#7c3aed;font-size:11px;padding:2px 9px" title="대회 등록과 연동된 공고 — 포스터·장소는 대회 정보를 함께 표시">🔗 대회 연동</span>':'')
-    +'<span class="strowname">🏁 '+esc(p.recruitType||'심판·운영요원')+' 모집 · '+esc(p.competitionName)+'</span>'
-    +'<span class="strowmeta">'+esc((p.author&&p.author.organization)||'')+' · '+period+'</span>'
-    +'<span class="strowend">마감 '+fmtD(p.deadline||'')+' · <b>'+t.applied+'/'+t.quota+'명</b></span>'
-    +'<span class="strowangl">자세히 ›</span>'
-    +'</div>'
-    +dayListHtml(p,true)   // [날짜별 정보] 날짜별 값이 있는 공고만 한 줄씩
+    +'<a class="crow'+(past?' past':'')+'" data-newkey="'+p.id+'" href="staff.html?post='+p.id+'">'
+    +'<div class="cdate"><b>'+(dm?(+dm[1])+'.'+dm[2]:'-')+'</b><span>'+dow+'</span></div>'
+    +'<div class="cbody"><div class="ctitle">'+esc(p.recruitType||'심판·운영요원')+' 모집 · '+esc(p.competitionName)+'</div>'+(meta?'<div class="cmeta">'+esc(meta)+'</div>':'')+'</div>'
+    +'<div class="cchips">'+chips+'</div><span class="cgo">›</span></a>'
     +'</div>';
 }
 // [1공고 1상세] 목록에서 공고 하나를 눌렀을 때, 그 공고만 단독으로 보여줍니다 (staff.html?post=공고ID)
@@ -2718,6 +2739,6 @@ async function copyRoster(id){
   </div>
 </div></footer>
 <script src="region_map.js?v=20260907a"></script>
-<script src="auth_ui.js?v=20260909c"></script>
+<script src="auth_ui.js?v=20260909d"></script>
 </body>
 </html>

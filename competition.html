@@ -99,14 +99,32 @@ details.ccsec[open]>summary::after{content:'접기'}
 .ckv b{color:#111}
 @media (max-width:760px){.ckv{grid-template-columns:1fr;gap:0}.ckv>div>i{width:58px}}
 .cday{display:block!important;width:100%;box-sizing:border-box;margin-top:10px}
-/* 목록 행: 날짜 배지 + 제목 + 메타 */
-.crow{display:flex;gap:14px;align-items:center;padding:14px 18px}
-.crow .cdate{flex:none;width:62px;text-align:center;background:#141d51;color:#fff;border-radius:12px;padding:7px 0 6px;line-height:1.15}
-.crow .cdate b{display:block;font-size:17px;font-weight:900}.crow .cdate span{font-size:11px;opacity:.85}
-.crow .cbody{flex:1;min-width:0}.crow .cbody .cmeta{margin-top:5px}
-.crow .cgo{flex:none;font-size:12.5px;font-weight:800;color:var(--blue);white-space:nowrap}
-@media (max-width:760px){.crow{gap:10px;padding:12px 14px}.crow .cdate{width:54px}.crow .cgo{display:none}}
-@media (max-width:560px){
+/* [공고 목록 행 2026-09-09] 날짜 배지 + 제목 + 상태 칩 — 체육회 게시판형 (긴 카드 대신 한 줄) */
+.crow{display:flex;gap:14px;align-items:center;padding:13px 16px;background:#fff;border:1px solid #e5e9f2;border-radius:14px;margin-bottom:8px;text-decoration:none;color:inherit;transition:border-color .15s,box-shadow .15s,transform .15s;cursor:pointer}
+.crow:hover{border-color:#1f5fb2;box-shadow:0 8px 22px rgba(20,29,81,.08);transform:translateY(-1px)}
+.crow.past{opacity:.7}
+.crow .cdate{flex:none;width:58px;text-align:center;background:#141d51;color:#fff;border-radius:12px;padding:7px 0 6px;line-height:1.1}
+.crow .cdate b{display:block;font-size:16px;font-weight:900;letter-spacing:-.3px}.crow .cdate span{font-size:10.5px;opacity:.8}
+.crow.past .cdate{background:#8a94a8}
+.crow .cbody{flex:1;min-width:0}
+.crow .ctitle{font-size:15.5px;font-weight:800;color:#141d51;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.crow .cmeta{font-size:12.5px;color:#6b7280;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crow .cchips{display:flex;gap:6px;flex:none;align-items:center}
+.chip{display:inline-block;font-size:11.5px;font-weight:800;border-radius:999px;padding:4px 10px;white-space:nowrap}
+.chip.open{background:#e0f2f1;color:#068081}.chip.soon{background:#fdeeee;color:#C41E2F}.chip.closed{background:#eef1f5;color:#6b7280}.chip.mine{background:#e6f4ea;color:#2f7d4a}.chip.wait{background:#fff6e0;color:#8a5a00}.chip.link{background:#f3eefc;color:#7c3aed}.chip.team{background:#eef3fa;color:#1f5fb2}
+.crow .cgo{flex:none;color:#aab3c0;font-size:18px}
+.crow.static{cursor:default}.crow.static:hover{border-color:#e5e9f2;box-shadow:none;transform:none}
+@media (max-width:760px){.crow{flex-wrap:wrap;gap:10px;padding:12px 12px}.crow .cdate{width:52px}.crow .cbody{flex:1 1 60%}.crow .cchips{flex-basis:100%;padding-left:62px;flex-wrap:wrap}.crow .cgo{display:none}}
+/* [개별 화면 2026-09-09] ?view=list | entry | manage — 화면 하나만 표시. ?slot= 상세는 종전 oneslot 규칙 */
+body[data-view="list"] #secEntryHead,body[data-view="list"] #cGate,body[data-view="list"] #cBody{display:none!important}
+body[data-view="entry"] #secLive,body[data-view="entry"] #compAdminBox,body[data-view="entry"] #pcArcBox{display:none!important}
+body[data-view="manage"] #secLive,body[data-view="manage"] #secEntryHead,body[data-view="manage"] #cSlotList,body[data-view="manage"] #myEntryBox{display:none!important}
+/* 구형 심판·운영 위촉 공고 구역 — staff.html 로 일원화(데이터는 그대로) */
+#secRecruitHead,#soAdminBox,#stEmbedWrap,#cRefSlotList{display:none!important}
+/* 화면 모드에서는 타이틀 영역이 제목을 맡으므로 구역 안 소제목은 감춤 */
+body[data-view] #secLive>.sec-label,body[data-view] #secLive>.sec-title,body[data-view] #secLive>.sec-desc,body[data-view] #secEntryHead{display:none!important}
+.myent{background:#fff;border:1px solid #e5e9f2;border-radius:14px;padding:14px 16px;margin-bottom:16px}
+.myent h3{font-size:14px;font-weight:900;color:#141d51;margin:0 0 8px}@media (max-width:560px){
   /* 일정/장소 열의 고정폭을 풀고, 표는 최소폭 확보 후 가로 스크롤 */
   table.tbl{min-width:520px;font-size:13.5px}
   .tbl th,.tbl td{padding:9px 7px}
@@ -230,6 +248,7 @@ details.ccsec[open]>summary::after{content:'접기'}
       </div>
       <div id="pcArcHint" style="font-size:11.5px;color:#8a5a00;margin-top:6px"></div>
     </div>
+    <div id="myEntryBox"></div>
     <div class="board" id="cSlotList"><div class="bempty">불러오는 중…</div></div>
 
     <!-- ══════════ [구조개편] ② 심판·운영요원 모집 · 신청 (참가 모집과 완전 분리) ══════════ -->
@@ -394,6 +413,13 @@ function myEntries(s){
     return arr[arr.length-1];
   });
 }
+// [개별 화면] ?view= 에 따라 화면 하나만 — 상세(?slot=)는 제외
+function _kfdfApplyView(){try{if(new URLSearchParams(location.search).get('slot'))return;if(!window.KFDF_VIEW)return;
+  KFDF_VIEW.apply({def:'list',menu:'대회',menuHref:'competition.html?view=list',hashMap:{staff:'entry',entry:'entry',manage:'manage'},views:{
+    list:{title:'대회 일정 · 안내',desc:'등록된 대회 공고를 권역 지도와 함께 한눈에 봅니다. 공고를 누르면 상세 화면으로 이동합니다.'},
+    entry:{title:'대회 참가 신청',desc:'승인 회원은 본인·자녀, 클럽·학교·팀 단위로 참가 신청할 수 있습니다. 아래 공고를 눌러 신청하세요.'},
+    manage:{title:'대회 공고 등록 · 관리',desc:'권한자 전용 — 대회 참가모집 공고 등록·수정과 보호자 동의서 보관함.'}}})}catch(e){}}
+if(window.KFDF_VIEW)_kfdfApplyView();else document.addEventListener('DOMContentLoaded',_kfdfApplyView);
 AUTH.onAuthStateChanged(async u=>{
   loadLiveComps();  // [대회v2] 실시간 공고 피드 (비로그인 포함)
   const g=document.getElementById('cGate');
@@ -431,6 +457,7 @@ function initSoAdmin(){
   const box=document.getElementById('soAdminBox');if(box)box.style.display='';
   // [대회이전] 대회 공고 등록 박스도 함께 표시
   const cb=document.getElementById('compAdminBox');if(cb)cb.style.display='';
+  try{if(window.KFDF_VIEW)KFDF_VIEW.showAdminLinks()}catch(e){}   // [개별 화면] 서브 내비의 [공고 등록 · 관리] 링크 켜기
   cc2LoadMine();
 }
 // ══════════════ 심판·운영요원 모집 (새 양식 — competitionStaff 컬렉션) ══════════════
@@ -2816,53 +2843,71 @@ async function cc2Save(){
   btn.disabled=false;btn.textContent=CC2_EDIT?'💾 수정 저장':'🏆 공고 등록';
 }
 // [대회v2] 실시간 대회 공고 피드 — 로그인 없이도 표시
+// ══ [공고 목록 행 2026-09-09] 공개 대회 목록(competitions) + 참가 공고(compSlots, 읽히면) → 날짜 배지·제목·상태 칩 한 줄 ══
+function compDday(r,today){
+  if(r.closed)return '<span class="chip closed">마감</span>';
+  if(r.deadline){const d=Math.ceil((new Date(r.deadline+'T00:00:00')-new Date(today+'T00:00:00'))/864e5);if(d<0)return '<span class="chip closed">마감</span>';if(d<=7)return '<span class="chip soon">D-'+d+'</span>'}
+  return '<span class="chip open">접수중</span>';
+}
+function compRow(r,today){
+  const dm=String(r.date||'').match(/^\d{4}-(\d{2})-(\d{2})$/);
+  const past=!!(r.end&&r.end<today);
+  const badge='<div class="cdate"><b>'+(dm?(+dm[1])+'.'+dm[2]:'-')+'</b><span>'+(dm?cc2DowOf(r.date):'')+'</span></div>';
+  const chips=(past?'<span class="chip closed">종료</span>':compDday(r,today))+(r.applied?'<span class="chip mine">신청함</span>':'')+(r.team?'<span class="chip team">단체전</span>':'');
+  const meta=[r.place,r.host].filter(Boolean).join(' · ');
+  const tag=r.href?'a':'div';
+  return '<'+tag+' class="crow'+(past?' past':'')+(r.href?'':' static')+'"'+(r.href?' href="'+r.href+'"':'')+(r.key?' data-newkey="'+cesc(r.key)+'"':'')+' data-reg="'+compRegOf(r.region)+'">'+badge
+    +'<div class="cbody"><div class="ctitle">'+cesc(r.title)+'</div>'+(meta?'<div class="cmeta">'+cesc(meta)+'</div>':'')+'</div>'
+    +'<div class="cchips">'+chips+'</div>'+(r.href?'<span class="cgo">›</span>':'')+'</'+tag+'>';
+}
+function compRowOfSlot(d,today,comp){
+  const s=d.data();const c=comp||{};
+  const mine=(typeof CME!=='undefined'&&CME)?myEntries(s).length>0:false;
+  return compRow({key:d.id,href:'competition.html?slot='+d.id,date:s.date||c.dateStart||'',end:c.dateEnd||s.date||'',title:s.title||c.title||'',place:s.place||c.place||'',host:s.host||c.host||'',region:s.region||c.sido||'',deadline:s.deadline||'',closed:!!(s.deadline&&s.deadline<today)||activeCount(s)>=s.quota,applied:mine,team:!!((s.teamDivs||[]).length)},today);
+}
 async function loadLiveComps(){
   const el=document.getElementById('liveComps');if(!el)return;
   try{
     const today=new Date().toISOString().slice(0,10);
-    const [sl,st]=await Promise.all([
-      DB.collection('compSlots').orderBy('date').limit(60).get(),
-      DB.collection('competitionStaff').where('approved','==',true).limit(30).get().catch(()=>null)
+    const [cs,sl]=await Promise.all([
+      DB.collection('competitions').orderBy('dateStart','desc').limit(80).get().catch(()=>null),
+      DB.collection('compSlots').orderBy('date').limit(80).get().catch(()=>null)
     ]);
-    const rows=[];
-    sl.docs.forEach(d=>{const s=d.data();
-      if(s.compId&&s.role!=='참가')return;  // 대회 묶음의 심판·운영은 접힘 (참가 공고 대표 표기)
-      const _tn=(s.teamDivs||[]).length; // [개인·단체 표시]
-      rows.push({date:s.date||'',end:s.date||'',title:s.title||'',kind:s.role==='참가'?'참가 모집':(s.role+'요원 모집'),
-        color:s.role==='참가'?'#153A77':(s.role==='심판'?'#7c3aed':'#b8860b'),
-        ind:s.role==='참가'&&((s.roles||[]).length>_tn),team:s.role==='참가'&&_tn>0,
-        done:!!(s.deadline&&s.deadline<today),place:(s.place?s.place+(s.region?' ('+s.region+')':''):(s.region||'')),href:'competition.html?slot='+d.id});});
-    if(st)st.docs.forEach(d=>{const s=d.data();
-      const ds=(s.dates||[]).map(x=>x.date).filter(Boolean).sort();
-      rows.push({date:ds[0]||s.startDate||'',end:ds[ds.length-1]||s.endDate||'',title:s.competitionName||'',kind:'심판·운영 모집',color:'#0f766e',
-        done:!!(s.manualClosed||(s.deadline&&s.deadline<today)),place:s.location||'',href:'staff.html?post='+d.id});});
-    rows.sort((x,y)=>String(x.date).localeCompare(String(y.date)));
-    const act=rows.filter(r=>!r.done&&(!r.end||r.end>=today));
-    const past=rows.filter(r=>r.done||(r.end&&r.end<today)).reverse();
-    const tr=r=>'<tr><td>'+cesc(r.date?(r.date.replace(/-/g,'.')+(r.end&&r.end!==r.date?' ~ '+r.end.slice(5).replace(/-/g,'.'):'')):'추후 공고')+'</td>'
-      +'<td class="l"><a href="'+r.href+'" style="color:inherit;text-decoration:none;font-weight:800">'+cesc(r.title)+'</a> <span style="font-size:11px;font-weight:800;color:#fff;background:'+r.color+';padding:2px 8px;border-radius:999px">'+r.kind+'</span>'
-      +(r.ind?' <span style="font-size:10.5px;font-weight:900;color:#1e3a8a;background:#e8effc;border:1px solid #c9d8ef;padding:1px 7px;border-radius:999px">🙋 개인전</span>':'')
-      +(r.team?' <span style="font-size:10.5px;font-weight:900;color:#0f5132;background:#e6f6ef;border:1px solid #b9ddcf;padding:1px 7px;border-radius:999px">👥 단체전</span>':'')
-      +(r.done?' <span style="font-size:11px;color:#8a919d;font-weight:800">마감</span>':'')+'</td>'
-      +'<td style="font-size:13.5px;font-weight:800;color:#374151">📍 '+cesc(r.place||'-')+'</td></tr>';
+    const slotMap={};if(sl)sl.docs.forEach(d=>slotMap[d.id]=d);
+    const rows=[],seen=new Set();
+    if(cs)cs.docs.forEach(cd=>{const c=cd.data();const sid=(c.slotIds||[])[0];const sd=sid?slotMap[sid]:null;if(sid)seen.add(sid);
+      if(sd){rows.push({html:compRowOfSlot(sd,today,c),date:c.dateStart||'',end:c.dateEnd||c.dateStart||''});return}
+      // 공고 문서를 못 읽는 경우(로그인 전)에도 공개 대회 정보로 행을 만들고 상세로 연결
+      rows.push({html:compRow({key:sid||'',href:sid?'competition.html?slot='+sid:'',date:c.dateStart||'',end:c.dateEnd||c.dateStart||'',title:c.title||'',place:c.place||'',host:c.host||'',region:c.sido||'',deadline:c.deadline||'',closed:!!(c.deadline&&c.deadline<today),team:!!((c.teamTypes||[]).length)},today),date:c.dateStart||'',end:c.dateEnd||c.dateStart||''});});
+    if(sl)sl.docs.forEach(d=>{const s=d.data();if(seen.has(d.id)||s.compId||s.role!=='참가')return;rows.push({html:compRowOfSlot(d,today),date:s.date||'',end:s.date||''})});
+    const act=rows.filter(r=>!r.end||r.end>=today).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const past=rows.filter(r=>r.end&&r.end<today).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
     el.innerHTML=(act.length||past.length)
-      ?('<div class="tblwrap"><table class="tbl"><tr><th style="width:24%">일정</th><th>공고</th><th style="width:22%">장소·지역</th></tr>'
-        +act.map(tr).join('')+past.slice(0,4).map(tr).join('')+'</table></div>'
-        +(past.length>4?'<div style="font-size:12px;color:#8a919d;margin-top:6px">지난 공고 '+(past.length-4)+'건 더 — 아래 목록·심판 페이지에서 확인</div>':''))
+      ?(act.map(r=>r.html).join('')+(past.length?'<div style="font-size:12.5px;font-weight:800;color:#8a919d;margin:14px 0 8px">지난 대회</div>'+past.slice(0,10).map(r=>r.html).join(''):''))
       :'<div class="bempty">등록된 대회 공고가 없습니다. 공고가 올라오면 이곳에 실시간 게시됩니다.</div>';
+    compMapRender();
   }catch(e){el.innerHTML='<div class="bempty">공고를 불러오지 못했습니다.</div>'}
+}
+// [참가 신청 화면] 내 신청 현황 — 신청한 공고를 위에 모아 보여 줍니다
+function renderMyEntryBox(){
+  const box=document.getElementById('myEntryBox');if(!box)return;
+  const today=new Date().toISOString().slice(0,10);
+  const mine=(CSLOTS||[]).filter(d=>d.data().role==='참가'&&myEntries(d.data()).length);
+  if(!mine.length){box.innerHTML='';return}
+  box.innerHTML='<div class="myent"><h3>내 신청 현황 ('+mine.length+'건)</h3>'+mine.map(d=>{const s=d.data();const names=myEntries(s).map(m=>m.name).filter(Boolean);
+    return compRow({key:'',href:'competition.html?slot='+d.id,date:s.date||'',end:s.date||'',title:s.title||'',place:names.join(' · '),host:'',region:s.region||'',deadline:s.deadline||'',closed:!!(s.deadline&&s.deadline<today),applied:true,team:!!(myEntries(s).some(m=>m.team))},today)}).join('')+'</div>';
 }
 // ══ [권역 지도 2026-09-09] 공고 목록을 권역별로 — 시도명(경남 등)·지역 문자열을 6개 권역으로 묶어 지도에 건수를 표시하고, 누르면 그 권역만 남김 ══
 let COMP_REG='';
 function compRegOf(s){try{return (window.KFDF_MAP?KFDF_MAP.guessRegion(String(s||'')):'')||''}catch(e){return ''}}
 function compMapFilter(){
-  document.querySelectorAll('#liveComps [data-reg],#cRefSlotList [data-reg]').forEach(x=>{x.style.display=(!COMP_REG||x.getAttribute('data-reg')===COMP_REG)?'':'none'});
+  document.querySelectorAll('#liveComps [data-reg]').forEach(x=>{x.style.display=(!COMP_REG||x.getAttribute('data-reg')===COMP_REG)?'':'none'});
   const lab=document.getElementById('compMapLab');if(lab)lab.textContent=COMP_REG?(COMP_REG+' 권역 공고만 표시 중 — 지도를 다시 누르면 전체'):'권역을 누르면 그 권역 공고만 보입니다';
 }
 function compMapRender(){
   const wrap=document.getElementById('compMapWrap'),host=document.getElementById('compMap');if(!wrap||!host||!window.KFDF_MAP)return;
   if(document.body.classList.contains('oneslot')||new URLSearchParams(location.search).get('slot')){wrap.style.display='none';return}
-  const items=[...document.querySelectorAll('#liveComps [data-reg],#cRefSlotList [data-reg]')];
+  const items=[...document.querySelectorAll('#liveComps [data-reg]')];
   if(!items.length){wrap.style.display='none';return}
   const counts={};KFDF_MAP.REGIONS.forEach(r=>counts[r]=0);items.forEach(x=>{const r=x.getAttribute('data-reg');if(counts[r]!=null)counts[r]++});
   const c2={};Object.keys(counts).forEach(r=>c2[r]='공고 '+counts[r]+'건');
@@ -2889,20 +2934,12 @@ async function loadSlots(){
     const linked=new Set();CCOMPS.forEach(cd=>(byComp[cd.id]||[]).forEach(d=>linked.add(d.id)));
     let html='';
     CCOMPS.forEach(cd=>{
-      const c=cd.data();
-      const slots=byComp[cd.id]||[];
-      const sports=(c.sports||[]).map(x=>'<span class="rbadge" style="background:'+(x.mode==='체험부스'?'#b8860b':'#153A77')+'">'+cesc(x.name)+(x.mode==='체험부스'?' 🎪체험부스':'')+'</span>').join(' ');
-      html+='<div data-reg="'+compRegOf(c.sido)+'" style="border:2px solid #b9cdec;border-radius:18px;padding:4px 16px 14px;margin-bottom:22px;background:#f8fbff">'
-        +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 4px 8px">'
-        +'<b style="font-size:17px">🏆 '+cesc(c.title)+'</b>'+sports
-        +'<span style="font-size:12.5px;color:#5b6472;font-weight:700">📅 '+cesc(c.dateStart)+(c.dateEnd&&c.dateEnd!==c.dateStart?' ~ '+cesc(c.dateEnd):'')+' · <span style="font-size:14px;font-weight:800;color:#374151">📍 '+cesc(c.place||'')+'</span></span></div>'
-        +(c.desc?'<div style="font-size:12.5px;color:#4b5563;padding:0 4px 8px;white-space:pre-line;word-break:keep-all;line-height:1.75">'+cesc(c.desc)+'</div>':'')
-        +((c.sports||[]).some(x=>x.mode==='체험부스')?'<div style="font-size:12.5px;font-weight:800;color:#8a5a00;background:#fff8ed;border:1px solid #ecd9b0;border-radius:9px;padding:8px 12px;margin:0 4px 8px">🎪 체험부스 종목은 신청 없이 현장에서 자유롭게 참여하실 수 있습니다.</div>':'')
-        +(slots.filter(d=>d.data().role==='참가').length?slots.filter(d=>d.data().role==='참가').map(d=>slotCardCompact(d,today)).join(''):'<div class="bempty" style="margin:4px">참가 모집 공고 준비 중</div>')
-        +'</div>';
+      const c=cd.data();const slots=(byComp[cd.id]||[]).filter(d=>d.data().role==='참가');
+      if(slots.length)html+=slots.map(d=>compRowOfSlot(d,today,c)).join('');
+      else html+=compRow({key:'',href:'',date:c.dateStart||'',end:c.dateEnd||c.dateStart||'',title:c.title||'',place:c.place||'',host:'참가 모집 공고 준비 중',region:c.sido||'',deadline:''},today);
     });
-    html+=snap.docs.filter(d=>!linked.has(d.id)&&d.data().role==='참가').map(d=>slotCardCompact(d,today)).join('');
-    el.innerHTML=html||'<div class="bempty">현재 모집 중인 대회 참가 공고가 없습니다.</div>';
+    html+=snap.docs.filter(d=>!linked.has(d.id)&&d.data().role==='참가').map(d=>compRowOfSlot(d,today)).join('');
+    renderMyEntryBox();    el.innerHTML=html||'<div class="bempty">현재 모집 중인 대회 참가 공고가 없습니다.</div>';
     // [구조개편] 심판·운영 위촉 공고(compSlots)는 별도 섹션에 렌더 — 참가 모집과 분리
     const refEl=document.getElementById('cRefSlotList');
     if(refEl){
@@ -2914,7 +2951,7 @@ async function loadSlots(){
     const _qs=new URLSearchParams(location.search).get('slot');
     if(_qs){
       const _d=CSLOTS.find(x=>x.id===_qs);
-      const _back='<div style="margin-bottom:12px"><a href="competition.html" style="font-weight:800;color:var(--blue);font-size:13.5px">← 전체 공고 목록</a></div>';
+      const _back='<div style="margin-bottom:12px"><a href="competition.html?view=list" style="font-weight:800;color:var(--blue);font-size:13.5px">← 전체 공고 목록</a></div>';
       if(_d){
         const _card=_back+slotCard(_d,today);
         if(_d.data().role==='참가'){el.innerHTML=_card;if(refEl)refEl.innerHTML='<div class="bempty">전체 공고 목록에서 확인하세요. <a href="competition.html" style="font-weight:800;color:var(--blue)">← 목록으로</a></div>';}
@@ -4022,6 +4059,6 @@ function tbRemoveMember(ti,mi){
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="region_map.js?v=20260907a"></script>
-<script src="auth_ui.js?v=20260909c"></script>
+<script src="auth_ui.js?v=20260909d"></script>
 </body>
 </html>

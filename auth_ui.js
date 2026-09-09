@@ -31,9 +31,10 @@
     {t:'사업안내',h:'business.html',d:[
       ['유소년 스포츠 기반구축사업','business.html#youth'],['학교체육 강습','business.html#school'],
       ['방과후 · 늘봄','business.html#after'],['교원연수 · 교재개발','business.html#train'],['학교 강습 신청','apply.html']]},
-    {t:'대회',h:'competition.html',d:[
-      ['대회 일정 · 안내','competition.html'],['참가 신청','competition.html#staff'],
-      ['심판 · 운영요원 모집','staff.html'],['대회 결과','results.html'],['사진첩','gallery.html']]},
+    {t:'대회',h:'competition.html?view=list',d:[
+      ['대회 일정 · 안내','competition.html?view=list'],['참가 신청','competition.html?view=entry'],
+      ['심판 · 운영요원 모집','staff.html'],['대회 결과','results.html'],['사진첩','gallery.html'],
+      ['공고 등록 · 관리','competition.html?view=manage','','admin']]},
     {t:'클럽',h:'club.html',d:[
       ['클럽 찾기 · 가입','club.html'],['클럽 만들기','club.html'],['내 클럽 · 가입 승인','club.html'],['클럽 교류전','club.html?tab=4']]},
     {t:'자격증',h:'license.html',d:[
@@ -46,13 +47,20 @@
       ['공지사항 · 공고','notice.html'],['연맹 일정 캘린더','calendar.html'],['자료실 (서식 다운로드)','archive.html'],['자주 묻는 질문','faq.html']]}
   ];
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+  // [개별 화면] 링크의 부가 속성 — x[2]: 인라인 스타일, x[3]==='admin': 권한자에게만(페이지가 .sn-admin 을 켬)
+  function linkAttr(x){return (x[2]?' style="'+x[2]+'"':'')+(x[3]==='admin'?' class="sn-admin" data-admin="1" hidden':'')}
+  function fileOf(h){return String(h||'').split('#')[0].split('?')[0].split('/').pop().toLowerCase()}
+  function viewOf(h){var m=String(h||'').match(/[?&]view=([^&#]+)/);return m?m[1]:''}
+  // 화면 기본값(뷰 이름이 없는 링크가 가리키는 화면)
+  var VIEW_DEF={'competition.html':'list'};
+  function curView(here){var v=(new URLSearchParams(location.search)).get('view')||'';if(!v){var h=(location.hash||'').replace('#','');if(h&&window.KFDF_VIEW&&KFDF_VIEW.hashMap&&KFDF_VIEW.hashMap[h])v=KFDF_VIEW.hashMap[h]}return v||VIEW_DEF[here]||''}
   function renderNav(){
     var nav=document.querySelector('header .menu');if(!nav)return;
     var here=(location.pathname.split('/').pop()||'index.html').toLowerCase();
     var html=MENU.map(function(m){
-      var act=(m.h.toLowerCase()===here)||m.d.some(function(x){return x[1].split('#')[0].toLowerCase()===here});
+      var act=(fileOf(m.h)===here)||m.d.some(function(x){return fileOf(x[1])===here});
       return '<div><a href="'+m.h+'" class="top'+(act?' active':'')+'">'+esc(m.t)+'</a>'
-        +'<div class="drop">'+m.d.map(function(x){return '<a href="'+x[1]+'"'+(x[2]?' style="'+x[2]+'"':'')+'>'+esc(x[0])+'</a>'}).join('')+'</div></div>';
+        +'<div class="drop">'+m.d.map(function(x){return '<a href="'+x[1]+'"'+linkAttr(x)+'>'+esc(x[0])+'</a>'}).join('')+'</div></div>';
     }).join('');
     // [체육회 스타일 2026-09-07] 우측 알약 버튼 묶음 (색은 style.css .navcta)
     html+='<div class="navcta"><a href="apply.html" class="cta">강습 신청</a><a href="jobs.html" class="cta cta2">강사신청</a></div>';
@@ -61,7 +69,7 @@
     try{
       var header=nav.closest('header');if(!header||header.querySelector('.mega'))return;
       var mega=document.createElement('div');mega.className='mega';
-      mega.innerHTML='<div class="wrap mega-in">'+MENU.map(function(m){return '<div class="mcol"><a class="mh" href="'+m.h+'">'+esc(m.t)+'</a>'+m.d.map(function(x){return '<a href="'+x[1]+'"'+(x[2]?' style="'+x[2]+'"':'')+'>'+esc(x[0])+'</a>'}).join('')+'</div>'}).join('')+'</div>';
+      mega.innerHTML='<div class="wrap mega-in">'+MENU.map(function(m){return '<div class="mcol"><a class="mh" href="'+m.h+'">'+esc(m.t)+'</a>'+m.d.map(function(x){return '<a href="'+x[1]+'"'+linkAttr(x)+'>'+esc(x[0])+'</a>'}).join('')+'</div>'}).join('')+'</div>';
       header.appendChild(mega);
       var tm=null;
       function open(){if(window.innerWidth<=1080)return;clearTimeout(tm);header.classList.add('mega-open')}
@@ -78,17 +86,43 @@
     var here=(location.pathname.split('/').pop()||'index.html').toLowerCase();
     if(here==='index.html'||here==='')return;
     var grp=null;
-    MENU.forEach(function(m){if(grp)return;var hit=(m.h.split('#')[0].toLowerCase()===here)||m.d.some(function(x){return x[1].split('#')[0].toLowerCase()===here});if(hit)grp=m});
+    MENU.forEach(function(m){if(grp)return;var hit=(fileOf(m.h)===here)||m.d.some(function(x){return fileOf(x[1])===here});if(hit)grp=m});
     if(!grp)return;
     var seen={},marked=false;
     var links=grp.d.filter(function(x){if(seen[x[1]])return false;seen[x[1]]=1;return true});
     var sn=document.createElement('div');sn.className='subnav';
     sn.innerHTML='<div class="wrap"><a class="sn-home" href="index.html" aria-label="홈"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></a>'
       +'<a class="sn-grp" href="'+grp.h+'">'+esc(grp.t)+'</a><div class="sn-links">'
-      +links.map(function(x){var f=x[1].split('#')[0].toLowerCase(),h=x[1].indexOf('#')>=0?x[1].slice(x[1].indexOf('#')):'';var on=!marked&&f===here&&(!h||h===location.hash||!location.hash);if(on)marked=true;return '<a href="'+x[1]+'"'+(on?' class="on"':'')+'>'+esc(x[0])+'</a>'}).join('')+'</div></div>';
+      +links.map(function(x){var f=fileOf(x[1]),lv=viewOf(x[1])||VIEW_DEF[f]||'',h=x[1].indexOf('#')>=0?x[1].slice(x[1].indexOf('#')):'';var on=!marked&&f===here&&(lv===curView(here))&&(!h||h===location.hash||!location.hash);if(on)marked=true;return '<a href="'+x[1]+'"'+(on?' class="on'+(x[3]==='admin'?' sn-admin':'')+'"':(x[3]==='admin'?' class="sn-admin"':''))+(x[3]==='admin'?' data-admin="1" hidden':'')+'>'+esc(x[0])+'</a>'}).join('')+'</div></div>';
     header.insertAdjacentElement('afterend',sn);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',renderNav);else renderNav();
+  // ══ [개별 화면 2026-09-09] KFDF_VIEW — 한 파일의 여러 구역을 주소 ?view=이름 으로 화면 하나씩 보여줍니다 ══
+  //   apply({def, hashMap:{앵커:view}, views:{name:{title,desc,crumb}}}) → body[data-view=name] 만 지정하고(구역 표시/숨김은 각 페이지 CSS),
+  //   타이틀 영역(h1·설명·빵부스러기)과 문서 제목을 그 화면에 맞게 바꿉니다. 옛 #앵커 주소로 들어오면 대응 화면으로 주소를 바꿔 줍니다.
+  window.KFDF_VIEW=(function(){
+    var hashMap={};
+    function get(def){var v=(new URLSearchParams(location.search)).get('view')||'';if(!v){var h=(location.hash||'').replace('#','');if(h&&hashMap[h])v=hashMap[h]}return v||def||''}
+    function apply(cfg){
+      cfg=cfg||{};hashMap=cfg.hashMap||{};KFDF_VIEW.hashMap=hashMap;
+      var v=get(cfg.def);if(!cfg.views||!cfg.views[v])v=cfg.def;
+      document.body.setAttribute('data-view',v);
+      var V=(cfg.views&&cfg.views[v])||{};
+      try{
+        var h1=document.querySelector('.phero h1'),p=document.querySelector('.phero p'),cr=document.querySelector('.phero .crumb');
+        if(V.title){if(h1)h1.textContent=V.title;document.title=V.title+' | 대한민국플라잉디스크연맹'}
+        if(V.desc&&p)p.textContent=V.desc;
+        if(cr&&V.title)cr.innerHTML='HOME &nbsp;›&nbsp; '+(cfg.menu?'<a href="'+esc(cfg.menuHref||'#')+'" style="color:inherit;text-decoration:none">'+esc(cfg.menu)+'</a> &nbsp;›&nbsp; ':'')+'<b>'+esc(V.title)+'</b>';
+        // 옛 #앵커 주소 → 화면 주소로 (뒤로가기 목록은 유지)
+        var h=(location.hash||'').replace('#','');if(h&&hashMap[h]&&!(new URLSearchParams(location.search)).get('view')){var u=new URL(location.href);u.searchParams.set('view',hashMap[h]);u.hash='';history.replaceState(null,'',u.toString())}
+      }catch(e){}
+      try{document.querySelectorAll('.subnav .sn-links a').forEach(function(a){var lv=(String(a.getAttribute('href')||'').match(/[?&]view=([^&#]+)/)||[])[1]||cfg.def;var f=String(a.getAttribute('href')||'').split('#')[0].split('?')[0].toLowerCase();var here=(location.pathname.split('/').pop()||'').toLowerCase();if(f===here)a.classList.toggle('on',lv===v)})}catch(e){}
+      return v;
+    }
+    // 권한자 전용 링크(sn-admin) 켜기 — 페이지가 권한을 확인한 뒤 호출
+    function showAdminLinks(){try{document.querySelectorAll('[data-admin="1"]').forEach(function(a){a.hidden=false;a.style.display=''})}catch(e){}}
+    return {get:get,apply:apply,showAdminLinks:showAdminLinks,hashMap:hashMap};
+  })();
   // ══ [사이트 설정 2026-09-07] 관리자 페이지 [사이트 설정]에서 저장한 siteContent/site 를 모든 페이지에 적용 ══
   //   · 상단 연락처(.util) · 푸터(footer .bottom / .links) · 관련 사이트(.rel) · 홈 히어로(문구·버튼)
   //   · 문서가 없거나 항목이 비어 있으면 HTML 에 적힌 기본값을 그대로 둡니다 (실패해도 화면 영향 없음)
@@ -130,7 +164,7 @@
   //  · 목록 페이지는 행 요소에 data-newkey="항목ID" 만 붙이면 됩니다 (competition·staff·gallery·results 적용). 읽기 권한이 없거나 오류면 조용히 넘어갑니다.
   //  · 처음 방문한 사람에게는 최근 14일치만 새 항목으로 봅니다. 읽음 표시는 이 브라우저(localStorage)에 저장됩니다.
   var NEW_SRC=[
-    {menu:'대회',link:'competition.html',col:'competitions',field:'createdAt',limit:20,keys:function(d,id){return (d.slotIds&&d.slotIds.length)?d.slotIds:[id]},params:['slot']},
+    {menu:'대회',link:'competition.html?view=list',col:'competitions',field:'createdAt',limit:20,keys:function(d,id){return (d.slotIds&&d.slotIds.length)?d.slotIds:[id]},params:['slot']},
     {menu:'대회',link:'staff.html',col:'competitionStaff',field:'createdAt',limit:20,params:['post']},
     {menu:'대회',link:'gallery.html',col:'gallery',where:['status','==','published'],time:['at','updatedAt'],limit:40,params:['id']},
     {menu:'대회',link:'results.html',col:'eventReports',where:['kind','==','comp'],time:['createdAt','at','updatedAt'],limit:40,params:['id']},
@@ -174,7 +208,7 @@
   function nUnread(){var seen=nSeen(),base=nFirst()-NEW_FIRST;return NEW_ITEMS.filter(function(it){return it.t>base&&!seen[it.k]})}
   function nBadge(n,small){var b=document.createElement('span');b.className='kfdfNew';b.textContent=n>1?String(n):'N';b.title='새로 올라온 내용 '+(n||1)+'건';
     b.style.cssText='display:inline-block;min-width:14px;height:14px;line-height:14px;margin-left:4px;padding:0 4px;border-radius:999px;background:#C41E2F;color:#fff;font-size:9.5px;font-weight:900;letter-spacing:0;text-align:center;vertical-align:top'+(small?';font-size:9px;height:13px;line-height:13px;min-width:13px':'');return b}
-  function nFile(href){return String(href||'').split('#')[0].split('?')[0].split('/').pop().toLowerCase()}
+  function nFile(href){var f=String(href||'').split('#')[0].split('?')[0].split('/').pop().toLowerCase();var m=String(href||'').match(/[?&]view=([^&#]+)/);return f+(m?'?view='+m[1]:'')}
   function nRender(){
     var un=nUnread(),byMenu={},byLink={},byKey={};
     un.forEach(function(it){byMenu[it.menu]=(byMenu[it.menu]||0)+1;byLink[it.link]=(byLink[it.link]||0)+1;byKey[it.k]=1});
@@ -191,7 +225,7 @@
   function nMark(keys){if(!keys||!keys.length)return;var seen=nSeen(),ch=false;keys.forEach(function(k){if(k&&!seen[k]){seen[k]=Date.now();ch=true}});if(ch){nSaveSeen(seen);nRender()}}
   function nCheckUrl(){
     try{var here=nHere(),qs=new URLSearchParams(location.search),ks=[];
-      NEW_SRC.forEach(function(s){if(s.link!==here)return;
+      NEW_SRC.forEach(function(s){if(nFile(s.link).split('?')[0]!==here)return;
         if(s.pageSeen){NEW_ITEMS.forEach(function(it){if(it.link===here)ks.push(it.k)});return}
         (s.params||[]).forEach(function(p){var v=qs.get(p);if(v)ks.push(v)});
       });
