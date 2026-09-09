@@ -16,9 +16,11 @@
   // 남한 해안선 근사 (경도·위도 → x=(lon-125.9)*88, y=(38.75-lat)*92) · viewBox 340x480
   var LAND='M66,89 L92,74 L106,64 L136,41 L176,40 L211,18 L224,14 L238,51 L264,87 L282,115 L304,147 L308,184 L312,216 L321,248 L304,276 L312,299 L299,327 L277,340 L255,345 L238,359 L220,368 L189,354 L172,368 L158,377 L141,382 L123,396 L97,391 L75,409 L53,396 L35,373 L44,345 L40,317 L57,290 L75,267 L57,248 L53,221 L26,198 L44,179 L75,175 L92,156 L70,138 L57,120 Z';
   var JEJU={cx:62,cy:452,rx:30,ry:13};
-  // [섬 2026-09-09] 본토 밖 섬 — 실제 위치(같은 투영) · 울릉도·독도는 실제 위치가 지도 밖(동쪽)이라 우상단 확대 상자로 표시
+  // [섬 2026-09-09] 본토 밖 섬 — 실제 위치(같은 투영)
   var ISLES=[{n:'강화',x:48,y:97,r:6},{n:'거제',x:236,y:358,r:8},{n:'남해',x:176,y:364,r:6},{n:'완도',x:74,y:410,r:5},{n:'진도',x:34,y:394,r:6}];
-  var INSET={x:236,y:8,w:98,h:70};
+  // 울릉도(130.87E,37.50N)·독도(131.87E,37.24N) — 같은 투영. 동해 구간(x>330)은 폭을 1/2로 줄여 지도 안에 실제 방향·순서대로 배치
+  var ESEA=function(x){return 330+(x-330)*0.5};
+  var ULL={x:ESEA(437),y:115},DOK={x:ESEA(525),y:139};
   // 권역 표식 위치(대략 중심)와 포인트 색
   var PIN={
     '서울·경기':{x:96,y:118,c:'#1f5fb2'},
@@ -57,20 +59,22 @@
       if(!el)return null;
       var uid='km'+Math.floor(Math.random()*1e6);
       function draw(){
-        var svg='<svg viewBox="0 0 340 480" style="width:100%;max-width:360px;display:block" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="권역 지도">'
+        var svg='<svg viewBox="0 0 450 480" style="width:100%;max-width:470px;display:block" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="권역 지도">'
           +'<defs><linearGradient id="'+uid+'l" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9f0fb"/><stop offset="1" stop-color="#cfe0f5"/></linearGradient>'
           +'<filter id="'+uid+'s" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#141d51" flood-opacity=".18"/></filter></defs>'
           +'<path d="'+LAND+'" fill="url(#'+uid+'l)" stroke="#9db8dd" stroke-width="2" stroke-linejoin="round"/>'
           +'<ellipse cx="'+JEJU.cx+'" cy="'+JEJU.cy+'" rx="'+JEJU.rx+'" ry="'+JEJU.ry+'" fill="url(#'+uid+'l)" stroke="#9db8dd" stroke-width="2"/>'
           +ISLES.map(function(i){return '<ellipse cx="'+i.x+'" cy="'+i.y+'" rx="'+i.r+'" ry="'+Math.max(3,i.r*0.7)+'" fill="url(#'+uid+'l)" stroke="#9db8dd" stroke-width="1.5"/>'}).join('')
-          // 울릉도·독도 확대 상자 (우상단)
-          +'<rect x="'+INSET.x+'" y="'+INSET.y+'" width="'+INSET.w+'" height="'+INSET.h+'" rx="8" fill="#fff" stroke="#c9d5e8" stroke-width="1.2" opacity=".92"/>'
-          +'<ellipse cx="'+(INSET.x+30)+'" cy="'+(INSET.y+34)+'" rx="9" ry="7" fill="url(#'+uid+'l)" stroke="#9db8dd" stroke-width="1.5"/>'
-          +'<text x="'+(INSET.x+30)+'" y="'+(INSET.y+56)+'" text-anchor="middle" font-size="9.5" font-weight="800" fill="#374151">울릉도</text>'
-          +'<ellipse cx="'+(INSET.x+72)+'" cy="'+(INSET.y+30)+'" rx="3.2" ry="2.4" fill="#1f5fb2" stroke="#1f5fb2"/><ellipse cx="'+(INSET.x+78)+'" cy="'+(INSET.y+33)+'" rx="2.2" ry="1.8" fill="#1f5fb2" stroke="#1f5fb2"/>'
-          +'<text x="'+(INSET.x+74)+'" y="'+(INSET.y+50)+'" text-anchor="middle" font-size="9.5" font-weight="900" fill="#141d51">독도</text>'
-          +'<text x="'+(INSET.x+INSET.w/2)+'" y="'+(INSET.y+13)+'" text-anchor="middle" font-size="8.5" font-weight="700" fill="#6b7280">동해 · 울릉도 · 독도</text>'
-          +'<text x="298" y="470" font-size="10" fill="#9db8dd" font-weight="700" letter-spacing="1">KOREA</text>'
+          // 동해·서해·남해 표기 + 울릉도·독도(실제 위치, 동해)
+          +'<text x="372" y="62" text-anchor="middle" font-size="12" font-weight="800" fill="#7f9cc4" letter-spacing="3">동 해</text>'
+          +'<text x="372" y="75" text-anchor="middle" font-size="7.5" font-weight="700" fill="#a9bdd9" letter-spacing="1">EAST SEA</text>'
+          +'<text x="24" y="250" text-anchor="middle" font-size="10" font-weight="800" fill="#a9bdd9" letter-spacing="2">서해</text>'
+          +'<text x="200" y="430" text-anchor="middle" font-size="10" font-weight="800" fill="#a9bdd9" letter-spacing="2">남해</text>'
+          +'<ellipse cx="'+ULL.x+'" cy="'+ULL.y+'" rx="7" ry="5.5" fill="url(#'+uid+'l)" stroke="#9db8dd" stroke-width="1.5"/>'
+          +'<text x="'+ULL.x+'" y="'+(ULL.y+17)+'" text-anchor="middle" font-size="9.5" font-weight="800" fill="#374151">울릉도</text>'
+          +'<ellipse cx="'+(DOK.x-2)+'" cy="'+DOK.y+'" rx="2.6" ry="2" fill="#1f5fb2" stroke="#1f5fb2"/><ellipse cx="'+(DOK.x+3)+'" cy="'+(DOK.y+2)+'" rx="1.9" ry="1.5" fill="#1f5fb2" stroke="#1f5fb2"/>'
+          +'<text x="'+DOK.x+'" y="'+(DOK.y+16)+'" text-anchor="middle" font-size="9.5" font-weight="900" fill="#141d51">독도</text>'
+          +'<text x="404" y="470" font-size="10" fill="#9db8dd" font-weight="700" letter-spacing="1">KOREA</text>'
           +'<text x="'+(JEJU.cx)+'" y="'+(JEJU.cy+26)+'" text-anchor="middle" font-size="9.5" font-weight="800" fill="#374151">제주도</text>';
         REGIONS.forEach(function(r){
           var p=PIN[r],on=sel.indexOf(r)>=0;

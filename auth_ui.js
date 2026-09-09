@@ -148,7 +148,7 @@
           var fl=document.querySelector('footer .links');if(fl&&f.links&&f.links.length)fl.innerHTML=f.links.filter(function(x){return x&&x.t&&x.h}).map(function(x){return '<a href="'+esc(x.h)+'">'+esc(x.t)+'</a>'}).join('');
           var fbrand=document.querySelector('footer .f-brand b');if(fbrand&&(f.org||cont.org))fbrand.textContent=(f.org||cont.org).replace(/^사단법인\s*/,'');}catch(e){}
         // 관련 사이트
-        try{var rel=document.querySelector('.rel .wrap');if(rel&&c.relSites&&c.relSites.length)rel.innerHTML='<b>관련 사이트</b>'+c.relSites.filter(function(x){return x&&x.name&&x.url}).map(function(x){return '<a href="'+esc(x.url)+'" target="_blank" rel="noopener">'+esc(x.name)+'</a>'}).join('')}catch(e){}
+        try{var rel=document.querySelector('.rel .wrap');if(rel&&c.relSites&&c.relSites.length)rel.innerHTML='<b>관련 사이트</b>'+c.relSites.filter(function(x){return x&&x.name&&x.url&&!/wfdf/i.test(x.name+' '+x.url)}).map(function(x){return '<a href="'+esc(x.url)+'" target="_blank" rel="noopener">'+esc(x.name)+'</a>'}).join('')}catch(e){}
         // 홈 히어로
         try{var h=c.hero||{};var se=document.querySelector('.hero .slogan-en');if(se&&h.slogan)se.innerHTML=esc(h.slogan)+(h.sloganEm?' <em>'+esc(h.sloganEm)+'</em>':'');
           var h1=document.querySelector('.hero h1');if(h1&&h.title){var t=esc(h.title);if(h.titleHi&&h.title.indexOf(h.titleHi)>=0)t=t.replace(esc(h.titleHi),'<span class="pt">'+esc(h.titleHi)+'</span>');h1.innerHTML=t}
