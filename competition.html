@@ -768,6 +768,7 @@ async function cfMatchMember(m,r){
   if(m.guardianUid)return {uid:m.guardianUid,kidName:m.name};
   if(m.uid&&!m.self)return {uid:m.uid};
   if(!m.birth)return null;
+  try{const hit=await taLookupKey(m.name,m.birth);if(hit)return hit.uid?{uid:hit.uid}:{uid:hit.guardianUid,kidName:hit.kidName}}catch(e){}   // [회원 색인] 관할 무관
   const admin=(typeof _cc2Admin==='function')?_cc2Admin():false;
   const scope=q=>admin?q:q.where('sidoKey','==',(CMY&&CMY.sido)||'__none__');
   const nm=String(m.name||'').trim(),nn=nm.replace(/\s+/g,'');
@@ -1757,6 +1758,25 @@ function taMatchClub(r){
   if(kk)return {guardianUid:kk.parentUid||kk.guardianUid||kk.uid||'',tag:'유소년'};
   return null;
 }
+// [회원 색인 조회] 성명+생년월일 → memberKeys (승인 회원만 조회 가능). 회원 본인 계정이면 {uid}, 보호자 계정의 자녀면 {guardianUid,kidName}
+async function taLookupKey(name,birth){
+  if(!name||!birth)return null;
+  try{const d=await DB.collection('memberKeys').doc(taNorm(name)+'|'+birth).get();if(!d.exists)return null;const x=d.data()||{};
+    if(x.kind==='child')return {guardianUid:x.uid,kidName:x.kidName||name};return {uid:x.uid,minor:!!x.minor}}catch(e){return null}
+}
+// 명단의 모든 줄 중 아직 회원 정보가 없는 줄을 색인으로 확인해 회원 표시(uid 보존). 담은 인원 수를 돌려줌
+async function taResolveMembers(){
+  let n=0;
+  for(const x of [...document.querySelectorAll('#taRosterBox > div')]){
+    if(x.dataset.self==='1'||x.dataset.uid||x.dataset.guardianUid)continue;
+    const name=((x.querySelector('.taR-name')||{}).value||'').trim(),birth=(x.querySelector('.taR-birth')||{}).value||'';
+    if(!name||!birth)continue;
+    const hit=await taLookupKey(name,birth);if(!hit)continue;
+    if(hit.uid){x.dataset.uid=hit.uid;if(!hit.minor)x.dataset.adult='1'}else if(hit.guardianUid)x.dataset.guardianUid=hit.guardianUid;
+    x.dataset.src='member';n++;
+  }
+  return n;
+}
 async function taImportXlsx(input){
   const f=input&&input.files&&input.files[0];if(!f)return;input.value='';
   if(typeof ExcelJS==='undefined'){alert('엑셀 라이브러리를 아직 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');return}
@@ -1776,9 +1796,10 @@ async function taImportXlsx(input){
       if(empty)empty.remove();
       taAddRow(v);added++;have.push({n:taNorm(r.name),b:r.birth});
     });
+    const linked=await taResolveMembers();   // [회원 색인] 클럽 명단에 없던 사람도 회원이면 회원으로
     // 번호 다시 매기기
     [...box.querySelectorAll('#taRosterBox > div')].forEach((x,i)=>{const s=x.querySelector('span');if(s&&/^\d+$/.test(s.textContent.trim()))s.textContent=String(i+1);x.style.marginTop=i?'6px':'0'});
-    alert('엑셀에서 '+added+'명을 담았습니다.'+(member?' (클럽 명단과 일치한 회원 '+member+'명)':'')+(dup?' · 이미 있는 '+dup+'명은 건너뜀':'')+(errors.length?'\n\n확인 필요:\n'+errors.slice(0,8).join('\n')+(errors.length>8?'\n… 외 '+(errors.length-8)+'건':''):'')+'\n\n비회원으로 표시된 팀원도 대회 종료 후 성명+생년월일로 회원 정보와 자동 연동되어 참가·입상 경력에 기록됩니다.');
+    alert('엑셀에서 '+added+'명을 담았습니다.'+((member+linked)?' (회원으로 확인 '+(member+linked)+'명)':'')+(dup?' · 이미 있는 '+dup+'명은 건너뜀':'')+(errors.length?'\n\n확인 필요:\n'+errors.slice(0,8).join('\n')+(errors.length>8?'\n… 외 '+(errors.length-8)+'건':''):'')+'\n\n비회원으로 표시된 팀원도 나중에 같은 성명·생년월일로 회원 가입하면 이 대회의 참가·입상 기록이 자동으로 경력에 연동됩니다.');
   }catch(e){alert('엑셀 읽기 실패: '+(e.message||e))}
 }
 async function taXlsxTemplate(){
@@ -1860,6 +1881,7 @@ async function submitTeam(){
     if(teamType==='학교팀'&&!teamOrg)return alert('소속 학교를 입력해주세요.');
     teamSchoolCode=(teamType==='학교팀'&&orgEl&&orgEl.dataset&&orgEl.dataset.code)||'';   // [학교 자동완성] 학교코드(있을 때만)
   }
+  try{await taResolveMembers()}catch(e){}   // [회원 색인] 직접 입력한 팀원도 회원이면 회원으로 저장
   const roster=[...document.querySelectorAll('#taRosterBox > div')].map(r=>Object.assign({},r.dataset.self==='1'?{self:true,uid:CME.uid}:{},(r.dataset.uid&&r.dataset.self!=='1')?{memberUid:r.dataset.uid}:{},r.dataset.guardianUid?{guardianUid:r.dataset.guardianUid}:{},{   // [회원 연동] 확인된 회원·자녀는 uid 를 함께 저장 (종료 처리 시 경력 연동)   // [클럽장 본인 참가] 본인 행만 self·uid 기록 (종료 처리 시 '선수' 경력용)
     name:r.querySelector('.taR-name').value.trim(),
     birth:r.querySelector('.taR-birth').value,

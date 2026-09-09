@@ -1176,6 +1176,8 @@ async function go(){
         }
       }catch(e){console.warn('employ upload',e)}
       await DB.collection('users').doc(cred.user.uid).set(Object.assign(baseDoc,typeDoc));
+      // [회원 색인] 성명|생년월일 → 계정 (단체전 명단·대회 기록 자동 연동용). 실패해도 가입은 진행
+      try{if(name&&birth){const mk=name.replace(/\s+/g,'')+'|'+birth;const ref=DB.collection('memberKeys').doc(mk);const ex=await ref.get();if(!ex.exists)await ref.set({uid:cred.user.uid,kind:'self',name:name,minor:(SIGNUP_TYPE==='student'),at:firebase.firestore.FieldValue.serverTimestamp()})}}catch(e){console.warn('memberKeys',e)}
       // [아이디 가입] 아이디 → 로그인용 이메일 문서 (실제 이메일은 비밀번호로 잠가 저장, 합성 주소는 그대로)
       try{await DB.collection('loginIds').doc(loginId).set(realEmail?{uid:cred.user.uid,enc:await KFDF_IDLOGIN.enc(loginId,pw,realEmail),at:firebase.firestore.FieldValue.serverTimestamp()}:{uid:cred.user.uid,email:email,at:firebase.firestore.FieldValue.serverTimestamp()})}catch(e){console.warn('loginIds',e)}
       if(SIGNUP_TYPE!=='student')await DB.collection('phoneIndex').doc(pnorm).set({uid:cred.user.uid}).catch(()=>{}); // 개인정보 최소화: 이름 미저장(중복확인은 존재여부만 사용) · 학생회원은 보호자 번호일 수 있어 기록 생략

@@ -2066,7 +2066,7 @@ AUTH.onAuthStateChanged(async u=>{
     const careerSnap=await DB.collection('staffCareer').where('uid','==',u.uid).limit(500).get();
     MYCAREER=careerSnap.docs.map(d2=>Object.assign({id:d2.id},d2.data())).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
     renderCareer();
-    try{athSyncChildKeys();athFind(true)}catch(e){}
+    try{athSyncChildKeys();athSyncMemberKeys();athFind(true).then(function(){if(ATH_FOUND&&ATH_FOUND.length)athClaim(true)}).catch(function(){})}catch(e){}   // [자동 연동] 색인 기록 + 보류 기록 자동 반영
     try{awardClaimsLoad()}catch(e){}   // [입상 기록 신청] 내 신청 현황   // [선수 경력] 보호자 자녀 키 저장 · 가져올 기록이 있으면 조용히 표시
     if(false&&!careerSnap.empty){
       document.getElementById('staffCareerBox').style.display='block';
@@ -2608,6 +2608,25 @@ async function awardClaimSave(){
     awardClaimsLoad();
   }catch(e){btn.disabled=false;btn.textContent=ed?'수정 저장':'신청';alert('저장 실패: '+(e.code||e.message)+'\n(보안 규칙 v23 게시가 필요할 수 있습니다)')}
 }
+// [회원 색인 2026-09-09] memberKeys/{성명|생년월일} → {uid, kind:self|child, kidName, minor} — 본인(과 자녀)을 기록해 두면 단체전 명단·종료 처리에서 성명+생년월일로 회원임을 바로 알 수 있습니다.
+//   승인 회원만 단건 조회(목록 불가). 이미 다른 계정이 같은 키를 쓰면 덮어쓰지 않습니다(동명이인·생일 동일). 이 브라우저에서 한 번 기록하면 다시 조회하지 않습니다.
+async function athSyncMemberKeys(){
+  try{
+    if(!MYD||!AUTH.currentUser)return;const uid=AUTH.currentUser.uid;
+    const want=[];
+    if(MYD.name&&MYD.birth)want.push({key:athNorm(MYD.name)+'|'+MYD.birth,doc:{uid:uid,kind:'self',name:MYD.name,minor:!!(MYD.isMinor||MYD.accountType==='student'||MYD.memberGroup==='student')}});
+    ((MYD.children)||[]).forEach(k=>{if(k&&k.name&&k.birth)want.push({key:athNorm(k.name)+'|'+k.birth,doc:{uid:uid,kind:'child',kidName:k.name,name:k.name,minor:true}})});
+    if(!want.length)return;
+    const lsKey='kfdfMK_'+uid;let done=[];try{done=JSON.parse(localStorage.getItem(lsKey)||'[]')}catch(e){}
+    const todo=want.filter(w=>done.indexOf(w.key)<0);if(!todo.length)return;
+    for(const w of todo){
+      try{const ref=DB.collection('memberKeys').doc(w.key);const d=await ref.get();
+        if(d.exists&&d.data().uid!==uid){done.push(w.key);continue}
+        await ref.set(Object.assign({},w.doc,{at:firebase.firestore.FieldValue.serverTimestamp()}));done.push(w.key)}catch(e){}
+    }
+    try{localStorage.setItem(lsKey,JSON.stringify(done))}catch(e){}
+  }catch(e){}
+}
 // 보호자 계정: 자녀 검색 키(성명|생년월일) 자가 저장 — 규칙이 자녀 기록 열람을 판정할 수 있게 (규칙 v19 전에는 조용히 실패)
 async function athSyncChildKeys(){
   try{
@@ -2644,10 +2663,11 @@ async function athFind(quiet){
     +ATH_FOUND.map((f,i)=>'<label style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-top:1px solid #f1e5c4;cursor:pointer;font-size:13px"><input type="checkbox" class="athPick" value="'+i+'" checked style="width:auto;margin-top:3px"><span><b>'+esc(f.competitionName||'')+'</b> <span style="color:#6b7280">'+esc(f.date||'')+(f.organizer?' · '+esc(f.organizer):'')+'</span><br><span style="font-size:12px;color:#374151">'+esc([f.sport,f.division].filter(Boolean).join(' · '))+(f.school?' · '+esc(f.school):'')+' · <b style="color:'+(f.result==='참가'?'#153A77':'#d97706')+'">'+esc(f.result||'참가')+'</b>'+(f._kid?' · 자녀 '+esc(f._kid):'')+'</span></span></label>').join('')
     +'<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn-sub" style="background:#0f766e" onclick="athClaim()">✓ 내 기록 맞음 — 가져오기</button><button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'athFound\').style.display=\'none\'">닫기</button></div></div>';
 }
-async function athClaim(){
-  const picks=[...document.querySelectorAll('.athPick:checked')].map(x=>ATH_FOUND[+x.value]).filter(Boolean);
-  if(!picks.length){alert('가져올 기록을 체크해 주세요.');return}
-  if(!confirm(picks.length+'건을 내 선수 경력으로 가져옵니다. 본인(자녀)의 기록이 맞습니까?\n\n※ 타인의 기록을 가져오면 기록이 취소되고 이용이 제한될 수 있습니다.'))return;
+async function athClaim(auto){
+  // [자동 연동] auto=true 면 성명+생년월일이 일치하는 보류 기록 전부를 확인 절차 없이 반영
+  const picks=auto?ATH_FOUND.slice():[...document.querySelectorAll('.athPick:checked')].map(x=>ATH_FOUND[+x.value]).filter(Boolean);
+  if(!picks.length){if(!auto)alert('가져올 기록을 체크해 주세요.');return}
+  if(!auto&&!confirm(picks.length+'건을 내 선수 경력으로 가져옵니다. 본인(자녀)의 기록이 맞습니까?\n\n※ 타인의 기록을 가져오면 기록이 취소되고 이용이 제한될 수 있습니다.'))return;
   const uid=AUTH.currentUser.uid;let ok=0;const fail=[];
   for(const f of picks){
     try{
@@ -2659,7 +2679,8 @@ async function athClaim(){
       ok++;
     }catch(e){fail.push((f.competitionName||'')+' — '+e.message)}
   }
-  alert(ok?('✓ '+ok+'건을 선수 경력에 기록했습니다.'+(fail.length?'\n\n실패 '+fail.length+'건:\n'+fail.join('\n'):'')):('가져오지 못했습니다.\n'+fail.join('\n')+'\n\n보안 규칙(v19)이 아직 게시되지 않았을 수 있습니다. 사무국에 문의해 주세요.'));
+  if(auto){if(ok)alert('보류 중이던 대회 기록 '+ok+'건이 성명·생년월일 일치로 선수 경력에 자동 연동되었습니다.\n마이페이지 [나의 선수 경력]에서 확인하세요. (본인 기록이 아니면 사무국에 알려 주세요)')}
+  else alert(ok?('✓ '+ok+'건을 선수 경력에 기록했습니다.'+(fail.length?'\n\n실패 '+fail.length+'건:\n'+fail.join('\n'):'')):('가져오지 못했습니다.\n'+fail.join('\n')+'\n\n보안 규칙(v19)이 아직 게시되지 않았을 수 있습니다. 사무국에 문의해 주세요.'));
   if(ok){try{const cs=await DB.collection('staffCareer').where('uid','==',uid).limit(500).get();MYCAREER=cs.docs.map(d2=>Object.assign({id:d2.id},d2.data())).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));renderCareer()}catch(e){}
     const out=document.getElementById('athFound');if(out)out.style.display='none'}
 }
