@@ -2541,60 +2541,72 @@ async function awardClaimsLoad(){
   box.innerHTML='<div style="font-size:12.5px;font-weight:800;color:#141d51;margin-bottom:4px">입상 기록 등록 신청 현황</div>'
     +AWARD_CLAIMS.map(c=>{const s=st[c.status]||st.pending;return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;padding:7px 10px;border:1px solid #eee2e4;border-radius:10px;background:#fff;margin-top:5px">'
       +'<span style="font-size:11px;font-weight:900;color:#fff;background:'+s[1]+';border-radius:999px;padding:2px 9px">'+s[0]+'</span>'
-      +'<b>'+esc(c.competitionName||'')+'</b><span style="color:#6b7280">'+esc(c.date||'')+' · '+esc([c.sport,c.division].filter(Boolean).join(' '))+' · <b style="color:#d97706">'+esc(c.result||'')+'</b>'+(c.kidName?' · '+esc(c.kidName):'')+'</span>'
+      +'<b>'+esc(c.competitionName||'')+'</b><span style="color:#6b7280">'+esc(c.date||'')+' · '+esc([c.sport,c.division].filter(Boolean).join(' '))+' · <b style="color:#d97706">'+esc(c.result||'')+'</b>'+(c.kidName?' · '+esc(c.kidName):'')+(c.organizer?' · 주최 '+esc(c.organizer):'')+'</span>'
       +(c.status==='rejected'&&c.reason?'<span style="color:#C41E2F">사유: '+esc(c.reason)+'</span>':'')
-      +(c.status==='pending'?'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1px solid #f1c7cc;padding:3px 9px;font-size:11.5px;margin-left:auto" onclick="awardClaimCancel(\''+c.id+'\')">신청 취소</button>':'')
+      +(c.status==='pending'?'<span style="margin-left:auto;display:inline-flex;gap:4px"><button class="btn-sub" style="background:#153A77;padding:3px 9px;font-size:11.5px" onclick="awardClaimOpen(\''+c.id+'\')">수정</button><button class="btn-sub" style="background:#fff;color:#C41E2F;border:1px solid #f1c7cc;padding:3px 9px;font-size:11.5px" onclick="awardClaimCancel(\''+c.id+'\')">신청 취소</button></span>':'')
       +'</div>'}).join('');
 }
 async function awardClaimCancel(id){if(!confirm('이 신청을 취소할까요?'))return;try{await DB.collection('awardClaims').doc(id).delete();awardClaimsLoad()}catch(e){alert('취소 실패: '+(e.code||e.message))}}
-function awardClaimOpen(){
+// 신청 창 — editId 가 있으면 검토 중인 내 신청을 불러와 수정합니다
+function awardClaimOpen(editId){
   if(!MYD||!AUTH.currentUser){alert('로그인 후 이용할 수 있습니다.');return}
+  const ed=editId?(AWARD_CLAIMS.find(x=>x.id===editId)||null):null;
+  if(editId&&!ed)return;
   const old=document.getElementById('acModal');if(old)old.remove();
   const kids=((MYD.children)||[]).filter(k=>k&&k.name);
   const inp='style="width:100%;padding:9px 12px;border:1.5px solid #d5dce8;border-radius:9px;font-family:inherit;font-size:13.5px;margin-top:3px;box-sizing:border-box"';
   const lb='style="font-size:12.5px;font-weight:800;display:block;margin-top:10px"';
-  const div=document.createElement('div');div.id='acModal';
+  const v=k=>esc((ed&&ed[k])||'');
+  const div=document.createElement('div');div.id='acModal';div.dataset.edit=editId||'';
   div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:560px;width:100%;padding:22px 24px;margin:10px 0">'
-    +'<div style="display:flex;align-items:center;gap:8px"><b style="font-size:16px">입상 기록 등록 신청</b><span style="flex:1"></span><button class="btn-sub" style="background:#eceff4;color:#555;padding:5px 12px" onclick="document.getElementById(\'acModal\').remove()">닫기</button></div>'
-    +'<div style="font-size:12.5px;color:#6b7280;line-height:1.7;margin-top:6px">연맹 홈페이지를 거치지 않은 대회(타 기관 주최·과거 대회 등)의 참가·입상 기록을 증빙(상장·결과표 사진)과 함께 올리면 연맹이 확인한 뒤 경력에 기록합니다.</div>'
-    +(kids.length?'<label '+lb+'>대상</label><select id="acWho" '+inp+'><option value="">본인 ('+esc(MYD.name||'')+')</option>'+kids.map(k=>'<option value="'+esc(k.name)+'">자녀 · '+esc(k.name)+(k.birth?' ('+esc(k.birth)+')':'')+'</option>').join('')+'</select>':'')
-    +'<label '+lb+'>대회명 *</label><input id="acComp" '+inp+' placeholder="예: 2026 ○○교육감배 학교스포츠클럽 플라잉디스크대회">'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label '+lb+'>대회일 *</label><input id="acDate" type="date" '+inp+'></div><div><label '+lb+'>주최 기관</label><input id="acOrg" '+inp+' placeholder="예: ○○교육청"></div>'
-    +'<div><label '+lb+'>종목 *</label><input id="acSport" '+inp+' placeholder="예: 얼티미트"></div><div><label '+lb+'>부문</label><input id="acDiv" '+inp+' placeholder="예: 남중부"></div>'
-    +'<div><label '+lb+'>결과 *</label><select id="acRes" '+inp+'><option>1위</option><option>2위</option><option>3위</option><option>우승</option><option>준우승</option><option>공동 3위</option><option>참가</option><option value="__">직접 입력</option></select><input id="acResX" '+inp+' placeholder="결과 직접 입력" style="display:none"></div>'
-    +'<div><label '+lb+'>당시 소속 (학교·팀)</label><input id="acTeam" '+inp+' value="'+esc(MYD.school||'')+'"></div></div>'
-    +'<label '+lb+'>증빙 * <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 상장·결과표·기록지 사진(JPG·PNG) 최대 3장</span></label><input id="acFiles" type="file" accept="image/*" multiple style="font-size:13px;margin-top:3px">'
-    +'<label '+lb+'>비고</label><input id="acNote" '+inp+' placeholder="예: 팀명, 기록, 특이사항">'
-    +'<label style="display:flex;gap:7px;align-items:flex-start;margin-top:12px;font-size:12.5px;font-weight:700;color:#153A77"><input type="checkbox" id="acPledge" style="width:auto;margin-top:3px"> 위 내용과 증빙이 사실이며, 허위 기재 시 기록 삭제 등 불이익을 감수합니다.</label>'
-    +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn-sub" style="background:#d99a1e;padding:10px 22px" id="acSaveBtn" onclick="awardClaimSave()">신청</button></div>'
+    +'<div style="display:flex;align-items:center;gap:8px"><b style="font-size:16px">'+(ed?'입상 기록 신청 수정':'입상 기록 등록 신청')+'</b><span style="flex:1"></span><button class="btn-sub" style="background:#eceff4;color:#555;padding:5px 12px" onclick="document.getElementById(\'acModal\').remove()">닫기</button></div>'
+    +'<div style="font-size:12.5px;color:#6b7280;line-height:1.7;margin-top:6px">연맹 홈페이지를 거치지 않은 대회(타 기관 주최·과거 대회 등)의 참가·입상 기록을 증빙(상장·결과표 사진)과 함께 올리면 연맹이 확인한 뒤 경력에 기록합니다. <b style="color:#C41E2F">*</b> 표시는 필수입니다.</div>'
+    +(kids.length?'<label '+lb+'>대상</label><select id="acWho" '+inp+'><option value="">본인 ('+esc(MYD.name||'')+')</option>'+kids.map(k=>'<option value="'+esc(k.name)+'"'+((ed&&ed.kidName===k.name)?' selected':'')+'>자녀 · '+esc(k.name)+(k.birth?' ('+esc(k.birth)+')':'')+'</option>').join('')+'</select>':'')
+    +'<label '+lb+'>대회명 <b style="color:#C41E2F">*</b></label><input id="acComp" '+inp+' value="'+v('competitionName')+'" placeholder="예: 2026 ○○교육감배 학교스포츠클럽 플라잉디스크대회">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label '+lb+'>대회일 <b style="color:#C41E2F">*</b></label><input id="acDate" type="date" '+inp+' value="'+v('date')+'"></div><div><label '+lb+'>종목 <b style="color:#C41E2F">*</b></label><input id="acSport" '+inp+' value="'+v('sport')+'" placeholder="예: 얼티미트"></div>'
+    +'<div><label '+lb+'>주최 <b style="color:#C41E2F">*</b> <span style="font-weight:600;color:#8a919d;font-size:11px">— 상장에 적힌 기관</span></label><input id="acOrg" '+inp+' value="'+v('organizer')+'" placeholder="예: ○○광역시교육청"></div>'
+    +'<div><label '+lb+'>주관 <b style="color:#C41E2F">*</b> <label style="font-weight:700;color:#153A77;font-size:11px;margin-left:6px;display:inline-flex;gap:4px;align-items:center"><input type="checkbox" id="acOrgSame" style="width:auto;margin:0" onchange="if(this.checked){document.getElementById(\'acOrg2\').value=document.getElementById(\'acOrg\').value}"> 주최와 같음</label></label><input id="acOrg2" '+inp+' value="'+v('coorganizer')+'" placeholder="예: ○○시플라잉디스크연맹"></div>'
+    +'<div><label '+lb+'>부문</label><input id="acDiv" '+inp+' value="'+v('division')+'" placeholder="예: 남중부"></div>'
+    +'<div><label '+lb+'>결과 <b style="color:#C41E2F">*</b></label><select id="acRes" '+inp+'>'+['1위','2위','3위','우승','준우승','공동 3위','참가'].map(r=>'<option'+((ed&&ed.result===r)?' selected':'')+'>'+r+'</option>').join('')+'<option value="__"'+((ed&&ed.result&&['1위','2위','3위','우승','준우승','공동 3위','참가'].indexOf(ed.result)<0)?' selected':'')+'>직접 입력</option></select><input id="acResX" '+inp+' placeholder="결과 직접 입력" value="'+((ed&&ed.result&&['1위','2위','3위','우승','준우승','공동 3위','참가'].indexOf(ed.result)<0)?esc(ed.result):'')+'" style="display:'+((ed&&ed.result&&['1위','2위','3위','우승','준우승','공동 3위','참가'].indexOf(ed.result)<0)?'':'none')+'"></div>'
+    +'<div><label '+lb+'>당시 소속 (학교·팀)</label><input id="acTeam" '+inp+' value="'+(ed?v('team'):esc(MYD.school||''))+'"></div></div>'
+    +'<label '+lb+'>증빙 '+(ed?'<span style="font-weight:600;color:#8a919d;font-size:11.5px">— 새로 올리면 기존 증빙을 대체합니다 (현재 '+((ed.files||[]).length)+'장)</span>':'<b style="color:#C41E2F">*</b> <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 상장·결과표·기록지 사진(JPG·PNG) 최대 3장</span>')+'</label><input id="acFiles" type="file" accept="image/*" multiple style="font-size:13px;margin-top:3px">'
+    +(ed&&(ed.files||[]).length?'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">'+ed.files.map(f=>'<a href="'+esc(f.url)+'" target="_blank"><img src="'+esc(f.url)+'" style="height:56px;border-radius:6px;border:1px solid #e5e9f2"></a>').join('')+'</div>':'')
+    +'<label '+lb+'>비고</label><input id="acNote" '+inp+' value="'+v('note')+'" placeholder="예: 팀명, 기록, 특이사항">'
+    +'<label style="display:flex;gap:7px;align-items:flex-start;margin-top:12px;font-size:12.5px;font-weight:700;color:#153A77"><input type="checkbox" id="acPledge" style="width:auto;margin-top:3px"'+(ed?' checked':'')+'> 위 내용과 증빙이 사실이며, 허위 기재 시 기록 삭제 등 불이익을 감수합니다.</label>'
+    +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn-sub" style="background:#d99a1e;padding:10px 22px" id="acSaveBtn" onclick="awardClaimSave()">'+(ed?'수정 저장':'신청')+'</button></div>'
     +'</div>';
   document.body.appendChild(div);
   const rs=document.getElementById('acRes');rs.addEventListener('change',()=>{const x=document.getElementById('acResX');x.style.display=rs.value==='__'?'':'none';if(rs.value==='__')x.focus()});
 }
 async function awardClaimSave(){
   const v=id=>{const e=document.getElementById(id);return e?(e.value||'').trim():''};
-  const comp=v('acComp'),date=v('acDate'),sport=v('acSport');let result=v('acRes');if(result==='__')result=v('acResX');
+  const editId=(document.getElementById('acModal')||{}).dataset?document.getElementById('acModal').dataset.edit:'';
+  const ed=editId?(AWARD_CLAIMS.find(x=>x.id===editId)||null):null;
+  const comp=v('acComp'),date=v('acDate'),sport=v('acSport'),org=v('acOrg'),org2=v('acOrg2');let result=v('acRes');if(result==='__')result=v('acResX');
   if(!comp||!date||!sport||!result){alert('대회명·대회일·종목·결과를 입력해주세요.');return}
+  if(!org||!org2){alert('주최와 주관 기관을 입력해주세요. (상장·결과표에 적힌 기관명 그대로. 같으면 「주최와 같음」에 체크)');return}
   const files=[...((document.getElementById('acFiles')||{}).files||[])];
-  if(!files.length){alert('증빙 사진(상장·결과표 등)을 1장 이상 첨부해주세요.');return}
+  if(!files.length&&!(ed&&(ed.files||[]).length)){alert('증빙 사진(상장·결과표 등)을 1장 이상 첨부해주세요.');return}
   if(files.length>3){alert('증빙은 최대 3장까지 첨부할 수 있습니다.');return}
   if(files.some(f=>!/^image\//.test(f.type))){alert('증빙은 이미지(JPG·PNG)만 올릴 수 있습니다. PDF 는 사진으로 저장해 올려 주세요.');return}
   if(!document.getElementById('acPledge').checked){alert('사실 확인에 체크해주세요.');return}
   const who=v('acWho');const kid=who?((MYD.children||[]).find(k=>k.name===who)||null):null;
   const btn=document.getElementById('acSaveBtn');btn.disabled=true;btn.textContent='올리는 중…';
   try{
-    const uid=AUTH.currentUser.uid;const urls=[];
-    for(let i=0;i<files.length;i++){const f=files[i];const ext=(f.name.split('.').pop()||'jpg').toLowerCase();
+    const uid=AUTH.currentUser.uid;let urls=(ed&&ed.files)?ed.files.slice():[];
+    if(files.length){urls=[];for(let i=0;i<files.length;i++){const f=files[i];const ext=(f.name.split('.').pop()||'jpg').toLowerCase();
       const ref=firebase.storage().ref('docs/'+uid+'/award_'+Date.now()+'_'+i+'.'+ext);
-      await ref.put(f,{contentType:f.type||'image/jpeg'});urls.push({name:f.name,url:await ref.getDownloadURL()})}
-    await DB.collection('awardClaims').add({uid:uid,name:kid?kid.name:(MYD.name||''),birth:kid?(kid.birth||''):(MYD.birth||''),kidName:kid?kid.name:'',
-      competitionName:comp,date:date,organizer:v('acOrg'),sport:sport,division:v('acDiv'),result:result,team:v('acTeam'),note:v('acNote'),files:urls,
-      status:'pending',sido:MYD.sido||'',email:AUTH.currentUser.email||'',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+      await ref.put(f,{contentType:f.type||'image/jpeg'});urls.push({name:f.name,url:await ref.getDownloadURL()})}}
+    const data={uid:uid,name:kid?kid.name:(MYD.name||''),birth:kid?(kid.birth||''):(MYD.birth||''),kidName:kid?kid.name:'',
+      competitionName:comp,date:date,organizer:org,coorganizer:org2,sport:sport,division:v('acDiv'),result:result,team:v('acTeam'),note:v('acNote'),files:urls,
+      status:'pending',sido:MYD.sido||'',email:AUTH.currentUser.email||''};
+    if(ed){data.updatedAt=firebase.firestore.FieldValue.serverTimestamp();await DB.collection('awardClaims').doc(ed.id).update(data)}
+    else{data.createdAt=firebase.firestore.FieldValue.serverTimestamp();await DB.collection('awardClaims').add(data)}
     document.getElementById('acModal').remove();
-    alert('입상 기록 등록을 신청했습니다. 연맹 확인 후 경력에 반영되며, 결과는 알림으로 안내됩니다.');
+    alert(ed?'신청 내용을 수정했습니다. 연맹 확인 후 경력에 반영됩니다.':'입상 기록 등록을 신청했습니다. 연맹 확인 후 경력에 반영되며, 결과는 알림으로 안내됩니다.');
     awardClaimsLoad();
-  }catch(e){btn.disabled=false;btn.textContent='신청';alert('신청 실패: '+(e.code||e.message)+'\n(보안 규칙 v20 게시가 필요할 수 있습니다)')}
+  }catch(e){btn.disabled=false;btn.textContent=ed?'수정 저장':'신청';alert('저장 실패: '+(e.code||e.message)+'\n(보안 규칙 v23 게시가 필요할 수 있습니다)')}
 }
 // 보호자 계정: 자녀 검색 키(성명|생년월일) 자가 저장 — 규칙이 자녀 기록 열람을 판정할 수 있게 (규칙 v19 전에는 조용히 실패)
 async function athSyncChildKeys(){

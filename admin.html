@@ -674,43 +674,116 @@ function tab(n){
 }
 // ══════════ [입상 기록 승인 2026-09-09] awardClaims 검토 — 승인 시 staffCareer 에 참가(선수)+입상 기록 (source 'award-claim') ══════════
 let AC_LIST=[],AC_FILTER='pending';
+const AC_ST={pending:['검토 대기','#d99a1e'],approved:['승인됨','#0f766e'],rejected:['반려됨','#C41E2F']};
+function acDstr(t){return (t&&t.toDate)?t.toDate().toISOString().slice(0,10):''}
+// 미기입·확인 필요 항목 — 관리자가 승인 전에 한눈에 보게
+function acWarn(c){const w=[];if(!c.organizer)w.push('주최 미기입');if(!c.coorganizer)w.push('주관 미기입');if(!c.division)w.push('부문 미기입');if(!c.team)w.push('소속 미기입');if(!(c.files||[]).length)w.push('증빙 없음');if(!c.birth)w.push('생년월일 없음');return w}
 async function acAdminLoad(f){
   if(f)AC_FILTER=f;const box=document.getElementById('acBox');if(!box)return;box.innerHTML='<div style="color:#8a919d;font-size:13px">불러오는 중…</div>';
-  try{const q=await DB.collection('awardClaims').where('status','==',AC_FILTER).limit(200).get();AC_LIST=q.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))}catch(e){box.innerHTML='<div style="color:#C41E2F">불러오기 실패: '+esc(e.code||e.message)+' (보안 규칙 v20 게시 필요)</div>';return}
-  const dstr=t=>(t&&t.toDate)?t.toDate().toISOString().slice(0,10):'';
+  try{const q=await DB.collection('awardClaims').where('status','==',AC_FILTER).limit(200).get();AC_LIST=q.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))}catch(e){box.innerHTML='<div style="color:#C41E2F">불러오기 실패: '+esc(e.code||e.message)+' (보안 규칙 v20 이상 게시 필요)</div>';return}
   const tabs=[['pending','검토 대기'],['approved','승인됨'],['rejected','반려됨']].map(([k,l])=>'<button class="btn-sub" style="background:'+(AC_FILTER===k?'#153A77':'#8a919d')+';padding:5px 12px;font-size:12px" onclick="acAdminLoad(\''+k+'\')">'+l+'</button>').join(' ');
-  box.innerHTML='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">'+tabs+'<span style="font-size:12.5px;color:#6b7280">'+AC_LIST.length+'건</span></div>'
-    +(AC_LIST.length?'<div style="overflow:auto"><table class="tbl" style="font-size:12.5px;min-width:860px"><tr><th>신청일</th><th>신청 계정</th><th>대상</th><th>대회</th><th>종목·부문</th><th>결과</th><th>증빙</th><th>처리</th></tr>'
-      +AC_LIST.map(c=>'<tr><td style="white-space:nowrap">'+esc(dstr(c.createdAt))+'</td>'
+  const btn=(l,bg,fn,extra)=>'<button class="btn-sub" style="background:'+bg+';padding:4px 10px;font-size:12px;margin:2px 0'+(extra||'')+'" onclick="'+fn+'">'+l+'</button>';
+  box.innerHTML='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">'+tabs+'<span style="font-size:12.5px;color:#6b7280">'+AC_LIST.length+'건</span><span style="font-size:12px;color:#8a919d;margin-left:auto">[자세히]에서 기입 내용 전체와 증빙을 확인·수정할 수 있습니다</span></div>'
+    +(AC_LIST.length?'<div style="overflow:auto"><table class="tbl" style="font-size:12.5px;min-width:980px"><tr><th>신청일</th><th>신청 계정</th><th>대상</th><th>대회 · 주최/주관</th><th>종목·부문</th><th>결과</th><th>증빙</th><th>확인 필요</th><th>처리</th></tr>'
+      +AC_LIST.map(c=>{const w=acWarn(c);return '<tr><td style="white-space:nowrap">'+esc(acDstr(c.createdAt))+(c.updatedAt?'<br><span style="color:#8a919d">수정 '+esc(acDstr(c.updatedAt))+'</span>':'')+'</td>'
         +'<td>'+esc(c.email||'')+'<br><span style="color:#6b7280">'+esc(c.sido||'')+'</span></td>'
         +'<td><b>'+esc(c.name||'')+'</b>'+(c.kidName?' <span style="font-size:11px;color:#8a919d">(자녀)</span>':'')+'<br><span style="color:#6b7280">'+esc(c.birth||'')+'</span></td>'
-        +'<td><b>'+esc(c.competitionName||'')+'</b><br><span style="color:#6b7280">'+esc(c.date||'')+(c.organizer?' · '+esc(c.organizer):'')+(c.team?' · '+esc(c.team):'')+'</span>'+(c.note?'<br><span style="color:#8a919d">'+esc(c.note)+'</span>':'')+'</td>'
-        +'<td>'+esc([c.sport,c.division].filter(Boolean).join(' '))+'</td><td><b style="color:#d97706">'+esc(c.result||'')+'</b></td>'
-        +'<td style="white-space:nowrap">'+(c.files||[]).map((f,i)=>'<a href="'+esc(f.url)+'" target="_blank" style="color:#153A77;font-weight:800">증빙'+(i+1)+'</a>').join(' ')+'</td>'
-        +'<td style="white-space:nowrap">'+(c.status==='pending'?'<button class="btn-sub" style="background:#0f766e;padding:4px 10px;font-size:12px" onclick="acDecide(\''+c.id+'\',true)">승인 · 경력 기록</button> <button class="btn-sub" style="background:#fff;color:#C41E2F;border:1px solid #f1c7cc;padding:4px 10px;font-size:12px" onclick="acDecide(\''+c.id+'\',false)">반려</button>'
-          :('<span style="color:#6b7280">'+esc(c.reviewedBy||'')+'<br>'+esc(dstr(c.reviewedAt))+(c.reason?'<br>사유: '+esc(c.reason):'')+'</span>'))+'</td></tr>').join('')
+        +'<td><b>'+esc(c.competitionName||'')+'</b><br><span style="color:#6b7280">'+esc(c.date||'')+'</span><br><span style="color:#374151">주최 '+(c.organizer?esc(c.organizer):'<span style="color:#C41E2F">미기입</span>')+' · 주관 '+(c.coorganizer?esc(c.coorganizer):'<span style="color:#C41E2F">미기입</span>')+'</span>'+(c.team?'<br><span style="color:#6b7280">소속 '+esc(c.team)+'</span>':'')+(c.note?'<br><span style="color:#8a919d">'+esc(c.note)+'</span>':'')+'</td>'
+        +'<td>'+esc(c.sport||'')+(c.division?'<br>'+esc(c.division):'')+'</td><td><b style="color:#d97706">'+esc(c.result||'')+'</b></td>'
+        +'<td style="white-space:nowrap">'+(c.files||[]).map((f,i)=>'<a href="'+esc(f.url)+'" target="_blank"><img src="'+esc(f.url)+'" style="height:44px;border-radius:5px;border:1px solid #e5e9f2;margin-right:3px;vertical-align:middle" title="증빙 '+(i+1)+' — 클릭하면 크게"></a>').join('')+'</td>'
+        +'<td style="font-size:11.5px;color:#C41E2F;font-weight:800">'+(w.length?w.join('<br>'):'<span style="color:#0f766e">이상 없음</span>')+'</td>'
+        +'<td style="white-space:nowrap">'+btn('자세히·수정','#153A77','acEdit(\''+c.id+'\')')+'<br>'
+          +(c.status==='pending'?btn('승인 · 경력 기록','#0f766e','acDecide(\''+c.id+'\',true)')+'<br>'+btn('반려','#fff;color:#C41E2F;border:1px solid #f1c7cc','acDecide(\''+c.id+'\',false)'):'')
+          +(c.status==='approved'?btn('승인 회수(대기로)','#b8860b','acRevoke(\''+c.id+'\',\'pending\')')+'<br>'+btn('반려로 변경','#fff;color:#C41E2F;border:1px solid #f1c7cc','acRevoke(\''+c.id+'\',\'rejected\')'):'')
+          +(c.status==='rejected'?btn('대기로 되돌리기','#b8860b','acRevoke(\''+c.id+'\',\'pending\')'):'')
+          +'<br>'+btn('삭제','#8a919d','acDelete(\''+c.id+'\')')
+          +(c.status!=='pending'?'<div style="font-size:11px;color:#6b7280;margin-top:3px">'+esc(c.reviewedBy||'')+' '+esc(acDstr(c.reviewedAt))+(c.reason?'<br>사유: '+esc(c.reason):'')+'</div>':'')+'</td></tr>'}).join('')
       +'</table></div>':'<div style="color:#8a919d;font-size:13px">해당 건이 없습니다.</div>');
+}
+// 기입 내용 전체 보기·수정 (승인된 건은 회수 후 수정)
+function acEdit(id){
+  const c=AC_LIST.find(x=>x.id===id);if(!c)return;
+  const old=document.getElementById('acEditModal');if(old)old.remove();
+  const inp='style="width:100%;padding:8px 11px;border:1.5px solid #dfe5ee;border-radius:9px;font-family:inherit;font-size:13px;margin-top:3px;box-sizing:border-box"';
+  const lb='style="font-size:12px;font-weight:800;display:block;margin-top:9px"';
+  const ro=c.status==='approved';
+  const F=(id2,label,val,req)=>'<div><label '+lb+'>'+label+(req?' <b style="color:#C41E2F">*</b>':'')+'</label><input id="'+id2+'" '+inp+' value="'+esc(val||'')+'"'+(ro?' readonly':'')+'></div>';
+  const div=document.createElement('div');div.id='acEditModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:640px;width:100%;padding:22px 24px;margin:10px 0">'
+    +'<div style="display:flex;align-items:center;gap:8px"><b style="font-size:16px">입상 기록 신청 — 기입 내용'+(ro?' (승인됨 · 수정하려면 먼저 회수)':' · 수정')+'</b><span style="flex:1"></span><button class="btn-sub" style="background:#eceff4;color:#555;padding:5px 12px" onclick="document.getElementById(\'acEditModal\').remove()">닫기</button></div>'
+    +'<div style="font-size:12px;color:#6b7280;margin-top:4px">신청 계정 '+esc(c.email||'')+' · '+esc(c.sido||'')+' · 신청일 '+esc(acDstr(c.createdAt))+'</div>'
+    +(acWarn(c).length?'<div style="margin-top:8px;padding:8px 11px;background:#fff5f5;border:1px solid #f3c9c9;border-radius:9px;font-size:12px;font-weight:800;color:#C41E2F">확인 필요: '+acWarn(c).join(' · ')+'</div>':'')
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+F('aeName','성명',c.name,true)+F('aeBirth','생년월일',c.birth)+'<div style="grid-column:1/-1">'+F('aeComp','대회명',c.competitionName,true)+'</div>'
+    +F('aeDate','대회일',c.date,true)+F('aeSport','종목',c.sport,true)+F('aeOrg','주최',c.organizer,true)+F('aeOrg2','주관',c.coorganizer,true)+F('aeDiv','부문',c.division)+F('aeRes','결과',c.result,true)+F('aeTeam','당시 소속',c.team)+F('aeNote','비고',c.note)+'</div>'
+    +'<label '+lb+'>증빙 ('+((c.files||[]).length)+'장) — 클릭하면 원본</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'+((c.files||[]).map(f=>'<a href="'+esc(f.url)+'" target="_blank"><img src="'+esc(f.url)+'" style="height:120px;border-radius:8px;border:1px solid #e5e9f2"></a>').join('')||'<span style="color:#C41E2F;font-size:12.5px">증빙 없음</span>')+'</div>'
+    +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">'+(ro?'':'<button class="btn-sub" style="background:#153A77;padding:9px 20px" onclick="acEditSave(\''+c.id+'\')">수정 저장</button>')+'</div></div>';
+  document.body.appendChild(div);
+}
+async function acEditSave(id){
+  const v=k=>{const e=document.getElementById(k);return e?(e.value||'').trim():''};
+  const d={name:v('aeName'),birth:v('aeBirth'),competitionName:v('aeComp'),date:v('aeDate'),sport:v('aeSport'),organizer:v('aeOrg'),coorganizer:v('aeOrg2'),division:v('aeDiv'),result:v('aeRes'),team:v('aeTeam'),note:v('aeNote')};
+  if(!d.name||!d.competitionName||!d.date||!d.sport||!d.result){alert('성명·대회명·대회일·종목·결과는 비울 수 없습니다.');return}
+  try{d.editedBy=(firebase.auth().currentUser||{}).email||'';d.editedAt=firebase.firestore.FieldValue.serverTimestamp();
+    await DB.collection('awardClaims').doc(id).update(d);document.getElementById('acEditModal').remove();acAdminLoad()}
+  catch(e){alert('저장 실패: '+(e.code||e.message))}
+}
+// 경력 기록 쓰기·지우기 (importId 'award:<신청ID>' 로 묶어 관리)
+async function acWriteCareer(c,me){
+  const org=[c.organizer,c.coorganizer].filter(Boolean).filter((x,i,a)=>a.indexOf(x)===i).join(' / ');
+  const base={uid:c.uid,name:c.name||'',date:c.date||'',competitionName:c.competitionName||'',sport:c.sport||'',location:'',organizer:org,division:c.division||'',team:c.team||'',source:'award-claim',kidName:c.kidName||'',importId:'award:'+c.id};
+  await CAREER.write(DB,Object.assign({},base,{role:'선수'}),me);
+  if(c.result&&c.result!=='참가')await CAREER.write(DB,Object.assign({},base,{role:'입상',result:c.result}),me);
+}
+async function acEraseCareer(id){
+  const q=await DB.collection('staffCareer').where('importId','==','award:'+id).limit(20).get();
+  for(const d of q.docs){await DB.collection('staffCareer').doc(d.id).delete()}
+  return q.size;
 }
 async function acDecide(id,ok){
   const c=AC_LIST.find(x=>x.id===id);if(!c)return;
   const me=(firebase.auth().currentUser||{}).email||'';
   if(ok){
     if(!window.CAREER||!CAREER.write){alert('경력 모듈(career.js)을 불러오지 못했습니다. 새로고침 후 다시 시도하세요.');return}
+    const w=acWarn(c);
+    if(w.length&&!confirm('확인 필요 항목이 있습니다: '+w.join(', ')+'\n[자세히·수정]에서 고친 뒤 승인하는 것을 권합니다.\n그래도 지금 승인할까요?'))return;
     const isAward=c.result&&c.result!=='참가';
-    if(!confirm('['+(c.name||'')+'] '+(c.competitionName||'')+' · '+(c.result||'')+'\n승인하고 경력(참가'+(isAward?' + 입상':'')+')에 기록할까요?'))return;
+    if(!confirm('['+(c.name||'')+'] '+(c.competitionName||'')+' · '+(c.result||'')+'\n주최 '+(c.organizer||'-')+' / 주관 '+(c.coorganizer||'-')+'\n승인하고 경력(참가'+(isAward?' + 입상':'')+')에 기록할까요? (승인 뒤에도 회수·반려로 변경할 수 있습니다)'))return;
     try{
-      const base={uid:c.uid,name:c.name||'',date:c.date||'',competitionName:c.competitionName||'',sport:c.sport||'',location:'',organizer:c.organizer||'',division:c.division||'',team:c.team||'',source:'award-claim',kidName:c.kidName||'',importId:'award:'+c.id};
-      await CAREER.write(DB,Object.assign({},base,{role:'선수'}),me);
-      if(isAward)await CAREER.write(DB,Object.assign({},base,{role:'입상',result:c.result}),me);
-      await DB.collection('awardClaims').doc(id).update({status:'approved',reviewedBy:me,reviewedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      await acWriteCareer(c,me);
+      await DB.collection('awardClaims').doc(id).update({status:'approved',reviewedBy:me,reviewedAt:firebase.firestore.FieldValue.serverTimestamp(),reason:firebase.firestore.FieldValue.delete()});
       try{KFDF.notify(c.uid,'['+(c.competitionName||'')+'] 입상 기록 등록이 승인되어 경력에 기록되었습니다 — 마이페이지 [나의 선수 경력]에서 확인하세요','mypage.html#athBox')}catch(e){}
     }catch(e){alert('승인 실패: '+(e.code||e.message));return}
   }else{
     const r=prompt('반려 사유 (신청자에게 전달됩니다)');if(r===null)return;
     try{await DB.collection('awardClaims').doc(id).update({status:'rejected',reason:r,reviewedBy:me,reviewedAt:firebase.firestore.FieldValue.serverTimestamp()});
-      try{KFDF.notify(c.uid,'['+(c.competitionName||'')+'] 입상 기록 등록이 반려되었습니다 — '+r,'mypage.html#athBox')}catch(e){}
+      try{KFDF.notify(c.uid,'['+(c.competitionName||'')+'] 입상 기록 등록이 반려되었습니다 — '+r+' (마이페이지에서 수정 후 다시 신청할 수 있습니다)','mypage.html#athBox')}catch(e){}
     }catch(e){alert('반려 실패: '+(e.code||e.message));return}
   }
+  acAdminLoad();
+}
+// 승인 회수(대기로) · 반려로 변경 · 반려→대기 : 승인으로 기록된 경력을 지우고 상태를 바꿉니다
+async function acRevoke(id,to){
+  const c=AC_LIST.find(x=>x.id===id);if(!c)return;
+  const me=(firebase.auth().currentUser||{}).email||'';
+  let reason='';
+  if(to==='rejected'){reason=prompt('반려 사유 (신청자에게 전달됩니다)');if(reason===null)return}
+  else if(!confirm('['+(c.name||'')+'] '+(c.competitionName||'')+'\n'+(c.status==='approved'?'승인을 회수하고 경력에 기록된 내용을 지운 뒤 검토 대기로 되돌릴까요?':'검토 대기로 되돌릴까요?')))return;
+  try{
+    let n=0;if(c.status==='approved')n=await acEraseCareer(id);
+    const upd={status:to,reviewedBy:me,reviewedAt:firebase.firestore.FieldValue.serverTimestamp()};
+    if(to==='rejected')upd.reason=reason;else upd.reason=firebase.firestore.FieldValue.delete();
+    await DB.collection('awardClaims').doc(id).update(upd);
+    try{if(to==='rejected')KFDF.notify(c.uid,'['+(c.competitionName||'')+'] 입상 기록 승인이 취소되어 반려 처리되었습니다 — '+reason,'mypage.html#athBox');else if(c.status==='approved')KFDF.notify(c.uid,'['+(c.competitionName||'')+'] 입상 기록 승인이 회수되어 다시 검토 중입니다','mypage.html#athBox')}catch(e){}
+    alert((c.status==='approved'?'경력 기록 '+n+'건을 지우고 ':'')+(to==='rejected'?'반려로 변경했습니다.':'검토 대기로 되돌렸습니다.'));
+  }catch(e){alert('처리 실패: '+(e.code||e.message));return}
+  acAdminLoad();
+}
+async function acDelete(id){
+  const c=AC_LIST.find(x=>x.id===id);if(!c)return;
+  if(!confirm('['+(c.name||'')+'] '+(c.competitionName||'')+' 신청을 삭제할까요?'+(c.status==='approved'?'\n승인으로 기록된 경력도 함께 지워집니다.':'')+'\n(되돌릴 수 없습니다)'))return;
+  try{let n=0;if(c.status==='approved')n=await acEraseCareer(id);await DB.collection('awardClaims').doc(id).delete();alert('삭제했습니다.'+(n?' (경력 기록 '+n+'건 삭제)':''))}
+  catch(e){alert('삭제 실패: '+(e.code||e.message));return}
   acAdminLoad();
 }
 // ══════════ [사이트 설정 2026-09-07] siteContent/site — 홈 히어로·버튼·관련 사이트·연락처·푸터 ══════════
