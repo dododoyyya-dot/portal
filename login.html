@@ -147,7 +147,7 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
       <div id="typeBtns" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px">
         <button type="button" class="mtypebtn on" data-t="instructor" onclick="setSignupType('instructor')">🧑‍🏫 KFDF공인 심판·지도자<span>연맹 자격증 보유·취득 예정</span></button>
         <button type="button" class="mtypebtn" data-t="teacher" onclick="setSignupType('teacher')">🎓 교사 (교원)<span>학교 재직 교원 · 재직증명서 첨부</span></button>
-        <button type="button" class="mtypebtn" data-t="natcert" onclick="setSignupType('natcert')">🏅 국가공인자격증 취득회원<span>유소년스포츠지도사(플라잉디스크) 전용 · 자격증 사본 첨부</span></button>
+        <button type="button" class="mtypebtn" data-t="natcert" onclick="setSignupType('natcert')">🏅 국가공인자격증 취득회원<span>플라잉디스크 종목 국가자격 보유자 · 자격증 사본 첨부</span></button>
         <button type="button" class="mtypebtn" data-t="athlete" onclick="setSignupType('athlete')">🏃 선수회원<span>성인 선수 · 연맹/타소속 동호인</span></button>
         <button type="button" class="mtypebtn" data-t="general" onclick="setSignupType('general')">👥 일반회원<span>학부모·서포터즈·협력기관</span></button>
         <button type="button" class="mtypebtn" data-t="student" onclick="setSignupType('student')">🧒 학생회원<span>만 18세 미만 본인</span></button>
@@ -174,9 +174,9 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
         <div id="genSubInfo" style="font-size:12px;font-weight:700;margin-top:8px;color:#8a5a00"></div>
       </div>
       <label>이름 (실명) <span style="color:#C41E2F">*</span></label><input id="sName" placeholder="홍길동">
-      <label>휴대전화 (배정·위촉 연락용) <span style="color:#C41E2F">*</span> <span style="font-weight:700;color:#0f766e;font-size:12px">— 본인 휴대폰 인증 필수</span></label>
+      <label>휴대전화 (배정·위촉 연락용) <span style="color:#C41E2F">*</span> <span id="phoneReqHint" style="font-weight:700;color:#0f766e;font-size:12px">— 본인 휴대폰 인증 필수</span></label>
       <input id="sPhone" placeholder="010-0000-0000" oninput="resetPhoneVerify()">
-      <div style="margin-top:6px;background:#f4f7fc;border:1.5px solid #d3e0f2;border-radius:10px;padding:11px 13px">
+      <div id="phoneVerifyBox" style="margin-top:6px;background:#f4f7fc;border:1.5px solid #d3e0f2;border-radius:10px;padding:11px 13px">
         <button type="button" id="sendCodeBtn" onclick="sendPhoneCode()" style="background:#153A77;color:#fff;border:none;padding:9px 16px;border-radius:8px;font-weight:800;cursor:pointer;font-family:inherit;font-size:13.5px">📱 인증번호 받기</button>
         <div id="codeRow" style="display:none;margin-top:9px;gap:8px;align-items:center">
           <input id="sCode" inputmode="numeric" maxlength="6" placeholder="문자로 받은 6자리" style="width:150px;padding:9px 12px;border:1.5px solid var(--line);border-radius:8px;font-size:15px;letter-spacing:2px">
@@ -245,9 +245,9 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
       <div id="sNatCertBlock" style="margin-top:14px;padding:14px 16px;background:#f4f7fb;border:1.5px solid #d7e2f2;border-radius:12px">
         <label style="display:flex;gap:7px;align-items:flex-start;margin:0;font-weight:800;font-size:13.5px;color:#153A77"><input type="checkbox" id="sHasNatCert" style="width:auto;margin-top:2px" onchange="document.getElementById('sNatCertSub').style.display=this.checked?'block':'none'"> 🏅 국가공인 체육지도사 자격 보유 <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 문화체육관광부 발급 국가자격 (예: 유소년스포츠지도사·생활스포츠지도사 등). 연맹(KFDF) 자격증과는 별개입니다.</span></label>
         <div id="sNatCertSub" style="display:none;margin-top:10px">
-          <div id="sNatOnlyNote" style="display:none;margin-bottom:10px;padding:9px 12px;background:#fff;border:1.5px solid #153A77;border-radius:10px;font-size:12.5px;line-height:1.6;color:#153A77;font-weight:700">이 유형은 <b>유소년스포츠지도사(플라잉디스크)</b> 자격 보유자만 가입할 수 있습니다. 보디빌딩·축구 등 <b>다른 종목</b>의 체육지도자 자격은 인정되지 않으니 [👥 일반회원] 또는 [🏃 선수회원]으로 가입해 주세요.</div>
-          <label style="font-size:12px;font-weight:800">자격 종류 · 등급 <span style="color:#C41E2F">*</span></label>
-          <input id="sNatCertName" placeholder="예: 유소년스포츠지도사(플라잉디스크), 생활스포츠지도사 2급(플라잉디스크)">
+          <div id="sNatOnlyNote" style="display:none;margin-bottom:10px;padding:9px 12px;background:#fff;border:1.5px solid #153A77;border-radius:10px;font-size:12.5px;line-height:1.6;color:#153A77;font-weight:700">이 유형은 <b>플라잉디스크 종목</b>의 국가자격(유소년·생활·전문·장애인·노인스포츠지도사) 보유자만 가입할 수 있습니다. 아래에서 보유 자격을 모두 체크해 주세요. 보디빌딩·축구 등 <b>다른 종목</b>의 체육지도자 자격은 인정되지 않으니 [👥 일반회원] 또는 [🏃 선수회원]으로 가입해 주세요.</div>
+          <label style="font-size:12px;font-weight:800">자격 종류 · 등급 <span style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11px">— 보유 자격을 모두 체크 (복수 선택)</span></label>
+          <div id="sNatCertList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:6px;margin-top:6px"><label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:12.5px;border:1.5px solid #dfe5ee;border-radius:9px;padding:7px 10px;cursor:pointer;background:#fff"><input type="checkbox" class="sNatCertChk" value="유소년스포츠지도사(플라잉디스크)" style="width:auto;margin:0" onchange="sNatCertSync()"> 유소년스포츠지도사(플라잉디스크)</label><label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:12.5px;border:1.5px solid #dfe5ee;border-radius:9px;padding:7px 10px;cursor:pointer;background:#fff"><input type="checkbox" class="sNatCertChk" value="생활스포츠지도사 2급(플라잉디스크)" style="width:auto;margin:0" onchange="sNatCertSync()"> 생활스포츠지도사 2급(플라잉디스크)</label><label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:12.5px;border:1.5px solid #dfe5ee;border-radius:9px;padding:7px 10px;cursor:pointer;background:#fff"><input type="checkbox" class="sNatCertChk" value="생활스포츠지도사 1급(플라잉디스크)" style="width:auto;margin:0" onchange="sNatCertSync()"> 생활스포츠지도사 1급(플라잉디스크)</label><label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:12.5px;border:1.5px solid #dfe5ee;border-radius:9px;padding:7px 10px;cursor:pointer;background:#fff"><input type="checkbox" class="sNatCertChk" value="전문스포츠지도사 2급(플라잉디스크)" style="width:auto;margin:0" onchange="sNatCertSync()"> 전문스포츠지도사 2급(플라잉디스크)</label><label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:12.5px;border:1.5px solid #dfe5ee;border-radius:9px;padding:7px 10px;cursor:pointer;background:#fff"><input type="checkbox" class="sNatCertChk" value="전문스포츠지도사 1급(플라잉디스크)" style="width:auto;margin:0" onchange="sNatCertSync()"> 전문스포츠지도사 1급(플라잉디스크)</label><label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:12.5px;border:1.5px solid #dfe5ee;border-radius:9px;padding:7px 10px;cursor:pointer;background:#fff"><input type="checkbox" class="sNatCertChk" value="장애인스포츠지도사 2급(플라잉디스크)" style="width:auto;margin:0" onchange="sNatCertSync()"> 장애인스포츠지도사 2급(플라잉디스크)</label><label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:12.5px;border:1.5px solid #dfe5ee;border-radius:9px;padding:7px 10px;cursor:pointer;background:#fff"><input type="checkbox" class="sNatCertChk" value="장애인스포츠지도사 1급(플라잉디스크)" style="width:auto;margin:0" onchange="sNatCertSync()"> 장애인스포츠지도사 1급(플라잉디스크)</label><label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:12.5px;border:1.5px solid #dfe5ee;border-radius:9px;padding:7px 10px;cursor:pointer;background:#fff"><input type="checkbox" class="sNatCertChk" value="노인스포츠지도사(플라잉디스크)" style="width:auto;margin:0" onchange="sNatCertSync()"> 노인스포츠지도사(플라잉디스크)</label></div><div style="display:flex;gap:6px;align-items:center;margin-top:6px"><label style="display:flex;gap:6px;align-items:center;font-weight:700;font-size:12.5px;white-space:nowrap;margin:0"><input type="checkbox" id="sNatCertEtcOn" style="width:auto;margin:0" onchange="sNatCertSync()"> 기타</label><input id="sNatCertEtc" placeholder="기타 자격명 직접 입력" oninput="sNatCertSync()" style="flex:1;padding:8px 10px;border:1.5px solid #dfe5ee;border-radius:9px;font-size:13px;margin:0"></div><input type="hidden" id="sNatCertName">
           <label style="font-size:12px;font-weight:800;display:block;margin-top:10px">📎 자격증 사본 첨부 <span style="color:#C41E2F">*</span> <span style="font-weight:600;color:var(--gray);font-size:11px">— 이미지 파일 (자동 압축 업로드)</span></label>
           <input type="file" id="sNatCertFile" accept="image/*" style="display:block;margin-top:5px;font-size:13px">
           <div style="font-size:11.5px;color:#153A77;margin-top:6px;font-weight:700">사무국이 첨부된 사본을 확인한 뒤 회원가입 승인이 완료됩니다. (지금 첨부가 어려우면 가입 후 마이페이지에서도 첨부할 수 있으나, 첨부 전까지 승인이 보류됩니다)</div>
@@ -367,8 +367,11 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
       <label style="display:flex;gap:7px;align-items:center;margin-top:8px;font-weight:800;color:#0f766e"><input type="checkbox" id="sPrivacyAgree" style="width:auto"> (필수) 개인정보 수집·이용에 동의합니다.</label>
     </div>
     </div>
-    <label>이메일 <span id="emailHint" style="font-weight:600;color:#8a919d;font-size:12px">· 자녀 계정은 아이디만 입력</span></label><input id="aEmail" type="text" placeholder="example@email.com">
+    <!-- [아이디 가입] 가입 때만 보이는 아이디 칸 — 로그인은 아래 칸에 아이디 또는 이메일 -->
+    <div id="sIdBlock" style="display:none"><label>아이디 <span style="color:#C41E2F">*</span> <span style="font-weight:600;color:#8a919d;font-size:12px">— 영문 소문자·숫자·._- 4~20자 · 로그인에 사용</span></label><input id="sLoginId" placeholder="예: kfdf2026" autocomplete="username" onblur="idCheckLive()"><div id="sIdMsg" style="font-size:12px;font-weight:700;margin-top:3px;min-height:14px"></div></div>
+    <label><span id="aEmailLbl">아이디 또는 이메일</span> <span id="emailHint" style="font-weight:600;color:#8a919d;font-size:12px">· 자녀 계정은 아이디만 입력</span> <span id="sEmailHint" style="display:none;font-weight:600;color:#8a919d;font-size:12px">— 비밀번호 찾기·안내 발송에 사용</span></label><input id="aEmail" type="text" placeholder="아이디 또는 이메일">
     <label>비밀번호</label><input id="aPw" type="password" placeholder="6자 이상">
+    <div id="sNotifyBlock" style="display:none;margin-top:8px;padding:10px 13px;background:#f4f7fb;border:1.5px solid #d7e2f2;border-radius:10px;font-size:12.5px"><label style="display:flex;gap:7px;align-items:flex-start;margin:0;font-weight:700;color:#153A77"><input type="checkbox" id="sNotifyEmail" checked style="width:auto;margin-top:2px"> (선택) 대회 안내·연맹 소식을 이메일로 받겠습니다 <span style="font-weight:600;color:#8a919d">— 이메일을 적은 경우에만 발송되며, 마이페이지에서 언제든 바꿀 수 있습니다</span></label></div>
     <button class="btn-main" id="goBtn" onclick="go()">로그인</button>
     <div class="msg" id="aMsg"></div>
     <div id="postSignupLink" style="display:none;margin-top:14px;padding:14px 16px;background:#f0f7f4;border:1.5px solid #cfe3d8;border-radius:12px">
@@ -401,7 +404,9 @@ function mode(m){
   document.getElementById('goBtn').textContent=m==='L'?'로그인':'가입 신청';
   const eh=document.getElementById('emailHint');
   if(eh)eh.style.display=(m==='L')?'inline':'none';
-  document.getElementById('aEmail').placeholder=(m==='L')?'example@email.com (자녀는 로그인 아이디)':'example@email.com';
+  document.getElementById('aEmail').placeholder=(m==='L')?'아이디 또는 이메일':'example@email.com';
+  // [아이디 가입] 가입 모드에서만 아이디 칸·알림 동의 표시, 라벨 전환
+  (function(){const l=document.getElementById('aEmailLbl');if(l)l.textContent=(m==='L')?'아이디 또는 이메일':'이메일';['sIdBlock','sNotifyBlock'].forEach(function(k){const e=document.getElementById(k);if(e)e.style.display=(m==='S')?'':'none'});const sh=document.getElementById('sEmailHint');if(sh)sh.style.display=(m==='S')?'inline':'none'})();
   document.getElementById('postSignupLink').style.display='none';
   if(m==='S'){aaRender();setSignupType('instructor');}
 }
@@ -437,7 +442,7 @@ const MTYPE_INFO={
   teacher:{bg:'#f0f7f4',bd:'1.5px solid #cfe3d8',fg:'#0f766e',
     html:'🎓 <b>교사 (교원)</b> — 초·중·고 학교에 재직 중인 교원입니다. <b>재직 학교</b>를 검색해 선택하고 <b>재직증명서</b>를 첨부해 주세요. 체육 전공이시면 함께 체크해 주시면 됩니다. 지도자군으로 관리되어 강습·대회 운영에 배정됩니다. <b>수당 계좌·피복 사이즈·학력</b>이 필수입니다.<br><span style="font-weight:700">※ 대회 심판은 KFDF공인 자격 보유자만 신청 가능합니다 — 이 유형은 대회 운영요원으로 신청하실 수 있습니다.</span>'},
   natcert:{bg:'#f4f7fb',bd:'1.5px solid #d7e2f2',fg:'#153A77',
-    html:'🏅 <b>국가공인자격증 취득회원</b> — 문화체육관광부 발급 <b>유소년스포츠지도사(플라잉디스크)</b> 국가자격 보유자 <b>전용</b> 유형입니다. <b style="color:#C41E2F">다른 종목(보디빌딩·축구·수영 등)의 체육지도자 자격으로는 가입할 수 없습니다</b> — 그 경우 [👥 일반회원] 또는 [🏃 선수회원]으로 가입해 주세요. 연맹(KFDF) 자격증과 달리 <b>연맹 자격 대장에 없는 자격</b>이므로, 아래에서 <b>자격증 사본을 첨부</b>해 신청해 주세요. 사무국이 사본을 확인한 뒤 승인됩니다.<br><span style="font-weight:700">※ 대회 심판은 KFDF공인 자격 보유자만 신청 가능합니다 — 이 유형은 대회 운영요원으로 신청하실 수 있습니다.</span>'},
+    html:'🏅 <b>국가공인자격증 취득회원</b> — 문화체육관광부 발급 <b>플라잉디스크 종목</b> 국가자격(유소년·생활·전문·장애인·노인스포츠지도사) 보유자 <b>전용</b> 유형입니다. <b style="color:#C41E2F">다른 종목(보디빌딩·축구·수영 등)의 체육지도자 자격으로는 가입할 수 없습니다</b> — 그 경우 [👥 일반회원] 또는 [🏃 선수회원]으로 가입해 주세요. 연맹(KFDF) 자격증과 달리 <b>연맹 자격 대장에 없는 자격</b>이므로, 아래에서 <b>자격증 사본을 첨부</b>해 신청해 주세요. 사무국이 사본을 확인한 뒤 승인됩니다.<br><span style="font-weight:700">※ 대회 심판은 KFDF공인 자격 보유자만 신청 가능합니다 — 이 유형은 대회 운영요원으로 신청하실 수 있습니다.</span>'},
   athlete:{bg:'#f0f5ff',bd:'1.5px solid #c7d7f5',fg:'#1e3a8a',
     html:'🏃 <b>선수회원</b> — 대회에 선수로 참가하거나 클럽에서 활동하는 <b>성인 동호인</b>(연맹 소속·타 단체·무소속)입니다. 대회 접수·보험 처리를 위해 <b>주민등록번호</b>가 필요하며(암호화 분리 보관), 자격증 정보는 받지 않습니다.<br>지도자 자격을 보유하셨다면 [🧑‍🏫 KFDF공인 심판·지도자] 유형으로 가입해주세요.'},
   general:{bg:'#fbf7f0',bd:'1.5px solid #e8dcc8',fg:'#8a5a00',
@@ -451,7 +456,7 @@ const MTYPE_CFG={
   // [유형분리] 교사(교원) — 재직증명서·재직학교 검색·체육전공 체크 추가
   teacher:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sSchoolBlock','sEmployBlock','sQualBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
   // [유형분리] 국가공인자격증 — 연맹 DB에 없는 자격이라 사본을 첨부해 신청 (그 외 항목은 기존 교사 탭과 동일)
-  natcert:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sQualBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
+  natcert:   {show:['sRrnBlock','sAddrBlock','sAreaBlock','sNatCertBlock','sAffBlock','sDegreeBlock','sSizeBlock','sBankBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:true,size:true,degree:true,rrn:true}},
   athlete:   {show:['sAddrBlock','sAreaBlock','sAffBlock','sPledgeBox','sPrivacyBox'],req:{addr:true,area:true,aff:true,work:false,bank:false,size:false,degree:false,rrn:false}}, // [5부문] 선수군 — 자격증란 없음. [항목설정] 주민번호·피복·계좌는 받지 않음(관리자 페이지에서 켤 수 있음)
   general:   {show:['sAddrBlock','sAreaBlock','sPledgeBox','sPrivacyBox'],req:{addr:false,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}}, // [5부문] 일반 — 소속·자격증 블록 제거(간소화)
   student:   {show:['sSchoolBlock','sAddrBlock','sAreaBlock','sStudentAffBlock','sPrivacyBox'],req:{addr:true,area:true,aff:false,work:false,bank:false,size:false,degree:false,rrn:false}} // [항목설정] 학생은 피복·계좌를 받지 않음(관리자 페이지에서 켤 수 있음)
@@ -539,9 +544,8 @@ function setSignupType(t){
   })();
   // [유형분리] 국가공인자격증 유형은 자격 입력란을 기본으로 펼쳐 둡니다
   // [전용] 국가공인자격증 유형은 자격명을 유소년스포츠지도사(플라잉디스크)로 고정(수정 불가) — 다른 종목 자격 가입 차단
-  (function(){const nn=document.getElementById('sNatCertName'),no=document.getElementById('sNatOnlyNote');const FIX='유소년스포츠지도사(플라잉디스크)';
-    if(t==='natcert'){if(nn){nn.value=FIX;nn.readOnly=true;nn.style.background='#eef3fa';nn.style.fontWeight='800';nn.style.color='#153A77'}if(no)no.style.display='block'}
-    else{if(nn){nn.readOnly=false;nn.style.background='';nn.style.fontWeight='';nn.style.color='';if(nn.value===FIX)nn.value=''}if(no)no.style.display='none'}})();
+  // [국가자격 체크박스] 유형별 문구만 바꾸고, 자격은 목록에서 체크해 고릅니다 (국가공인자격증 유형은 플라잉디스크 종목만 허용 — 제출 시 검사)
+  (function(){const no=document.getElementById('sNatOnlyNote');if(no)no.style.display=(t==='natcert')?'block':'none';if(typeof sNatCertSync==='function')sNatCertSync()})();
   if(t==='natcert'){
     const hn=document.getElementById('sHasNatCert'), sub=document.getElementById('sNatCertSub');
     if(hn){hn.checked=true;}
@@ -551,6 +555,8 @@ function setSignupType(t){
   const gs=document.getElementById('sGenSubBlock');
   if(gs)gs.style.display=(t==='general')?'':'none';
   if(t==='general')setGenSub(GEN_SUB);
+  // [학생회원] 휴대폰 인증 없이 번호만 기입(보호자 번호 가능) · 이메일 선택
+  (function(){const st=(t==='student');const pvb=document.getElementById('phoneVerifyBox');if(pvb)pvb.style.display=st?'none':'';const prh=document.getElementById('phoneReqHint');if(prh){prh.textContent=st?'— 학생회원은 인증 없이 기입 (보호자 연락처도 가능)':'— 본인 휴대폰 인증 필수'}const el=document.getElementById('aEmailLbl');if(el&&M==='S')el.textContent=st?'이메일 (선택)':'이메일';const sh=document.getElementById('sEmailHint');if(sh)sh.textContent=st?'— 없으면 비워 두세요 (아이디로 로그인)':'— 비밀번호 찾기·안내 발송에 사용'})();
   const box=document.getElementById('typeInfoBox');
   const inf=MTYPE_INFO[t]||MTYPE_INFO.instructor;
   box.style.background=inf.bg;box.style.border=inf.bd;box.style.color=inf.fg;box.innerHTML=inf.html;
@@ -894,11 +900,23 @@ async function verifyPhoneCode(){
     msg.innerHTML='인증 실패: '+t;msg.style.color='#C41E2F';
   }
 }
+// [국가자격 체크박스] 목록 ↔ 숨은 입력 동기화
+// [국가자격 체크박스 2026-09-09] 선택 항목 → 숨은 입력('sNatCertName')에 ' · ' 로 이어 저장 (기존 natCertName 문자열 형식 그대로)
+function sNatCertSync(){const vals=[...document.querySelectorAll('.sNatCertChk:checked')].map(c=>c.value);const on=document.getElementById('sNatCertEtcOn'),et=document.getElementById('sNatCertEtc');if(on&&on.checked&&et&&et.value.trim())vals.push(et.value.trim());const h=document.getElementById('sNatCertName');if(h)h.value=vals.join(' · ');return vals}
+function sNatCertSet(val){const parts=String(val||'').split(/\s*·\s*/).map(x=>x.trim()).filter(Boolean);const known=[...document.querySelectorAll('.sNatCertChk')];known.forEach(c=>{c.checked=parts.indexOf(c.value)>=0});const rest=parts.filter(x=>!known.some(c=>c.value===x));const on=document.getElementById('sNatCertEtcOn'),et=document.getElementById('sNatCertEtc');if(on)on.checked=rest.length>0;if(et)et.value=rest.join(' · ');sNatCertSync()}
+// [아이디 가입] 아이디 사용 가능 여부 — loginIds 문서·합성 주소 계정(회원/자녀) 존재 확인. 사용 가능하면 '' 반환
+async function idAvailable(id){
+  try{const d=await DB.collection('loginIds').doc(id).get();if(d.exists)return '이미 사용 중인 아이디입니다. 다른 아이디를 입력하세요.'}catch(e){}
+  for(const dom of [KFDF_IDLOGIN.DOM_MEMBER,KFDF_IDLOGIN.DOM_KIDS]){try{const m=await AUTH.fetchSignInMethodsForEmail(id+dom);if(m&&m.length)return '이미 사용 중인 아이디입니다. 다른 아이디를 입력하세요.'}catch(e){}}
+  return '';
+}
+async function idCheckLive(){const el=document.getElementById('sLoginId'),m=document.getElementById('sIdMsg');if(!el||!m)return;const id=KFDF_IDLOGIN.norm(el.value);el.value=id;if(!id){m.textContent='';return}if(!KFDF_IDLOGIN.valid(id)){m.textContent='영문 소문자·숫자·._- 4~20자로 입력하세요';m.style.color='#C41E2F';return}m.textContent='확인 중…';m.style.color='#8a919d';const r=await idAvailable(id);m.textContent=r||'사용할 수 있는 아이디입니다';m.style.color=r?'#C41E2F':'#0f766e'}
 async function go(){
   let email=document.getElementById('aEmail').value.trim(), pw=document.getElementById('aPw').value;
-  if(!email||!pw)return say('이메일(또는 자녀 로그인 아이디)과 비밀번호를 입력하세요');
-  // 자녀 대리생성 계정: @가 없는 아이디는 자녀 계정 도메인으로 변환
-  if(M==='L'&&email.indexOf('@')<0)email=email.toLowerCase()+'@kids.kfdf.local';
+  if(M==='L'){if(!email||!pw)return say('아이디(또는 이메일)와 비밀번호를 입력하세요')}
+  else{if(!pw)return say('비밀번호를 입력하세요');if(pw.length<6)return say('비밀번호는 6자 이상이어야 합니다')}
+  // [아이디 로그인] @ 가 없으면 아이디 → loginIds(비밀번호로 잠근 이메일 / 합성 주소) → 없으면 자녀 계정 도메인
+  if(M==='L'&&email.indexOf('@')<0){const r=await KFDF_IDLOGIN.resolve(DB,email,pw);if(!r)return say('아이디 또는 비밀번호가 올바르지 않습니다');email=r}
   try{
     if(M==='L'){
       await AUTH.signInWithEmailAndPassword(email,pw);
@@ -907,6 +925,14 @@ async function go(){
       const name=document.getElementById('sName').value.trim();
       const phone=document.getElementById('sPhone').value.trim();
       if(!name)return say('이름을 입력하세요');
+      // [아이디 가입] 아이디 필수 · 이메일은 학생회원만 선택(없으면 합성 주소로 계정 생성) · 아이디 중복 확인
+      const loginId=KFDF_IDLOGIN.norm((document.getElementById('sLoginId')||{}).value);
+      if(!KFDF_IDLOGIN.valid(loginId))return say('아이디는 영문 소문자·숫자·._- 4~20자로 입력하세요');
+      const realEmail=email;
+      if(realEmail&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(realEmail))return say('이메일 형식을 확인해주세요');
+      if(!realEmail&&SIGNUP_TYPE!=='student')return say('이메일을 입력하세요 (비밀번호 찾기·안내 발송에 사용됩니다)');
+      email=realEmail||(loginId+KFDF_IDLOGIN.DOM_MEMBER);
+      const idTaken=await idAvailable(loginId);if(idTaken)return say(idTaken);
       if(!/^01[016789][-. ]?\d{3,4}[-. ]?\d{4}$/.test(phone)){say('휴대전화 번호를 확인해주세요 (예: 010-1234-5678)');return}
       const gender=document.getElementById('sGender').value;
       const birth=document.getElementById('sBirth').value;
@@ -993,7 +1019,7 @@ async function go(){
       // 국가공인 체육지도사 자격 — 강사·교사 유형에서 체크 시 종류·등급 입력 + 사본 첨부 (가입 단계에서 진행)
       let natCertName='';
       if((SIGNUP_TYPE==='instructor'||SIGNUP_TYPE==='natcert')&&document.getElementById('sHasNatCert')&&document.getElementById('sHasNatCert').checked){
-        natCertName=document.getElementById('sNatCertName').value.trim();
+        natCertName=sNatCertSync().join(' · ');   // [국가자격 체크박스]
         if(!natCertName)return say('보유하신 국가공인 자격의 종류·등급을 입력해주세요');
         const ncFile=document.getElementById('sNatCertFile')&&document.getElementById('sNatCertFile').files[0];
         // [유형분리] 국가공인자격증 유형은 사본이 곧 자격 증빙이므로 첨부를 필수로 받습니다
@@ -1005,7 +1031,7 @@ async function go(){
       // [유형분리] 국가공인자격증 유형은 자격 정보 자체가 필수
       if(SIGNUP_TYPE==='natcert'&&!natCertName)return say('국가공인자격 종류·등급을 입력하고 사본을 첨부해주세요.');
       // [전용] 국가공인자격증 취득회원 = 유소년스포츠지도사(플라잉디스크) 보유자만 (다른 종목 자격으로 가입하는 사례 차단)
-      if(SIGNUP_TYPE==='natcert'&&natCertName.indexOf('플라잉디스크')<0)return say('국가공인자격증 취득회원은 유소년스포츠지도사(플라잉디스크) 자격 보유자만 가입할 수 있습니다. 다른 종목 자격은 [일반회원] 또는 [선수회원]으로 가입해 주세요.');
+      if(SIGNUP_TYPE==='natcert'&&natCertName.split(' · ').some(x=>x.indexOf('플라잉디스크')<0))return say('국가공인자격증 취득회원은 플라잉디스크 종목의 국가자격 보유자만 가입할 수 있습니다. 다른 종목 자격은 [일반회원] 또는 [선수회원]으로 가입해 주세요. (기타 입력 시 종목 「플라잉디스크」를 함께 적어 주세요)');
       // [유형분리] 교사(교원) — 재직 학교 + 재직증명서 필수
       let employFile=null;
       if(SIGNUP_TYPE==='teacher'){
@@ -1020,8 +1046,8 @@ async function go(){
       const pnorm=phone.replace(/[^0-9]/g,'');
       if(pnorm.length<10){say('휴대전화 번호를 정확히 입력해주세요');return}
       // 휴대폰 본인인증 필수 — 인증 완료된 번호와 입력 번호가 일치해야 가입 진행 (미인증이면 계정 생성 안 됨)
-      if(PHONE_VERIFIED_NUM!==pnorm){say('휴대폰 본인인증을 완료해주세요.\n[📱 인증번호 받기] → 문자 6자리 입력 → [확인] 순서로 인증하면 가입할 수 있습니다.');return}
-      try{
+      if(SIGNUP_TYPE!=='student'&&PHONE_VERIFIED_NUM!==pnorm){say('휴대폰 본인인증을 완료해주세요.\n[📱 인증번호 받기] → 문자 6자리 입력 → [확인] 순서로 인증하면 가입할 수 있습니다.');return}
+      if(SIGNUP_TYPE!=='student')try{   // [학생회원] 보호자 번호를 적을 수 있어 중복 확인 생략
         const dup=await DB.collection('phoneIndex').doc(pnorm).get();
         if(dup.exists){say('이미 이 전화번호로 가입된 회원이 있습니다.\n기존 계정으로 로그인하시거나, 계정을 잊으셨으면 사무국(031-984-3248)으로 문의해주세요.');return}
       }catch(e){}
@@ -1064,9 +1090,12 @@ async function go(){
         if(_errs.length)return say('🎖 자격번호를 확인해주세요\n'+_errs.join('\n')+'\n\n번호를 정확히 입력하시거나, 자격번호 칸을 비우고 가입한 뒤 마이페이지에서 등록해주세요.');
       }
       // 인증된 전화계정에 이메일/비밀번호 연결 = 계정 생성. (본인인증을 통과해야만 여기 도달)
-      const cred=await AUTH.currentUser.linkWithCredential(firebase.auth.EmailAuthProvider.credential(email,pw));
+      // [학생회원] 인증 전화계정이 없으므로 이메일(또는 합성 주소)·비밀번호로 바로 계정 생성. 그 외 유형은 종전대로 인증된 전화계정에 연결
+      const cred=(SIGNUP_TYPE==='student')?await AUTH.createUserWithEmailAndPassword(email,pw):await AUTH.currentUser.linkWithCredential(firebase.auth.EmailAuthProvider.credential(email,pw));
       const baseDoc={
         name:name, email:email,
+        loginId:loginId, contactEmail:realEmail||'',   // [아이디 가입] 로그인 아이디 · 실제 연락 이메일(합성 주소 계정은 빈값)
+        notifyEmail:!!(realEmail&&document.getElementById('sNotifyEmail')&&document.getElementById('sNotifyEmail').checked), notifyEmailAt:firebase.firestore.FieldValue.serverTimestamp(),
         phone:phone,
         gender:gender, birth:birth,
         activityAreas:aaSave(), activityRegions:aaRegions(), baseCity:aaBase(),
@@ -1139,7 +1168,9 @@ async function go(){
         }
       }catch(e){console.warn('employ upload',e)}
       await DB.collection('users').doc(cred.user.uid).set(Object.assign(baseDoc,typeDoc));
-      await DB.collection('phoneIndex').doc(pnorm).set({uid:cred.user.uid}).catch(()=>{}); // 개인정보 최소화: 이름 미저장(중복확인은 존재여부만 사용)
+      // [아이디 가입] 아이디 → 로그인용 이메일 문서 (실제 이메일은 비밀번호로 잠가 저장, 합성 주소는 그대로)
+      try{await DB.collection('loginIds').doc(loginId).set(realEmail?{uid:cred.user.uid,enc:await KFDF_IDLOGIN.enc(loginId,pw,realEmail),at:firebase.firestore.FieldValue.serverTimestamp()}:{uid:cred.user.uid,email:email,at:firebase.firestore.FieldValue.serverTimestamp()})}catch(e){console.warn('loginIds',e)}
+      if(SIGNUP_TYPE!=='student')await DB.collection('phoneIndex').doc(pnorm).set({uid:cred.user.uid}).catch(()=>{}); // 개인정보 최소화: 이름 미저장(중복확인은 존재여부만 사용) · 학생회원은 보호자 번호일 수 있어 기록 생략
       // 주민등록번호 — 일반 회원정보와 분리된 privateInfo 컬렉션에 저장 (본인·중앙관리자만 열람). 강사·교사만 가입 시 즉시 저장, 일반·학생은 마이페이지에서 나중에 입력.
       if(rrnRaw){
         await DB.collection('privateInfo').doc(cred.user.uid).set({
@@ -1171,6 +1202,7 @@ async function go(){
 async function resetPw(){
   const email=document.getElementById('aEmail').value.trim();
   if(!email)return say('이메일을 먼저 입력하세요');
+  if(email.indexOf('@')<0)return say('아이디로는 비밀번호를 재설정할 수 없습니다. 가입 때 적은 이메일을 입력해 주세요. 이메일이 없는 학생회원은 보호자 또는 사무국(031-984-3248)에 문의해 주세요.');
   try{await AUTH.sendPasswordResetEmail(email);say('재설정 메일을 보냈습니다. 메일함을 확인하세요.',true)}catch(e){say('오류: '+e.message)}
 }
 AUTH.onAuthStateChanged(u=>{if(u&&M==='L'&&!location.hash)location.replace('mypage.html')}); // [뒤로가기] replace로 히스토리 항목 미생성
@@ -1258,6 +1290,6 @@ function pickSchoolInto(id){
     © 2026 KOREA FLYING DISC FEDERATION. All rights reserved. &nbsp;|&nbsp; <a href="privacy.html" style="color:#9aa1ad">개인정보처리방침</a>
   </div>
 </div></footer>
-<script src="auth_ui.js?v=20260907d"></script>
+<script src="auth_ui.js?v=20260909a"></script>
 </body>
 </html>

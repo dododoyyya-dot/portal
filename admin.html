@@ -315,6 +315,8 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub ufl" data-f="hdoc" onclick="userFilter('hdoc',this)" style="background:#8a919d" title="교원 회원 중 겸직 허가서가 없거나 반려된 회원, 확인 대기 중인 회원">🧑‍🏫 겸직 허가서 미비·대기</button>
         <button class="btn-sub" onclick="moonDocRemind()" style="background:#b8860b" title="겸직 허가서 미제출·반려 교원에게 제출 요청 알림">📣 겸직 허가서 요청 알림</button>
       </div>
+      <!-- [회원 유형 필터] 유형별로 보기 — 위 지원 분야 필터·검색과 함께 적용됩니다 -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center"><span style="font-size:12px;font-weight:800;color:#5b6472;margin-right:2px">회원 유형</span><button class="btn-sub utf" data-t="all" onclick="userType('all',this)" style="padding:5px 12px;font-size:12px">전체</button><button class="btn-sub utf" data-t="instructor" onclick="userType('instructor',this)" style="padding:5px 12px;font-size:12px;background:#8a919d">지도자·강사</button><button class="btn-sub utf" data-t="teacher" onclick="userType('teacher',this)" style="padding:5px 12px;font-size:12px;background:#8a919d">교사</button><button class="btn-sub utf" data-t="natcert" onclick="userType('natcert',this)" style="padding:5px 12px;font-size:12px;background:#8a919d">국가공인자격</button><button class="btn-sub utf" data-t="athlete" onclick="userType('athlete',this)" style="padding:5px 12px;font-size:12px;background:#8a919d">선수</button><button class="btn-sub utf" data-t="general" onclick="userType('general',this)" style="padding:5px 12px;font-size:12px;background:#8a919d">일반</button><button class="btn-sub utf" data-t="student" onclick="userType('student',this)" style="padding:5px 12px;font-size:12px;background:#8a919d">학생</button></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
         <span style="font-size:12.5px;font-weight:800;color:#6b7280">보기 방식</span>
         <button class="btn-sub vwl on" data-v="table" onclick="setView('table',this)">🗂 명단(표)</button>
@@ -2061,6 +2063,20 @@ async function scTemplate(){
     scDownload('학교스포츠클럽_대회결과_양식.xlsx',new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   }catch(e){alert('양식 생성 실패: '+e.message)}
 }
+// [읽기 오류 대응 2026-09-09] ExcelJS 4.4 는 docProps/app.xml 의 구조가 다르면(한셀·구글시트·타 도구 저장본) "reading 'company'" 오류로 멈춥니다.
+//   그 경우 JSZip 으로 docProps/app.xml·core.xml 만 빼낸 사본을 만들어 다시 읽습니다 (표 내용은 그대로).
+async function scLoadXlsx(buf){
+  const wb=new ExcelJS.Workbook();
+  try{await wb.xlsx.load(buf);return wb}
+  catch(e){
+    const msg=String(e&&e.message||e);
+    if(!/company|manager|docProps|reading '\w+'/.test(msg)||typeof JSZip==='undefined')throw e;
+    const zip=await JSZip.loadAsync(buf);
+    ['docProps/app.xml','docProps/core.xml','docProps/custom.xml'].forEach(p=>{if(zip.file(p))zip.remove(p)});
+    const buf2=await zip.generateAsync({type:'arraybuffer'});
+    const wb2=new ExcelJS.Workbook();await wb2.xlsx.load(buf2);return wb2;
+  }
+}
 async function scPreview(){
   const inp=document.getElementById('scFile');const f=inp&&inp.files&&inp.files[0];
   if(!f){alert('엑셀 파일(.xlsx)을 먼저 선택해 주세요.');return}
@@ -2068,7 +2084,7 @@ async function scPreview(){
   try{
     if(!USERS.length)await loadUsers();
     await new Promise(res=>{try{KFDF.loadSchools(()=>res())}catch(e){res()}});
-    const wb=new ExcelJS.Workbook();await wb.xlsx.load(await f.arrayBuffer());
+    const wb=await scLoadXlsx(await f.arrayBuffer());   // [읽기 오류 대응] app.xml 을 못 읽는 파일은 그 부분을 빼고 다시 읽음
     const ws=wb.worksheets[0];if(!ws)throw new Error('시트가 없습니다.');
     let hdrRow=0,hdr=[];
     ws.eachRow((row,n)=>{if(hdrRow)return;const vals=(row.values||[]).map(scCell);if(vals.some(v=>/^(성명|이름)/.test(v))&&vals.some(v=>/^대회명/.test(v))){hdrRow=n;hdr=vals}});
@@ -4003,6 +4019,10 @@ function exportCSV(){
   a.download='강습신청_전체.csv';a.click();
 }
 let UFL='전체';
+// [회원 유형 필터 2026-09-09] 지도자·강사 / 교사 / 국가공인자격 / 선수 / 일반 / 학생 — 다른 필터·검색과 함께 적용
+let UTYPE='all';
+function userType(t,btn){UTYPE=t;document.querySelectorAll('.utf').forEach(b=>{b.style.background=b.dataset.t===t?'':'#8a919d'});renderUsers();}
+function uTypeOf(v){if(v.accountType)return v.accountType;if(v.memberGroup==='student'||v.isMinor)return 'student';if(v.memberGroup==='active')return 'instructor';return 'general'}
 // [관할] 시도연맹 임원의 조회 범위 — 'mine'(관할 회원) / 'none'(관할 미판정)
 //   회원 문서에 sidoKey 가 비어 있으면 어느 시도에도 잡히지 않아 아무도 돌보지 못하게 됩니다.
 //   그래서 '미판정' 을 따로 볼 수 있게 하고, 채우기 도구가 판정 불가 회원에게도 빈 값('')을 남깁니다.
@@ -4156,6 +4176,7 @@ function showMemberModal(uid){
   document.body.appendChild(ov);
 }
 function uMatch(v){
+  if(UTYPE!=='all'){const t=uTypeOf(v);if(UTYPE==='student'){if(!(t==='student'||v.memberGroup==='student'||v.isMinor))return false}else if(t!==UTYPE)return false}   // [회원 유형 필터]
   if(UFL==='pending'){if(v.status==='approved')return false}
   else if(UFL==='any'){const f=v.instructorFor||{};if(v.status!=='approved')return false;if(!(f.school||f.after||f.referee||f.staff))return false}
   else if(UFL==='ncdoc'){if(!(v.natCertName&&!v.natCertDoc&&!v.natCertApproved))return false}
@@ -7575,6 +7596,6 @@ async function dlGoodsCerts(){
   a.download='용품수령확인증_'+n+'개교_'+new Date().toISOString().slice(0,10)+'.zip';a.click();
 }
 </script>
-<script src="auth_ui.js?v=20260907d"></script>
+<script src="auth_ui.js?v=20260909a"></script>
 </body>
 </html>

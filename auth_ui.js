@@ -5,6 +5,21 @@
   // ── 메뉴 구성 (2026-09-07 정리: 이모지·중복·화살표 제거, 항목명 간결화. 자격증 → 안전교육은 강사·활동에만) ──
   // [아이콘 2026-09-07] 이모지를 체육회 스타일 선 아이콘으로 바꿔 그리는 icons.js 를 모든 페이지에서 불러옵니다 (페이지 파일 무수정)
   try{if(!document.querySelector('script[src^="icons.js"]')){var _ic=document.createElement('script');_ic.src='icons.js?v=20260907';document.head.appendChild(_ic)}}catch(e){}
+  // ══ [아이디 로그인 2026-09-09] KFDF_IDLOGIN — 아이디 ↔ 로그인용 이메일. loginIds/{아이디} 문서에 비밀번호(PBKDF2→AES-GCM)로 잠근 실제 이메일을 두어, 비밀번호 없이는 이메일이 드러나지 않습니다.
+  //   이메일이 없는 계정(학생회원·보호자가 만든 자녀 계정)은 합성 주소(아이디@member.kfdf.local / @kids.kfdf.local)를 그대로 씁니다.
+  window.KFDF_IDLOGIN=(function(){
+    var DOM_MEMBER='@member.kfdf.local',DOM_KIDS='@kids.kfdf.local';
+    function norm(id){return String(id||'').trim().toLowerCase()}
+    function valid(id){return /^[a-z0-9._-]{4,20}$/.test(id)}
+    function b64(buf){var a=new Uint8Array(buf),s='';for(var i=0;i<a.length;i++)s+=String.fromCharCode(a[i]);return btoa(s)}
+    function unb64(s){var b=atob(s),a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a}
+    function key(id,pw){var te=new TextEncoder();return crypto.subtle.importKey('raw',te.encode(String(pw)),'PBKDF2',false,['deriveKey']).then(function(base){return crypto.subtle.deriveKey({name:'PBKDF2',salt:te.encode('kfdf-loginid:'+id),iterations:120000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])})}
+    function enc(id,pw,email){return key(id,pw).then(function(k){var iv=crypto.getRandomValues(new Uint8Array(12));return crypto.subtle.encrypt({name:'AES-GCM',iv:iv},k,new TextEncoder().encode(email)).then(function(ct){return b64(iv)+'.'+b64(ct)})})}
+    function dec(id,pw,blob){var p=String(blob||'').split('.');return key(id,pw).then(function(k){return crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(p[0])},k,unb64(p[1]))}).then(function(pt){return new TextDecoder().decode(pt)})}
+    // 아이디+비밀번호 → 로그인용 이메일. 문서가 없으면 자녀 계정 도메인, 비밀번호가 틀리면 null
+    function resolve(DB,id,pw){id=norm(id);return DB.collection('loginIds').doc(id).get().then(function(d){if(!d.exists)return id+DOM_KIDS;var x=d.data()||{};if(x.enc)return dec(id,pw,x.enc).catch(function(){return null});return x.email||(id+DOM_MEMBER)})}
+    return {norm:norm,valid:valid,enc:enc,dec:dec,resolve:resolve,DOM_MEMBER:DOM_MEMBER,DOM_KIDS:DOM_KIDS};
+  })();
   var MENU=[
     {t:'연맹소개',h:'about.html',d:[
       ['인사말 · 미션','about.html#greet'],['CI 소개','about.html#ci'],['조직도','about.html#org'],
