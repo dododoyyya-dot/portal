@@ -89,6 +89,12 @@ body[data-view] #clHead{display:none}
 @media(max-width:900px){.cl-meet{grid-template-columns:1fr}}
 #clPane4 .clubcard{padding:14px 16px;display:block}
 #clGate.gbox{text-align:center;font-weight:700}
+.cinfo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px;font-size:12.5px;margin-top:6px}
+.cinfo .ci{display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #eef1f6;align-items:flex-start;min-width:0}
+.cinfo .ci i{font-style:normal;flex:none;width:82px;color:#6b7280;font-weight:800}
+.cinfo .ci span{color:#374151;min-width:0;word-break:keep-all;line-height:1.6}
+.cinfo .ci.full{grid-column:1/-1}
+@media(max-width:760px){.cinfo{grid-template-columns:1fr}}
 @media(max-width:760px){.clubcard .ct{padding:14px 14px 8px}.clubcard .cchips,.clubcard .cintro,.clubcard .cbody{padding-left:14px;padding-right:14px}.clubcard .cfoot{padding:10px 14px 12px}}
 </style></style>
 </head>
@@ -286,6 +292,9 @@ body[data-view] #clHead{display:none}
       </div>
       <label class="clabel">클럽 소개</label>
       <input id="ncIntro" class="cfield" placeholder="한 줄 소개 (활동 종목·연령대 등)">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px"><div><label class="clabel">창립일 (선택)</label><input id="ncFounded" type="date" class="cfield"></div>
+      <div><label class="clabel">주 종목 (선택)</label><input id="ncSports" class="cfield" placeholder="예: 얼티미트, 디스크골프"></div></div>
+      <label class="clabel">홈 구장 · 주 활동 장소 (선택)</label><input id="ncHome" class="cfield" placeholder="예: 김포 한강 체육공원 잔디구장">
       <label class="clabel">클럽 내규 (회비 · 운동 시간 · 규칙)</label>
       <textarea id="ncRules" class="cfield" rows="5">1. 월 회비:      원 (운영·장소 대여 등에 사용)
 2. 정기 운동:  매주   요일    시 ~    시 /  장소:
@@ -383,7 +392,7 @@ function showClTab(k){
   const tb=document.getElementById('clTabs');
   if(tb){const r=tb.getBoundingClientRect();if(r.top<0||r.top>window.innerHeight-80)tb.scrollIntoView({block:'start'});}
 }
-let KME=null,KMY=null,ALLCLUBS=[],SIDO_F='',MYCLUB_CACHE=[],CLUB_AWARDS={};
+let KME=null,KMY=null,ALLCLUBS=[],SIDO_F='',MYCLUB_CACHE=[],CLUB_AWARDS={},CLUB_REC={};
 AUTH.onAuthStateChanged(async u=>{
   const g=document.getElementById('clGate');
   if(!u){g.style.display='block';g.innerHTML='🔒 승인 회원 전용입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a> 후 이용할 수 있습니다.';return}
@@ -442,6 +451,8 @@ async function loadClubs(){
     ALLCLUBS=snap.docs;
     // [클럽 입상] 공개 요약(clubAwards)을 한 번에 읽어 클럽별로 묶음
     try{const aq=await DB.collection('clubAwards').limit(1000).get();CLUB_AWARDS={};aq.docs.forEach(d=>{const a=d.data();if(!a.clubId)return;(CLUB_AWARDS[a.clubId]=CLUB_AWARDS[a.clubId]||[]).push(a)});Object.keys(CLUB_AWARDS).forEach(k=>CLUB_AWARDS[k].sort((x,y)=>String(y.date||'').localeCompare(String(x.date||''))))}catch(e){console.warn('clubAwards',e)}
+    // [클럽 정보] 교류전 전적(완료 경기) 클럽별 집계
+    try{const ms=await DB.collection('clubMatches').where('status','==','완료').limit(500).get();CLUB_REC={};ms.docs.forEach(d=>{const m=d.data();const A=CLUB_REC[m.chId]=CLUB_REC[m.chId]||{w:0,dr:0,l:0},B=CLUB_REC[m.tgId]=CLUB_REC[m.tgId]||{w:0,dr:0,l:0};if(m.scoreCh>m.scoreTg){A.w++;B.l++}else if(m.scoreCh<m.scoreTg){B.w++;A.l++}else{A.dr++;B.dr++}})}catch(e){console.warn('clubMatches',e)}
     // 전국 집계 (숨김 클럽 포함, 승인 기준 — 임시클럽 제외)
     const tot=snap.docs.filter(d=>d.data().status==='승인').reduce((a,d)=>{a.c++;a.m+=(d.data().memberUids||[]).length;return a},{c:0,m:0});
     const kp=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
@@ -479,7 +490,7 @@ function renderClubs(){
       const chips=(c.status==='임시'?'<span class="cpill2" style="background:#b8860b" title="학생들이 만든 임시클럽 — 성인 회장 인수 후 정식 승인됩니다">임시클럽</span>':'<span class="cpill2 o">연맹 정식 클럽</span>')
         +(c.clubType==='external'?'<span class="cpill2" style="background:#7c3aed" title="타 단체 소속 클럽 — 연맹 정식 클럽이 아닙니다">타단체'+(c.orgName?': '+kesc(c.orgName):'')+'</span>':'')
         +(c.code?'<span class="cpill2 o" title="클럽 코드">코드 '+kesc(c.code)+'</span>':'')
-        +((CLUB_AWARDS[d.id]||[]).length?'<span class="cpill2" style="background:#b8860b" title="연맹 대회 종료 처리·입상 신청 승인으로 등록된 클럽 입상 기록">입상 '+CLUB_AWARDS[d.id].length+'건</span>':'');
+        +(clubAwardN(d.id)?'<span class="cpill2" style="background:#b8860b" title="연맹 대회 종료 처리·입상 신청 승인으로 등록된 클럽 입상 기록">입상 '+clubAwardN(d.id)+'건</span>':'');
       return '<div class="clubcard" data-sido="'+kesc(c.sido||'')+'"><div class="ct">'+cavHtml(c)
         +'<div class="ttl"><span class="cname"><a href="clubhome.html?id='+d.id+'">'+kesc(c.name)+'</a></span>'
         +'<span class="loc">'+PIN+kesc(c.sido)+' '+kesc(c.gugun||'')+(c.clubType==='external'?' (활동 거점)':'')+'</span></div>'+act+'</div>'
@@ -495,39 +506,58 @@ function renderClubs(){
     }).join('');
 }
 // ── 클럽정보 칸 (내규 앞) — 구성원 나이대·성별 비율 등 통계만 공개, 명단은 클럽 회원만(클럽홈) ──
+function clubAwardN(id){return ((id&&CLUB_AWARDS[id])||[]).filter(a=>a.result&&a.result!=='참가').length}
 function clubInfoHtml(c,id){
-  const aw=(id&&CLUB_AWARDS[id])||[];
-  const awTxt=aw.length?'<br>입상 '+aw.length+'건: '+aw.slice(0,3).map(a=>kesc(a.date||'')+' '+kesc(a.competitionName||'')+(a.division?' '+kesc(a.division):'')+' <b style="color:#8a5a00">'+kesc(a.result||'')+'</b>').join(' · ')+(aw.length>3?' <a href="clubhome.html?id='+id+'" style="color:#153A77;font-weight:800">전체 보기</a>':''):'';
-  const adults=(c.members||[]),kids=(c.childMembers||[]);
-  const kidCids=new Set(kids.map(k=>k.cid));
-  const adultsOnly=adults.filter(m=>!kidCids.has(m.uid));
-  const total=adultsOnly.length+kids.length;
-  // 나이대 분포 (birth 있는 인원 기준)
-  const ages={'10세 이하':0,'11~13세':0,'14~17세':0,'18~29세':0,'30~49세':0,'50세 이상':0};
-  let aged=0;
-  const addAge=b=>{if(!b)return;const a=ageOf(b);if(a<=0)return;aged++;
-    if(a<=10)ages['10세 이하']++;else if(a<=13)ages['11~13세']++;else if(a<=17)ages['14~17세']++;
-    else if(a<=29)ages['18~29세']++;else if(a<=49)ages['30~49세']++;else ages['50세 이상']++;};
-  adultsOnly.forEach(m=>addAge(m.birth));kids.forEach(k=>addAge(k.birth));
-  // 성별 비율 (gender 기재 인원 기준)
-  let male=0,female=0;
-  const addG=g=>{g=String(g||'');if(g.indexOf('남')>=0)male++;else if(g.indexOf('여')>=0)female++;};
-  adultsOnly.forEach(m=>addG(m.gender));kids.forEach(k=>addG(k.gender));
-  const gTot=male+female;
-  const ageTxt=Object.keys(ages).filter(k=>ages[k]>0).map(k=>k+' '+ages[k]+'명').join(' · ');
-  const created=c.createdAt&&c.createdAt.toDate?c.createdAt.toDate().toISOString().slice(0,10):'';
-  return '<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#0f766e">📋 클럽 정보 보기</summary>'
-    +'<div style="font-size:12.5px;color:#4b5563;background:#f6fbf8;border:1px solid #d9ebe2;border-radius:10px;padding:10px 13px;margin-top:6px;line-height:1.9">'
-    +(c.clubType==='external'?'📍 활동 거점: ':'📍 소속·거점: ')+kesc(c.sido||'')+' '+kesc(c.gugun||'')
-    +(c.clubType==='external'&&c.orgName?' · 소속 단체: '+kesc(c.orgName):'')
-    +'<br>👑 클럽장: '+kesc(c.ownerName||'')+((c.temp||c.status==='임시')?' <b style="color:#8a5a00">🧒학생(임시)</b>':' <b style="color:#0f766e">✓성인</b>')
-    +(created?' · 개설일 '+created:'')
-    +'<br>👥 구성원: 총 '+total+'명 (성인 '+adultsOnly.length+' · 유소년 '+kids.length+')'
-    +(ageTxt?'<br>📊 나이대: '+ageTxt+(aged<total?' <span style="color:#8a919d">(미기재 '+(total-aged)+'명 제외)</span>':''):'')
-    +(gTot?'<br>⚖️ 성별: 남 '+Math.round(male/gTot*100)+'% · 여 '+Math.round(female/gTot*100)+'%'+(gTot<total?' <span style="color:#8a919d">(기재 '+gTot+'명 기준)</span>':''):'')
-    +awTxt
-    +'<br><span style="font-size:11.5px;color:#8a919d">개별 회원 명단은 클럽 회원만 클럽 홈에서 확인할 수 있습니다.</span>'
+  const owner=!!(KME&&c.ownerUid===KME.uid);
+  return '<details><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#0f766e">클럽 정보 보기</summary>'
+    +'<div style="background:#f6fbf8;border:1px solid #d9ebe2;border-radius:10px;padding:8px 13px 4px;margin-top:6px">'
+    +clubInfoRows(c,{awards:(id&&CLUB_AWARDS[id])||[],rec:(id&&CLUB_REC[id])||null,owner:owner,moreHref:id?'clubhome.html?id='+id:''})
+    +'<div style="font-size:11.5px;color:#8a919d;padding:6px 0 4px">창립일·주 종목·홈 구장·정기 활동·연락처는 클럽장이 [수정]에서 입력하고, 구성원·대회 참가·입상·교류전 전적은 자동 집계됩니다. 개별 회원 명단은 클럽 회원만 클럽 홈에서 확인할 수 있습니다.</div>'
     +'</div></details>';
+}
+
+// [클럽 정보] 구성원 통계 — 성인/유소년은 생년월일(만 나이) 기준. 학생회원 계정도 유소년으로 집계되고, 만 18세가 지나면 자동으로 성인으로 잡힙니다.
+function clubDemo(c){
+  const kids=(c.childMembers||[]),kidCids=new Set(kids.map(k=>k.cid));
+  const people=(c.members||[]).filter(m=>!kidCids.has(m.uid)).map(m=>({birth:m.birth,gender:m.gender,kid:false})).concat(kids.map(k=>({birth:k.birth,gender:k.gender,kid:true})));
+  const ages={'10세 이하':0,'11~13세':0,'14~17세':0,'18~29세':0,'30~49세':0,'50세 이상':0};
+  const d={total:people.length,adultN:0,minorN:0,unk:0,aged:0,male:0,female:0,ages:ages};
+  people.forEach(p=>{const a=ageOf(p.birth);
+    if(a<=0){if(p.kid)d.minorN++;else d.unk++}
+    else{d.aged++;if(a<18)d.minorN++;else d.adultN++;
+      if(a<=10)ages['10세 이하']++;else if(a<=13)ages['11~13세']++;else if(a<=17)ages['14~17세']++;else if(a<=29)ages['18~29세']++;else if(a<=49)ages['30~49세']++;else ages['50세 이상']++}
+    const g=String(p.gender||'');if(g.indexOf('남')>=0)d.male++;else if(g.indexOf('여')>=0)d.female++});
+  d.ageTxt=Object.keys(ages).filter(k=>ages[k]>0).map(k=>k+' '+ages[k]+'명').join(' · ');
+  return d;
+}
+// [클럽 정보] 라벨·값 표 — 기본 정보(클럽장 기입) + 자동 집계(구성원·대회 참가·입상·교류전)
+function clubInfoRows(c,opt){
+  opt=opt||{};const d=clubDemo(c);const E=opt.esc||kesc;
+  const aw=(opt.awards||[]).slice().sort((x,y)=>String(y.date||'').localeCompare(String(x.date||'')));
+  const awards=aw.filter(a=>a.result&&a.result!=='참가');
+  const events={};aw.forEach(a=>{const k=(a.competitionName||'')+'|'+(a.date||'');if(!events[k])events[k]=a});
+  const evList=Object.values(events);
+  const rec=opt.rec||null;const played=rec?(rec.w+rec.dr+rec.l):0;
+  const created=c.createdAt&&c.createdAt.toDate?c.createdAt.toDate().toISOString().slice(0,10):'';
+  const own=opt.owner;const miss=own?'<span style="color:#b8860b">미기입 — [수정]에서 입력</span>':'<span style="color:#9aa3b2">미기입</span>';
+  const R=(k,v,full)=>'<div class="ci'+(full?' full':'')+'"><i>'+k+'</i><span>'+v+'</span></div>';
+  let h='<div class="cinfo">';
+  h+=R(c.clubType==='external'?'활동 거점':'소속·거점',E(c.sido||'')+' '+E(c.gugun||'')+(c.clubType==='external'&&c.orgName?' · '+E(c.orgName):''));
+  h+=R('클럽장',E(c.ownerName||'')+((c.temp||c.status==='임시')?' <b style="color:#8a5a00">학생(임시)</b>':''));
+  h+=R('창립일',c.foundedAt?E(c.foundedAt):miss);
+  h+=R('사이트 등록',created?E(created):'-');
+  h+=R('주 종목',c.sports?E(c.sports):miss);
+  h+=R('홈 구장·장소',c.homeGround?E(c.homeGround):miss);
+  h+=R('정기 활동',c.activity?E(c.activity):miss);
+  h+=R('연락처',c.contact?(/^https?:\/\//.test(c.contact)?'<a href="'+E(c.contact)+'" target="_blank" rel="noopener" style="color:#1f5fb2;font-weight:800">'+E(c.contact.replace(/^https?:\/\//,'').slice(0,40))+'</a>':E(c.contact)):miss);
+  h+=R('구성원','총 <b>'+d.total+'</b>명 (성인 '+d.adultN+' · 유소년 '+d.minorN+(d.unk?' · 생년월일 미기재 '+d.unk:'')+')',true);
+  if(d.ageTxt)h+=R('나이대',d.ageTxt+(d.aged<d.total?' <span style="color:#9aa3b2">(미기재 '+(d.total-d.aged)+'명 제외)</span>':''),true);
+  if(d.male+d.female)h+=R('성별','남 '+Math.round(d.male/(d.male+d.female)*100)+'% · 여 '+Math.round(d.female/(d.male+d.female)*100)+'%'+((d.male+d.female)<d.total?' <span style="color:#9aa3b2">(기재 '+(d.male+d.female)+'명 기준)</span>':''));
+  h+=R('대회 참가',evList.length?'<b>'+evList.length+'</b>회'+(evList[0]?' · 최근 '+E(evList[0].date||'')+' '+E(evList[0].competitionName||''):''):'<span style="color:#9aa3b2">기록 없음</span>',true);
+  h+=R('입상',awards.length?'<b>'+awards.length+'</b>건 · '+awards.slice(0,2).map(a=>E(a.date||'')+' '+E(a.competitionName||'')+' <b style="color:#8a5a00">'+E(a.result||'')+'</b>').join(' · ')+(awards.length>2&&opt.moreHref?' <a href="'+opt.moreHref+'" style="color:#153A77;font-weight:800">전체 보기</a>':''):'<span style="color:#9aa3b2">기록 없음</span>',true);
+  h+=R('교류전 전적',played?'<b>'+rec.w+'승 '+rec.dr+'무 '+rec.l+'패</b> · 승률 '+Math.round(rec.w/played*100)+'% ('+played+'경기)':'<span style="color:#9aa3b2">기록 없음</span>',true);
+  h+='</div>';
+  return h;
 }
 function ageOf(birth){
   if(!birth)return 0;
@@ -837,7 +867,7 @@ async function loadMyClubs(){
         +(c.clubType==='external'?'<span class="cpill2" style="background:#7c3aed" title="타 단체 소속 클럽 — 연맹 정식 클럽이 아닙니다">🔗 타단체'+(c.orgName?': '+kesc(c.orgName):'')+'</span>':'')
         +badge
         +(c.code&&(isOwner||isMember)?'<span class="cpill2" style="background:#b8860b" title="이 코드로 회원을 초대할 수 있습니다">🔑 '+kesc(c.code)+'</span>':'')
-        +((CLUB_AWARDS[d.id]||[]).length?'<span class="cpill2" style="background:#7c3aed">입상 '+CLUB_AWARDS[d.id].length+'건</span>':'')
+        +(clubAwardN(d.id)?'<span class="cpill2" style="background:#7c3aed">입상 '+clubAwardN(d.id)+'건</span>':'')
         +'<span style="font-size:12px;color:#8a919d;font-weight:700">회원 '+((c.memberUids||[]).length)+'명</span>'
         +'<span style="flex:1"></span>'+homeBtn+ownerBtns+leaveBtn+'</div>'
         +(c.intro?'<div class="cmeta2">'+kesc(c.intro)+'</div>':'')
@@ -972,6 +1002,7 @@ async function createClub(){
       name:name,sido:sido,gugun:gugun,
       intro:document.getElementById('ncIntro').value.trim(),
       rulesText:document.getElementById('ncRules').value.trim(),
+      foundedAt:(document.getElementById('ncFounded')||{}).value||'',sports:((document.getElementById('ncSports')||{}).value||'').trim(),homeGround:((document.getElementById('ncHome')||{}).value||'').trim(),
       ownerUid:KME.uid,ownerName:KMY.name||'',
       status:TEMP_CLUB?'임시':'대기',temp:TEMP_CLUB,hidden:ncType==='external',code:code,
       clubType:ncType,orgName:orgName,
@@ -1011,6 +1042,12 @@ function editMyClub(id){
     +'<div style="font-size:11.5px;color:#8a919d;margin-top:3px">정사각형 이미지 권장 · 자동 압축 (2MB 이하)</div></div></div>'
     +'<label class="clabel">클럽명</label><input id="mcName" class="cfield" value="'+kesc(c.name||'')+'">'
     +'<label class="clabel">클럽 소개</label><input id="mcIntro" class="cfield" value="'+kesc(c.intro||'')+'">'
+    +'<div style="margin-top:14px;padding:12px 14px;background:#f5f8fd;border:1px solid #dbe4f3;border-radius:12px"><b style="font-size:13px;color:#141d51">기본 정보</b><div style="font-size:11.5px;color:#6b7280;margin-top:2px">클럽 정보 카드와 클럽 홈에 표시됩니다. 구성원·대회 참가·입상·교류전 전적은 자동 집계됩니다.</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px"><div><label class="clabel">창립일</label><input id="mcFounded" type="date" class="cfield" value="'+kesc(c.foundedAt||'')+'"></div>'
+    +'<div><label class="clabel">주 종목</label><input id="mcSports" class="cfield" value="'+kesc(c.sports||'')+'" placeholder="예: 얼티미트, 디스크골프"></div></div>'
+    +'<label class="clabel">홈 구장 · 주 활동 장소</label><input id="mcHome" class="cfield" value="'+kesc(c.homeGround||'')+'" placeholder="예: 김포 한강 체육공원 잔디구장">'
+    +'<label class="clabel">정기 활동</label><input id="mcActivity" class="cfield" value="'+kesc(c.activity||'')+'" placeholder="예: 매주 토 10:00~12:00">'
+    +'<label class="clabel">연락처 · SNS</label><input id="mcContact" class="cfield" value="'+kesc(c.contact||'')+'" placeholder="예: 010-0000-0000 / 인스타그램 주소"></div>'
     +'<label class="clabel">클럽 내규</label><textarea id="mcRules" class="cfield" rows="6">'+kesc(c.rulesText||'')+'</textarea>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
     +'<button class="cbtn" style="background:#eceff4;color:#555" onclick="document.getElementById(\'mcModal\').remove()">닫기</button>'
@@ -1023,7 +1060,8 @@ async function saveMyClub(id){
   try{
     const upd={name:name,
       intro:document.getElementById('mcIntro').value.trim(),
-      rulesText:document.getElementById('mcRules').value.trim()};
+      rulesText:document.getElementById('mcRules').value.trim(),
+      foundedAt:(document.getElementById('mcFounded')||{}).value||'',sports:((document.getElementById('mcSports')||{}).value||'').trim(),homeGround:((document.getElementById('mcHome')||{}).value||'').trim(),activity:((document.getElementById('mcActivity')||{}).value||'').trim(),contact:((document.getElementById('mcContact')||{}).value||'').trim()};
     const sf=document.getElementById('mcSymbol')&&document.getElementById('mcSymbol').files[0];
     if(sf)upd.symbol=await uploadClubSymbol(id,sf);
     await DB.collection('clubs').doc(id).update(upd);

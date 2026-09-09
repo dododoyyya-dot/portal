@@ -42,6 +42,12 @@
 .wallnote .wdel:hover{opacity:1}
 .teaserbox{text-align:center;padding:46px 20px;background:linear-gradient(180deg,#f6f8fc,#fff);border:1.5px dashed #d7e1f0;border-radius:18px}
 .teaserbox .em{font-size:40px}
+.cinfo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px;font-size:12.5px;margin-top:6px}
+.cinfo .ci{display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #eef1f6;align-items:flex-start;min-width:0}
+.cinfo .ci i{font-style:normal;flex:none;width:82px;color:#6b7280;font-weight:800}
+.cinfo .ci span{color:#374151;min-width:0;word-break:keep-all;line-height:1.6}
+.cinfo .ci.full{grid-column:1/-1}
+@media(max-width:760px){.cinfo{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -125,6 +131,7 @@
   <div id="chBody" style="display:none">
 
     <div class="clubcard" id="chHeader"></div>
+    <div class="clubcard" id="chInfo" style="margin-top:12px;display:none"></div>
     <div class="clubcard" id="chAwards" style="margin-top:12px;display:none"></div>
 
     <div id="chPublicArea" style="display:none">
@@ -218,7 +225,7 @@ async function loadClub(){
     document.getElementById('chGate').style.display='none';
     document.getElementById('chBody').style.display='block';
     renderHeader();
-    loadClubAwards().catch(e=>console.warn('clubAwards',e));
+    loadClubStats().catch(e=>console.warn('clubStats',e));
     if(CH_IS_MEMBER){
       document.getElementById('chMemberArea').style.display='block';
       document.getElementById('chPublicArea').style.display='none';
@@ -261,12 +268,13 @@ function renderHeader(){
 async function loadClubAwards(){
   const el=document.getElementById('chAwards');if(!el)return;
   const q=await DB.collection('clubAwards').where('clubId','==',CID).limit(300).get();
-  const list=q.docs.map(d=>d.data()).filter(a=>a.clubId===CID).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  const all=q.docs.map(d=>d.data()).filter(a=>a.clubId===CID).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  const list=all.filter(a=>a.result&&a.result!=='참가');   // 참가 기록은 클럽 정보의 '대회 참가'에만
   el.style.display='block';
   const TRO='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b8860b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"/></svg>';
   const head='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="display:inline-flex">'+TRO+'</span><b style="font-size:16px">클럽 입상 기록</b><span style="font-size:12.5px;color:#8a919d;font-weight:700">'+list.length+'건</span>'
     +'<span style="flex:1"></span><span style="font-size:11.5px;color:#8a919d">연맹 대회 종료 처리·입상 신청 승인 시 자동 등록</span></div>';
-  if(!list.length){el.innerHTML=head+'<div style="font-size:12.5px;color:#8a919d;margin-top:8px">아직 등록된 입상 기록이 없습니다. 연맹 대회에서 입상하면 자동으로 표시되고, 다른 대회 입상은 마이페이지 [입상 기록 신청]으로 등록할 수 있습니다.</div>';return}
+  if(!list.length){el.innerHTML=head+'<div style="font-size:12.5px;color:#8a919d;margin-top:8px">아직 등록된 입상 기록이 없습니다. 연맹 대회에서 입상하면 자동으로 표시되고, 다른 대회 입상은 마이페이지 [입상 기록 신청]으로 등록할 수 있습니다.</div>';return all}
   const byYear={};list.forEach(a=>{const y=String(a.date||'').slice(0,4)||'기타';(byYear[y]=byYear[y]||[]).push(a)});
   const years=Object.keys(byYear).sort((a,b)=>b.localeCompare(a));
   const row=a=>{const who=a.kind==='team'?((a.teamName?kesc(a.teamName)+' ':'')+((a.members||[]).length?'('+(a.members||[]).slice(0,6).map(kesc).join(', ')+((a.members||[]).length>6?' 외 '+((a.members||[]).length-6)+'명':'')+')':'')):(a.members||[]).map(kesc).join(', ');
@@ -278,6 +286,62 @@ async function loadClubAwards(){
     +'<thead><tr style="background:#f5f8fd"><th style="padding:8px;text-align:left;font-size:12px;color:#6b7280">일자</th><th style="padding:8px;text-align:left;font-size:12px;color:#6b7280">대회 · 부문</th><th style="padding:8px;font-size:12px;color:#6b7280">결과</th><th style="padding:8px;text-align:left;font-size:12px;color:#6b7280">선수</th></tr></thead>'
     +years.map(y=>'<tbody><tr><td colspan="4" style="padding:8px 8px 4px;font-weight:900;color:#141d51;border-top:1px solid #eef1f6">'+kesc(y)+'년 · '+byYear[y].length+'건</td></tr>'+byYear[y].map(a=>row(a).replace(/<td/g,'<td style="padding:7px 8px;border-top:1px solid #f1f3f7"').replace(/style="padding:7px 8px;border-top:1px solid #f1f3f7" style="/g,'style="padding:7px 8px;border-top:1px solid #f1f3f7;')).join('')+'</tbody>').join('')
     +'</table></div>';
+  return all;
+}
+// [클럽 정보] 입상·참가(clubAwards) + 교류전 전적(clubMatches) → 정보 카드
+async function loadClubStats(){
+  let all=[];try{all=(await loadClubAwards())||[]}catch(e){console.warn('clubAwards',e)}
+  let rec={w:0,dr:0,l:0};
+  try{const [a,b]=await Promise.all([DB.collection('clubMatches').where('chId','==',CID).where('status','==','완료').limit(300).get(),DB.collection('clubMatches').where('tgId','==',CID).where('status','==','완료').limit(300).get()]);
+    a.docs.concat(b.docs).forEach(d=>{const m=d.data();const me=m.chId===CID;const my=me?m.scoreCh:m.scoreTg,op=me?m.scoreTg:m.scoreCh;if(my>op)rec.w++;else if(my<op)rec.l++;else rec.dr++})}catch(e){console.warn('clubMatches',e)}
+  const el=document.getElementById('chInfo');if(!el)return;
+  el.style.display='block';
+  el.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:16px">클럽 정보</b><span style="font-size:11.5px;color:#8a919d">기본 정보는 클럽장이 [클럽 목록 › 내 클럽 › 수정]에서 입력 · 구성원·대회·교류전은 자동 집계</span></div>'
+    +clubInfoRows(CCLUB,{awards:all,rec:rec,owner:CH_IS_OWNER});
+}
+
+// [클럽 정보] 구성원 통계 — 성인/유소년은 생년월일(만 나이) 기준. 학생회원 계정도 유소년으로 집계되고, 만 18세가 지나면 자동으로 성인으로 잡힙니다.
+function clubDemo(c){
+  const kids=(c.childMembers||[]),kidCids=new Set(kids.map(k=>k.cid));
+  const people=(c.members||[]).filter(m=>!kidCids.has(m.uid)).map(m=>({birth:m.birth,gender:m.gender,kid:false})).concat(kids.map(k=>({birth:k.birth,gender:k.gender,kid:true})));
+  const ages={'10세 이하':0,'11~13세':0,'14~17세':0,'18~29세':0,'30~49세':0,'50세 이상':0};
+  const d={total:people.length,adultN:0,minorN:0,unk:0,aged:0,male:0,female:0,ages:ages};
+  people.forEach(p=>{const a=ageOf(p.birth);
+    if(a<=0){if(p.kid)d.minorN++;else d.unk++}
+    else{d.aged++;if(a<18)d.minorN++;else d.adultN++;
+      if(a<=10)ages['10세 이하']++;else if(a<=13)ages['11~13세']++;else if(a<=17)ages['14~17세']++;else if(a<=29)ages['18~29세']++;else if(a<=49)ages['30~49세']++;else ages['50세 이상']++}
+    const g=String(p.gender||'');if(g.indexOf('남')>=0)d.male++;else if(g.indexOf('여')>=0)d.female++});
+  d.ageTxt=Object.keys(ages).filter(k=>ages[k]>0).map(k=>k+' '+ages[k]+'명').join(' · ');
+  return d;
+}
+// [클럽 정보] 라벨·값 표 — 기본 정보(클럽장 기입) + 자동 집계(구성원·대회 참가·입상·교류전)
+function clubInfoRows(c,opt){
+  opt=opt||{};const d=clubDemo(c);const E=opt.esc||kesc;
+  const aw=(opt.awards||[]).slice().sort((x,y)=>String(y.date||'').localeCompare(String(x.date||'')));
+  const awards=aw.filter(a=>a.result&&a.result!=='참가');
+  const events={};aw.forEach(a=>{const k=(a.competitionName||'')+'|'+(a.date||'');if(!events[k])events[k]=a});
+  const evList=Object.values(events);
+  const rec=opt.rec||null;const played=rec?(rec.w+rec.dr+rec.l):0;
+  const created=c.createdAt&&c.createdAt.toDate?c.createdAt.toDate().toISOString().slice(0,10):'';
+  const own=opt.owner;const miss=own?'<span style="color:#b8860b">미기입 — [수정]에서 입력</span>':'<span style="color:#9aa3b2">미기입</span>';
+  const R=(k,v,full)=>'<div class="ci'+(full?' full':'')+'"><i>'+k+'</i><span>'+v+'</span></div>';
+  let h='<div class="cinfo">';
+  h+=R(c.clubType==='external'?'활동 거점':'소속·거점',E(c.sido||'')+' '+E(c.gugun||'')+(c.clubType==='external'&&c.orgName?' · '+E(c.orgName):''));
+  h+=R('클럽장',E(c.ownerName||'')+((c.temp||c.status==='임시')?' <b style="color:#8a5a00">학생(임시)</b>':''));
+  h+=R('창립일',c.foundedAt?E(c.foundedAt):miss);
+  h+=R('사이트 등록',created?E(created):'-');
+  h+=R('주 종목',c.sports?E(c.sports):miss);
+  h+=R('홈 구장·장소',c.homeGround?E(c.homeGround):miss);
+  h+=R('정기 활동',c.activity?E(c.activity):miss);
+  h+=R('연락처',c.contact?(/^https?:\/\//.test(c.contact)?'<a href="'+E(c.contact)+'" target="_blank" rel="noopener" style="color:#1f5fb2;font-weight:800">'+E(c.contact.replace(/^https?:\/\//,'').slice(0,40))+'</a>':E(c.contact)):miss);
+  h+=R('구성원','총 <b>'+d.total+'</b>명 (성인 '+d.adultN+' · 유소년 '+d.minorN+(d.unk?' · 생년월일 미기재 '+d.unk:'')+')',true);
+  if(d.ageTxt)h+=R('나이대',d.ageTxt+(d.aged<d.total?' <span style="color:#9aa3b2">(미기재 '+(d.total-d.aged)+'명 제외)</span>':''),true);
+  if(d.male+d.female)h+=R('성별','남 '+Math.round(d.male/(d.male+d.female)*100)+'% · 여 '+Math.round(d.female/(d.male+d.female)*100)+'%'+((d.male+d.female)<d.total?' <span style="color:#9aa3b2">(기재 '+(d.male+d.female)+'명 기준)</span>':''));
+  h+=R('대회 참가',evList.length?'<b>'+evList.length+'</b>회'+(evList[0]?' · 최근 '+E(evList[0].date||'')+' '+E(evList[0].competitionName||''):''):'<span style="color:#9aa3b2">기록 없음</span>',true);
+  h+=R('입상',awards.length?'<b>'+awards.length+'</b>건 · '+awards.slice(0,2).map(a=>E(a.date||'')+' '+E(a.competitionName||'')+' <b style="color:#8a5a00">'+E(a.result||'')+'</b>').join(' · ')+(awards.length>2&&opt.moreHref?' <a href="'+opt.moreHref+'" style="color:#153A77;font-weight:800">전체 보기</a>':''):'<span style="color:#9aa3b2">기록 없음</span>',true);
+  h+=R('교류전 전적',played?'<b>'+rec.w+'승 '+rec.dr+'무 '+rec.l+'패</b> · 승률 '+Math.round(rec.w/played*100)+'% ('+played+'경기)':'<span style="color:#9aa3b2">기록 없음</span>',true);
+  h+='</div>';
+  return h;
 }
 function showChTab(k){
   ['1','2','3'].forEach(n=>{const p=document.getElementById('chPane'+n);if(p)p.style.display=(n===k?'':'none')});
