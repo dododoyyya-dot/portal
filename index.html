@@ -15,7 +15,7 @@
 <link rel="canonical" href="https://xn--3e0bs9hwxbnzdb8dgzd5uq6mgd1dcu4a8tlm1a.com/">
 <title>대한민국 플라잉디스크의 중심 | 대한민국플라잉디스크연맹</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="style.css?v=20260907c">
+<link rel="stylesheet" href="style.css?v=20260909a">
 <style>
 #heroNotice:hover{opacity:1;transform:translateY(-2px);border-color:rgba(230,180,34,.7)}
 @media(max-width:1080px){#heroNotice{display:none!important}}
@@ -381,7 +381,7 @@
 <script src="region_map.js?v=20260907a"></script>
 <script src="banner.js?v=20260907b"></script>
 
-<section id="liveStats" style="display:none;background:linear-gradient(120deg,#0f1013,#1a1c22 60%,#153A77);padding:64px 0"><div class="wrap">
+<section id="liveStats" style="display:none;background:linear-gradient(120deg,#141d51,#1a2f7a 60%,#153A77);padding:64px 0"><div class="wrap">
   <div class="sec-label" style="color:#e6b422">LIVE</div>
   <h2 class="sec-title" style="color:#fff">사업 현황 <span id="lsTime" style="font-size:14px;font-weight:700;color:#9aa1ad"></span></h2>
   <p class="sec-desc" style="color:#c3c9d4">신청·선정·강습 진행 상황이 실시간으로 집계됩니다.</p>
@@ -417,7 +417,7 @@
   </div>
 </div></section>
 
-<section id="clubBattles" style="display:none;background:linear-gradient(120deg,#1a0f13,#0f1013 55%,#132347);padding:64px 0"><div class="wrap">
+<section id="clubBattles" style="display:none;background:linear-gradient(120deg,#141d51,#141d51 55%,#132347);padding:64px 0"><div class="wrap">
   <div class="sec-label" style="color:#e6b422">CLUB MATCH</div>
   <h2 class="sec-title" style="color:#fff">⚔️ 클럽 교류전 <a href="club.html" style="font-size:13px;font-weight:800;color:#2dd4bf;text-decoration:none;margin-left:10px">우리 클럽도 도전하기 →</a></h2>
   <p style="color:#9aa1ad;font-size:13.5px;margin:-6px 0 24px">전국 클럽들이 도전장을 주고받으며 전적을 쌓는 중! 승리하면 랭킹이 올라갑니다.</p>
@@ -494,11 +494,11 @@
     firebase.firestore().collection('licenseNotices').orderBy('createdAt','desc').limit(12).get().then(snap=>{
       const open=[];
       snap.forEach(d=>{const n=d.data();
-        if((n.approval===undefined||n.approval==='승인')&&n.status==='접수중'&&n.showOnBanner===true)open.push(n);});
+        if((n.approval===undefined||n.approval==='승인')&&n.status==='접수중'&&n.showOnBanner===true)open.push(Object.assign({id:d.id},n));});
       if(!open.length)return;
       const el=document.getElementById('lnList');
       el.innerHTML=open.slice(0,6).map(n=>
-        '<a href="license.html" style="display:block;background:#fff;border:1.5px solid #e8dcc8;border-radius:12px;padding:14px 16px;text-decoration:none;color:inherit">'
+        '<a href="license.html?id='+n.id+'" style="display:block;background:#fff;border:1.5px solid #e8dcc8;border-radius:12px;padding:14px 16px;text-decoration:none;color:inherit">'
         +'<span style="display:inline-block;background:'+(n.type==='갱신'?'#0f766e':((n.type||'').indexOf('보수')>=0?'#b8860b':'#153A77'))+';color:#fff;font-size:11.5px;font-weight:900;padding:3px 10px;border-radius:999px">'+(n.type||'공고')+'</span> '
         +(n.sido?'<span style="display:inline-block;background:#8a919d;color:#fff;font-size:11.5px;font-weight:900;padding:3px 10px;border-radius:999px">'+n.sido+'</span>':'')
         +'<b style="display:block;font-size:14.5px;margin-top:7px;line-height:1.5">'+(n.title||'')+'</b>'
@@ -704,9 +704,15 @@
     nwRender();schRender();
     // 접수 공고 → 소식
     try{const s=await DB.collection('licenseNotices').orderBy('createdAt','desc').limit(12).get();
-      s.forEach(d=>{const n=d.data();if((n.approval===undefined||n.approval==='승인')&&n.status==='접수중')NEWS.push({t:'recruit',cat:(n.type||'').indexOf('갱신')>=0?'접수':'공고',title:n.title||'',date:n.date||'',href:'license.html'})});nwRender()}catch(e){}
+      s.forEach(d=>{const n=d.data();if((n.approval===undefined||n.approval==='승인')&&n.status==='접수중')NEWS.push({t:'recruit',cat:(n.type||'').indexOf('갱신')>=0?'접수':'공고',title:n.title||'',date:n.date||'',href:'license.html?id='+d.id})});nwRender()}catch(e){}
     // 캘린더 일정 (공개)
     try{const s=await DB.collection('events').orderBy('start').limit(400).get();EV=EV.concat(s.docs.map(d=>Object.assign({id:d.id},d.data())))}catch(e){}
+    // [개별 페이지] 대회 일정은 해당 공고(competition.html?slot=)로 — 일정에 저장된 slotId, 없으면 공개 대회 목록(competitions)에서 제목·날짜로 찾음
+    try{const cs=await DB.collection('competitions').limit(150).get();const nt=t=>String(t||'').replace(/^🏆\s*/,'').replace(/\s+/g,'');const cmap={};
+      cs.docs.forEach(d=>{const c=d.data();const sid=(c.slotIds||[])[0];if(!sid)return;cmap[nt(c.title)+'|'+(c.dateStart||'')]=sid;if(!cmap[nt(c.title)])cmap[nt(c.title)]=sid;
+        if(!EV.some(v=>nt(v.title)===nt(c.title)&&(v.start||'')===(c.dateStart||'')))EV.push({title:c.title||'',type:'대회',start:c.dateStart||'',end:c.dateEnd||c.dateStart||'',sido:c.sido||'',place:c.place||'',href:'competition.html?slot='+sid})});
+      EV.forEach(e=>{if(e.href)return;const sid=e.type==='대회'?(e.slotId||((e.link||'').indexOf('slot=')>=0?(e.link.split('slot=')[1]||'').split('&')[0]:'')||cmap[nt(e.title)+'|'+(e.start||'')]||cmap[nt(e.title)]):'';if(sid)e.href='competition.html?slot='+sid;else if(e.id)e.href='calendar.html?id='+e.id});   // 공고가 없는 일정은 캘린더 단건 보기로
+    }catch(e){}
     // 대회 공고 (읽히면 보탬)
     try{const s=await DB.collection('compSlots').orderBy('date').limit(60).get();
       s.docs.forEach(d=>{const x=d.data();if(x.compId||x.role!=='참가')return;const e={title:x.title||'',type:'대회',start:x.date||'',end:x.date||'',sido:x.region||'',place:x.place||'',href:'competition.html?slot='+d.id};

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>일정 캘린더 | 대한민국플라잉디스크연맹</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="style.css?v=20260907c">
+<link rel="stylesheet" href="style.css?v=20260909a">
 <style>
 .calbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
 .calbar .mon{font-size:22px;font-weight:900;letter-spacing:-.3px;min-width:150px;text-align:center}
@@ -164,6 +164,8 @@ async function loadEvents(){
     EVENTS=snap.docs.map(d=>Object.assign({id:d.id},d.data()));
   }catch(e){EVENTS=[]}
   render();
+  // [개별 페이지] calendar.html?id=일정ID 로 들어오면 그 달로 이동해 일정 상세를 바로 엽니다 (홈 다가오는 대회·일정 카드에서 연결)
+  try{const _id=new URLSearchParams(location.search).get('id');if(_id){const _e=EVENTS.find(x=>x.id===_id);if(_e){const _d=new Date(String(_e.start||'').slice(0,7)+'-01T00:00:00');if(!isNaN(_d)){YM=_d;render()}viewEv(_id)}}}catch(e){}
 }
 loadEvents();
 function allEvents(){return EVENTS.concat(COMP_EVENTS).filter(e=>!FILTER||e.type===FILTER)}

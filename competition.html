@@ -7,7 +7,7 @@
 <meta name="naver-site-verification" content="f2bba301d1f9ca2d37efa24800dcad9676123d09" />
 <title>대회 · 심판 | 대한민국플라잉디스크연맹</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="style.css?v=20260907c">
+<link rel="stylesheet" href="style.css?v=20260909a">
 <style>
 /* ── 대회 모집·신청 UI (2026.8 리디자인) ── */
 .cslot{background:#fff;border:1px solid #e8ecf3;border-radius:16px;padding:20px 22px;margin-bottom:14px;box-shadow:0 2px 10px rgba(21,58,119,.05);transition:box-shadow .2s,transform .2s}
@@ -198,6 +198,8 @@ details.ccsec[open]>summary::after{content:'접기'}
   <div class="sec-label">COMPETITION</div>
   <h2 class="sec-title">대회 공고 · 일정</h2>
   <p class="sec-desc">등록된 참가·심판·운영요원 모집 공고가 실시간으로 게시됩니다. 공고를 누르면 신청 화면으로 이동합니다. <a href="results.html" style="font-weight:800;color:#153A77;white-space:nowrap">🏆 대회 결과 보기 →</a></p>
+  <!-- [권역 지도 2026-09-09] 공고를 권역별로 한눈에 — 표식을 누르면 그 권역 공고만, 다시 누르면 전체 -->
+  <div id="compMapWrap" style="display:none;margin:0 0 16px;padding:14px 12px;background:#fff;border:1px solid #e5e9f2;border-radius:16px"><div id="compMap" style="max-width:360px;margin:0 auto"></div><div id="compMapLab" style="text-align:center;font-size:12.5px;font-weight:700;color:#5b6472;margin-top:6px">권역을 누르면 그 권역 공고만 보입니다</div></div>
   <div id="liveComps"><div class="bempty">공고를 불러오는 중…</div></div>
   </div>
   <!-- ══════════ [구조개편] ① 대회 참가 모집 · 신청 ══════════ -->
@@ -2795,13 +2797,13 @@ async function cc2Save(){
           }
         }catch(e){}
       }
-      if(prev.eventId)await DB.collection('events').doc(prev.eventId).update({title:'🏆 '+title,start:base.dateStart,end:base.dateEnd,sido:sido,place:place,desc:base.desc||'대회 페이지에서 신청'}).catch(()=>{});
+      if(prev.eventId)await DB.collection('events').doc(prev.eventId).update(Object.assign({title:'🏆 '+title,start:base.dateStart,end:base.dateEnd,sido:sido,place:place,desc:base.desc||'대회 페이지에서 신청'},(prev.slotIds&&prev.slotIds[0])?{link:'competition.html?slot='+prev.slotIds[0],slotId:prev.slotIds[0]}:{})).catch(()=>{});
       alert('✓ 대회 공고가 수정되었습니다.');
     }else{
       const sref=await DB.collection('compSlots').add(Object.assign({bySido:sido,byUid:uid,
         claimed:[],cancels:[],confirmed:[],createdAt:firebase.firestore.FieldValue.serverTimestamp()},slotBase));
       const ev=await DB.collection('events').add({title:'🏆 '+title,type:'대회',start:base.dateStart,end:base.dateEnd,
-        sido:sido,place:place,desc:base.desc||'대회 페이지에서 신청',link:'competition.html',
+        sido:sido,place:place,desc:base.desc||'대회 페이지에서 신청',link:'competition.html?slot='+sref.id,slotId:sref.id,   // [개별 페이지] 홈·캘린더에서 이 공고로 바로
         byUid:uid,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
       const cref=await DB.collection('competitions').add(Object.assign({},base,{slotIds:[sref.id],eventId:ev.id,
         byUid:uid,createdAt:firebase.firestore.FieldValue.serverTimestamp()}));
@@ -2850,6 +2852,24 @@ async function loadLiveComps(){
       :'<div class="bempty">등록된 대회 공고가 없습니다. 공고가 올라오면 이곳에 실시간 게시됩니다.</div>';
   }catch(e){el.innerHTML='<div class="bempty">공고를 불러오지 못했습니다.</div>'}
 }
+// ══ [권역 지도 2026-09-09] 공고 목록을 권역별로 — 시도명(경남 등)·지역 문자열을 6개 권역으로 묶어 지도에 건수를 표시하고, 누르면 그 권역만 남김 ══
+let COMP_REG='';
+function compRegOf(s){try{return (window.KFDF_MAP?KFDF_MAP.guessRegion(String(s||'')):'')||''}catch(e){return ''}}
+function compMapFilter(){
+  document.querySelectorAll('#liveComps [data-reg],#cRefSlotList [data-reg]').forEach(x=>{x.style.display=(!COMP_REG||x.getAttribute('data-reg')===COMP_REG)?'':'none'});
+  const lab=document.getElementById('compMapLab');if(lab)lab.textContent=COMP_REG?(COMP_REG+' 권역 공고만 표시 중 — 지도를 다시 누르면 전체'):'권역을 누르면 그 권역 공고만 보입니다';
+}
+function compMapRender(){
+  const wrap=document.getElementById('compMapWrap'),host=document.getElementById('compMap');if(!wrap||!host||!window.KFDF_MAP)return;
+  if(document.body.classList.contains('oneslot')||new URLSearchParams(location.search).get('slot')){wrap.style.display='none';return}
+  const items=[...document.querySelectorAll('#liveComps [data-reg],#cRefSlotList [data-reg]')];
+  if(!items.length){wrap.style.display='none';return}
+  const counts={};KFDF_MAP.REGIONS.forEach(r=>counts[r]=0);items.forEach(x=>{const r=x.getAttribute('data-reg');if(counts[r]!=null)counts[r]++});
+  const c2={};Object.keys(counts).forEach(r=>c2[r]='공고 '+counts[r]+'건');
+  wrap.style.display='';
+  window.__compMap=KFDF_MAP.render('compMap',{mode:'single',selected:COMP_REG?[COMP_REG]:[],counts:c2,onChange:sel=>{const r=sel[0]||'';COMP_REG=(r===COMP_REG)?'':r;if(!COMP_REG&&window.__compMap)window.__compMap.set([]);compMapFilter()}});
+  compMapFilter();
+}
 async function loadSlots(){
   const el=document.getElementById('cSlotList');
   try{
@@ -2872,7 +2892,7 @@ async function loadSlots(){
       const c=cd.data();
       const slots=byComp[cd.id]||[];
       const sports=(c.sports||[]).map(x=>'<span class="rbadge" style="background:'+(x.mode==='체험부스'?'#b8860b':'#153A77')+'">'+cesc(x.name)+(x.mode==='체험부스'?' 🎪체험부스':'')+'</span>').join(' ');
-      html+='<div style="border:2px solid #b9cdec;border-radius:18px;padding:4px 16px 14px;margin-bottom:22px;background:#f8fbff">'
+      html+='<div data-reg="'+compRegOf(c.sido)+'" style="border:2px solid #b9cdec;border-radius:18px;padding:4px 16px 14px;margin-bottom:22px;background:#f8fbff">'
         +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 4px 8px">'
         +'<b style="font-size:17px">🏆 '+cesc(c.title)+'</b>'+sports
         +'<span style="font-size:12.5px;color:#5b6472;font-weight:700">📅 '+cesc(c.dateStart)+(c.dateEnd&&c.dateEnd!==c.dateStart?' ~ '+cesc(c.dateEnd):'')+' · <span style="font-size:14px;font-weight:800;color:#374151">📍 '+cesc(c.place||'')+'</span></span></div>'
@@ -2889,6 +2909,7 @@ async function loadSlots(){
       const rf=snap.docs.filter(d=>d.data().role!=='참가').map(d=>slotCardCompact(d,today)).join('');
       refEl.innerHTML=rf||'<div class="bempty">진행 중인 심판·운영 위촉 공고가 없습니다. (신규 공고는 위 「심판·운영요원 모집공고」에 게시됩니다)</div>';
     }
+    compMapRender();   // [권역 지도]
     // [1공고 1상세] 목록에서 공고 하나를 눌러 들어오면(?slot=id) 그 공고 하나만 단독으로 보여줍니다.
     const _qs=new URLSearchParams(location.search).get('slot');
     if(_qs){
@@ -2918,7 +2939,7 @@ function slotCardCompact(d,today){
   // [공고 시인성] 날짜 배지 + 제목 + 메타 한 줄 (항목은 종전과 동일)
   const dm=String(s.date||'').match(/^\d{4}-(\d{2})-(\d{2})$/);
   const dateBadge='<div class="cdate"><b>'+(dm?(+dm[1])+'.'+dm[2]:'-')+'</b><span>'+(dm?cc2DowOf(s.date):'')+'</span></div>';
-  return '<div class="cslot crow" data-newkey="'+d.id+'" style="cursor:pointer" onclick="location.href=\'competition.html?slot='+d.id+'\'">'+dateBadge+'<div class="cbody">'
+  return '<div class="cslot crow" data-newkey="'+d.id+'" data-reg="'+compRegOf(s.region)+'" style="cursor:pointer" onclick="location.href=\'competition.html?slot='+d.id+'\'">'+dateBadge+'<div class="cbody">'
     +'<div class="chead">'+(s.host?'<span style="font-size:12px;font-weight:800;color:#6b7280">'+cesc(s.host)+' · </span>':'')+'<span class="ctitle">'+cesc(s.title)+'</span><span class="rbadge" style="background:'+rc+'">'+cesc(s.role)+(s.role==='참가'?' (선수)':'요원')+'</span>'
     +(closed?'<span class="rbadge" style="background:#8a919d">마감</span>':'')
     +(applied?'<span class="rbadge" style="background:#0f766e">✓ 신청함</span>':'')+(s.compKind==='schoolclub'?'<span class="rbadge" style="background:#0e7490">학교스포츠클럽</span>':'')
@@ -4000,6 +4021,7 @@ function tbRemoveMember(ti,mi){
 </div></footer>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="region_map.js?v=20260907a"></script>
 <script src="auth_ui.js?v=20260909c"></script>
 </body>
 </html>

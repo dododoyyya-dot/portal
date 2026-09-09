@@ -7,7 +7,7 @@
 <meta name="naver-site-verification" content="f2bba301d1f9ca2d37efa24800dcad9676123d09" />
 <title>공지사항 · 공고 | 대한민국플라잉디스크연맹</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="style.css?v=20260907c">
+<link rel="stylesheet" href="style.css?v=20260909a">
 </head>
 <body>
 <div class="util"><div class="wrap">
@@ -148,11 +148,11 @@ const POSTS = [
 const board = document.getElementById('board');
 let cat = "전체", q = "";
 function render(){
-  const list = POSTS
+  const list = POSTS.map((p,idx)=>Object.assign({idx:idx},p))
     .filter(p => (cat==="전체"||p.cat===cat) && (p.title.includes(q)||p.body.includes(q)))
     .sort((a,b)=> (b.pin-a.pin) || b.date.localeCompare(a.date));
   board.innerHTML = list.length ? list.map((p,i)=>`
-    <div class="brow" onclick="this.classList.toggle('open')">
+    <div class="brow" data-i="${p.idx}" onclick="this.classList.toggle('open')">
       <div class="head">
         <div class="no ${p.pin?'pin':''}">${p.pin?'공지':list.length-i}</div>
         <div class="tt">${p.title}${(new Date()-new Date(p.date))/864e5<14?'<span class="new">N</span>':''}</div>
@@ -168,6 +168,8 @@ document.querySelectorAll('.bcat').forEach(b=>b.onclick=()=>{
 });
 document.getElementById('bq').oninput=e=>{q=e.target.value.trim();render();};
 render();
+// [개별 페이지] notice.html?i=번호 로 들어오면 그 글만 펼쳐 보이고 나머지는 숨김 (목록으로 돌아가는 링크 제공)
+(function(){try{const i=new URLSearchParams(location.search).get('i');if(i==null)return;const rows=[...document.querySelectorAll('#board .brow')];const hit=rows.find(r=>r.dataset.i===String(i));if(!hit)return;rows.forEach(r=>{if(r!==hit)r.style.display='none'});hit.classList.add('open');hit.onclick=null;document.getElementById('board').insertAdjacentHTML('afterbegin','<div style="padding:10px 0 12px"><a href="notice.html" style="font-weight:800;color:var(--blue);font-size:13.5px">← 전체 게시글 목록</a></div>');const tools=document.querySelector('.board-tools');if(tools)tools.style.display='none';window.scrollTo(0,0)}catch(e){}})();
 </script>
 
 <footer><div class="wrap">
@@ -192,9 +194,9 @@ render();
   function esc(x){return String(x||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
   function load(){
     firebase.firestore().collection('licenseNotices').orderBy('createdAt','desc').limit(12).get().then(snap=>{
-      const open=[];snap.forEach(d=>{const n=d.data();if((n.approval===undefined||n.approval==='승인')&&n.status==='접수중'&&n.showOnBanner===true)open.push(n);});
+      const open=[];snap.forEach(d=>{const n=d.data();if((n.approval===undefined||n.approval==='승인')&&n.status==='접수중'&&n.showOnBanner===true)open.push(Object.assign({id:d.id},n));});
       if(!open.length)return;
-      document.getElementById('lnList').innerHTML=open.slice(0,6).map(n=>'<a href="license.html" style="display:block;background:#fff;border:1px solid #e8dcc8;border-radius:10px;padding:12px 14px;text-decoration:none;color:inherit"><b style="font-size:13.5px">'+(n.title||'')+'</b><span style="display:block;font-size:12px;color:#5b6472;margin-top:3px">'+(n.date||'')+(n.until?' · 마감 '+n.until:'')+'</span></a>').join('');
+      document.getElementById('lnList').innerHTML=open.slice(0,6).map(n=>'<a href="license.html?id='+n.id+'" style="display:block;background:#fff;border:1px solid #e8dcc8;border-radius:10px;padding:12px 14px;text-decoration:none;color:inherit"><b style="font-size:13.5px">'+(n.title||'')+'</b><span style="display:block;font-size:12px;color:#5b6472;margin-top:3px">'+(n.date||'')+(n.until?' · 마감 '+n.until:'')+'</span></a>').join('');
       document.getElementById('lnStrip').style.display='block';
     }).catch(e=>console.warn(e));
     firebase.firestore().collection('public').doc('stats').get().then(doc=>{

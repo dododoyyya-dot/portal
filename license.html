@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>연맹 자격증 (지도자·심판) | 대한민국플라잉디스크연맹</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="style.css?v=20260907c">
+<link rel="stylesheet" href="style.css?v=20260909a">
 <style>
 .lcbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
 .lcchip{border:1.5px solid #dfe5ee;background:#fff;color:#5b6472;font-weight:800;font-size:13px;padding:8px 15px;border-radius:999px;cursor:pointer;transition:.15s}
@@ -400,13 +400,13 @@ async function loadNotices(){
       const closed=n.status!=='접수중';
       const mine=ISMGR&&(CENTRAL||MFEDS.indexOf(n.sido)>=0);
       const rst=n.reportStatus||'';
-      let html='<div class="lccard"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center"><div style="flex:1;min-width:240px">'
+      let html='<div class="lccard" data-nid="'+d.id+'"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center"><div style="flex:1;min-width:240px">'
         +String(n.type||'신규').split('·').map(t=>'<span class="lctag" style="background:'+(t==='갱신'?'#0f766e':(t.indexOf('보수')>=0?'#b8860b':'#153A77'))+'">'+esc(t)+'</span>').join(' ')+' '
         +'<span class="lctag" style="background:#8a919d">'+esc(n.target)+'</span> '
         +(n.sido?'<span class="lctag" style="background:#b8860b">'+esc(n.sido)+'</span> ':'')
         +(!approved?'<span class="lctag" style="background:'+(n.approval==='반려'?'#C41E2F':'#7c3aed')+'">'+(n.approval==='반려'?'반려됨':'중앙승인 대기')+'</span> ':(closed?'<span class="lctag" style="background:#C41E2F">마감</span> ':''))
         +(rst?'<span class="lctag" style="background:'+(rst==='승인'?'#0f766e':(rst==='보완요청'?'#C41E2F':'#b8860b'))+'">보고 '+esc(rst)+'</span> ':'')
-        +(n.showOnBanner?'<span class="lctag" style="background:#e6b422;color:#1a1c22">📢 메인배너노출</span> ':'')
+        +(n.showOnBanner?'<span class="lctag" style="background:#e6b422;color:#1a2f7a">📢 메인배너노출</span> ':'')
         +'<b style="font-size:15.5px;display:block;margin-top:6px">'+esc(n.title)+'</b>'
         +'<div style="font-size:12.5px;color:var(--gray);margin-top:4px;line-height:1.7">'+esc(n.issuer||'')+' · '+esc(n.date||'')+' · '+esc(n.place||'')+(n.fee?' · '+esc(n.fee):'')+(n.until?' · 마감 '+esc(n.until):'')
         +(n.acct?'<br>💳 수수료 입금: '+esc(n.acct):'')
@@ -432,6 +432,8 @@ async function loadNotices(){
         +'</div></div></div>';
       return html;
     }).join('');
+    // [개별 페이지] license.html?id=공고ID 로 들어오면 그 공고만 보이고 나머지는 숨김
+    try{const nid=new URLSearchParams(location.search).get('id');if(nid){const cards=[...el.querySelectorAll('.lccard')];const hit=cards.find(c=>c.dataset.nid===nid);if(hit){cards.forEach(c=>{if(c!==hit)c.style.display='none'});el.insertAdjacentHTML('afterbegin','<div style="margin-bottom:12px"><a href="license.html" style="font-weight:800;color:var(--blue);font-size:13.5px">← 전체 공고 목록</a></div>');el.scrollIntoView({block:'start'})}}}catch(e){}
   }catch(e){el.innerHTML='<div class="bempty">불러오기 실패: '+esc(e.message)+'</div>'}
 }
 let EDIT_ID=null;

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>심판·운영요원 모집 | 대한민국플라잉디스크연맹</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="style.css?v=20260907c">
+<link rel="stylesheet" href="style.css?v=20260909a">
 <style>
 .stcard{background:#fff;border:1px solid #e6eaf2;border-radius:18px;padding:18px 20px;margin-bottom:12px;box-shadow:0 1px 4px rgba(15,25,60,.04)}
 .stbtn{border:none;cursor:pointer;font-family:inherit;font-weight:800;font-size:13px;padding:9px 18px;border-radius:11px;transition:filter .15s}
@@ -134,6 +134,8 @@ body.onepost #stWriteBox{display:none!important}   /* [1공고 1상세] PC 에�
       </div>
     </div>
 
+    <!-- [권역 지도 2026-09-09] 심판·운영 공고를 권역별로 — 표식을 누르면 그 권역만 -->
+    <div id="stMapWrap" style="display:none;margin:0 0 14px;padding:14px 12px;background:#fff;border:1px solid #e5e9f2;border-radius:16px"><div id="stMap" style="max-width:360px;margin:0 auto"></div><div id="stMapLab" style="text-align:center;font-size:12.5px;font-weight:700;color:#5b6472;margin-top:6px">권역을 누르면 그 권역 공고만 보입니다</div></div>
     <div id="stList"><div class="bempty">불러오는 중…</div></div>
   </div>
 </div></section>
@@ -340,7 +342,7 @@ function rowHtml(p){
   const period=periodTxt(p);
   // [목록간소화] 목록에는 요약만 표시합니다. 클릭하면 이 공고 하나만 보여주는 단독 상세 페이지(staff.html?post=id)로 이동합니다.
   //   본문(expandRowHtml — 포스터 이미지 등)은 목록 DOM에 아예 넣지 않아, 공고가 많아도 목록 페이지 길이가 늘어나지 않습니다.
-  return '<div class="strowitem" id="row_'+p.id+'">'
+  return '<div class="strowitem" id="row_'+p.id+'" data-reg="'+stRegOf(p)+'">'
     +'<div class="strow" data-newkey="'+p.id+'" onclick="location.href=\'staff.html?post='+p.id+'\'" style="cursor:pointer">'
     +'<span class="stpill" style="background:'+stCol+';font-size:11px;padding:2px 9px">'+stTxt+'</span>'
     +(!p.approved?'<span class="stpill" style="background:#C41E2F;font-size:11px;padding:2px 9px">승인대기</span>':'')
@@ -462,6 +464,24 @@ function toggleRow(id){
   if(angl)angl.style.transform=open?'rotate(90deg)':'';
   if(item)item.classList.toggle('open',open);
 }
+// ══ [권역 지도 2026-09-09] 공고의 시도(sido)·장소 문자열을 6개 권역으로 묶어 지도에 건수 표시, 누르면 그 권역만 ══
+let ST_REG='';
+function stRegOf(p){try{return (window.KFDF_MAP?(KFDF_MAP.guessRegion(p.sido||'')||KFDF_MAP.guessRegion(p.location||'')||KFDF_MAP.guessRegion((p.author&&p.author.organization)||'')):'')||''}catch(e){return ''}}
+function stMapFilter(){
+  document.querySelectorAll('#stList .strowitem[data-reg]').forEach(x=>{x.style.display=(!ST_REG||x.getAttribute('data-reg')===ST_REG)?'':'none'});
+  const lab=document.getElementById('stMapLab');if(lab)lab.textContent=ST_REG?(ST_REG+' 권역 공고만 표시 중 — 지도를 다시 누르면 전체'):'권역을 누르면 그 권역 공고만 보입니다';
+}
+function stMapRender(){
+  const wrap=document.getElementById('stMapWrap');if(!wrap||!window.KFDF_MAP)return;
+  if(document.body.classList.contains('onepost')||new URLSearchParams(location.search).get('post')){wrap.style.display='none';return}
+  const items=[...document.querySelectorAll('#stList .strowitem[data-reg]')];
+  if(!items.length){wrap.style.display='none';return}
+  const counts={};KFDF_MAP.REGIONS.forEach(r=>counts[r]=0);items.forEach(x=>{const r=x.getAttribute('data-reg');if(counts[r]!=null)counts[r]++});
+  const c2={};Object.keys(counts).forEach(r=>c2[r]='공고 '+counts[r]+'건');
+  wrap.style.display='';
+  window.__stMap=KFDF_MAP.render('stMap',{mode:'single',selected:ST_REG?[ST_REG]:[],counts:c2,onChange:sel=>{const r=sel[0]||'';ST_REG=(r===ST_REG)?'':r;if(!ST_REG&&window.__stMap)window.__stMap.set([]);stMapFilter()}});
+  stMapFilter();
+}
 function renderList(){
   const el=document.getElementById('stList');
   if(!POSTS.length){el.innerHTML='<div class="bempty">현재 등록된 모집 공고가 없습니다.</div>';return}
@@ -488,6 +508,7 @@ function renderList(){
   if(!active.length&&!past.length)html+='<div class="bempty">현재 등록된 모집 공고가 없습니다.</div>';
   html+='</div>';
   el.innerHTML=html;
+  stMapRender();   // [권역 지도]
 }
 // [v6] 관리자 수동 마감/해제
 async function togglePostClosed(id){
@@ -2696,6 +2717,7 @@ async function copyRoster(id){
     <div style="font-size:12.5px">ⓒ Korea Flying Disc Federation. All rights reserved.</div>
   </div>
 </div></footer>
+<script src="region_map.js?v=20260907a"></script>
 <script src="auth_ui.js?v=20260909c"></script>
 </body>
 </html>
