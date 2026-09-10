@@ -3641,7 +3641,9 @@ async function rptDownload(){
       const inst=a.assignedUid?U[a.assignedUid]:null;let L=0,M=0;
       if(inst){if(inst.natCertApproved)L=1;else M=1}else if(a.selfTeach){M=1}
       const type=RPT_TYPE[a.typeKey]||((String(a.type||'').indexOf('방과후')>=0||String(a.type||'').indexOf('돌봄')>=0)?RPT_TYPE.after:RPT_TYPE.school);
-      return {B:type,C:sido,D:gugun,E:a.school||'',F:'',G:total||null,H:null,J:0,K:0,L:L,M:M,months:months,sessions:sessions};
+      // 남녀: 신청서에 구분이 없어 합계를 반반으로 나눔 (홀수면 남 +1)
+      const male=total?Math.ceil(total/2):null,female=total?Math.floor(total/2):null;
+      return {B:type,C:sido,D:gugun,E:a.school||'',F:'',G:male,H:female,J:0,K:0,L:L,M:M,months:months,sessions:sessions,typeKey:(type===RPT_TYPE.after?'after':'school')};
     });
     const res=await fetch('files/report_template_2026.xlsx?v='+Date.now());if(!res.ok)throw new Error('양식 파일(files/report_template_2026.xlsx)을 찾을 수 없습니다');
     const zip=await JSZip.loadAsync(await res.arrayBuffer());
@@ -3654,12 +3656,21 @@ async function rptDownload(){
     zip.file('xl/worksheets/sheet1.xml',sx);
     let wbx=await zip.file('xl/workbook.xml').async('string');
     const sheetName='플라잉디스크연맹 '+mo+'월 현황';
+    const oldName=((wbx.match(/<x:sheet name="([^"]*)" sheetId="1"/)||[])[1])||'';
     wbx=wbx.replace(/<x:sheet name="[^"]*" sheetId="1"/,'<x:sheet name="'+sheetName+'" sheetId="1"');
+    // [2번 시트 「사업 성과」] 유형별 학교 수(흰 칸)만 기입 — 나머지는 1번 시트를 참조하는 수식. 시트명이 바뀌므로 수식의 참조 이름도 함께 바꿉니다
+    const n3=rows.filter(r=>r.typeKey==='school').length,n5=rows.filter(r=>r.typeKey==='after').length;
+    for(const p of Object.keys(zip.files).filter(p=>/^xl\/worksheets\/sheet\d+\.xml$/.test(p))){
+      let x=await zip.file(p).async('string');let changed=false;
+      if(p==='xl/worksheets/sheet2.xml'){x=rptSetCell(x,'B23',n3||null);x=rptSetCell(x,'B37',n5||null);changed=true}
+      if(oldName&&x.indexOf("'"+oldName+"'!")>=0){x=x.split("'"+oldName+"'!").join("'"+sheetName+"'!");changed=true}
+      if(changed)zip.file(p,x);
+    }
     if(/<x:calcPr /.test(wbx)&&!/fullCalcOnLoad/.test(wbx))wbx=wbx.replace(/<x:calcPr /,'<x:calcPr fullCalcOnLoad="1" ');
     zip.file('xl/workbook.xml',wbx);
     const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=String(mo).padStart(2,'0')+'월_플라잉디스크_'+String(y).slice(2)+'년 유소년월별 현황보고서.xlsx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
-    alert('📊 '+ym+' 현황보고서를 내려받았습니다.\n· 학교 '+rows.length+'개 (양식 '+start+'행부터)'+(noLog?'\n· 일지 미제출 '+noLog+'개교는 기관 정보만 기입':'')+'\n· 수혜자 성별은 신청서에 없어 합계를 「남성」 칸에 넣었습니다 — 필요 시 엑셀에서 나눠 주세요\n· 색칠된 수식 칸은 엑셀에서 열 때 자동 계산됩니다');
+    alert('📊 '+ym+' 현황보고서를 내려받았습니다.\n· 학교 '+rows.length+'개 (양식 '+start+'행부터)'+(noLog?'\n· 일지 미제출 '+noLog+'개교는 기관 정보만 기입':'')+'\n· 수혜자 남녀는 신청서에 구분이 없어 합계를 반반으로 나눠 넣었습니다\n· 「사업 성과」 시트의 유형3·유형5 학교 수도 함께 기입되며, 색칠된 수식 칸은 엑셀에서 열 때 자동 계산됩니다');
   }catch(e){alert('보고서 생성 실패: '+(e.message||e))}
 }
 async function payrollCSV(){
