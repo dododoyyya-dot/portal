@@ -1931,7 +1931,7 @@ function taClearSig(){const cv=document.getElementById('taSig');cv.getContext('2
 //   · 사진은 긴 변 1600px JPEG 로 줄여 올림(휴대폰 원본 5MB 초과 거부 방지) · 줄이지 못하는 형식(HEIC 등)은 원본 그대로
 //   · PDF 는 형식(contentType)을 명시 — 일부 기기 파일 앱은 형식을 비워 보내 규칙에서 거부됨
 //   · 5MB 넘는 PDF·이미지는 올리기 전에 안내 · 실패한 파일명을 함께 알려줌
-const TA_MAX=5*1024*1024;
+const TA_MAX=10*1024*1024;   // 저장소 규칙 v8(2026-09-10 게시)과 동일 — 동의서 파일당 10MB
 async function taUploadFiles(files,slotId,pid){
   const urls=[],fails=[];
   for(let i=0;i<Math.min(files.length,10);i++){
@@ -1946,13 +1946,13 @@ async function taUploadFiles(files,slotId,pid){
         try{body=await _pcShrink(f,1600);meta={contentType:'image/jpeg'};outExt='jpg'}
         catch(e){meta={contentType:(f.type&&/^image\//.test(f.type))?f.type:'image/jpeg'}}
       }else{meta={contentType:'application/pdf'};outExt='pdf'}
-      if(body.size>=TA_MAX)throw new Error('파일이 5MB 를 넘습니다 ('+(body.size/1048576).toFixed(1)+'MB) — 스캔 해상도를 낮추거나 사진으로 찍어 올려 주세요');
+      if(body.size>=TA_MAX)throw new Error('파일이 10MB 를 넘습니다 ('+(body.size/1048576).toFixed(1)+'MB) — 스캔 해상도를 낮추거나 사진으로 찍어 올려 주세요');
       const ref=firebase.storage().ref('logs/'+CME.uid+'/teamconsent_'+slotId+'_'+pid+'_'+Date.now()+'_'+i+'.'+outExt);
       const snap=await ref.put(body,meta);
       urls.push(await snap.ref.getDownloadURL());
     }catch(e){
       const m=String((e&&e.message)||e||'');
-      fails.push(f.name+' — '+(/unauthorized|permission|403/i.test(m)?'저장소 규칙에서 거부(5MB 초과 또는 이미지·PDF 가 아님)':(/canceled|network|retry/i.test(m)?'네트워크 문제 — 다시 시도':m)));
+      fails.push(f.name+' — '+(/unauthorized|permission|403/i.test(m)?'저장소 규칙에서 거부(10MB 초과 또는 이미지·PDF 가 아님)':(/canceled|network|retry/i.test(m)?'네트워크 문제 — 다시 시도':m)));
     }
   }
   if(fails.length){
@@ -2076,7 +2076,7 @@ async function teamConsentUpload(slotId){
       const all=(prev.exists?(prev.data().files||[]):[]).concat(urls);
       await DB.collection('teamConsents').doc(docId).set({slotId:slotId,pid:pid,uid:CME.uid,files:all,at:new Date().toISOString()});
       alert('📎 동의서 '+urls.length+'건 업로드 완료 (총 '+all.length+'건 보관 중)'+(partialErr?'\n\n'+partialErr.message:''));
-    }catch(e){alert('업로드 실패: '+(e&&e.message||e)+'\n\n· 이미지(JPG·PNG)·PDF 만, 파일당 5MB 미만\n· PDF 가 크면 사진으로 찍어 올려도 됩니다')}
+    }catch(e){alert('업로드 실패: '+(e&&e.message||e)+'\n\n· 이미지(JPG·PNG)·PDF 만, 파일당 10MB 미만\n· PDF 가 크면 사진으로 찍어 올려도 됩니다')}
   };
   inp.click();
 }
