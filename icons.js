@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════
-// KFDF 공용 아이콘 (icons.js) — 2026-09-07 체육회 스타일 선 아이콘
+// KFDF 공용 아이콘 (icons.js) — 2026-09-07 체육회 스타일 선 아이콘 · v20260910 스프라이트/복제/일괄 처리
 //  · 화면에 표시되는 이모지(✓ 📍 👥 🏆 …)를 같은 뜻의 SVG 선 아이콘으로 바꿔 그립니다.
 //  · 페이지 파일은 손대지 않고, 표시 시점(문서 로드 + 이후 동적으로 추가되는 화면)에만 바꿉니다.
 //    → 저장 데이터·알림 문구·기능은 그대로이고, 보이는 모양만 바뀝니다.
@@ -142,9 +142,20 @@
     opt=opt||{};var p=P[name];if(!p)return '';
     return '<svg class="ki'+(opt.cls?' '+opt.cls:'')+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(opt.stroke||2.1)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"'+(opt.size?' style="width:'+opt.size+'px;height:'+opt.size+'px"':'')+'>'+p+'</svg>';
   }
-  function makeEl(name){var w=document.createElement('span');w.innerHTML=svg(name);return w.firstChild}
+  // [성능 2026-09-10] 아이콘 하나당 innerHTML 파싱을 하지 않습니다. 경로는 숨은 스프라이트의 <symbol>에 한 번만 두고,
+  //   화면의 각 아이콘은 <svg class="ki"><use href="#ki-이름"/></svg> 템플릿을 복제합니다 (큰 명단에서 수천 개 생성 시 렉 감소).
+  var NS='http://www.w3.org/2000/svg',SPRITE=null,TPL={};
+  function sprite(){if(SPRITE&&SPRITE.isConnected)return SPRITE;SPRITE=document.getElementById('kiSprite');if(!SPRITE){SPRITE=document.createElementNS(NS,'svg');SPRITE.id='kiSprite';SPRITE.setAttribute('aria-hidden','true');SPRITE.style.cssText='position:absolute;width:0;height:0;overflow:hidden';(document.body||document.documentElement).appendChild(SPRITE)}return SPRITE}
+  function ensureSymbol(name){var sp=sprite();if(sp.querySelector('#ki-'+name))return;var w=document.createElement('div');w.innerHTML='<svg xmlns="'+NS+'"><symbol id="ki-'+name+'" viewBox="0 0 24 24">'+P[name]+'</symbol></svg>';var sym=w.firstChild&&w.firstChild.firstChild;if(sym)sp.appendChild(document.importNode(sym,true))}
+  function makeEl(name){
+    if(!P[name])return document.createTextNode('');
+    var t=TPL[name];
+    if(!t){ensureSymbol(name);t=document.createElementNS(NS,'svg');t.setAttribute('class','ki');t.setAttribute('viewBox','0 0 24 24');t.setAttribute('fill','none');t.setAttribute('stroke','currentColor');t.setAttribute('stroke-width','2.1');t.setAttribute('stroke-linecap','round');t.setAttribute('stroke-linejoin','round');t.setAttribute('aria-hidden','true');var u=document.createElementNS(NS,'use');u.setAttribute('href','#ki-'+name);u.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href','#ki-'+name);t.appendChild(u);TPL[name]=t}
+    return t.cloneNode(true);
+  }
   function fixText(node){
-    var s=node.nodeValue;if(!s||!RE.test(s))return;RE.lastIndex=0;
+    if(node.__ki)return;   // [성능] 우리가 만든 텍스트 조각은 다시 검사하지 않음
+    var s=node.nodeValue;if(!s||!RE.test(s)){RE.lastIndex=0;return}RE.lastIndex=0;
     var parent=node.parentNode;if(!parent||SKIP[parent.nodeName])return;
     var frag=document.createDocumentFragment(),last=0,m,changed=false;
     RE.lastIndex=0;
@@ -152,12 +163,12 @@
       var key=norm(m[0]);var nm=M[key];
       if(!nm){continue}
       changed=true;
-      if(m.index>last)frag.appendChild(document.createTextNode(s.slice(last,m.index)));
+      if(m.index>last){var t1=document.createTextNode(s.slice(last,m.index));t1.__ki=1;frag.appendChild(t1)}
       frag.appendChild(makeEl(nm));
       last=m.index+m[0].length;
     }
     if(!changed)return;
-    if(last<s.length)frag.appendChild(document.createTextNode(s.slice(last)));
+    if(last<s.length){var t2=document.createTextNode(s.slice(last));t2.__ki=1;frag.appendChild(t2)}
     parent.replaceChild(frag,node);
   }
   function fixAttr(el){
@@ -169,17 +180,20 @@
   }
   function replace(root){
     if(!root)return;
-    if(root.nodeType===3){fixText(root);return}
+    if(root.nodeType===3){if(!root.__ki)fixText(root);return}
+    if(root.nodeType===1&&root.__kiDone)return;   // [성능] 같은 요소를 두 번 훑지 않음
     if(root.nodeType!==1&&root.nodeType!==11)return;
     if(root.nodeType===1){if(SKIP[root.nodeName])return;fixAttr(root)}
     var walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT,null);
     var texts=[],n;
     while((n=walker.nextNode())){
-      if(n.nodeType===1){fixAttr(n);continue}
+      if(n.nodeType===1){if(n.nodeName==='svg'||n.nodeName==='SVG')continue;fixAttr(n);continue}
+      if(n.__ki)continue;
       if(n.parentNode&&!SKIP[n.parentNode.nodeName]&&n.nodeValue&&RE.test(n.nodeValue))texts.push(n);
       RE.lastIndex=0;
     }
     texts.forEach(fixText);
+    if(root.nodeType===1)root.__kiDone=1;
   }
   var started=false;
   function start(){
@@ -189,11 +203,14 @@
       document.head.appendChild(st);}
     replace(document.body);
     try{
+      var pend=[],pendT=[],sched=false;
+      function flush(){sched=false;var a=pend,t=pendT;pend=[];pendT=[];for(var i=0;i<t.length;i++)if(!t[i].__ki)fixText(t[i]);for(var j=0;j<a.length;j++){var nd=a[j];if(!nd.isConnected)continue;if(nd.nodeType===3&&nd.__ki)continue;if(nd.nodeType===1&&(nd.nodeName==='svg'||nd.nodeName==='SVG'||nd.__kiDone))continue;replace(nd)}}
       var mo=new MutationObserver(function(muts){
         for(var i=0;i<muts.length;i++){var mu=muts[i];
-          if(mu.type==='characterData'){fixText(mu.target);continue}
-          for(var j=0;j<mu.addedNodes.length;j++)replace(mu.addedNodes[j]);
+          if(mu.type==='characterData'){pendT.push(mu.target);continue}
+          for(var j=0;j<mu.addedNodes.length;j++)pend.push(mu.addedNodes[j]);
         }
+        if(!sched){sched=true;(document.hidden||!window.requestAnimationFrame)?setTimeout(flush,0):requestAnimationFrame(flush)}   // 숨은 탭에서는 rAF 가 멈추므로 setTimeout
       });
       mo.observe(document.body,{childList:true,subtree:true,characterData:true});
     }catch(e){}

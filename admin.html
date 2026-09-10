@@ -4772,7 +4772,7 @@ function renderUsers(){
   if(!docs.length){el.innerHTML='<div class="bempty">해당 조건의 회원이 없습니다.</div>';axFilter();return}
   if(VIEWMODE==='inst'){el.innerHTML=renderInstTable(docs);axFilter();return}
   if(VIEWMODE==='table'){el.innerHTML=renderRoster(docs);axFilter();return}
-  el.innerHTML=docs.map(d=>{
+  const __rows=docs.map(d=>{
     const v=d.data(),lv=lvOf(v.points||0);
     return '<div class="urow"><div class="grow"><b>'+esc(v.name)+'</b> <span class="lvmini" style="background:'+LVC[lv]+';color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px">Lv.'+lv+'</span>'
       +(v.org?' '+orgChip(v.org,v.region,v.orgTitle,v.fedName):'')+(v.withdrawReq?' <span style="font-size:11px;font-weight:900;color:#fff;background:'+(v.withdrawStatus==='보류'?'#b8860b':'#C41E2F')+';padding:2px 8px;border-radius:999px">🚪 탈퇴 요청'+(v.withdrawStatus==='보류'?' · 보류중':'')+'</span>':'')
@@ -4824,8 +4824,9 @@ function renderUsers(){
       +(v.withdrawReq?'<button class="btn-sub" style="background:#C41E2F" onclick="withdrawModal(\''+d.id+'\')">🚪 탈퇴 요청 처리</button>':'')
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delUser(\''+d.id+'\',\''+esc(v.name)+'\')">🗑</button>'
       +'</div>';
-  }).join('');
-  axFilter();
+  });
+  // [성능 2026-09-10] 회원이 많으면 100명씩 나눠 그립니다 (검색·필터 시 화면 멈춤 방지)
+  if(window.KFDF_CHUNK&&__rows.length>120)KFDF_CHUNK(el,__rows,{size:100,after:axFilter});else{el.innerHTML=__rows.join('');axFilter()}
 }
 function axFilter(){
   const sel=document.getElementById('axUser');if(!sel)return;
@@ -7690,6 +7691,6 @@ async function dlGoodsCerts(){
   a.download='용품수령확인증_'+n+'개교_'+new Date().toISOString().slice(0,10)+'.zip';a.click();
 }
 </script>
-<script src="auth_ui.js?v=20260910a"></script>
+<script src="auth_ui.js?v=20260910b"></script>
 </body>
 </html>

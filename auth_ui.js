@@ -1,10 +1,10 @@
-// v20260910a · 전 페이지 공용: ① 상단 메뉴 일괄 렌더(A안) ② 로그인/로그아웃 전환 ③ 알림 배지
+// v20260910b · 전 페이지 공용: ① 상단 메뉴 일괄 렌더(A안) ② 로그인/로그아웃 전환 ③ 알림 배지
 (function(){
   var CFG={apiKey:"AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",authDomain:"koreaflyingdiscfederation.firebaseapp.com",projectId:"koreaflyingdiscfederation",appId:"1:1081847355343:web:ca40ed9a52e13f607f64ba"};
 
   // ── 메뉴 구성 (2026-09-07 정리: 이모지·중복·화살표 제거, 항목명 간결화. 자격증 → 안전교육은 강사·활동에만) ──
   // [아이콘 2026-09-07] 이모지를 체육회 스타일 선 아이콘으로 바꿔 그리는 icons.js 를 모든 페이지에서 불러옵니다 (페이지 파일 무수정)
-  try{if(!document.querySelector('script[src^="icons.js"]')){var _ic=document.createElement('script');_ic.src='icons.js?v=20260907';document.head.appendChild(_ic)}}catch(e){}
+  try{if(!document.querySelector('script[src^="icons.js"]')){var _ic=document.createElement('script');_ic.src='icons.js?v=20260910';document.head.appendChild(_ic)}}catch(e){}
   // ══ [아이디 로그인 2026-09-09] KFDF_IDLOGIN — 아이디 ↔ 로그인용 이메일. loginIds/{아이디} 문서에 비밀번호(PBKDF2→AES-GCM)로 잠근 실제 이메일을 두어, 비밀번호 없이는 이메일이 드러나지 않습니다.
   //   이메일이 없는 계정(학생회원·보호자가 만든 자녀 계정)은 합성 주소(아이디@member.kfdf.local / @kids.kfdf.local)를 그대로 씁니다.
   window.KFDF_IDLOGIN=(function(){
@@ -350,5 +350,28 @@
     function onKey(e){if(e.key==='Escape')close()}
     ov.addEventListener('click',close);document.addEventListener('keydown',onKey);
     document.body.appendChild(ov);
+  };
+})();
+
+// [성능 2026-09-10] 큰 목록 분할 렌더 — KFDF_CHUNK(el, htmlArray, {size, after}) : 첫 묶음은 즉시, 나머지는 프레임마다 이어 붙임.
+//   같은 el 에 새 렌더가 시작되면 이전 진행분은 중단됩니다. 검색·필터로 자주 다시 그려도 화면이 멈추지 않습니다.
+(function(){
+  window.KFDF_CHUNK=function(el,rows,opt){
+    opt=opt||{};var size=opt.size||100;if(!el)return;
+    var tok=(el.__chunkTok||0)+1;el.__chunkTok=tok;
+    if(!rows||!rows.length){el.innerHTML='';if(opt.after)opt.after();return}
+    el.innerHTML=rows.slice(0,size).join('');
+    var i=size;
+    if(i>=rows.length){if(opt.after)opt.after();return}
+    var bar=document.createElement('div');bar.className='kfdf-chunkbar';bar.style.cssText='padding:10px;text-align:center;font-size:12.5px;color:#6b7280;font-weight:700';
+    bar.textContent='표시 중… '+i+' / '+rows.length;el.appendChild(bar);
+    function step(){
+      if(el.__chunkTok!==tok)return;
+      var html=rows.slice(i,i+size).join('');i+=size;
+      bar.insertAdjacentHTML('beforebegin',html);
+      if(i<rows.length){bar.textContent='표시 중… '+Math.min(i,rows.length)+' / '+rows.length;((document.hidden||!window.requestAnimationFrame)?setTimeout:requestAnimationFrame)(step)}
+      else{bar.remove();if(opt.after)opt.after()}
+    }
+    ((document.hidden||!window.requestAnimationFrame)?setTimeout:requestAnimationFrame)(step);
   };
 })();

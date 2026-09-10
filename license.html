@@ -268,7 +268,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
         <select id="lsYear" class="lcin" style="width:auto" onchange="renderLics()">
           <option value="">연도 전체</option><option>2026</option><option>2025</option><option>2024</option><option>2023</option><option>2022</option><option>2021</option>
         </select>
-        <input id="lsSearch" class="lcin" style="flex:1;min-width:180px" oninput="renderLics()" placeholder="🔍 자격번호·성명 검색">
+        <input id="lsSearch" class="lcin" style="flex:1;min-width:180px" oninput="clearTimeout(window.__lsT);window.__lsT=setTimeout(renderLics,200)" placeholder="🔍 자격번호·성명 검색">
         <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:#153A77;cursor:pointer;white-space:nowrap"><input type="checkbox" id="lsSelAll" style="width:auto;margin:0" onchange="document.querySelectorAll('.lcsel').forEach(c=>{c.checked=this.checked})"> 전체 선택</label>
         <button class="lcbtn p" onclick="printLicCerts('sel')" title="체크한 자격증을 한 번에 인쇄·PDF 저장 (취합 제출용)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M6 9V4h12v5"/><rect x="3" y="9" width="18" height="9" rx="2"/><path d="M7 14h10v6H7z"/></svg>선택 출력</button>
         <button class="lcbtn s" onclick="printLicCerts('all')" title="현재 목록의 관할 자격증 전체를 한 번에 인쇄·PDF 저장"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M6 9V4h12v5"/><rect x="3" y="9" width="18" height="9" rx="2"/><path d="M7 14h10v6H7z"/></svg>목록 전체 출력</button>
@@ -1795,7 +1795,7 @@ function renderLics(){
   });
   document.getElementById('lsCount').textContent=docs.length+'건';
   if(!docs.length){el.innerHTML='<div class="bempty">발급된 자격이 없습니다.</div>';return}
-  el.innerHTML=docs.map(d=>{
+  const __rows=docs.map(d=>{
     const l=d.data();const expired=(l.status==='만료')||(l.expireAt?l.expireAt<today:true);
     return '<div class="lccard" style="padding:11px 16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div>'
       +'<b>'+esc(d.id)+'</b> · '+esc(l.name||l.maskName)+' · '+esc(l.type)+' '+esc(l.grade)
@@ -1813,7 +1813,9 @@ function renderLics(){
       +((LICWRITE&&!inJurL(l.region)&&!CENTRAL)?'<span class="lctag" style="background:#8a919d" title="타 관할 자격은 조회만 가능합니다">'+esc(l.region||'미지정')+' 관할</span>':'')
       +(CENTRAL?'<button class="lcbtn ghost" onclick="delLic(\''+d.id+'\')">🗑 삭제</button>':'')
       +'</div></div>';
-  }).join('');
+  });
+  // [성능 2026-09-10] 대장이 길면 100건씩 나눠 그립니다
+  if(window.KFDF_CHUNK&&__rows.length>120)KFDF_CHUNK(el,__rows,{size:100});else el.innerHTML=__rows.join('');
 }
 // ── 자격 삭제 (중앙 전용 — 오발급·테스트 정리) ──
 async function delLic(no){
@@ -1994,6 +1996,6 @@ function exportLics(){
 function _kfdfBind(){try{if(!window.KFDF_VIEW)return;KFDF_VIEW.apply({def:'notices',menu:'자격증',menuHref:'license.html?view=notices',sections:{notices:'#ntSec',my:['#myApps','#myNote'],admin:['#adminPanel','#adminNote']},views:{notices:{title:'연맹 자격증 신청',desc:'지도자·심판 자격 검정·갱신 공고를 확인하고 신청합니다.'},my:{title:'내 자격 신청 현황',desc:'내가 신청한 검정·갱신 건의 접수·납부·발급 상태입니다.'},admin:{title:'자격 관리',desc:'공고 등록·관리, 신청 처리·발급, 자격 연결 요청 (관리자 전용).'}}});}catch(e){console.warn("view",e)}}
 if(window.KFDF_VIEW)_kfdfBind();else document.addEventListener("DOMContentLoaded",_kfdfBind);
 </script>
-<script src="auth_ui.js?v=20260910a"></script>
+<script src="auth_ui.js?v=20260910b"></script>
 </body>
 </html>
