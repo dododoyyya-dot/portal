@@ -369,7 +369,7 @@ function rowHtml(p){
     +(!p.approved?'<span class="chip wait">승인대기</span>':'')
     +(p.compId?'<span class="chip link">대회 연동</span>':'')
     +'<span class="chip" style="background:#eef1f5;color:#374151">마감 '+esc(fmtD(p.deadline||'').slice(5)||'-')+' · '+t.applied+'/'+t.quota+'명</span>';
-  return '<div class="strowitem" id="row_'+p.id+'" data-reg="'+stRegOf(p)+'" data-sido="'+esc((window.KFDF_MAP?(KFDF_MAP.sidoOf(p.sido||'')||KFDF_MAP.sidoOf(p.location||'')||KFDF_MAP.sidoOf((p.author&&p.author.organization)||'')||KFDF_MAP.sidoOf(p.competitionName||'')):'')||'')+'">'
+  return '<div class="strowitem" id="row_'+p.id+'" data-reg="'+stRegOf(p)+'" data-sido="'+esc((window.KFDF_MAP?(KFDF_MAP.sidoOf(p.location||'')||KFDF_MAP.sidoOf(p.competitionName||'')||KFDF_MAP.sidoOf((p.author&&p.author.organization)||'')||KFDF_MAP.sidoOf(p.sido||'')):'')||'')+'">'
     +'<a class="crow'+(past?' past':'')+'" data-newkey="'+p.id+'" href="staff.html?post='+p.id+'">'
     +'<div class="cdate"><b>'+(dm?(+dm[1])+'.'+dm[2]:'-')+'</b><span>'+dow+'</span></div>'
     +'<div class="cbody"><div class="ctitle">'+esc(p.recruitType||'심판·운영요원')+' 모집 · '+esc(p.competitionName)+'</div>'+(meta?'<div class="cmeta">'+esc(meta)+'</div>':'')+'</div>'
@@ -487,7 +487,7 @@ function toggleRow(id){
 }
 // ══ [권역 지도 2026-09-09] 공고의 시도(sido)·장소 문자열을 6개 권역으로 묶어 지도에 건수 표시, 누르면 그 권역만 ══
 let ST_REG='',ST_SIDO='';
-function stRegOf(p){try{if(!window.KFDF_MAP)return '';if(/전국/.test(String(p.sido||'')))return '전국';var comp=(p.compId&&window.COMPMAP&&COMPMAP[p.compId])||{};var c=[p.sido,p.location,comp.sido,comp.place,(p.author&&p.author.organization),p.competitionName,comp.title];for(var i=0;i<c.length;i++){var g=KFDF_MAP.guessRegion(String(c[i]||''));if(g)return g}return ''}catch(e){return ''}}
+function stRegOf(p){try{if(!window.KFDF_MAP)return '';if(/전국/.test(String(p.sido||'')))return '전국';var comp=(p.compId&&window.COMPMAP&&COMPMAP[p.compId])||{};var c=[p.location,comp.place,comp.sido,p.competitionName,comp.title,(p.author&&p.author.organization),p.sido];/* [2026-09-10] 작성자 계정 시도(p.sido)는 대신 올린 공고에서 엉뚱한 권역이 되므로 맨 뒤 */for(var i=0;i<c.length;i++){var g=KFDF_MAP.guessRegion(String(c[i]||''));if(g)return g}return ''}catch(e){return ''}}
 function stMapFilter(){
   document.querySelectorAll('#stList .strowitem[data-reg]').forEach(x=>{const rg=x.getAttribute('data-reg');const regOk=!ST_REG||rg===ST_REG||rg==='전국'||!rg;const sdOk=!ST_SIDO||x.getAttribute('data-sido')===ST_SIDO||rg==='전국'||!rg;x.style.display=(regOk&&sdOk)?'':'none'});
   const lab=document.getElementById('stMapLab');if(lab)lab.textContent=ST_SIDO?(ST_SIDO+' 공고만 표시 중 — 시도를 다시 누르면 권역 전체'):(ST_REG?(ST_REG+' 권역 공고만 표시 중 — 아래 시도를 누르면 더 좁혀 보고, 지도를 다시 누르면 전체'):'권역을 누르면 그 권역 공고만 보이고, 시도별 건수가 나타납니다');
