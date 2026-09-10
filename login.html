@@ -165,7 +165,7 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
         <label style="margin:0;font-size:13px;font-weight:800;color:#8a5a00">일반회원 구분 <span style="color:#C41E2F">*</span></label>
         <div id="genSubBtns" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
           <!-- [5부문 개편] 연맹동호인·타소속 동호인은 [🏃 선수회원] 유형으로 분리 (2026-08-24) -->
-          <button type="button" class="gsbtn on" data-v="학부모" onclick="setGenSub('학부모')">학부모</button>
+          <button type="button" class="gsbtn" data-v="학부모" onclick="setGenSub('학부모')">학부모</button>
           <button type="button" class="gsbtn" data-v="서포터즈" onclick="setGenSub('서포터즈')">서포터즈</button>
           <button type="button" class="gsbtn" data-v="협력기관" onclick="setGenSub('협력기관')">협력기관</button>
         </div>
@@ -416,18 +416,20 @@ function mode(m){
 let SIGNUP_TYPE='instructor';
 let AF2_AUTO=false;  // [소속] '교사(교원)' 체크가 유형 선택 때문에 자동으로 켜진 것인지 표시
 // [일반회원 세분류] 연맹동호인·타소속 = 기존 일반회원 폼 / 학부모·서포터즈·협력기관 = 간략 가입(이름·성별·전화·주소·생년월일)
-let GEN_SUB='학부모'; // [5부문 개편] 동호인(연맹·타소속)은 선수회원 유형으로 분리 — 일반회원은 학부모·서포터즈·협력기관 간략가입만
+let GEN_SUB=''; // [2026-09-10] 기본값 없음 — 가입자가 직접 골라야 함 (기본값이 학부모라 전부 학부모로 가입되던 문제) // [5부문 개편] 동호인(연맹·타소속)은 선수회원 유형으로 분리 — 일반회원은 학부모·서포터즈·협력기관 간략가입만
 const GEN_SIMPLE=['학부모','서포터즈','협력기관'];
-function isGenSimple(){return SIGNUP_TYPE==='general'&&GEN_SIMPLE.indexOf(GEN_SUB)>=0}
+function isGenSimple(){return SIGNUP_TYPE==='general'&&(GEN_SUB===''||GEN_SIMPLE.indexOf(GEN_SUB)>=0)}
 function setGenSub(v){
   GEN_SUB=v;
   [...document.querySelectorAll('#genSubBtns .gsbtn')].forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-  const simple=GEN_SIMPLE.indexOf(v)>=0;
+  const simple=(v==='')||GEN_SIMPLE.indexOf(v)>=0;
   // 간략 가입: 활동범위·소속구분·자격 블록 숨김 (주소 블록은 유지 — 간략 가입도 주소 필수)
   // [가입폼 다이어트] '소속 구분' 항목은 폐지되어 토글 대상에서 제외합니다
   ['sAreaBlock','sQualBlock'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display=simple?'none':'';});
   const info=document.getElementById('genSubInfo');
-  if(info)info.textContent=simple
+  if(info)info.textContent=(v==='')
+    ?'학부모 · 서포터즈 · 협력기관 중 하나를 꼭 선택해 주세요. (자녀 연동은 학부모, 기관장·단체는 협력기관, 응원·후원은 서포터즈)'
+    :simple
     ?('「'+v+'」 회원은 간략 가입입니다 — 이름·성별·전화번호·주소·생년월일만 입력하면 됩니다.')
     :(v==='타소속'?'타 단체·무소속 동호인입니다. 아래 소속 구분에서 단체명을 입력해주세요.':'시도·구군연맹 소속 동호인 회원입니다.');
   // 소속 구분 라디오 자동 동기화
@@ -914,7 +916,10 @@ async function idCheckLive(){const el=document.getElementById('sLoginId'),m=docu
 async function go(){
   let email=document.getElementById('aEmail').value.trim(), pw=document.getElementById('aPw').value;
   if(M==='L'){if(!email||!pw)return say('아이디(또는 이메일)와 비밀번호를 입력하세요')}
-  else{if(!pw)return say('비밀번호를 입력하세요');if(pw.length<6)return say('비밀번호는 6자 이상이어야 합니다')}
+  else{
+    // [일반회원 구분 필수] 기본값이 없으므로 고르지 않으면 진행 불가
+    if(SIGNUP_TYPE==='general'&&!GEN_SUB){try{const b=document.getElementById('genSubBtns');if(b){b.scrollIntoView({behavior:'smooth',block:'center'});b.style.outline='2px solid #C41E2F';b.style.borderRadius='12px';setTimeout(()=>{b.style.outline=''},2500)}}catch(e){}return say('일반회원 구분(학부모 · 서포터즈 · 협력기관)을 먼저 선택해 주세요')}
+    if(!pw)return say('비밀번호를 입력하세요');if(pw.length<6)return say('비밀번호는 6자 이상이어야 합니다')}
   // [아이디 로그인] @ 가 없으면 아이디 → loginIds(비밀번호로 잠근 이메일 / 합성 주소) → 없으면 자녀 계정 도메인
   let _idn='',_idDoc=null;
   if(M==='L'&&email.indexOf('@')<0){_idn=KFDF_IDLOGIN.norm(email);const r=await KFDF_IDLOGIN.lookup(DB,_idn,pw);_idDoc=r.data;if(!r.email)return say('아이디 또는 비밀번호가 올바르지 않습니다');email=r.email}
