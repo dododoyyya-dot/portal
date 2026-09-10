@@ -369,7 +369,7 @@ function rowHtml(p){
     +(!p.approved?'<span class="chip wait">승인대기</span>':'')
     +(p.compId?'<span class="chip link">대회 연동</span>':'')
     +'<span class="chip" style="background:#eef1f5;color:#374151">마감 '+esc(fmtD(p.deadline||'').slice(5)||'-')+' · '+t.applied+'/'+t.quota+'명</span>';
-  return '<div class="strowitem" id="row_'+p.id+'" data-reg="'+stRegOf(p)+'" data-sido="'+esc((window.KFDF_MAP?(KFDF_MAP.sidoOf(p.sido||'')||KFDF_MAP.sidoOf(p.location||'')||KFDF_MAP.sidoOf((p.author&&p.author.organization)||'')):'')||'')+'">'
+  return '<div class="strowitem" id="row_'+p.id+'" data-reg="'+stRegOf(p)+'" data-sido="'+esc((window.KFDF_MAP?(KFDF_MAP.sidoOf(p.sido||'')||KFDF_MAP.sidoOf(p.location||'')||KFDF_MAP.sidoOf((p.author&&p.author.organization)||'')||KFDF_MAP.sidoOf(p.competitionName||'')):'')||'')+'">'
     +'<a class="crow'+(past?' past':'')+'" data-newkey="'+p.id+'" href="staff.html?post='+p.id+'">'
     +'<div class="cdate"><b>'+(dm?(+dm[1])+'.'+dm[2]:'-')+'</b><span>'+dow+'</span></div>'
     +'<div class="cbody"><div class="ctitle">'+esc(p.recruitType||'심판·운영요원')+' 모집 · '+esc(p.competitionName)+'</div>'+(meta?'<div class="cmeta">'+esc(meta)+'</div>':'')+'</div>'
@@ -487,9 +487,9 @@ function toggleRow(id){
 }
 // ══ [권역 지도 2026-09-09] 공고의 시도(sido)·장소 문자열을 6개 권역으로 묶어 지도에 건수 표시, 누르면 그 권역만 ══
 let ST_REG='',ST_SIDO='';
-function stRegOf(p){try{return (window.KFDF_MAP?(KFDF_MAP.guessRegion(p.sido||'')||KFDF_MAP.guessRegion(p.location||'')||KFDF_MAP.guessRegion((p.author&&p.author.organization)||'')):'')||''}catch(e){return ''}}
+function stRegOf(p){try{if(!window.KFDF_MAP)return '';if(/전국/.test(String(p.sido||'')))return '전국';var comp=(p.compId&&window.COMPMAP&&COMPMAP[p.compId])||{};var c=[p.sido,p.location,comp.sido,comp.place,(p.author&&p.author.organization),p.competitionName,comp.title];for(var i=0;i<c.length;i++){var g=KFDF_MAP.guessRegion(String(c[i]||''));if(g)return g}return ''}catch(e){return ''}}
 function stMapFilter(){
-  document.querySelectorAll('#stList .strowitem[data-reg]').forEach(x=>{x.style.display=((!ST_REG||x.getAttribute('data-reg')===ST_REG)&&(!ST_SIDO||x.getAttribute('data-sido')===ST_SIDO))?'':'none'});
+  document.querySelectorAll('#stList .strowitem[data-reg]').forEach(x=>{const rg=x.getAttribute('data-reg');const regOk=!ST_REG||rg===ST_REG||rg==='전국'||!rg;const sdOk=!ST_SIDO||x.getAttribute('data-sido')===ST_SIDO||rg==='전국'||!rg;x.style.display=(regOk&&sdOk)?'':'none'});
   const lab=document.getElementById('stMapLab');if(lab)lab.textContent=ST_SIDO?(ST_SIDO+' 공고만 표시 중 — 시도를 다시 누르면 권역 전체'):(ST_REG?(ST_REG+' 권역 공고만 표시 중 — 아래 시도를 누르면 더 좁혀 보고, 지도를 다시 누르면 전체'):'권역을 누르면 그 권역 공고만 보이고, 시도별 건수가 나타납니다');
 }
 function stMapRender(){
@@ -497,10 +497,12 @@ function stMapRender(){
   if(document.body.classList.contains('onepost')||new URLSearchParams(location.search).get('post')){wrap.style.display='none';return}
   const items=[...document.querySelectorAll('#stList .strowitem[data-reg]')];
   if(!items.length){wrap.style.display='none';return}
-  const counts={};KFDF_MAP.REGIONS.forEach(r=>counts[r]=0);items.forEach(x=>{const r=x.getAttribute('data-reg');if(counts[r]!=null)counts[r]++});
+  const counts={};KFDF_MAP.REGIONS.forEach(r=>counts[r]=0);let nat=0,unk=0;items.forEach(x=>{const r=x.getAttribute('data-reg');if(r==='전국'){nat++;KFDF_MAP.REGIONS.forEach(k=>counts[k]++)}else if(counts[r]!=null)counts[r]++;else unk++});
   const c2={};Object.keys(counts).forEach(r=>c2[r]='공고 '+counts[r]+'건');
-  const sub={};items.forEach(x=>{const r=x.getAttribute('data-reg'),s=x.getAttribute('data-sido');if(!r||!s)return;sub[r]=sub[r]||{};sub[r][s]=(sub[r][s]||0)+1});
+  const sub={};items.forEach(x=>{const r=x.getAttribute('data-reg'),s=x.getAttribute('data-sido');if(!r||!s||r==='전국')return;sub[r]=sub[r]||{};sub[r][s]=(sub[r][s]||0)+1});
   wrap.style.display='';
+  const host=document.getElementById('stMap');const ex=document.getElementById('stMapExtra')||(()=>{const d=document.createElement('div');d.id='stMapExtra';d.style.cssText='text-align:center;font-size:12px;color:#6b7280;font-weight:700;margin-top:4px';if(host)host.insertAdjacentElement('afterend',d);return d})();
+  ex.textContent=(nat?'전국 공고 '+nat+'건은 모든 권역에 표시':'')+(nat&&unk?' · ':'')+(unk?'지역 미확인 '+unk+'건 (권역 선택 시 함께 표시)':'');
   window.__stMap=KFDF_MAP.render('stMap',{mode:'single',selected:ST_REG?[ST_REG]:[],counts:c2,subCounts:sub,sub:ST_SIDO,onChange:sel=>{const r=sel[0]||'';ST_REG=(r===ST_REG)?'':r;ST_SIDO='';if(!ST_REG&&window.__stMap)window.__stMap.set([]);stMapFilter()},onSub:k=>{ST_SIDO=k||'';stMapFilter()}});
   stMapFilter();
 }
@@ -2739,7 +2741,7 @@ async function copyRoster(id){
     <div style="font-size:12.5px">ⓒ Korea Flying Disc Federation. All rights reserved.</div>
   </div>
 </div></footer>
-<script src="region_map.js?v=20260909b"></script>
+<script src="region_map.js?v=20260910a"></script>
 <script src="auth_ui.js?v=20260909f"></script>
 </body>
 </html>

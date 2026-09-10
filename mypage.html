@@ -88,7 +88,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260821"></script>
 <script src="career.js?v=20260907a"></script>
-<script src="region_map.js?v=20260909b"></script>
+<script src="region_map.js?v=20260910a"></script>
 <script>
 KFDF.initApp();
 const AUTH = firebase.auth();
@@ -1458,13 +1458,21 @@ function showMyTab(k){
   const tb=document.getElementById('myTabbar');
   if(tb){const r=tb.getBoundingClientRect();if(r.top<0||r.top>window.innerHeight-80)tb.scrollIntoView({block:'start'});}
 }
+// [알림 이동 2026-09-10] #상자 해시 → 해당 탭을 열고 스크롤·강조. 페이지 진입 시와 같은 페이지 안에서 해시가 바뀔 때(알림함의 [확인 →]) 모두 동작
+const MY_HASH_TAB={alarmBox:'Alarm',famReqBox:'Alarm',profileBox:'Profile',kidsBox:'Family',certBox:'Career',licBox:'Career',claimBox:'Career',careerBox:'Journey',athBox:'Journey',contractBox:'Work',compContractBox:'Work',staffCareerBox:'Work',goodsLinkBox:'Work',logBox:'Work',actList:'Work',consentBox:'Work'};
+function gotoMyHash(h,delay){
+  h=String(h||'').replace('#','');if(!h)return false;
+  const tab=MY_HASH_TAB[h];if(tab&&typeof showMyTab==='function')showMyTab(tab);
+  setTimeout(()=>{const el=document.getElementById(h);if(!el)return;
+    if(el.style.display==='none')el.style.display='';
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+    el.style.transition='box-shadow .3s';el.style.boxShadow='0 0 0 4px #ffd166';setTimeout(()=>{el.style.boxShadow=''},2600)},delay==null?400:delay);
+  return true;
+}
 (function(){
-  const map={alarmBox:'Alarm',famReqBox:'Alarm',profileBox:'Profile',kidsBox:'Family',certBox:'Career',licBox:'Career',claimBox:'Career',careerBox:'Journey',contractBox:'Work',compContractBox:'Work',staffCareerBox:'Work',logBox:'Work',actList:'Work',consentBox:'Work'};
   const h=(location.hash||'').replace('#','');
-  if(map[h]&&map[h]!=='Profile'){
-    showMyTab(map[h]);
-    setTimeout(()=>{const el=document.getElementById(h);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},400);
-  }
+  if(MY_HASH_TAB[h]&&MY_HASH_TAB[h]!=='Profile')gotoMyHash(h,400);
+  window.addEventListener('hashchange',()=>gotoMyHash(location.hash,150));
 })();
 // ── 알림함 ──
 let ALARMS=[];
@@ -1496,7 +1504,12 @@ async function loadAlarms(){
 async function openAlarm(id){
   const a=ALARMS.find(x=>x._id===id);if(!a)return;
   try{if(!a.read)await DB.collection('notifications').doc(id).update({read:true});}catch(e){}
-  if(a.link)location.href=a.link;else{a.read=true;loadAlarmsRender();}
+  if(a.link){
+    // [알림 이동] 마이페이지 안의 #상자로 가는 링크는 페이지 이동 없이 탭 전환·스크롤 (같은 해시를 다시 눌러도 동작)
+    const m=String(a.link).match(/^(?:\.\/)?mypage\.html(?:\?[^#]*)?#([A-Za-z0-9_-]+)$/);
+    if(m){a.read=true;loadAlarmsRender();if(location.hash!=='#'+m[1])location.hash=m[1];else gotoMyHash(m[1],0);return}
+    location.href=a.link;
+  }else{a.read=true;loadAlarmsRender();}
 }
 function loadAlarmsRender(){loadAlarms()}
 async function markAllAlarms(){
@@ -2006,7 +2019,7 @@ AUTH.onAuthStateChanged(async u=>{
   document.getElementById('myCard').style.display='block';
   document.getElementById('myName').textContent=d.name;
   // [화면 주소] mypage.html#상자ID 로 들어오면(알림 링크 등) 자료가 채워진 뒤 그 상자로 이동하고 잠시 강조
-  (function(){try{const h=(location.hash||'').replace('#','');if(!h)return;setTimeout(function(){const el=document.getElementById(h);if(!el)return;el.scrollIntoView({block:'start'});el.style.transition='box-shadow .3s';el.style.boxShadow='0 0 0 4px #ffd166';setTimeout(function(){el.style.boxShadow=''},2600)},700)}catch(e){}})();
+  (function(){try{const h=(location.hash||'').replace('#','');if(!h||typeof gotoMyHash!=='function')return;gotoMyHash(h,700)}catch(e){}})();
   (function(){const b=document.getElementById('loginIdBtn');if(b)b.textContent=d.loginId?('아이디 '+d.loginId+' · 변경'):'아이디 설정'})();   // [아이디 로그인]
   (function(){const av=document.getElementById('myAvatar');if(av)av.textContent=String(d.name||'').trim().slice(0,1)})();   // [프로필] 아바타 첫 글자
   document.getElementById('mySub').textContent=d.region+' 권역 · '+(d.edu2026?'2026 자율연수 이수':'연수 미이수')+' · '+(/@(member|kids)\.kfdf\.local$/.test(d.email||'')?(d.contactEmail||'이메일 없음'):d.email)+(d.pendingEmail?' (변경 확인 대기: '+d.pendingEmail+')':'');

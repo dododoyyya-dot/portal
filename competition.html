@@ -1492,7 +1492,7 @@ async function openTeamApply(id){
   // 인솔자는 성인만 (교사·클럽장·학부모·일반 성인 회원 모두 가능)
   // [공고규칙] 담당자가 이 공고에서 '미성년 클럽장 인솔 허용'을 켠 경우에만 예외를 둡니다
   if(CMY.birth&&ageOf(CMY.birth)<18&&!(s.extras&&s.extras.allowMinorLeader)){
-    alert('👥 팀 신청(인솔자 등록)은 성인 회원만 할 수 있습니다.\n지도교사·클럽장·보호자께 요청해주세요.');return;
+    alert('👥 이 대회의 팀 신청(인솔자 등록)은 성인 회원만 할 수 있습니다.\n지도교사·클럽장·보호자께 요청해주세요.\n(대회 담당자가 공고의 참가 규칙에서 「미성년 클럽장 팀 신청 허용」을 켜면 미성년 클럽장도 신청할 수 있습니다)');return;
   }
   TA_ID=id;TA_ROSTER=[];TA_FILES=[];
   const tts=(s.teamTypes&&s.teamTypes.length)?s.teamTypes:['클럽팀','학교팀','자유팀'];
@@ -2702,7 +2702,9 @@ function cc2Open(editId){
       +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer"><input type="checkbox" id="cc2NoTemp" style="width:auto"'+((c.extras&&c.extras.noTempClub)?' checked':'')+'> 🚫 임시클럽 참가 불가</label>'
       +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer"><input type="checkbox" id="cc2NoExt" style="width:auto"'+((c.extras&&c.extras.noExternal)?' checked':'')+'> 🚫 타 단체 클럽 참가 불가</label>'
       +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer"><input type="checkbox" id="cc2NeedPay" style="width:auto"'+((c.extras&&c.extras.needPay)?' checked':'')+'> 💳 참가비 입금 확인 필요</label>'
-      +'</div>')
+      +'<label style="display:flex;gap:6px;align-items:center;font-weight:800;border:1.5px solid #dfe5ee;border-radius:999px;padding:7px 15px;cursor:pointer" title="켜면 만 18세 미만 클럽장(임시클럽 포함)도 인솔자로 팀 신청을 할 수 있습니다. 미성년 팀원의 보호자 동의 절차는 그대로 적용됩니다."><input type="checkbox" id="cc2MinorLead" style="width:auto"'+((c.extras&&c.extras.allowMinorLeader)?' checked':'')+'> 미성년 클럽장 팀 신청(인솔) 허용</label>'
+      +'</div>'
+      +'<div style="font-size:11.5px;color:#8a919d;margin-top:6px;line-height:1.6">「미성년 클럽장 팀 신청 허용」을 켜지 않으면 팀 신청(인솔자 등록)은 성인 회원만 할 수 있습니다. 개인 참가는 이 설정과 무관하게 미성년자도 보호자 승인으로 신청합니다.</div>')
     +sec('⑤ 신청서·동의서 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 조직위원회 명의, 전자서명 또는 인쇄 제출</span>',
       // [동의서 양식] 서면 동의서를 어느 양식으로 낼지 고릅니다 — 연맹 기본(보호자 동의서) / 강서구청장배(참가 동의서).
       //   팀 신청 화면의 [동의서 양식 열기·인쇄] 링크가 이 선택을 따라갑니다.
@@ -2790,7 +2792,8 @@ async function cc2Save(){
       // [공고규칙] 체크 안 하면 false — 기존 공고 동작 그대로
       noTempClub:!!(document.getElementById('cc2NoTemp')&&document.getElementById('cc2NoTemp').checked),
       noExternal:!!(document.getElementById('cc2NoExt')&&document.getElementById('cc2NoExt').checked),
-      needPay:!!(document.getElementById('cc2NeedPay')&&document.getElementById('cc2NeedPay').checked)};
+      needPay:!!(document.getElementById('cc2NeedPay')&&document.getElementById('cc2NeedPay').checked),
+      allowMinorLeader:!!(document.getElementById('cc2MinorLead')&&document.getElementById('cc2MinorLead').checked)};
     const committee=v('cc2Cmte')||(title+' 조직위원회');
     const prev=CC2_EDIT?(CC2_LIST.find(x=>x.id===CC2_EDIT)||{}):{};
     const sports=[...new Set(entry.indiv.concat(entry.team).map(x=>x.name))].map(n=>({name:n,mode:'일반'}));
@@ -2866,7 +2869,7 @@ function compRow(r,today){
   const chips=(past?'<span class="chip closed">종료</span>':compDday(r,today))+(r.applied?'<span class="chip mine">신청함</span>':'')+(r.team?'<span class="chip team">단체전</span>':'');
   const meta=[r.place,r.host].filter(Boolean).join(' · ');
   const tag=r.href?'a':'div';
-  return '<'+tag+' class="crow'+(past?' past':'')+(r.href?'':' static')+'"'+(r.href?' href="'+r.href+'"':'')+(r.key?' data-newkey="'+cesc(r.key)+'"':'')+' data-reg="'+compRegOf(r.region)+'" data-sido="'+cesc((window.KFDF_MAP?KFDF_MAP.sidoOf(r.region+' '+(r.place||'')):'')||'')+'">'+badge
+  return '<'+tag+' class="crow'+(past?' past':'')+(r.href?'':' static')+'"'+(r.href?' href="'+r.href+'"':'')+(r.key?' data-newkey="'+cesc(r.key)+'"':'')+' data-reg="'+compRegOf(r.region,r)+'" data-sido="'+cesc((window.KFDF_MAP?(KFDF_MAP.sidoOf(r.region+' '+(r.place||''))||KFDF_MAP.sidoOf(r.host||'')||KFDF_MAP.sidoOf(r.title||'')):'')||'')+'">'+badge
     +'<div class="cbody"><div class="ctitle">'+cesc(r.title)+'</div>'+(meta?'<div class="cmeta">'+cesc(meta)+'</div>':'')+'</div>'
     +'<div class="cchips">'+chips+'</div>'+(r.href?'<span class="cgo">›</span>':'')+'</'+tag+'>';
 }
@@ -2909,9 +2912,9 @@ function renderMyEntryBox(){
 }
 // ══ [권역 지도 2026-09-09] 공고 목록을 권역별로 — 시도명(경남 등)·지역 문자열을 6개 권역으로 묶어 지도에 건수를 표시하고, 누르면 그 권역만 남김 ══
 let COMP_REG='',COMP_SIDO='';
-function compRegOf(s){try{return (window.KFDF_MAP?KFDF_MAP.guessRegion(String(s||'')):'')||''}catch(e){return ''}}
+function compRegOf(s,r){try{if(!window.KFDF_MAP)return '';if(/전국/.test(String(s||'')))return '전국';var c=[s,r&&r.place,r&&r.host,r&&r.title];for(var i=0;i<c.length;i++){var g=KFDF_MAP.guessRegion(String(c[i]||''));if(g)return g}return ''}catch(e){return ''}}
 function compMapFilter(){
-  document.querySelectorAll('#liveComps [data-reg]').forEach(x=>{x.style.display=((!COMP_REG||x.getAttribute('data-reg')===COMP_REG)&&(!COMP_SIDO||x.getAttribute('data-sido')===COMP_SIDO))?'':'none'});
+  document.querySelectorAll('#liveComps [data-reg]').forEach(x=>{const rg=x.getAttribute('data-reg');const regOk=!COMP_REG||rg===COMP_REG||rg==='전국'||!rg;const sdOk=!COMP_SIDO||x.getAttribute('data-sido')===COMP_SIDO||rg==='전국'||!rg;x.style.display=(regOk&&sdOk)?'':'none'});   // [권역 보강] 전국·미확인 공고는 어느 권역을 골라도 표시
   const lab=document.getElementById('compMapLab');if(lab)lab.textContent=COMP_SIDO?(COMP_SIDO+' 공고만 표시 중 — 시도를 다시 누르면 권역 전체'):(COMP_REG?(COMP_REG+' 권역 공고만 표시 중 — 아래 시도를 누르면 더 좁혀 보고, 지도를 다시 누르면 전체'):'권역을 누르면 그 권역 공고만 보이고, 시도별 건수가 나타납니다');
 }
 function compMapRender(){
@@ -2919,11 +2922,13 @@ function compMapRender(){
   if(document.body.classList.contains('oneslot')||new URLSearchParams(location.search).get('slot')){wrap.style.display='none';return}
   const items=[...document.querySelectorAll('#liveComps [data-reg]')];
   if(!items.length){wrap.style.display='none';return}
-  const counts={};KFDF_MAP.REGIONS.forEach(r=>counts[r]=0);items.forEach(x=>{const r=x.getAttribute('data-reg');if(counts[r]!=null)counts[r]++});
+  const counts={};KFDF_MAP.REGIONS.forEach(r=>counts[r]=0);let nat=0,unk=0;items.forEach(x=>{const r=x.getAttribute('data-reg');if(r==='전국'){nat++;KFDF_MAP.REGIONS.forEach(k=>counts[k]++)}else if(counts[r]!=null)counts[r]++;else unk++});   // [권역 보강] 전국 공고는 모든 권역에, 판정 불가는 미확인으로
   const c2={};Object.keys(counts).forEach(r=>c2[r]='공고 '+counts[r]+'건');
   // 권역별 → 시도별 건수
-  const sub={};items.forEach(x=>{const r=x.getAttribute('data-reg'),s=x.getAttribute('data-sido');if(!r||!s)return;sub[r]=sub[r]||{};sub[r][s]=(sub[r][s]||0)+1});
+  const sub={};items.forEach(x=>{const r=x.getAttribute('data-reg'),s=x.getAttribute('data-sido');if(!r||!s||r==='전국')return;sub[r]=sub[r]||{};sub[r][s]=(sub[r][s]||0)+1});
   wrap.style.display='';
+  const ex=document.getElementById('compMapExtra')||(()=>{const d=document.createElement('div');d.id='compMapExtra';d.style.cssText='text-align:center;font-size:12px;color:#6b7280;font-weight:700;margin-top:4px';host.insertAdjacentElement('afterend',d);return d})();
+  ex.textContent=(nat?'전국 공고 '+nat+'건은 모든 권역에 표시':'')+(nat&&unk?' · ':'')+(unk?'지역 미확인 '+unk+'건 (권역 선택 시 함께 표시)':'');
   window.__compMap=KFDF_MAP.render('compMap',{mode:'single',selected:COMP_REG?[COMP_REG]:[],counts:c2,subCounts:sub,sub:COMP_SIDO,onChange:sel=>{const r=sel[0]||'';COMP_REG=(r===COMP_REG)?'':r;COMP_SIDO='';if(!COMP_REG&&window.__compMap)window.__compMap.set([]);compMapFilter()},onSub:k=>{COMP_SIDO=k||'';compMapFilter()}});
   compMapFilter();
 }
@@ -3055,8 +3060,8 @@ function slotCard(d,today){
             const isImg=x=>/\.(jpe?g|png|gif|webp)(\?|$)/i.test(x.url||'')||String(x.url||'').indexOf('image')>=0;
             const imgs=att.filter(isImg);
             const docsA=att.filter(x=>!isImg(x));
-            const hasEx=!!(s.extras&&(s.extras.prize||s.extras.souvenir||s.extras.insurance||s.extras.prizeNote||s.extras.noTempClub||s.extras.noExternal||s.extras.needPay));
-            const exHtml=hasEx?'<div class="cnote" style="display:block;box-sizing:border-box;width:100%;margin-top:8px;background:#fffbeb;border:1.5px solid #fde68a;color:#8a5a00">'+[s.extras.prize?'🏆 시상품 지급':'',s.extras.souvenir?'🎁 기념품 지급':'',s.extras.insurance?'🛡 행사 보험 가입':'',s.extras.noTempClub?'🚫 임시클럽 참가 불가':'',s.extras.noExternal?'🚫 타 단체 클럽 참가 불가':'',s.extras.needPay?'💳 참가비 입금 확인 후 확정':''].filter(Boolean).join(' · ')+(s.extras.prizeNote?'<br>🎖 '+cesc(s.extras.prizeNote):'')+'</div>':'';
+            const hasEx=!!(s.extras&&(s.extras.prize||s.extras.souvenir||s.extras.insurance||s.extras.prizeNote||s.extras.noTempClub||s.extras.noExternal||s.extras.needPay||s.extras.allowMinorLeader));
+            const exHtml=hasEx?'<div class="cnote" style="display:block;box-sizing:border-box;width:100%;margin-top:8px;background:#fffbeb;border:1.5px solid #fde68a;color:#8a5a00">'+[s.extras.prize?'🏆 시상품 지급':'',s.extras.souvenir?'🎁 기념품 지급':'',s.extras.insurance?'🛡 행사 보험 가입':'',s.extras.noTempClub?'🚫 임시클럽 참가 불가':'',s.extras.noExternal?'🚫 타 단체 클럽 참가 불가':'',s.extras.needPay?'💳 참가비 입금 확인 후 확정':'',s.extras.allowMinorLeader?'👥 미성년 클럽장 팀 신청 허용':''].filter(Boolean).join(' · ')+(s.extras.prizeNote?'<br>🎖 '+cesc(s.extras.prizeNote):'')+'</div>':'';
             const noteHtml=s.note?'<div class="cnote" style="flex:1 1 300px;margin-top:0;display:block;min-width:min(280px,100%)">📌 '+cesc(s.note)+'</div>':'';
             let posterHtml='';
             if(imgs.length){
@@ -4070,7 +4075,7 @@ function tbRemoveMember(ti,mi){
 </div></footer>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
-<script src="region_map.js?v=20260909b"></script>
+<script src="region_map.js?v=20260910a"></script>
 <script src="auth_ui.js?v=20260909f"></script>
 </body>
 </html>
