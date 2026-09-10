@@ -386,6 +386,8 @@ function pcKeyAt(teamKey,roster,i){return pcMemberKeys(teamKey,roster)[i]||(team
 // 동의 기록 조회 — 고정 키 우선, 없으면 구 순번 키로 폴백.
 //  단, 구 기록은 저장해 둔 성명이 지금 명단의 그 자리 사람과 같을 때만 인정합니다.
 //  (명단이 바뀌어 이미 밀려 있던 예전 기록을 엉뚱한 사람의 동의로 표시하지 않기 위함)
+// [수기동의 수정] 기록이 저장된 실제 키(고정 키 또는 구 순번 키) — 수정 창이 같은 키에 덮어쓰게
+function pcRecKey(paper,teamKey,roster,i){const p=paper||{};const k=pcKeyAt(teamKey,roster,i);if(k&&p[k])return k;return pcRec(paper,teamKey,roster,i)?(teamKey+'_'+i):k}
 function pcRec(paper,teamKey,roster,i){
   const p=paper||{};
   const k=pcKeyAt(teamKey,roster,i);
@@ -939,7 +941,8 @@ async function viewRoster(id){
     if(_as==='adult')return '';
     if(c.kid)return ' <span style="font-size:10.5px;font-weight:900;color:#0f766e">👨‍👧 보호자서명✓</span>';
     if(paper[key])return ' <span style="font-size:10.5px;font-weight:900;color:#0f766e" title="'+cesc((paper[key].by||'')+' 확인 '+String(paper[key].at||'').slice(0,10))+'">📄 수기동의✓</span>'
-      +((paper[key].files||[]).map((u,fi)=>' <a href="'+cesc(u)+'" target="_blank" style="font-size:10.5px;font-weight:900;color:#153A77" title="첨부 동의서 보기">📎'+(fi+1)+'</a>').join(''));
+      +((paper[key].files||[]).map((u,fi)=>' <a href="'+cesc(u)+'" target="_blank" style="font-size:10.5px;font-weight:900;color:#153A77" title="첨부 동의서 보기">📎'+(fi+1)+'</a>').join(''))
+      +(staff?' <button onclick="'+'markPaper(\''+id+'\',\''+key+'\',\''+cesc(c.name||'')+'\')'+'" style="border:1.5px solid #c9d8ef;background:#fff;color:#153A77;border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:800;cursor:pointer" title="첨부 동의서 추가·삭제">✎ 수정</button>':'');
     // [수기동의 경로] 본인이 '서면 제출' 전제로 접수한 건은 그 사실을 함께 보여줍니다.
     const _albl=(_as==='minor')?'⚠ 보호자동의 필요':('⚠ 생년월일 없음'+(looksMinorSchool(c.school||c.club)?' · 미성년 추정':''));
     return ' <span style="font-size:10.5px;font-weight:900;color:'+(_as==='minor'?'#C41E2F':'#8a5a00')+'">'+_albl+(c.needPaper?' (서면 제출 예정)':'')+'</span>'
@@ -974,7 +977,8 @@ async function viewRoster(id){
               const st=ageState(r), pk=pcRec(paper,ckey(c),c.roster,j);
               if(st==='adult')return '';
               if(pk)return ' <b style="color:#0f766e" title="'+cesc((pk.by||'')+' 확인 '+String(pk.at||'').slice(0,10))+'">📄 수기동의✓</b>'
-                +((pk.files||[]).map((u,fi)=>' <a href="'+cesc(u)+'" target="_blank" style="font-size:10.5px;font-weight:900;color:#153A77">📎'+(fi+1)+'</a>').join(''));
+                +((pk.files||[]).map((u,fi)=>' <a href="'+cesc(u)+'" target="_blank" style="font-size:10.5px;font-weight:900;color:#153A77">📎'+(fi+1)+'</a>').join(''))
+                +(staff?' <button onclick="'+'markPaper(\''+id+'\',\''+pcRecKey(paper,ckey(c),c.roster,j)+'\',\''+cesc(r.name)+'\')'+'" style="border:1.5px solid #c9d8ef;background:#fff;color:#153A77;border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:800;cursor:pointer" title="첨부 동의서 추가·삭제">✎ 수정</button>':'');
               const lbl=(st==='minor')?'⚠미성년'
                 :('⚠생년월일 없음'+(looksMinorSchool(r.school)?' · 미성년 추정':''));
               return ' <b style="color:'+(st==='minor'?'#C41E2F':'#8a5a00')+'">'+lbl+'</b>'
@@ -1067,6 +1071,9 @@ function _pcShrink(file,max){return new Promise(function(res,rej){
   img.src=URL.createObjectURL(file);});}
 function openPaperModal(slotId,key,name,from){
   _PC={slotId:slotId,key:key,name:name||'',from:from||''};
+  // [수기동의 수정] 이미 확인한 기록이 있으면 불러와 첨부를 유지·삭제·추가할 수 있게 합니다
+  let ex=null;try{const sd=CSLOTS.find(d=>d.id===slotId);ex=sd?(((sd.data().paperConsents)||{})[key]||null):null}catch(e){}
+  _PC.existing=ex;
   const old=document.getElementById('pcModal');if(old)old.remove();
   const d=document.createElement('div');d.id='pcModal';
   d.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.6);z-index:1300;display:flex;align-items:center;justify-content:center;padding:16px';
@@ -1083,10 +1090,12 @@ function openPaperModal(slotId,key,name,from){
       +'<div style="font-size:12px;color:#8a919d;margin-top:4px">이미지 또는 PDF · 최대 5개</div>'
       +'<input type="file" id="pcFile" accept="image/*,application/pdf" capture="environment" multiple style="display:none" onchange="pcPreview()">'
     +'</label>'
+    +(ex?'<div id="pcExist" style="margin-top:10px;font-size:12.5px;color:#4b5563"><b style="color:#0f766e">이미 확인 처리됨</b> — '+cesc((ex.by||'')+' · '+String(ex.at||'').slice(0,10))+((ex.files||[]).length?'<div style="margin-top:4px;color:#8a919d">체크를 풀면 저장 시 그 첨부가 삭제됩니다</div>':'')
+        +(ex.files||[]).map((u,i)=>'<label style="display:flex;gap:8px;align-items:center;margin-top:6px;cursor:pointer"><input type="checkbox" class="pcKeep" value="'+cesc(u)+'" checked style="width:auto">'+taFileThumb(u)+'<span style="flex:1">첨부 '+(i+1)+'</span><a href="'+cesc(u)+'" target="_blank" style="font-weight:800;color:#153A77">보기</a></label>').join('')+'</div>':'')
     +'<div id="pcList" style="margin-top:10px;font-size:12.5px;color:#4b5563"></div>'
     +'<div id="pcMsg" style="margin-top:10px;font-size:12.5px;color:#153A77"></div>'
     +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap">'
-    +'<button id="pcOk" class="cbtn" style="background:#0f766e;color:#fff" onclick="pcConfirm(true)">✅ 서류 확인만 처리 (첨부 없이)</button>'
+    +'<button id="pcOk" class="cbtn" style="background:#0f766e;color:#fff" onclick="pcConfirm(true)">'+(ex?'💾 변경 저장':'✅ 서류 확인만 처리 (첨부 없이)')+'</button>'
     +'<button class="cbtn cbtn-ghost" onclick="document.getElementById(\'pcModal\').remove()">취소</button></div></div>';
   document.body.appendChild(d);
 }
@@ -1096,7 +1105,7 @@ function pcPreview(){
   const n=f&&f.files?Math.min(f.files.length,5):0;
   // [수기서류 승인] 첨부 유무에 따라 버튼 문구를 바꿔, 지금 무엇이 저장되는지 분명히 보이게 합니다.
   const ok=document.getElementById('pcOk');
-  if(ok)ok.textContent=n?('✅ 첨부 '+n+'개와 함께 확인 처리'):'✅ 서류 확인만 처리 (첨부 없이)';
+  if(ok)ok.textContent=_PC.existing?(n?('💾 첨부 '+n+'개 추가하고 저장'):'💾 변경 저장'):(n?('✅ 첨부 '+n+'개와 함께 확인 처리'):'✅ 서류 확인만 처리 (첨부 없이)');
   if(!n){box.textContent='';return}
   box.innerHTML='첨부 '+n+'개 — '+[].slice.call(f.files,0,5).map(x=>cesc(x.name)).join(', ');
 }
@@ -1118,8 +1127,11 @@ async function pcConfirm(){
       urls.push(await snap.ref.getDownloadURL());
     }
     msg.textContent='저장 중…';
-    const rec={name:_PC.name||'',by:(CMY&&CMY.name)||'관리자',at:new Date().toISOString()};
-    if(urls.length)rec.files=urls;
+    const ex=_PC.existing;
+    const kept=ex?[...document.querySelectorAll('#pcExist .pcKeep:checked')].map(x=>x.value):[];
+    const rec=ex?Object.assign({},ex,{name:_PC.name||ex.name||'',editedBy:(CMY&&CMY.name)||'관리자',editedAt:new Date().toISOString()}):{name:_PC.name||'',by:(CMY&&CMY.name)||'관리자',at:new Date().toISOString()};
+    const finalFiles=kept.concat(urls);
+    if(finalFiles.length)rec.files=finalFiles;else delete rec.files;
     await DB.collection('compSlots').doc(_PC.slotId).update(
       new firebase.firestore.FieldPath('paperConsents',_PC.key), rec);
     await _refreshSlot(_PC.slotId);
@@ -1362,7 +1374,7 @@ function reRender(){
     //   담당자가 버튼을 찾지 못하는 일이 있었습니다.
     const pprBtn=(st!=='adult'&&!done&&isCompStaff())
       ? '<button onclick="reMarkPaper('+i+')" title="담당자가 서면(수기) 동의서를 수령한 경우 클릭" style="border:1.5px solid #e6b422;background:#fffbeb;color:#8a5a00;border-radius:8px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;margin-right:4px">📄 수기동의 확인</button>'
-      : '';
+      : ((st!=='adult'&&done&&isCompStaff())?'<button onclick="reMarkPaper('+i+')" title="첨부 동의서 추가·삭제" style="border:1.5px solid #c9d8ef;background:#fff;color:#153A77;border-radius:8px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;margin-right:4px">✎ 동의서 수정</button>':'');
     // [줄바꿈] 버튼이 붙으면 좁은 화면에서 설명 글이 한 글자씩 세로로 쪼개지던 문제 →
     //   행을 wrap 시키고 설명 칸에 최소 너비를 주어 버튼이 아랫줄로 내려가게 합니다.
     return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid '+(st==='unknown'&&!done?'#eddfc4':'#e5e9f0')+';background:'+(st==='unknown'&&!done?'#fffdf5':'#fff')+';border-radius:9px;padding:7px 10px;margin-bottom:5px;font-size:13px"><b style="min-width:52px;flex:0 0 auto">'+cesc(r.name)+'</b><span style="color:#6b7280;font-size:12px;flex:1 1 150px;min-width:130px;line-height:1.55">'+cesc(r.birth||'')+(r.school?' · '+cesc(r.school):'')+(r.nonMember?' <b style="color:#8a5a00">🧾 비회원 참가자</b>':'')+mark+'</span>'+fixBtn+pprBtn+'<button onclick="reDel('+i+')" title="명단에서 제거" style="border:none;background:#fee2e2;color:#C41E2F;border-radius:7px;width:26px;height:26px;font-weight:900;cursor:pointer">✕</button></div>';
@@ -1378,7 +1390,7 @@ function reMarkPaper(i){
     alert('명단이 변경되었습니다.\n\n동의 기록은 명단 순번으로 저장되므로, 먼저 [\uD83D\uDCBE 저장]을 눌러 명단을 확정한 뒤 수기동의 확인을 진행해 주세요.');
     return;
   }
-  openPaperModal(_RED.slotId,pcKeyAt(_RED.key,_RED.roster,i),r.name||'','re');
+  openPaperModal(_RED.slotId,pcRecKey(_RED.paper,_RED.key,_RED.roster,i),r.name||'','re');
 }
 // [연령확인] 명단의 생년월일 채우기 — ① 같은 이름의 회원을 찾아 불러오기 ② 직접 입력
 //   클럽 명단에 생년월일이 복사되지 않은 채 팀 명단으로 넘어온 경우를 그 자리에서 바로잡습니다.
