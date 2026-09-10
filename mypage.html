@@ -611,6 +611,11 @@ function orgChip(o,region,title,fed){
         <div><label>수업일 *</label><input id="lgDate" type="date"></div>
         <div><label>참여 인원 *</label><input id="lgCount" type="number" min="1" placeholder="예: 24"></div>
       </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
+        <div><label>남학생 <span style="font-weight:600;color:#8a919d">(실적보고용)</span></label><input id="lgMale" type="number" min="0" placeholder="예: 12" oninput="lgSumMF()"></div>
+        <div><label>여학생 <span style="font-weight:600;color:#8a919d">(실적보고용)</span></label><input id="lgFemale" type="number" min="0" placeholder="예: 12" oninput="lgSumMF()"></div>
+      </div>
+      <div style="font-size:12px;color:#8a919d;margin-top:4px">남·여를 적으면 참여 인원이 자동으로 합산됩니다. 월별 실적보고서(수혜자 남/여)에 그대로 들어가니 가능하면 적어 주세요.</div>
       <label>수업 내용 *</label><textarea id="lgContent" rows="2" placeholder="예: 백핸드 스로우 기초, 캐치 게임 (교재 2단원)"></textarea>
       <label>활동 사진 <span style="font-weight:600;color:#8a919d;font-size:12px">· 활동 장면 1~3장 (자동 압축 업로드)</span></label>
       <input id="lgPhotos" type="file" accept="image/*" multiple style="border:none;padding:6px 0" onchange="document.getElementById('lgPhotoState').textContent=this.files.length?('선택됨 '+Math.min(this.files.length,3)+'장'+(this.files.length>3?' — 최대 3장까지만 업로드됩니다':'')):''">
@@ -2221,6 +2226,7 @@ function editLog(id){
     +'<div style="font-size:12.5px;color:#666;margin:4px 0 12px">'+esc(l.school||'')+' · '+esc(l.date||'')+'</div>'
     +'<label style="font-size:12.5px;font-weight:800">수업일</label><input id="elDate" type="date" value="'+esc(l.date||'')+'" '+inp+'>'
     +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">참여 인원</label><input id="elCount" type="number" min="1" value="'+(l.count||'')+'" '+inp+'>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">남학생</label><input id="elMale" type="number" min="0" value="'+(l.male!=null?l.male:'')+'" oninput="elSumMF()" '+inp+'></div><div><label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">여학생</label><input id="elFemale" type="number" min="0" value="'+(l.female!=null?l.female:'')+'" oninput="elSumMF()" '+inp+'></div></div>'
     +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">수업 내용</label><textarea id="elContent" rows="2" '+inp+'>'+esc(l.content||'')+'</textarea>'
     +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">비고</label><input id="elNote" value="'+esc(l.note||'')+'" '+inp+'>'
     +'<div style="margin-top:12px;padding:12px 14px;background:#f6faf7;border:1.5px solid #cfe4d8;border-radius:10px">'
@@ -2249,7 +2255,9 @@ async function saveLogEdit(id){
   const m=document.getElementById('elMsg');
   const l=MYLOGS.find(x=>x._id===id);if(!l)return;
   const date=document.getElementById('elDate').value;
-  const cnt=parseInt(document.getElementById('elCount').value);
+  const elM=document.getElementById('elMale'),elF=document.getElementById('elFemale');
+  const male=elM&&elM.value!==''?Math.max(0,parseInt(elM.value)||0):null,female=elF&&elF.value!==''?Math.max(0,parseInt(elF.value)||0):null;
+  let cnt=parseInt(document.getElementById('elCount').value);if(male!=null&&female!=null&&male+female>0)cnt=male+female;
   const content=document.getElementById('elContent').value.trim();
   if(!date||!cnt||cnt<1||!content){m.textContent='수업일·참여 인원·수업 내용을 확인해주세요';m.style.color='#C41E2F';return}
   try{
@@ -2265,7 +2273,7 @@ async function saveLogEdit(id){
     }
     m.textContent='저장 중…';
     await DB.collection('sessionLogs').doc(id).update({
-      date:date,count:cnt,content:content,
+      date:date,count:cnt,male:male,female:female,content:content,
       note:document.getElementById('elNote').value.trim(),
       photos:photos,
       editedAt:firebase.firestore.FieldValue.serverTimestamp()});
@@ -2282,7 +2290,10 @@ async function submitLog(){
   const sess=parseInt(document.getElementById('lgSession').value);
   const date=document.getElementById('lgDate').value;
   const content=document.getElementById('lgContent').value.trim();
-  const cnt=parseInt(document.getElementById('lgCount').value);
+  const lgM=document.getElementById('lgMale'),lgF=document.getElementById('lgFemale');
+  const male=lgM&&lgM.value!==''?Math.max(0,parseInt(lgM.value)||0):null,female=lgF&&lgF.value!==''?Math.max(0,parseInt(lgF.value)||0):null;
+  let cnt=parseInt(document.getElementById('lgCount').value);
+  if(male!=null&&female!=null&&male+female>0)cnt=male+female;   // [실적보고] 남+여가 있으면 합계 우선
   if(!appId||!sess||sess<1||sess>24||!date||!content||!cnt||cnt<1){m.textContent='회차·수업일·참여 인원·수업 내용을 입력해주세요';m.className='msg err';return}
   const chk={level:document.getElementById('lgChk1').checked,fit:document.getElementById('lgChk2').checked,time:document.getElementById('lgChk3').checked,notice:document.getElementById('lgChk4').checked};
   if(!chk.level||!chk.fit||!chk.time||!chk.notice){m.textContent='안전 지도 점검 4개 항목을 모두 확인해주세요';m.className='msg err';return}
@@ -2303,10 +2314,10 @@ async function submitLog(){
     }
     await DB.collection('sessionLogs').add({
       appId:appId,school:a.school,type:a.type,uid:AUTH.currentUser.uid,name:MYD.name,
-      session:sess,date:date,count:cnt,content:content,note:document.getElementById('lgNote').value.trim(),
+      session:sess,date:date,count:cnt,male:male,female:female,content:content,note:document.getElementById('lgNote').value.trim(),
       check:chk,photos:photos,teacherConfirm:null,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
     m.textContent='✓ '+sess+'회차 보고가 제출되었습니다.'+(photos.length?' (사진 '+photos.length+'장 포함)':'')+' 사무국 확인 후 포인트가 반영됩니다.';m.className='msg ok';
-    document.getElementById('lgContent').value='';document.getElementById('lgNote').value='';document.getElementById('lgCount').value='';
+    document.getElementById('lgContent').value='';document.getElementById('lgNote').value='';document.getElementById('lgCount').value='';if(lgM)lgM.value='';if(lgF)lgF.value='';
     document.getElementById('lgSession').value='';
     document.getElementById('lgPhotos').value='';document.getElementById('lgPhotoState').textContent='';
     [1,2,3,4].forEach(i=>{document.getElementById('lgChk'+i).checked=false;});
@@ -2566,6 +2577,8 @@ async function awardClaimsLoad(){
 }
 async function awardClaimCancel(id){if(!confirm('이 신청을 취소할까요?'))return;try{await DB.collection('awardClaims').doc(id).delete();awardClaimsLoad()}catch(e){alert('취소 실패: '+(e.code||e.message))}}
 // 신청 창 — editId 가 있으면 검토 중인 내 신청을 불러와 수정합니다
+function lgSumMF(){const m=document.getElementById('lgMale'),f=document.getElementById('lgFemale'),c=document.getElementById('lgCount');if(!m||!f||!c)return;if(m.value!==''||f.value!==''){c.value=(parseInt(m.value)||0)+(parseInt(f.value)||0)}}
+function elSumMF(){const m=document.getElementById('elMale'),f=document.getElementById('elFemale'),c=document.getElementById('elCount');if(!m||!f||!c)return;if(m.value!==''||f.value!==''){c.value=(parseInt(m.value)||0)+(parseInt(f.value)||0)}}
 function awardClaimOpen(editId){
   if(!MYD||!AUTH.currentUser){alert('로그인 후 이용할 수 있습니다.');return}
   const ed=editId?(AWARD_CLAIMS.find(x=>x.id===editId)||null):null;

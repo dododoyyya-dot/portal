@@ -508,6 +508,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#153A77" onclick="reviewHist()">📋 이력 승인·포인트 전환</button>
         <button class="btn-sub" style="background:#b8860b" onclick="payrollCSV()">💰 월 지급 계산 CSV</button>
         <button class="btn-sub" style="background:#0f766e" onclick="rptDownload()" title="유소년 월별 현황보고서 양식에 누적 실적을 자동 기입해 내려받습니다 (양식·수식은 그대로)">📊 월별 현황보고서 (양식 자동기입)</button>
+        <label class="btn-sub" style="background:#0e7490;cursor:pointer;display:inline-block" title="지난달 제출한 보고서(.xlsx)의 학년-반·남·여를 학교별 수혜자 정보로 저장">📥 이전 보고서에서 수혜자 정보 가져오기<input type="file" accept=".xlsx" style="display:none" onchange="rptImportPrev(this)"></label>
         <button class="btn-sub" style="background:#555" onclick="closeWaitlist()">⏳ 대기자 일괄 종료</button>
         <button class="btn-sub" style="background:#0f766e" onclick="showSupply()">🧭 권역별 수급 현황</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="copyPhoneList('apps')">📱 문자명단 복사 (교사·현재 필터)</button>
@@ -1471,7 +1472,7 @@ function renderApps(){
       +((st==='선정'||st==='배정완료')?' <span style="font-size:11px;font-weight:800;color:'+(gc&&gc.delivery?'#0f766e':'#C41E2F')+'" title="'+(gc&&gc.delivery?esc(((gc.delivery.addr||'')+' '+(gc.delivery.addr2||'')).trim())+' · '+esc(gc.delivery.receiver||'')+' '+esc(gc.delivery.phone||''):'배송지 미입력 — 📦 버튼으로 링크를 교사에게 전달하세요')+'">🚚 배송지 '+(gc&&gc.delivery?'O':'X')+'</span>':'')
       +((st==='선정'||st==='배정완료')?' <span style="font-size:11px;font-weight:800;color:'+(gc&&gc.teacherConfirm?'#0f766e':'#C41E2F')+'" title="'+(gc&&gc.teacherConfirm?esc(gc.teacherConfirm.name)+' 수령확인'+(gc.teacherConfirm.photo?' · 사진첨부':' · 사진없음(구양식)'):'용품 수령 미확인')+'">📦 수령 '+(gc&&gc.teacherConfirm?'O':'X')+'</span>':'')
       +((st==='선정'||st==='배정완료')?mailBadge(s.email):'')  // [메일로그] 발송 성공✓/실패✗/기록없음−
-      +'<div class="sub3">'+(s.code?'<b>'+esc(s.code)+'</b> · ':'')+esc(s.region)+(s.city?' · <b style="color:#1F4E9C">📍'+esc(s.city)+'</b>':' · <b style="color:#C41E2F">시군구 미입력</b>')+' · '+esc(s.students)+(s.start&&s.start.indexOf('8월')>=0?' · <b style="color:#C41E2F">⚡8월 방학 개강 희망</b>':'')+' · 희망 '+esc(s.d1)
+      +'<div class="sub3">'+(s.code?'<b>'+esc(s.code)+'</b> · ':'')+esc(s.region)+(s.city?' · <b style="color:#1F4E9C">📍'+esc(s.city)+'</b>':' · <b style="color:#C41E2F">시군구 미입력</b>')+' · '+esc(s.students)+' <button class="btn-sub" style="background:'+((s.studentsM!=null||s.studentsF!=null)?'#0e7490':'#8a919d')+';padding:1px 8px;font-size:11px" title="실적보고서 수혜자 남/여·학년-반 (월별 현황보고서에 그대로 기입)" onclick="setBenef(\''+d.id+'\')">👥 '+((s.studentsM!=null||s.studentsF!=null)?('남 '+(s.studentsM||0)+' · 여 '+(s.studentsF||0)):'수혜자 미입력')+(s.grade?' · '+esc(s.grade):'')+'</button>'+(s.start&&s.start.indexOf('8월')>=0?' · <b style="color:#C41E2F">⚡8월 방학 개강 희망</b>':'')+' · 희망 '+esc(s.d1)
       +'<br>담당 '+esc(s.teacher)+' '+esc(s.phone)+(s.assignedName?' · <b style="color:#0f766e">배정: '+esc(s.assignedName)+'</b>':'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
       +((st==='접수'||st==='대기')?'<button class="btn-sub" onclick="setStatus(\''+d.id+'\',\'선정\')">선정</button><button class="btn-sub" style="background:#8a919d" onclick="setStatus(\''+d.id+'\',\'미선정\')">미선정</button>':'')
@@ -3624,6 +3625,38 @@ function rptFill(xml,rows,startRow){
   return xml;
 }
 // RPT-CORE-END
+// [수혜자 정보] 학년-반·남·여 — 월별 현황보고서 F·G·H 칸에 그대로 들어갑니다
+async function setBenef(id){
+  const doc=APPS.find(d=>d.id===id);if(!doc)return;const s=doc.data();
+  const g=prompt('['+(s.school||'')+'] 학년-반 (예: 3-2, 1~2학년)',s.grade||'');if(g===null)return;
+  const m=prompt('수혜자 남학생 수',(s.studentsM!=null?s.studentsM:''));if(m===null)return;
+  const f=prompt('수혜자 여학생 수',(s.studentsF!=null?s.studentsF:''));if(f===null)return;
+  const upd={grade:g.trim(),studentsM:m.trim()===''?null:(parseInt(m)||0),studentsF:f.trim()===''?null:(parseInt(f)||0),benefAt:new Date().toISOString()};
+  try{await DB.collection('schoolApplications').doc(id).update(upd);await loadApps()}catch(e){alert('저장 실패: '+e.message)}
+}
+// [이전 보고서 가져오기] 지난달 제출한 현황보고서(.xlsx)의 유형3·5 행에서 학년-반·남·여를 읽어 학교(기관명)·유형이 같은 신청에 저장
+async function rptImportPrev(input){
+  const f=input&&input.files&&input.files[0];if(!f)return;input.value='';
+  if(typeof ExcelJS==='undefined'){alert('엑셀 라이브러리를 아직 불러오는 중입니다.');return}
+  try{
+    if(!APPS.length)await loadApps();
+    const wb=await scLoadXlsx(await f.arrayBuffer());const ws=wb.worksheets[0];if(!ws)throw new Error('시트가 없습니다');
+    const norm=x=>String(x||'').replace(/\s+/g,'').replace(/(초등학교|중학교|고등학교)$/,m=>({'초등학교':'초','중학교':'중','고등학교':'고'}[m]));
+    const cellv=c=>{const v=c&&c.value;if(v==null)return '';if(typeof v==='object'){if(v.richText)return v.richText.map(t=>t.text).join('');if(v.result!=null)return v.result;if(v.text!=null)return v.text;return ''}return v};
+    let ok=0,miss=[],rows=0;
+    for(let n=16;n<=215;n++){const r=ws.getRow(n);const B=String(cellv(r.getCell(2)));if(!B)continue;rows++;
+      const tk=/유형3/.test(B)?'school':(/유형5/.test(B)?'after':'');if(!tk)continue;
+      const school=String(cellv(r.getCell(5))).trim(),grade=String(cellv(r.getCell(6))).trim();const mv=cellv(r.getCell(7)),fv=cellv(r.getCell(8));
+      const m=mv===''?null:(parseInt(mv)||0),fe=fv===''?null:(parseInt(fv)||0);
+      const app=APPS.find(d=>{const s=d.data();const tk2=s.typeKey||((String(s.type||'').indexOf('방과후')>=0||String(s.type||'').indexOf('돌봄')>=0)?'after':'school');return tk2===tk&&norm(s.school)===norm(school)});
+      if(!app){miss.push(school+'('+(tk==='after'?'유형5':'유형3')+')');continue}
+      const upd={benefAt:new Date().toISOString(),benefSrc:f.name};if(grade)upd.grade=grade;if(m!=null)upd.studentsM=m;if(fe!=null)upd.studentsF=fe;
+      await DB.collection('schoolApplications').doc(app.id).update(upd);ok++;
+    }
+    await loadApps();
+    alert('이전 보고서에서 수혜자 정보를 가져왔습니다.\n· 읽은 행 '+rows+'개 중 저장 '+ok+'건'+(miss.length?'\n· 신청 목록에서 못 찾은 학교 '+miss.length+'개: '+miss.slice(0,12).join(', ')+(miss.length>12?' 외 '+(miss.length-12):''):''));
+  }catch(e){alert('가져오기 실패: '+(e.message||e))}
+}
 async function rptDownload(){
   if(typeof JSZip==='undefined'){alert('압축 라이브러리를 아직 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');return}
   const def=new Date().toISOString().slice(0,7);
@@ -3641,11 +3674,13 @@ async function rptDownload(){
     const U={};for(const a of apps){if(a.assignedUid&&!U[a.assignedUid]){try{const d=await DB.collection('users').doc(a.assignedUid).get();U[a.assignedUid]=d.exists?(d.data()||{}):{}}catch(e){U[a.assignedUid]={}}}}
     const order={school:0,after:1};
     apps.sort((p,q)=>((order[p.typeKey]||0)-(order[q.typeKey]||0))||String(p.city||'').localeCompare(String(q.city||''))||String(p.school||'').localeCompare(String(q.school||'')));
-    let noLog=0;
+    let noLog=0;const estList=[];
     const rows=apps.map(a=>{
       const logs=(byApp[a.id]||[]).slice().sort((p,q)=>(p.session||0)-(q.session||0));if(!logs.length)noLog++;
       const months={};logs.forEach(l=>{const m=parseInt(String(l.date).slice(5,7),10);if(m)months[m]=(months[m]||0)+1});
-      const sess={};logs.forEach(l=>{const n=+l.session||0;if(!n)return;sess[n]=Math.max(sess[n]||0,+l.count||0)});
+      const sess={};logs.forEach(l=>{const n=+l.session||0;if(!n)return;const c=(l.male!=null&&l.female!=null&&(l.male+l.female)>0)?(l.male+l.female):(+l.count||0);sess[n]=Math.max(sess[n]||0,c)});
+      // [수혜자 남/여] ① 관리자가 입력한 수혜자 정보 ② 강사 일지의 남/여(가장 최근 회차) ③ 둘 다 없으면 합계를 반반 분할하고 '추정'으로 표시
+      const mfLog=logs.slice().reverse().find(l=>l.male!=null&&l.female!=null&&(l.male+l.female)>0);
       const sessions=Object.keys(sess).map(n=>({n:+n,lead:1,part:sess[n]||null}));
       const city=String(a.city||'').trim();const sido=city.split(/\s+/)[0]||'';const gugun=city.slice(sido.length).trim();
       const total=Math.max(parseInt(a.students)||0,...Object.values(sess),0);
@@ -3653,8 +3688,11 @@ async function rptDownload(){
       if(inst){if(inst.natCertApproved)L=1;else M=1}else if(a.selfTeach){M=1}
       const type=RPT_TYPE[a.typeKey]||((String(a.type||'').indexOf('방과후')>=0||String(a.type||'').indexOf('돌봄')>=0)?RPT_TYPE.after:RPT_TYPE.school);
       // 남녀: 신청서에 구분이 없어 합계를 반반으로 나눔 (홀수면 남 +1)
-      const male=total?Math.ceil(total/2):null,female=total?Math.floor(total/2):null;
-      return {B:type,C:sido,D:gugun,E:a.school||'',F:'',G:male,H:female,J:0,K:0,L:L,M:M,months:months,sessions:sessions,typeKey:(type===RPT_TYPE.after?'after':'school')};
+      let male,female,src='est';
+      if(a.studentsM!=null||a.studentsF!=null){male=a.studentsM||0;female=a.studentsF||0;src='admin'}
+      else if(mfLog){male=mfLog.male;female=mfLog.female;src='log'}
+      else{male=total?Math.ceil(total/2):null;female=total?Math.floor(total/2):null;if(total)estList.push(a.school||'')}
+      return {B:type,C:sido,D:gugun,E:a.school||'',F:a.grade||'',G:male||null,H:female||null,J:0,K:0,L:L,M:M,months:months,sessions:sessions,typeKey:(type===RPT_TYPE.after?'after':'school'),src:src};
     });
     const res=await fetch('files/report_template_2026.xlsx?v='+Date.now());if(!res.ok)throw new Error('양식 파일(files/report_template_2026.xlsx)을 찾을 수 없습니다');
     const zip=await JSZip.loadAsync(await res.arrayBuffer());
@@ -3681,7 +3719,7 @@ async function rptDownload(){
     zip.file('xl/workbook.xml',wbx);
     const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=String(mo).padStart(2,'0')+'월_플라잉디스크_'+String(y).slice(2)+'년 유소년월별 현황보고서.xlsx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
-    alert('📊 '+ym+' 현황보고서를 내려받았습니다.\n· 학교 '+rows.length+'개 (양식 '+start+'행부터)'+(noLog?'\n· 일지 미제출 '+noLog+'개교는 기관 정보만 기입':'')+'\n· 수혜자 남녀는 신청서에 구분이 없어 합계를 반반으로 나눠 넣었습니다\n· 「사업 성과」 시트의 유형3·유형5 학교 수도 함께 기입되며, 색칠된 수식 칸은 엑셀에서 열 때 자동 계산됩니다');
+    alert('📊 '+ym+' 현황보고서를 내려받았습니다.\n· 학교 '+rows.length+'개 (양식 '+start+'행부터)'+(noLog?'\n· 일지 미제출 '+noLog+'개교는 기관 정보만 기입':'')+'\n· 수혜자 남/여: 관리자 입력 '+rows.filter(r=>r.src==='admin').length+'교 · 강사 일지 '+rows.filter(r=>r.src==='log').length+'교'+(estList.length?'\n  ⚠ 추정(반반 분할) '+estList.length+'교 — [👥 수혜자] 버튼이나 [이전 보고서 가져오기]로 실제 값을 넣어 주세요: '+estList.slice(0,10).join(', ')+(estList.length>10?' 외 '+(estList.length-10):''):'')+'\n· 「사업 성과」 시트의 유형3·유형5 학교 수도 함께 기입되며, 색칠된 수식 칸은 엑셀에서 열 때 자동 계산됩니다');
   }catch(e){alert('보고서 생성 실패: '+(e.message||e))}
 }
 async function payrollCSV(){
