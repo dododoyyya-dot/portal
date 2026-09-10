@@ -1548,7 +1548,7 @@ async function openTeamApply(id){
     +'<div style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;font-weight:700">인솔자: '+cesc(CMY.name||'')+' <select id="taRole" '+inp+'><option>지도교사</option><option>클럽장</option><option>학부모</option><option>성인 인솔자</option></select><span style="font-size:11.5px;color:#8a919d">'+cesc(CMY.phone||'')+'</span></div>'
     +'<div style="font-size:13px;font-weight:800;margin:14px 0 4px">② 팀원 명단 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 인솔자 본인 · 클럽 명단 · 비회원 직접 입력 모두 가능</span></div>'
     +'<div id="taRosterBox" style="border:1px solid #e2e7f0;border-radius:10px;padding:8px"></div>'
-    +'<div style="display:flex;gap:8px;margin-top:7px;flex-wrap:wrap;align-items:center"><span style="font-size:12px;font-weight:800;color:#5b6472">팀원 담기</span><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#e0f2f1;color:#068081" onclick="taAddSelf()">인솔자 본인도 선수로 참가</button><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#fff6e0;color:#8a5a00" onclick="taXlsxTemplate()">엑셀 양식</button><label class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#fff6e0;color:#8a5a00;cursor:pointer;margin:0">엑셀로 명단 불러오기<input type="file" accept=".xlsx" style="display:none" onchange="taImportXlsx(this)"></label><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px" onclick="taAddRow()">+ 비회원 팀원 추가</button>'
+    +'<div style="display:flex;gap:8px;margin-top:7px;flex-wrap:wrap;align-items:center"><span style="font-size:12px;font-weight:800;color:#5b6472">팀원 담기</span><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#e0f2f1;color:#068081" onclick="taAddSelf()">인솔자 본인도 선수로 참가</button><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#fff6e0;color:#8a5a00" onclick="taXlsxTemplate()">엑셀 양식</button><label class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#fff6e0;color:#8a5a00;cursor:pointer;margin:0">엑셀로 명단 불러오기<input type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" style="display:none" onchange="taImportXlsx(this)"></label><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px" onclick="taAddRow()">+ 비회원 팀원 추가</button>'
     +'<button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#eef7f4;color:#0f766e" onclick="taFindTeams(true)">👥 명단에서 클릭 선택</button>'
     +'<button type="button" class="cbtn cbtn-soft" id="taLoadClub" style="padding:6px 14px;font-size:12.5px;display:none" onclick="taLoadClubRoster()">📋 클럽 명단 불러오기</button></div>'
     +'<div style="font-size:13px;font-weight:800;margin:14px 0 4px">③ 보호자 동의 (미성년 팀원)</div>'
@@ -1781,10 +1781,13 @@ function taCell(c){if(c==null)return '';if(c instanceof Date)return taDate(c);if
 // 시트 → {rows:[{name,birth,gender,school,phone,address,note}],errors:[]}  (머리글에서 열을 찾음)
 function taParseSheet(ws){
   let hdrRow=0,hdr=[];
-  ws.eachRow((row,n)=>{if(hdrRow)return;const vals=(row.values||[]).map(taCell);if(vals.some(v=>/^(성명|이름)/.test(v)))({hdrRow,hdr}={hdrRow:n,hdr:vals})});
-  if(!hdrRow)return {rows:[],errors:['머리글 행(성명·생년월일 …)을 찾지 못했습니다. [엑셀 양식]을 내려받아 그 양식에 적어 주세요.']};
-  const col=re=>{for(let i=0;i<hdr.length;i++)if(re.test(hdr[i]||''))return i;return -1};
-  const C={name:col(/^(성명|이름)/),birth:col(/^생년월일|^생일|^출생/),gender:col(/^성별/),school:col(/^학교|^소속|^학교.?소속/),phone:col(/^연락처|^전화|^휴대/),addr:col(/^주소/),note:col(/^비고|^메모/)};
+  // [명단 인식 보강 2026-09-10] 머리글은 '성명·이름·학생명·선수명·참가자·이름(한글)' 등 어디에 있어도 찾고, 공백·괄호는 무시합니다
+  const NAME_RE=/(성\s*명|이름|학생명|선수명|참가자|참가자명|선수이름|학생이름|성함)/;
+  ws.eachRow((row,n)=>{if(hdrRow)return;const vals=(row.values||[]).map(taCell);if(vals.some(v=>NAME_RE.test(String(v).replace(/\s+/g,''))))({hdrRow,hdr}={hdrRow:n,hdr:vals})});
+  if(!hdrRow)return {rows:[],errors:['머리글 행을 찾지 못했습니다. 첫 줄에 「성명」(또는 이름·학생명) 칸이 있어야 합니다. [엑셀 양식]을 내려받아 그 양식에 적어 주세요.']};
+  const H=hdr.map(h=>String(h||'').replace(/\s+/g,''));
+  const col=re=>{for(let i=0;i<H.length;i++)if(re.test(H[i]))return i;return -1};
+  const C={name:col(NAME_RE),birth:col(/생년월일|생일|출생|생년|birth/i),gender:col(/성별|gender|남녀/i),school:col(/학교|소속|팀명|클럽/),phone:col(/연락처|전화|휴대|핸드폰|phone/i),addr:col(/주소/),note:col(/비고|메모|특이/)};
   if(C.name<0)return {rows:[],errors:['성명 열이 없습니다.']};
   const rows=[],errors=[];
   ws.eachRow((row,n)=>{if(n<=hdrRow)return;const v=row.values||[];const g=i=>i>=0?taCell(v[i]):'';
@@ -1844,9 +1847,26 @@ async function taImportXlsx(input){
   const f=input&&input.files&&input.files[0];if(!f)return;input.value='';
   if(typeof ExcelJS==='undefined'){alert('엑셀 라이브러리를 아직 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');return}
   try{
-    const wb=await taLoadXlsx(await f.arrayBuffer());const ws=wb.worksheets[0];if(!ws)throw new Error('시트가 없습니다.');
-    const {rows,errors}=taParseSheet(ws);
-    if(!rows.length){alert((errors[0]||'읽을 명단이 없습니다.'));return}
+    const fname=String(f.name||'').toLowerCase();
+    let rows=[],errors=[];
+    if(/\.csv$/.test(fname)||/text\/csv/.test(f.type||'')){
+      // CSV: 쉼표·탭 구분, UTF-8/EUC-KR 모두 시도
+      let txt='';const buf=await f.arrayBuffer();
+      try{txt=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){try{txt=new TextDecoder('euc-kr').decode(buf)}catch(e2){txt=new TextDecoder('utf-8').decode(buf)}}
+      const lines=txt.replace(/^\ufeff/,'').split(/\r?\n/).filter(l=>l.trim());
+      const grid=lines.map(l=>l.split(l.indexOf('\t')>=0?'\t':',').map(x=>x.replace(/^"|"$/g,'').trim()));
+      const fake={eachRow:function(fn){grid.forEach((r,i)=>fn({values:[''].concat(r)},i+1))}};
+      ({rows,errors}=taParseSheet(fake));
+    }else if(/\.xls$/.test(fname)){
+      throw new Error('구형 엑셀(.xls) 파일은 읽을 수 없습니다. 엑셀에서 [다른 이름으로 저장] → 파일 형식 「Excel 통합 문서(*.xlsx)」로 저장한 뒤 다시 올려 주세요.');
+    }else{
+      const wb=await taLoadXlsx(await f.arrayBuffer());
+      if(!wb.worksheets.length)throw new Error('시트가 없습니다.');
+      // 첫 시트가 안내문이어도 명단이 있는 시트를 찾습니다
+      let best=null;for(const w of wb.worksheets){const p=taParseSheet(w);if(p.rows.length){best=p;break}if(!best)best=p}
+      rows=best.rows;errors=best.errors;
+    }
+    if(!rows.length){alert((errors[0]||'읽을 명단이 없습니다.')+'\n\n파일: '+f.name);return}
     const box=document.getElementById('taRosterBox');
     const have=[...box.querySelectorAll('#taRosterBox > div')].map(x=>({n:taNorm((x.querySelector('.taR-name')||{}).value),b:(x.querySelector('.taR-birth')||{}).value||''}));
     let added=0,member=0,dup=0;
@@ -1863,7 +1883,7 @@ async function taImportXlsx(input){
     // 번호 다시 매기기
     [...box.querySelectorAll('#taRosterBox > div')].forEach((x,i)=>{const s=x.querySelector('span');if(s&&/^\d+$/.test(s.textContent.trim()))s.textContent=String(i+1);x.style.marginTop=i?'6px':'0'});
     alert('엑셀에서 '+added+'명을 담았습니다.'+((member+linked)?' (회원으로 확인 '+(member+linked)+'명)':'')+(dup?' · 이미 있는 '+dup+'명은 건너뜀':'')+(errors.length?'\n\n확인 필요:\n'+errors.slice(0,8).join('\n')+(errors.length>8?'\n… 외 '+(errors.length-8)+'건':''):'')+'\n\n비회원으로 표시된 팀원도 나중에 같은 성명·생년월일로 회원 가입하면 이 대회의 참가·입상 기록이 자동으로 경력에 연동됩니다.');
-  }catch(e){alert('엑셀 읽기 실패: '+(e.message||e))}
+  }catch(e){alert('엑셀 읽기 실패: '+(e.message||e)+'\n\n· 파일이 .xlsx 인지 확인해 주세요 (.xls·한셀 파일은 엑셀에서 .xlsx 로 다시 저장)\n· 첫 줄에 성명·생년월일 등 제목이 있어야 합니다\n· 계속 안 되면 [엑셀 양식]을 내려받아 옮겨 적어 주세요')}
 }
 async function taXlsxTemplate(){
   if(typeof ExcelJS==='undefined'){alert('엑셀 라이브러리를 아직 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');return}
