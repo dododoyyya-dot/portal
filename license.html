@@ -241,6 +241,10 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
         <b>자격번호, 성명, 종류(지도자/심판), 급수(1/2/3), 발급일, 유효기간(비우면 발급일+4년), 이메일(선택 — 회원 자동연결), 소속지역</b><br>
         예: <code>0105-23060001,이용기,지도자,1,2023-06-15,2027-06-14,,광주</code>
       </p>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin:0 0 8px;font-size:13px;font-weight:700">
+        <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio" name="bkMode" value="new" checked style="width:auto"> 신규 등록 <span style="font-weight:600;color:var(--gray)">— 같은 번호가 있으면 덮어씀</span></label>
+        <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio" name="bkMode" value="merge" style="width:auto"> 기존 번호 정정·갱신 <span style="font-weight:600;color:var(--gray)">— 대장에 있는 번호만, 채운 칸만 바꾸고 빈 칸은 유지 · 9번째 열에 갱신일(선택)</span></label>
+      </div>
       <textarea id="bkData" rows="8" class="lcin" placeholder="여기에 붙여넣기"></textarea>
       <div style="margin-top:10px"><button class="lcbtn w" id="bkBtn" onclick="bulkImport()">일괄 등록 실행</button> <span id="bkMsg" style="font-size:13px;font-weight:700"></span></div>
       <div id="bkResult" style="font-size:12.5px;margin-top:8px;line-height:1.7"></div>
@@ -1364,7 +1368,7 @@ function bkParse(raw){
   for(const line of lines){
     try{
       const c=line.split(/\t|,/).map(x=>x.trim());
-      const [noRaw,name,typeRaw,gradeRaw,issued,valid,email,region]=c;
+      const [noRaw,name,typeRaw,gradeRaw,issued,valid,email,region,renewed]=c;
       if(noRaw==='자격번호')continue; // 머리글 행 스킵
       const no=(noRaw||'').toUpperCase();
       if(!no||!name||!typeRaw||!gradeRaw)throw new Error('필수값 누락');
@@ -1373,12 +1377,13 @@ function bkParse(raw){
       if(['1','2','3'].indexOf(grade)<0)throw new Error('급수 오류');
       const issuedAt=(issued&&/^\d{4}-\d{2}-\d{2}$/.test(issued))?issued:'';
       const expireAt=(valid&&/^\d{4}-\d{2}-\d{2}$/.test(valid))?valid:(issuedAt?plus4y(issuedAt):'');
-      rows.push({no:no,name:name,type:type,grade:grade,issuedAt:issuedAt,expireAt:expireAt,email:(email||'').toLowerCase(),region:region||''});
+      rows.push({no:no,name:name,type:type,grade:grade,issuedAt:issuedAt,expireAt:expireAt,email:(email||'').toLowerCase(),region:region||'',renewedAt:(renewed&&/^\d{4}-\d{2}-\d{2}$/.test(renewed))?renewed:''});
     }catch(e){fail.push(line.slice(0,24)+'… ('+e.message+')')}
   }
   return {rows:rows,fail:fail};
 }
-async function bkExecRows(rows,progress){
+function bkMode(){const r=document.querySelector('input[name="bkMode"]:checked');return (r&&r.value)||'new'}
+async function bkExecRows(rows,progress,mode){
   // 실제 대장 쓰기 — 중앙 실행 단계에서만 호출됩니다. 이메일 → 회원 자동연결도 여기서 합니다.
   let ok=0; const fail=[];
   for(let i=0;i<rows.length;i++){
@@ -1389,6 +1394,20 @@ async function bkExecRows(rows,progress){
       if(r.email&&r.email.indexOf('@')>0){
         const us=await DB.collection('users').where('email','==',r.email).limit(1).get();
         if(!us.empty)uid=us.docs[0].id;
+      }
+      // [정정·갱신 2026-09-10] 병합 모드: 있는 번호만, 채운 칸만 갱신 (발급일·유효기간·지역 빈칸은 유지, 회원 연결은 비어 있을 때만 채움)
+      if(mode==='merge'){
+        const ex=await DB.collection('licenses').doc(r.no).get();
+        if(!ex.exists)throw new Error('대장에 없는 번호');
+        const v=ex.data()||{};
+        const upd={name:r.name,maskName:maskName(r.name),type:r.type,grade:r.grade+'급',status:'유효',fixedAt:new Date().toISOString().slice(0,10),fixedBy:((LME&&LME.uid)||''),fixedByName:((LMY&&LMY.name)||'')};
+        if(r.issuedAt)upd.issuedAt=r.issuedAt;
+        if(r.expireAt)upd.expireAt=r.expireAt;
+        if(r.region)upd.region=r.region;
+        if(r.renewedAt)upd.renewedAt=r.renewedAt;
+        if(!v.uid&&uid)upd.uid=uid;
+        await DB.collection('licenses').doc(r.no).update(upd);
+        ok++;continue;
       }
       await DB.collection('licenses').doc(r.no).set({
         name:r.name,maskName:maskName(r.name),type:r.type,grade:r.grade+'급',
@@ -1423,9 +1442,11 @@ async function bulkImport(){
     }catch(e){m.textContent='요청 실패: '+e.message;m.style.color='#C41E2F'}
     return;
   }
-  if(!confirm(p.rows.length+'건을 등록할까요? (자격번호가 비어있으면 자동 생성)'))return;
-  m.textContent='등록 중…';m.style.color='#153A77';
-  const r=await bkExecRows(p.rows,function(i,n){m.textContent='등록 중… '+i+'/'+n});
+  const mode=bkMode();
+  if(mode==='merge'&&!CENTRAL){alert('정정·갱신 모드는 중앙연맹 관리자만 실행할 수 있습니다.');return}
+  if(!confirm(p.rows.length+'건을 '+(mode==='merge'?'정정·갱신할까요? (대장에 있는 번호만, 채운 칸만 바뀝니다)':'등록할까요? (같은 번호가 있으면 덮어씁니다)')))return;
+  m.textContent='처리 중…';m.style.color='#153A77';
+  const r=await bkExecRows(p.rows,function(i,n){m.textContent='처리 중… '+i+'/'+n},mode);
   const fail=p.fail.concat(r.fail);
   m.textContent='✓ 완료 — 성공 '+r.ok+'건'+(fail.length?' / 실패 '+fail.length+'건':'');m.style.color=fail.length?'#C41E2F':'#0f766e';
   rst.innerHTML=fail.length?('<b style="color:#C41E2F">실패 목록:</b><br>'+fail.map(esc).join('<br>')):'';
