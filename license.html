@@ -243,7 +243,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
       </p>
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin:0 0 8px;font-size:13px;font-weight:700">
         <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio" name="bkMode" value="new" checked style="width:auto"> 신규 등록 <span style="font-weight:600;color:var(--gray)">— 같은 번호가 있으면 덮어씀</span></label>
-        <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio" name="bkMode" value="merge" style="width:auto"> 기존 번호 정정·갱신 <span style="font-weight:600;color:var(--gray)">— 대장에 있는 번호만, 채운 칸만 바꾸고 빈 칸은 유지 · 9번째 열에 갱신일(선택)</span></label>
+        <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio" name="bkMode" value="merge" style="width:auto"> 기존 번호 정정·갱신 <span style="font-weight:600;color:var(--gray)">— 대장에 있는 번호만, 채운 칸만 바꾸고 빈 칸은 유지 · 9번째 열 갱신일 · 10번째 열 생년월일(선택 — 회원 미연결 자격 출력용)</span></label>
       </div>
       <textarea id="bkData" rows="8" class="lcin" placeholder="여기에 붙여넣기"></textarea>
       <div style="margin-top:10px"><button class="lcbtn w" id="bkBtn" onclick="bulkImport()">일괄 등록 실행</button> <span id="bkMsg" style="font-size:13px;font-weight:700"></span></div>
@@ -1368,7 +1368,7 @@ function bkParse(raw){
   for(const line of lines){
     try{
       const c=line.split(/\t|,/).map(x=>x.trim());
-      const [noRaw,name,typeRaw,gradeRaw,issued,valid,email,region,renewed]=c;
+      const [noRaw,name,typeRaw,gradeRaw,issued,valid,email,region,renewed,birthRaw]=c;
       if(noRaw==='자격번호')continue; // 머리글 행 스킵
       const no=(noRaw||'').toUpperCase();
       if(!no||!name||!typeRaw||!gradeRaw)throw new Error('필수값 누락');
@@ -1377,7 +1377,7 @@ function bkParse(raw){
       if(['1','2','3'].indexOf(grade)<0)throw new Error('급수 오류');
       const issuedAt=(issued&&/^\d{4}-\d{2}-\d{2}$/.test(issued))?issued:'';
       const expireAt=(valid&&/^\d{4}-\d{2}-\d{2}$/.test(valid))?valid:(issuedAt?plus4y(issuedAt):'');
-      rows.push({no:no,name:name,type:type,grade:grade,issuedAt:issuedAt,expireAt:expireAt,email:(email||'').toLowerCase(),region:region||'',renewedAt:(renewed&&/^\d{4}-\d{2}-\d{2}$/.test(renewed))?renewed:''});
+      rows.push({no:no,name:name,type:type,grade:grade,issuedAt:issuedAt,expireAt:expireAt,email:(email||'').toLowerCase(),region:region||'',renewedAt:(renewed&&/^\d{4}-\d{2}-\d{2}$/.test(renewed))?renewed:'',birth:(birthRaw&&/^\d{4}-\d{2}-\d{2}$/.test(birthRaw))?birthRaw:''});
     }catch(e){fail.push(line.slice(0,24)+'… ('+e.message+')')}
   }
   return {rows:rows,fail:fail};
@@ -1405,6 +1405,7 @@ async function bkExecRows(rows,progress,mode){
         if(r.expireAt)upd.expireAt=r.expireAt;
         if(r.region)upd.region=r.region;
         if(r.renewedAt)upd.renewedAt=r.renewedAt;
+        if(r.birth)upd.birth=r.birth;   // 10번째 열 생년월일 — 회원 미연결 자격의 출력물 생년월일
         if(!v.uid&&uid)upd.uid=uid;
         await DB.collection('licenses').doc(r.no).update(upd);
         ok++;continue;
