@@ -592,6 +592,7 @@ function orgChip(o,region,title,fed){
   </div>
   <div id="staffCareerBox" style="display:none;margin-top:44px">
     <h3 class="sub">심판·운영요원 경력</h3>
+    <div id="stOpenLink" style="font-size:13px;margin:2px 0 10px"><a href="competition.html?view=list&kind=staff" style="font-weight:800;color:#1f5fb2">모집 중인 심판·운영요원 공고 보기 →</a></div>
     <div class="board" id="staffCareerList"><div class="bempty">불러오는 중…</div></div>
     <div class="note" style="margin-top:14px">대회 심판·운영요원으로 확정·활동한 기록이 사무국에 의해 등록됩니다. 누락된 경력은 kfdf60@hanmail.net으로 문의하세요.</div>
   </div>
@@ -1474,6 +1475,8 @@ function gotoMyHash(h,delay){
   if(MY_HASH_TAB[h]&&MY_HASH_TAB[h]!=='Profile')gotoMyHash(h,400);
   window.addEventListener('hashchange',()=>gotoMyHash(location.hash,150));
 })();
+// [지름길] 모집 중인 심판·운영 공고 건수 — 심판 경력 상자 위 링크에 표시
+AUTH.onAuthStateChanged(u=>{if(!u)return;DB.collection('competitionStaff').limit(200).get().then(q=>{const t=new Date().toISOString().slice(0,10);const n=q.docs.filter(d=>{const p=d.data();return p.approved&&!p.manualClosed&&!p.closed&&!(p.deadline&&p.deadline<t)&&!(p.endDate&&p.endDate<t)}).length;const el=document.getElementById('stOpenLink');if(el)el.innerHTML='<a href="competition.html?view=list&kind=staff" style="font-weight:800;color:#1f5fb2">지금 모집 중인 심판·운영요원 공고 '+n+'건 보기 →</a>'}).catch(()=>{})});
 // ── 알림함 ──
 let ALARMS=[];
 function aesc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
@@ -3363,6 +3366,6 @@ function copyCfm(){var t=document.getElementById('cfmLink').value;
 document.getElementById('cfmModal').addEventListener('click',function(e){if(e.target===this)closeCfm()});
 document.getElementById('sigModal').addEventListener('click',function(e){if(e.target===this)closeSigModal()});
 </script>
-<script src="auth_ui.js?v=20260909f"></script>
+<script src="auth_ui.js?v=20260910a"></script>
 </body>
 </html>

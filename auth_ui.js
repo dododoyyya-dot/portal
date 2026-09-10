@@ -1,4 +1,4 @@
-// v20260909f · 전 페이지 공용: ① 상단 메뉴 일괄 렌더(A안) ② 로그인/로그아웃 전환 ③ 알림 배지
+// v20260910a · 전 페이지 공용: ① 상단 메뉴 일괄 렌더(A안) ② 로그인/로그아웃 전환 ③ 알림 배지
 (function(){
   var CFG={apiKey:"AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",authDomain:"koreaflyingdiscfederation.firebaseapp.com",projectId:"koreaflyingdiscfederation",appId:"1:1081847355343:web:ca40ed9a52e13f607f64ba"};
 
@@ -33,7 +33,7 @@
       ['방과후 · 늘봄','business.html?view=after'],['교원연수 · 교재개발','business.html?view=train'],['학교 강습 신청','apply.html']]},
     {t:'대회',h:'competition.html?view=list',d:[
       ['대회 일정 · 안내','competition.html?view=list'],['참가 신청','competition.html?view=entry'],
-      ['심판 · 운영요원 모집','staff.html'],['대회 결과','results.html'],['사진첩','gallery.html'],
+      ['심판 · 운영요원 모집','competition.html?view=list&kind=staff'],['대회 결과','results.html'],['사진첩','gallery.html'],
       ['공고 등록 · 관리','competition.html?view=manage','','admin']]},
     {t:'클럽',h:'club.html?view=find',d:[
       ['클럽 찾기 · 가입','club.html?view=find'],['클럽 만들기','club.html?view=create'],['내 클럽 · 가입 승인','club.html?view=mine'],['클럽 교류전','club.html?view=meet']]},
@@ -91,7 +91,7 @@
     var sn=document.createElement('div');sn.className='subnav';
     sn.innerHTML='<div class="wrap"><a class="sn-home" href="index.html" aria-label="홈"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></a>'
       +'<a class="sn-grp" href="'+grp.h+'">'+esc(grp.t)+'</a><div class="sn-links">'
-      +links.map(function(x){var f=fileOf(x[1]),lv=viewOf(x[1])||VIEW_DEF[f]||'',h=x[1].indexOf('#')>=0?x[1].slice(x[1].indexOf('#')):'';var on=!marked&&f===here&&(lv===curView(here))&&(!h||h===location.hash||!location.hash);if(on)marked=true;return '<a href="'+x[1]+'"'+(on?' class="on'+(x[3]==='admin'?' sn-admin':'')+'"':(x[3]==='admin'?' class="sn-admin"':''))+(x[3]==='admin'?' data-admin="1" hidden':'')+'>'+esc(x[0])+'</a>'}).join('')+'</div></div>';
+      +links.map(function(x){var f=fileOf(x[1]),lv=viewOf(x[1])||VIEW_DEF[f]||'',h=x[1].indexOf('#')>=0?x[1].slice(x[1].indexOf('#')):'';var lk=(x[1].match(/[?&]kind=([^&#]+)/)||[])[1]||'',hk=(new URLSearchParams(location.search)).get('kind')||'';var on=!marked&&f===here&&(lv===curView(here))&&lk===hk&&(!h||h===location.hash||!location.hash);if(on)marked=true;return '<a href="'+x[1]+'"'+(on?' class="on'+(x[3]==='admin'?' sn-admin':'')+'"':(x[3]==='admin'?' class="sn-admin"':''))+(x[3]==='admin'?' data-admin="1" hidden':'')+'>'+esc(x[0])+'</a>'}).join('')+'</div></div>';
     header.insertAdjacentElement('afterend',sn);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',renderNav);else renderNav();
@@ -117,7 +117,7 @@
         // 옛 #앵커 주소 → 화면 주소로 (뒤로가기 목록은 유지)
         var h=(location.hash||'').replace('#','');if(h&&hashMap[h]&&!(new URLSearchParams(location.search)).get('view')){var u=new URL(location.href);u.searchParams.set('view',hashMap[h]);u.hash='';history.replaceState(null,'',u.toString())}
       }catch(e){}
-      try{document.querySelectorAll('.subnav .sn-links a').forEach(function(a){var lv=(String(a.getAttribute('href')||'').match(/[?&]view=([^&#]+)/)||[])[1]||cfg.def;var f=String(a.getAttribute('href')||'').split('#')[0].split('?')[0].toLowerCase();var here=(location.pathname.split('/').pop()||'').toLowerCase();if(f===here)a.classList.toggle('on',lv===v)})}catch(e){}
+      try{document.querySelectorAll('.subnav .sn-links a').forEach(function(a){var lv=(String(a.getAttribute('href')||'').match(/[?&]view=([^&#]+)/)||[])[1]||cfg.def;var f=String(a.getAttribute('href')||'').split('#')[0].split('?')[0].toLowerCase();var here=(location.pathname.split('/').pop()||'').toLowerCase();var lk=(String(a.getAttribute('href')||'').match(/[?&]kind=([^&#]+)/)||[])[1]||'';var hk=(new URLSearchParams(location.search)).get('kind')||'';if(f===here)a.classList.toggle('on',lv===v&&lk===hk)})}catch(e){}
       return v;
     }
     // 권한자 전용 링크(sn-admin) 켜기 — 페이지가 권한을 확인한 뒤 호출
@@ -168,7 +168,7 @@
   //  · 처음 방문한 사람에게는 최근 14일치만 새 항목으로 봅니다. 읽음 표시는 이 브라우저(localStorage)에 저장됩니다.
   var NEW_SRC=[
     {menu:'대회',link:'competition.html?view=list',col:'competitions',field:'createdAt',limit:20,keys:function(d,id){return (d.slotIds&&d.slotIds.length)?d.slotIds:[id]},params:['slot']},
-    {menu:'대회',link:'staff.html',col:'competitionStaff',field:'createdAt',limit:20,params:['post']},
+    {menu:'대회',link:'competition.html?view=list&kind=staff',col:'competitionStaff',field:'createdAt',limit:20,params:['post']},
     {menu:'대회',link:'gallery.html',col:'gallery',where:['status','==','published'],time:['at','updatedAt'],limit:40,params:['id']},
     {menu:'대회',link:'results.html',col:'eventReports',where:['kind','==','comp'],time:['createdAt','at','updatedAt'],limit:40,params:['id']},
     {menu:'대회',link:'results.html',col:'schoolClubEvents',time:['createdAt','updatedAt'],limit:40,params:['id']},
