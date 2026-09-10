@@ -1927,14 +1927,37 @@ function taInitSig(){
   TA_DRAWN=false;
 }
 function taClearSig(){const cv=document.getElementById('taSig');cv.getContext('2d').clearRect(0,0,cv.width,cv.height);TA_DRAWN=false;SAVED_SIG_URL.taSig='';const m=document.getElementById('taSigMsg');if(m)m.textContent='';}
+// [동의서 업로드 2026-09-10] 저장소 규칙(5MB 미만 · 이미지/PDF만)에 맞춥니다.
+//   · 사진은 긴 변 1600px JPEG 로 줄여 올림(휴대폰 원본 5MB 초과 거부 방지) · 줄이지 못하는 형식(HEIC 등)은 원본 그대로
+//   · PDF 는 형식(contentType)을 명시 — 일부 기기 파일 앱은 형식을 비워 보내 규칙에서 거부됨
+//   · 5MB 넘는 PDF·이미지는 올리기 전에 안내 · 실패한 파일명을 함께 알려줌
+const TA_MAX=5*1024*1024;
 async function taUploadFiles(files,slotId,pid){
-  const urls=[];
+  const urls=[],fails=[];
   for(let i=0;i<Math.min(files.length,10);i++){
     const f=files[i];
-    const ext=(f.name.split('.').pop()||'jpg').toLowerCase();
-    const ref=firebase.storage().ref('logs/'+CME.uid+'/teamconsent_'+slotId+'_'+pid+'_'+Date.now()+'_'+i+'.'+ext);
-    const snap=await ref.put(f);
-    urls.push(await snap.ref.getDownloadURL());
+    const ext=(f.name.split('.').pop()||'').toLowerCase();
+    const isPdf=ext==='pdf'||/pdf$/i.test(f.type||'');
+    const isImg=/^image\//.test(f.type||'')||/^(jpg|jpeg|png|gif|webp|heic|heif|bmp)$/.test(ext);
+    try{
+      if(!isPdf&&!isImg)throw new Error('이미지(JPG·PNG) 또는 PDF 만 올릴 수 있습니다');
+      let body=f,meta,outExt=ext||'jpg';
+      if(isImg){
+        try{body=await _pcShrink(f,1600);meta={contentType:'image/jpeg'};outExt='jpg'}
+        catch(e){meta={contentType:(f.type&&/^image\//.test(f.type))?f.type:'image/jpeg'}}
+      }else{meta={contentType:'application/pdf'};outExt='pdf'}
+      if(body.size>=TA_MAX)throw new Error('파일이 5MB 를 넘습니다 ('+(body.size/1048576).toFixed(1)+'MB) — 스캔 해상도를 낮추거나 사진으로 찍어 올려 주세요');
+      const ref=firebase.storage().ref('logs/'+CME.uid+'/teamconsent_'+slotId+'_'+pid+'_'+Date.now()+'_'+i+'.'+outExt);
+      const snap=await ref.put(body,meta);
+      urls.push(await snap.ref.getDownloadURL());
+    }catch(e){
+      const m=String((e&&e.message)||e||'');
+      fails.push(f.name+' — '+(/unauthorized|permission|403/i.test(m)?'저장소 규칙에서 거부(5MB 초과 또는 이미지·PDF 가 아님)':(/canceled|network|retry/i.test(m)?'네트워크 문제 — 다시 시도':m)));
+    }
+  }
+  if(fails.length){
+    const err=new Error((urls.length?urls.length+'건은 올라갔고 ':'')+fails.length+'건 실패:\n'+fails.join('\n'));
+    err.urls=urls;throw err;
   }
   return urls;
 }
@@ -1992,7 +2015,7 @@ async function submitTeam(){
   // 서면 동의서 파일 (지금 올린 경우)
   let files=[];
   const fEl=document.getElementById('taFiles');
-  try{if(fEl&&fEl.files&&fEl.files.length)files=await taUploadFiles(fEl.files,TA_ID,pid);}catch(e){console.warn('upload',e);alert('동의서 파일 업로드에 실패했습니다. 신청은 계속 진행되며, 신청 후 [📎 동의서 업로드]로 다시 시도할 수 있습니다.');}
+  try{if(fEl&&fEl.files&&fEl.files.length)files=await taUploadFiles(fEl.files,TA_ID,pid);}catch(e){console.warn('upload',e);files=(e&&e.urls)||[];alert('동의서 파일 일부를 올리지 못했습니다.\n'+(e&&e.message||'')+'\n\n신청은 계속 진행되며, 신청 후 [📎 동의서 업로드]로 다시 올릴 수 있습니다.');}
   const ref=DB.collection('compSlots').doc(TA_ID);
   try{
     await DB.runTransaction(async tx=>{
@@ -2045,14 +2068,15 @@ async function teamConsentUpload(slotId){
   inp.type='file';inp.accept='image/*,.pdf';inp.multiple=true;
   inp.onchange=async()=>{
     if(!inp.files.length)return;
+    let partialErr=null;
     try{
-      const urls=await taUploadFiles(inp.files,slotId,pid);
+      let urls;try{urls=await taUploadFiles(inp.files,slotId,pid)}catch(e){if(e&&e.urls&&e.urls.length){urls=e.urls;partialErr=e}else throw e}
       const docId=slotId+'_'+pid;
       const prev=await DB.collection('teamConsents').doc(docId).get();
       const all=(prev.exists?(prev.data().files||[]):[]).concat(urls);
       await DB.collection('teamConsents').doc(docId).set({slotId:slotId,pid:pid,uid:CME.uid,files:all,at:new Date().toISOString()});
-      alert('📎 동의서 '+urls.length+'건 업로드 완료 (총 '+all.length+'건 보관 중)');
-    }catch(e){alert('업로드 실패: '+e.message)}
+      alert('📎 동의서 '+urls.length+'건 업로드 완료 (총 '+all.length+'건 보관 중)'+(partialErr?'\n\n'+partialErr.message:''));
+    }catch(e){alert('업로드 실패: '+(e&&e.message||e)+'\n\n· 이미지(JPG·PNG)·PDF 만, 파일당 5MB 미만\n· PDF 가 크면 사진으로 찍어 올려도 됩니다')}
   };
   inp.click();
 }
