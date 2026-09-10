@@ -1559,6 +1559,7 @@ async function openTeamApply(id){
       :'<a href="consent_guardian.html?form='+encodeURIComponent(s.consentForm||'basic')+'&t='+encodeURIComponent(s.title||'')+'&d='+encodeURIComponent(s.date||'')+'&p='+encodeURIComponent(s.place||'')+'" target="_blank" style="color:#153A77;font-weight:800">📄 동의서 양식 열기·인쇄 →</a>')+'<br>'
     +'인솔자가 전원분을 수합·보관하고, 아래에서 사진·스캔본을 업로드해 주세요. <b>지금 없으면 신청 후 [📎 동의서 업로드] 버튼으로 나중에 제출할 수 있습니다.</b>'
     +'<div style="margin-top:7px"><input id="taFiles" type="file" accept="image/*,.pdf" multiple style="font-size:12.5px"></div>'
+    +'<div id="taExistFiles"></div>'
     +'<label style="display:flex;gap:7px;align-items:flex-start;margin-top:8px;font-weight:800;color:#153A77"><input type="checkbox" id="taPledge" style="width:auto;margin-top:3px"> 인솔자로서 미성년 팀원 전원의 보호자 동의를 받았으며(또는 대회 전까지 수합·제출하며), 명단이 사실임을 확인합니다.</label>'
     // [명단제공] 팀원 연락처·주소를 주최기관 명단에 싣는 데 대한 동의 — 인솔자가 팀원 전원에게 받아 확인합니다.
     +'<label style="display:flex;gap:7px;align-items:flex-start;margin-top:6px;font-weight:800;color:#153A77"><input type="checkbox" id="taPconsent" style="width:auto;margin-top:3px"> 팀원 전원으로부터 주최기관 참가자 명단(성명·생년월일·성별·연락처·주소) 제공 동의를 받았음을 확인합니다. <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 체크하지 않으면 명단에서 연락처·주소는 빠집니다</span></label></div>'
@@ -1582,11 +1583,12 @@ async function openTeamApply(id){
     (c.roster||[]).forEach(r=>taAddRow({name:r.name,birth:r.birth,gender:r.gender,school:r.school,phone:r.phone,address:r.address,adult:!!r.adultAcct,nonMember:!!r.nonMember,self:!!r.self}));
     if(!(c.roster||[]).length)taAddRow();
     const pc=document.getElementById('taPconsent');if(pc)pc.checked=!!c.pconsent;
+    taRenderExistFiles(c.consentFiles||[]);   // [동의서 관리] 이전에 올린 파일 — 유지/삭제 선택
     const mt=div.querySelector('.mt');if(mt)mt.textContent='👥 팀원 추가·변경 — '+(c.name||'');
     const sb=div.querySelector('.cbtn-main');if(sb)sb.textContent='팀원 변경 저장';
     const info=document.createElement('div');
     info.style.cssText='background:#eef3fa;border-radius:10px;padding:9px 12px;font-size:12.5px;font-weight:700;color:#153A77;margin:6px 0 10px';
-    info.textContent='기존 신청('+(c.rosterN||0)+'명)을 불러왔습니다. [+ 비회원 팀원 추가] 또는 [명단에서 클릭 선택]으로 인원을 늘리거나 내용을 고친 뒤 [팀원 변경 저장]을 누르세요. 이전에 올린 동의서 파일은 그대로 유지됩니다.';
+    info.textContent='기존 신청('+(c.rosterN||0)+'명)을 불러왔습니다. [+ 비회원 팀원 추가] 또는 [명단에서 클릭 선택]으로 인원을 늘리거나 내용을 고친 뒤 [팀원 변경 저장]을 누르세요. 이전에 올린 동의서는 아래 목록에서 유지·삭제를 고르고, 빠진 사람 것은 새 파일로 추가할 수 있습니다.';
     const box=document.getElementById('taRosterBox');if(box)box.parentNode.insertBefore(info,box);
     taInitSig();
   }else{
@@ -2016,6 +2018,7 @@ async function submitTeam(){
   let files=[];
   const fEl=document.getElementById('taFiles');
   try{if(fEl&&fEl.files&&fEl.files.length)files=await taUploadFiles(fEl.files,TA_ID,pid);}catch(e){console.warn('upload',e);files=(e&&e.urls)||[];alert('동의서 파일 일부를 올리지 못했습니다.\n'+(e&&e.message||'')+'\n\n신청은 계속 진행되며, 신청 후 [📎 동의서 업로드]로 다시 올릴 수 있습니다.');}
+  const wasEdit=!!TA_EDIT;const keptFiles=wasEdit?taKeptFiles():[];   // [동의서 관리] 유지로 표시된 기존 파일
   const ref=DB.collection('compSlots').doc(TA_ID);
   try{
     await DB.runTransaction(async tx=>{
@@ -2033,7 +2036,7 @@ async function submitTeam(){
         pconsent:!!(document.getElementById('taPconsent')&&document.getElementById('taPconsent').checked),   // [명단제공] 팀원 연락처·주소 제공 동의
         leaderAddress:(CMY.address||''),
         edited:!!TA_EDIT,                                   // [팀원 후속 추가] 수정 신청 표식
-        consentFiles:(files.length?files:((TA_EDIT&&TA_EDIT.consentFiles)||[])),   // 새로 안 올리면 이전 동의서 파일 유지
+        consentFiles:(wasEdit?keptFiles.concat(files):files),   // [동의서 관리] 유지한 기존 파일 + 새 파일
         at:new Date().toISOString()});
       tx.update(ref,{claimed:claimed});
       TA_EDIT=null;
@@ -2045,40 +2048,75 @@ async function submitTeam(){
     let sigSaveOk=true;
     await DB.collection('users').doc(CME.uid).update({contracts:c}).catch(e=>{sigSaveOk=false;console.warn('sign save',e)});
     CMY.contracts=c;
-    if(files.length)await DB.collection('teamConsents').doc(TA_ID+'_'+pid).set({slotId:TA_ID,pid:pid,uid:CME.uid,files:files,at:now}).catch(()=>{});
+    const allFiles=wasEdit?keptFiles.concat(files):files;
+    if(allFiles.length||wasEdit)await DB.collection('teamConsents').doc(TA_ID+'_'+pid).set({slotId:TA_ID,pid:pid,uid:CME.uid,files:allFiles,at:now}).catch(()=>{});
     document.getElementById('taModal').remove();
     alert('👥 ['+teamName+'] 팀 참가 신청 완료! ('+roster.length+'명)'+(files.length?'\n동의서 '+files.length+'건이 함께 제출되었습니다.':'\n\n📎 서면 동의서는 대회 전까지 [📎 동의서 업로드] 버튼으로 제출해주세요.')+(sigSaveOk?'':'\n\n⚠ 인솔자 서명 저장에 실패했습니다 — [📄 내 신청서]에서 서명이 비어있으면 신청을 다시 열어 서명해주세요.'));
     loadSlots();
   }catch(e){alert(cErrMsg(e))}
 }
 // 신청 후 서면 동의서 추가 업로드
+// [동의서 관리 2026-09-10] 파일 썸네일·유지 체크 (팀 신청 창의 기존 파일 목록)
+function taFileThumb(u){const p=String(u||'').split('?')[0].toLowerCase();const isImg=/\.(jpe?g|png|gif|webp)$/.test(p);
+  return isImg?'<img src="'+cesc(u)+'" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid #dfe5ee;flex:none">':'<span style="width:44px;height:44px;border-radius:8px;border:1px solid #dfe5ee;background:#fff5f5;color:#C41E2F;font-weight:900;font-size:11px;display:inline-flex;align-items:center;justify-content:center;flex:none">PDF</span>'}
+function taRenderExistFiles(list){
+  const box=document.getElementById('taExistFiles');if(!box)return;
+  if(!list||!list.length){box.innerHTML='';return}
+  box.innerHTML='<div style="margin-top:8px;font-size:12.5px;font-weight:800;color:#374151">이전에 올린 동의서 '+list.length+'건 <span style="font-weight:600;color:#8a919d">— 체크를 풀면 저장 시 삭제됩니다</span></div>'
+    +list.map((u,i)=>'<label style="display:flex;gap:8px;align-items:center;margin-top:6px;font-size:12.5px;cursor:pointer"><input type="checkbox" class="taKeep" value="'+cesc(u)+'" checked style="width:auto">'+taFileThumb(u)+'<span style="flex:1">동의서 '+(i+1)+'</span><a href="'+cesc(u)+'" target="_blank" style="font-weight:800;color:#153A77">보기</a></label>').join('');
+}
+function taKeptFiles(){return [...document.querySelectorAll('#taExistFiles .taKeep:checked')].map(x=>x.value)}
+// 신청 후 [동의서 관리] — 목록 보기·삭제·추가 후 저장. 저장 시 명단 기록(claimed)에도 최신 파일 목록을 남겨 담당자 화면에 반영됩니다.
 async function teamConsentUpload(slotId){
   const s0=CSLOTS.find(d=>d.id===slotId);if(!s0)return;
   const mine=myTeamEntries(s0.data());
   if(!mine.length)return;
-  let pid=mine[0].pid;
+  let cur=mine[0];
   if(mine.length>1){
-    const pick=prompt('동의서를 올릴 팀 번호를 선택하세요:\n'+mine.map((m,i)=>(i+1)+'. '+m.name+' ('+(m.rosterN||0)+'명)').join('\n'),'1');
+    const pick=prompt('동의서를 관리할 팀 번호를 선택하세요:\n'+mine.map((m,i)=>(i+1)+'. '+m.name+' ('+(m.rosterN||0)+'명)').join('\n'),'1');
     if(pick===null)return;
     const idx=parseInt(pick,10)-1;
     if(!(idx>=0&&idx<mine.length))return alert('잘못된 번호입니다');
-    pid=mine[idx].pid;
+    cur=mine[idx];
   }
-  const inp=document.createElement('input');
-  inp.type='file';inp.accept='image/*,.pdf';inp.multiple=true;
-  inp.onchange=async()=>{
-    if(!inp.files.length)return;
-    let partialErr=null;
-    try{
-      let urls;try{urls=await taUploadFiles(inp.files,slotId,pid)}catch(e){if(e&&e.urls&&e.urls.length){urls=e.urls;partialErr=e}else throw e}
-      const docId=slotId+'_'+pid;
-      const prev=await DB.collection('teamConsents').doc(docId).get();
-      const all=(prev.exists?(prev.data().files||[]):[]).concat(urls);
-      await DB.collection('teamConsents').doc(docId).set({slotId:slotId,pid:pid,uid:CME.uid,files:all,at:new Date().toISOString()});
-      alert('📎 동의서 '+urls.length+'건 업로드 완료 (총 '+all.length+'건 보관 중)'+(partialErr?'\n\n'+partialErr.message:''));
-    }catch(e){alert('업로드 실패: '+(e&&e.message||e)+'\n\n· 이미지(JPG·PNG)·PDF 만, 파일당 10MB 미만\n· PDF 가 크면 사진으로 찍어 올려도 됩니다')}
+  const pid=cur.pid;const docId=slotId+'_'+pid;
+  let files=(cur.consentFiles||[]).slice();
+  try{const prev=await DB.collection('teamConsents').doc(docId).get();if(prev.exists)(prev.data().files||[]).forEach(u=>{if(files.indexOf(u)<0)files.push(u)})}catch(e){}
+  const removed=new Set();const added=[];
+  const old=document.getElementById('tcModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='tcModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+  const draw=()=>{
+    const all=files.filter(u=>!removed.has(u)).concat(added);
+    div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:90vh;overflow:auto;padding:22px 24px">'
+      +'<b style="font-size:16px">📎 동의서 관리 — '+cesc(cur.name||'')+'</b>'
+      +'<div style="font-size:12.5px;color:#6b7280;margin:4px 0 12px;line-height:1.7">보관 중 '+all.length+'건. 빠진 사람의 동의서는 [파일 추가]로 올리고, 잘못 올린 파일은 [삭제]한 뒤 [저장]을 누르세요.</div>'
+      +(all.length?all.map((u,i)=>'<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #f0f2f6;font-size:13px">'+taFileThumb(u)+'<span style="flex:1">동의서 '+(i+1)+(added.indexOf(u)>=0?' <b style="color:#0f766e;font-size:11px">새로 추가</b>':'')+'</span>'
+        +'<a href="'+cesc(u)+'" target="_blank" style="font-weight:800;color:#153A77">보기</a>'
+        +'<button type="button" class="cbtn" style="padding:4px 10px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" data-u="'+cesc(u)+'">삭제</button></div>').join('')
+        :'<div class="bempty" style="padding:18px 0">보관 중인 동의서가 없습니다.</div>')
+      +'<div style="margin-top:12px"><label class="cbtn cbtn-soft" style="display:inline-block;cursor:pointer">+ 파일 추가 (사진·PDF)<input type="file" id="tcAdd" accept="image/*,.pdf" multiple style="display:none"></label> <span id="tcMsg" style="font-size:12.5px;font-weight:700;margin-left:6px"></span></div>'
+      +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px"><button type="button" class="cbtn cbtn-ghost" id="tcClose">닫기</button><button type="button" class="cbtn cbtn-main" id="tcSave">저장</button></div></div>';
+    div.querySelectorAll('button[data-u]').forEach(b=>b.onclick=()=>{const u=b.getAttribute('data-u');if(!confirm('이 동의서를 삭제할까요?'))return;const ai=added.indexOf(u);if(ai>=0)added.splice(ai,1);else removed.add(u);draw()});
+    div.querySelector('#tcClose').onclick=()=>div.remove();
+    div.querySelector('#tcAdd').onchange=async e=>{const inp=e.target;if(!inp.files.length)return;const msg=div.querySelector('#tcMsg');msg.textContent='업로드 중…';msg.style.color='#153A77';
+      try{const urls=await taUploadFiles(inp.files,slotId,pid);urls.forEach(u=>added.push(u));draw()}
+      catch(err){(err.urls||[]).forEach(u=>added.push(u));draw();alert('일부 파일을 올리지 못했습니다.\n'+(err.message||err))}};
+    div.querySelector('#tcSave').onclick=async()=>{
+      const final=files.filter(u=>!removed.has(u)).concat(added);
+      const btn=div.querySelector('#tcSave');btn.disabled=true;btn.textContent='저장 중…';
+      try{
+        const now=new Date().toISOString();
+        await DB.collection('teamConsents').doc(docId).set({slotId:slotId,pid:pid,uid:CME.uid,files:final,at:now});
+        // 명단 기록에도 최신 파일 목록 — 기존 신청을 복사해 파일만 바꿔 덧붙입니다(담당자 화면·확인창이 이 목록을 봅니다)
+        const ref=DB.collection('compSlots').doc(slotId);
+        await DB.runTransaction(async tx=>{const d=await tx.get(ref);const sd=d.data();const latest=(sd.claimed||[]).filter(c=>c.pid===pid&&c.uid===CME.uid).pop();if(!latest)throw new Error('팀 신청 기록을 찾지 못했습니다');
+          const claimed=(sd.claimed||[]).slice();claimed.push(Object.assign({},latest,{consentFiles:final,edited:true,at:now}));tx.update(ref,{claimed:claimed})});
+        div.remove();alert('📎 동의서 '+final.length+'건으로 저장되었습니다.');loadSlots();
+      }catch(err){btn.disabled=false;btn.textContent='저장';alert('저장 실패: '+cErrMsg(err))}
+    };
   };
-  inp.click();
+  document.body.appendChild(div);draw();
 }
 async function openMinorReq(id){
   if(!(CMY&&CMY.guardianUid)){
@@ -3181,7 +3219,7 @@ function slotCard(d,today){
         +divGroupsHtml(s,entry)
         +'<div class="cact">'+action
         +((s.teamDivs&&s.teamDivs.length&&s.role==='참가'&&!closed)?'<button class="cbtn cbtn-soft" onclick="openTeamApply(\''+d.id+'\')">👥 단체전 참가 신청</button>':'')
-        +(myTeamEntries(s).length?'<button class="cbtn cbtn-ghost" onclick="teamConsentUpload(\''+d.id+'\')">📎 동의서 업로드</button>':'')
+        +(myTeamEntries(s).length?'<button class="cbtn cbtn-ghost" onclick="teamConsentUpload(\''+d.id+'\')">📎 동의서 관리 (추가·삭제)</button>':'')
         +'<button class="cbtn cbtn-ghost" onclick="viewRoster(\''+d.id+'\')">👥 신청 현황</button></div></div>';
   }
 }
