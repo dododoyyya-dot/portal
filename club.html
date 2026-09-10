@@ -556,7 +556,10 @@ function clubInfoRows(c,opt){
   if(d.ageTxt)h+=R('나이대',d.ageTxt+(d.aged<d.total?' <span style="color:#9aa3b2">(미기재 '+(d.total-d.aged)+'명 제외)</span>':''),true);
   if(d.male+d.female)h+=R('성별','남 '+Math.round(d.male/(d.male+d.female)*100)+'% · 여 '+Math.round(d.female/(d.male+d.female)*100)+'%'+((d.male+d.female)<d.total?' <span style="color:#9aa3b2">(기재 '+(d.male+d.female)+'명 기준)</span>':''));
   h+=R('대회 참가',evList.length?'<b>'+evList.length+'</b>회'+(evList[0]?' · 최근 '+E(evList[0].date||'')+' '+E(evList[0].competitionName||''):''):'<span style="color:#9aa3b2">기록 없음</span>',true);
-  h+=R('입상',awards.length?'<b>'+awards.length+'</b>건 · '+awards.slice(0,2).map(a=>E(a.date||'')+' '+E(a.competitionName||'')+' <b style="color:#8a5a00">'+E(a.result||'')+'</b>').join(' · ')+(awards.length>2&&opt.moreHref?' <a href="'+opt.moreHref+'" style="color:#153A77;font-weight:800">전체 보기</a>':''):'<span style="color:#9aa3b2">기록 없음</span>',true);
+  const awT=awards.filter(a=>a.kind==='team'),awM=awards.filter(a=>a.kind!=='team');
+  const awLine=(arr)=>arr.length?'<b>'+arr.length+'</b>건 · 최근 '+E(arr[0].date||'')+' '+E(arr[0].competitionName||'')+' <b style="color:#8a5a00">'+E(arr[0].result||'')+'</b>':'<span style="color:#9aa3b2">없음</span>';
+  h+=R('단체 입상',awLine(awT)+(awT.length>1&&opt.moreHref?' <a href="'+opt.moreHref+'" style="color:#153A77;font-weight:800">전체</a>':''),true);
+  h+=R('개인 입상',awLine(awM)+(awM.length>1&&opt.moreHref?' <a href="'+opt.moreHref+'" style="color:#153A77;font-weight:800">전체</a>':''),true);
   h+=R('교류전 전적',played?'<b>'+rec.w+'승 '+rec.dr+'무 '+rec.l+'패</b> · 승률 '+Math.round(rec.w/played*100)+'% ('+played+'경기)':'<span style="color:#9aa3b2">기록 없음</span>',true);
   h+='</div>';
   return h;

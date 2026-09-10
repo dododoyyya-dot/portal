@@ -690,10 +690,10 @@ async function acAdminLoad(f){
     +(AC_LIST.length?'<div style="overflow:auto"><table class="tbl" style="font-size:12.5px;min-width:980px"><tr><th>신청일</th><th>신청 계정</th><th>대상</th><th>대회 · 주최/주관</th><th>종목·부문</th><th>결과</th><th>증빙</th><th>확인 필요</th><th>처리</th></tr>'
       +AC_LIST.map(c=>{const w=acWarn(c);return '<tr><td style="white-space:nowrap">'+esc(acDstr(c.createdAt))+(c.updatedAt?'<br><span style="color:#8a919d">수정 '+esc(acDstr(c.updatedAt))+'</span>':'')+'</td>'
         +'<td>'+esc(c.email||'')+'<br><span style="color:#6b7280">'+esc(c.sido||'')+'</span></td>'
-        +'<td><b>'+esc(c.name||'')+'</b>'+(c.kidName?' <span style="font-size:11px;color:#8a919d">(자녀)</span>':'')+'<br><span style="color:#6b7280">'+esc(c.birth||'')+'</span></td>'
+        +'<td>'+(c.scope==='team'?'<span style="font-size:10.5px;font-weight:900;color:#fff;background:#7c3aed;border-radius:999px;padding:1px 7px">단체</span> ':'<span style="font-size:10.5px;font-weight:900;color:#fff;background:#0f766e;border-radius:999px;padding:1px 7px">개인</span> ')+'<b>'+esc(c.name||'')+'</b>'+(c.kidName?' <span style="font-size:11px;color:#8a919d">(자녀)</span>':'')+'<br><span style="color:#6b7280">'+esc(c.birth||'')+'</span>'+(c.clubName?'<br><span style="color:#153A77;font-weight:800">'+esc(c.clubName)+'</span>':'')+(c.scope==='team'&&(c.members||[]).length?'<br><span style="font-size:11px;color:#6b7280">팀원 '+(c.members||[]).length+'명</span>':'')+'</td>'
         +'<td><b>'+esc(c.competitionName||'')+'</b><br><span style="color:#6b7280">'+esc(c.date||'')+'</span><br><span style="color:#374151">주최 '+(c.organizer?esc(c.organizer):'<span style="color:#C41E2F">미기입</span>')+' · 주관 '+(c.coorganizer?esc(c.coorganizer):'<span style="color:#C41E2F">미기입</span>')+'</span>'+(c.team?'<br><span style="color:#6b7280">소속 '+esc(c.team)+'</span>':'')+(c.note?'<br><span style="color:#8a919d">'+esc(c.note)+'</span>':'')+'</td>'
         +'<td>'+esc(c.sport||'')+(c.division?'<br>'+esc(c.division):'')+'</td><td><b style="color:#d97706">'+esc(c.result||'')+'</b></td>'
-        +'<td style="white-space:nowrap">'+(c.files||[]).map((f,i)=>'<a href="'+esc(f.url)+'" target="_blank"><img src="'+esc(f.url)+'" style="height:44px;border-radius:5px;border:1px solid #e5e9f2;margin-right:3px;vertical-align:middle" title="증빙 '+(i+1)+' — 클릭하면 크게"></a>').join('')+'</td>'
+        +'<td style="white-space:nowrap">'+(c.files||[]).map((f,i)=>acThumb(f,44)).join('')+'</td>'
         +'<td style="font-size:11.5px;color:#C41E2F;font-weight:800">'+(w.length?w.join('<br>'):'<span style="color:#0f766e">이상 없음</span>')+'</td>'
         +'<td style="white-space:nowrap">'+btn('자세히·수정','#153A77','acEdit(\''+c.id+'\')')+'<br>'
           +(c.status==='pending'?btn('승인 · 경력 기록','#0f766e','acDecide(\''+c.id+'\',true)')+'<br>'+btn('반려','#fff;color:#C41E2F;border:1px solid #f1c7cc','acDecide(\''+c.id+'\',false)'):'')
@@ -719,7 +719,8 @@ function acEdit(id){
     +(acWarn(c).length?'<div style="margin-top:8px;padding:8px 11px;background:#fff5f5;border:1px solid #f3c9c9;border-radius:9px;font-size:12px;font-weight:800;color:#C41E2F">확인 필요: '+acWarn(c).join(' · ')+'</div>':'')
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+F('aeName','성명',c.name,true)+F('aeBirth','생년월일',c.birth)+'<div style="grid-column:1/-1">'+F('aeComp','대회명',c.competitionName,true)+'</div>'
     +F('aeDate','대회일',c.date,true)+F('aeSport','종목',c.sport,true)+F('aeOrg','주최',c.organizer,true)+F('aeOrg2','주관',c.coorganizer,true)+F('aeDiv','부문',c.division)+F('aeRes','결과',c.result,true)+F('aeTeam','당시 소속',c.team)+F('aeNote','비고',c.note)+'</div>'
-    +'<label '+lb+'>증빙 ('+((c.files||[]).length)+'장) — 클릭하면 원본</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'+((c.files||[]).map(f=>'<a href="'+esc(f.url)+'" target="_blank"><img src="'+esc(f.url)+'" style="height:120px;border-radius:8px;border:1px solid #e5e9f2"></a>').join('')||'<span style="color:#C41E2F;font-size:12.5px">증빙 없음</span>')+'</div>'
+    +(c.scope==='team'?'<div style="margin-top:8px;padding:8px 11px;background:#f5f0ff;border:1px solid #d9c9f5;border-radius:9px;font-size:12.5px"><b style="color:#6d28d9">클럽 단체 입상</b> · 클럽: '+esc(c.clubName||'-')+' · 팀원: '+esc((c.members||[]).join(', ')||'-')+(c.selfPlayed?' · 본인도 선수 참가':'')+'</div>':(c.clubName?'<div style="margin-top:8px;font-size:12.5px;color:#153A77;font-weight:800">소속 클럽: '+esc(c.clubName)+' (승인 시 이 클럽 페이지에도 기록)</div>':''))
+    +'<label '+lb+'>증빙 ('+((c.files||[]).length)+'장) — 클릭하면 원본</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'+((c.files||[]).map(f=>acThumb(f,120)).join('')||'<span style="color:#C41E2F;font-size:12.5px">증빙 없음</span>')+'</div>'
     +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">'+(ro?'':'<button class="btn-sub" style="background:#153A77;padding:9px 20px" onclick="acEditSave(\''+c.id+'\')">수정 저장</button>')+'</div></div>';
   document.body.appendChild(div);
 }
@@ -732,15 +733,25 @@ async function acEditSave(id){
   catch(e){alert('저장 실패: '+(e.code||e.message))}
 }
 // 경력 기록 쓰기·지우기 (importId 'award:<신청ID>' 로 묶어 관리)
+function acThumb(f,h){const u=(f&&f.url)||'';const isPdf=/\.pdf(\?|$)/i.test(String((f&&f.name)||''))||/\.pdf(\?|$)/i.test(u.split('?')[0]);
+  return isPdf?'<a href="'+esc(u)+'" target="_blank" style="display:inline-flex;align-items:center;justify-content:center;height:'+h+'px;min-width:'+h+'px;padding:0 10px;border-radius:6px;border:1px solid #f1c7cc;background:#fff5f5;color:#C41E2F;font-weight:900;font-size:12px;text-decoration:none;margin-right:3px;vertical-align:middle">PDF</a>':'<a href="'+esc(u)+'" target="_blank"><img src="'+esc(u)+'" style="height:'+h+'px;border-radius:6px;border:1px solid #e5e9f2;margin-right:3px;vertical-align:middle" title="증빙 — 클릭하면 크게"></a>'}
 async function acWriteCareer(c,me){
   const org=[c.organizer,c.coorganizer].filter(Boolean).filter((x,i,a)=>a.indexOf(x)===i).join(' / ');
+  const isAward=!!(c.result&&c.result!=='참가');
   const base={uid:c.uid,name:c.name||'',date:c.date||'',competitionName:c.competitionName||'',sport:c.sport||'',location:'',organizer:org,division:c.division||'',team:c.team||'',source:'award-claim',kidName:c.kidName||'',importId:'award:'+c.id};
-  await CAREER.write(DB,Object.assign({},base,{role:'선수'}),me);
-  if(c.result&&c.result!=='참가')await CAREER.write(DB,Object.assign({},base,{role:'입상',result:c.result}),me);
-  // [클럽 입상] 소속(팀명=클럽명) 또는 본인이 속한 클럽의 클럽 페이지에 입상 기록
-  if(c.result&&c.result!=='참가'&&CAREER.clubAward){try{
-    const clubs=await CAREER.findClubs(DB,c.team?{name:c.team,uid:c.uid}:{uid:c.uid});
-    for(const k of clubs)await CAREER.clubAward(DB,{clubId:k.id,clubName:k.name,date:c.date||'',competitionName:c.competitionName||'',sport:c.sport||'',division:c.division||'',result:c.result,kind:'member',members:[c.kidName||c.name||''],teamName:c.team||'',source:'award-claim',importId:'award:'+c.id,organizer:org,byUid:(AUTH.currentUser||{}).uid||''},me);
+  // 개인 경력: 개인 입상은 항상, 클럽 단체 입상은 '본인도 선수 참가'를 체크한 경우만
+  if(c.scope!=='team'||c.selfPlayed){
+    await CAREER.write(DB,Object.assign({},base,{role:'선수'}),me);
+    if(isAward)await CAREER.write(DB,Object.assign({},base,{role:'입상',result:c.result}),me);
+  }
+  // [클럽 입상] 신청 때 고른 소속 클럽에 기록 (단체: 팀 기록 / 개인: 구성원 기록). 클럽을 고르지 않은 개인 입상만 소속·팀명으로 추정
+  if(isAward&&CAREER.clubAward){try{
+    let clubs=[];
+    if(c.clubId)clubs=[{id:c.clubId,name:c.clubName||''}];
+    else if(c.scope!=='team')clubs=await CAREER.findClubs(DB,c.team?{name:c.team,uid:c.uid}:{uid:c.uid});
+    for(const k of clubs)await CAREER.clubAward(DB,{clubId:k.id,clubName:k.name,date:c.date||'',competitionName:c.competitionName||'',sport:c.sport||'',division:c.division||'',result:c.result,
+      kind:c.scope==='team'?'team':'member',members:c.scope==='team'?((c.members&&c.members.length)?c.members:[c.kidName||c.name||'']):[c.kidName||c.name||''],teamName:c.scope==='team'?(c.team||k.name||''):(c.team||''),
+      source:'award-claim',importId:'award:'+c.id,organizer:org,byUid:(AUTH.currentUser||{}).uid||''},me);
   }catch(e){console.warn('clubAward',e)}}
 }
 async function acEraseCareer(id){
@@ -757,7 +768,7 @@ async function acDecide(id,ok){
     const w=acWarn(c);
     if(w.length&&!confirm('확인 필요 항목이 있습니다: '+w.join(', ')+'\n[자세히·수정]에서 고친 뒤 승인하는 것을 권합니다.\n그래도 지금 승인할까요?'))return;
     const isAward=c.result&&c.result!=='참가';
-    if(!confirm('['+(c.name||'')+'] '+(c.competitionName||'')+' · '+(c.result||'')+'\n주최 '+(c.organizer||'-')+' / 주관 '+(c.coorganizer||'-')+'\n승인하고 경력(참가'+(isAward?' + 입상':'')+')에 기록할까요? (승인 뒤에도 회수·반려로 변경할 수 있습니다)'))return;
+    if(!confirm('['+(c.name||'')+'] '+(c.competitionName||'')+' · '+(c.result||'')+(c.scope==='team'?'\n[클럽 단체 입상] '+(c.clubName||'')+' · 팀원 '+((c.members||[]).length)+'명'+(c.selfPlayed?' · 본인 참가':''):(c.clubName?'\n소속 클럽: '+c.clubName:''))+'\n주최 '+(c.organizer||'-')+' / 주관 '+(c.coorganizer||'-')+'\n승인하고 '+(c.scope==='team'?'클럽 입상 기록'+(c.selfPlayed?'과 본인 경력':'')+'에':'경력(참가'+(isAward?' + 입상':'')+')'+(c.clubName?'과 클럽 페이지':'')+'에')+' 기록할까요? (승인 뒤에도 회수·반려로 변경할 수 있습니다)'))return;
     try{
       await acWriteCareer(c,me);
       await DB.collection('awardClaims').doc(id).update({status:'approved',reviewedBy:me,reviewedAt:firebase.firestore.FieldValue.serverTimestamp(),reason:firebase.firestore.FieldValue.delete()});

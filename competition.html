@@ -782,7 +782,7 @@ async function openCompFinish(id){
   const s=doc.data();const list=compClaimList(s).filter(c=>c.status!=='반려');
   if(!list.length){alert('참가 신청자가 없습니다.');return}
   const prev=s.results||{};
-  CF={id:id,rows:list.map(c=>{const key=c.pid||c.uid;const pv=prev[key]||{};return {key:key,uid:c.uid,name:c.name||'',team:!!c.team,teamType:c.teamType||'',members:(c.roster||[]).length,roster:(c.roster||[]),selfPlays:!!(c.roster||[]).some(x=>x&&x.self&&x.uid===c.uid),kid:!!c.kid,div:(c.prefs||[])[0]||'',on:pv.on!==false,award:pv.award||''}})};
+  CF={id:id,rows:list.map(c=>{const key=c.pid||c.uid;const pv=prev[key]||{};return {key:key,uid:c.uid,name:c.name||'',team:!!c.team,teamType:c.teamType||'',members:(c.roster||[]).length,roster:(c.roster||[]),selfPlays:!!(c.roster||[]).some(x=>x&&x.self&&x.uid===c.uid),kid:!!c.kid,div:(c.prefs||[])[0]||'',club:c.club||'',clubId:c.clubId||'',teamOrgId:c.teamOrgId||'',on:pv.on!==false,award:pv.award||''}})};
   const old=document.getElementById('cfModal');if(old)old.remove();
   const div=document.createElement('div');div.id='cfModal';div.className='cmodal-bg';
   div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.65);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
@@ -828,7 +828,11 @@ async function cfMatchMember(m,r){
 async function cfClubAward(r,s,base){
   if(!window.CAREER||!CAREER.clubAward)return;
   if(!r.team&&!r.award)return;
-  const clubs=await CAREER.findClubs(DB,r.team?{name:r.name,uid:r.uid}:{uid:r.uid});
+  // [다중 소속] 클럽팀은 신청 때 고른 클럽(teamOrgId), 개인은 신청서의 소속 클럽(clubId)으로 정확히 연결 — 없을 때만 이름·소속으로 추정
+  let clubs=[];
+  if(r.team&&r.teamType==='클럽팀'&&r.teamOrgId)clubs=[{id:r.teamOrgId,name:r.name}];
+  else if(!r.team&&r.clubId)clubs=[{id:r.clubId,name:r.club||''}];
+  else clubs=await CAREER.findClubs(DB,r.team?{name:r.name,uid:r.uid}:{uid:r.uid});
   if(!clubs.length)return;
   const members=r.team?(r.roster||[]).map(m=>m&&m.name).filter(Boolean):[base.name||r.name||''];
   for(const k of clubs)await CAREER.clubAward(DB,{clubId:k.id,clubName:k.name,date:s.date||'',competitionName:s.title||'',sport:base.sport||'',division:r.div||'',result:r.award||'참가',kind:r.team?'team':'member',members:members,teamName:r.team?r.name:'',slotId:CF.id,source:'comp-complete',host:s.host||'',organizer:s.organizer||'',byUid:CME.uid},(CMY&&CMY.name)||'');
@@ -3435,7 +3439,7 @@ async function openApply(id){
   }
   if(entry&&MY_CLUBS===null){
     try{const cs=await DB.collection('clubs').where('memberUids','array-contains',CME.uid).limit(10).get();
-      MY_CLUBS=cs.docs.filter(x=>x.data().status==='승인').map(x=>x.data().name);}catch(e){MY_CLUBS=[]}
+      MY_CLUBS=cs.docs.filter(x=>x.data().status==='승인').map(x=>({id:x.id,name:x.data().name||''}));}catch(e){MY_CLUBS=[]}   // [다중 소속] id 로 연결
   }
   const old=document.getElementById('cApplyModal');if(old)old.remove();
   const div=document.createElement('div');
@@ -3453,7 +3457,7 @@ async function openApply(id){
       :((selfMinor&&!PAPER_MODE)?[]:[{pid:CME.uid+'#self',name:CMY.name||'',label:(CMY.name||'본인')+' · 본인',birth:CMY.birth||'',gender:CMY.gender||'',school:'',kid:false}]))
       .concat(FAMREQ?[]:(CMY.children||[]).map((k,i)=>({pid:CME.uid+'#k'+i,name:k.name,label:k.name+' · 자녀',birth:k.birth||'',gender:k.gender||'',school:k.school||'',kid:true})));
     APPLY_PARTS=parts.filter(p=>!activeOfKey(s,p.pid)||p.pid===EDIT_KEY); // [신청수정] 수정 대상 참가자는 목록에 포함
-    const clubOpts=(MY_CLUBS||[]).map(n=>'<option>'+cesc(n)+'</option>').join('');
+    const clubOpts=(MY_CLUBS||[]).map(c=>'<option value="'+cesc(c.id)+'">'+cesc(c.name)+'</option>').join('');
     inner='<div class="cmodal">'
       +'<div class="mhead"><div class="mt">🏃 대회 개인전 참가 신청서</div><div class="ms">'+cesc(s.title)+' · '+cesc(s.region)+' · '+cesc(s.date)+(s.place?' · 📍 '+cesc(s.place):'')+(s.note?' · 📌 '+cesc(String(s.note).replace(/\s+/g,' ').slice(0,80)):'')+'</div></div>'
       +'<div class="mbody">'
@@ -3766,7 +3770,9 @@ async function submitEntry(){
   const title=s0.title||'';
   const sign=exportSig();
   const clubSel=document.getElementById('epClub');
-  const club=clubSel.value==='__etc'?document.getElementById('epClubEtc').value.trim():clubSel.value;
+  const _cobj=(MY_CLUBS||[]).find(c=>c.id===clubSel.value)||null;
+  const club=clubSel.value==='__etc'?document.getElementById('epClubEtc').value.trim():(_cobj?_cobj.name:clubSel.value);
+  const clubId=_cobj?_cobj.id:'';   // [다중 소속] 어느 클럽 소속으로 나가는지 — 종료 처리 시 이 클럽에만 입상 기록
   // 참가 차단 클럽 확인 (구청장기 등 소속 제한 대회 — 공고의 blockClubs)
   if(s0.blockClubs&&s0.blockClubs.length&&club){
     const nc=String(club).replace(/\s/g,'').toLowerCase();
@@ -3806,7 +3812,7 @@ async function submitEntry(){
         cancels.push(cm); // 기존 신청은 취소 처리 후 새 내용으로 재접수 (이력 보존)
       }
       const _specials=[...document.querySelectorAll('#cSpecialBtns .rolechip.on')].map(x=>x.dataset.special);
-      const _newClaim={uid:CME.uid,pid:APPLY_PID,name:p.name,birth:p.birth||'',gender:p.gender||'',school:p.school||'',club:club||'',kid:!!p.kid,
+      const _newClaim={uid:CME.uid,pid:APPLY_PID,name:p.name,birth:p.birth||'',gender:p.gender||'',school:p.school||'',club:club||'',clubId:clubId||'',kid:!!p.kid,
         special:_specials,
         guardian:p.kid?(CMY.name||''):'',guardianPhone:p.kid?(CMY.phone||''):'',
         // [성인표시] 본인 신청이고 학생회원이 아니면 성인 계정 — 생년월일이 비어 있어도 성인으로 표시됩니다.

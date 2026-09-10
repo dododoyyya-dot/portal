@@ -275,17 +275,16 @@ async function loadClubAwards(){
   const head='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="display:inline-flex">'+TRO+'</span><b style="font-size:16px">클럽 입상 기록</b><span style="font-size:12.5px;color:#8a919d;font-weight:700">'+list.length+'건</span>'
     +'<span style="flex:1"></span><span style="font-size:11.5px;color:#8a919d">연맹 대회 종료 처리·입상 신청 승인 시 자동 등록</span></div>';
   if(!list.length){el.innerHTML=head+'<div style="font-size:12.5px;color:#8a919d;margin-top:8px">아직 등록된 입상 기록이 없습니다. 연맹 대회에서 입상하면 자동으로 표시되고, 다른 대회 입상은 마이페이지 [입상 기록 신청]으로 등록할 수 있습니다.</div>';return all}
-  const byYear={};list.forEach(a=>{const y=String(a.date||'').slice(0,4)||'기타';(byYear[y]=byYear[y]||[]).push(a)});
-  const years=Object.keys(byYear).sort((a,b)=>b.localeCompare(a));
-  const row=a=>{const who=a.kind==='team'?((a.teamName?kesc(a.teamName)+' ':'')+((a.members||[]).length?'('+(a.members||[]).slice(0,6).map(kesc).join(', ')+((a.members||[]).length>6?' 외 '+((a.members||[]).length-6)+'명':'')+')':'')):(a.members||[]).map(kesc).join(', ');
-    const title=a.slotId&&/comp/.test(a.source||'')?'<a href="competition.html?slot='+encodeURIComponent(a.slotId)+'" style="color:#141d51;text-decoration:none;font-weight:800">'+kesc(a.competitionName||'')+'</a>':'<b>'+kesc(a.competitionName||'')+'</b>';
-    return '<tr><td style="white-space:nowrap;color:#6b7280">'+kesc(a.date||'')+'</td><td style="text-align:left">'+title+(a.division?' <span style="color:#6b7280;font-size:12px">'+kesc(a.division)+'</span>':'')+'</td>'
-      +'<td><span style="background:#fff8e6;color:#8a5a00;border:1px solid #ecd9b0;border-radius:999px;padding:2px 10px;font-weight:900;font-size:12px;white-space:nowrap">'+kesc(a.result||'')+'</span></td>'
-      +'<td style="text-align:left;font-size:12.5px;color:#374151">'+(a.kind==='team'?'<span style="font-size:11px;color:#1f5fb2;font-weight:800">단체</span> ':'<span style="font-size:11px;color:#0f766e;font-weight:800">개인</span> ')+who+'</td></tr>'};
-  el.innerHTML=head+'<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:520px">'
-    +'<thead><tr style="background:#f5f8fd"><th style="padding:8px;text-align:left;font-size:12px;color:#6b7280">일자</th><th style="padding:8px;text-align:left;font-size:12px;color:#6b7280">대회 · 부문</th><th style="padding:8px;font-size:12px;color:#6b7280">결과</th><th style="padding:8px;text-align:left;font-size:12px;color:#6b7280">선수</th></tr></thead>'
-    +years.map(y=>'<tbody><tr><td colspan="4" style="padding:8px 8px 4px;font-weight:900;color:#141d51;border-top:1px solid #eef1f6">'+kesc(y)+'년 · '+byYear[y].length+'건</td></tr>'+byYear[y].map(a=>row(a).replace(/<td/g,'<td style="padding:7px 8px;border-top:1px solid #f1f3f7"').replace(/style="padding:7px 8px;border-top:1px solid #f1f3f7" style="/g,'style="padding:7px 8px;border-top:1px solid #f1f3f7;')).join('')+'</tbody>').join('')
-    +'</table></div>';
+  // [2단 표시] 단체 입상 | 개인 입상 — 최근 5건씩, [전체 보기]로 펼침
+  const teams=list.filter(a=>a.kind==='team'),inds=list.filter(a=>a.kind!=='team');
+  const item=a=>{const title=a.slotId&&/comp/.test(a.source||'')?'<a href="competition.html?slot='+encodeURIComponent(a.slotId)+'" style="color:#141d51;text-decoration:none;font-weight:800">'+kesc(a.competitionName||'')+'</a>':'<b>'+kesc(a.competitionName||'')+'</b>';
+    const who=a.kind==='team'?((a.teamName?kesc(a.teamName):'')+((a.members||[]).length?' <span style="color:#6b7280">('+(a.members||[]).slice(0,4).map(kesc).join(', ')+((a.members||[]).length>4?' 외 '+((a.members||[]).length-4)+'명':'')+')</span>':'')):(a.members||[]).map(kesc).join(', ');
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid #f1f3f7;font-size:13px"><span style="background:#fff8e6;color:#8a5a00;border:1px solid #ecd9b0;border-radius:999px;padding:2px 10px;font-weight:900;font-size:12px;white-space:nowrap;flex:none">'+kesc(a.result||'')+'</span><div style="min-width:0;flex:1"><div>'+title+(a.division?' <span style="color:#6b7280;font-size:12px">'+kesc(a.division)+'</span>':'')+'</div><div style="font-size:12px;color:#6b7280;margin-top:2px">'+kesc(a.date||'')+(who?' · '+who:'')+'</div></div></div>'};
+  const col=(ttl,color,arr,key)=>'<div style="min-width:0"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="width:4px;height:16px;border-radius:2px;background:'+color+'"></span><b style="font-size:14px">'+ttl+'</b><span style="font-size:12px;color:#8a919d;font-weight:700">'+arr.length+'건</span></div>'
+    +(arr.length?'<div class="aw-list" data-k="'+key+'">'+arr.map((a,i)=>'<div class="aw-item"'+(i>=5?' style="display:none"':'')+'>'+item(a)+'</div>').join('')+'</div>'+(arr.length>5?'<button type="button" class="cbtn cbtn-soft" style="padding:5px 12px;font-size:12px;margin-top:6px" onclick="chAwMore(this)">전체 보기 ('+arr.length+'건)</button>':''):'<div style="font-size:12.5px;color:#9aa3b2;padding:10px 0">기록 없음</div>')+'</div>';
+  el.innerHTML=head+'<div class="aw-cols" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:10px">'+col('단체 입상','#1f5fb2',teams,'t')+col('개인 입상','#0f766e',inds,'m')+'</div>'
+    +(CH_IS_MEMBER?'<div style="margin-top:12px;padding:10px 14px;background:#f5f8fd;border:1px solid #dbe4f3;border-radius:12px;font-size:12.5px;color:#374151;line-height:1.7">홈페이지 이전의 입상은 <a href="mypage.html#athBox" style="font-weight:800;color:#1f5fb2">마이페이지 › 입상 기록 신청</a>에서 증빙(상장 사진·PDF)을 붙여 요청하면 연맹 확인 후 이 카드에 표시됩니다. 등록 구분에서 「클럽 단체 입상」과 소속 클럽을 고르세요.</div>':'')
+    +'<style>@media(max-width:700px){#chAwards .aw-cols{grid-template-columns:1fr}}</style>';
   return all;
 }
 // [클럽 정보] 입상·참가(clubAwards) + 교류전 전적(clubMatches) → 정보 카드
@@ -338,11 +337,15 @@ function clubInfoRows(c,opt){
   if(d.ageTxt)h+=R('나이대',d.ageTxt+(d.aged<d.total?' <span style="color:#9aa3b2">(미기재 '+(d.total-d.aged)+'명 제외)</span>':''),true);
   if(d.male+d.female)h+=R('성별','남 '+Math.round(d.male/(d.male+d.female)*100)+'% · 여 '+Math.round(d.female/(d.male+d.female)*100)+'%'+((d.male+d.female)<d.total?' <span style="color:#9aa3b2">(기재 '+(d.male+d.female)+'명 기준)</span>':''));
   h+=R('대회 참가',evList.length?'<b>'+evList.length+'</b>회'+(evList[0]?' · 최근 '+E(evList[0].date||'')+' '+E(evList[0].competitionName||''):''):'<span style="color:#9aa3b2">기록 없음</span>',true);
-  h+=R('입상',awards.length?'<b>'+awards.length+'</b>건 · '+awards.slice(0,2).map(a=>E(a.date||'')+' '+E(a.competitionName||'')+' <b style="color:#8a5a00">'+E(a.result||'')+'</b>').join(' · ')+(awards.length>2&&opt.moreHref?' <a href="'+opt.moreHref+'" style="color:#153A77;font-weight:800">전체 보기</a>':''):'<span style="color:#9aa3b2">기록 없음</span>',true);
+  const awT=awards.filter(a=>a.kind==='team'),awM=awards.filter(a=>a.kind!=='team');
+  const awLine=(arr)=>arr.length?'<b>'+arr.length+'</b>건 · 최근 '+E(arr[0].date||'')+' '+E(arr[0].competitionName||'')+' <b style="color:#8a5a00">'+E(arr[0].result||'')+'</b>':'<span style="color:#9aa3b2">없음</span>';
+  h+=R('단체 입상',awLine(awT)+(awT.length>1&&opt.moreHref?' <a href="'+opt.moreHref+'" style="color:#153A77;font-weight:800">전체</a>':''),true);
+  h+=R('개인 입상',awLine(awM)+(awM.length>1&&opt.moreHref?' <a href="'+opt.moreHref+'" style="color:#153A77;font-weight:800">전체</a>':''),true);
   h+=R('교류전 전적',played?'<b>'+rec.w+'승 '+rec.dr+'무 '+rec.l+'패</b> · 승률 '+Math.round(rec.w/played*100)+'% ('+played+'경기)':'<span style="color:#9aa3b2">기록 없음</span>',true);
   h+='</div>';
   return h;
 }
+function chAwMore(btn){const wrap=btn.previousElementSibling;if(!wrap)return;const hidden=[...wrap.querySelectorAll('.aw-item')].filter(x=>x.style.display==='none');if(hidden.length){hidden.forEach(x=>x.style.display='');btn.textContent='접기'}else{[...wrap.querySelectorAll('.aw-item')].forEach((x,i)=>{if(i>=5)x.style.display='none'});btn.textContent='전체 보기 ('+wrap.querySelectorAll('.aw-item').length+'건)'}}
 function showChTab(k){
   ['1','2','3'].forEach(n=>{const p=document.getElementById('chPane'+n);if(p)p.style.display=(n===k?'':'none')});
   document.querySelectorAll('#chTabs .st').forEach(b=>b.classList.toggle('on',b.dataset.s===k));
