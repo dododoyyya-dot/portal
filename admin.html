@@ -3717,7 +3717,7 @@ async function rptDownload(){
     }
     if(/<x:calcPr /.test(wbx)&&!/fullCalcOnLoad/.test(wbx))wbx=wbx.replace(/<x:calcPr /,'<x:calcPr fullCalcOnLoad="1" ');
     zip.file('xl/workbook.xml',wbx);
-    const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});   // 압축 (기본값은 무압축이라 파일이 8배 커짐)
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=String(mo).padStart(2,'0')+'월_플라잉디스크_'+String(y).slice(2)+'년 유소년월별 현황보고서.xlsx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
     alert('📊 '+ym+' 현황보고서를 내려받았습니다.\n· 학교 '+rows.length+'개 (양식 '+start+'행부터)'+(noLog?'\n· 일지 미제출 '+noLog+'개교는 기관 정보만 기입':'')+'\n· 수혜자 남/여: 관리자 입력 '+rows.filter(r=>r.src==='admin').length+'교 · 강사 일지 '+rows.filter(r=>r.src==='log').length+'교'+(estList.length?'\n  ⚠ 추정(반반 분할) '+estList.length+'교 — [👥 수혜자] 버튼이나 [이전 보고서 가져오기]로 실제 값을 넣어 주세요: '+estList.slice(0,10).join(', ')+(estList.length>10?' 외 '+(estList.length-10):''):'')+'\n· 「사업 성과」 시트의 유형3·유형5 학교 수도 함께 기입되며, 색칠된 수식 칸은 엑셀에서 열 때 자동 계산됩니다');
   }catch(e){alert('보고서 생성 실패: '+(e.message||e))}
