@@ -1023,6 +1023,13 @@ async function viewRoster(id){
             +'<td '+td+' style="text-align:center"><button onclick="clearClaimReview(\''+id+'\',\''+key+'\')" style="border:1px solid #dfe5ee;background:#fff;color:#8a919d;'+_rvb+'">↩ 되돌리기</button></td></tr>';
         }).join('')
       +'</table></div></details>'):'')
+    +(staff?(function(){const all=(s.claimed||[]).slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));if(!all.length)return '';const cancels=(s.cancels||[]);
+        return '<details style="margin-top:14px;border-top:1px dashed #e5e9f0;padding-top:10px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#6b7280">전체 신청 이력 '+all.length+'건 (취소·반려·수정 기록 포함) — 명단에 없는 신청을 찾을 때</summary>'
+        +'<div style="overflow-x:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse"><tr><th '+th+'>신청 시각</th><th '+th+'>성명·팀</th><th '+th+'>계정</th><th '+th+'>부문</th><th '+th+'>상태</th></tr>'
+        +all.map(c=>{const key=ckey(c);const rv=((s.reviewStatus||{})[key])||{};const canc=cancels.filter(k=>ckey(k)===key).length;const later=(s.claimed||[]).filter(x=>ckey(x)===key&&String(x.at||'')>String(c.at||'')).length;
+          const st=rv.st==='반려'?'반려':(canc>=(s.claimed||[]).filter(x=>ckey(x)===key).length?'취소됨':(later?'수정 전 기록':(activeOfKey(s,key)?'명단 표시 중':'제외')));
+          return '<tr><td '+td+' style="white-space:nowrap">'+cesc(String(c.at||'').replace('T',' ').slice(0,16))+'</td><td '+td+'>'+(c.team?'<b>팀</b> ':'')+cesc(c.name||'')+(c.team&&c.leader?' <span style="color:#6b7280">(인솔 '+cesc(c.leader)+(c.rosterN?' · '+c.rosterN+'명':'')+')</span>':'')+'</td><td '+td+' style="font-size:11px;color:#8a919d">'+cesc(String(c.uid||'').slice(0,8))+'</td><td '+td+'>'+cesc((c.prefs||[]).join(', ')||'-')+'</td><td '+td+' style="white-space:nowrap">'+st+'</td></tr>'}).join('')
+        +'</table></div><div style="font-size:11.5px;color:#8a919d;margin-top:6px">신청자가 「신청 완료」를 봤는데 여기에도 없다면 다른 공고(같은 대회의 다른 슬롯이나 심판 공고)에 신청했거나 저장이 거부된 경우입니다. 신청자 마이페이지의 [내 신청 현황]과 대조해 주세요.</div></details>'})():'')
     +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">'
     +(staff&&entry?'<button class="cbtn" style="background:#153A77;color:#fff" onclick="exportRosterCsv(\''+id+'\')" title="주최기관 제출용 — 명단 제공에 동의한 참가자만 연락처·주소가 채워집니다">📥 참가자 명단 엑셀</button>':'')
     +(staff&&entry?'<button class="cbtn" style="background:#0f766e;color:#fff" onclick="document.getElementById(\'rosterModal\').remove();openTeamBuilder(\''+id+'\')">🧩 팀 구성 (개인 참가자)</button>':'')
@@ -2900,8 +2907,8 @@ async function loadLiveComps(){
     const today=new Date().toISOString().slice(0,10);
     const u=AUTH.currentUser;
     const [cs,sl,sp]=await Promise.all([
-      DB.collection('competitions').orderBy('dateStart','desc').limit(80).get().catch(()=>null),
-      DB.collection('compSlots').orderBy('date').limit(80).get().catch(()=>null),
+      DB.collection('competitions').orderBy('dateStart','desc').limit(100).get().catch(()=>null),
+      DB.collection('compSlots').orderBy('date').limit(300).get().catch(()=>null),
       u?DB.collection('competitionStaff').limit(200).get().catch(()=>null):Promise.resolve(null)
     ]);
     const slotMap={};if(sl)sl.docs.forEach(d=>slotMap[d.id]=d);
@@ -2978,8 +2985,8 @@ async function loadSlots(){
   const el=document.getElementById('cSlotList');
   try{
     const [snap,comps,cfg]=await Promise.all([
-      DB.collection('compSlots').orderBy('date').limit(50).get(),
-      DB.collection('competitions').orderBy('dateStart','desc').limit(30).get().catch(()=>null),
+      DB.collection('compSlots').orderBy('date').limit(300).get(),   // [2026-09-10] 날짜순 50건 한도에 최근 대회가 잘려 신청 화면·신청 현황에서 빠지던 문제
+      DB.collection('competitions').orderBy('dateStart','desc').limit(100).get().catch(()=>null),
       DB.collection('settings').doc('global').get().catch(()=>null)
     ]);
     CSLOTS=snap.docs;

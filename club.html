@@ -387,7 +387,7 @@ let _matchLoaded=false;
 function showClTab(k){
   ['1','2','3','4'].forEach(n=>{const p=document.getElementById('clPane'+n);if(p)p.style.display=(n===k?'':'none')});
   document.querySelectorAll('#clTabs .st').forEach(b=>b.classList.toggle('on',b.dataset.s===k));
-  if(k==='4'&&!_matchLoaded){_matchLoaded=true;loadMatches();}
+  if(k==='4'&&!_matchLoaded&&KME){_matchLoaded=true;loadMatches();}   // [2026-09-10] 로그인 확정 전(KME 없음)에는 보류 — 로그인 후 아래 핸들러가 이어서 불러옵니다
   // 탭바가 화면 밖일 때만 탭바 위치로 (최상단 강제 스크롤 X)
   const tb=document.getElementById('clTabs');
   if(tb){const r=tb.getBoundingClientRect();if(r.top<0||r.top>window.innerHeight-80)tb.scrollIntoView({block:'start'});}
@@ -406,6 +406,8 @@ AUTH.onAuthStateChanged(async u=>{
   loadMyClubs();
   loadSidoApprovals().catch(()=>{});
   loadOfficer().catch(()=>{});
+  // [교류전] 뷰 주소(?view=meet)로 바로 들어와 교류전 탭이 이미 열려 있으면 로그인 확정 후 여기서 불러옵니다
+  try{const p4=document.getElementById('clPane4');if(p4&&p4.style.display!=='none'&&!_matchLoaded){_matchLoaded=true;loadMatches()}}catch(e){}
   // [메뉴딥링크] club.html?tab=4 처럼 상단 메뉴·외부 링크에서 특정 탭으로 바로 이동
   //   (competition.html의 ?slot=, staff.html의 ?post= 와 동일한 패턴)
   const _tabQ=new URLSearchParams(location.search).get('tab');
@@ -1402,6 +1404,7 @@ async function declineClubInvite(id){
 let CM_ALL=[],CM_MYOWN=[];
 async function loadMatches(){
   const mineEl=document.getElementById('cmMine');
+  if(!KME){_matchLoaded=false;if(mineEl)mineEl.innerHTML='<div class="bempty">로그인 확인 중…</div>';return}
   try{
     const [ms,own]=await Promise.all([
       DB.collection('clubMatches').orderBy('createdAt','desc').limit(200).get(),
