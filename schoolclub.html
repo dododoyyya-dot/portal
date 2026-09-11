@@ -327,7 +327,7 @@ async function scTeamLoad(id){
   const idset=new Set(ids);const rows=[];
   (evs?evs.docs:[]).forEach(e=>{const x=e.data();const st=x.stage||SCC.stageOf('',x.competitionName);const yr=x.year||SCC.schoolYear(x.date);
     Object.keys(x.divisions||{}).forEach(dv=>{const T=(x.divisions[dv]||{}).teams||{};Object.keys(T).forEach(k=>{const t=T[k];if(!idset.has(t.scid))return;
-      rows.push({eventId:e.id,name:x.competitionName||'',date:x.date||'',year:yr,stage:st,div:dv,result:t.result||'',rank:t.rank!=null?t.rank:SCC.rankOf(t.result),members:(t.members||[]).length})})})});
+      rows.push({eventId:e.id,src:x.source||'',slot:x.slotId||'',name:x.competitionName||'',date:x.date||'',year:yr,stage:st,div:dv,result:t.result||'',rank:t.rank!=null?t.rank:SCC.rankOf(t.result),members:(t.members||[]).length})})})});
   const matches=(mts?mts.docs:[]).map(m=>Object.assign({id:m.id},m.data()));
   const S=SCC.statsOf(ids,rows,matches);
   document.title=(c.teamName||c.schoolName)+' | 학교스포츠클럽 | 대한민국플라잉디스크연맹';
@@ -349,7 +349,7 @@ async function scTeamLoad(id){
   const byY={};rows.forEach(r=>{(byY[r.year||'미상']=byY[r.year||'미상']||[]).push(r)});
   const ys=Object.keys(byY).sort((a,b)=>String(b).localeCompare(String(a)));
   h+='<div class="two"><div class="tp"><h3>대회 이력<small>'+rows.length+'건</small></h3>'+(ys.length?ys.map(y=>'<div class="yr"><b>'+E(y)+(y==='미상'?'':'학년도')+'</b>'+byY[y].sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(r=>
-      '<div class="ev"><span class="d">'+E(String(r.date).replace(/-/g,'.'))+'</span><span>'+stg(r.stage)+' <a href="results.html?id=s_'+encodeURIComponent(r.eventId)+'">'+E(r.name)+'</a><span class="dv">'+E(r.div)+(r.members?' · 선수 '+r.members+'명':'')+'</span></span>'+rk(r.result,r.rank)+'</div>').join('')+'</div>').join('')
+      '<div class="ev"><span class="d">'+E(String(r.date).replace(/-/g,'.'))+'</span><span>'+stg(r.stage)+' <a href="'+(r.src==='kfdf'&&r.slot?'competition.html?slot='+encodeURIComponent(r.slot):'results.html?id=s_'+encodeURIComponent(r.eventId))+'">'+E(r.name)+'</a><span class="dv">'+E(r.div)+(r.members?' · 선수 '+r.members+'명':'')+'</span></span>'+rk(r.result,r.rank)+'</div>').join('')+'</div>').join('')
     :'<div style="font-size:13px;color:#6b7280">아직 정리된 대회 기록이 없습니다.</div>')+'</div>';
   // 오른쪽: 경기 기록 + 학년도 명단 + 일반 클럽 시절
   let right='';

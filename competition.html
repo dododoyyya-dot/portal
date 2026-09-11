@@ -304,6 +304,7 @@ body[data-view] #secLive>.sec-label,body[data-view] #secLive>.sec-title,body[dat
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260821"></script>
 <script src="career.js?v=20260907a"></script>
+<script src="schoolclub_core.js?v=20260911b"></script>
 <script src="site_config.js"></script>
 <script>
 KFDF.initApp();
@@ -809,7 +810,7 @@ async function openCompFinish(id){
   const s=doc.data();const list=compClaimList(s).filter(c=>c.status!=='반려');
   if(!list.length){alert('참가 신청자가 없습니다.');return}
   const prev=s.results||{};
-  CF={id:id,rows:list.map(c=>{const key=c.pid||c.uid;const pv=prev[key]||{};return {key:key,uid:c.uid,name:c.name||'',team:!!c.team,teamType:c.teamType||'',members:(c.roster||[]).length,roster:(c.roster||[]),selfPlays:!!(c.roster||[]).some(x=>x&&x.self&&x.uid===c.uid),kid:!!c.kid,div:(c.prefs||[])[0]||'',club:c.club||'',clubId:c.clubId||'',teamOrgId:c.teamOrgId||'',on:pv.on!==false,award:pv.award||''}})};
+  CF={id:id,rows:list.map(c=>{const key=c.pid||c.uid;const pv=prev[key]||{};return {key:key,uid:c.uid,name:c.name||'',team:!!c.team,teamType:c.teamType||'',members:(c.roster||[]).length,roster:(c.roster||[]),selfPlays:!!(c.roster||[]).some(x=>x&&x.self&&x.uid===c.uid),kid:!!c.kid,div:(c.prefs||[])[0]||'',club:c.club||'',clubId:c.clubId||'',teamOrgId:c.teamOrgId||'',teamOrg:c.teamOrg||'',teamSchoolCode:c.teamSchoolCode||'',teamSchoolClubId:c.teamSchoolClubId||'',on:pv.on!==false,award:pv.award||''}})};
   const old=document.getElementById('cfModal');if(old)old.remove();
   const div=document.createElement('div');div.id='cfModal';div.className='cmodal-bg';
   div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.65);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
@@ -904,6 +905,18 @@ async function cfSave(){
       ok++;
     }catch(e){fail++;console.warn('career',e)}
   }
+  // [학교스포츠클럽] 학교팀 결과를 학교스포츠클럽 대회 기록에 — 팀 홈의 대회 이력·전적에 바로 반영 (연맹 대회 = 문서 kfdf_공고ID)
+  let scNote='';
+  try{const st=rows.filter(r=>r.team&&r.teamType==='학교팀');
+    if(st.length&&window.SCC){const dvs={};const sc={};
+      st.forEach(r=>{const dv=r.div||'전체';const D=dvs[dv]=dvs[dv]||{teams:{}};const school=r.teamOrg||r.name;const tk=school+(r.name&&r.name!==school?'|'+r.name:'');
+        D.teams[tk]={school:school,team:r.name||'',result:r.award||'참가',rank:SCC.rankOf(r.award||'참가'),scid:r.teamSchoolClubId||'',code:r.teamSchoolCode||'',members:(r.roster||[]).filter(m=>m&&m.name&&!m.self).map(m=>m.name),src:'kfdf'};if(r.teamSchoolClubId)sc[r.teamSchoolClubId]=1});
+      const ref=DB.collection('schoolClubEvents').doc('kfdf_'+CF.id);const ex=await ref.get().catch(()=>null);
+      const doc={competitionName:s.title||'',date:s.date||'',year:SCC.schoolYear(s.date),stage:(/전국/.test(String(s.region||'')+String(s.title||''))?'전국':'시도'),organizer:s.host||'대한민국플라잉디스크연맹',coorganizer:s.organizer||'',
+        sport:sportOf(st[0].div),sido:SCC.sidoNorm(s.sido||s.bySido||s.region)||'',divisions:dvs,scids:Object.keys(sc),status:'published',source:'kfdf',slotId:CF.id,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+      if(!(ex&&ex.exists))doc.createdAt=firebase.firestore.FieldValue.serverTimestamp();
+      await ref.set(doc);scNote=' · 학교스포츠클럽 기록 '+st.length+'팀'}
+  }catch(e){console.warn('schoolClubEvents',e);scNote=' · 학교스포츠클럽 기록 실패('+(e.code||e.message)+')'}
   // 결과 저장 + 종료 표시
   const results={};CF.rows.forEach(r=>{results[r.key]={on:r.on,award:r.award||''}});
   const teams=rows.filter(r=>r.team),inds=rows.filter(r=>!r.team);const members=teams.reduce((n,r)=>n+(r.members||0),0);
@@ -1579,6 +1592,11 @@ async function openTeamApply(id){
       return true;
     }).map(x=>({id:x.id,name:x.data().name,data:x.data()}));}catch(e){}
   window.TA_MYCLUBS=myClubs;
+  // [학교스포츠클럽] 내가 지도교사인 팀 + (교사 회원이면) 우리 학교 팀 — 운영 중인 팀만
+  window.TA_MYSC=[];
+  try{const qs=[DB.collection('schoolClubs').where('coachUid','==',CME.uid).get()];if(CMY&&CMY.schoolCode)qs.push(DB.collection('schoolClubs').where('schoolCode','==',CMY.schoolCode).get());
+    const rs=await Promise.all(qs.map(p=>p.catch(()=>({docs:[]}))));const mp={};rs.forEach(r=>(r.docs||[]).forEach(d=>{const c=d.data()||{};if(c.status!=='운영'||c.mergedInto)return;mp[d.id]=Object.assign({id:d.id},c)}));
+    window.TA_MYSC=Object.values(mp)}catch(e){}
   const old=document.getElementById('taModal');if(old)old.remove();
   const div=document.createElement('div');div.id='taModal';
   div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.6);z-index:999;display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto';
@@ -1627,7 +1645,8 @@ async function openTeamApply(id){
     setv('taType',c.teamType);setv('taName',c.name);setv('taDiv',(c.prefs||[])[0]);setv('taGender',c.teamGender);setv('taRole',c.leaderRole);
     taTypeUI();
     const org=document.getElementById('taOrg');
-    if(org){if(org.tagName==='SELECT'){if(c.teamOrgId)org.value=c.teamOrgId}else org.value=c.teamOrg||''}
+    if(org){if(org.tagName==='SELECT'){if(c.teamOrgId)org.value=c.teamOrgId}else{org.value=c.teamOrg||'';if(c.teamSchoolCode)org.dataset.code=c.teamSchoolCode}}
+    if(c.teamSchoolClubId){const scSel=document.getElementById('taSC');if(scSel){if(![...scSel.options].some(x=>x.value===c.teamSchoolClubId)){const op=document.createElement('option');op.value=c.teamSchoolClubId;op.textContent=c.name||c.teamSchoolClubId;scSel.appendChild(op)}scSel.value=c.teamSchoolClubId}}
     (c.roster||[]).forEach(r=>taAddRow({name:r.name,birth:r.birth,gender:r.gender,school:r.school,phone:r.phone,address:r.address,adult:!!r.adultAcct,nonMember:!!r.nonMember,self:!!r.self}));
     if(!(c.roster||[]).length)taAddRow();
     const pc=document.getElementById('taPconsent');if(pc)pc.checked=!!c.pconsent;
@@ -1669,6 +1688,7 @@ async function taFindTeams(focusMembers){
       map[d.id]=Object.assign({id:d.id},c);});
     TA_TEAMS=Object.values(map);
   }catch(e){TA_TEAMS=[];}
+  (window.TA_MYSC||[]).forEach(sc=>TA_TEAMS.push({id:sc.id,name:sc.teamName||sc.schoolName,kind:'school',sc:sc,members:[],childMembers:[]}));   // [학교스포츠클럽] 학년도 명단
   taRenderPanel();
   if(focusMembers&&TA_TEAM)taRenderMembers();
 }
@@ -1677,13 +1697,22 @@ function taRenderPanel(){
   p.innerHTML='<div style="display:flex;align-items:center;margin-bottom:8px"><b style="flex:1;font-size:14px">🔍 내 팀 선택</b><span style="cursor:pointer;font-weight:900;font-size:16px;padding:2px 6px" onclick="document.getElementById(\'taSide\').remove()">✕</span></div>'
     +(TA_TEAMS.length?TA_TEAMS.map((c,i)=>'<div onclick="taPickTeam('+i+')" style="border:1.5px solid '+(TA_TEAM&&TA_TEAM.id===c.id?'#0f766e':'#dfe5ee')+';border-radius:10px;padding:9px 12px;margin-top:6px;cursor:pointer;background:'+(TA_TEAM&&TA_TEAM.id===c.id?'#f0fdf4':'#fff')+'">'
       +'<b style="font-size:13.5px">'+cesc(c.name||'')+'</b>'
-      +'<div style="font-size:11.5px;color:#6b7280;margin-top:2px">'+(c.ownerUid===CME.uid?'👑 클럽장':'회원')+' · 구성원 '+(((c.members||[]).length)+((c.childMembers||[]).length))+'명'+(c.region?' · '+cesc(c.region):'')+'</div></div>').join('')
+      +'<div style="font-size:11.5px;color:#6b7280;margin-top:2px">'+(c.kind==='school'?'🏫 학교스포츠클럽 · '+cesc(c.sc.schoolName||'')+' · 학년도 명단':(c.ownerUid===CME.uid?'👑 클럽장':'회원')+' · 구성원 '+(((c.members||[]).length)+((c.childMembers||[]).length))+'명')+(c.region?' · '+cesc(c.region):'')+'</div></div>').join('')
     :'<div style="font-size:12.5px;color:#8a919d;padding:8px 0">소속된 클럽이 없습니다.<br>클럽 페이지에서 클럽을 만들거나 가입한 뒤 이용할 수 있습니다.<br>지금은 왼쪽에서 직접 입력해주세요.</div>')
     +'<div id="taSideMembers"></div>';
 }
-function taPickTeam(i){
+async function taPickTeam(i){
   const c=TA_TEAMS[i];if(!c)return;
   TA_TEAM=c;
+  if(c.kind==='school'){   // [학교스포츠클럽] 팀 유형=학교팀, 학교클럽 선택, 명단은 학년도 명단
+    const sel=document.getElementById('taType');if(sel){const opt=[...sel.options].find(o=>o.value.indexOf('학교')>=0);if(opt){sel.value=opt.value;taTypeUI()}}
+    const scSel=document.getElementById('taSC');if(scSel){scSel.value=c.id;taSCPick()}
+    const nameEl=document.getElementById('taName');if(nameEl)nameEl.value=c.name||'';
+    taRenderPanel();const box=document.getElementById('taSideMembers');if(box)box.innerHTML='<div style="font-size:12px;color:#8a919d;margin-top:10px">학년도 명단을 불러오는 중…</div>';
+    const r=await taSCRoster(c);c._year=r.year;c._denied=!!r.denied;
+    c._rows=(r.members||[]).map(m=>({name:m.name||'',birth:m.birth||'',gender:m.gender==='남'?'남':(m.gender==='여'?'여':(m.gender||'')),school:c.sc.schoolName||'',tag:(m.grade?m.grade+'학년':'학생')}));
+    taRenderMembers();return;
+  }
   // 팀명·유형·소속 자동 기입 (기존 입력값은 덮어씀 — 사용자가 클릭으로 선택한 것)
   const nameEl=document.getElementById('taName');if(nameEl)nameEl.value=c.name||'';
   const sel=document.getElementById('taType');
@@ -1702,6 +1731,12 @@ function taPickTeam(i){
 function taRenderMembers(){
   const box=document.getElementById('taSideMembers');if(!box||!TA_TEAM)return;
   const c=TA_TEAM;
+  if(c.kind==='school'){const rows=c._rows||[];TA_MEMROWS=rows;
+    box.innerHTML='<div style="font-weight:800;font-size:12.5px;margin-top:14px;color:#0f766e">🏫 '+cesc(c.name||'')+' '+(c._year||'')+'학년도 명단 — 클릭하면 왼쪽 팀원 표에 담깁니다</div>'
+      +(rows.length?rows.map((r,j)=>'<div onclick="taPickMember('+j+')" style="display:flex;gap:7px;align-items:center;border:1px solid #e3e9f2;border-radius:9px;padding:7px 11px;margin-top:5px;cursor:pointer;font-size:12.5px"><b>'+cesc(r.name)+'</b><span style="color:#8a919d;font-size:11px">'+cesc(r.tag)+(r.birth?' · '+cesc(r.birth):'')+'</span><span style="flex:1"></span><span style="color:#0f766e;font-weight:900">＋</span></div>').join('')
+        +'<button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12px;margin-top:8px;width:100%" onclick="taPickAll()">전원 담기</button>'
+      :'<div style="font-size:12px;color:#8a919d;margin-top:5px;line-height:1.6">'+(c._denied?'이 팀의 명단은 지도교사·연맹 담당자만 볼 수 있습니다.':'아직 학년도 명단이 없습니다. 왼쪽에 직접 입력해 신청하면 이 팀의 이번 학년도 명단으로 저장됩니다.')+'</div>');
+    return;}
   const rows=[];
   (c.childMembers||[]).forEach(k=>rows.push({name:k.name||'',birth:k.birth||'',gender:k.gender||'',school:k.school||'',tag:'유소년',guardianUid:k.parentUid||k.guardianUid||k.uid||''}));
   // [클럽장 본인 참가] 인솔자 본인도 명단 맨 위에 '본인'으로 올려 클릭 한 번으로 팀원에 담을 수 있게 합니다 (종전에는 본인이 빠져 있었음)
@@ -1760,9 +1795,14 @@ function taTypeUI(){
       :'<span style="font-size:12.5px;color:#C41E2F;font-weight:700">내가 클럽장인 클럽이 없습니다 — 학교팀/자유팀을 선택하거나 클럽을 먼저 만들어주세요.</span>';
     if(lb)lb.style.display=cl.length?'':'none';
   }else if(t==='학교팀'){
-    row.innerHTML='소속 학교: <input id="taOrg" placeholder="예: 대한중학교" style="padding:8px 11px;border:1.5px solid #d5dce8;border-radius:9px;font-size:13px;width:220px">';
+    const scs=window.TA_MYSC||[];
+    row.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span>학교스포츠클럽:</span><select id="taSC" onchange="taSCPick()" style="padding:8px 11px;border:1.5px solid #bfe0da;border-radius:9px;font-size:13px;max-width:320px"><option value="">(학교스포츠클럽 없이 신청)</option>'+scs.map(c=>'<option value="'+cesc(c.id)+'">'+cesc((c.teamName||c.schoolName)+' · '+((window.SCC&&SCC.DIV[c.division])||'')+' · '+(c.schoolName||''))+'</option>').join('')+'</select>'
+      +'<a href="schoolclub.html" target="_blank" style="font-size:12px;font-weight:800;color:#0f766e">우리 학교 클럽 등록 신청 →</a></div>'
+      +'<div style="margin-top:6px">소속 학교: <input id="taOrg" placeholder="예: 대한중학교" style="padding:8px 11px;border:1.5px solid #d5dce8;border-radius:9px;font-size:13px;width:220px"></div>'
+      +'<div id="taSCNote" style="font-size:11.5px;color:#0f766e;font-weight:700;margin-top:4px"></div>';
+    if(scs.length===1&&!TA_EDIT){setTimeout(()=>{const s0=document.getElementById('taSC');if(s0&&!s0.value){s0.value=scs[0].id;taSCPick()}},0)}
     // [학교 자동완성·2026-09-07] 전국 학교 표준 DB에서 골라 정식 명칭과 학교코드를 함께 저장 (직접 입력도 그대로 허용)
-    setTimeout(function(){const e=document.getElementById('taOrg');if(!e||!window.KFDF||!KFDF.schoolAuto)return;try{KFDF.schoolAuto(e,function(nm){try{const hit=(KFDF.schoolSearch(nm,10)||[]).find(x=>x.name===nm);e.dataset.code=hit?(hit.code||''):''}catch(err){}});e.addEventListener('input',function(){e.dataset.code=''})}catch(err){}},0);
+    setTimeout(function(){const e=document.getElementById('taOrg');if(!e||!window.KFDF||!KFDF.schoolAuto)return;try{KFDF.schoolAuto(e,function(nm){try{const hit=(KFDF.schoolSearch(nm,10)||[]).find(x=>x.name===nm);e.dataset.code=hit?(hit.code||''):'';if(hit&&hit.code)taSCLoadByCode(hit.code)}catch(err){}});e.addEventListener('input',function(){e.dataset.code=''})}catch(err){}},0);
     if(lb)lb.style.display='none';
   }else{
     // [소속 중복 제거] 클럽팀·학교팀이 아니면 팀 유형 선택이 곧 소속이므로 별도 소속 칸을 두지 않습니다
@@ -1770,6 +1810,30 @@ function taTypeUI(){
     if(lb)lb.style.display='none';
   }
   taDivUI();
+}
+// [학교스포츠클럽] 고른 팀으로 학교명·학교코드·팀명 채우기
+function taSCPick(){
+  const sel=document.getElementById('taSC');const note=document.getElementById('taSCNote');if(!sel)return;
+  const c=(window.TA_MYSC||[]).find(x=>x.id===sel.value);
+  if(!c){if(note)note.textContent='';return}
+  const org=document.getElementById('taOrg');if(org){org.value=c.schoolName||'';org.dataset.code=c.schoolCode||''}
+  const nm=document.getElementById('taName');if(nm&&(!nm.value||nm.dataset.auto==='1')){nm.value=c.teamName||'';nm.dataset.auto='1'}
+  if(note)note.textContent='이 팀 이름으로 참가하고, 대회 결과가 학교스포츠클럽 팀 기록에 쌓입니다. 팀원은 [👥 내 클럽 명단에서 선택]에서 학년도 명단으로 담을 수 있습니다.';
+}
+// 학교를 검색해 고르면 그 학교의 운영 중인 학교클럽을 목록에 더합니다 (관리자·다른 교사 대리 신청)
+async function taSCLoadByCode(code){
+  try{const s=await DB.collection('schoolClubs').where('schoolCode','==',code).get();const add=s.docs.map(d=>Object.assign({id:d.id},d.data())).filter(c=>c.status==='운영'&&!c.mergedInto);
+    const cur=window.TA_MYSC||[];add.forEach(c=>{if(!cur.some(x=>x.id===c.id))cur.push(c)});window.TA_MYSC=cur;
+    const sel=document.getElementById('taSC');if(!sel)return;const keep=sel.value;
+    sel.innerHTML='<option value="">(학교스포츠클럽 없이 신청)</option>'+cur.map(c=>'<option value="'+cesc(c.id)+'">'+cesc((c.teamName||c.schoolName)+' · '+((window.SCC&&SCC.DIV[c.division])||'')+' · '+(c.schoolName||''))+'</option>').join('');
+    if(keep)sel.value=keep;else if(add.length===1){sel.value=add[0].id;taSCPick()}
+  }catch(e){}
+}
+// 학교클럽 학년도 명단(실명 — 지도교사·관리자만 읽힘) → 팀원 후보
+async function taSCRoster(c){
+  const yr=(window.SCC&&SCC.schoolYear(new Date().toISOString().slice(0,10)))||new Date().getFullYear();
+  for(const y of [yr,yr-1]){try{const d=await DB.collection('scRosters').doc(c.id+'_'+y).get();if(d.exists){const m=(d.data().members||[]);if(m.length)return {year:y,members:m}}}catch(e){return {year:y,members:[],denied:true}}}
+  return {year:yr,members:[]};
 }
 // [팀 구분 자동] 부문명(예: 얼티미트70 남초부·여중부·혼성)에서 구분을 읽어 냅니다. 읽히면 선택칸을 숨기고 그 값을 저장합니다.
 function taGenderOf(name){
@@ -2034,6 +2098,7 @@ async function submitTeam(){
     }
   }else{
     teamOrg=orgEl?orgEl.value.trim():'';
+    if(teamType==='학교팀'){const scSel=document.getElementById('taSC');window.__TA_SCID=scSel?scSel.value:''}else window.__TA_SCID='';
     if(teamType==='학교팀'&&!teamOrg)return alert('소속 학교를 입력해주세요.');
     teamSchoolCode=(teamType==='학교팀'&&orgEl&&orgEl.dataset&&orgEl.dataset.code)||'';   // [학교 자동완성] 학교코드(있을 때만)
   }
@@ -2078,7 +2143,7 @@ async function submitTeam(){
       const sameDiv=!!(TA_EDIT&&((TA_EDIT.prefs||[])[0]===divName));
       if(dv&&dv.cap&&!sameDiv&&divActiveCount(s,dv.name)>=dv.cap)throw new Error('['+dv.name+'] 부문 정원이 마감되었습니다');
       const claimed=(s.claimed||[]).slice();
-      claimed.push({uid:CME.uid,pid:pid,team:true,name:teamName,teamType:teamType,teamOrg:teamOrg,teamOrgId:teamOrgId,teamSchoolCode:teamSchoolCode,
+      claimed.push({uid:CME.uid,pid:pid,team:true,name:teamName,teamType:teamType,teamOrg:teamOrg,teamOrgId:teamOrgId,teamSchoolCode:teamSchoolCode,teamSchoolClubId:(teamType==='학교팀'?(window.__TA_SCID||''):''),
         teamGender:(function(){const g=document.getElementById('taGender');return (g&&g.value)||taGenderOf(divName)})(),   // [팀 구분 자동] 선택칸이 없어도 부문명에서 읽음
         leader:CMY.name||'',leaderRole:document.getElementById('taRole').value,leaderPhone:CMY.phone||'',
         roster:roster,rosterN:roster.length,prefs:[divName],consent:true,signed:true,
@@ -2099,6 +2164,8 @@ async function submitTeam(){
     CMY.contracts=c;
     const allFiles=wasEdit?keptFiles.concat(files):files;
     if(allFiles.length||wasEdit)await DB.collection('teamConsents').doc(TA_ID+'_'+pid).set({slotId:TA_ID,pid:pid,uid:CME.uid,files:allFiles,at:now}).catch(()=>{});
+    // [학교스포츠클럽] 신청 명단을 그 팀의 이번 학년도 명단에 더합니다 (지도교사·관리자 권한 — 실패해도 신청은 유지)
+    if(teamType==='학교팀'&&window.__TA_SCID)try{await taSCSaveRoster(window.__TA_SCID,roster,s0.data())}catch(e){console.warn('sc roster',e)}
     // [보호자 알림 2026-09-11] 팀 명단의 미성년 팀원이 보호자 계정에 연동돼 있으면(자녀 프로필·연동 코드) 보호자에게, 본인 계정이 있으면 본인에게 알립니다
     //   (팀 신청의 보호자 동의는 종전대로 인솔자가 수합·첨부하는 서면 동의서로 확인합니다 — 이 알림은 안내용)
     try{const _t=(s0.data().title||'대회');const _sent={};
@@ -2109,6 +2176,16 @@ async function submitTeam(){
     alert('👥 ['+teamName+'] 팀 참가 신청 완료! ('+roster.length+'명)'+(files.length?'\n동의서 '+files.length+'건이 함께 제출되었습니다.':'\n\n📎 서면 동의서는 대회 전까지 [📎 동의서 업로드] 버튼으로 제출해주세요.')+(sigSaveOk?'':'\n\n⚠ 인솔자 서명 저장에 실패했습니다 — [📄 내 신청서]에서 서명이 비어있으면 신청을 다시 열어 서명해주세요.'));
     loadSlots();
   }catch(e){alert(cErrMsg(e))}
+}
+async function taSCSaveRoster(scid,roster,s){
+  if(!window.SCC)return;const c=(window.TA_MYSC||[]).find(x=>x.id===scid)||{};const yr=SCC.schoolYear(s.date||new Date().toISOString().slice(0,10));const id=scid+'_'+yr;const FV=firebase.firestore.FieldValue;
+  const pr=await DB.collection('scRosters').doc(id).get();const mem=pr.exists?((pr.data().members||[]).slice()):[];const have={};mem.forEach(m=>{have[String(m.name||'').replace(/\s+/g,'')+'|'+(m.birth||'')]=1});
+  let add=0;(roster||[]).forEach(r=>{if(!r||!r.name||r.self)return;const k=String(r.name).replace(/\s+/g,'')+'|'+(r.birth||'');if(have[k])return;have[k]=1;mem.push({name:r.name,birth:r.birth||'',grade:SCC.gradeOf(yr,r.birth,c.level||''),gender:r.gender==='여'||r.gender==='여자'?'여':(r.gender?'남':''),imp:'comp:'+TA_ID});add++});
+  if(!add)return;
+  const pub=mem.map(m=>({n:SCC.mask(m.name),g:m.grade||'',s:m.gender||'',imp:m.imp||''}));
+  await DB.collection('scRosters').doc(id).set({scid:scid,year:yr,members:mem,updatedAt:FV.serverTimestamp()},{merge:true});
+  const ps=await DB.collection('scSeasons').doc(id).get();
+  await DB.collection('scSeasons').doc(id).set(Object.assign({scid:scid,year:yr,roster:pub,rosterN:pub.length,updatedAt:FV.serverTimestamp()},(ps.exists&&ps.data().count)?{}:{count:pub.length}),{merge:true});
 }
 // 신청 후 서면 동의서 추가 업로드
 // [동의서 관리 2026-09-10] 파일 썸네일·유지 체크 (팀 신청 창의 기존 파일 목록)

@@ -153,7 +153,7 @@ async function rsLoad(){
     ]);
     ITEMS=[];
     if(a)a.docs.forEach(d=>{const x=d.data();if(!(x.awards&&x.awards.length)&&!(x.stats&&x.stats.teams))return;ITEMS.push({id:'r_'+d.id,src:'fed',title:x.title||'',date:x.date||'',endDate:x.endDate||'',organizer:'대한민국플라잉디스크연맹',place:x.place||'',sport:x.sport||'',awards:x.awards||[],stats:x.stats||{},summary:x.summary||''})});
-    if(b)b.docs.forEach(d=>{const x=d.data();ITEMS.push({id:'s_'+d.id,src:'school',title:x.competitionName||'',date:x.date||'',organizer:x.organizer||'',place:'',sport:x.sport||'',divisions:x.divisions||{},sido:x.sido||''})});
+    if(b)b.docs.forEach(d=>{const x=d.data();if(x.source==='kfdf')return;ITEMS.push({id:'s_'+d.id,src:'school',title:x.competitionName||'',date:x.date||'',organizer:x.organizer||'',place:'',sport:x.sport||'',divisions:x.divisions||{},sido:x.sido||''})});
     ITEMS.sort((a2,b2)=>String(b2.date||'').localeCompare(String(a2.date||'')));
     rsRender();
     const id=new URLSearchParams(location.search).get('id');if(id)rsOpen(id);
