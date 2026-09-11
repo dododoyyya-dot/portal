@@ -7636,19 +7636,18 @@ function utExtraPatch(v,at){
   const p={};const mc=String(v.memberClass||'');const minor=isMinorNow(v.birth);
   if(at==='student'){if(mc)p.memberClass='';if(minor!==false)p.isMinor=true}
   else if(at==='athlete'){if(mc.indexOf('선수')!==0)p.memberClass='선수·무소속'}
-  else if(at==='general'){if(mc&&['학부모','서포터즈','협력기관'].indexOf(mc)<0)p.memberClass=''}
-  else if(mc)p.memberClass='';
+  else if(mc.indexOf('선수')===0)p.memberClass='';   // 일반·지도자·교사 등: 「선수·…」만 지움 (학부모·서포터즈·협력기관 표시는 겸할 수 있어 유지)
   if(at!=='student'&&v.isMinor&&minor===false)p.isMinor=false;
   return p;
 }
 // [유형 변경 정리] 소속 클럽의 임시회원 표시 — 보호자 미연동 미성년 학생이면 tempUids 에 넣고, 성인 유형이 되면 뺍니다
-function utNeedTemp(v){return (v.accountType==='student'||v.memberGroup==='student')&&!v.guardianUid&&isMinorNow(v.birth)!==false}
+function utNeedTemp(v){const stu=(v.accountType==='student'||v.memberGroup==='student');const m=isMinorNow(v.birth);return !v.guardianUid&&((stu&&m!==false)||m===true)}   // 보호자 미연동 + (학생 유형 또는 생년월일상 미성년)
 async function utSyncClubTemp(uid,v){
   const need=utNeedTemp(v);const FV=firebase.firestore.FieldValue;
   const s=await DB.collection('clubs').where('memberUids','array-contains',uid).get();let changed=0;
   for(const d of s.docs){const c=d.data()||{};const has=(c.tempUids||[]).indexOf(uid)>=0;
     if(need&&!has){await d.ref.update({tempUids:FV.arrayUnion(uid)});changed++}
-    else if(!need&&has&&!(v.accountType==='student'||v.memberGroup==='student')){await d.ref.update({tempUids:FV.arrayRemove(uid)});changed++}}
+    else if(!need&&has&&isMinorNow(v.birth)===false){await d.ref.update({tempUids:FV.arrayRemove(uid)});changed++}}   // 해제는 생년월일상 성인일 때만
   return {clubs:s.size,changed:changed};
 }
 // ══ [유형 변경 정리 도구] 이미 남은 옛 표시 정리 — 미리보기(쓰기 0) → 백업 JSON → 1명 시험 → 전체 ══
@@ -7661,7 +7660,7 @@ async function utCleanScan(){
     USERS.forEach(d=>{const v=d.data()||{};if(v.deleted)return;const at=v.accountType||uTypeOf(v);
       const p=utExtraPatch(Object.assign({},v),at);delete p.isMinor;   // 미성년 표시는 도구에서 건드리지 않음(성인 전환 도구 몫)
       const clubs=[];cs.docs.forEach(c=>{const x=c.data()||{};if((x.memberUids||[]).indexOf(d.id)<0)return;const has=(x.tempUids||[]).indexOf(d.id)>=0;const need=utNeedTemp(Object.assign({},v,{accountType:at}));
-        if(need&&!has)clubs.push({id:c.id,name:x.name||'',op:'add'});else if(!need&&has&&at!=='student')clubs.push({id:c.id,name:x.name||'',op:'remove'})});
+        if(need&&!has)clubs.push({id:c.id,name:x.name||'',op:'add'});else if(!need&&has&&isMinorNow(v.birth)===false)clubs.push({id:c.id,name:x.name||'',op:'remove'})});
       if(Object.keys(p).length||clubs.length)items.push({uid:d.id,name:v.name||'',at:at,mc:v.memberClass||'',patch:p,clubs:clubs})});
     UTC={items:items,backed:false,done:{}};
     b.innerHTML='<b style="font-size:15px">🧩 유형 변경 후 남은 표시 정리 — 미리보기 (쓰기 0건)</b>'
