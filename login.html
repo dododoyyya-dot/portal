@@ -558,7 +558,7 @@ function setSignupType(t){
   if(gs)gs.style.display=(t==='general')?'':'none';
   if(t==='general')setGenSub(GEN_SUB);
   // [학생회원] 휴대폰 인증 없이 번호만 기입(보호자 번호 가능) · 이메일 선택
-  (function(){const st=(t==='student');const pvb=document.getElementById('phoneVerifyBox');if(pvb)pvb.style.display=st?'none':'';const prh=document.getElementById('phoneReqHint');if(prh){prh.textContent=st?'— 학생회원은 인증 없이 기입 (보호자 연락처도 가능)':'— 본인 휴대폰 인증 필수'}const el=document.getElementById('aEmailLbl');if(el&&M==='S')el.textContent=st?'이메일 (선택)':'이메일';const sh=document.getElementById('sEmailHint');if(sh)sh.textContent=st?'— 없으면 비워 두세요 (아이디로 로그인)':'— 비밀번호 찾기·안내 발송에 사용'})();
+  (function(){const st=(t==='student');const pvb=document.getElementById('phoneVerifyBox');if(pvb)pvb.style.display='';const prh=document.getElementById('phoneReqHint');if(prh){prh.textContent=st?'— 본인 또는 보호자 휴대폰으로 인증 (형제자매는 같은 번호 가능)':'— 본인 휴대폰 인증 필수'}const el=document.getElementById('aEmailLbl');if(el&&M==='S')el.textContent=st?'이메일 (선택)':'이메일';const sh=document.getElementById('sEmailHint');if(sh)sh.textContent=st?'— 없으면 비워 두세요 (아이디로 로그인)':'— 비밀번호 찾기·안내 발송에 사용'})();
   const box=document.getElementById('typeInfoBox');
   const inf=MTYPE_INFO[t]||MTYPE_INFO.instructor;
   box.style.background=inf.bg;box.style.border=inf.bd;box.style.color=inf.fg;box.innerHTML=inf.html;
@@ -813,10 +813,10 @@ function aaSave(){return AA.map(a=>AA_FULL[a.s]+' '+a.g)}
 function aaRegions(){return [...new Set(AA.map(a=>AA_REG[a.s]))]}
 function aaBase(){if(!AA.length)return '';const a=AA[0];return AA_FULL[a.s]+(a.g==='전지역'?'':' '+a.g)}
 // ── 휴대폰 본인인증 (SMS) — 가입 필수. 인증된 전화계정에 이메일/비번을 연결하는 방식 ──
-let PHONE_CONFIRM=null, PHONE_VERIFIED_NUM=null, recaptchaVerifier=null;
+let PHONE_CONFIRM=null, PHONE_VERIFIED_NUM=null, recaptchaVerifier=null, PHONE_DETACHED=false;   // PHONE_DETACHED: 인증 번호가 다른 회원(보호자) 계정 소유 → 인증만 하고 별도 계정
 function e164KR(phone){const n=String(phone||'').replace(/[^0-9]/g,'');return n.charAt(0)==='0'?('+82'+n.slice(1)):('+82'+n);}
 function resetPhoneVerify(){
-  PHONE_VERIFIED_NUM=null;PHONE_CONFIRM=null;
+  PHONE_VERIFIED_NUM=null;PHONE_CONFIRM=null;PHONE_DETACHED=false;
   const cr=document.getElementById('codeRow');if(cr)cr.style.display='none';
   const sc=document.getElementById('sCode');if(sc){sc.value='';sc.disabled=false;}
   const b=document.getElementById('sendCodeBtn');if(b){b.disabled=false;b.textContent='📱 인증번호 받기';}
@@ -861,7 +861,7 @@ async function sendPhoneCode(){
   const phone=document.getElementById('sPhone').value.trim();
   if(!/^01[016789][-. ]?\d{3,4}[-. ]?\d{4}$/.test(phone)){msg.innerHTML='휴대전화 번호를 정확히 입력해주세요 (예: 010-1234-5678)';msg.style.color='#C41E2F';return;}
   const pnorm=phone.replace(/[^0-9]/g,'');
-  try{const dup=await DB.collection('phoneIndex').doc(pnorm).get();if(dup.exists){msg.innerHTML='이미 이 번호로 가입된 회원이 있습니다. 로그인하시거나 사무국(031-984-3248)으로 문의해주세요.';msg.style.color='#C41E2F';return;}}catch(e){}
+  if(SIGNUP_TYPE!=='student')try{const dup=await DB.collection('phoneIndex').doc(pnorm).get();if(dup.exists){msg.innerHTML='이미 이 번호로 가입된 회원이 있습니다. 로그인하시거나 사무국(031-984-3248)으로 문의해주세요.';msg.style.color='#C41E2F';return;}}catch(e){}   // [학생회원] 보호자 번호(형제자매 공유) 허용catch(e){}
   msg.innerHTML='인증번호 전송 중…';msg.style.color='var(--gray)';
   try{
     if(!recaptchaVerifier){recaptchaVerifier=new firebase.auth.RecaptchaVerifier('recaptcha-container',{size:'invisible'});}
@@ -887,9 +887,12 @@ async function verifyPhoneCode(){
   try{
     const result=await PHONE_CONFIRM.confirm(code);
     const u=result.user;
+    PHONE_DETACHED=false;
     if((u.providerData||[]).some(p=>p.providerId==='password')){
       await AUTH.signOut().catch(()=>{});PHONE_CONFIRM=null;
-      msg.innerHTML='이미 가입된 번호입니다. 로그인 화면에서 로그인해주세요.';msg.style.color='#C41E2F';return;
+      if(SIGNUP_TYPE!=='student'){msg.innerHTML='이미 가입된 번호입니다. 로그인 화면에서 로그인해주세요.';msg.style.color='#C41E2F';return;}
+      // [학생회원] 보호자(이미 회원)의 번호로 인증한 경우 — 번호 소유 확인만 하고 학생 계정은 따로 만듭니다
+      PHONE_DETACHED=true;
     }
     PHONE_VERIFIED_NUM=document.getElementById('sPhone').value.replace(/[^0-9]/g,'');
     msg.innerHTML='✅ <b style="color:#0f766e">휴대폰 본인인증 완료</b> — 아래 정보를 마저 입력하고 가입하기를 눌러주세요.';
@@ -913,7 +916,18 @@ async function idAvailable(id){
   return '';
 }
 async function idCheckLive(){const el=document.getElementById('sLoginId'),m=document.getElementById('sIdMsg');if(!el||!m)return;const id=KFDF_IDLOGIN.norm(el.value);el.value=id;if(!id){m.textContent='';return}if(!KFDF_IDLOGIN.valid(id)){m.textContent='영문 소문자·숫자·._- 4~20자로 입력하세요';m.style.color='#C41E2F';return}m.textContent='확인 중…';m.style.color='#8a919d';const r=await idAvailable(id);m.textContent=r||'사용할 수 있는 아이디입니다';m.style.color=r?'#C41E2F':'#0f766e'}
+// [연타 방지 2026-09-11] 처리 중에는 버튼을 잠급니다 — 학생회원 가입이 몇 초 걸리는 동안 버튼을 여러 번 눌러
+//   같은 아이디·이메일로 계정이 5~11개씩 생기던 것이 중복 가입의 실제 원인이었습니다(같은 사람이 3~10초 안에 생성).
+let __GO_BUSY=false;
 async function go(){
+  if(__GO_BUSY)return;
+  __GO_BUSY=true;
+  const _gb=document.getElementById('goBtn');const _gt=_gb?_gb.textContent:'';
+  if(_gb){_gb.disabled=true;_gb.textContent=(M==='S')?'가입 처리 중…':'로그인 중…'}
+  try{await go_()}
+  finally{__GO_BUSY=false;if(_gb&&!window.__SIGNUP_DONE){_gb.disabled=false;_gb.textContent=_gt}}
+}
+async function go_(){
   let email=document.getElementById('aEmail').value.trim(), pw=document.getElementById('aPw').value;
   if(M==='L'){if(!email||!pw)return say('아이디(또는 이메일)와 비밀번호를 입력하세요')}
   else{
@@ -1075,7 +1089,7 @@ async function go(){
       const pnorm=phone.replace(/[^0-9]/g,'');
       if(pnorm.length<10){say('휴대전화 번호를 정확히 입력해주세요');return}
       // 휴대폰 본인인증 필수 — 인증 완료된 번호와 입력 번호가 일치해야 가입 진행 (미인증이면 계정 생성 안 됨)
-      if(SIGNUP_TYPE!=='student'&&PHONE_VERIFIED_NUM!==pnorm){say('휴대폰 본인인증을 완료해주세요.\n[📱 인증번호 받기] → 문자 6자리 입력 → [확인] 순서로 인증하면 가입할 수 있습니다.');return}
+      if(PHONE_VERIFIED_NUM!==pnorm){say((SIGNUP_TYPE==='student'?'휴대폰 인증을 완료해주세요 (본인 또는 보호자 번호).':'휴대폰 본인인증을 완료해주세요.')+'\n[📱 인증번호 받기] → 문자 6자리 입력 → [확인] 순서로 인증하면 가입할 수 있습니다.');return}
       if(SIGNUP_TYPE!=='student')try{   // [학생회원] 보호자 번호를 적을 수 있어 중복 확인 생략
         const dup=await DB.collection('phoneIndex').doc(pnorm).get();
         if(dup.exists){say('이미 이 전화번호로 가입된 회원이 있습니다.\n기존 계정으로 로그인하시거나, 계정을 잊으셨으면 사무국(031-984-3248)으로 문의해주세요.');return}
@@ -1120,12 +1134,14 @@ async function go(){
       }
       // 인증된 전화계정에 이메일/비밀번호 연결 = 계정 생성. (본인인증을 통과해야만 여기 도달)
       // [학생회원] 인증 전화계정이 없으므로 이메일(또는 합성 주소)·비밀번호로 바로 계정 생성. 그 외 유형은 종전대로 인증된 전화계정에 연결
-      const cred=(SIGNUP_TYPE==='student')?await AUTH.createUserWithEmailAndPassword(email,pw):await AUTH.currentUser.linkWithCredential(firebase.auth.EmailAuthProvider.credential(email,pw));
+      // [학생회원 인증 복원 2026-09-11] 인증한 전화계정이 새 계정이면 거기에 연결(성인과 동일), 보호자 등 기존 회원의 번호였으면 별도 계정 생성
+      const _pu=AUTH.currentUser;const _canLink=!!(_pu&&(_pu.providerData||[]).some(p=>p.providerId==='phone')&&!(_pu.providerData||[]).some(p=>p.providerId==='password'));
+      const cred=(SIGNUP_TYPE==='student'&&!_canLink)?await AUTH.createUserWithEmailAndPassword(email,pw):await AUTH.currentUser.linkWithCredential(firebase.auth.EmailAuthProvider.credential(email,pw));
       const baseDoc={
         name:name, email:email,
         loginId:loginId, contactEmail:realEmail||'',   // [아이디 가입] 로그인 아이디 · 실제 연락 이메일(합성 주소 계정은 빈값)
         notifyEmail:!!(realEmail&&document.getElementById('sNotifyEmail')&&document.getElementById('sNotifyEmail').checked), notifyEmailAt:firebase.firestore.FieldValue.serverTimestamp(),
-        phone:phone,
+        phone:phone, phoneVerified:true, phoneShared:!!(SIGNUP_TYPE==='student'&&(PHONE_DETACHED||!_canLink)),   // [학생회원] phoneShared: 보호자 등 다른 회원 번호로 인증
         gender:gender, birth:birth,
         activityAreas:aaSave(), activityRegions:aaRegions(), baseCity:aaBase(),
         region:(aaRegions()[0]||'서울·경기'),
@@ -1220,13 +1236,13 @@ async function go(){
       }
       if(SIGNUP_TYPE==='student'){
         say('가입 신청 완료! 아이디 「'+loginId+'」 — 사무국 승인 후 이용할 수 있습니다. 다시 가입하지 마세요 (승인 전에도 이 아이디로 로그인하면 「승인 대기」로 표시됩니다). 아래에서 보호자와 연동해주세요.',true);
-        try{const _gb=document.getElementById('goBtn');if(_gb){_gb.disabled=true;_gb.textContent='가입 신청 완료';}}catch(e){}   // [중복 가입 차단] 같은 화면에서 버튼을 또 눌러 재신청하는 일 방지
+        window.__SIGNUP_DONE=true;try{const _gb=document.getElementById('goBtn');if(_gb){_gb.disabled=true;_gb.textContent='가입 신청 완료';}}catch(e){}   // [중복 가입 차단] 같은 화면에서 버튼을 또 눌러 재신청하는 일 방지
         document.getElementById('postSignupLink').style.display='block';
       }else if(SIGNUP_TYPE==='general'){
-        say('가입 신청 완료! 사무국 승인 후 이용할 수 있습니다. 강사 활동을 원하시면 마이페이지 → 강사 활동 지원에서 추가 정보를 입력해주세요.',true);
+        window.__SIGNUP_DONE=true;say('가입 신청 완료! 사무국 승인 후 이용할 수 있습니다. 강사 활동을 원하시면 마이페이지 → 강사 활동 지원에서 추가 정보를 입력해주세요.',true);
         setTimeout(()=>location.href='mypage.html',1800);
       }else{
-        say('가입 신청 완료! 사무국 승인 후 커뮤니티를 이용할 수 있습니다.',true);
+        window.__SIGNUP_DONE=true;say('가입 신청 완료! 사무국 승인 후 커뮤니티를 이용할 수 있습니다.',true);
         setTimeout(()=>location.href='mypage.html',1500);
       }
     }
