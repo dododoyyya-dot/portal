@@ -273,7 +273,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
           <option value="">연도 전체</option><option>2026</option><option>2025</option><option>2024</option><option>2023</option><option>2022</option><option>2021</option>
         </select>
         <input id="lsSearch" class="lcin" style="flex:1;min-width:180px" oninput="clearTimeout(window.__lsT);window.__lsT=setTimeout(renderLics,200)" placeholder="🔍 자격번호·성명 검색">
-        <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:#153A77;cursor:pointer;white-space:nowrap"><input type="checkbox" id="lsSelAll" style="width:auto;margin:0" onchange="lcSelAll(this.checked)"> 보이는 목록 전체 선택</label>
+        <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:#153A77;cursor:pointer;white-space:nowrap"><input type="checkbox" id="lsSelAll" style="width:auto;margin:0" onchange="lcSelAll(this.checked)"> 검색 결과 전체 선택</label>
         <span id="lsSelCnt" style="font-size:12px;font-weight:800;color:#0f766e;white-space:nowrap"></span>
         <button class="lcbtn ghost" id="lsSelClear" style="display:none" onclick="lcSelClear()">선택 해제</button>
         <button class="lcbtn p" onclick="printLicCerts('sel')" title="체크한 자격증을 한 번에 인쇄·PDF 저장 (취합 제출용)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M6 9V4h12v5"/><rect x="3" y="9" width="18" height="9" rx="2"/><path d="M7 14h10v6H7z"/></svg>선택 출력</button>
@@ -1793,6 +1793,10 @@ async function showLicMember(id){
       +'계속 뜨면 사무국에 문의해주세요.');
   }
 }
+// [성능 2026-09-11] 대장 3천여 건을 전부 카드로 그리면 화면 요소가 9만 개를 넘어 멈춥니다 → 100건씩 표시(더 보기/전체 보기)
+//   검색·필터를 바꾸면 처음 100건부터. '검색 결과 전체 선택'·'전체 출력'은 화면에 그린 것이 아니라 검색 결과 전체 기준(LC_VIEW)
+let LPAGE=100,__LSIG='',LC_VIEW=[];
+function lcMore(n){LPAGE=n?LPAGE+n:1e9;renderLics()}
 function renderLics(){
   const el=document.getElementById('licList');if(!el)return;
   const q=(document.getElementById('lsSearch').value||'').trim().toLowerCase();
@@ -1818,8 +1822,15 @@ function renderLics(){
     return true;
   });
   document.getElementById('lsCount').textContent=docs.length+'건';
-  if(!docs.length){el.innerHTML='<div class="bempty">발급된 자격이 없습니다.</div>';return}
-  const __rows=docs.map(d=>{
+  LC_VIEW=docs.filter(d=>LC_PRINTABLE(d.data())).map(d=>d.id);
+  if(!docs.length){el.innerHTML='<div class="bempty">발급된 자격이 없습니다.</div>';lcSelRefresh();return}
+  const __sig=[q,fr,fs,(document.getElementById('lsType')||{}).value||'',(document.getElementById('lsGrade')||{}).value||'',(document.getElementById('lsYear')||{}).value||''].join('|');
+  if(__sig!==__LSIG){__LSIG=__sig;LPAGE=100}
+  const __shown=docs.slice(0,LPAGE);
+  const __more=(docs.length>__shown.length)
+    ?'<div style="display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;padding:14px 0;font-size:13px;font-weight:800;color:#153A77">'+__shown.length+' / '+docs.length+'건 표시 · <button class="lcbtn b" onclick="lcMore(100)">100건 더 보기</button><button class="lcbtn ghost" onclick="lcMore(0)">전체 보기 (느릴 수 있음)</button></div>'
+    :'';
+  const __rows=__shown.map(d=>{
     const l=d.data();const expired=(l.status==='만료')||(l.expireAt?l.expireAt<today:true);
     return '<div class="lccard" style="padding:11px 16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div>'
       +'<b>'+esc(d.id)+'</b> · '+esc(l.name||l.maskName)+' · '+esc(l.type)+' '+esc(l.grade)
@@ -1839,6 +1850,7 @@ function renderLics(){
       +'</div></div>';
   });
   // [성능 2026-09-10] 대장이 길면 100건씩 나눠 그립니다
+  if(__more)__rows.push(__more);
   if(window.KFDF_CHUNK&&__rows.length>120)KFDF_CHUNK(el,__rows,{size:100,after:lcSelRefresh});else{el.innerHTML=__rows.join('');lcSelRefresh()}
 }
 // ── 자격 삭제 (중앙 전용 — 오발급·테스트 정리) ──
@@ -1959,14 +1971,14 @@ async function lcMemberOf(uid){
 }
 // [선택 유지 2026-09-10] 검색·필터로 목록을 다시 그려도 체크가 남도록 자격번호 집합으로 기억합니다
 const LC_SEL=new Set();
-function lcSelRefresh(){const c=document.getElementById('lsSelCnt'),b=document.getElementById('lsSelClear');if(c)c.textContent=LC_SEL.size?('선택 '+LC_SEL.size+'건'):'';if(b)b.style.display=LC_SEL.size?'':'none';const a=document.getElementById('lsSelAll');if(a){const vis=[...document.querySelectorAll('.lcsel')];a.checked=!!vis.length&&vis.every(x=>LC_SEL.has(x.value))}}
+function lcSelRefresh(){const c=document.getElementById('lsSelCnt'),b=document.getElementById('lsSelClear');if(c)c.textContent=LC_SEL.size?('선택 '+LC_SEL.size+'건'):'';if(b)b.style.display=LC_SEL.size?'':'none';const a=document.getElementById('lsSelAll');if(a){a.checked=!!LC_VIEW.length&&LC_VIEW.every(x=>LC_SEL.has(x))}}
 function lcSelToggle(no,on){if(on)LC_SEL.add(no);else LC_SEL.delete(no);lcSelRefresh()}
-function lcSelAll(on){document.querySelectorAll('.lcsel').forEach(c=>{c.checked=on;if(on)LC_SEL.add(c.value);else LC_SEL.delete(c.value)});lcSelRefresh()}
+function lcSelAll(on){LC_VIEW.forEach(no=>{if(on)LC_SEL.add(no);else LC_SEL.delete(no)});document.querySelectorAll('.lcsel').forEach(c=>{c.checked=LC_SEL.has(c.value)});lcSelRefresh()}   // [100건씩] 화면에 안 그린 검색 결과도 포함
 function lcSelClear(){LC_SEL.clear();document.querySelectorAll('.lcsel').forEach(c=>{c.checked=false});lcSelRefresh()}
 async function printLicCerts(which){
   let nos=[];
   if(which==='sel')nos=Array.from(LC_SEL);   // [선택 유지] 검색을 바꿔가며 고른 것도 모두 포함
-  else if(which==='all')nos=Array.from(document.querySelectorAll('.lcsel')).map(c=>c.value);   // 현재 필터로 보이는 목록
+  else if(which==='all')nos=LC_VIEW.slice();   // 현재 검색·필터 결과 전체 (100건씩 표시와 무관)
   else nos=[which];
   const docs=nos.map(n=>LICS.find(d=>d.id===n)).filter(d=>d&&LC_PRINTABLE(d.data()));
   if(!docs.length){alert(which==='sel'?'출력할 자격증을 먼저 체크해 주세요. (검색을 바꿔 가며 여러 명을 체크해도 선택이 유지됩니다)':'출력할 수 있는(관할) 자격증이 목록에 없습니다.');return}
