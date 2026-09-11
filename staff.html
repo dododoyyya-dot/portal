@@ -164,6 +164,7 @@ body.onepost #stWriteBox{display:none!important}   /* [1공고 1상세] PC 에�
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260821"></script>
+<script src="post_alert.js?v=20260911a"></script>
 <script src="career.js?v=20260907a"></script>
 <script src="site_config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -552,6 +553,7 @@ async function togglePostClosed(id){
 async function approvePost(id,ok){
   const p=POSTS.find(x=>x.id===id);if(!p)return;
   if(ok){await DB.collection('competitionStaff').doc(id).update({approved:true});
+    try{if(window.KFDF_POSTALERT&&!p.alertedAt){await KFDF_POSTALERT.push(DB,'staff',id,{title:p.competitionName,location:p.location,sido:p.sido||''},'staff.html?post='+id,SME.uid,SMY);await DB.collection('competitionStaff').doc(id).update({alertedAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{})}}catch(e){console.warn('postalert',e)}   // [공고 지역 알림] 승인되어 게시될 때
     KFDF.notify(p.author.uid,'✅ ['+p.competitionName+'] 심판·운영요원 모집 공고가 승인·게시되었습니다','staff.html');}
   else{
     const r=prompt('반려 사유를 입력하세요 (작성자에게 전달됩니다)');if(r===null)return;
@@ -1264,7 +1266,8 @@ async function savePost(editId){
     }else{
       data.approved=instant;
       data.createdAt=firebase.firestore.FieldValue.serverTimestamp();
-      await DB.collection('competitionStaff').add(data);
+      const _pref=await DB.collection('competitionStaff').add(data);
+      if(instant)try{if(window.KFDF_POSTALERT)await KFDF_POSTALERT.push(DB,'staff',_pref.id,{title:name,location:loc,sido:SMY.sido||''},'staff.html?post='+_pref.id,SME.uid,SMY)}catch(e){console.warn('postalert',e)}   // [공고 지역 알림] 즉시 게시될 때
     }
     document.getElementById('pfModal').remove();
     alert(editId?'✓ 수정되었습니다.':(instant?'✓ 공고가 등록·게시되었습니다.':'✓ 공고가 등록되었습니다.\n관리자 승인 후 게시됩니다.'));
@@ -2744,6 +2747,6 @@ async function copyRoster(id){
   </div>
 </div></footer>
 <script src="region_map.js?v=20260910a"></script>
-<script src="auth_ui.js?v=20260911a"></script>
+<script src="auth_ui.js?v=20260911b"></script>
 </body>
 </html>

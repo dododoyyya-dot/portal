@@ -1,4 +1,4 @@
-// v20260911a · 전 페이지 공용: ① 상단 메뉴 일괄 렌더(A안) ② 로그인/로그아웃 전환 ③ 알림 배지
+// v20260911b · 전 페이지 공용: ① 상단 메뉴 일괄 렌더(A안) ② 로그인/로그아웃 전환 ③ 알림 배지
 (function(){
   var CFG={apiKey:"AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",authDomain:"koreaflyingdiscfederation.firebaseapp.com",projectId:"koreaflyingdiscfederation",appId:"1:1081847355343:web:ca40ed9a52e13f607f64ba"};
 
@@ -316,6 +316,7 @@
         el.onclick=function(e){e.preventDefault();if(confirm('로그아웃 할까요?'))firebase.auth().signOut().then(function(){location.href='index.html'})};
         badge(u);
         safetyPill(u);
+        setTimeout(function(){postPull(u)},3500);   // [공고 지역 알림] 들어올 때 내 활동 지역의 새 공고 확인 (2시간에 한 번)
         if(!firebase.firestore){
           var s3=document.createElement('script');
           s3.src='https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js';
@@ -325,6 +326,13 @@
         el.textContent='로그인';el.href='login.html';el.onclick=null;
       }
     });
+  }
+  function postPull(u){
+    try{
+      var go=function(){if(!(window.firebase&&firebase.firestore&&window.KFDF_POSTALERT))return;var db=firebase.firestore();
+        db.collection('users').doc(u.uid).get().then(function(d){if(!d.exists)return;return KFDF_POSTALERT.pull(db,u.uid,d.data()).then(function(n){if(n)badge(u)})}).catch(function(){})};
+      if(window.KFDF_POSTALERT)go();else{var s=document.createElement('script');s.src='post_alert.js?v=20260911a';s.onload=go;document.head.appendChild(s)}
+    }catch(e){}
   }
   if(window.firebase&&firebase.auth){ready();return}
   var s1=document.createElement('script');

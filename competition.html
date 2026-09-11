@@ -305,6 +305,7 @@ body[data-view] #secLive>.sec-label,body[data-view] #secLive>.sec-title,body[dat
 <script src="kfdf.js?v=20260821"></script>
 <script src="career.js?v=20260907a"></script>
 <script src="schoolclub_core.js?v=20260911b"></script>
+<script src="post_alert.js?v=20260911a"></script>
 <script src="site_config.js"></script>
 <script>
 KFDF.initApp();
@@ -622,7 +623,8 @@ async function saveSoPost(editId){
     if(editId){
       await DB.collection('compSlots').doc(editId).update(data);
     }else{
-      await DB.collection('compSlots').add(Object.assign({claimed:[],cancels:[],confirmed:[],createdAt:firebase.firestore.FieldValue.serverTimestamp()},data));
+      const _sref=await DB.collection('compSlots').add(Object.assign({claimed:[],cancels:[],confirmed:[],createdAt:firebase.firestore.FieldValue.serverTimestamp()},data));
+      try{if(window.KFDF_POSTALERT)await KFDF_POSTALERT.push(DB,'staff',_sref.id,{title:title,region:region,bySido:CMY.sido||''},'competition.html?slot='+_sref.id,CME.uid,CMY)}catch(e){console.warn('postalert',e)}   // [공고 지역 알림]
     }
     document.getElementById('soModal').remove();
     alert((editId?'✓ 수정되었습니다.':'✓ 모집공고가 등록되었습니다.')+'\n대회 페이지에 바로 게시됩니다.');
@@ -3091,7 +3093,9 @@ async function cc2Save(){
       const cref=await DB.collection('competitions').add(Object.assign({},base,{slotIds:[sref.id],eventId:ev.id,
         byUid:uid,createdAt:firebase.firestore.FieldValue.serverTimestamp()}));
       await DB.collection('compSlots').doc(sref.id).update({compId:cref.id}).catch(()=>{});
-      alert('🏆 대회 공고가 등록되었습니다!\n· 참가 모집 공고 게시 + 캘린더 등재 완료\n· 심판·운영요원 모집은 심판·운영 공고에서 「상위 대회 불러오기」로 등록하세요.');
+      // [공고 지역 알림] 대회 지역(관할 시도·장소)과 활동 지역이 맞는 회원에게 알림 (학생·미성년 제외)
+      let _pa='';try{if(window.KFDF_POSTALERT){const r=await KFDF_POSTALERT.push(DB,'comp',sref.id,{title:title,region:sido,sido:sido,place:place},'competition.html?slot='+sref.id,CME.uid,CMY);if(r.sidos)_pa='\n· 활동 지역이 맞는 회원 '+r.sent+'명에게 알림을 보냈습니다'}}catch(e){console.warn('postalert',e)}
+      alert('🏆 대회 공고가 등록되었습니다!'+_pa+'\n· 참가 모집 공고 게시 + 캘린더 등재 완료\n· 심판·운영요원 모집은 심판·운영 공고에서 「상위 대회 불러오기」로 등록하세요.');
     }
     document.getElementById('cc2Modal').remove();
     loadSlots();loadLiveComps();cc2LoadMine();
@@ -4362,6 +4366,6 @@ function tbRemoveMember(ti,mi){
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="region_map.js?v=20260910a"></script>
-<script src="auth_ui.js?v=20260911a"></script>
+<script src="auth_ui.js?v=20260911b"></script>
 </body>
 </html>
