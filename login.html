@@ -946,6 +946,22 @@ async function go(){
       if(!realEmail&&SIGNUP_TYPE!=='student')return say('이메일을 입력하세요 (비밀번호 찾기·안내 발송에 사용됩니다)');
       email=realEmail||(loginId+KFDF_IDLOGIN.DOM_MEMBER);
       const idTaken=await idAvailable(loginId);if(idTaken)return say(idTaken);
+      // [중복 가입 차단 2026-09-11] 같은 성명·생년월일로 이미 가입(신청)된 계정이 있으면 새 계정을 만들지 않습니다
+      //   ① 이 기기에서 가입 신청한 기록(브라우저 저장소) ② 회원 색인 memberKeys(성명|생년월일, kind:self — 규칙 v26에서 가입 전 단건 조회 허용)
+      //   학생회원은 휴대폰 인증이 없어 아이디만 바꿔 같은 정보로 여러 번 신청되던 문제. 관리자 「가입 점검」(중복 정리)과 함께 운용
+      window.__MK_ABSENT=false;
+      {
+        const _bd=((document.getElementById('sBirth')||{}).value||'').trim();
+        if(_bd){
+          const _mk=name.replace(/\s+/g,'')+'|'+_bd;
+          let _prev=null;try{_prev=JSON.parse(localStorage.getItem('kfdf_signup_'+_mk)||'null')}catch(e){}
+          if(_prev&&_prev.loginId)return say('이 기기에서 이미 같은 성명·생년월일로 가입 신청했습니다 (아이디: '+_prev.loginId+' · '+String(_prev.at||'').slice(0,10)+').\n다시 가입하지 말고 [로그인] 탭에서 그 아이디로 로그인해 주세요. 승인 전에는 「승인 대기」로 표시되며, 사무국 승인 후 이용할 수 있습니다.\n아이디·비밀번호를 잊었다면 사무국으로 문의해 주세요.');
+          try{const _ex=await DB.collection('memberKeys').doc(_mk).get();
+            if(_ex.exists&&(_ex.data()||{}).kind!=='child')return say('같은 성명·생년월일로 이미 가입 신청된 계정이 있습니다.\n다시 가입하지 말고 [로그인] 탭에서 기존 아이디로 로그인해 주세요. 승인 전에는 「승인 대기」로 표시됩니다.\n아이디·비밀번호를 잊었다면 사무국으로 문의해 주세요.');
+            window.__MK_ABSENT=!_ex.exists;
+          }catch(e){window.__MK_ABSENT=false}  // 규칙 미게시(권한 오류) 등 조회 실패 시에는 종전대로 진행
+        }
+      }
       if(!/^01[016789][-. ]?\d{3,4}[-. ]?\d{4}$/.test(phone)){say('휴대전화 번호를 확인해주세요 (예: 010-1234-5678)');return}
       const gender=document.getElementById('sGender').value;
       const birth=document.getElementById('sBirth').value;
@@ -1182,7 +1198,11 @@ async function go(){
       }catch(e){console.warn('employ upload',e)}
       await DB.collection('users').doc(cred.user.uid).set(Object.assign(baseDoc,typeDoc));
       // [회원 색인] 성명|생년월일 → 계정 (단체전 명단·대회 기록 자동 연동용). 실패해도 가입은 진행
-      try{if(name&&birth){const mk=name.replace(/\s+/g,'')+'|'+birth;const ref=DB.collection('memberKeys').doc(mk);const ex=await ref.get();if(!ex.exists)await ref.set({uid:cred.user.uid,kind:'self',name:name,minor:(SIGNUP_TYPE==='student'),at:firebase.firestore.FieldValue.serverTimestamp()})}}catch(e){console.warn('memberKeys',e)}
+      try{if(name&&birth){const mk=name.replace(/\s+/g,'')+'|'+birth;const ref=DB.collection('memberKeys').doc(mk);const _doc={uid:cred.user.uid,kind:'self',name:name,minor:(SIGNUP_TYPE==='student'),at:firebase.firestore.FieldValue.serverTimestamp()};
+        if(window.__MK_ABSENT)await ref.set(_doc);   // [중복 가입 차단] 가입 전 조회에서 없음이 확인된 경우 바로 기록 (승인 전 계정은 조회 권한이 없어 종전에는 기록되지 않던 문제)
+        else{const ex=await ref.get();if(!ex.exists)await ref.set(_doc)}}}catch(e){console.warn('memberKeys',e)}
+      // [중복 가입 차단] 이 기기에 가입 신청 기록(아이디·시각) 보관 — 같은 정보로 다시 가입하려 하면 기존 아이디를 안내
+      try{if(name&&birth)localStorage.setItem('kfdf_signup_'+name.replace(/\s+/g,'')+'|'+birth,JSON.stringify({loginId:loginId,at:new Date().toISOString()}))}catch(e){}
       // [아이디 가입] 아이디 → 로그인용 이메일 문서 (실제 이메일은 비밀번호로 잠가 저장, 합성 주소는 그대로)
       try{await DB.collection('loginIds').doc(loginId).set(realEmail?{uid:cred.user.uid,enc:await KFDF_IDLOGIN.enc(loginId,pw,realEmail),at:firebase.firestore.FieldValue.serverTimestamp()}:{uid:cred.user.uid,email:email,at:firebase.firestore.FieldValue.serverTimestamp()})}catch(e){console.warn('loginIds',e)}
       if(SIGNUP_TYPE!=='student')await DB.collection('phoneIndex').doc(pnorm).set({uid:cred.user.uid}).catch(()=>{}); // 개인정보 최소화: 이름 미저장(중복확인은 존재여부만 사용) · 학생회원은 보호자 번호일 수 있어 기록 생략
@@ -1199,7 +1219,8 @@ async function go(){
         if(window.__NC_UPLOAD_FAIL)alert('자격증 사본 업로드에 실패했습니다.\n가입은 완료되었으니, 마이페이지 → 내 정보에서 사본을 다시 첨부해 주세요. (첨부 전까지 승인 보류)');
       }
       if(SIGNUP_TYPE==='student'){
-        say('가입 신청 완료! 사무국 승인 후 이용할 수 있습니다. 아래에서 보호자와 연동해주세요.',true);
+        say('가입 신청 완료! 아이디 「'+loginId+'」 — 사무국 승인 후 이용할 수 있습니다. 다시 가입하지 마세요 (승인 전에도 이 아이디로 로그인하면 「승인 대기」로 표시됩니다). 아래에서 보호자와 연동해주세요.',true);
+        try{const _gb=document.getElementById('goBtn');if(_gb){_gb.disabled=true;_gb.textContent='가입 신청 완료';}}catch(e){}   // [중복 가입 차단] 같은 화면에서 버튼을 또 눌러 재신청하는 일 방지
         document.getElementById('postSignupLink').style.display='block';
       }else if(SIGNUP_TYPE==='general'){
         say('가입 신청 완료! 사무국 승인 후 이용할 수 있습니다. 강사 활동을 원하시면 마이페이지 → 강사 활동 지원에서 추가 정보를 입력해주세요.',true);

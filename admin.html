@@ -490,6 +490,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#0e7490" onclick="showInspections()">📋 점검 제출현황</button>
         <button class="btn-sub" style="background:#0f766e" onclick="backfillPhoneIndex()">📇 전화번호 중복확인 보정</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="ageMigScan()">🎓 만 18세 도달 학생 → 성인 전환</button>
+        <button class="btn-sub" style="background:#C41E2F" onclick="dupScan()" title="같은 성명·생년월일로 여러 번 가입된 계정을 하나만 남기고 정리 · 본인을 자녀로 등록한 계정 식별">👥 가입 점검 (중복 가입·본인 자녀등록)<span id="dupCntBadge" style="display:none;background:#fff;color:#C41E2F;border-radius:999px;padding:1px 7px;font-size:11px;margin-left:5px;font-weight:900"></span></button>
         <button class="btn-sub" style="background:#C41E2F" onclick="qualFixScan()">🎖 미검증 급수 정리</button>
         <button class="btn-sub" style="background:#1F4E9C" onclick="memberNoScan()">🔢 회원 고유번호 부여</button>
         <button class="btn-sub" style="background:#0e7490" onclick="typeFixScan()">🧩 회원 유형 누락 정리</button>
@@ -4385,12 +4386,17 @@ function showMemberModal(uid){
     rows.push(['👨‍👩‍👧 가족연동 (자녀 '+v.children.length+'명)',
       v.children.map((k,ci)=>{
         const kage=k.birth?ageNow(k.birth):null;
-        return '<div style="background:#f6f8fb;border-radius:8px;padding:8px 11px;margin-bottom:6px;font-size:12.5px;line-height:1.6">'
+        // [가입 점검] 본인을 자녀로 등록(같은 성명·생년월일) · 학생회원이 등록한 자녀 → 경고 + 삭제 버튼
+        const kSelf=(String(k.name||'').replace(/\s+/g,'')===String(v.name||'').replace(/\s+/g,'')&&String(k.birth||'')===String(v.birth||''));
+        const kStu=(v.accountType==='student'||v.memberGroup==='student')&&isMinorNow(v.birth)!==false;
+        return '<div style="background:'+((kSelf||kStu)?'#fdf2f2':'#f6f8fb')+';border-radius:8px;padding:8px 11px;margin-bottom:6px;font-size:12.5px;line-height:1.6">'
           +'<b>'+esc(k.name||'-')+'</b> <span style="color:#8a919d;font-size:11px">ID '+esc(k.cid||'-')+'</span>'
+          +(kSelf?' <span style="font-size:11px;font-weight:900;color:#fff;background:#C41E2F;padding:1px 8px;border-radius:999px">⚠ 본인을 자녀로 등록 — 삭제 필요</span>':(kStu?' <span style="font-size:11px;font-weight:900;color:#fff;background:#b8860b;padding:1px 8px;border-radius:999px">⚠ 학생회원이 등록한 자녀</span>':''))
           +'<div style="color:#555">'+esc(k.birth||'생년월일 미입력')+(kage!==null?' (만 '+kage+'세)':'')+' · '+esc(k.gender||'-')+(k.school?' · '+esc(k.school):'')+'</div>'
           +(k.childUid?'<div style="color:#0f766e;font-weight:700">🔑 본인 계정 연결됨'+(k.loginId?' — 로그인ID '+esc(k.loginId):'')+'</div>'
             :'<div style="color:#8a919d">계정 없음 (보호자가 입력한 정보만 등록)</div>')
           +'<button class="btn-sub" style="padding:2px 10px;font-size:11px;margin-top:4px;background:#153A77" onclick="editChildAdmin(\''+uid+'\','+ci+')">✏️ 자녀 정보 수정</button>'
+          +' <button class="btn-sub" style="padding:2px 10px;font-size:11px;margin-top:4px;background:#C41E2F" onclick="delChildAdmin(\''+uid+'\','+ci+')">🗑 자녀 항목 삭제</button>'
         +'</div>';
       }).join('')
     ]);
@@ -4910,7 +4916,7 @@ function renderSchoolGroups(){
         +'<div style="font-size:12.5px;color:#5b6472;margin-top:4px;line-height:1.7">'+g.members.map(m=>esc(m.name||'')+(m.birth?' <span style="color:#8a919d">('+schoolAge(m.birth)+')</span>':'')).join(' · ')+'</div></div>';
     }).join('');
 }
-function renderUsers(){
+function renderUsers(){try{dupBadge()}catch(e){}
   const el=document.getElementById('userList');
   // 시도 필터 선택 시에만 '권역 보정 포함' 옵션 노출
   (function(){
@@ -7321,6 +7327,100 @@ async function editChildAdmin(uid,idx){
     alert('✓ 자녀 정보를 수정했습니다.');
     showMemberModal(uid);
   }catch(e){alert('수정 실패: '+e.message)}
+}
+// ── [가입 점검 2026-09-11] 관리자가 자녀 항목 삭제 (본인을 자녀로 등록한 오류 등) — cid 기준 트랜잭션, 자녀 본인 계정은 건드리지 않음 ──
+async function delChildAdmin(uid,idx){
+  try{
+    if(typeof IS_SIDO!=='undefined'&&IS_SIDO){alert('시도연맹 임원은 자녀 항목을 삭제할 수 없습니다 — 중앙 사무국에 요청해 주세요.');return false}
+    const doc=await DB.collection('users').doc(uid).get();const d=doc.data()||{};const k=(d.children||[])[idx];
+    if(!k){alert('자녀 정보를 찾을 수 없습니다 (목록이 변경되었을 수 있어요 — 새로고침 후 다시 시도해주세요).');return false}
+    if(!confirm('['+(k.name||'')+' '+(k.birth||'')+'] 자녀 항목을 삭제할까요?\n(본인을 자녀로 잘못 등록한 경우 등. 자녀 본인 계정이 연결되어 있어도 그 계정은 그대로 남습니다)'))return false;
+    const ref=DB.collection('users').doc(uid);let ok=false;
+    await DB.runTransaction(async function(tx){
+      const snap=await tx.get(ref);const cur=(((snap.data()||{}).children)||[]).slice();let j=-1;
+      if(k.cid)j=cur.findIndex(function(x){return x.cid===k.cid});
+      else if(cur[idx]&&String(cur[idx].name||'')===String(k.name||'')&&String(cur[idx].birth||'')===String(k.birth||''))j=idx;
+      if(j<0)return;cur.splice(j,1);ok=true;tx.update(ref,{children:cur});
+    });
+    if(!ok){alert('그 사이 보호자가 자녀 명단을 변경해 삭제하지 못했습니다.\n새로고침 후 다시 시도해주세요.');return false}
+    alert('✓ 자녀 항목을 삭제했습니다.');
+    await loadUsers();const mo=document.getElementById('memModalOv');if(mo){closeMemberModal();showMemberModal(uid)}
+    return true;
+  }catch(e){alert('삭제 실패: '+e.message);return false}
+}
+// ══════════ [가입 점검 2026-09-11] 중복 가입(같은 성명·생년월일 계정 여러 개) 정리 + 본인을 자녀로 등록한 계정 식별 ══════════
+//   학생회원은 휴대폰 인증 없이 아이디만으로 가입되어, 같은 학생이 아이디만 바꿔 2~8건씩 신청하는 일이 생겼습니다.
+//   남길 계정 하나를 고르면 나머지는 휴지통(복구 가능)+「거절」로 보내고, 그 아이디로 로그인한 회원에게는 남긴 아이디로 로그인하라는 안내가 뜹니다.
+function dupKey(v){const n=String(v.name||'').replace(/\s+/g,'');const b=String(v.birth||'').trim();return (n&&b)?(n+'|'+b):''}
+function dupTs(t){try{return t&&t.toMillis?t.toMillis():(t?new Date(t).getTime():0)}catch(e){return 0}}
+function dupScore(v){let s=0;if(v.status==='approved')s+=100;if(v.guardianUid)s+=40;if(v.memberNo)s+=30;if(v.phone)s+=5;if(v.school||v.workSchool)s+=5;if(v.address)s+=5;if(v.contactEmail)s+=3;if(v.children&&v.children.length)s+=3;if(v.rejectReason)s-=20;return s}
+function dupGroups(){
+  const g={};USERS.forEach(d=>{const v=d.data()||{};if(v.deleted)return;const k=dupKey(v);if(!k)return;(g[k]=g[k]||[]).push({id:d.id,v:v})});
+  return Object.keys(g).filter(k=>g[k].length>1).map(k=>({key:k,list:g[k].sort((a,b)=>(dupScore(b.v)-dupScore(a.v))||(dupTs(a.v.createdAt)-dupTs(b.v.createdAt)))}));
+}
+function selfKidList(){
+  const out=[];
+  USERS.forEach(d=>{const v=d.data()||{};if(v.deleted)return;const me=dupKey(v);const stu=(v.accountType==='student'||v.memberGroup==='student')&&isMinorNow(v.birth)!==false;
+    (v.children||[]).forEach((k,i)=>{const kk=String(k.name||'').replace(/\s+/g,'')+'|'+String(k.birth||'').trim();const self=!!(me&&kk===me);if(self||stu)out.push({id:d.id,v:v,k:k,i:i,self:self,stu:stu})})});
+  return out;
+}
+function dupBadge(){const b=document.getElementById('dupCntBadge');if(!b)return;const n=dupGroups().length+selfKidList().length;b.style.display=n?'':'none';b.textContent=n}
+function dupScan(){
+  const groups=dupGroups(),selfs=selfKidList();window.__DUPG=groups;
+  let ov=document.getElementById('dupOv');if(ov)ov.remove();
+  ov=document.createElement('div');ov.id='dupOv';ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:30px 12px;overflow:auto';
+  const typeName=v=>({general:'일반',athlete:'선수',student:'학생',instructor:'지도자',teacher:'교사',natcert:'국가자격'}[v.accountType]||v.accountType||'-');
+  const stName=v=>v.status==='approved'?'<b style="color:#0f766e">승인</b>':(v.status==='거절'?'<b style="color:#C41E2F">거절</b>':'<b style="color:#b8860b">승인 대기</b>');
+  const when=v=>{const t=dupTs(v.createdAt);return t?new Date(t).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'-'};
+  let h='<div style="background:#fff;border-radius:16px;max-width:980px;width:100%;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
+    +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h3 style="margin:0;font-size:17px">👥 가입 점검</h3><span style="flex:1"></span>'
+    +(groups.length?'<button class="btn-sub" style="background:#C41E2F" onclick="dupResolveAll()">추천(선택)대로 모두 정리 — '+groups.length+'건</button>':'')
+    +'<button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'dupOv\').remove()">닫기</button></div>'
+    +'<h4 style="margin:14px 0 4px;font-size:15px">① 중복 가입 계정 <span style="color:#C41E2F">'+groups.length+'건</span></h4>'
+    +'<p style="font-size:12.5px;color:#6b7280;line-height:1.7;margin:0 0 12px">같은 <b>성명·생년월일</b>로 만들어진 계정이 2개 이상이면 묶여 나옵니다. <b>남길 계정</b>을 고르고 정리하면 나머지는 휴지통(복구 가능)으로 가고 「거절」 상태가 되어, 그 아이디로 로그인한 회원에게 <b>남긴 아이디로 로그인하라는 안내</b>가 뜹니다. 남긴 계정에 보호자 연동이 없고 다른 계정에 있으면 연동 정보를 옮겨 옵니다. 정리 뒤 남긴 계정을 평소처럼 [승인]하면 됩니다.<br>추천 순서: 승인됨 › 보호자 연동 › 회원번호 › 정보 많은 순 › 먼저 가입한 순.</p>';
+  if(!groups.length)h+='<div style="padding:12px 14px;background:#f0f7f4;border-radius:10px;font-weight:800;color:#0f766e">✓ 중복 가입 계정이 없습니다.</div>';
+  groups.forEach((g,gi)=>{const n=g.key.split('|')[0],b=g.key.split('|')[1];
+    h+='<div style="border:1.5px solid #f1c7cc;border-radius:12px;padding:12px 14px;margin-bottom:10px"><div style="font-weight:900;font-size:14px;margin-bottom:6px">'+esc(n)+' <span style="color:#6b7280;font-weight:700;font-size:12.5px">'+esc(b)+' · 계정 '+g.list.length+'개</span></div>'
+      +g.list.map((x,xi)=>'<label style="display:flex;gap:10px;align-items:flex-start;padding:7px 10px;border-radius:9px;background:'+(xi===0?'#f0f7f4':'#f8f9fb')+';margin-bottom:5px;font-size:12.5px;cursor:pointer"><input type="radio" name="dupK'+gi+'" value="'+x.id+'"'+(xi===0?' checked':'')+' style="width:auto;margin-top:3px">'
+        +'<div style="flex:1;line-height:1.6"><b>'+esc(x.v.loginId||x.v.contactEmail||x.v.email||'-')+'</b> · '+typeName(x.v)+' · '+stName(x.v)+(xi===0?' <span style="font-size:11px;font-weight:900;color:#fff;background:#0f766e;padding:1px 8px;border-radius:999px">추천</span>':'')
+        +'<div style="color:#555">'+esc(when(x.v))+' 가입 · '+esc(x.v.phone||'-')+((x.v.school||x.v.workSchool)?' · '+esc(x.v.school||x.v.workSchool):'')+(x.v.guardianUid?' · <b style="color:#0f766e">보호자 연동</b>':'')+(x.v.memberNo?' · 회원번호 '+esc(x.v.memberNo):'')+((x.v.children&&x.v.children.length)?' · 자녀 '+x.v.children.length+'명':'')+(x.v.rejectReason?' · <span style="color:#C41E2F">거절 사유 있음</span>':'')+'</div>'
+        +'<a href="javascript:void(0)" onclick="showMemberModal(\''+x.id+'\')" style="font-size:11.5px;color:#153A77;font-weight:700">상세 보기</a></div></label>').join('')
+      +'<button class="btn-sub" style="background:#C41E2F;margin-top:4px" onclick="dupResolve('+gi+').then(async ok=>{if(ok){await loadUsers();dupScan()}})">선택한 계정만 남기고 나머지 정리</button></div>'});
+  h+='<h4 style="margin:18px 0 4px;font-size:15px">② 본인을 자녀로 등록했거나 학생회원이 자녀를 등록한 계정 <span style="color:#C41E2F">'+selfs.length+'건</span></h4>'
+    +'<p style="font-size:12.5px;color:#6b7280;line-height:1.7;margin:0 0 10px">학생(미성년) 본인이 「자녀 등록」에 자기 정보를 넣은 경우입니다. 자녀 항목을 삭제하고, 보호자가 있으면 <b>보호자 본인 계정</b>에서 연동 코드를 발급해 학생 계정에 입력하도록 안내해 주세요. (학생회원 계정에서는 이제 자녀 등록 칸이 숨겨지고 본인 정보는 등록되지 않습니다)</p>';
+  if(!selfs.length)h+='<div style="padding:12px 14px;background:#f0f7f4;border-radius:10px;font-weight:800;color:#0f766e">✓ 해당 계정이 없습니다.</div>';
+  selfs.forEach(s=>{h+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 12px;border:1.5px solid #f1c7cc;border-radius:10px;margin-bottom:6px;font-size:12.5px"><b>'+esc(s.v.name||'')+'</b> <span style="color:#6b7280">'+esc(s.v.birth||'')+' · '+typeName(s.v)+' · '+esc(s.v.loginId||s.v.email||'')+' · '+stName(s.v)+'</span>'
+    +'<span style="font-weight:900;color:#C41E2F">'+(s.self?'본인을 자녀로 등록':'학생회원의 자녀 등록')+'</span><span style="color:#555">→ 자녀 항목: '+esc(s.k.name||'')+' '+esc(s.k.birth||'')+(s.k.school?' · '+esc(s.k.school):'')+'</span><span style="flex:1"></span>'
+    +'<button class="btn-sub" style="background:#C41E2F;padding:4px 12px;font-size:12px" onclick="delChildAdmin(\''+s.id+'\','+s.i+').then(ok=>{if(ok)dupScan()})">🗑 자녀 항목 삭제</button><button class="btn-sub" style="background:#153A77;padding:4px 12px;font-size:12px" onclick="showMemberModal(\''+s.id+'\')">상세</button></div>'});
+  h+='</div>';ov.innerHTML=h;ov.addEventListener('click',e=>{if(e.target===ov)ov.remove()});document.body.appendChild(ov);
+}
+async function dupResolve(gi,silent){
+  if(typeof IS_SIDO!=='undefined'&&IS_SIDO){alert('중복 가입 정리는 중앙 사무국만 할 수 있습니다.');return false}
+  const g=(window.__DUPG||[])[gi];if(!g)return false;
+  const sel=document.querySelector('input[name="dupK'+gi+'"]:checked');const keepId=sel?sel.value:g.list[0].id;
+  const keep=g.list.find(x=>x.id===keepId);const others=g.list.filter(x=>x.id!==keepId);if(!keep||!others.length)return false;
+  const keepLogin=keep.v.loginId||keep.v.contactEmail||keep.v.email||'';
+  if(!silent&&!confirm('['+(keep.v.name||'')+' '+(keep.v.birth||'')+']\n남길 계정: '+keepLogin+'\n정리(휴지통·거절): '+others.map(x=>x.v.loginId||x.v.email||x.id).join(', ')+'\n\n진행할까요?'))return false;
+  const FV=firebase.firestore.FieldValue;const by=(firebase.auth().currentUser||{}).email||'';
+  const reason='중복 가입 정리 — 같은 성명·생년월일로 여러 번 가입 신청되어 하나만 남겼습니다. 아이디 「'+keepLogin+'」 로 로그인해 주세요. (이 계정은 사용하지 않습니다)';
+  const b=DB.batch();
+  others.forEach(x=>{
+    b.update(DB.collection('users').doc(x.id),{deleted:true,deletedAt:FV.serverTimestamp(),delBy:by,dupOf:keepId,dupKeepId:keepLogin,status:'거절',rejectReason:reason,rejectedAt:FV.serverTimestamp()});
+    b.set(DB.collection('notifications').doc(),{toUid:x.id,title:'👥 '+reason,link:'mypage.html',read:false,createdAt:FV.serverTimestamp()});
+  });
+  const kp={dupMergedAt:FV.serverTimestamp(),dupMergedFrom:others.map(x=>x.id)};
+  if(!keep.v.guardianUid){const src=others.find(x=>x.v.guardianUid);if(src){kp.guardianUid=src.v.guardianUid;kp.guardianName=src.v.guardianName||'';kp.guardianLinkedAt=src.v.guardianLinkedAt||FV.serverTimestamp()}}
+  b.update(DB.collection('users').doc(keepId),kp);
+  try{await b.commit()}catch(e){alert('정리 실패: '+e.message);return false}
+  // 회원 색인(성명|생년월일 → 남긴 계정). 규칙 v26 이전에는 권한 오류가 날 수 있어 실패해도 무시
+  try{await DB.collection('memberKeys').doc(g.key).set({uid:keepId,kind:'self',name:keep.v.name||'',minor:!!(keep.v.accountType==='student'||keep.v.memberGroup==='student'),at:FV.serverTimestamp(),by:'admin'})}catch(e){}
+  return true;
+}
+async function dupResolveAll(){
+  const gs=window.__DUPG||[];if(!gs.length)return;
+  if(!confirm('중복 그룹 '+gs.length+'건을 모두 선택(추천)된 계정만 남기고 정리할까요?\n나머지 계정은 휴지통으로 가며 복구할 수 있습니다.'))return;
+  let n=0;for(let i=0;i<gs.length;i++){if(await dupResolve(i,true))n++}
+  alert('✓ '+n+'건 정리 완료');await loadUsers();dupScan();
 }
 // ── 회원 유형 변경 — 카드형 선택창. 다른 종목 국가자격으로 잘못 가입한 경우 등 유형을 바로잡습니다.
 //    시도연맹 임원은 직접 반영하지 않고 중앙 결재 요청(pendingChanges, action editBasic)으로 접수됩니다.
