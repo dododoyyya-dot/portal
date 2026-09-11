@@ -293,6 +293,15 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#0f766e" onclick="exportInstructors()">⬇ 강사·요원 지원자 CSV</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="copyPhoneList('users')">📱 문자명단 복사 (현재 필터)</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="dupScan()" title="같은 성명·생년월일로 여러 번 가입된 계정을 하나만 남기고 정리 · 본인을 자녀로 등록한 계정 식별">👥 가입 점검 (중복 가입·본인 자녀등록)<span id="dupCntBadge" style="display:none;background:#fff;color:#C41E2F;border-radius:999px;padding:1px 7px;font-size:11px;margin-left:5px;font-weight:900"></span></button>
+        <!-- [재배치 2026-09-11] 회원 정리 도구 — 종전에는 강습 신청 관리 탭 도구줄에 있었음 -->
+        <button class="btn-sub" style="background:#0f766e" onclick="backfillPhoneIndex()">📇 전화번호 중복확인 보정</button>
+        <button class="btn-sub" style="background:#7c3aed" onclick="ageMigScan()">🎓 만 18세 도달 학생 → 성인 전환</button>
+        <button class="btn-sub" style="background:#C41E2F" onclick="qualFixScan()">🎖 미검증 급수 정리</button>
+        <button class="btn-sub" style="background:#1F4E9C" onclick="memberNoScan()">🔢 회원 고유번호 부여</button>
+        <button class="btn-sub" style="background:#0e7490" onclick="typeFixScan()">🧩 회원 유형 누락 정리</button>
+        <button class="btn-sub" style="background:#7c3aed" onclick="sidoKeyScan()">🗺 관할 시도 키 채우기</button>
+        <button class="btn-sub" style="background:#8a5a00" onclick="noBirthScan()">🎂 생년월일 미입력 회원</button>
+        <button class="btn-sub" style="background:#0e7490" onclick="ncWaiveScan()">🏅 국가자격 승인차단 해제</button>
         <details style="display:inline-block">
           <summary style="cursor:pointer;padding:9px 16px;background:#8a919d;color:#fff;border-radius:10px;font-weight:800;font-size:13.5px;list-style:none">🧰 관리 도구 더보기 ▾</summary>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;padding:10px;background:#f4f6f9;border-radius:10px">
@@ -303,6 +312,15 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
           </div>
         </details>
       </div>
+      <!-- [재배치 2026-09-11] 회원 정리 도구 결과 상자 -->
+      <div id="phoneIdxBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;white-space:pre-line;font-size:13px;line-height:1.8"></div>
+      <div id="ageMigBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
+      <div id="qualFixBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
+      <div id="memberNoBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
+      <div id="typeFixBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
+      <div id="sidoKeyBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
+      <div id="noBirthBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
+      <div id="ncWaiveBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
         <button class="btn-sub ufl on" data-f="전체" onclick="userFilter('전체',this)">전체 회원</button>
         <button class="btn-sub ufl" data-f="pending" onclick="userFilter('pending',this)" style="background:#8a919d">⏳ 승인 대기</button>
@@ -489,15 +507,7 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
         <button class="btn-sub" style="background:#153A77" onclick="dlGoodsCerts()">🧾 수령확인증 일괄 다운로드</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="showGigs()">🔎 단기공고 승인<span id="gigCntBadge" style="display:none;background:#C41E2F;border-radius:999px;padding:1px 7px;font-size:11px;margin-left:5px"></span></button>
         <button class="btn-sub" style="background:#0e7490" onclick="showInspections()">📋 점검 제출현황</button>
-        <button class="btn-sub" style="background:#0f766e" onclick="backfillPhoneIndex()">📇 전화번호 중복확인 보정</button>
-        <button class="btn-sub" style="background:#7c3aed" onclick="ageMigScan()">🎓 만 18세 도달 학생 → 성인 전환</button>
-        <button class="btn-sub" style="background:#C41E2F" onclick="qualFixScan()">🎖 미검증 급수 정리</button>
-        <button class="btn-sub" style="background:#1F4E9C" onclick="memberNoScan()">🔢 회원 고유번호 부여</button>
-        <button class="btn-sub" style="background:#0e7490" onclick="typeFixScan()">🧩 회원 유형 누락 정리</button>
-        <button class="btn-sub" style="background:#7c3aed" onclick="sidoKeyScan()">🗺 관할 시도 키 채우기</button>
         <button class="btn-sub" style="background:#8c1622" onclick="appKeyScan()">🏫 강습 신청서 관할 채우기</button>
-        <button class="btn-sub" style="background:#8a5a00" onclick="noBirthScan()">🎂 생년월일 미입력 회원</button>
-        <button class="btn-sub" style="background:#0e7490" onclick="ncWaiveScan()">🏅 국가자격 승인차단 해제</button>
         <button class="btn-sub" style="background:#8a919d" onclick="showTrash()">🗑 휴지통</button>
         <details style="display:inline-block">
           <summary style="cursor:pointer;padding:9px 16px;background:#8a919d;color:#fff;border-radius:10px;font-weight:800;font-size:13.5px;list-style:none">🧰 관리 도구 더보기 ▾</summary>
@@ -521,16 +531,8 @@ function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>
       <div id="supplyBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px"></div>
       <div id="inspBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px"></div>
       <div id="gigBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px"></div>
-      <div id="phoneIdxBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;white-space:pre-line;font-size:13px;line-height:1.8"></div>
-      <div id="ageMigBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
-      <div id="qualFixBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
-      <div id="memberNoBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
-      <div id="typeFixBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="appKeyBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px"></div>
-      <div id="sidoKeyBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="applyGateBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
-      <div id="noBirthBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
-      <div id="ncWaiveBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="trashBox" style="display:none;background:#faf8f4;border:1.5px solid #e5e0d8;border-radius:14px;padding:14px 18px;margin-bottom:14px"></div>
       <div id="instLinkBox" style="background:#f6f9f7;border:1.5px solid #cfe3d8;border-radius:14px;padding:14px 18px;margin-bottom:14px">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -2618,7 +2620,7 @@ function qualFixIsTarget(uid,v){
   return qualFixItems(uid,v).length>0;
 }
 function dashQualFix(){
-  try{ tab(3); }catch(e){}   // 정리 도구 상자가 [강습 신청 관리] 탭의 관리도구 모음 안에 있습니다
+  try{ tab(1); }catch(e){}   // 정리 도구 상자가 [회원 승인·목록] 탭 도구줄 아래에 있습니다 (2026-09-11 재배치)
   try{ qualFixScan(); }catch(e){}
   setTimeout(function(){const b=document.getElementById('qualFixBox');if(b)b.scrollIntoView({behavior:'smooth',block:'center'});},260);
 }
@@ -2767,7 +2769,7 @@ let NOBIRTH=[];
 function noBirthBoxEl(){const b=document.getElementById('noBirthBox');b.style.display='block';return b}
 function noBirthIsTarget(v){ return !v.deleted && !String(v.birth||'').trim(); }
 function dashNoBirth(){
-  try{ tab(3); }catch(e){}
+  try{ tab(1); }catch(e){}   // 2026-09-11 재배치
   try{ noBirthScan(); }catch(e){}
   setTimeout(function(){const b=document.getElementById('noBirthBox');if(b)b.scrollIntoView({behavior:'smooth',block:'center'});},260);
 }
