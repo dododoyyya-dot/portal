@@ -113,6 +113,9 @@ function orgChip(o,region,title,fed){
 }
 const EDU_ROSTER='강다연,강수경,강유라,권남혁,권태수,권희찬,김나리,김나연,김남영,김다윤,김도야,김미영,김민정,김상훈,김선미,김성관,김연상,김연우,김영빈,김유진,김이현,김재우,김정심,김정희,김지아,김한효,김현서,남궁영민,노현정,류선주,문상우,문현민,박광열,박규미,박규성,박기정,박미리,박상명,박선희,박성곤,박영환,박주송,박찬혜,방서인,방수림,방수민,배성호,백지은,성연선,손성민,송희은,신고운이,신세란,신은상,신호철,안미진,안환기,양지선,엄혁주,여인찬,연선주,염정선,오주연,우소라,유정미,윤경희,윤연진,윤태경,은보라,이가영,이다봄,이대천,이소희,이솔지,이수환,이승훈,이영진,이영철,이용기,이은실,이은지,이재우,이재천,이지영,이한민,이현표,임성경,임아륜,장경숙,전경윤,전성현,정광섭,정예온,정인용,정지수,정진호,정창윤,조용대,조현숙,조혜진,조홍익,지미연,천관문,천효정,최문규,최윤형,최인향,최종선,최종은,최지안,최창훈,한문아,한미향,허지범,황규빈,황성하,황윤경,황인중'.split(',');
 function inRoster(n){return EDU_ROSTER.indexOf(String(n||'').replace(/\s/g,''))>=0}
+// [동명이인] 같은 이름으로 이미 이수 인증(edu2026)된 다른 회원 — 명단에는 같은 이름이 하나뿐이므로 두 번째부터는 동명이인 의심
+function eduClaimants(name,exceptUid){const n=String(name||'').replace(/\s/g,'');if(!n)return [];return (typeof USERS!=='undefined'?USERS:[]).filter(d=>{const v=d.data()||{};return d.id!==exceptUid&&!v.deleted&&v.edu2026===true&&String(v.name||'').replace(/\s/g,'')===n}).map(d=>({id:d.id,v:d.data()}))}
+function eduWho(v){return (v.name||'')+' ('+(v.birth||'생년월일 없음')+' · '+(v.baseCity||v.region||'-')+(v.phone?' · '+v.phone:'')+(v.workSchool?' · '+v.workSchool:'')+')'}
 </script>
 <style>
 .authbox{max-width:460px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:38px;box-shadow:0 14px 34px rgba(17,17,20,.06)}
@@ -4422,6 +4425,7 @@ function showMemberModal(uid){
     '<button class="btn-sub" style="background:'+(v.certDoc?'#0f766e':'#8a919d')+'" onclick="toggleCert(\''+uid+'\')">'+(v.certDoc?'자격확인 ✓':'자격확인 체크')+'</button>',
     '<button class="btn-sub" style="background:'+(v.safetyEdu?'#0f766e':'#8a919d')+'" onclick="toggleSafety(\''+uid+'\')">'+(v.safetyEdu?'안전교육 ✓':'안전교육 처리')+'</button>',
     ((v.submitDocs||{}).moonlight?'<button class="btn-sub" style="background:'+(((v.submitDocs||{}).moonlight||{}).status==='확인'?'#0f766e':'#8a919d')+'" onclick="moonDocSet(\''+uid+'\',\'확인\')">겸직허가서 '+(((v.submitDocs||{}).moonlight||{}).status==='확인'?'✓':'확인')+'</button><button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="moonDocSet(\''+uid+'\',\'반려\')">겸직허가서 반려</button>':''),
+    (v.status==='approved'?(v.edu2026?'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="revokeEdu(\''+uid+'\',\''+esc(v.name)+'\');closeMemberModal()">🎓 이수 취소</button>':'<button class="btn-sub" style="background:'+(inRoster(v.name)?'#0f766e':'#8a919d')+'" onclick="grantEdu(\''+uid+'\');closeMemberModal()">🎓 이수 인증 부여'+(inRoster(v.name)?' (명단 일치)':'')+'</button>'):''),
     '<button class="btn-sub" style="background:#7c3aed" onclick="resetMemberPw(\''+esc(v.email)+'\',\''+esc(v.name)+'\')">🔑 비밀번호 재설정메일</button>',
     '<button class="btn-sub" style="background:#b8860b" onclick="resetMemberPwManual(\''+uid+'\',\''+esc(v.name)+'\')">🔧 임시 비밀번호 직접 설정</button>',
     '<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delUser(\''+uid+'\',\''+esc(v.name)+'\');closeMemberModal()">🗑 삭제</button>'
@@ -5167,16 +5171,38 @@ async function auditEdu(){
   if(!rows.length){box.innerHTML='<b>이수 표시된 승인 회원이 없습니다.</b>';return}
   const bad=rows.filter(r=>!r.inList);
   const okNoCert=rows.filter(r=>r.inList&&!r.hasCert);
+  // [동명이인] 같은 이름으로 2명 이상 인증 — 명단에는 이름이 하나뿐이므로 한 명만 실제 이수자
+  const byName={};rows.forEach(r=>{const k=String(r.name||'').replace(/\s/g,'');(byName[k]=byName[k]||[]).push(r)});
+  const dupN=Object.keys(byName).filter(k=>byName[k].length>1);
+  const uinfo=uid=>{const d=USERS.find(x=>x.id===uid);return d?eduWho(d.data()):uid};
+  const dupHtml=dupN.length?'<div style="margin-top:14px;padding:12px 14px;background:#fff8e6;border:1.5px solid #f0d68a;border-radius:10px"><b style="color:#8a5a00">👥 같은 이름으로 2명 이상 이수 인증 — 동명이인 의심 '+dupN.length+'건 (실제 이수자 한 명만 남기고 취소)</b>'
+    +dupN.map(k=>'<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #f0d68a"><b>'+esc(k)+'</b> · '+byName[k].length+'명'+byName[k].map(r=>'<div style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:13px"><span style="flex:1">'+esc(uinfo(r.uid))+' · '+(r.hasCert?'이수증 있음':'이수증 없음')+' · '+r.pts+'P</span><button class="btn-sub" style="background:#C41E2F;font-size:12px;padding:5px 12px" onclick="revokeEdu(\''+r.uid+'\',\''+esc(r.name)+'\')">이수 취소</button></div>').join('')+'</div>').join('')+'</div>':'';
   box.innerHTML='<b style="font-size:15px">🔍 이수자 명단 대조 결과</b> <span style="font-size:13px;color:var(--gray)">(이수 표시 '+rows.length+'명 / 내장 명단 '+EDU_ROSTER.length+'명)</span>'
     +'<div style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap;font-size:13.5px">'
     +'<span>✅ 명단 일치: <b style="color:#0f766e">'+(rows.length-bad.length)+'명</b></span>'
     +'<span>⚠ 명단에 없음: <b style="color:#C41E2F">'+bad.length+'명</b></span>'
-    +'<span>🎓 이수증 발급 가능: <b>'+rows.filter(r=>r.hasCert).length+'명</b></span></div>'
+    +'<span>🎓 이수증 발급 가능: <b>'+rows.filter(r=>r.hasCert).length+'명</b></span>'+(dupN.length?'<span>👥 동명이인 의심: <b style="color:#8a5a00">'+dupN.length+'건</b></span>':'')+'</div>'+dupHtml
     +(bad.length?'<div style="margin-top:14px;padding:12px 14px;background:#fdf3f4;border:1.5px solid #f3c2c7;border-radius:10px"><b style="color:#C41E2F">⚠ 명단에 없는데 이수로 표시된 회원 — 확인 필요</b>'
       +bad.map(r=>'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px dashed #f3c2c7;font-size:13.5px"><b style="min-width:70px">'+esc(r.name)+'</b><span style="color:var(--gray)">'+esc(r.region)+' · '+r.pts+'P · '+(r.hasCert?'<b style="color:#C41E2F">이수증 발급됨</b>':'이수증 미발급')+'</span>'
         +'<button class="btn-sub" style="background:#C41E2F;font-size:12px;padding:6px 12px" onclick="revokeEdu(\''+r.uid+'\',\''+esc(r.name)+'\')">이수 취소</button></div>').join('')
       +'</div>':'<div style="margin-top:12px;color:#0f766e;font-weight:700">✅ 이상 없음 — 이수 표시된 회원 전원이 명단과 일치합니다.</div>')
     +(okNoCert.length?'<div style="margin-top:12px;font-size:13px;color:#b8860b">🎓 명단엔 있으나 이수증 코드 미생성 '+okNoCert.length+'명 — 위 "이수자 일괄 정리" 버튼을 누르면 생성됩니다.</div>':'');
+}
+// [동명이인] 승인 때 보류했던 이수 인증을 확인 후 수동 부여 (뱃지 + 50P + 활동이력 + 이수증)
+async function grantEdu(uid){
+  const d=USERS.find(x=>x.id===uid);if(!d){alert('회원 정보를 찾을 수 없습니다.');return}
+  const v=d.data();if(v.edu2026){alert('이미 이수 인증된 회원입니다.');return}
+  const others=eduClaimants(v.name,uid);
+  const msg='🎓 ['+eduWho(v)+'] 회원에게 2026 자율연수 이수 인증을 부여할까요?\n· 명단: '+(inRoster(v.name)?'일치':'없음 (명단 밖 — 이수 사실을 직접 확인한 경우만)')
+    +(others.length?'\n· ⚠ 같은 이름으로 이미 인증된 회원: '+others.map(x=>eduWho(x.v)).join(' / '):'')+'\n\n뱃지 + 50P + 이수증 검증코드가 발급됩니다.';
+  if(!confirm(msg))return;
+  try{
+    await DB.collection('users').doc(uid).update({edu2026:true,points:firebase.firestore.FieldValue.increment(50),eduGrantedAt:firebase.firestore.FieldValue.serverTimestamp(),eduGrantedBy:(CMY&&CMY.name)||'admin'});
+    await DB.collection('users').doc(uid).collection('activities').add({label:'2026 교원·지도자 자율연수 이수 인증',date:'2026.07.05',points:50,addedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await makeCert(uid,v.name);
+    await updateLeaderboard();
+    alert('✓ 이수 인증을 부여했습니다.');loadUsers();
+  }catch(e){alert('부여 실패: '+e.message)}
 }
 async function revokeEdu(uid,name){
   if(!confirm('['+name+'] 회원의 이수 자격을 취소합니다.\n- 이수 표시(edu2026) 해제\n- 이수증 검증코드 무효화\n- 지급된 연수 50P 회수\n계속할까요?'))return;
@@ -7595,13 +7621,27 @@ async function approve(uid){
   // [관할키 자동·2026-09-07] 승인 시 sidoKey 가 비어 있으면 거점·활동범위·주소·근무학교로 판정해 함께 저장 (매일 수동 도구를 누르지 않아도 되게). 판정 불가면 건드리지 않음.
   const _sk=(!d.sidoKey&&kfdfSidoKey(d))||'';
   const skPatch=_sk?{sidoKey:_sk,sidoKeyV:SIDOKEY_V,sidoKeyAt:firebase.firestore.FieldValue.serverTimestamp()}:{};
+  // [동명이인 2026-09-11] 명단은 이름만 있으므로, 같은 이름이 이미 인증돼 있으면 기본을 '인증 없이 승인'으로 둡니다.
+  //   예전에는 [취소]를 누르면 승인 자체가 중단돼 인증 없이 승인할 길이 없었습니다.
+  let withEdu=false;
   if(onRoster){
-    if(!confirm('📋 명단 일치 — ['+d.name+'] 연수 이수자 명단에 있습니다.\n이수 인증(🎓뱃지 + 50P + 이수증 발급)과 함께 승인할까요?'))return;
+    const others=eduClaimants(d.name,uid);
+    const msg=others.length
+      ?('⚠ 동명이인 확인 — ['+d.name+'] 이름은 이미 이수 인증을 받은 회원이 있습니다.\n'+others.map(x=>'  · '+eduWho(x.v)).join('\n')+'\n\n이번 가입자: '+eduWho(d)
+        +'\n\n1 = 이수 인증 없이 승인 (동명이인 · 권장)\n2 = 이 회원도 이수자로 인증하며 승인 (연수 명단에 같은 이름이 둘 이상임을 확인한 경우만)\n취소 = 승인 중단')
+      :('📋 명단 일치 — ['+d.name+'] 연수 이수자 명단에 있습니다.\n가입자: '+eduWho(d)
+        +'\n\n1 = 이수 인증(🎓뱃지 + 50P + 이수증)과 함께 승인\n2 = 이수 인증 없이 승인 (동명이인 등 — 나중에 회원 상세에서 부여 가능)\n취소 = 승인 중단');
+    const pick=prompt(msg,'1');if(pick===null)return;
+    withEdu=others.length?(pick.trim()==='2'):(pick.trim()!=='2');
+  }
+  if(onRoster&&withEdu){
     await DB.collection('users').doc(uid).update(Object.assign({status:'approved',edu2026:true,points:50},skPatch));
     await DB.collection('users').doc(uid).collection('activities').add({
       label:'2026 교원·지도자 자율연수 이수 인증',date:'2026.07.05',points:50,
       addedAt:firebase.firestore.FieldValue.serverTimestamp()});
     await makeCert(uid,d.name);
+  }else if(onRoster&&!withEdu){
+    await DB.collection('users').doc(uid).update(Object.assign({status:'approved',edu2026:false,eduSkipNote:'승인 시 이수 인증 보류(동명이인 등) '+new Date().toISOString().slice(0,10)},skPatch));
   }else if(d.edu2026){
     // 과거 자기신고 데이터가 남아있는데 명단엔 없는 경우 — 사무국 확인 후 예외 처리
     if(confirm('⚠ ['+d.name+'] 연수 이수로 표시되어 있으나 명단엔 없습니다!\n\n[확인] = 그래도 이수 인증으로 승인 (명단 누락 등 직접 확인한 경우만)\n[취소] = 이수 인증 없이 일반 승인')){
