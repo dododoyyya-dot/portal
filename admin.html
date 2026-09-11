@@ -4497,6 +4497,7 @@ function __lstart(){
   __LLREADY=new Promise(function(res,rej){
     let first=true;
     DB.collection('licenses').where('uid','>','').onSnapshot(function(snap){
+      if(first&&snap.metadata&&snap.metadata.fromCache)return;   // [캐시 응답 무시] 서버 응답으로 시작
       const m={};
       snap.docs.forEach(function(d){const l=d.data()||{};if(!l.uid||l.status==='이관')return;(m[l.uid]=m[l.uid]||[]).push({id:d.id,type:l.type||'',grade:l.grade||'',status:l.status||'',expireAt:l.expireAt||''})});
       LICMAP=m;
@@ -4573,6 +4574,9 @@ function __ustart(){
   __ULREADY=new Promise(function(res,rej){
     let first=true;const map=new Map();
     __ULIVE=DB.collection('users').orderBy('createdAt','desc').onSnapshot(function(snap){
+      // [캐시 응답 무시] 첫 응답이 메모리 캐시(예: 로그인 때 읽은 본인 계정 1건)로 먼저 올 수 있어, 서버 응답이 올 때까지 기다립니다
+      //   — 이 때문에 현황판이 '승인 대기 0 · 승인 회원 1' 로 그려지던 문제. 서버 응답 전에는 목록도 그리지 않습니다.
+      if(first&&snap.metadata&&snap.metadata.fromCache)return;
       snap.docChanges().forEach(function(ch){if(ch.type==='removed')map.delete(ch.doc.id);else map.set(ch.doc.id,__uwrap(ch.doc))});
       const all=snap.docs.map(function(d){let w=map.get(d.id);if(!w){w=__uwrap(d);map.set(d.id,w)}return w});
       TRASH.users=all.filter(function(d){return d.data().deleted});
