@@ -227,6 +227,7 @@ body[data-view] #clHead{display:none}
       </div>
     </div>
 
+    <div class="cl-panel teal" style="margin-top:20px"><div class="ph">학교 동아리를 찾으시나요?</div><div class="pd" style="margin-bottom:0">초·중·고 학교스포츠클럽은 따로 모았습니다. 학교별 대회 기록과 전적을 <a href="schoolclub.html" style="font-weight:800;color:#0f766e">학교스포츠클럽</a>에서 볼 수 있습니다.</div></div>
     <div class="cl-panel navy" style="margin-top:20px">
       <div class="ph">클럽 코드로 찾기 · 가입</div>
       <div class="pd">모든 클럽에는 생성 시 연맹이 발급하는 <b>클럽 코드</b>(예: 0001)가 부여됩니다. 코드를 알고 있다면 목록을 찾지 않고 바로 가입 신청할 수 있습니다.<br>KFDF 소속이 아닌 <b>타 단체(사단체) 클럽의 선수</b>도 연맹에서 발급받은 단체 코드를 입력해 회원으로 가입 신청할 수 있습니다.</div>
@@ -434,7 +435,7 @@ function clMapLab(){
 function clMapRender(){
   if(!window.KFDF_MAP||!document.getElementById('clMap'))return;
   const cnt={},sub={};
-  ALLCLUBS.forEach(d=>{const c=d.data();if(c.hidden||c.clubType==='external'||c.status!=='승인')return;
+  ALLCLUBS.forEach(d=>{const c=d.data();if(c.hidden||c.clubType==='external'||c.status!=='승인'||c.schoolClubId)return;   // [학교스포츠클럽] 연결된 학교 동아리는 학교스포츠클럽에서
     const r=KFDF_MAP.SIDO[c.sido]||'';if(!r)return;cnt[r]=(cnt[r]||0)+1;sub[r]=sub[r]||{};sub[r][c.sido]=(sub[r][c.sido]||0)+1});
   window.__clMap=KFDF_MAP.render('clMap',{mode:'single',selected:REG_F?[REG_F]:[],counts:cnt,subCounts:sub,sub:SIDO_F,
     onChange:sel=>{REG_F=(sel&&sel[0])||'';if(!REG_F||(SIDO_F&&KFDF_MAP.SIDO[SIDO_F]!==REG_F))SIDO_F='';if(window.__clMap)__clMap.setSub(SIDO_F);renderSido();renderClubs();clMapLab()},
@@ -472,7 +473,7 @@ function renderClubs(){
   const el=document.getElementById('clubList');
   const q=((document.getElementById('clSearch')||{}).value||'').trim().toLowerCase();
   const docs=ALLCLUBS.filter(d=>{const c=d.data();
-    if(c.hidden||c.clubType==='external'||(SIDO_F&&c.sido!==SIDO_F))return false;
+    if(c.hidden||c.clubType==='external'||c.schoolClubId||(SIDO_F&&c.sido!==SIDO_F))return false;   // [학교스포츠클럽] 연결된 학교 동아리 제외
     if(REG_F&&!SIDO_F&&window.KFDF_MAP&&(KFDF_MAP.SIDO[c.sido]||'')!==REG_F)return false;
     if(q&&[c.name,c.sido,c.gugun,c.intro].map(x=>String(x||'').toLowerCase()).join(' ').indexOf(q)<0)return false;
     return true});
@@ -1693,6 +1694,6 @@ function cmVsCard(m,done){
 function _kfdfBind(){try{if(!window.KFDF_VIEW)return;const tq=new URLSearchParams(location.search).get('tab');const byTab={'1':'mine','2':'find','3':'create','4':'meet'};const toTab={find:'2',create:'3',mine:'1',meet:'4'};KFDF_VIEW.apply({def:byTab[tq]||'find',menu:'클럽',menuHref:'club.html?view=find',views:{find:{title:'클럽 찾기 · 가입',desc:'시도·시군구별 클럽을 찾아 가입 신청합니다. 가입 승인은 클럽장이 합니다.'},create:{title:'클럽 만들기',desc:'승인 회원이면 클럽을 만들 수 있습니다. 연맹 승인 후 정식 클럽이 됩니다.'},mine:{title:'내 클럽 · 가입 승인',desc:'내가 속한 클럽과 가입 신청 현황을 관리합니다. 클럽장은 가입 승인·구성원 관리를 합니다.'},meet:{title:'클럽 교류전',desc:'클럽 간 교류전 도전장·결과·전적을 기록합니다.'}},onView:function(v){const t=document.getElementById('clTabs');if(t)t.classList.add('kv-tabs');if(typeof showClTab==='function')showClTab(toTab[v]||'2')}});}catch(e){console.warn("view",e)}}
 if(window.KFDF_VIEW)_kfdfBind();else document.addEventListener("DOMContentLoaded",_kfdfBind);
 </script>
-<script src="auth_ui.js?v=20260910b"></script>
+<script src="auth_ui.js?v=20260911a"></script>
 </body>
 </html>

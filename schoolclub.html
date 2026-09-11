@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>학교스포츠클럽 | 대한민국플라잉디스크연맹</title>
+<meta name="description" content="초·중·고 학교스포츠클럽 플라잉디스크 팀의 대회 기록·전적·학년도 명단">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="style.css?v=20260909b">
+<style>
+/* [학교스포츠클럽 2026-09-11] 클럽 화면과 같은 체육회 스타일 · 학교클럽 강조색 청록(#0f766e) */
+.sc-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:0 0 18px}
+.sc-kpi>div{background:#fff;border:1px solid #e5e9f2;border-radius:14px;padding:16px 18px 14px 20px;box-shadow:0 2px 10px rgba(20,29,81,.04);position:relative;overflow:hidden}
+.sc-kpi>div::after{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--kc,#0f766e)}
+.sc-kpi i{font-style:normal;display:block;font-size:12px;font-weight:800;color:#6b7280;letter-spacing:.3px}
+.sc-kpi b{display:block;font-size:26px;font-weight:900;color:#141d51;letter-spacing:-.5px;line-height:1.15;margin-top:4px;font-variant-numeric:tabular-nums}
+.sc-kpi b small{font-size:13px;font-weight:800;color:#6b7280;margin-left:2px}
+@media(max-width:760px){.sc-kpi{grid-template-columns:repeat(2,1fr);gap:8px}.sc-kpi b{font-size:21px}}
+.sc-find{display:grid;grid-template-columns:380px minmax(0,1fr);gap:20px;align-items:start}
+.sc-aside{position:sticky;top:76px}
+@media(max-width:980px){.sc-find{grid-template-columns:1fr}.sc-aside{position:static}}
+.sc-map{background:#fff;border:1px solid #e5e9f2;border-radius:16px;padding:12px 10px 8px;box-shadow:0 2px 10px rgba(20,29,81,.04)}
+.sc-map .lab{text-align:center;font-size:12px;color:#6b7280;font-weight:700;margin-top:6px;min-height:18px}
+.sc-chips{display:flex;gap:6px;flex-wrap:wrap}
+.sc-chip{border:1.5px solid #d7e1f0;background:#fff;color:#3b5a86;font-weight:800;font-size:12px;padding:5px 11px;border-radius:999px;cursor:pointer;font-family:inherit}
+.sc-chip:hover{border-color:#0f766e;color:#0f766e}
+.sc-chip.on{background:#0f766e;color:#fff;border-color:#0f766e}
+.sc-chip:focus-visible,.sc-seg button:focus-visible,.sccard:focus-visible{outline:2px solid #1f5fb2;outline-offset:2px}
+.sc-search{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #dfe5ee;border-radius:12px;padding:0 14px;height:46px;margin-bottom:10px}
+.sc-search:focus-within{border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,.12)}
+.sc-search svg{flex:none;color:#0f766e}
+.sc-search input{flex:1;border:none;outline:none;font:inherit;font-size:14.5px;min-width:0;background:transparent}
+.sc-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.sc-tools select{width:auto;padding:7px 10px;border:1.5px solid #dfe5ee;border-radius:10px;font:inherit;font-size:12.5px;font-weight:700;background:#fff;color:#374151}
+.sc-tools .stat{font-size:12.5px;font-weight:800;color:#6b7280;margin-left:auto}
+.sc-seg{display:inline-flex;background:#eef2f7;border-radius:10px;padding:3px}
+.sc-seg button{border:none;background:none;font:inherit;font-size:12.5px;font-weight:800;color:#6b7280;padding:5px 11px;border-radius:8px;cursor:pointer}
+.sc-seg button.on{background:#fff;color:#0f766e;box-shadow:0 1px 4px rgba(20,29,81,.12)}
+.sc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;align-items:stretch}
+.sc-empty{grid-column:1/-1;background:#fff;border:1px dashed #d7e1f0;border-radius:16px;padding:34px 20px;text-align:center;color:#6b7280;font-size:14px;line-height:1.8}
+.sccard{display:flex;flex-direction:column;background:#fff;border:1px solid #e5e9f2;border-radius:16px;overflow:hidden;text-decoration:none;color:inherit;box-shadow:0 2px 10px rgba(20,29,81,.04);transition:transform .18s,box-shadow .18s,border-color .18s}
+.sccard:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(20,29,81,.10);border-color:#bfe0da}
+.sccard .top{display:flex;gap:12px;align-items:center;padding:16px 18px 10px}
+.lvav{flex:0 0 50px;width:50px;height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:19px;color:#fff;overflow:hidden}
+.lvav img{width:100%;height:100%;object-fit:cover}
+.lv-초{background:linear-gradient(135deg,#34a58f,#0f766e)}.lv-중{background:linear-gradient(135deg,#3a7bd5,#1f4e9c)}.lv-고{background:linear-gradient(135deg,#5b4bb7,#312e81)}.lv-{background:linear-gradient(135deg,#8a919d,#4b5563)}
+.sccard .tn{font-size:16px;font-weight:900;color:#141d51;letter-spacing:-.2px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sccard .sch{font-size:12.5px;font-weight:700;color:#1f5fb2;margin-top:3px}
+.sccard .chips{display:flex;gap:5px;flex-wrap:wrap;padding:0 18px}
+.pill{font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;background:#eef6f4;color:#0f766e;white-space:nowrap}
+.pill.b{background:#eef2f9;color:#1f4e9c}.pill.g{background:#f4f4f6;color:#6b7280}
+.sccard .rec{display:flex;gap:16px;padding:12px 18px 12px;font-variant-numeric:tabular-nums}
+.sccard .rec div{font-size:11.5px;color:#6b7280;font-weight:700}
+.sccard .rec b{display:block;font-size:18px;color:#141d51;font-weight:900;line-height:1.2}
+.sccard .foot{margin-top:auto;border-top:1px solid #eef1f6;background:#fafbfd;padding:10px 18px;font-size:12px;color:#6b7280;font-weight:700;display:flex;justify-content:space-between;gap:8px}
+.sccard .foot b{color:#0f766e}
+.stg{display:inline-block;font-size:10.5px;font-weight:900;color:#fff;padding:2px 7px;border-radius:6px;vertical-align:1px}
+.rk{display:inline-flex;align-items:center;justify-content:center;min-width:54px;font-size:12px;font-weight:900;padding:3px 9px;border-radius:999px;background:#f1f3f7;color:#4b5563}
+.rk.r1{background:#fdf1cf;color:#8a5a00}.rk.r2{background:#eceff3;color:#475569}.rk.r3{background:#f6e3d3;color:#8a4a1a}.rk.r4,.rk.r5{background:#eef2f9;color:#1f4e9c}
+/* 팀 홈 */
+.th{background:#fff;border:1px solid #e5e9f2;border-radius:18px;padding:22px 24px;box-shadow:0 2px 10px rgba(20,29,81,.04);display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.th .lvav{flex-basis:76px;width:76px;height:76px;border-radius:20px;font-size:28px}
+.th h2{margin:0;font-size:24px;font-weight:900;color:#141d51;letter-spacing:-.4px;text-wrap:balance}
+.th .sub{font-size:14px;font-weight:700;color:#1f5fb2;margin-top:4px}
+.th .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.th .intro{font-size:13.5px;color:#4b5563;margin-top:10px;line-height:1.7;max-width:60em}
+.th .act{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.btn2{display:inline-flex;align-items:center;gap:6px;border:1.5px solid #d7e1f0;background:#fff;color:#141d51;font-weight:800;font-size:12.5px;padding:8px 14px;border-radius:10px;text-decoration:none;cursor:pointer;font-family:inherit}
+.btn2:hover{border-color:#0f766e;color:#0f766e}
+.tk{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0}
+.tk>div{background:#fff;border:1px solid #e5e9f2;border-radius:14px;padding:14px 16px}
+.tk i{font-style:normal;display:block;font-size:12px;font-weight:800;color:#6b7280}
+.tk b{display:block;font-size:22px;font-weight:900;color:#141d51;margin-top:3px;font-variant-numeric:tabular-nums;line-height:1.25}
+.tk span{display:block;font-size:12px;color:#6b7280;font-weight:700;margin-top:3px;line-height:1.5}
+@media(max-width:860px){.tk{grid-template-columns:repeat(2,1fr)}}
+.tp{background:#fff;border:1px solid #e5e9f2;border-radius:16px;padding:18px 20px;margin-top:14px}
+.tp h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:15.5px;font-weight:900;color:#141d51}
+.tp h3::before{content:"";width:4px;height:16px;border-radius:2px;background:#0f766e;flex:none}
+.tp h3 small{font-size:12px;color:#6b7280;font-weight:700;margin-left:4px}
+.yr{margin-top:12px}
+.yr>b{display:block;font-size:13px;color:#0f766e;font-weight:900;margin-bottom:4px}
+.ev{display:grid;grid-template-columns:92px 1fr auto;gap:10px;align-items:center;padding:9px 4px;border-top:1px solid #f0f2f6;font-size:13.5px}
+.ev:first-of-type{border-top:none}
+.ev .d{font-variant-numeric:tabular-nums;color:#6b7280;font-size:12.5px;font-weight:700}
+.ev a{color:#141d51;font-weight:800;text-decoration:none}
+.ev a:hover{color:#0f766e;text-decoration:underline}
+.ev .dv{display:block;font-size:12px;color:#6b7280;font-weight:600;margin-top:1px}
+@media(max-width:560px){.ev{grid-template-columns:1fr auto}.ev .d{grid-column:1/-1}}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:860px){.two{grid-template-columns:1fr}}
+.ros{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ros span{background:#f4f6fa;border-radius:8px;padding:4px 10px;font-size:13px;font-weight:700;color:#374151}
+.ros span em{font-style:normal;color:#6b7280;font-weight:600;margin-left:4px;font-size:12px}
+.mt{display:grid;grid-template-columns:86px 1fr auto auto;gap:10px;align-items:center;padding:8px 2px;border-top:1px solid #f0f2f6;font-size:13px}
+.mt .sc{font-variant-numeric:tabular-nums;font-weight:900;color:#141d51}
+.wl{font-size:11px;font-weight:900;padding:2px 8px;border-radius:6px;color:#fff}
+.wl.w{background:#0f766e}.wl.l{background:#b3202e}.wl.d{background:#8a919d}
+.sc-note{font-size:12px;color:#8a919d;margin-top:26px;line-height:1.7}
+.sc-seg,.sc-tools select{flex:none}
+@media(max-width:640px){.th{padding:18px;gap:14px}.th .lvav{flex-basis:60px;width:60px;height:60px;font-size:22px;border-radius:16px}.th h2{font-size:20px}.th .act{order:3;width:100%;margin-left:0}.sc-tools .stat{margin-left:0;width:100%}}
+</style>
+</head>
+<body>
+<div class="util"><div class="wrap">
+  <div><b>대한민국플라잉디스크연맹</b> · 대한체육회 인정단체</div>
+  <div><a href="mailto:kfdf60@hanmail.net">kfdf60@hanmail.net</a> &nbsp;|&nbsp; 031-984-3248 &nbsp;|&nbsp; <a href="login.html" id="utilAuth" style="color:#fff;font-weight:700">로그인</a> · <a href="mypage.html" style="color:#fff;font-weight:700">마이페이지</a></div>
+</div></div>
+<header><div class="wrap nav">
+  <a href="index.html" class="brand">
+    <img src="kfdf_logo.png" alt="대한민국플라잉디스크연맹 로고">
+    <div><div class="t1">대한민국플라잉디스크연맹</div><div class="t2">KOREA FLYING DISC FEDERATION</div></div>
+  </a>
+  <button class="hamb" onclick="document.querySelector('.menu').classList.toggle('open')">☰</button>
+  <nav class="menu">
+    <div><a href="about.html" class="top">연맹소개</a>
+      <div class="drop">
+        <a href="about.html#greet">인사말 · 미션</a>
+        <a href="about.html#org">조직도</a>
+        <a href="about.html#rule">정관 · 규정</a>
+        <a href="about.html#region">시도연맹 구성</a>
+        <a href="sponsor.html">후원안내</a>
+        <a href="about.html#way">오시는 길</a>
+      </div></div>
+    <div><a href="sports.html" class="top">종목소개</a>
+      <div class="drop">
+        <a href="sports.html">얼티미트</a>
+        <a href="sports.html">디스크골프</a>
+        <a href="sports.html">원반윷놀이 · 기타 종목</a>
+      </div></div>
+    <div><a href="business.html" class="top">사업안내</a>
+      <div class="drop">
+        <a href="business.html#youth">2026 유소년 스포츠 기반구축사업</a>
+        <a href="business.html#school">└ 학교체육 강습</a>
+        <a href="business.html#after">└ 방과후 · 늘봄</a>
+        <a href="competition.html">└ 권역별 유소년 대회</a>
+        <a href="business.html#train">└ 교원연수 · 교재개발</a>
+      </div></div>
+    <div><a href="certification.html" class="top">자격증</a>
+      <div class="drop">
+        <a href="certification.html">체육지도자 실기 · 구술 (국가자격)</a>
+        <a href="license.html">연맹 자격증 (지도자 · 심판)</a>
+        <a href="verify.html">이수증 · 자격증 진위확인</a>
+      </div></div>
+    <div><a href="leader.html" class="top">지도자·심판</a>
+      <div class="drop">
+        <a href="leader.html">레벨업 (포인트) 시스템</a>
+        <a href="jobs.html">강사 활동 지원 · 지명</a>
+        <a href="guide.html">강사 가이드 (일지·운영·유의사항)</a>
+        <a href="safety.html">안전교육 이수</a>
+        <a href="mypage.html">마이페이지</a>
+      </div></div>
+
+    <div><a href="notice.html" class="top">알림마당</a>
+      <div class="drop">
+        <a href="calendar.html">연맹 일정 캘린더</a>
+        <a href="notice.html">공지사항 · 공고</a>
+        <a href="archive.html">자료실 (서식 다운로드)</a>
+        <a href="faq.html">자주 묻는 질문</a>
+      </div></div>
+    <div><a href="competition.html" class="top">대회</a>
+      <div class="drop">
+        <a href="competition.html">대회 일정 · 안내</a>
+        <a href="competition.html#staff">대회 참가 신청 (선수)</a>
+        <a href="staff.html">심판·운영요원 모집</a>
+      </div></div>
+    <div><a href="club.html" class="top">클럽</a>
+      <div class="drop">
+        <a href="club.html">클럽 찾기 · 가입</a>
+        <a href="club.html">클럽 만들기 (클럽장)</a>
+        <a href="club.html">내 클럽 · 가입 승인</a>
+      </div></div>
+    <a href="apply.html" class="cta">강습 신청</a>
+    <a href="jobs.html" class="cta" style="background:#1F4E9C;margin-left:8px">강사신청</a>
+  </nav>
+</div></header>
+<div class="phero"><div class="wrap">
+  <div class="crumb">HOME &nbsp;›&nbsp; 클럽 &nbsp;›&nbsp; <b>학교스포츠클럽</b></div>
+  <h1 id="scH1">학교스포츠클럽</h1><p id="scLede">초·중·고 학교스포츠클럽의 대회 기록과 전적을 한곳에 모았습니다. 학교체육진흥회·교육청 대회 기록을 연맹이 정리해 학년도마다 쌓아 갑니다.</p>
+</div></div>
+<section style="padding:36px 0 70px"><div class="wrap">
+  <div id="scFind">
+    <div class="sc-kpi" id="scKpi">
+      <div style="--kc:#0f766e"><i>학교스포츠클럽</i><b id="kTeams">-</b></div>
+      <div style="--kc:#1f5fb2"><i>참여 학교</i><b id="kSchools">-</b></div>
+      <div style="--kc:#b8860b"><i>누적 대회 기록</i><b id="kEvents">-</b></div>
+      <div style="--kc:#b3202e"><i>우승 팀 수</i><b id="kChamps">-</b></div>
+    </div>
+    <div class="sc-find">
+      <aside class="sc-aside">
+        <div class="sc-map"><div id="scMap" style="max-width:470px;margin:0 auto"></div><div class="lab" id="scMapLab">권역을 누르면 그 지역 학교클럽만 봅니다</div></div>
+        <div id="scSidoChips" class="sc-chips" style="margin-top:12px"></div>
+      </aside>
+      <div>
+        <div class="sc-search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="scQ" placeholder="학교명 · 팀명 · 교육지원청 검색" oninput="scDeb()"></div>
+        <div class="sc-tools">
+          <div class="sc-seg" id="scLevel"><button data-v="" class="on">전체</button><button data-v="초">초등</button><button data-v="중">중학</button><button data-v="고">고등</button></div>
+          <div class="sc-seg" id="scDiv"><button data-v="" class="on">모든 부</button><button data-v="M">남자부</button><button data-v="F">여자부</button><button data-v="X">혼성부</button></div>
+          <select id="scSport" onchange="scRender()"><option value="">모든 종목</option></select>
+          <select id="scSort" onchange="scRender()"><option value="events">대회 기록 많은 순</option><option value="best">최고 성적 순</option><option value="recent">최근 활동 순</option><option value="name">이름 순</option></select>
+          <span class="stat" id="scStat"></span>
+        </div>
+        <div id="scList" class="sc-grid"><div class="sc-empty">불러오는 중…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="scTeam" style="display:none"></div>
+  <p class="sc-note">기록은 연맹이 학교체육진흥회·교육청 대회 자료로 정리했습니다. 참가 선수 이름은 가림 표기로만 싣고 생년월일은 공개하지 않습니다. 잘못된 기록은 사무국(031-984-3248)으로 알려 주세요.</p>
+</div></section>
+
+<footer><div class="wrap">
+  <div class="top">
+    <div class="f-brand"><img src="kfdf_logo.png" alt="로고">
+      <div><b>대한민국플라잉디스크연맹</b><span>KOREA FLYING DISC FEDERATION</span></div></div>
+    <div class="links">
+      <a href="about.html">연맹소개</a><a href="business.html">사업안내</a>
+      <a href="notice.html">알림마당</a><a href="archive.html">자료실</a>
+      <a href="apply.html">학교 강습 신청</a><a href="sponsor.html">후원안내</a>
+    </div>
+  </div>
+  <div class="bottom">
+    <span style="display:inline-block;margin-bottom:8px;padding:4px 14px;background:rgba(255,255,255,.08);border-radius:999px;font-size:12px;font-weight:700;color:#c3c9d4">유소년 스포츠 기반구축사업은 문화체육관광부 · 국민체육진흥공단 · 대한체육회가 후원하며 국민체육진흥기금을 지원받아 운영됩니다</span><br>
+    <b>사단법인 대한민국플라잉디스크연맹</b> &nbsp;|&nbsp; 경기도 김포시 홍도평로 72-22 가동 2층<br>
+    TEL 031-984-3248 &nbsp;|&nbsp; EMAIL kfdf60@hanmail.net<br>
+    © 2026 KOREA FLYING DISC FEDERATION. All rights reserved. &nbsp;|&nbsp; <a href="privacy.html" style="color:#9aa1ad">개인정보처리방침</a>
+  </div>
+</div></footer>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="kfdf.js?v=20260821"></script>
+<script src="region_map.js?v=20260910a"></script>
+<script src="schoolclub_core.js?v=20260911a"></script>
+<script>
+// ══════════ 학교스포츠클럽 (공개) — 찾기 화면 · 팀 홈(?id=) ══════════
+//   팀 = 학교 × 종목 × 부 · 통계는 팀 홈에서 대회 기록(schoolClubEvents)·경기(scMatches)로 바로 계산, 찾기 카드는 관리자가 저장한 요약(stats) 사용
+KFDF.initApp();
+const DB=firebase.firestore();
+const E=SCC.esc;
+let ALL=[],F={q:'',level:'',div:'',sport:'',reg:'',sido:''},MORE=60;
+const PIN='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>';
+function av(c){return c.emblem?'<span class="lvav"><img src="'+E(c.emblem)+'" alt=""></span>':'<span class="lvav lv-'+E(c.level||'')+'">'+E(c.level||'교')+'</span>'}
+function rk(result,rank){const r=rank!=null?rank:SCC.rankOf(result);return '<span class="rk'+(r<=5?' r'+r:'')+'">'+E(result||SCC.rankLabel(r))+'</span>'}
+function stg(s){return '<span class="stg" style="background:'+SCC.stageBadge(s)+'">'+E(s||'')+'</span>'}
+function scDeb(){clearTimeout(window.__scT);window.__scT=setTimeout(()=>{F.q=document.getElementById('scQ').value;MORE=60;scRender()},180)}
+function seg(id,key){document.querySelectorAll('#'+id+' button').forEach(b=>b.onclick=()=>{F[key]=b.dataset.v;document.querySelectorAll('#'+id+' button').forEach(x=>x.classList.toggle('on',x===b));MORE=60;scRender()})}
+async function scFindLoad(){
+  seg('scLevel','level');seg('scDiv','div');
+  const sp=document.getElementById('scSport');SCC.SPORTS.forEach(s=>{const o=document.createElement('option');o.value=s[0];o.textContent=s[1];sp.appendChild(o)});
+  sp.onchange=()=>{F.sport=sp.value;MORE=60;scRender()};
+  try{const s=await DB.collection('schoolClubs').get();ALL=s.docs.map(d=>Object.assign({id:d.id},d.data())).filter(c=>!c.mergedInto&&c.status!=='숨김')}
+  catch(e){document.getElementById('scList').innerHTML='<div class="sc-empty">학교스포츠클럽 기록을 준비하고 있습니다. 곧 공개됩니다.</div>';scKpi();return}
+  scKpi();scSidoChips();scMap();scRender();
+}
+function scKpi(){
+  const k=(id,v)=>{const e=document.getElementById(id);if(e)e.innerHTML=v};
+  k('kTeams',ALL.length+'<small>팀</small>');k('kSchools',new Set(ALL.map(c=>c.schoolCode)).size+'<small>개교</small>');
+  k('kEvents',ALL.reduce((s,c)=>s+((c.stats&&c.stats.events)||0),0)+'<small>건</small>');k('kChamps',ALL.filter(c=>c.stats&&c.stats.titles&&c.stats.titles[1]>0).length+'<small>팀</small>');
+}
+function scSidoChips(){
+  const cnt={};ALL.forEach(c=>{if(c.sido)cnt[c.sido]=(cnt[c.sido]||0)+1});
+  const el=document.getElementById('scSidoChips');
+  el.innerHTML='<button class="sc-chip'+(F.sido?'':' on')+'" data-s="">전체</button>'+SCC.SIDO_LIST.filter(s=>cnt[s]).map(s=>'<button class="sc-chip'+(F.sido===s?' on':'')+'" data-s="'+s+'">'+s+' '+cnt[s]+'</button>').join('');
+  el.querySelectorAll('button').forEach(b=>b.onclick=()=>{F.sido=b.dataset.s;F.reg=F.sido&&window.KFDF_MAP?(KFDF_MAP.SIDO[F.sido]||''):'';MORE=60;scSidoChips();scMap();scRender()});
+}
+function scMap(){
+  if(!window.KFDF_MAP||!document.getElementById('scMap'))return;
+  const cnt={},sub={};ALL.forEach(c=>{const r=KFDF_MAP.SIDO[c.sido]||'';if(!r)return;cnt[r]=(cnt[r]||0)+1;sub[r]=sub[r]||{};sub[r][c.sido]=(sub[r][c.sido]||0)+1});
+  window.__scMap=KFDF_MAP.render('scMap',{mode:'single',selected:F.reg?[F.reg]:[],counts:cnt,subCounts:sub,sub:F.sido,
+    onChange:sel=>{F.reg=(sel&&sel[0])||'';if(!F.reg||(F.sido&&KFDF_MAP.SIDO[F.sido]!==F.reg))F.sido='';MORE=60;scSidoChips();scRender();scMapLab()},
+    onSub:s=>{F.sido=s||'';MORE=60;scSidoChips();scRender();scMapLab()}});
+  scMapLab();
+}
+function scMapLab(){const l=document.getElementById('scMapLab');if(l)l.textContent=F.sido?(F.sido+' 학교클럽'):(F.reg?(F.reg+' 권역 — 시·도를 누르면 좁혀집니다'):'권역을 누르면 그 지역 학교클럽만 봅니다')}
+function bestScore(c){const b=c.stats&&c.stats.best;if(!b)return 0;return (10-b.rank)*10+(SCC.STAGE_ORDER[b.stage]||0)}
+function scRender(){
+  const q=SCC.norm(F.q).toLowerCase();const sort=(document.getElementById('scSort')||{}).value||'events';
+  let rows=ALL.filter(c=>{if(F.level&&c.level!==F.level)return false;if(F.div&&c.division!==F.div)return false;if(F.sport&&c.sportCode!==F.sport)return false;
+    if(F.sido&&c.sido!==F.sido)return false;if(F.reg&&!F.sido&&window.KFDF_MAP&&(KFDF_MAP.SIDO[c.sido]||'')!==F.reg)return false;
+    if(q&&(SCC.norm(c.teamName)+' '+SCC.norm(c.schoolName)+' '+SCC.norm(c.eduOffice)+' '+SCC.norm(c.gugun)).toLowerCase().indexOf(q)<0)return false;return true});
+  const ev=c=>(c.stats&&c.stats.events)||0,last=c=>(c.stats&&c.stats.lastYear)||0;
+  rows.sort(sort==='name'?(a,b)=>String(a.teamName||'').localeCompare(String(b.teamName||'')):sort==='recent'?(a,b)=>last(b)-last(a)||ev(b)-ev(a):sort==='best'?(a,b)=>bestScore(b)-bestScore(a)||ev(b)-ev(a):(a,b)=>ev(b)-ev(a)||String(a.teamName||'').localeCompare(String(b.teamName||'')));
+  document.getElementById('scStat').textContent=rows.length+'팀';
+  const el=document.getElementById('scList');
+  if(!ALL.length){el.innerHTML='<div class="sc-empty">아직 등록된 학교스포츠클럽이 없습니다.<br>연맹이 학교체육진흥회·교육청 대회 기록을 정리하는 중입니다.</div>';return}
+  if(!rows.length){el.innerHTML='<div class="sc-empty">조건에 맞는 학교클럽이 없습니다. 검색어나 필터를 바꿔 보세요.</div>';return}
+  el.innerHTML=rows.slice(0,MORE).map(c=>{const s=c.stats||{};const t=s.titles||{};const b=s.best;
+    return '<a class="sccard" href="schoolclub.html?id='+encodeURIComponent(c.id)+'"><div class="top">'+av(c)+'<div style="min-width:0;flex:1"><span class="tn">'+E(c.teamName||c.schoolName)+'</span><div class="sch">'+E(c.schoolName||'')+'</div></div></div>'
+      +'<div class="chips"><span class="pill">'+E(c.sport||SCC.sportName(c.sportCode))+' · '+E(SCC.DIV[c.division]||'')+'</span><span class="pill b">'+PIN.replace('13','11').replace('13','11')+' '+E(c.sido||'')+(c.gugun?' '+E(c.gugun):'')+'</span>'+(c.eduOffice?'<span class="pill g">'+E(c.eduOffice)+'</span>':'')+'</div>'
+      +'<div class="rec"><div><b>'+(s.events||0)+'</b>대회</div><div><b>'+((t[1]||0))+'</b>우승</div><div><b>'+((t[2]||0)+(t[3]||0))+'</b>준우승·3위</div></div>'
+      +'<div class="foot"><span>'+(b?'최고 <b>'+E(b.stage+' '+b.label)+'</b>':'대회 기록 정리 중')+'</span><span>'+(c.foundedYear?'창단 '+E(c.foundedYear):(s.firstYear?s.firstYear+'학년도~':''))+'</span></div></a>'}).join('')
+    +(rows.length>MORE?'<div class="sc-empty" style="padding:14px"><button class="btn2" onclick="MORE+=60;scRender()">'+(rows.length-MORE)+'팀 더 보기</button></div>':'');
+}
+// ── 팀 홈 ──
+async function scTeamLoad(id){
+  document.getElementById('scFind').style.display='none';const box=document.getElementById('scTeam');box.style.display='block';box.innerHTML='<div class="sc-empty">불러오는 중…</div>';
+  let d;try{d=await DB.collection('schoolClubs').doc(id).get()}catch(e){box.innerHTML='<div class="sc-empty">학교스포츠클럽 기록을 준비하고 있습니다. 곧 공개됩니다.<br><a class="btn2" href="schoolclub.html" style="margin-top:10px">목록으로</a></div>';return}
+  if(!d.exists){box.innerHTML='<div class="sc-empty">학교클럽을 찾을 수 없습니다. 주소를 확인해 주세요.<br><a class="btn2" href="schoolclub.html" style="margin-top:10px">목록으로</a></div>';return}
+  const c=d.data();if(c.mergedInto){location.replace('schoolclub.html?id='+encodeURIComponent(c.mergedInto));return}
+  const ids=[id].concat(c.aliases||[]).slice(0,10);
+  const [evs,seas,mts,sibs]=await Promise.all([
+    DB.collection('schoolClubEvents').where('scids','array-contains-any',ids).get().catch(()=>null),
+    DB.collection('scSeasons').where('scid','in',ids).get().catch(()=>null),
+    DB.collection('scMatches').where('scids','array-contains-any',ids).get().catch(()=>null),
+    DB.collection('schoolClubs').where('schoolCode','==',c.schoolCode||'-').get().catch(()=>null)]);
+  const idset=new Set(ids);const rows=[];
+  (evs?evs.docs:[]).forEach(e=>{const x=e.data();const st=x.stage||SCC.stageOf('',x.competitionName);const yr=x.year||SCC.schoolYear(x.date);
+    Object.keys(x.divisions||{}).forEach(dv=>{const T=(x.divisions[dv]||{}).teams||{};Object.keys(T).forEach(k=>{const t=T[k];if(!idset.has(t.scid))return;
+      rows.push({eventId:e.id,name:x.competitionName||'',date:x.date||'',year:yr,stage:st,div:dv,result:t.result||'',rank:t.rank!=null?t.rank:SCC.rankOf(t.result),members:(t.members||[]).length})})})});
+  const matches=(mts?mts.docs:[]).map(m=>Object.assign({id:m.id},m.data()));
+  const S=SCC.statsOf(ids,rows,matches);
+  document.title=(c.teamName||c.schoolName)+' | 학교스포츠클럽 | 대한민국플라잉디스크연맹';
+  document.getElementById('scH1').textContent=c.teamName||c.schoolName;
+  document.getElementById('scLede').textContent=(c.schoolName||'')+' · '+(SCC.LEVEL[c.level]||'')+' · '+(c.sido||'')+(c.gugun?' '+c.gugun:'')+' — '+(c.sport||SCC.sportName(c.sportCode))+' '+(SCC.DIV[c.division]||'');
+  const sib=(sibs?sibs.docs:[]).filter(x=>x.id!==id&&!x.data().mergedInto&&x.data().status!=='숨김');
+  let h='<div class="th">'+av(c)+'<div style="min-width:0;flex:1"><h2>'+E(c.teamName||c.schoolName)+'</h2><div class="sub">'+E(c.schoolName||'')+' · '+E(SCC.LEVEL[c.level]||'')+'</div>'
+    +'<div class="chips"><span class="pill">'+E(c.sport||SCC.sportName(c.sportCode))+' · '+E(SCC.DIV[c.division]||'')+'</span><span class="pill b">'+E(c.sido||'')+(c.gugun?' '+E(c.gugun):'')+'</span>'+(c.eduOffice?'<span class="pill g">'+E(c.eduOffice)+'</span>':'')+(c.foundedYear?'<span class="pill g">창단 '+E(c.foundedYear)+'</span>':'')+(c.coachName?'<span class="pill g">지도교사 '+E(c.coachName)+'</span>':'')+'</div>'
+    +(c.intro?'<div class="intro">'+E(c.intro)+'</div>':'')
+    +(sib.length?'<div class="chips" style="margin-top:10px"><span style="font-size:12px;color:#6b7280;font-weight:700">같은 학교의 다른 팀</span>'+sib.map(x=>'<a class="pill b" style="text-decoration:none" href="schoolclub.html?id='+encodeURIComponent(x.id)+'">'+E(x.data().teamName||'')+' · '+E(SCC.DIV[x.data().division]||'')+'</a>').join('')+'</div>':'')
+    +'</div><div class="act"><a class="btn2" href="schoolclub.html">← 학교클럽 목록</a></div></div>';
+  const t=S.titles;
+  h+='<div class="tk"><div><i>출전 대회</i><b>'+S.events+'<small style="font-size:13px;color:#6b7280"> 회</small></b><span>전국 '+S.stageCounts['전국']+' · 시도 '+S.stageCounts['시도']+' · 교육지원청 '+S.stageCounts['교육지원청']+'</span></div>'
+    +'<div><i>입상</i><b>'+(t[1]+t[2]+t[3])+'<small style="font-size:13px;color:#6b7280"> 회</small></b><span>우승 '+t[1]+' · 준우승 '+t[2]+' · 3위 '+t[3]+'</span></div>'
+    +'<div><i>최고 성적</i><b style="font-size:19px">'+(S.best?E(S.best.stage+' '+S.best.label):'-')+'</b><span>'+(S.best?E(S.best.year+'학년도 · '+S.best.name):'대회 기록 정리 중')+'</span></div>'
+    +(S.games?'<div><i>경기 전적</i><b>'+S.w+'승 '+S.l+'패'+(S.d?' '+S.d+'무':'')+'</b><span>득점 '+S.gf+' · 실점 '+S.ga+' · 승률 '+Math.round(S.w/Math.max(1,S.w+S.l)*100)+'%</span></div>'
+      :'<div><i>활동 학년도</i><b>'+(S.years.length||0)+'<small style="font-size:13px;color:#6b7280"> 개</small></b><span>'+(S.firstYear?S.firstYear+' ~ '+S.lastYear+'학년도':'-')+'</span></div>')+'</div>';
+  // 대회 이력 — 학년도별
+  const byY={};rows.forEach(r=>{(byY[r.year||'미상']=byY[r.year||'미상']||[]).push(r)});
+  const ys=Object.keys(byY).sort((a,b)=>String(b).localeCompare(String(a)));
+  h+='<div class="two"><div class="tp"><h3>대회 이력<small>'+rows.length+'건</small></h3>'+(ys.length?ys.map(y=>'<div class="yr"><b>'+E(y)+(y==='미상'?'':'학년도')+'</b>'+byY[y].sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(r=>
+      '<div class="ev"><span class="d">'+E(String(r.date).replace(/-/g,'.'))+'</span><span>'+stg(r.stage)+' <a href="results.html?id=s_'+encodeURIComponent(r.eventId)+'">'+E(r.name)+'</a><span class="dv">'+E(r.div)+(r.members?' · 선수 '+r.members+'명':'')+'</span></span>'+rk(r.result,r.rank)+'</div>').join('')+'</div>').join('')
+    :'<div style="font-size:13px;color:#6b7280">아직 정리된 대회 기록이 없습니다.</div>')+'</div>';
+  // 오른쪽: 경기 기록 + 학년도 명단 + 일반 클럽 시절
+  let right='';
+  if(matches.length){matches.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    right+='<div class="tp" style="margin-top:0"><h3>경기 기록<small>'+matches.length+'경기</small></h3>'+matches.slice(0,20).map(m=>{const side=idset.has((m.a||{}).scid)?'a':'b';const me=m[side]||{},op=m[side==='a'?'b':'a']||{};const res=+me.score>+op.score?'w':(+me.score<+op.score?'l':'d');
+      return '<div class="mt"><span class="d" style="font-size:12px;color:#6b7280;font-weight:700">'+E(String(m.date||'').replace(/-/g,'.'))+'</span><span><a href="schoolclub.html?id='+encodeURIComponent(op.scid||'')+'" style="color:#141d51;font-weight:800;text-decoration:none">vs '+E(op.school||'')+'</a><span style="display:block;font-size:11.5px;color:#6b7280">'+E((m.round?m.round+' · ':'')+(m.eventName||''))+(m.source==='teacher'&&!m.verified?' · 비공식':'')+'</span></span><span class="sc">'+E(me.score)+' : '+E(op.score)+'</span><span class="wl '+res+'">'+(res==='w'?'승':res==='l'?'패':'무')+'</span></div>'}).join('')+'</div>'}
+  const seasons=(seas?seas.docs:[]).map(x=>x.data()).sort((a,b)=>(b.year||0)-(a.year||0));
+  if(seasons.length){right+='<div class="tp"'+(matches.length?'':' style="margin-top:0"')+'><h3>학년도 명단<small>이름은 가림 표기</small></h3><div class="sc-seg" id="rosYr" style="flex-wrap:wrap">'+seasons.map((s,i)=>'<button data-i="'+i+'"'+(i?'':' class="on"')+'>'+E(s.year)+'</button>').join('')+'</div><div id="rosBox"></div></div>'}
+  h+='<div>'+(right||'<div class="tp" style="margin-top:0"><h3>경기 기록 · 명단</h3><div style="font-size:13px;color:#6b7280">경기 점수와 학년도 명단이 정리되면 여기에 표시됩니다.</div></div>')+'<div id="scFromClub"></div></div></div>';
+  box.innerHTML=h;
+  if(seasons.length){const show=i=>{const s=seasons[i];const ro=(s.roster||[]);document.getElementById('rosBox').innerHTML='<div style="font-size:12.5px;color:#6b7280;font-weight:700;margin-top:10px">'+E(s.year)+'학년도 · '+(s.count||ro.length)+'명'+(s.countM||s.countF?' (남 '+(s.countM||0)+' · 여 '+(s.countF||0)+')':'')+(s.coachName?' · 지도교사 '+E(s.coachName):'')+'</div>'
+      +(ro.length?'<div class="ros">'+ro.slice().sort((a,b)=>String(b.g).localeCompare(String(a.g))||String(a.n).localeCompare(String(b.n))).map(r=>'<span>'+E(r.n)+'<em>'+(r.g?E(r.g)+'학년':'')+(r.s?' '+E(r.s):'')+'</em></span>').join('')+'</div>':'<div style="font-size:12.5px;color:#8a919d;margin-top:6px">선수 명단은 아직 정리되지 않았습니다.</div>')};
+    document.querySelectorAll('#rosYr button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#rosYr button').forEach(x=>x.classList.toggle('on',x===b));show(+b.dataset.i)});show(0)}
+  if(c.fromClubId){try{const a=await DB.collection('clubAwards').where('clubId','==',c.fromClubId).get();const list=a.docs.map(x=>x.data()).sort((p,q)=>String(q.date||'').localeCompare(String(p.date||'')));
+    document.getElementById('scFromClub').innerHTML='<div class="tp"><h3>일반 클럽 시절 기록<small>'+list.length+'건</small></h3><div style="font-size:12.5px;color:#6b7280;margin-bottom:6px">이 팀은 연맹 일반 클럽으로 활동하다 학교스포츠클럽으로 옮겼습니다. <a href="clubhome.html?id='+encodeURIComponent(c.fromClubId)+'">옛 클럽 홈 →</a></div>'
+      +list.slice(0,10).map(x=>'<div class="ev"><span class="d">'+E(String(x.date||'').replace(/-/g,'.'))+'</span><span>'+E(x.competitionName||'')+'<span class="dv">'+E(x.division||'')+'</span></span>'+rk(x.result||'참가')+'</div>').join('')+'</div>'}catch(e){}}
+}
+(function(){const id=new URLSearchParams(location.search).get('id');const go=()=>{if(id)scTeamLoad(id);else scFindLoad()};
+  if(window.KFDF_MAP||id)go();else{let n=0;const t=setInterval(()=>{if(window.KFDF_MAP||++n>20){clearInterval(t);go()}},200)}})();
+</script>
+<script src="auth_ui.js?v=20260911a"></script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-// v20260910b · 전 페이지 공용: ① 상단 메뉴 일괄 렌더(A안) ② 로그인/로그아웃 전환 ③ 알림 배지
+// v20260911a · 전 페이지 공용: ① 상단 메뉴 일괄 렌더(A안) ② 로그인/로그아웃 전환 ③ 알림 배지
 (function(){
   var CFG={apiKey:"AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",authDomain:"koreaflyingdiscfederation.firebaseapp.com",projectId:"koreaflyingdiscfederation",appId:"1:1081847355343:web:ca40ed9a52e13f607f64ba"};
 
@@ -36,7 +36,7 @@
       ['심판 · 운영요원 모집','competition.html?view=list&kind=staff'],['대회 결과','results.html'],['사진첩','gallery.html'],
       ['공고 등록 · 관리','competition.html?view=manage','','admin']]},
     {t:'클럽',h:'club.html?view=find',d:[
-      ['클럽 찾기 · 가입','club.html?view=find'],['클럽 만들기','club.html?view=create'],['내 클럽 · 가입 승인','club.html?view=mine'],['클럽 교류전','club.html?view=meet']]},
+      ['클럽 찾기 · 가입','club.html?view=find'],['학교스포츠클럽','schoolclub.html'],['클럽 만들기','club.html?view=create'],['내 클럽 · 가입 승인','club.html?view=mine'],['클럽 교류전','club.html?view=meet']]},
     {t:'자격증',h:'license.html?view=notices',d:[
       ['연맹 자격증 신청 (지도자 · 심판)','license.html?view=notices'],['내 신청 현황','license.html?view=my'],['자격 · 이수증 진위확인','verify.html'],['체육지도자 자격검정 (국가자격)','certification.html'],['자격 관리','license.html?view=admin','','admin']]},
     {t:'강사·활동',h:'jobs.html?view=apply',d:[
