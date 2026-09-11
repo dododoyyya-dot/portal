@@ -98,6 +98,26 @@
 .sc-note{font-size:12px;color:#8a919d;margin-top:26px;line-height:1.7}
 .sc-seg,.sc-tools select{flex:none}
 @media(max-width:640px){.th{padding:18px;gap:14px}.th .lvav{flex-basis:60px;width:60px;height:60px;font-size:22px;border-radius:16px}.th h2{font-size:20px}.th .act{order:3;width:100%;margin-left:0}.sc-tools .stat{margin-left:0;width:100%}}
+
+.sc-panel{background:#f5faf9;border:1px solid #cfe7e2;border-radius:16px;padding:16px 18px}
+.sc-panel .ph{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:900;color:#141d51;margin-bottom:6px}
+.sc-panel .ph::before{content:"";width:4px;height:15px;border-radius:2px;background:#0f766e;flex:none}
+.sc-panel .pd{font-size:12.5px;color:#4b5563;line-height:1.7}
+.mine{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e1ece9;border-radius:10px;padding:8px 11px;margin-top:6px;font-size:13px;text-decoration:none;color:#141d51;font-weight:800}
+.st{font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px;margin-left:auto;white-space:nowrap}
+.st.ok{background:#e3f2ef;color:#0f766e}.st.wait{background:#fdf1cf;color:#8a5a00}.st.no{background:#fbe9eb;color:#b3202e}
+.btn3{display:inline-flex;align-items:center;justify-content:center;border:none;background:#0f766e;color:#fff;font:inherit;font-weight:800;font-size:13px;padding:9px 14px;border-radius:10px;cursor:pointer;width:100%;margin-top:10px;box-sizing:border-box}
+.btn3:hover{filter:brightness(1.07)}
+.scm-bg{position:fixed;inset:0;background:rgba(10,15,30,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:24px 14px;overflow:auto}
+.scm{background:#fff;border-radius:18px;max-width:520px;width:100%;padding:22px 24px;box-shadow:0 24px 60px rgba(0,0,0,.25)}
+.scm h3{margin:0 0 4px;font-size:18px;font-weight:900;color:#141d51}
+.scm label{display:block;font-size:12.5px;font-weight:800;color:#374151;margin:12px 0 4px}
+.scm input,.scm select{width:100%;padding:10px 12px;border:1.5px solid #dfe5ee;border-radius:10px;font:inherit;font-size:14px;box-sizing:border-box}
+.scm .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.schl{max-height:180px;overflow:auto;border:1px solid #eef1f6;border-radius:10px;margin-top:6px}
+.schl div{padding:7px 11px;font-size:13px;cursor:pointer;border-bottom:1px solid #f3f5f8}
+.schl div:hover,.schl div.on{background:#eef6f4;color:#0f766e;font-weight:800}
+.banner{background:#fdf6e3;border:1.5px solid #f0d68a;color:#7a5b00;border-radius:12px;padding:11px 15px;font-size:13px;font-weight:700;margin-bottom:12px}
 </style>
 </head>
 <body>
@@ -189,6 +209,7 @@
       <aside class="sc-aside">
         <div class="sc-map"><div id="scMap" style="max-width:470px;margin:0 auto"></div><div class="lab" id="scMapLab">권역을 누르면 그 지역 학교클럽만 봅니다</div></div>
         <div id="scSidoChips" class="sc-chips" style="margin-top:12px"></div>
+        <div class="sc-panel" style="margin-top:14px"><div class="ph">우리 학교 클럽 (지도교사)</div><div id="scMine"><div class="pd">확인 중…</div></div></div>
       </aside>
       <div>
         <div class="sc-search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="scQ" placeholder="학교명 · 팀명 · 교육지원청 검색" oninput="scDeb()"></div>
@@ -226,10 +247,11 @@
   </div>
 </div></footer>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260821"></script>
 <script src="region_map.js?v=20260910a"></script>
-<script src="schoolclub_core.js?v=20260911a"></script>
+<script src="schoolclub_core.js?v=20260911b"></script>
 <script>
 // ══════════ 학교스포츠클럽 (공개) — 찾기 화면 · 팀 홈(?id=) ══════════
 //   팀 = 학교 × 종목 × 부 · 통계는 팀 홈에서 대회 기록(schoolClubEvents)·경기(scMatches)로 바로 계산, 찾기 카드는 관리자가 저장한 요약(stats) 사용
@@ -247,7 +269,7 @@ async function scFindLoad(){
   seg('scLevel','level');seg('scDiv','div');
   const sp=document.getElementById('scSport');SCC.SPORTS.forEach(s=>{const o=document.createElement('option');o.value=s[0];o.textContent=s[1];sp.appendChild(o)});
   sp.onchange=()=>{F.sport=sp.value;MORE=60;scRender()};
-  try{const s=await DB.collection('schoolClubs').get();ALL=s.docs.map(d=>Object.assign({id:d.id},d.data())).filter(c=>!c.mergedInto&&c.status!=='숨김')}
+  try{const s=await DB.collection('schoolClubs').get();ALL=s.docs.map(d=>Object.assign({id:d.id},d.data())).filter(c=>!c.mergedInto&&['숨김','대기','반려'].indexOf(c.status)<0)}
   catch(e){document.getElementById('scList').innerHTML='<div class="sc-empty">학교스포츠클럽 기록을 준비하고 있습니다. 곧 공개됩니다.</div>';scKpi();return}
   scKpi();scSidoChips();scMap();scRender();
 }
@@ -312,7 +334,7 @@ async function scTeamLoad(id){
   document.getElementById('scH1').textContent=c.teamName||c.schoolName;
   document.getElementById('scLede').textContent=(c.schoolName||'')+' · '+(SCC.LEVEL[c.level]||'')+' · '+(c.sido||'')+(c.gugun?' '+c.gugun:'')+' — '+(c.sport||SCC.sportName(c.sportCode))+' '+(SCC.DIV[c.division]||'');
   const sib=(sibs?sibs.docs:[]).filter(x=>x.id!==id&&!x.data().mergedInto&&x.data().status!=='숨김');
-  let h='<div class="th">'+av(c)+'<div style="min-width:0;flex:1"><h2>'+E(c.teamName||c.schoolName)+'</h2><div class="sub">'+E(c.schoolName||'')+' · '+E(SCC.LEVEL[c.level]||'')+'</div>'
+  let h=(c.status==='대기'?'<div class="banner">이 팀은 관할 시도연맹의 등록 승인을 기다리고 있습니다. 승인되면 학교스포츠클럽 목록에 게시됩니다.</div>':(c.status==='반려'?'<div class="banner">이 팀의 등록 신청은 반려되었습니다'+(c.rejectReason?' — '+E(c.rejectReason):'')+'</div>':''))+'<div class="th">'+av(c)+'<div style="min-width:0;flex:1"><h2>'+E(c.teamName||c.schoolName)+'</h2><div class="sub">'+E(c.schoolName||'')+' · '+E(SCC.LEVEL[c.level]||'')+'</div>'
     +'<div class="chips"><span class="pill">'+E(c.sport||SCC.sportName(c.sportCode))+' · '+E(SCC.DIV[c.division]||'')+'</span><span class="pill b">'+E(c.sido||'')+(c.gugun?' '+E(c.gugun):'')+'</span>'+(c.eduOffice?'<span class="pill g">'+E(c.eduOffice)+'</span>':'')+(c.foundedYear?'<span class="pill g">창단 '+E(c.foundedYear)+'</span>':'')+(c.coachName?'<span class="pill g">지도교사 '+E(c.coachName)+'</span>':'')+'</div>'
     +(c.intro?'<div class="intro">'+E(c.intro)+'</div>':'')
     +(sib.length?'<div class="chips" style="margin-top:10px"><span style="font-size:12px;color:#6b7280;font-weight:700">같은 학교의 다른 팀</span>'+sib.map(x=>'<a class="pill b" style="text-decoration:none" href="schoolclub.html?id='+encodeURIComponent(x.id)+'">'+E(x.data().teamName||'')+' · '+E(SCC.DIV[x.data().division]||'')+'</a>').join('')+'</div>':'')
@@ -345,6 +367,63 @@ async function scTeamLoad(id){
     document.getElementById('scFromClub').innerHTML='<div class="tp"><h3>일반 클럽 시절 기록<small>'+list.length+'건</small></h3><div style="font-size:12.5px;color:#6b7280;margin-bottom:6px">이 팀은 연맹 일반 클럽으로 활동하다 학교스포츠클럽으로 옮겼습니다. <a href="clubhome.html?id='+encodeURIComponent(c.fromClubId)+'">옛 클럽 홈 →</a></div>'
       +list.slice(0,10).map(x=>'<div class="ev"><span class="d">'+E(String(x.date||'').replace(/-/g,'.'))+'</span><span>'+E(x.competitionName||'')+'<span class="dv">'+E(x.division||'')+'</span></span>'+rk(x.result||'참가')+'</div>').join('')+'</div>'}catch(e){}}
 }
+// ── 지도교사: 우리 학교 클럽 등록 신청 (관할 시도연맹 승인, 시도연맹이 없는 곳은 중앙) ──
+let ME=null,MY=null,REG={code:''};
+function isTeacher(){return !!(MY&&MY.status==='approved'&&MY.accountType==='teacher')}
+function scAuth(){if(!(window.firebase&&firebase.auth)){scMine();return}firebase.auth().onAuthStateChanged(async u=>{ME=u;MY=null;if(u){try{const d=await DB.collection('users').doc(u.uid).get();MY=d.exists?d.data():null}catch(e){}}scMine()})}
+async function scMine(){
+  const box=document.getElementById('scMine');if(!box)return;
+  if(!ME){box.innerHTML='<div class="pd">지도교사 회원이 로그인하면 우리 학교 학교스포츠클럽을 등록 신청할 수 있습니다. 승인은 관할 시도연맹(없는 곳은 연맹 사무국)이 합니다.</div><a class="btn3" href="login.html" style="text-decoration:none">로그인</a>';return}
+  let mine=[];try{const s=await DB.collection('schoolClubs').where('coachUid','==',ME.uid).get();mine=s.docs.map(d=>Object.assign({id:d.id},d.data()))}catch(e){}
+  const st=c=>c.status==='운영'?'<span class="st ok">운영 중</span>':c.status==='대기'?'<span class="st wait">승인 대기</span>':c.status==='반려'?'<span class="st no">반려</span>':'<span class="st">'+E(c.status||'')+'</span>';
+  box.innerHTML=(mine.length?mine.map(c=>'<a class="mine" href="schoolclub.html?id='+encodeURIComponent(c.id)+'">'+E(c.teamName||c.schoolName)+' <span style="font-weight:600;color:#6b7280;font-size:12px">'+E(SCC.DIV[c.division]||'')+'</span>'+st(c)+'</a>').join(''):'<div class="pd">'+(isTeacher()?'아직 등록한 학교클럽이 없습니다. 등록하면 대회 학교팀 신청에서 이 팀을 골라 참가하고, 기록이 팀에 쌓입니다.':'학교클럽 등록 신청은 <b>교사 회원</b>만 할 수 있습니다. 담당 선생님께 요청해 주세요.')+'</div>')
+    +(isTeacher()?'<button class="btn3" onclick="scRegOpen()">우리 학교 클럽 등록 신청</button>':'');
+}
+function scRegOpen(){
+  REG={code:(MY&&MY.schoolCode)||''};
+  const d=document.createElement('div');d.className='scm-bg';d.id='scReg';d.onclick=e=>{if(e.target===d)d.remove()};
+  d.innerHTML='<div class="scm"><h3>우리 학교 클럽 등록 신청</h3><div style="font-size:12.5px;color:#6b7280;line-height:1.7">학교 · 종목 · 부(남·여·혼성)마다 한 팀입니다. 관할 시도연맹이 확인하면 목록에 게시되고, 대회 학교팀 신청에서 이 팀으로 참가할 수 있습니다.</div>'
+    +'<label>학교 *</label><input id="rgSch" value="'+E((MY&&(MY.workSchool||MY.school))||'')+'" placeholder="학교명 입력" oninput="scRegFind()" autocomplete="off"><div class="schl" id="rgList"></div>'
+    +'<div class="row"><div><label>종목</label><select id="rgSport">'+SCC.SPORTS.map(s=>'<option value="'+s[0]+'"'+(s[0]==='FD'?' selected':'')+'>'+E(s[1])+'</option>').join('')+'</select></div>'
+    +'<div><label>부</label><select id="rgDiv"><option value="X">혼성부</option><option value="M">남자부</option><option value="F">여자부</option></select></div></div>'
+    +'<label>팀명</label><input id="rgTeam" placeholder="비우면 「○○초 플라잉디스크부」로 만듭니다">'
+    +'<div class="row"><div><label>창단 학년도</label><input id="rgFounded" inputmode="numeric" placeholder="예: 2024"></div><div><label>시군구</label><input id="rgGugun" placeholder="예: 해운대구"></div></div>'
+    +'<label>한 줄 소개</label><input id="rgIntro" placeholder="예: 점심시간 주 3회 연습">'
+    +'<div id="rgMsg" style="font-size:12.5px;font-weight:800;margin-top:10px"></div>'
+    +'<div style="display:flex;gap:8px;margin-top:12px"><button class="btn2" onclick="document.getElementById(\'scReg\').remove()" style="flex:1;justify-content:center">닫기</button><button class="btn3" style="flex:2;margin-top:0" onclick="scRegSave()">등록 신청</button></div></div>';
+  document.body.appendChild(d);
+  KFDF.loadSchools(()=>scRegFind(true));
+}
+function scRegFind(first){
+  const q=(document.getElementById('rgSch')||{}).value||'';const el=document.getElementById('rgList');if(!el)return;
+  if(!first)REG.code='';
+  let list=[];try{list=KFDF.schoolSearch(q,20)||[]}catch(e){}
+  if(first&&REG.code){const hit=list.find(x=>x.code===REG.code);if(hit)list=[hit].concat(list.filter(x=>x!==hit))}
+  el.innerHTML=list.length?list.map(x=>'<div data-c="'+E(x.code)+'" data-n="'+E(x.name)+'" data-k="'+E(x.kind)+'" class="'+(x.code===REG.code?'on':'')+'">'+E(x.name)+' <span style="color:#6b7280;font-weight:600">('+E(x.kind)+' · '+E(SCC.sidoOf(x.code))+')</span></div>').join(''):'<div style="color:#8a919d;cursor:default">학교명을 입력하세요</div>';
+  el.querySelectorAll('div[data-c]').forEach(n=>n.onclick=()=>{REG.code=n.dataset.c;REG.name=n.dataset.n;REG.kind=n.dataset.k;el.querySelectorAll('div').forEach(x=>x.classList.toggle('on',x===n));document.getElementById('rgSch').value=n.dataset.n});
+}
+async function scRegSave(){
+  const m=document.getElementById('rgMsg');const g=id=>(document.getElementById(id)||{}).value||'';
+  if(!isTeacher()){m.textContent='교사 회원만 등록 신청할 수 있습니다';m.style.color='#b3202e';return}
+  if(!REG.code){m.textContent='학교를 목록에서 골라 주세요';m.style.color='#b3202e';return}
+  let sch={name:REG.name||g('rgSch'),kind:REG.kind||''};
+  if(!REG.kind){const hit=(KFDF.schoolSearch(g('rgSch'),40)||[]).find(x=>x.code===REG.code);if(hit)sch=hit}
+  const sp=g('rgSport')||'FD',dv=g('rgDiv')||'X';const id=SCC.scid(REG.code,sp,dv);
+  try{
+    const ex=await DB.collection('schoolClubs').doc(id).get();
+    if(ex.exists){const x=ex.data();m.innerHTML='이미 등록된 팀입니다: <a href="schoolclub.html?id='+encodeURIComponent(id)+'">'+E(x.teamName||id)+'</a>'+(x.coachUid?'':' — 지도교사 계정 연결은 연맹 사무국(031-984-3248)에 요청해 주세요');m.style.color='#8a5a00';return}
+    const sido=SCC.sidoOf(REG.code);const short=String(sch.name||'').replace(/초등학교$/,'초').replace(/중학교$/,'중').replace(/고등학교$/,'고');
+    const doc={scid:id,schoolCode:REG.code,schoolName:sch.name,level:SCC.levelOf(sch.kind||sch.name),sido:sido,gugun:g('rgGugun').trim(),sport:SCC.sportName(sp),sportCode:sp,division:dv,
+      teamName:g('rgTeam').trim()||(short+' '+(sp==='FD'?'플라잉디스크':SCC.sportName(sp))+'부'),foundedYear:g('rgFounded').trim(),intro:g('rgIntro').trim(),
+      coachUid:ME.uid,coachName:(MY&&MY.name)||'',status:'대기',source:'teacher',importIds:[],createdAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+    await DB.collection('schoolClubs').doc(id).set(doc);
+    let r=null;try{r=await SCC.notifyApprovers(DB,sido,'🏫 ['+sido+'] 「'+doc.teamName+'」 학교스포츠클럽 등록 신청 ('+((MY&&MY.name)||'')+' 교사) — 승인해 주세요','club.html?view=mine','admin.html?tab=8')}catch(e){}
+    document.getElementById('scReg').remove();
+    alert('✓ 등록 신청했습니다.\n'+(r?(r.fed?'관할 '+r.sido+' 시도연맹이 확인 후 승인합니다.':'관할 시도연맹이 없어 연맹 사무국이 확인 후 승인합니다.'):'확인 후 승인됩니다.'));
+    scMine();
+  }catch(e){m.textContent='신청 실패: '+(e.code==='permission-denied'?'권한이 없습니다 (교사 회원 승인 여부 확인 · 연맹 사무국 문의)':e.message);m.style.color='#b3202e'}
+}
+scAuth();
 (function(){const id=new URLSearchParams(location.search).get('id');const go=()=>{if(id)scTeamLoad(id);else scFindLoad()};
   if(window.KFDF_MAP||id)go();else{let n=0;const t=setInterval(()=>{if(window.KFDF_MAP||++n>20){clearInterval(t);go()}},200)}})();
 </script>

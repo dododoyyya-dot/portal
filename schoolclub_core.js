@@ -1,4 +1,4 @@
-// v20260911a · 학교스포츠클럽 공용 계산 (schoolclub.html 공개 화면 · admin.html 관리 도구가 함께 씁니다)
+// v20260911b · 학교스포츠클럽 공용 계산 (schoolclub.html 공개 화면 · admin.html 관리 도구가 함께 씁니다)
 //   팀 단위 = 학교 × 종목 × 부(남·여·혼성)  ·  ID = 학교코드_종목코드_부코드  (예: S160001234_UL_M)
 //   학년도 = 3월 시작 (2027-02 대회는 2026학년도)
 (function(){
@@ -50,7 +50,16 @@
       if(off){if(mf>ma)S.uw++;else if(mf<ma)S.ul++;else S.ud++;return}
       S.games++;S.gf+=mf;S.ga+=ma;if(mf>ma)S.w++;else if(mf<ma)S.l++;else S.d++});
     return S}
+  // ── [승인 경로 2026-09-11] 클럽·학교클럽 승인은 관할 시도연맹(담당자 있음)이, 시도연맹이 없는 곳은 중앙이 합니다 ──
+  //   siteContent/sidoFeds = {sidos:{부산:[{uid,name,kind}]}, central:[uid]} — 관리자 화면이 열릴 때 회원 명단에서 자동 갱신
+  function loadFeds(DB){return DB.collection('siteContent').doc('sidoFeds').get().then(function(d){return d.exists?(d.data()||{}):{}}).catch(function(){return {}})}
+  function approversOf(DB,sido){return loadFeds(DB).then(function(f){var k=sidoNorm(sido)||sido;var list=((f.sidos||{})[k]||[]);return {sido:k,fed:list.length>0,list:list,central:f.central||[]}})}
+  function notifyApprovers(DB,sido,title,sidoLink,centralLink){return approversOf(DB,sido).then(function(a){var to=a.fed?a.list.map(function(x){return x.uid}):a.central;var seen={};
+    var ps=to.filter(function(u){if(!u||seen[u])return false;seen[u]=1;return true}).map(function(u){try{return window.KFDF&&KFDF.notify?KFDF.notify(u,title,a.fed?sidoLink:centralLink):null}catch(e){return null}});
+    return Promise.all(ps).then(function(){return a})})}
+  // 학년 추정 (학년도 · 생년 · 학교급) — 3월 입학 기준, 범위를 벗어나면 ''
+  function gradeOf(year,birth,level){var by=parseInt(String(birth||'').slice(0,4),10);if(!year||!by)return '';var g=year-by-6;if(level==='중')g-=6;else if(level==='고')g-=9;var max=level==='초'?6:3;return (g>=1&&g<=max)?String(g):''}
   window.SCC={SIDO:SIDO,SIDO_LIST:SIDO_LIST,SPORTS:SPORTS.map(function(x){return [x[0],x[1]]}),DIV:DIV,LEVEL:LEVEL,STAGE_ORDER:STAGE_ORDER,
     esc:esc,norm:norm,canon:canon,sidoOf:sidoOf,sidoNorm:sidoNorm,sportCode:sportCode,sportName:sportName,divCode:divCode,levelOf:levelOf,
-    scid:scid,parseId:parseId,schoolYear:schoolYear,rankOf:rankOf,rankLabel:rankLabel,stageOf:stageOf,mask:mask,stageBadge:stageBadge,statsOf:statsOf};
+    scid:scid,parseId:parseId,loadFeds:loadFeds,approversOf:approversOf,notifyApprovers:notifyApprovers,gradeOf:gradeOf,schoolYear:schoolYear,rankOf:rankOf,rankLabel:rankLabel,stageOf:stageOf,mask:mask,stageBadge:stageBadge,statsOf:statsOf};
 })();

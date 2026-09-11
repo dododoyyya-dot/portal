@@ -4605,9 +4605,29 @@ function __ustart(){
   });
   return __ULREADY;
 }
+// [승인 경로 2026-09-11] 시도연맹 담당자(시도임원·클럽승인 권한자) 명단을 공개 문서 siteContent/sidoFeds 에 정리합니다.
+//   클럽·학교클럽 신청 시 이 명단으로 관할 시도연맹에 알림을 보내고, 담당자가 없는 시도는 중앙(관리자)에게 보냅니다.
+let SIDOFEDS=null,__FEDSYNC=false;
+async function syncSidoFeds(){
+  if(__FEDSYNC||IS_SIDO||!window.SCC)return;__FEDSYNC=true;
+  try{
+    const m={},central=[];
+    USERS.forEach(d=>{const v=d.data()||{};if(v.deleted||v.status!=='approved')return;const roles=[v.role].concat(v.roles||[]);
+      if(v.owner===true||roles.indexOf('admin')>=0)central.push(d.id);
+      const add=(s,kind)=>{const k=SCC.sidoNorm(s);if(!k)return;m[k]=m[k]||[];if(!m[k].some(x=>x.uid===d.id))m[k].push({uid:d.id,name:v.name||'',kind:kind})};
+      if(roles.indexOf('sidoOfficer')>=0&&v.sido)add(v.sido,'시도임원');
+      if(v.clubAdminSido)add(v.clubAdminSido,'클럽승인');
+    });
+    SIDOFEDS={sidos:m,central:central};
+    const cur=await DB.collection('siteContent').doc('sidoFeds').get().catch(()=>null);
+    const same=cur&&cur.exists&&JSON.stringify(cur.data().sidos||{})===JSON.stringify(m)&&JSON.stringify(cur.data().central||[])===JSON.stringify(central);
+    if(!same)await DB.collection('siteContent').doc('sidoFeds').set({sidos:m,central:central,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  }catch(e){console.warn('sidoFeds',e);__FEDSYNC=false}
+}
+function clubRouteOf(c){const k=window.SCC?SCC.sidoNorm(c.sido):c.sido;const list=((SIDOFEDS&&SIDOFEDS.sidos)||{})[k]||[];return {fed:list.length>0,names:list.map(x=>x.name).join('·'),sido:k}}
 async function loadUsers(){
   if(!IS_SIDO){
-    try{await __ustart();await loadLicenses();renderUsers();pcUpdateBadge();return}
+    try{await __ustart();await loadLicenses();renderUsers();pcUpdateBadge();syncSidoFeds();return}
     catch(e){console.warn('회원 실시간 구독 실패 → 한 번 조회 방식으로',e)}
   }
   // [권한] 회원 목록을 볼 수 없는 계정이면 '불러오는 중…' 에서 멈추지 않고 이유를 알려줍니다.
@@ -6045,6 +6065,7 @@ function renderClubsAdmin(){
       +(c.code?' <span style="font-size:11px;font-weight:800;color:#b8860b">코드: '+esc(c.code)+'</span>':'')
       +'<div class="sub3">클럽장 '+esc(c.ownerName||'')+((c.temp||c.status==='임시')?' <b style="color:#8a5a00">🧒학생(임시)</b>':' <b style="color:#0f766e">✓성인</b>')+' · 회원 '+((c.memberUids||[]).length)+'명 · 가입대기 '+((c.pendingUids||[]).length)+'명'+(c.intro?'<br>'+esc(c.intro):'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +((c.status==='대기'&&SIDOFEDS)?(()=>{const r=clubRouteOf(c);return '<div style="width:100%;font-size:12px;font-weight:800;color:'+(r.fed?'#8a5a00':'#153A77')+';margin-bottom:4px">'+(r.fed?'관할 '+esc(r.sido)+' 시도연맹 승인 대상 ('+esc(r.names)+') — 클럽 페이지 「내 클럽」의 관할 클럽 승인에서 처리합니다':'중앙 승인 대상 — '+esc(r.sido||'시도 미상')+'에 시도연맹 담당자가 없습니다')+'</div>'})():'')
       +(c.status!=='승인'?'<button class="btn-sub" style="background:#0f766e" onclick="approveClub(\''+d.id+'\')">✓ 승인</button>':'')
       +(c.clubType==='external'?'<button class="btn-sub" style="background:#1F4E9C" onclick="absorbClub(\''+d.id+'\',\''+esc(c.name)+'\')">🔁 연맹 클럽으로 전환</button>':'')
       +'<button class="btn-sub" style="background:#8a919d" onclick="toggleClubHidden(\''+d.id+'\','+(!c.hidden)+')">'+(c.hidden?'👁 노출':'🙈 숨김')+'</button>'
@@ -6055,6 +6076,8 @@ function renderClubsAdmin(){
 async function approveClub(id){
   const c=(await DB.collection('clubs').doc(id).get()).data();
   if(IS_SIDO && !sameSidoClub(c)){alert('관할 시도가 아닌 클럽입니다.');return;}
+  // [승인 경로] 관할 시도연맹이 있는 곳은 시도연맹이 승인합니다 — 중앙은 대신 처리할 때만 확인 후 진행
+  if(!IS_SIDO&&SIDOFEDS&&c&&c.status==='대기'){const r=clubRouteOf(c);if(r.fed&&!confirm('['+(c.name||'')+'] 은(는) 관할 '+r.sido+' 시도연맹('+r.names+') 승인 대상입니다.\n중앙에서 대신 승인할까요?'))return}
   const upd={status:'승인'};
   // [연령] 승인해도 temp가 남아 '🧒학생(임시)' 배지가 계속 붙던 문제 —
   //        클럽장이 성인임이 확인된(성인 전환 신청) 경우 임시 표시를 함께 해제합니다.
@@ -6063,6 +6086,7 @@ async function approveClub(id){
     upd.adultConvertReq=firebase.firestore.FieldValue.delete();
   }
   await DB.collection('clubs').doc(id).update(upd);loadClubsAdmin();
+  try{if(c&&c.ownerUid)KFDF.notify(c.ownerUid,'✅ ['+(c.name||'')+'] 클럽 생성이 승인되었습니다 — 클럽 목록에 게시됩니다','club.html?view=mine')}catch(e){}
   loadExtClubMap().then(renderUsers).catch(()=>{});
 }
 // 흡수 전략: 타단체 클럽을 연맹 정식 클럽으로 전환(clubType만 변경, 회원·역사 유지)
@@ -8102,8 +8126,8 @@ async function dlGoodsCerts(){
   a.download='용품수령확인증_'+n+'개교_'+new Date().toISOString().slice(0,10)+'.zip';a.click();
 }
 </script>
-<script src="schoolclub_core.js?v=20260911a"></script>
-<script src="schoolclub_admin.js?v=20260911a"></script>
+<script src="schoolclub_core.js?v=20260911b"></script>
+<script src="schoolclub_admin.js?v=20260911b"></script>
 <script src="auth_ui.js?v=20260911a"></script>
 </body>
 </html>

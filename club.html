@@ -333,6 +333,7 @@ body[data-view] #clHead{display:none}
 <script src="kfdf.js?v=20260821"></script>
 <script src="site_config.js"></script>
 <script src="region_map.js?v=20260910a"></script>
+<script src="schoolclub_core.js?v=20260911b"></script>
 <script>
 KFDF.initApp();
 const AUTH=firebase.auth(),DB=firebase.firestore();
@@ -1022,7 +1023,10 @@ async function createClub(){
     if(sf){m.textContent='심볼 업로드 중…';m.style.color='#8a919d';
       try{const url=await uploadClubSymbol(ref.id,sf);await ref.update({symbol:url});}
       catch(e){console.warn('symbol',e);}}
-    alert('✓ '+(TEMP_CLUB?'임시클럽 생성 완료!':(ncType==='external'?'타 단체 소속 클럽 등록 신청 완료!':'클럽 생성 신청 완료!'))+(code?'\n\n귀 클럽의 고유 코드는 [ '+code+' ] 입니다.\n회원들에게 이 코드를 알려주면 코드로 바로 가입 신청할 수 있습니다.':'')+(ncType==='external'?'\n\n⚠ 타 단체 소속 클럽은 일반 클럽 찾기 목록에 노출되지 않습니다 — 코드를 아는 회원만 가입 신청할 수 있습니다.':'')+(TEMP_CLUB?'\n\n친구들을 초대해 보세요! 성인 회장 인수 후 연맹 승인을 받으면 정식 클럽이 됩니다.':'\n\n승인 후 클럽 목록에 게시됩니다.'));
+    // [승인 경로 2026-09-11] 관할 시도연맹 담당자에게(없으면 중앙에) 승인 요청 알림
+    let _route=null;
+    if(!TEMP_CLUB&&window.SCC){try{_route=await SCC.notifyApprovers(DB,sido,'🏠 ['+sido+' '+gugun+'] 「'+name+'」 클럽 생성 신청 — 승인해 주세요','club.html?view=mine','admin.html?tab=4')}catch(e){}}
+    alert((_route?(_route.fed?'관할 '+_route.sido+' 시도연맹에서 승인합니다.\n':'관할 시도연맹이 없어 중앙 사무국에서 승인합니다.\n'):'')+'✓ '+(TEMP_CLUB?'임시클럽 생성 완료!':(ncType==='external'?'타 단체 소속 클럽 등록 신청 완료!':'클럽 생성 신청 완료!'))+(code?'\n\n귀 클럽의 고유 코드는 [ '+code+' ] 입니다.\n회원들에게 이 코드를 알려주면 코드로 바로 가입 신청할 수 있습니다.':'')+(ncType==='external'?'\n\n⚠ 타 단체 소속 클럽은 일반 클럽 찾기 목록에 노출되지 않습니다 — 코드를 아는 회원만 가입 신청할 수 있습니다.':'')+(TEMP_CLUB?'\n\n친구들을 초대해 보세요! 성인 회장 인수 후 연맹 승인을 받으면 정식 클럽이 됩니다.':'\n\n승인 후 클럽 목록에 게시됩니다.'));
     m.textContent='✓ 생성 신청 완료'+(code?' — 클럽 코드 ['+code+']':'');m.style.color='#0f766e';
     document.getElementById('ncName').value='';document.getElementById('ncSymbol').value='';
     document.getElementById('ncOrgName').value='';
@@ -1206,17 +1210,40 @@ async function loadSidoApprovals(){
           +(c.intro?'<div class="cmeta2">'+kesc(c.intro)+'</div>':'')+'</div>';
       }).join('');
   }catch(e){box.style.display='block';document.getElementById('sidoApproveList').innerHTML='<div style="font-size:12.5px;color:#C41E2F">불러오기 실패: '+kesc(e.message)+'</div>';}
+  // [학교스포츠클럽 승인 2026-09-11] 지도교사가 신청한 학교클럽(schoolClubs status '대기') — 관할 시도연맹이 승인
+  try{
+    let q2=DB.collection('schoolClubs').where('status','==','대기');
+    if(sido&&!isAdm)q2=q2.where('sido','==',sido);
+    const s2=await q2.limit(80).get();
+    const list=document.getElementById('sidoApproveList');
+    if(s2.size&&list){box.style.display='block';
+      list.insertAdjacentHTML('beforeend','<div style="font-weight:900;font-size:13.5px;color:#0f766e;margin:14px 0 6px">학교스포츠클럽 승인 대기 '+s2.size+'팀</div>'+s2.docs.map(d=>{const c=d.data();
+        return '<div class="clubcard" style="margin-bottom:8px;padding:12px 16px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="cname">'+kesc(c.teamName||c.schoolName)+'</span><span class="cpill2" style="background:#0f766e">'+kesc(c.schoolName||'')+' · '+kesc((window.SCC&&SCC.DIV[c.division])||'')+'</span>'
+          +'<span style="font-size:12px;color:#8a919d">'+kesc(c.sido||'')+' · 지도교사 '+kesc(c.coachName||'')+'</span><span style="flex:1"></span>'
+          +'<a class="cbtn cbtn-soft" style="padding:5px 12px;text-decoration:none" href="schoolclub.html?id='+encodeURIComponent(d.id)+'" target="_blank">보기</a>'
+          +'<button class="cbtn cbtn-teal" style="padding:5px 14px" onclick="scApprove(\''+d.id+'\',true)">✓ 승인</button><button class="cbtn" style="padding:5px 14px;background:#eceff4;color:#666" onclick="scApprove(\''+d.id+'\',false)">반려</button></div></div>'}).join(''))}
+  }catch(e){console.warn('schoolClubs pending',e)}
+}
+async function scApprove(id,ok){
+  const reason=ok?'':(prompt('반려 사유를 입력해 주세요 (지도교사에게 전달됩니다)','')||'');
+  if(!ok&&!reason.trim())return;
+  try{const ref=DB.collection('schoolClubs').doc(id);const c=(await ref.get()).data()||{};
+    await ref.update(ok?{status:'운영',approvedBy:KMY.name||'',approvedAt:firebase.firestore.FieldValue.serverTimestamp()}:{status:'반려',rejectReason:reason.trim(),approvedBy:KMY.name||''});
+    if(c.coachUid)KFDF.notify(c.coachUid,ok?'✅ 학교스포츠클럽 ['+(c.teamName||'')+'] 등록이 승인되었습니다 — 대회 학교팀 신청에서 선택할 수 있습니다':'학교스포츠클럽 ['+(c.teamName||'')+'] 등록이 반려되었습니다 — 사유: '+reason.trim(),'schoolclub.html?id='+encodeURIComponent(id));
+    alert(ok?'승인했습니다.':'반려했습니다.');loadSidoApprovals();
+  }catch(e){alert('처리 실패: '+(e.code==='permission-denied'?'관할 권한이 없습니다 (보안 규칙 v28 게시 확인)':e.message))}
 }
 async function sidoApprove(id){
   try{
     await DB.collection('clubs').doc(id).update({status:'승인'});
+    try{const c0=(await DB.collection('clubs').doc(id).get()).data()||{};if(c0.ownerUid)KFDF.notify(c0.ownerUid,'✅ ['+(c0.name||'')+'] 클럽 생성이 승인되었습니다 — 클럽 목록에 게시됩니다','club.html?view=mine')}catch(e){}
     alert('승인되었습니다. 클럽 목록에 게시됩니다.');
     loadSidoApprovals();loadClubs();
   }catch(e){alert('승인 실패: '+(e.code==='permission-denied'?'관할 권한이 없습니다':e.message))}
 }
 async function sidoReject(id){
   if(!confirm('이 클럽 생성 신청을 반려할까요?'))return;
-  try{await DB.collection('clubs').doc(id).update({status:'반려'});loadSidoApprovals();}
+  try{await DB.collection('clubs').doc(id).update({status:'반려'});try{const c0=(await DB.collection('clubs').doc(id).get()).data()||{};if(c0.ownerUid)KFDF.notify(c0.ownerUid,'['+(c0.name||'')+'] 클럽 생성 신청이 반려되었습니다 — 관할 시도연맹에 문의해 주세요','club.html?view=mine')}catch(e){}loadSidoApprovals();}
   catch(e){alert('반려 실패: '+(e.code==='permission-denied'?'관할 권한이 없습니다':e.message))}
 }
 // ── 보호자 연동 완료된 학생: 소속 클럽의 임시회원 표시 자동 해제 ──

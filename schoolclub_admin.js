@@ -1,4 +1,4 @@
-// v20260911a · 관리자 [학교스포츠클럽] 탭 — 학교클럽 등록·목록·통합, 과거 자료 4종 업로드(미리보기→백업→시험 1곳→나머지→되돌리기), 통계 다시 계산, 일반 클럽 연결
+// v20260911b · 관리자 [학교스포츠클럽] 탭 — 학교클럽 등록·목록·통합, 과거 자료 4종 업로드(미리보기→백업→시험 1곳→나머지→되돌리기), 통계 다시 계산, 일반 클럽 연결
 //   admin.html 의 전역(DB, esc, CMY, IS_SIDO, ExcelJS, scLoadXlsx, scCell, scDate, scDownload, KFDF)을 씁니다. 계산 규칙은 schoolclub_core.js(SCC)
 //   컬렉션: schoolClubs/{학교코드_종목_부} · scSeasons/{ID_학년도}(공개, 이름 가림) · scRosters/{ID_학년도}(비공개 실명) · scMatches/{결정적 ID} · scImports/{업로드 ID}
 //           대회 결과는 기존 schoolClubEvents(대회 결과 페이지 공개)에 합칩니다 — 팀마다 scid·rank, 문서에 scids[]·stage·year
@@ -44,9 +44,9 @@
   };
   function renderList(){
     var b=box();var q=SCC.norm(LF.q).toLowerCase();var keepBar=!!document.getElementById('sccTbl');
-    var rows=CLUBS.filter(function(c){if(LF.show==='on'&&(c.mergedInto||c.status==='숨김'))return false;if(LF.sido&&c.sido!==LF.sido)return false;if(LF.level&&c.level!==LF.level)return false;if(LF.sport&&c.sportCode!==LF.sport)return false;
+    var rows=CLUBS.filter(function(c){if(LF.show==='on'&&(c.mergedInto||c.status==='숨김'||c.status==='반려'))return false;if(LF.sido&&c.sido!==LF.sido)return false;if(LF.level&&c.level!==LF.level)return false;if(LF.sport&&c.sportCode!==LF.sport)return false;
       if(q&&(SCC.norm(c.teamName)+' '+SCC.norm(c.schoolName)+' '+SCC.norm(c.eduOffice)+' '+c.id).toLowerCase().indexOf(q)<0)return false;return true})
-      .sort(function(a,z){return ((z.stats&&z.stats.events)||0)-((a.stats&&a.stats.events)||0)||String(a.schoolName||'').localeCompare(String(z.schoolName||''))});
+      .sort(function(a,z){return ((z.status==='대기')-(a.status==='대기'))||((z.stats&&z.stats.events)||0)-((a.stats&&a.stats.events)||0)||String(a.schoolName||'').localeCompare(String(z.schoolName||''))});
     var sel=function(id,opts,val,fn){return '<select onchange="'+fn+'(this.value)" style="width:auto;padding:6px 10px;font-size:12.5px">'+opts.map(function(o){return '<option value="'+E(o[0])+'"'+(o[0]===val?' selected':'')+'>'+E(o[1])+'</option>'}).join('')+'</select>'};
     var h='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><b style="font-size:15px">📋 학교스포츠클럽 '+rows.length+'팀</b><span style="flex:1"></span>'
       +'<input placeholder="팀명·학교·교육지원청·ID" value="'+E(LF.q)+'" oninput="sccLF(\'q\',this.value)" style="width:200px;padding:6px 10px;font-size:12.5px">'
@@ -62,14 +62,25 @@
         return '<tr><td><a href="schoolclub.html?id='+encodeURIComponent(c.id)+'" target="_blank" style="font-weight:800;color:#153A77">'+E(c.teamName||'-')+'</a><div style="font-size:11px;color:#8a919d">'+E(c.id)+'</div></td>'
           +'<td>'+E(c.schoolName||'')+' <span style="color:#8a919d">('+E(kindLabel(c.level))+')</span></td><td>'+E(c.sport||SCC.sportName(c.sportCode))+' · '+E(SCC.DIV[c.division]||c.division||'')+'</td>'
           +'<td>'+E(c.sido||'')+(c.gugun?' '+E(c.gugun):'')+(c.eduOffice?'<div style="font-size:11px;color:#6b7280">'+E(c.eduOffice)+'</div>':'')+'</td><td>'+E(c.foundedYear||'')+'</td><td>'+E(c.coachName||'')+'</td>'
-          +'<td>'+(st.events||0)+'회 · '+E(best)+'</td><td>'+(c.mergedInto?'<span style="color:#8a919d">통합→'+E(c.mergedInto)+'</span>':(c.status==='숨김'?'<span style="color:#8a919d">숨김</span>':'운영'))+(c.fromClubId?'<div style="font-size:11px;color:#7c3aed">일반 클럽 연결</div>':'')+'</td>'
-          +'<td style="white-space:nowrap"><button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#153A77" onclick="sccEdit(\''+c.id+'\')">수정</button> '
+          +'<td>'+(st.events||0)+'회 · '+E(best)+'</td><td>'+(c.mergedInto?'<span style="color:#8a919d">통합→'+E(c.mergedInto)+'</span>':(c.status==='숨김'?'<span style="color:#8a919d">숨김</span>':(c.status==='대기'?'<b style="color:#b8860b">승인 대기</b><div style="font-size:11px;color:#6b7280">'+E(routeTxt(c))+'</div>':(c.status==='반려'?'<span style="color:#C41E2F">반려</span>':'운영'))))+(c.fromClubId?'<div style="font-size:11px;color:#7c3aed">일반 클럽 연결</div>':'')+'</td>'
+          +'<td style="white-space:nowrap">'+(c.status==='대기'?'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#0f766e" onclick="sccDecide(\''+c.id+'\',true)">승인</button> <button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#fff;color:#C41E2F;border:1px solid #C41E2F" onclick="sccDecide(\''+c.id+'\',false)">반려</button> ':'')+'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#153A77" onclick="sccEdit(\''+c.id+'\')">수정</button> '
           +(c.mergedInto?'':'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#7c3aed" onclick="sccMerge(\''+c.id+'\')">통합</button> ')
           +'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#8a919d" onclick="sccHide(\''+c.id+'\')">'+(c.status==='숨김'?'복원':'숨김')+'</button></td></tr>'}).join('')
       +'</tbody></table></div>'+(rows.length>300?'<div style="font-size:12px;color:#6b7280;margin-top:6px">앞 300팀만 표시 — 검색·필터로 좁혀 주세요.</div>':'');
     if(keepBar){document.getElementById('sccTbl').innerHTML=t;var c0=document.getElementById('sccCnt');if(c0)c0.textContent=rows.length;return}
     b.innerHTML=h.replace('📋 학교스포츠클럽 '+rows.length+'팀','📋 학교스포츠클럽 <span id="sccCnt">'+rows.length+'</span>팀')+'<div id="sccTbl">'+t+'</div>';
   }
+  function routeTxt(c){var f=(typeof SIDOFEDS!=='undefined'&&SIDOFEDS)?SIDOFEDS.sidos[c.sido]||[]:null;if(!f)return '';return f.length?('관할 '+c.sido+' 시도연맹 승인 대상'):'중앙 승인 대상 (시도연맹 없음)'}
+  window.sccDecide=async function(id,ok){
+    var c=CLUBS.find(function(x){return x.id===id});if(!c)return;
+    if(isSido()&&c.sido!==mySido()){alert('관할 시도가 아닙니다.');return}
+    var f=(typeof SIDOFEDS!=='undefined'&&SIDOFEDS)?(SIDOFEDS.sidos[c.sido]||[]):[];
+    if(!isSido()&&f.length&&!confirm('['+(c.teamName||id)+'] 은(는) 관할 '+c.sido+' 시도연맹('+f.map(function(x){return x.name}).join('·')+') 승인 대상입니다.\n중앙에서 대신 처리할까요?'))return;
+    var reason=ok?'':(prompt('반려 사유 (지도교사에게 전달됩니다)','')||'');if(!ok&&!reason.trim())return;
+    try{await DB.collection('schoolClubs').doc(id).update(ok?{status:'운영',approvedBy:me(),approvedAt:FV().serverTimestamp()}:{status:'반려',rejectReason:reason.trim(),approvedBy:me()});
+      if(c.coachUid)try{KFDF.notify(c.coachUid,ok?'✅ 학교스포츠클럽 ['+(c.teamName||'')+'] 등록이 승인되었습니다 — 대회 학교팀 신청에서 선택할 수 있습니다':'학교스포츠클럽 ['+(c.teamName||'')+'] 등록이 반려되었습니다 — 사유: '+reason.trim(),'schoolclub.html?id='+encodeURIComponent(id))}catch(e){}
+      c.status=ok?'운영':'반려';renderList()}catch(e){alert('처리 실패: '+e.message)}
+  };
   window.sccLF=function(k,v){LF[k]=v;clearTimeout(window.__sccLFt);window.__sccLFt=setTimeout(renderList,200)};
   window.sccLFs=function(v){LF.sido=v;renderList()};window.sccLFl=function(v){LF.level=v;renderList()};window.sccLFp=function(v){LF.sport=v;renderList()};window.sccLFv=function(v){LF.show=v;renderList()};
 
@@ -90,7 +101,7 @@
       +'<div><label>창단 학년도</label><input id="sccFounded" inputmode="numeric" value="'+v('foundedYear')+'" placeholder="예: 2017"></div>'
       +'<div><label>시군구</label><input id="sccGugun" value="'+v('gugun')+'" placeholder="예: 해운대구"></div>'
       +'<div><label>관할 교육지원청</label><input id="sccEdu" value="'+v('eduOffice')+'" placeholder="예: 해운대교육지원청"></div>'
-      +'<div><label>지도교사</label><input id="sccCoach" value="'+v('coachName')+'"></div>'
+      +'<div><label>지도교사</label><div style="display:flex;gap:6px"><input id="sccCoach" value="'+v('coachName')+'" style="flex:1"><button class="btn-sub" style="background:#153A77" onclick="sccCoachFind()">계정 연결</button></div><div id="sccCoachList" style="font-size:12px;margin-top:4px">'+(c&&c.coachUid?'<span style="color:#0f766e">✓ 계정 연결됨 — 이 교사가 대회 학교팀 신청·명단 관리를 할 수 있습니다</span>':'<span style="color:#8a919d">계정을 연결하면 그 교사가 대회 학교팀 신청과 학년도 명단을 관리할 수 있습니다</span>')+'</div></div>'
       +'<div><label>한 줄 소개</label><input id="sccIntro" value="'+v('intro')+'" placeholder="예: 2017년 창단, 교육감배 3회 우승"></div>'
       +'</div><div style="display:flex;gap:8px;margin-top:12px"><button class="btn-sub" style="background:#0f766e" onclick="sccSave()">저장</button><button class="btn-sub" style="background:#8a919d" onclick="sccList()">목록으로</button></div><div id="sccEdMsg" style="font-size:12.5px;font-weight:700;margin-top:8px"></div>';
     b.innerHTML=h;
@@ -101,11 +112,16 @@
     if(isSido())list=list.filter(function(x){return SCC.sidoOf(x.code)===mySido()});
     el.innerHTML=list.length?list.map(function(x){return '<label style="display:block;padding:3px 0;cursor:pointer"><input type="radio" name="sccSchPick" value="'+E(x.code)+'" onchange="sccSchPick(this.value)" style="width:auto;margin-right:6px">'+E(x.name)+' <span style="color:#6b7280">('+E(x.kind)+' · '+E(SCC.sidoOf(x.code))+')</span></label>'}).join(''):'<span style="color:#C41E2F">검색 결과가 없습니다</span>';
   };
+  window.sccCoachFind=function(){var q=SCC.norm((document.getElementById('sccCoach')||{}).value);var el=document.getElementById('sccCoachList');
+    var list=(typeof USERS!=='undefined'?USERS:[]).filter(function(d){var v=d.data()||{};return !v.deleted&&v.status==='approved'&&SCC.norm(v.name)===q}).slice(0,10);
+    el.innerHTML=list.length?list.map(function(d){var v=d.data();return '<label style="display:block;cursor:pointer;padding:2px 0"><input type="radio" name="sccCoachPick" value="'+d.id+'" onchange="sccCoachPick(this.value)" style="width:auto;margin-right:6px">'+E(v.name)+' <span style="color:#6b7280">('+E(({teacher:'교사',instructor:'지도자',general:'일반',athlete:'선수'})[v.accountType]||v.accountType||'-')+(v.workSchool?' · '+E(v.workSchool):'')+(v.phone?' · '+E(String(v.phone).slice(-4)):'')+')</span></label>'}).join(''):'<span style="color:#C41E2F">같은 이름의 승인 회원이 없습니다 (회원 목록을 먼저 불러오세요)</span>'};
+  window.sccCoachPick=function(uid){ED.coachUid=uid};
   window.sccSchPick=function(code){ED.code=code;var s=BY_CODE[code];if(s){document.getElementById('sccSch').value=s.name}};
   window.sccSave=async function(){
     var m=document.getElementById('sccEdMsg');var g=function(id){var e=document.getElementById(id);return e?String(e.value||'').trim():''};
     try{
       var patch={teamName:g('sccTeam'),foundedYear:g('sccFounded')?(+g('sccFounded')||g('sccFounded')):'',gugun:g('sccGugun'),eduOffice:g('sccEdu'),coachName:g('sccCoach'),intro:g('sccIntro'),updatedAt:FV().serverTimestamp(),by:me()};
+      if(ED.coachUid)patch.coachUid=ED.coachUid;
       if(ED.id){if(!patch.teamName)delete patch.teamName;await DB.collection('schoolClubs').doc(ED.id).update(patch);m.textContent='✓ 저장했습니다';m.style.color='#0f766e';await loadClubs(true);return}
       if(!ED.code){m.textContent='학교를 검색해 목록에서 골라 주세요';m.style.color='#C41E2F';return}
       var s=BY_CODE[ED.code];var sp=g('sccSport')||'FD',dv=g('sccDiv')||'X';var id=SCC.scid(ED.code,sp,dv);
