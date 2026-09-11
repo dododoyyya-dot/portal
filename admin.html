@@ -316,6 +316,7 @@ function eduWho(v){return (v.name||'')+' ('+(v.birth||'생년월일 없음')+' �
         <button class="btn-sub" style="background:#C41E2F" onclick="qualFixScan()">🎖 미검증 급수 정리</button>
         <button class="btn-sub" style="background:#1F4E9C" onclick="memberNoScan()">🔢 회원 고유번호 부여</button>
         <button class="btn-sub" style="background:#0e7490" onclick="typeFixScan()">🧩 회원 유형 누락 정리</button>
+        <button class="btn-sub" style="background:#0e7490" onclick="utCleanScan()" title="선수→학생 등 유형을 바꾼 뒤 남은 세부 구분·클럽 임시회원 표시 정리">🧩 유형 변경 후 남은 표시 정리</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="sidoKeyScan()">🗺 관할 시도 키 채우기</button>
         <button class="btn-sub" style="background:#8a5a00" onclick="noBirthScan()">🎂 생년월일 미입력 회원</button>
         <button class="btn-sub" style="background:#0e7490" onclick="ncWaiveScan()">🏅 국가자격 승인차단 해제</button>
@@ -334,6 +335,7 @@ function eduWho(v){return (v.name||'')+' ('+(v.birth||'생년월일 없음')+' �
       <div id="ageMigBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="qualFixBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="memberNoBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
+      <div id="utCleanBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="typeFixBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="sidoKeyBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="noBirthBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
@@ -7363,6 +7365,7 @@ async function pcApprove(uid){
       if(p.kind==='type')patch.typeConvertedAt=firebase.firestore.FieldValue.serverTimestamp();
       patch.pendingChanges=del;
       await DB.collection('users').doc(uid).update(patch);
+      if(p.kind==='type'){try{const d0=USERS.find(x=>x.id===uid);await utSyncClubTemp(uid,Object.assign({},d0?d0.data():{},p.patch||{}))}catch(e){console.warn('club temp sync',e)}}
       alert('✓ 정보 수정이 반영되었습니다: '+Object.keys(p.patch||{}).join(', '));
     }else{
       alert('알 수 없는 요청 유형입니다: '+(p.kind||''));return;
@@ -7628,16 +7631,70 @@ function convertUserType(uid){
     +'</div></div>';
   document.body.appendChild(ov);
 }
+// [유형 변경 정리] 새 유형에 맞지 않는 세부 구분(memberClass)·미성년 표시(isMinor)를 함께 고칩니다 (빈 값 '' — 결재 요청에도 그대로 실림)
+function utExtraPatch(v,at){
+  const p={};const mc=String(v.memberClass||'');const minor=isMinorNow(v.birth);
+  if(at==='student'){if(mc)p.memberClass='';if(minor!==false)p.isMinor=true}
+  else if(at==='athlete'){if(mc.indexOf('선수')!==0)p.memberClass='선수·무소속'}
+  else if(at==='general'){if(mc&&['학부모','서포터즈','협력기관'].indexOf(mc)<0)p.memberClass=''}
+  else if(mc)p.memberClass='';
+  if(at!=='student'&&v.isMinor&&minor===false)p.isMinor=false;
+  return p;
+}
+// [유형 변경 정리] 소속 클럽의 임시회원 표시 — 보호자 미연동 미성년 학생이면 tempUids 에 넣고, 성인 유형이 되면 뺍니다
+function utNeedTemp(v){return (v.accountType==='student'||v.memberGroup==='student')&&!v.guardianUid&&isMinorNow(v.birth)!==false}
+async function utSyncClubTemp(uid,v){
+  const need=utNeedTemp(v);const FV=firebase.firestore.FieldValue;
+  const s=await DB.collection('clubs').where('memberUids','array-contains',uid).get();let changed=0;
+  for(const d of s.docs){const c=d.data()||{};const has=(c.tempUids||[]).indexOf(uid)>=0;
+    if(need&&!has){await d.ref.update({tempUids:FV.arrayUnion(uid)});changed++}
+    else if(!need&&has&&!(v.accountType==='student'||v.memberGroup==='student')){await d.ref.update({tempUids:FV.arrayRemove(uid)});changed++}}
+  return {clubs:s.size,changed:changed};
+}
+// ══ [유형 변경 정리 도구] 이미 남은 옛 표시 정리 — 미리보기(쓰기 0) → 백업 JSON → 1명 시험 → 전체 ══
+let UTC=null;
+async function utCleanScan(){
+  const b=document.getElementById('utCleanBox');b.style.display='block';b.innerHTML='회원·클럽을 대조하는 중…';
+  try{
+    if(!USERS.length)await loadUsers();
+    const cs=await DB.collection('clubs').get();const items=[];
+    USERS.forEach(d=>{const v=d.data()||{};if(v.deleted)return;const at=v.accountType||uTypeOf(v);
+      const p=utExtraPatch(Object.assign({},v),at);delete p.isMinor;   // 미성년 표시는 도구에서 건드리지 않음(성인 전환 도구 몫)
+      const clubs=[];cs.docs.forEach(c=>{const x=c.data()||{};if((x.memberUids||[]).indexOf(d.id)<0)return;const has=(x.tempUids||[]).indexOf(d.id)>=0;const need=utNeedTemp(Object.assign({},v,{accountType:at}));
+        if(need&&!has)clubs.push({id:c.id,name:x.name||'',op:'add'});else if(!need&&has&&at!=='student')clubs.push({id:c.id,name:x.name||'',op:'remove'})});
+      if(Object.keys(p).length||clubs.length)items.push({uid:d.id,name:v.name||'',at:at,mc:v.memberClass||'',patch:p,clubs:clubs})});
+    UTC={items:items,backed:false,done:{}};
+    b.innerHTML='<b style="font-size:15px">🧩 유형 변경 후 남은 표시 정리 — 미리보기 (쓰기 0건)</b>'
+      +'<div style="font-size:12.5px;color:#6b7280;margin:6px 0 10px;line-height:1.7">예: 선수로 가입했다가 학생회원으로 바뀐 회원의 「선수·타소속」 표시, 보호자 미연동 학생인데 클럽에 임시회원 표시가 없는 경우. 회원 유형 자체는 바꾸지 않습니다.</div>'
+      +(items.length?'<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th>회원</th><th>유형</th><th>세부 구분</th><th>클럽 임시회원 표시</th></tr></thead><tbody>'+items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(UTYPE_NAME[x.at]||x.at)+'</td><td>'+(x.patch.memberClass!==undefined?esc(x.mc||'-')+' → <b>'+esc(x.patch.memberClass||'(지움)')+'</b>':'-')+'</td><td>'+(x.clubs.length?x.clubs.map(c=>esc(c.name)+' '+(c.op==='add'?'<b style="color:#b8860b">임시 표시 추가</b>':'<b style="color:#0f766e">임시 표시 해제</b>')).join('<br>'):'-')+'</td></tr>').join('')+'</tbody></table></div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn-sub" style="background:#153A77" onclick="utCleanBackup()">💾 백업 JSON</button><button class="btn-sub" style="background:#b8860b" onclick="utCleanApply(1)">🧪 1명 시험 적용</button><button class="btn-sub" style="background:#0f766e" onclick="utCleanApply(0)">✅ 전체 적용 ('+items.length+'명)</button></div><div id="utCleanMsg" style="margin-top:8px;font-size:13px"></div>'
+        :'<div style="color:#0f766e;font-weight:800">✓ 정리할 회원이 없습니다.</div>');
+  }catch(e){b.innerHTML='<b style="color:#C41E2F">조회 실패: '+esc(e.message)+'</b>'}
+}
+function utCleanBackup(){if(!UTC)return;const bk=UTC.items.map(x=>{const d=USERS.find(u=>u.id===x.uid);const v=d?d.data():{};return {uid:x.uid,name:x.name,memberClass:v.memberClass||'',clubs:x.clubs}});
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({at:new Date().toISOString(),items:bk},null,1)],{type:'application/json'}));a.download='유형변경정리_백업_'+new Date().toISOString().slice(0,10)+'.json';a.click();UTC.backed=true;
+  document.getElementById('utCleanMsg').innerHTML='<b style="color:#0f766e">✓ 백업을 받았습니다.</b>'}
+async function utCleanApply(one){
+  if(!UTC)return;if(!UTC.backed){alert('먼저 [💾 백업 JSON]을 받아 주세요.');return}
+  const todo=UTC.items.filter(x=>!UTC.done[x.uid]).slice(0,one?1:1e9);if(!todo.length){alert('남은 대상이 없습니다.');return}
+  if(!one&&!confirm(todo.length+'명을 정리할까요?'))return;
+  const m=document.getElementById('utCleanMsg');const FV=firebase.firestore.FieldValue;let n=0,fail=0;
+  for(const x of todo){try{if(Object.keys(x.patch).length)await DB.collection('users').doc(x.uid).update(x.patch);
+      for(const c of x.clubs)await DB.collection('clubs').doc(c.id).update({tempUids:c.op==='add'?FV.arrayUnion(x.uid):FV.arrayRemove(x.uid)});
+      UTC.done[x.uid]=1;n++}catch(e){fail++;console.warn('utclean',x.name,e)}}
+  m.innerHTML='<b style="color:#0f766e">✓ '+(one?'시험 적용':'적용')+' '+n+'명</b>'+(fail?' · 실패 '+fail+'명':'')+(one?' — 회원 상세·클럽 화면에서 확인 후 전체 적용을 누르세요 ('+esc(todo[0].name)+')':'');
+}
 async function utApply(uid,at){
   const t=UTYPE_DEF.find(x=>x[0]===at);if(!t)return;
   const d=USERS.find(x=>x.id===uid);const v=d?d.data():{};const cur=v.accountType||'?';
   if(at===cur){alert('이미 해당 유형입니다.');return}
   if(!confirm((v.name||'')+' 님을 ['+(UTYPE_NAME[cur]||cur)+'] → ['+t[1]+'] 유형으로 변경할까요?'))return;
   closeTypeModal();
-  const patch={accountType:at,memberGroup:t[3],typeConvertedFrom:cur};
+  const patch=Object.assign({accountType:at,memberGroup:t[3],typeConvertedFrom:cur},utExtraPatch(v,at));
   if(typeof IS_SIDO!=='undefined'&&IS_SIDO){return pcRequest(uid,'type',{patch:patch})}
   try{
     await DB.collection('users').doc(uid).update(Object.assign({},patch,{typeConvertedAt:firebase.firestore.FieldValue.serverTimestamp()}));
+    try{const r=await utSyncClubTemp(uid,Object.assign({},v,patch));if(r.changed)console.log('club temp sync',r)}catch(e){console.warn('club temp sync',e)}
     if(typeof KFDF!=='undefined'&&KFDF.notify)KFDF.notify(uid,'회원 유형이 ['+t[1]+']로 변경되었습니다. 문의는 사무국(031-984-3248)','mypage.html');
     alert('✓ 유형 변경 완료: '+t[1]+(v.status==='approved'?'':'\n이제 [승인하기]로 승인할 수 있습니다.'));
     loadUsers();
