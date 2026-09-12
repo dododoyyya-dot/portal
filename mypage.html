@@ -2229,7 +2229,9 @@ function compressImg(file){
 let MYLOGS=[];
 function editLog(id){
   const l=MYLOGS.find(x=>x._id===id);if(!l)return;
-  if(l.teacherConfirm){alert('교사 확인이 완료된 회차는 수정할 수 없습니다.\n정정이 필요하면 사무국(031-984-3248)으로 요청해주세요.');return}
+  // [서명 후 정정 2026-09-12] 교사확인이 끝난 회차도 고칠 수 있습니다.
+  //   저장하면 교사확인이 「미확인」으로 되돌아가고(기존 서명은 editHistory 에 보존),
+  //   [📱 교사 확인 요청] 으로 다시 확인받아야 합니다 — 서명과 내용이 어긋나지 않게.
   const old=document.getElementById('elModal');if(old)old.remove();
   const div=document.createElement('div');div.id='elModal';
   div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';
@@ -2237,6 +2239,7 @@ function editLog(id){
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:480px;width:100%;max-height:92vh;overflow:auto;padding:22px">'
     +'<b style="font-size:16px">✏️ '+esc(l.session)+'회차 보고 수정</b>'
     +'<div style="font-size:12.5px;color:#666;margin:4px 0 12px">'+esc(l.school||'')+' · '+esc(l.date||'')+'</div>'
+    +(l.teacherConfirm?'<div style="background:#fff7e6;border:1.5px solid #f0d48a;border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:12px;line-height:1.6">⚠ 이 회차는 <b>담당교사 확인(서명)이 끝난 회차</b>입니다 — '+esc((l.teacherConfirm||{}).name||'')+'.<br>저장하면 교사확인이 <b>「미확인」으로 되돌아가고</b>, 기존 서명은 <b>정정 이력에 보존</b>됩니다.<br>저장 후 <b>[📱 교사 확인 요청]</b>을 다시 눌러 담당교사에게 재확인을 받아주세요.</div>':'')
     +'<label style="font-size:12.5px;font-weight:800">수업일</label><input id="elDate" type="date" value="'+esc(l.date||'')+'" '+inp+'>'
     +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">참여 인원</label><input id="elCount" type="number" min="1" value="'+(l.count||'')+'" '+inp+'>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">남학생</label><input id="elMale" type="number" min="0" value="'+(l.male!=null?l.male:'')+'" oninput="elSumMF()" '+inp+'></div><div><label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">여학생</label><input id="elFemale" type="number" min="0" value="'+(l.female!=null?l.female:'')+'" oninput="elSumMF()" '+inp+'></div></div>'
@@ -2267,12 +2270,16 @@ function elDelPhoto(i){
 async function saveLogEdit(id){
   const m=document.getElementById('elMsg');
   const l=MYLOGS.find(x=>x._id===id);if(!l)return;
+  const WASCFM=l.teacherConfirm||null;   // [서명 후 정정] 정정 전 교사확인 — 해제하고 이력에 보존
   const date=document.getElementById('elDate').value;
   const elM=document.getElementById('elMale'),elF=document.getElementById('elFemale');
   const male=elM&&elM.value!==''?Math.max(0,parseInt(elM.value)||0):null,female=elF&&elF.value!==''?Math.max(0,parseInt(elF.value)||0):null;
   let cnt=parseInt(document.getElementById('elCount').value);if(male!=null&&female!=null&&male+female>0)cnt=male+female;
   const content=document.getElementById('elContent').value.trim();
   if(!date||!cnt||cnt<1||!content){m.textContent='수업일·참여 인원·수업 내용을 확인해주세요';m.style.color='#C41E2F';return}
+  if(WASCFM&&!confirm('['+(l.school||'')+'] '+l.session+'회차는 담당교사 확인(서명)이 끝난 회차입니다 — '+(WASCFM.name||'')+'.\n\n'
+    +'저장하면 교사확인이 「미확인」으로 되돌아가고, 기존 서명은 정정 이력에 보존됩니다.\n'
+    +'저장 후 [📱 교사 확인 요청] 을 다시 눌러 담당교사에게 재확인을 받아주세요.\n\n계속할까요?'))return;
   try{
     const photos=EL_PHOTOS.slice();
     const files=[...(document.getElementById('elPhotos').files||[])].slice(0,Math.max(0,3-photos.length));
@@ -2289,9 +2296,15 @@ async function saveLogEdit(id){
       date:date,count:cnt,male:male,female:female,content:content,
       note:document.getElementById('elNote').value.trim(),
       photos:photos,
+      teacherConfirm:null,   // [서명 후 정정] 없었으면 그대로 null, 있었으면 해제해 재확인 대상으로
+      editHistory:firebase.firestore.FieldValue.arrayUnion({
+        at:new Date().toISOString(),by:(MYD&&MYD.name)||'',uid:(AUTH.currentUser||{}).uid||'',role:'강사',
+        before:{date:l.date||'',count:(l.count!=null?l.count:null),male:(l.male!=null?l.male:null),female:(l.female!=null?l.female:null),content:l.content||'',note:l.note||'',photos:((l.photos||[]).length)},
+        voidedConfirm:WASCFM}),
       editedAt:firebase.firestore.FieldValue.serverTimestamp()});
     document.getElementById('elModal').remove();
-    alert('✓ '+l.session+'회차 보고가 수정되었습니다.'+(photos.length?'\n사진 '+photos.length+'장이 등록되었습니다.':''));
+    alert('✓ '+l.session+'회차 보고가 수정되었습니다.'+(photos.length?'\n사진 '+photos.length+'장이 등록되었습니다.':'')
+      +(WASCFM?'\n\n⚠ 교사확인이 「미확인」으로 되돌아갔습니다.\n[📱 교사 확인 요청] 을 눌러 담당교사에게 다시 확인을 받아주세요.':''));
     loadMyLogs();
   }catch(e){m.textContent='저장 실패: '+e.message;m.style.color='#C41E2F'}
 }
@@ -2883,8 +2896,9 @@ async function loadMyLogs(){
           +'<span><b>'+esc(l.session)+'회차</b> <span style="color:var(--gray)">'+esc(l.date)+'</span>'+(l.count?' · 👥'+esc(l.count):'')
             +(l.photos&&l.photos.length?' · <b style="color:#0f766e">📷'+l.photos.length+'</b>':' · <b style="color:#C41E2F">📷 사진 없음</b>')+'</span>'
           +'<span style="display:flex;gap:6px;align-items:center">'
-          +(l.teacherConfirm?'<b style="color:#0f766e">✓ '+esc(l.teacherConfirm.name)+'</b>':'<b style="color:#C41E2F">미확인</b>')
-          +(l.teacherConfirm?'':'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#b8860b" onclick="editLog(\''+l._id+'\')">✏️ 수정</button>')
+          +(l.teacherConfirm?'<b style="color:#0f766e">✓ '+esc(l.teacherConfirm.name)+'</b>'
+              :'<b style="color:#C41E2F">'+(((l.editHistory||[]).some(function(x){return x&&x.voidedConfirm}))?'정정 후 재확인 필요':'미확인')+'</b>')
+          +'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:'+(l.teacherConfirm?'#8a919d':'#b8860b')+'" title="'+(l.teacherConfirm?'교사확인 후 정정 — 저장하면 확인이 해제되어 재확인이 필요합니다':'회차 보고 수정')+'" onclick="editLog(\''+l._id+'\')">✏️ 수정</button>'
           +'</span></div>').join('')
         +'</div>';
     }).join('');

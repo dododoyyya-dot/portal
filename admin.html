@@ -3831,22 +3831,102 @@ async function copyNotice(id){
   navigator.clipboard.writeText(txt).then(()=>alert('✓ 통보문 전체가 복사되었습니다. 문자·메일에 붙여넣으세요.\n\n'+txt))
     .catch(()=>prompt('아래 내용을 복사하세요',txt));
 }
+// ══════════ [일지 정정 2026-09-12] 선정교 📒 일지 패널에서 사무국이 회차 보고를 정정 ══════════
+//   · 중앙 사무국(VIEWER_IS_ADMIN)만 보입니다. 시도임원·권역장 화면에는 버튼이 나오지 않습니다.
+//   · 사무국 정정은 교사확인(teacherConfirm)을 그대로 둡니다 — 담당교사와 확인한 내용만 고친다는 전제.
+//     (강사가 마이페이지에서 고치면 그때는 교사확인이 해제되고 재확인 대상이 됩니다)
+//   · 정정 전 값을 editHistory 에 쌓습니다(덮어쓰기 아님 → 되돌릴 근거 보존).
+//   · 활동 사진·회차 번호는 이 창에서 다루지 않습니다(사진은 강사 마이페이지, 회차는 재제출).
+var ALOGS={};
+function adLogSumMF(){
+  var m=document.getElementById('alMale'),f=document.getElementById('alFemale'),c=document.getElementById('alCount');
+  if(!m||!f||!c)return;
+  if(m.value!==''||f.value!=='')c.value=(parseInt(m.value)||0)+(parseInt(f.value)||0);
+}
+// 정정 이력 한 줄 — 누가 몇 번 고쳤는지 · 정정 전 값 · 정정으로 무효된 교사확인
+function adEditBadge(l){
+  var h=((l&&l.adminEdit)?[l.adminEdit]:[]).concat((l&&l.editHistory)||[]);   // [구 키 폴백] adminEdit 도 함께 표시
+  if(!h.length)return '';
+  var last=h[h.length-1]||{},b=last.before||null;
+  var voided=h.filter(function(x){return x&&x.voidedConfirm}).map(function(x){
+    return (x.voidedConfirm.name||'')+' '+String(x.voidedConfirm.at||'').replace('T',' ').slice(0,16);});
+  return '<div style="font-size:11.5px;font-weight:700;color:#b8860b;margin-top:2px">✏️ 정정 '+h.length+'회 · 마지막 '+esc(last.role||'사무국')+' '+esc(last.by||'')+' ('+esc(String(last.at||'').replace('T',' ').slice(0,16))+')'
+    +(b?' <span style="font-weight:600;color:#8a919d">— 정정 전: '+esc(b.date||'')+' · '+esc(String(b.count==null?'':b.count))+'명 · '+esc(b.content||'')+'</span>':'')
+    +(voided.length?'<br><span style="color:#C41E2F">⚠ 정정으로 무효된 교사확인: '+esc(voided.join(' / '))+' → 담당교사 재확인 필요</span>':'')
+    +'</div>';
+}
+function adEditLog(id){
+  if(!VIEWER_IS_ADMIN){alert('일지 정정은 중앙 사무국만 할 수 있습니다.');return}
+  var l=ALOGS[id];if(!l){alert('일지를 다시 불러온 뒤 시도해주세요. (📒 일지를 닫았다 다시 열기)');return}
+  var old=document.getElementById('alModal');if(old)old.remove();
+  var inp='style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;margin-top:4px;font-family:inherit;font-size:14px"';
+  var div=document.createElement('div');div.id='alModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:480px;width:100%;max-height:92vh;overflow:auto;padding:22px">'
+    +'<b style="font-size:16px">✏️ '+esc(String(l.session||''))+'회차 일지 정정 (사무국)</b>'
+    +'<div style="font-size:12.5px;color:#666;margin:4px 0 10px">'+esc(l.school||'')+' · 강사 '+esc(l.name||'')+'</div>'
+    +(l.teacherConfirm?'<div style="background:#fff7e6;border:1.5px solid #f0d48a;border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:10px;line-height:1.55">⚠ 이 회차는 <b>교사확인 완료</b>('+esc((l.teacherConfirm||{}).name||'')+')입니다. 사무국 정정은 <b>교사확인을 그대로 남기고</b> 정정 이력만 기록합니다. 실적 증빙이니 <b>담당교사와 확인한 내용만</b> 고쳐주세요.</div>':'')
+    +'<label style="font-size:12.5px;font-weight:800">수업일</label><input id="alDate" type="date" value="'+esc(l.date||'')+'" '+inp+'>'
+    +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">참여 인원(합계)</label><input id="alCount" type="number" min="1" value="'+(l.count||'')+'" '+inp+'>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">남학생</label><input id="alMale" type="number" min="0" value="'+(l.male!=null?l.male:'')+'" oninput="adLogSumMF()" '+inp+'></div><div><label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">여학생</label><input id="alFemale" type="number" min="0" value="'+(l.female!=null?l.female:'')+'" oninput="adLogSumMF()" '+inp+'></div></div>'
+    +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">수업 내용</label><textarea id="alContent" rows="2" '+inp+'>'+esc(l.content||'')+'</textarea>'
+    +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">비고</label><input id="alNote" value="'+esc(l.note||'')+'" '+inp+'>'
+    +'<div style="font-size:11.5px;color:#8a919d;margin-top:8px">· 활동 사진은 강사 마이페이지에서만 수정합니다(여기에서는 그대로 유지).<br>· 회차 번호는 바꾸지 않습니다 — 회차가 잘못된 경우 강사에게 재제출을 요청해주세요.</div>'
+    +'<div id="alMsg" style="font-size:12.5px;font-weight:700;margin-top:8px"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
+    +'<button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'alModal\').remove()">닫기</button>'
+    +'<button class="btn-sub" style="background:#0f766e" onclick="adSaveLog(\''+id+'\')">💾 저장</button></div></div>';
+  document.body.appendChild(div);
+}
+async function adSaveLog(id){
+  var m=document.getElementById('alMsg');
+  var l=ALOGS[id];if(!l)return;
+  var date=document.getElementById('alDate').value;
+  var eM=document.getElementById('alMale'),eF=document.getElementById('alFemale');
+  var male=eM&&eM.value!==''?Math.max(0,parseInt(eM.value)||0):null,female=eF&&eF.value!==''?Math.max(0,parseInt(eF.value)||0):null;
+  var cnt=parseInt(document.getElementById('alCount').value);
+  if(male!=null&&female!=null&&male+female>0)cnt=male+female;
+  var content=document.getElementById('alContent').value.trim();
+  var note=document.getElementById('alNote').value.trim();
+  if(!date||!cnt||cnt<1||!content){m.textContent='수업일·참여 인원·수업 내용을 확인해주세요';m.style.color='#C41E2F';return}
+  var before={date:l.date||'',count:(l.count!=null?l.count:null),male:(l.male!=null?l.male:null),female:(l.female!=null?l.female:null),content:l.content||'',note:l.note||''};
+  if(!confirm('['+(l.school||'')+'] '+(l.session||'')+'회차 일지를 정정합니다.\n\n'
+    +'수업일 '+(before.date||'-')+' → '+date+'\n'
+    +'인원 '+(before.count==null?'-':before.count)+'명 → '+cnt+'명'+((male!=null||female!=null)?' (남 '+(male==null?'-':male)+' · 여 '+(female==null?'-':female)+')':'')+'\n'
+    +'내용 '+(before.content||'-')+'\n  → '+content+'\n\n'
+    +'정정 전 값은 기록으로 남아 되돌릴 수 있습니다. 계속할까요?'))return;
+  try{
+    m.textContent='저장 중…';m.style.color='#8a919d';
+    await DB.collection('sessionLogs').doc(id).update({
+      date:date,count:cnt,male:male,female:female,content:content,note:note,
+      editHistory:firebase.firestore.FieldValue.arrayUnion({
+        at:new Date().toISOString(),by:(CMY&&CMY.name)||'',uid:(AUTH.currentUser||{}).uid||'',role:'사무국',before:before}),
+      editedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    var mod=document.getElementById('alModal');if(mod)mod.remove();
+    alert('✓ '+(l.session||'')+'회차 일지를 정정했습니다.');
+    var box=document.getElementById('logs_'+(l._appId||''));
+    if(box){box.style.display='none';toggleLogs(l._appId)}
+  }catch(e){m.textContent='저장 실패: '+(e.code||e.message)+' — 보안 규칙에서 사무국의 sessionLogs 수정이 막혀 있을 수 있습니다.';m.style.color='#C41E2F'}
+}
 async function toggleLogs(id){
   const el=document.getElementById('logs_'+id);
   if(el.style.display==='block'){el.style.display='none';return}
   el.style.display='block';el.innerHTML='<span style="font-size:13px;color:var(--gray)">불러오는 중…</span>';
   try{
     const snap=await DB.collection('sessionLogs').where('appId','==',id).get();
-    const logs=snap.docs.map(d=>d.data()).sort((a,b)=>(a.session||0)-(b.session||0));
+    const logs=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).sort((a,b)=>(a.session||0)-(b.session||0));
+    logs.forEach(function(l){ALOGS[l._id]=Object.assign({},l,{_appId:id})});   // [일지 정정] 수정창에서 참조
     if(!logs.length){el.innerHTML='<span style="font-size:13px;color:var(--gray)">아직 제출된 일지가 없습니다. 배정된 강사(마이페이지 › 운영일지)가 직접 회차 보고를 등록해야 이곳에 표시됩니다 — 강사에게 제출을 안내해주세요.</span>';return}
     const cfmN=logs.filter(l=>l.teacherConfirm).length;
     el.innerHTML='<b style="font-size:13.5px">운영일지 '+logs.length+'건 (강사: '+esc(logs[0].name)+')</b> <span style="font-size:12px;font-weight:800;color:'+(cfmN===logs.length?'#0f766e':'#C41E2F')+'">· 교사확인 '+cfmN+'/'+logs.length+'</span>'
       +logs.map(l=>'<div style="border-top:1px dashed #d5d9e0;padding:8px 0;font-size:13px">'
         +'<b>'+l.session+'회차</b> · '+esc(l.date)+(l.count?' · 👥 '+l.count+'명':'')+' — '+esc(l.content)
         +(l.note?' · <span style="color:#C41E2F">'+esc(l.note)+'</span>':'')
+        +(VIEWER_IS_ADMIN?' <button class="btn-sub" style="padding:2px 9px;font-size:11.5px;background:#b8860b" title="사무국 정정 — 수업일·인원·내용·비고. 교사확인은 그대로 남으며 정정 이력이 기록됩니다" onclick="adEditLog(\''+l._id+'\')">✏️ 수정</button>':'')
         +'<div style="margin-top:4px">'+(l.teacherConfirm
             ?'<span style="font-weight:800;color:#0f766e">✓ 교사확인: '+esc(l.teacherConfirm.name)+'</span>'+(l.teacherConfirm.at?' <span style="color:#8a919d;font-size:11.5px">('+esc(String(l.teacherConfirm.at).replace("T"," ").slice(0,16))+')</span>':'')+(l.teacherConfirm.sign?' <a href="'+l.teacherConfirm.sign+'" target="_blank"><img src="'+l.teacherConfirm.sign+'" style="height:26px;vertical-align:middle;border:1px solid #eee;border-radius:4px;margin-left:4px"></a>':'')
             :'<span style="font-weight:800;color:#C41E2F">⚠ 교사 미확인</span>')+'</div>'
+        +adEditBadge(l)
         +(l.photos&&l.photos.length?'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">'+l.photos.map(p=>'<a href="'+p+'" target="_blank"><img src="'+p+'" style="width:90px;height:66px;object-fit:cover;border-radius:8px"></a>').join('')+'</div>':'')
         +'</div>').join('');
   }catch(e){el.innerHTML='<span style="font-size:13px;color:var(--red)">불러오기 실패: '+esc(e.message)+'</span>'}
