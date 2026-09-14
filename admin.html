@@ -309,6 +309,7 @@ function eduWho(v){return (v.name||'')+' ('+(v.birth||'생년월일 없음')+' �
     <div id="v1">
       <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
         <button class="btn-sub" style="background:#0f766e" onclick="exportInstructors()">⬇ 강사·요원 지원자 CSV</button>
+        <button class="btn-sub" style="background:#153A77" onclick="cdocBulk()" title="위촉 전자동의·경력 조회 동의·위촉계약서 등 회원이 홈페이지에서 동의·서명한 기록을 한 파일(PDF)로">📄 동의서·계약서 일괄 PDF</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="copyPhoneList('users')">📱 문자명단 복사 (현재 필터)</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="dupScan()" title="같은 성명·생년월일로 여러 번 가입된 계정을 하나만 남기고 정리 · 본인을 자녀로 등록한 계정 식별">👥 가입 점검 (중복 가입·본인 자녀등록)<span id="dupCntBadge" style="display:none;background:#fff;color:#C41E2F;border-radius:999px;padding:1px 7px;font-size:11px;margin-left:5px;font-weight:900"></span></button>
         <!-- [재배치 2026-09-11] 회원 정리 도구 — 종전에는 강습 신청 관리 탭 도구줄에 있었음 -->
@@ -4560,6 +4561,7 @@ function showMemberModal(uid){
     ((v.submitDocs||{}).moonlight?'<button class="btn-sub" style="background:'+(((v.submitDocs||{}).moonlight||{}).status==='확인'?'#0f766e':'#8a919d')+'" onclick="moonDocSet(\''+uid+'\',\'확인\')">겸직허가서 '+(((v.submitDocs||{}).moonlight||{}).status==='확인'?'✓':'확인')+'</button><button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="moonDocSet(\''+uid+'\',\'반려\')">겸직허가서 반려</button>':''),
     (v.status==='approved'?(v.edu2026?'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="revokeEdu(\''+uid+'\',\''+esc(v.name)+'\');closeMemberModal()">🎓 이수 취소</button>':'<button class="btn-sub" style="background:'+(inRoster(v.name)?'#0f766e':'#8a919d')+'" onclick="grantEdu(\''+uid+'\');closeMemberModal()">🎓 이수 인증 부여'+(inRoster(v.name)?' (명단 일치)':'')+'</button>'):''),
     '<button class="btn-sub" style="background:#7c3aed" onclick="resetMemberPw(\''+esc(v.email)+'\',\''+esc(v.name)+'\')">🔑 비밀번호 재설정메일</button>',
+    '<button class="btn-sub" style="background:#153A77" onclick="cdocMember(\''+uid+'\')" title="회원가입·위촉 전자동의·경력 조회 동의·위촉계약서·대회 동의 기록">📄 동의서·계약서 PDF</button>',
     '<button class="btn-sub" style="background:#b8860b" onclick="resetMemberPwManual(\''+uid+'\',\''+esc(v.name)+'\')">🔧 임시 비밀번호 직접 설정</button>',
     '<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delUser(\''+uid+'\',\''+esc(v.name)+'\');closeMemberModal()">🗑 삭제</button>'
   ].filter(Boolean).join('');
@@ -5224,6 +5226,7 @@ function renderUsers(){if(__DBV!==__UVER){__DBV=__UVER;try{dupBadge()}catch(e){}
       +'<button class="btn-sub" style="background:'+(v.certDoc?'#0f766e':'#8a919d')+'" onclick="toggleCert(\''+d.id+'\')">'+(v.certDoc?'자격확인 ✓':'자격확인 체크')+'</button>'
       +'<button class="btn-sub" style="background:'+(v.safetyEdu?'#0f766e':'#8a919d')+'" onclick="toggleSafety(\''+d.id+'\')">'+(v.safetyEdu?'안전교육 ✓':'안전교육 처리')+'</button>'
       +'<button class="btn-sub" style="background:#7c3aed" onclick="resetMemberPw(\''+esc(v.email)+'\',\''+esc(v.name)+'\')">🔑 비밀번호 재설정메일</button>'
+      +'<button class="btn-sub" style="background:#153A77" onclick="cdocMember(\''+d.id+'\')" title="회원가입·위촉 전자동의·경력 조회 동의·위촉계약서·대회 동의 기록을 PDF로">📄 동의서</button>'
       +'<button class="btn-sub" style="background:#b8860b" onclick="resetMemberPwManual(\''+d.id+'\',\''+esc(v.name)+'\')">🔧 임시 비밀번호 직접 설정</button>'
       +(v.withdrawReq?'<button class="btn-sub" style="background:#C41E2F" onclick="withdrawModal(\''+d.id+'\')">🚪 탈퇴 요청 처리</button>':'')
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delUser(\''+d.id+'\',\''+esc(v.name)+'\')">🗑</button>'
@@ -7084,6 +7087,57 @@ async function toggleSafety(uid){
   await DB.collection('users').doc(uid).update(upd);
   loadUsers();
 }
+// ══════════ [동의서 출력 2026-09-14] 회원가입·위촉 전자동의·경력 조회 동의·위촉계약서·대회 동의 기록 → PDF (consentdocs.js) ══════════
+//   회원 한 명: 상세창·카드의 [📄 동의서] / 여러 명: 회원 관리 도구줄 [📄 동의서·계약서 일괄 PDF] (대상·권역·문서 종류 선택)
+function cdocMember(uid){
+  var w=KFDF_CDOCS.prep();if(!w)return;
+  (async function(){try{
+    var d=USERS.find(function(x){return x.id===uid});var v=d?d.data():null;
+    if(!v){var g=await DB.collection('users').doc(uid).get();v=g.exists?g.data():null}
+    if(!v)throw new Error('회원 정보를 찾을 수 없습니다');
+    await KFDF_CDOCS.render(w,DB,[{uid:uid,v:v}],{by:(CMY&&CMY.name)||'',role:VIEWER_IS_ADMIN?'사무국':'시도 담당'});
+  }catch(e){KFDF_CDOCS.fail(w,e)}})();
+}
+function cdocPool(){
+  var f=(document.getElementById('cdScope')||{}).value||'hire',rg=(document.getElementById('cdReg')||{}).value||'';
+  return USERS.filter(function(d){var v=d.data();if(v.deleted)return false;var fo=v.instructorFor||{};
+    if(rg&&v.region!==rg)return false;
+    if(f==='hire')return !!(v.consents&&v.consents.agreedAt);
+    if(f==='contract')return !!(v.contracts&&Object.keys(v.contracts).some(function(k){return !/^compapply_|^compconsent_/.test(k)}));
+    if(f==='apply')return !!(fo.school||fo.after||fo.referee||fo.staff);
+    return v.status==='approved';
+  }).sort(function(a,b){return String(a.data().name||'').localeCompare(String(b.data().name||''),'ko')});
+}
+function cdocCount(){var e=document.getElementById('cdCnt');if(e)e.textContent=cdocPool().length+'명'}
+function cdocBulk(){
+  if(!USERS.length){alert('회원 목록을 먼저 불러와 주세요 (회원 관리 탭).');return}
+  var old=document.getElementById('cdModal');if(old)old.remove();
+  var regs=[...new Set(USERS.map(function(d){return d.data().region||''}).filter(Boolean))].sort();
+  var div=document.createElement('div');div.id='cdModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  var ck=function(id,lb,on){return '<label style="display:flex;gap:7px;align-items:center;font-size:13px;font-weight:700;margin:4px 0"><input type="checkbox" id="'+id+'" style="width:auto"'+(on?' checked':'')+'> '+lb+'</label>'};
+  var sel='style="width:100%;padding:8px 10px;border:1.5px solid var(--line);border-radius:9px;font-family:inherit;font-size:13.5px;margin-top:4px"';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:470px;width:100%;padding:22px">'
+    +'<b style="font-size:16px">📄 동의서·계약서 일괄 PDF</b>'
+    +'<div style="font-size:12.5px;color:#666;margin:4px 0 10px;line-height:1.6">회원이 홈페이지에서 동의·서명한 기록을 당시 문안 그대로 한 파일로 모읍니다. 사람마다 쪽이 나뉘고, 주민등록번호는 가림 표기입니다.</div>'
+    +'<label style="font-size:12.5px;font-weight:800">대상</label><select id="cdScope" '+sel+' onchange="cdocCount()"><option value="hire">위촉 전자동의를 한 회원 (강사·심판·운영요원)</option><option value="contract">위촉계약서에 서명한 회원</option><option value="apply">강사·요원 지원자 전체</option><option value="all">승인 회원 전체</option></select>'
+    +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">권역</label><select id="cdReg" '+sel+' onchange="cdocCount()"><option value="">전체</option>'+regs.map(function(r){return '<option>'+esc(r)+'</option>'}).join('')+'</select>'
+    +'<div style="font-size:12.5px;font-weight:800;margin-top:12px">담을 문서 <span style="font-weight:600;color:#8a919d">— 기록이 있는 사람만 해당 쪽이 들어갑니다</span></div>'
+    +ck('cdHire','위촉 전자동의서',1)+ck('cdCrim','아동학대·성범죄 경력 조회 동의 확인서',1)+ck('cdContract','위촉계약서 (강습 강사 · 대회요원, 전자서명 포함)',1)+ck('cdSignup','회원가입 개인정보 동의 확인서',0)+ck('cdComp','대회 신청·동의 전자서명 기록',0)
+    +'<div style="font-size:13px;font-weight:800;margin-top:10px">대상 <span id="cdCnt" style="color:#153A77">-</span></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'cdModal\').remove()">닫기</button><button class="btn-sub" style="background:#153A77" onclick="cdocBulkGo()">PDF 만들기</button></div></div>';
+  document.body.appendChild(div);cdocCount();
+}
+function cdocBulkGo(){
+  var pool=cdocPool();if(!pool.length){alert('대상 회원이 없습니다.');return}
+  var g=function(id){var e=document.getElementById(id);return !!(e&&e.checked)};
+  var inc={hire:g('cdHire'),crim:g('cdCrim'),contract:g('cdContract'),signup:g('cdSignup'),comp:g('cdComp')};
+  if(!inc.hire&&!inc.crim&&!inc.contract&&!inc.signup&&!inc.comp){alert('담을 문서를 하나 이상 고르세요.');return}
+  if(pool.length>150&&!confirm(pool.length+'명입니다. 쪽수가 많아 만드는 데 시간이 걸릴 수 있습니다. 계속할까요?'))return;
+  var w=KFDF_CDOCS.prep();if(!w)return;
+  document.getElementById('cdModal').remove();
+  KFDF_CDOCS.render(w,DB,pool.map(function(d){return {uid:d.id,v:d.data()}}),{include:inc,by:(CMY&&CMY.name)||'',role:VIEWER_IS_ADMIN?'사무국':'시도 담당'}).catch(function(e){KFDF_CDOCS.fail(w,e)});
+}
 async function toggleCrim(uid){
   const doc=await DB.collection('users').doc(uid).get();const d=doc.data();
   const now=!d.crimDoc;
@@ -8323,6 +8377,7 @@ async function dlGoodsCerts(){
 <script src="post_alert.js?v=20260911a"></script>
 <script src="schoolclub_admin.js?v=20260914b"></script>
 <script src="logbook.js?v=20260914a"></script>
+<script src="consentdocs.js?v=20260914a"></script>
 <script src="auth_ui.js?v=20260914a"></script>
 </body>
 </html>
