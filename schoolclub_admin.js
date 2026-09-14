@@ -436,8 +436,55 @@
       var all=CLUBS.map(function(c){return c.id}).concat(doCreate?Object.keys(RC.create):[]);var ali={};CLUBS.forEach(function(c){if(c.mergedInto){var r=RC.root(c.id);(ali[r]=ali[r]||[]).push(c.id)}});
       all.forEach(function(id){if(RC.root(id)!==id)return;var ids=[id].concat(ali[id]||[]);var st=SCC.statsOf(ids,RC.rows[id]||[],RC.mts);ops.push(['update','schoolClubs',id,{stats:st,statsAt:FV().serverTimestamp()}])});
       m.textContent='저장 중…';await commit(ops,function(t){m.textContent=t});
-      m.innerHTML='<b style="color:#0f766e">✓ 저장했습니다</b> — 학교클럽 '+all.length+'팀 통계'+(doCreate?' · 자동 등록 '+Object.keys(RC.create).length+'팀':'')+' · 대회 '+RC.evPatch.length+'건 연결. <a href="schoolclub.html" target="_blank">공개 화면 보기 →</a>';
+      m.innerHTML='<b style="color:#0f766e">✓ 저장했습니다</b> — 학교클럽 '+all.length+'팀 통계'+(doCreate?' · 자동 등록 '+Object.keys(RC.create).length+'팀':'')+' · 대회 '+RC.evPatch.length+'건 연결. <a href="schoolclub.html" target="_blank">공개 화면 보기 →</a><div style="font-size:12.5px;color:#6b7280;margin-top:4px">학년도 명단을 새로 올렸다면 [👣 발자취 색인]도 눌러 학생 발자취를 갱신하세요.</div>';
       loadClubs(true).catch(function(){});
+    }catch(e){m.innerHTML='<b style="color:#C41E2F">저장 실패: '+E(e.message)+'</b>'}
+  };
+
+  // ══════════ ⑦ [3단계] 발자취 색인 scPersons/{성명|생년월일} — 학년도 실명 명단(scRosters)에서 사람별 학교클럽 이력을 모읍니다 ══════════
+  //   · 본인·보호자는 마이페이지 [나의 발자취]에서 자기(자녀) 키로만 읽고 「내 기록으로 연결」(links.{uid})만 쓸 수 있습니다(보안 규칙 v31).
+  //   · 다시 만들 때 연결 정보(links)는 그대로 두고 이력(stints)만 새로 씁니다. 명단에서 빠진 사람은 이력만 비웁니다.
+  //   · 생년월일이 없는 명단 줄은 사람을 특정할 수 없어 넣지 않습니다(동명이인 오연결 방지).
+  var PR=null;
+  async function buildPersons(){
+    await loadClubs(true);var byId={};CLUBS.forEach(function(c){byId[c.id]=c});
+    var root=function(id){var seen=0;while(byId[id]&&byId[id].mergedInto&&seen<10){id=byId[id].mergedInto;seen++}return id};
+    var ro=(await DB.collection('scRosters').limit(5000).get()).docs;var P={},skip=0;
+    ro.forEach(function(d){var x=d.data();var m0=String(d.id).match(/^(.*)_(\d{4})$/);var sc=root(x.scid||(m0?m0[1]:d.id));var c=byId[sc]||{};var yr=+x.year||(m0?+m0[2]:0);
+      (x.members||[]).forEach(function(m){if(!m||!m.name)return;if(!m.birth){skip++;return}var k=SCC.personKey(m.name,m.birth);
+        var p=P[k]=P[k]||{name:String(m.name).trim(),birth:m.birth,gender:m.gender||'',stints:[]};
+        if(!p.gender&&m.gender)p.gender=m.gender;
+        if(!p.stints.some(function(s){return s.scid===sc&&s.year===yr}))p.stints.push({scid:sc,year:yr,grade:String(m.grade||SCC.gradeOf(yr,m.birth,c.level||'')||''),school:c.schoolName||'',team:c.teamName||'',level:c.level||'',sport:c.sport||'',div:c.division||'',sido:c.sido||''})})});
+    Object.keys(P).forEach(function(k){P[k].stints.sort(function(a,b){return (a.year-b.year)||String(a.scid).localeCompare(String(b.scid))})});
+    var ex={};(await DB.collection('scPersons').limit(20000).get()).docs.forEach(function(d){ex[d.id]=d.data()});
+    return {P:P,ex:ex,rosters:ro.length,skip:skip};
+  }
+  window.sccPersons=async function(){
+    if(isSido()){alert('발자취 색인은 중앙 사무국만 만들 수 있습니다.');return}
+    var b=box();b.innerHTML='학년도 실명 명단을 읽는 중…';
+    try{PR=await buildPersons();var ks=Object.keys(PR.P);
+      var nNew=ks.filter(function(k){return !PR.ex[k]}).length;
+      var gone=Object.keys(PR.ex).filter(function(k){return !PR.P[k]&&(PR.ex[k].stints||[]).length}).length;
+      var linked=Object.keys(PR.ex).filter(function(k){return PR.ex[k].links&&Object.keys(PR.ex[k].links).length}).length;
+      var multi=ks.filter(function(k){var s={};PR.P[k].stints.forEach(function(x){s[x.scid]=1});return Object.keys(s).length>1}).length;
+      b.innerHTML='<b style="font-size:15px">👣 발자취 색인 — 미리보기 (쓰기 0건)</b>'
+        +'<div style="font-size:12.5px;color:#6b7280;line-height:1.7;margin:6px 0">학년도별 실명 명단에서 사람마다 학교클럽 이력을 모읍니다. 학생·보호자는 마이페이지 <b>[경력 여정 › 나의 발자취]</b>에서 성명+생년월일이 같은 자기(자녀) 기록만 볼 수 있고, 「내 기록으로 연결」을 누르면 이어집니다. 생년월일이 없는 명단 줄은 넣지 않습니다.</div>'
+        +'<div style="display:flex;gap:14px;flex-wrap:wrap;margin:8px 0;font-size:13.5px"><span>명단 <b>'+PR.rosters+'</b>건</span><span>사람 <b>'+ks.length+'</b>명</span><span>새로 생김 <b>'+nNew+'</b></span><span>두 팀 이상 이어진 사람 <b>'+multi+'</b></span><span>이미 연결 <b>'+linked+'</b></span>'
+        +(PR.skip?'<span style="color:#8a919d">생년월일 없어 제외 <b>'+PR.skip+'</b>줄</span>':'')+(gone?'<span style="color:#b8860b">명단에서 빠져 이력 비움 <b>'+gone+'</b></span>':'')+'</div>'
+        +'<button class="btn-sub" style="background:#0f766e;margin-top:6px" onclick="sccPersonsApply()">✅ 색인 저장</button><div id="sccPrMsg" style="margin-top:8px;font-size:13px"></div>';
+    }catch(e){b.innerHTML='<b style="color:#C41E2F">읽기 실패: '+E(e.message)+'</b>'+(String(e.message).indexOf('permission')>=0?'<div style="font-size:12.5px;margin-top:4px">보안 규칙 v31(scPersons) 게시 전에는 색인을 만들 수 없습니다.</div>':'')}
+  };
+  window.sccPersonsApply=async function(){
+    if(!PR)return;var m=document.getElementById('sccPrMsg');
+    try{var ops=[];var n=0;
+      Object.keys(PR.P).forEach(function(k){var p=PR.P[k];var old=PR.ex[k];
+        if(old&&JSON.stringify(old.stints||[])===JSON.stringify(p.stints)&&old.name===p.name&&(old.gender||'')===p.gender)return;
+        ops.push(old?['update','scPersons',k,{name:p.name,birth:p.birth,gender:p.gender,stints:p.stints,updatedAt:FV().serverTimestamp()}]
+          :['set','scPersons',k,{name:p.name,birth:p.birth,gender:p.gender,stints:p.stints,links:{},createdAt:FV().serverTimestamp(),updatedAt:FV().serverTimestamp()}]);n++});
+      Object.keys(PR.ex).forEach(function(k){if(!PR.P[k]&&(PR.ex[k].stints||[]).length){ops.push(['update','scPersons',k,{stints:[],updatedAt:FV().serverTimestamp()}]);n++}});
+      if(!ops.length){m.innerHTML='<b style="color:#0f766e">바뀐 것이 없습니다.</b>';return}
+      m.textContent='저장 중…';await commit(ops,function(t){m.textContent=t});
+      m.innerHTML='<b style="color:#0f766e">✓ 저장했습니다</b> — '+n+'명 갱신';PR=null;
     }catch(e){m.innerHTML='<b style="color:#C41E2F">저장 실패: '+E(e.message)+'</b>'}
   };
 

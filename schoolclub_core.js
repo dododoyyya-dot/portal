@@ -108,8 +108,12 @@
     var ps=to.filter(function(u){if(!u||seen[u])return false;seen[u]=1;return true}).map(function(u){try{return window.KFDF&&KFDF.notify?KFDF.notify(u,title,a.fed?sidoLink:centralLink):null}catch(e){return null}});
     return Promise.all(ps).then(function(){return a})})}
   // 학년 추정 (학년도 · 생년 · 학교급) — 3월 입학 기준, 범위를 벗어나면 ''
+  // [3단계 발자취] 개인 키(성명 공백 제거|생년월일) — 회원 색인(memberKeys)·자녀 키(childKeys)와 같은 형식
+  function personKey(name,birth){return String(name||'').replace(/\s+/g,'')+'|'+String(birth||'')}
+  function maxGrade(level){return level==='초'?6:((level==='중'||level==='고')?3:0)}
+  function nextLevel(level){return level==='초'?'중':(level==='중'?'고':'')}
   function gradeOf(year,birth,level){var by=parseInt(String(birth||'').slice(0,4),10);if(!year||!by)return '';var g=year-by-6;if(level==='중')g-=6;else if(level==='고')g-=9;var max=level==='초'?6:3;return (g>=1&&g<=max)?String(g):''}
   window.SCC={SIDO:SIDO,SIDO_LIST:SIDO_LIST,SPORTS:SPORTS.map(function(x){return [x[0],x[1]]}),DIV:DIV,LEVEL:LEVEL,STAGE_ORDER:STAGE_ORDER,
     esc:esc,norm:norm,canon:canon,sidoOf:sidoOf,sidoNorm:sidoNorm,sportCode:sportCode,sportName:sportName,divCode:divCode,levelOf:levelOf,
-    scid:scid,parseId:parseId,loadFeds:loadFeds,approversOf:approversOf,notifyApprovers:notifyApprovers,gradeOf:gradeOf,schoolYear:schoolYear,rankOf:rankOf,rankLabel:rankLabel,stageOf:stageOf,mask:mask,stageBadge:stageBadge,statsOf:statsOf,POINTS:POINTS,pointsOf:pointsOf,rivalsOf:rivalsOf,styleOf:styleOf,TACTICS:TACTICS,tacticsFor:tacticsFor};
+    scid:scid,parseId:parseId,loadFeds:loadFeds,approversOf:approversOf,notifyApprovers:notifyApprovers,gradeOf:gradeOf,personKey:personKey,maxGrade:maxGrade,nextLevel:nextLevel,schoolYear:schoolYear,rankOf:rankOf,rankLabel:rankLabel,stageOf:stageOf,mask:mask,stageBadge:stageBadge,statsOf:statsOf,POINTS:POINTS,pointsOf:pointsOf,rivalsOf:rivalsOf,styleOf:styleOf,TACTICS:TACTICS,tacticsFor:tacticsFor};
 })();

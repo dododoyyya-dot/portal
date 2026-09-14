@@ -405,7 +405,9 @@ function renderMembers(){
       +'</div>'
       +'<div style="font-size:12.5px;margin-bottom:8px"><b>연령대 분포</b> · '+ageHtml+'</div>'
       +'<div style="font-size:12.5px"><b>학교별 유소년</b> · '+(schHtml||'없음')+'</div>'
-      +'<div style="font-size:11.5px;color:#8a919d;margin-top:10px">개별 회원 명단은 클럽장/관리자만 확인할 수 있습니다.</div>';
+      +'<div style="font-size:11.5px;color:#8a919d;margin-top:10px">개별 회원 명단은 클럽장/관리자만 확인할 수 있습니다.</div>'
+      +'<div id="chAlumni"></div>';
+    chAlumni();
     return;
   }
 
@@ -430,7 +432,21 @@ function renderMembers(){
         +'</div>';
     });
   }
-  el.innerHTML=html;
+  el.innerHTML=html+'<div id="chAlumni"></div>';
+  chAlumni();
+}
+// ── [학교스포츠클럽 3단계] 학교클럽 출신 회원 — 본인이 발자취를 연결한 회원의 공개 요약(scAlumni: 가림 이름·학교클럽). 로그인 회원만 조회됩니다 ──
+async function chAlumni(){
+  const box=document.getElementById('chAlumni');if(!box||!CCLUB)return;
+  const uids=(CCLUB.memberUids||[]).slice(0,100);if(!uids.length)return;
+  const out=[];
+  for(let i=0;i<uids.length;i+=10){try{const q=await DB.collection('scAlumni').where(firebase.firestore.FieldPath.documentId(),'in',uids.slice(i,i+10)).get();q.docs.forEach(d=>out.push(d.data()))}catch(e){return}}
+  if(!out.length)return;
+  const teams={};out.forEach(a=>(a.stints||[]).forEach(s=>{if(!s||!s.scid)return;const t=teams[s.scid]=teams[s.scid]||{s:s,n:0};t.n++}));
+  box.innerHTML='<div style="margin-top:12px;background:#f3f8f6;border:1.5px solid #cfe3d8;border-radius:12px;padding:10px 13px;font-size:12.5px;line-height:1.8">'
+    +'🏫 <b>학교스포츠클럽 출신 회원 '+out.length+'명</b> — '+Object.values(teams).sort((x,y)=>y.n-x.n).slice(0,8).map(t=>'<a href="schoolclub.html?id='+encodeURIComponent(t.s.scid)+'" style="font-weight:800;color:#0f766e">'+kesc(t.s.team||t.s.school||'')+'</a> '+t.n+'명').join(' · ')
+    +(CH_IS_MEMBER?'<div style="color:#6b7280;font-size:12px">'+out.map(a=>kesc(a.name||'')+' ('+(a.stints||[]).map(s=>kesc((s.team||s.school||'')+' '+(s.years||''))).join(', ')+')').join(' · ')+'</div>':'')
+    +'</div>';
 }
 
 // ── 클럽장 인계 신청 (성인 회원 → 관리자 승인 시 인계) ──

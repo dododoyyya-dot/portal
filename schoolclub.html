@@ -298,7 +298,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260821"></script>
 <script src="region_map.js?v=20260910a"></script>
-<script src="schoolclub_core.js?v=20260914a"></script>
+<script src="schoolclub_core.js?v=20260914b"></script>
 <script>
 // ══════════ 학교스포츠클럽 (공개) — 찾기 화면 · 팀 홈(?id=) ══════════
 //   팀 = 학교 × 종목 × 부 · 통계는 팀 홈에서 대회 기록(schoolClubEvents)·경기(scMatches)로 바로 계산, 찾기 카드는 관리자가 저장한 요약(stats) 사용
@@ -420,15 +420,27 @@ async function scTeamLoad(id){
       return '<div class="mt"><span class="d" style="font-size:12px;color:#6b7280;font-weight:700">'+E(String(m.date||'').replace(/-/g,'.'))+'</span><span><a href="schoolclub.html?id='+encodeURIComponent(op.scid||'')+'" style="color:#141d51;font-weight:800;text-decoration:none">vs '+E(op.school||'')+'</a><span style="display:block;font-size:11.5px;color:#6b7280">'+E((m.round?m.round+' · ':'')+(m.eventName||''))+(m.source==='teacher'&&!m.verified?' · 비공식':'')+'</span></span><span class="sc">'+E(me.score)+' : '+E(op.score)+'</span><span class="wl '+res+'">'+(res==='w'?'승':res==='l'?'패':'무')+'</span></div>'}).join('')+'</div>'}
   const seasons=(seas?seas.docs:[]).map(x=>x.data()).sort((a,b)=>(b.year||0)-(a.year||0));
   if(seasons.length){right+='<div class="tp"'+(matches.length?'':' style="margin-top:0"')+'><h3>학년도 명단<small>이름은 가림 표기</small></h3><div class="sc-seg" id="rosYr" style="flex-wrap:wrap">'+seasons.map((s,i)=>'<button data-i="'+i+'"'+(i?'':' class="on"')+'>'+E(s.year)+'</button>').join('')+'</div><div id="rosBox"></div></div>'}
-  h+='<div>'+(right||'<div class="tp" style="margin-top:0"><h3>경기 기록 · 명단</h3><div style="font-size:13px;color:#6b7280">경기 점수와 학년도 명단이 정리되면 여기에 표시됩니다.</div></div>')+'<div id="scFromClub"></div></div></div>';
+  h+='<div>'+(right||'<div class="tp" style="margin-top:0"><h3>경기 기록 · 명단</h3><div style="font-size:13px;color:#6b7280">경기 점수와 학년도 명단이 정리되면 여기에 표시됩니다.</div></div>')+'<div id="scFromClub"></div><div id="scAlumni"></div></div></div>';
   box.innerHTML=h;
-  scStyleRender();scCoachTools();
+  scStyleRender();scCoachTools();scAlumniRender(ids);
   if(seasons.length){const show=i=>{const s=seasons[i];const ro=(s.roster||[]);document.getElementById('rosBox').innerHTML='<div style="font-size:12.5px;color:#6b7280;font-weight:700;margin-top:10px">'+E(s.year)+'학년도 · '+(s.count||ro.length)+'명'+(s.countM||s.countF?' (남 '+(s.countM||0)+' · 여 '+(s.countF||0)+')':'')+(s.coachName?' · 지도교사 '+E(s.coachName):'')+'</div>'
       +(ro.length?'<div class="ros">'+ro.slice().sort((a,b)=>String(b.g).localeCompare(String(a.g))||String(a.n).localeCompare(String(b.n))).map(r=>'<span>'+E(r.n)+'<em>'+(r.g?E(r.g)+'학년':'')+(r.s?' '+E(r.s):'')+'</em></span>').join('')+'</div>':'<div style="font-size:12.5px;color:#8a919d;margin-top:6px">선수 명단은 아직 정리되지 않았습니다.</div>')};
     document.querySelectorAll('#rosYr button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#rosYr button').forEach(x=>x.classList.toggle('on',x===b));show(+b.dataset.i)});show(0)}
   if(c.fromClubId){try{const a=await DB.collection('clubAwards').where('clubId','==',c.fromClubId).get();const list=a.docs.map(x=>x.data()).sort((p,q)=>String(q.date||'').localeCompare(String(p.date||'')));
     document.getElementById('scFromClub').innerHTML='<div class="tp"><h3>일반 클럽 시절 기록<small>'+list.length+'건</small></h3><div style="font-size:12.5px;color:#6b7280;margin-bottom:6px">이 팀은 연맹 일반 클럽으로 활동하다 학교스포츠클럽으로 옮겼습니다. <a href="clubhome.html?id='+encodeURIComponent(c.fromClubId)+'">옛 클럽 홈 →</a></div>'
       +list.slice(0,10).map(x=>'<div class="ev"><span class="d">'+E(String(x.date||'').replace(/-/g,'.'))+'</span><span>'+E(x.competitionName||'')+'<span class="dv">'+E(x.division||'')+'</span></span>'+rk(x.result||'참가')+'</div>').join('')+'</div>'}catch(e){}}
+}
+// ── [3단계] 졸업생 · 출신 회원 — 이 팀에서 뛴 기록을 본인 계정에 연결한 회원의 공개 요약(scAlumni). 로그인 회원에게만 보입니다 ──
+async function scAlumniRender(ids){
+  const el=document.getElementById('scAlumni');if(!el)return;
+  let list=[];try{const q=await DB.collection('scAlumni').where('scids','array-contains-any',ids.slice(0,10)).limit(200).get();list=q.docs.map(d=>d.data())}catch(e){return}
+  if(!list.length)return;
+  const cl={};list.forEach(a=>(a.clubs||[]).forEach(c=>{if(!c||!c.id)return;const x=cl[c.id]=cl[c.id]||{name:c.name||'',n:0};x.n++}));
+  const inClub=list.filter(a=>(a.clubs||[]).length).length;
+  el.innerHTML='<div class="tp"><h3>졸업생 · 출신 회원<small>'+list.length+'명</small></h3>'
+    +'<div style="font-size:12.5px;color:#6b7280;margin-bottom:6px">이 팀에서 뛴 기록을 본인 계정에 연결한 연맹 회원입니다 · 일반 클럽에서 활동 중 <b>'+inClub+'명</b></div>'
+    +(Object.keys(cl).length?'<div class="chips">'+Object.keys(cl).sort((a,b)=>cl[b].n-cl[a].n).slice(0,10).map(id=>'<a class="pill b" style="text-decoration:none" href="clubhome.html?id='+encodeURIComponent(id)+'">'+E(cl[id].name)+' '+cl[id].n+'명</a>').join('')+'</div>':'')
+    +'<div class="ros" style="margin-top:8px">'+list.slice(0,40).map(a=>{const s=(a.stints||[]).find(x=>ids.indexOf(x.scid)>=0)||{};return '<span>'+E(a.name||'')+'<em>'+E(s.years||'')+'</em></span>'}).join('')+'</div></div>';
 }
 // ── [2단계] 전술 성향: 지도교사가 고른 태그 + 기록으로 계산한 지표(같은 학교급 평균과 비교) ──
 let CUR=null,ALLC=null;

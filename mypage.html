@@ -554,6 +554,8 @@ function orgChip(o,region,title,fed){
 
   <div class="mypane" id="paneJourney">
   <!-- [경력 여정] 임무 완료·대회 참가·입상 이력(staffCareer)을 통계·배지·타임라인으로 보여주고 경력증명서를 발급 -->
+  <!-- [학교스포츠클럽 3단계] 나의 발자취 — 본인·자녀의 학교클럽 이력·팀 대회 기록·일반 클럽·다음 활동 추천 (fpLoad) -->
+  <div id="fpBox" style="display:none;margin-top:8px"></div>
   <div id="careerBox" style="display:none;margin-top:8px">
     <h3 class="sub" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span id="careerTitleIcon"></span>나의 경력 여정 <span style="font-size:12px;font-weight:700;color:#8a919d">— 임무 완료·대회 참가·입상이 자동으로 쌓입니다</span></h3>
     <div id="careerHero" style="border-radius:16px;padding:18px 20px;background:linear-gradient(135deg,#0b1a3a,#153A77 60%,#1F4E9C);color:#fff;margin-bottom:12px"></div>
@@ -2019,6 +2021,7 @@ async function pfAutoAdult(uid,d){
     return false;
   }
   Object.assign(d,upd,{typeConvertedAt:new Date(),adultConvertedAt:new Date()});
+  try{KFDF.notify((AUTH.currentUser||{}).uid,'🎓 성인 회원으로 전환되었습니다 — 학교클럽 기록을 이어 갈 가까운 일반 클럽은 마이페이지 [경력 여정 › 나의 발자취]에서 볼 수 있습니다','mypage.html')}catch(e){}   // [3단계 발자취] 다음 활동 안내
   MYD=d;
   const box=document.createElement('div');
   box.id='adultConvertNotice';
@@ -2103,7 +2106,7 @@ AUTH.onAuthStateChanged(async u=>{
     MYCAREER=careerSnap.docs.map(d2=>Object.assign({id:d2.id},d2.data())).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
     renderCareer();
     try{athSyncChildKeys();athSyncMemberKeys();athFind(true).then(function(){if(ATH_FOUND&&ATH_FOUND.length)athClaim(true)}).catch(function(){})}catch(e){}   // [자동 연동] 색인 기록 + 보류 기록 자동 반영
-    try{awardClaimsLoad()}catch(e){}   // [입상 기록 신청] 내 신청 현황   // [선수 경력] 보호자 자녀 키 저장 · 가져올 기록이 있으면 조용히 표시
+    try{awardClaimsLoad()}catch(e){}try{fpLoad().catch(function(){})}catch(e){}   // [입상 기록 신청] 내 신청 현황 · [3단계] 나의 발자취   // [선수 경력] 보호자 자녀 키 저장 · 가져올 기록이 있으면 조용히 표시
     if(false&&!careerSnap.empty){
       document.getElementById('staffCareerBox').style.display='block';
       const rows=careerSnap.docs.map(d2=>{const c=d2.data();return '<div class="brow" style="display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;padding:10px 14px">'
@@ -2559,6 +2562,132 @@ function badgeCelebrate(bd){
   BADGE_Q=fresh.map(b=>b.id);
   const next=()=>{const id=BADGE_Q.shift();if(!id)return;badgePop(id,next)};
   setTimeout(next,600);
+}
+// ══════════ [학교스포츠클럽 3단계 · 2026-09-14] 나의 발자취 — 본인·자녀의 학교클럽 이력 + 팀 대회 기록 + 일반 클럽 + 다음 활동 추천 ══════════
+//  · 이력 보관함 scPersons/{성명|생년월일} 은 관리자 [👣 발자취 색인]이 학년도 실명 명단(scRosters)에서 만듭니다.
+//    본인·보호자는 자기(자녀) 키로만 읽을 수 있습니다(보안 규칙 v31 — 키 = 내 성명 공백 제거|생년월일, 또는 childKeys).
+//  · 「내 기록으로 연결」 = scPersons.links.{내 uid} 기록. 본인 연결이면 공개 요약 scAlumni/{uid}(가림 이름·학교클럽·가입한 일반 클럽)를 남겨
+//    일반 클럽 홈의 「학교클럽 출신」, 학교클럽 홈의 「졸업생 · 출신 회원」에 씁니다.
+//  · 다음 활동: 마지막 학년도가 졸업 학년이면 다음 학교급 학교클럽(같은 시도·종목), 고교 졸업·만 18세면 가까운 일반 클럽 3곳.
+let FP=null;
+function fpMask(n){n=String(n||'').trim();if(n.length<2)return n;if(n.length===2)return n[0]+'○';return n[0]+'○'.repeat(n.length-2)+n[n.length-1]}
+function fpYears(list){const ys=[...new Set((list||[]).map(s=>+s.year).filter(Boolean))].sort((a,b)=>a-b);if(!ys.length)return '';return ys[0]===ys[ys.length-1]?ys[0]+'학년도':ys[0]+'–'+ys[ys.length-1]+'학년도'}
+function fpCurYear(){const d=new Date();return d.getMonth()>=2?d.getFullYear():d.getFullYear()-1}
+function fpLast(w){const st=((w.p&&w.p.stints)||[]).slice().sort((a,b)=>a.year-b.year);return st[st.length-1]||null}
+async function fpLoad(){
+  const box=document.getElementById('fpBox');if(!box||!MYD||!AUTH.currentUser||!window.SCC)return;
+  const uid=AUTH.currentUser.uid;
+  const who=[];
+  if(MYD.name&&MYD.birth)who.push({kind:'self',name:MYD.name,birth:MYD.birth,key:SCC.personKey(MYD.name,MYD.birth)});
+  (MYD.children||[]).forEach(k=>{if(k&&k.name&&k.birth)who.push({kind:'child',name:k.name,birth:k.birth,key:SCC.personKey(k.name,k.birth)})});
+  if(!who.length)return;
+  // 보안 규칙이 자녀 키(childKeys)로 열람을 판정하므로, 빠진 자녀 키가 있으면 먼저 채웁니다
+  const ck=MYD.childKeys||[];const miss=who.filter(w=>w.kind==='child'&&ck.indexOf(w.key)<0).map(w=>w.key);
+  if(miss.length){try{await DB.collection('users').doc(uid).update({childKeys:firebase.firestore.FieldValue.arrayUnion.apply(null,miss)});MYD.childKeys=ck.concat(miss)}catch(e){}}
+  await Promise.all(who.map(async w=>{try{const d=await DB.collection('scPersons').doc(w.key).get();w.p=d.exists?d.data():null}catch(e){w.p=null}}));
+  const scids=[...new Set(who.flatMap(w=>((w.p&&w.p.stints)||[]).map(s=>s.scid)).filter(Boolean))];
+  const clubs={},evs=[];
+  for(let i=0;i<scids.length;i+=10){const part=scids.slice(i,i+10);
+    try{const q=await DB.collection('schoolClubs').where(firebase.firestore.FieldPath.documentId(),'in',part).get();q.docs.forEach(d=>{clubs[d.id]=d.data()})}catch(e){}
+    try{const q=await DB.collection('schoolClubEvents').where('scids','array-contains-any',part).get();q.docs.forEach(d=>evs.push(Object.assign({id:d.id},d.data())))}catch(e){}}
+  let myClubs=[];try{const q=await DB.collection('clubs').where('memberUids','array-contains',uid).limit(10).get();myClubs=q.docs.map(d=>Object.assign({id:d.id},d.data())).filter(c=>c.status==='승인'&&!c.schoolClubId)}catch(e){}
+  FP={who:who,clubs:clubs,evs:evs,myClubs:myClubs};
+  for(const w of who){try{w.rec=await fpRecommend(w)}catch(e){w.rec=null}}
+  fpRender();
+  const me=who.find(w=>w.kind==='self');
+  if(me&&me.p&&me.p.links&&me.p.links[uid])fpAlumniSync(me).catch(function(){});   // 연결된 본인은 공개 요약을 최신으로
+}
+async function fpRecommend(w){
+  const age=w.birth?ageOf(w.birth):0;const last=fpLast(w);const cy=fpCurYear();
+  const lastClub=last?(FP.clubs[last.scid]||{}):{};
+  const level=last?(last.level||lastClub.level||''):'';
+  const mg=SCC.maxGrade(level);const grad=!!(last&&mg&&(+last.grade)>=mg);
+  const sido=SCC.sidoNorm((last&&(last.sido||lastClub.sido))||MYD.sidoKey||MYD.baseCity||MYD.address||'');
+  // 고교 졸업·만 18세 → 가까운 일반 클럽 (학교클럽 출신이거나, 막 성인이 된 본인)
+  const toClub=(last&&((level==='고'&&grad&&cy>last.year)||age>=18))||(w.kind==='self'&&age>=18&&age<=20);
+  if(toClub){
+    if(w.kind==='self'&&FP.myClubs.length)return null;   // 이미 일반 클럽 회원
+    if(!sido)return {kind:'club',sido:'',list:[]};
+    const home=String(MYD.baseCity||MYD.address||'');
+    try{const q=await DB.collection('clubs').where('sido','==',sido).where('status','==','승인').limit(80).get();
+      const near=c=>(home&&c.gugun&&home.indexOf(c.gugun)>=0)?1:0;
+      const list=q.docs.map(d=>Object.assign({id:d.id},d.data())).filter(c=>!c.schoolClubId&&c.clubType!=='external'&&!c.hidden)
+        .sort((a,b)=>(near(b)-near(a))||((b.memberUids||[]).length-(a.memberUids||[]).length)).slice(0,3);
+      return {kind:'club',sido:sido,list:list}}catch(e){return {kind:'club',sido:sido,list:[]}}
+  }
+  // 초6·중3(졸업 학년) → 다음 학교급 학교클럽 (같은 시도·같은 종목, 같은 시군구 우선)
+  const nl=SCC.nextLevel(level);
+  if(last&&nl&&grad&&cy>=last.year){
+    try{const q=await DB.collection('schoolClubs').where('sido','==',sido||lastClub.sido||'-').where('level','==',nl).limit(300).get();
+      const same=c=>(c.gugun&&lastClub.gugun&&c.gugun===lastClub.gugun)?1:0;
+      const list=q.docs.map(d=>Object.assign({id:d.id},d.data())).filter(c=>!c.mergedInto&&['숨김','대기','반려','통합'].indexOf(c.status)<0&&(!last.sport||c.sport===last.sport))
+        .sort((a,b)=>(same(b)-same(a))||(((b.stats&&b.stats.points)||0)-((a.stats&&a.stats.points)||0))).slice(0,3);
+      return {kind:'school',level:nl,sido:sido,list:list}}catch(e){return {kind:'school',level:nl,sido:sido,list:[]}}
+  }
+  return null;
+}
+function fpRender(){
+  const box=document.getElementById('fpBox');if(!box||!FP)return;
+  const show=FP.who.filter(w=>(w.p&&(w.p.stints||[]).length)||w.rec);
+  if(!show.length){box.style.display='none';return}
+  box.style.display='block';
+  box.innerHTML='<h3 class="sub" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">👣 나의 발자취 <span style="font-size:12px;font-weight:700;color:#8a919d">— 학교스포츠클럽에서 일반 클럽까지 이어지는 기록</span></h3>'
+    +show.map(fpCard).join('');
+}
+function fpCard(w){
+  const uid=AUTH.currentUser.uid;const st=((w.p&&w.p.stints)||[]).slice().sort((a,b)=>a.year-b.year);
+  const linked=!!(w.p&&w.p.links&&w.p.links[uid]);const idx=FP.who.indexOf(w);
+  const g={};st.forEach(s=>{(g[s.scid]=g[s.scid]||[]).push(s)});
+  const items=[];
+  Object.keys(g).forEach(id=>{const L=g[id];const c=FP.clubs[id]||{};const f=L[0],l=L[L.length-1];
+    const gr=(f.grade||l.grade)?' · '+(f.grade===l.grade?f.grade:(f.grade||'?')+'–'+(l.grade||'?'))+'학년':'';
+    items.push({y:+f.year,c:'#0f766e',h:'<b><a href="schoolclub.html?id='+encodeURIComponent(id)+'" style="color:#0f766e;text-decoration:none">'+esc(c.teamName||f.team||f.school||id)+'</a></b> <span style="color:#6b7280">'+esc(c.schoolName||f.school||'')+' · '+esc([c.sport||f.sport,(SCC.DIV||{})[c.division||f.div]].filter(Boolean).join(' '))+'</span>',s:esc(fpYears(L)+gr)+' · 학년도 명단'});
+    const ys=new Set(L.map(s=>+s.year));
+    FP.evs.forEach(e=>{const yr=+(e.year||SCC.schoolYear(e.date));if(!ys.has(yr))return;
+      Object.keys(e.divisions||{}).forEach(dv=>{const T=(e.divisions[dv]||{}).teams||{};Object.keys(T).forEach(k=>{const t=T[k];if(!t||t.scid!==id)return;
+        items.push({y:yr,d:e.date||'',c:'#153A77',h:'<b>'+esc(e.competitionName||'')+'</b> <span style="color:#6b7280">'+esc(dv)+'</span> — <b style="color:'+((t.rank&&t.rank<=3)?'#d97706':'#153A77')+'">'+esc(t.result||'참가')+'</b>',s:esc((e.stage?e.stage+' 대회 · ':'')+(c.teamName||f.team||''))+' · 팀 기록'})})})});
+  });
+  if(w.kind==='self')FP.myClubs.forEach(c=>{const m=(c.members||[]).find(x=>x&&x.uid===uid);const y=m&&m.at?+String(m.at).slice(0,4):0;
+    items.push({y:y||9999,c:'#9A6A08',h:'<b><a href="clubhome.html?id='+encodeURIComponent(c.id)+'" style="color:#9A6A08;text-decoration:none">'+esc(c.name||'')+'</a></b> 일반 클럽 회원',s:(y?y+'년 가입 · ':'')+esc(((c.sido||'')+' '+(c.gugun||'')).trim())})});
+  items.sort((a,b)=>(a.y-b.y)||String(a.d||'').localeCompare(String(b.d||'')));
+  return '<div style="border:1.5px solid #cfe3d8;background:#fbfdfc;border-radius:14px;padding:14px 16px;margin-bottom:10px">'
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:14.5px">'+esc(w.name)+'</b><span style="font-size:12px;color:#6b7280">'+(w.kind==='self'?'본인':'자녀')+' · '+esc(w.birth)+'</span>'
+    +(w.p&&st.length?(linked?'<span style="font-size:11.5px;font-weight:800;color:#0f766e">✓ 내 기록으로 연결됨</span>':'<button class="btn-sub" style="background:#0f766e;padding:4px 12px;font-size:12px" onclick="fpLink('+idx+')">내 기록으로 연결</button>'):'')+'</div>'
+    +(items.length?'<ul style="list-style:none;margin:10px 0 0;padding:0 0 0 18px;border-left:2px solid #dce1ec">'+items.map(it=>'<li style="position:relative;margin:0 0 9px;font-size:13px;line-height:1.55"><span style="position:absolute;left:-25px;top:4px;width:10px;height:10px;border-radius:50%;background:#fff;border:3px solid '+it.c+'"></span><span style="font-size:11.5px;color:#8a919d;font-weight:700;margin-right:6px">'+(it.y&&it.y!==9999?it.y:'')+'</span>'+it.h+'<div style="font-size:11.5px;color:#8a919d">'+it.s+'</div></li>').join('')+'</ul>'
+      :'<div style="font-size:12.5px;color:#6b7280;margin-top:6px">아직 학교스포츠클럽 명단에 오른 기록이 없습니다.</div>')
+    +(w.rec?fpRecHtml(w,w.rec):'')
+    +'</div>';
+}
+function fpRecHtml(w,r){
+  const head=r.kind==='club'?'🎓 다음 활동 — 가까운 일반 클럽'+(r.sido?' ('+esc(r.sido)+')':''):'🏫 진학 — '+esc(r.sido||'')+' '+esc(({'초':'초등학교','중':'중학교','고':'고등학교'})[r.level]||r.level)+' 학교스포츠클럽';
+  const note=r.kind==='club'?(w.kind==='self'?'학교클럽에서 쌓은 기록을 들고 일반 클럽에서 계속 뛸 수 있습니다. 클럽 홈에서 가입 신청하세요.':'만 18세가 되면 본인 계정으로 가입해 일반 클럽에서 활동할 수 있습니다.'):'진학한 학교의 학교클럽 명단에 같은 성명·생년월일로 오르면 이 발자취에 이어집니다.';
+  const list=(r.list||[]).map(c=>r.kind==='club'
+    ?'<a href="clubhome.html?id='+encodeURIComponent(c.id)+'" style="display:inline-flex;gap:6px;align-items:center;border:1.5px solid #e8d9b0;background:#fff;border-radius:10px;padding:6px 11px;font-size:12.5px;font-weight:800;color:#6b4a06;text-decoration:none;margin:0 6px 6px 0">'+esc(c.name||'')+'<span style="font-weight:600;color:#8a919d">'+esc(c.gugun||'')+' · '+((c.memberUids||[]).length)+'명</span></a>'
+    :'<a href="schoolclub.html?id='+encodeURIComponent(c.id)+'" style="display:inline-flex;gap:6px;align-items:center;border:1.5px solid #cfe3d8;background:#fff;border-radius:10px;padding:6px 11px;font-size:12.5px;font-weight:800;color:#0f766e;text-decoration:none;margin:0 6px 6px 0">'+esc(c.teamName||c.schoolName||'')+'<span style="font-weight:600;color:#8a919d">'+esc(c.gugun||'')+'</span></a>').join('');
+  return '<div style="margin-top:10px;background:'+(r.kind==='club'?'#fffaf0':'#f3f8f6')+';border-radius:10px;padding:10px 12px"><div style="font-size:12.5px;font-weight:900;color:#141d51">'+head+'</div><div style="font-size:12px;color:#6b7280;margin:3px 0 7px">'+note+'</div>'
+    +(list||'<span style="font-size:12px;color:#8a919d">추천할 곳을 아직 찾지 못했습니다. '+(r.kind==='club'?'<a href="club.html">클럽 찾기 →</a>':'<a href="schoolclub.html">학교클럽 찾기 →</a>')+'</span>')+'</div>';
+}
+async function fpLink(i){
+  const w=FP&&FP.who[i];if(!w||!w.p)return;const uid=AUTH.currentUser.uid;
+  if(!confirm(w.name+' ('+w.birth+') 학교스포츠클럽 기록을 '+(w.kind==='self'?'내':'자녀')+' 기록으로 연결할까요?\n\n성명과 생년월일이 같은 기록입니다. 다른 사람의 기록이면 연결하지 말고 사무국(031-984-3248)에 알려 주세요.'))return;
+  try{
+    const v={kind:w.kind,at:new Date().toISOString(),name:MYD.name||''};
+    await DB.collection('scPersons').doc(w.key).update(new firebase.firestore.FieldPath('links',uid),v);
+    w.p.links=Object.assign({},w.p.links||{});w.p.links[uid]=v;
+    if(w.kind==='self')await fpAlumniSync(w).catch(function(){});
+    fpRender();
+    alert('✓ 연결했습니다.'+(w.kind==='self'?'\n가입한 일반 클럽 홈과 학교클럽 홈에 「학교클럽 출신」으로 표시됩니다(이름은 가림 표기).':''));
+  }catch(e){const m=String(e.code||e.message);alert('연결 실패: '+m+(m.indexOf('permission')>=0?'\n(보안 규칙 v31 게시 전에는 연결할 수 없습니다)':''))}
+}
+// 본인 연결 시 공개 요약 — 가림 이름·학교클럽·가입한 일반 클럽 (로그인 회원만 열람)
+async function fpAlumniSync(w){
+  const uid=AUTH.currentUser.uid;const g={};((w.p&&w.p.stints)||[]).forEach(s=>{(g[s.scid]=g[s.scid]||[]).push(s)});
+  const stints=Object.keys(g).map(id=>{const c=FP.clubs[id]||{};const L=g[id];return {scid:id,school:c.schoolName||L[0].school||'',team:c.teamName||L[0].team||'',level:c.level||L[0].level||'',sport:c.sport||L[0].sport||'',years:fpYears(L)}});
+  const doc={uid:uid,name:fpMask(MYD.name||''),scids:Object.keys(g),stints:stints,clubs:(FP.myClubs||[]).map(c=>({id:c.id,name:c.name||''})),updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  const ref=DB.collection('scAlumni').doc(uid);
+  try{const ex=await ref.get();if(ex.exists){const x=ex.data();
+    if(JSON.stringify(x.stints||[])===JSON.stringify(doc.stints)&&JSON.stringify((x.clubs||[]).map(c=>c.id))===JSON.stringify(doc.clubs.map(c=>c.id))&&x.name===doc.name)return}}catch(e){}
+  await ref.set(doc);
 }
 // ══════════ [선수 경력·2026-09-07] 나의 선수 경력(대회 참가·입상, 학교스포츠클럽 포함) + 내 기록 찾기(보류함 schoolClubResults → 본인 경력) + 경력증명서 3종 ══════════
 //  · 기록 소스: staffCareer 중 group 선수·입상 (연맹 대회 comp-complete, 학교스포츠클럽 schoolclub-import / schoolclub-claim)
@@ -3454,6 +3583,7 @@ function copyCfm(){var t=document.getElementById('cfmLink').value;
 document.getElementById('cfmModal').addEventListener('click',function(e){if(e.target===this)closeCfm()});
 document.getElementById('sigModal').addEventListener('click',function(e){if(e.target===this)closeSigModal()});
 </script>
+<script src="schoolclub_core.js?v=20260914b"></script>
 <script src="logbook.js?v=20260914a"></script>
 <script src="auth_ui.js?v=20260914a"></script>
 </body>
