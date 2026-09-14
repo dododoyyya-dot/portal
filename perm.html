@@ -86,7 +86,7 @@ body{background:#f4f6fa}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="kfdf.js?v=20260821"></script>
+<script src="kfdf.js?v=20260914a"></script>
 <script>
 KFDF.initApp();
 const AUTH=firebase.auth();
@@ -95,7 +95,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
 function fmtDate(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);return isNaN(d)?'':d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')}
 
 const PM_REGIONS=['서울·경기','강원','충청','전라','경상','제주'];
-const PM_SIDOS=['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
+const PM_SIDOS=['서울','부산','대구','인천','전남광주','대전','울산','세종','경기','강원','충북','충남','전북','경북','경남','제주'];   // [전남광주 통합] 광주·전남 → 전남광주 (관할 판정은 KFDF.sidoSet)
 const PM_FEDS=['경기','강원','부산','경남','경북','전남광주','전북'];
 const PM_EXP={'경기':['경기','서울','인천'],'강원':['강원'],'부산':['부산','울산'],'경남':['경남'],'경북':['경북','대구'],'전남광주':['전남광주','광주전남','광주','전남'],'전북':['전북']};
 const PM_GUGUN={
@@ -116,6 +116,9 @@ const PM_GUGUN={
  '경북':['경산시','경주시','고령군','구미시','김천시','문경시','봉화군','상주시','성주군','안동시','영덕군','영양군','영주시','영천시','예천군','울릉군','울진군','의성군','청도군','청송군','칠곡군','포항시'],
  '경남':['거제시','거창군','고성군','김해시','남해군','밀양시','사천시','산청군','양산시','의령군','진주시','창녕군','창원시','통영시','하동군','함안군','함양군','합천군'],
  '제주':['서귀포시','제주시']};
+PM_GUGUN['전남광주']=PM_GUGUN['광주'].concat(PM_GUGUN['전남']);   // [전남광주 통합] 광주 5개 구 + 전남 22개 시군
+function pmSidoUi(s){return ['광주','전남','광주전남'].indexOf(s)>=0?'전남광주':s}   // 예전 「광주」「전남」 지정은 「전남광주」로 보여 줌
+function pmSidoNote(s){return ['광주','전남','광주전남'].indexOf(s)>=0?'<span style="font-size:11.5px;color:#b8860b;font-weight:700;margin-left:6px">기존 「'+esc(s)+'」 → 저장하면 「전남광주」(광주·전남 통합)로 바뀝니다</span>':''}
 
 let ME=null,MY=null,IS_OWNER=false,USERS=[],SEL=null,FLT='';
 AUTH.onAuthStateChanged(async u=>{
@@ -175,6 +178,28 @@ function renderStats(){
     ['👑 중앙관리자',c.admin],['🏛 시도임원',c.sido],['🏛 구군임원',c.gugun],['🛡 권역장',c.region],
     ['📅 캘린더 권한',c.cal],['📋 엑셀 일괄 신청',c.bulk],['🛡 클럽승인(구)',c.club],['✔ 검증강사',c.verify]
   ].map(x=>'<div class="stat2"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>').join('');
+  pmJnBanner();
+}
+// [전남광주 통합] 관할이 「광주」「전남」으로 따로 지정된 임원·클럽승인 권한자 → 「전남광주」로 일괄 전환 (오너)
+function pmJnLegacy(){return USERS.filter(d=>{const v=d.data();return (['광주','전남','광주전남'].indexOf(v.sido)>=0&&(pmHas(v,'sidoOfficer')||pmHas(v,'gugunOfficer')))||['광주','전남','광주전남'].indexOf(v.clubAdminSido)>=0})}
+function pmJnBanner(){
+  let b=document.getElementById('pmJnBan');const L=pmJnLegacy();
+  if(!L.length){if(b)b.remove();return}
+  if(!b){b=document.createElement('div');b.id='pmJnBan';const sr=document.getElementById('statRow');sr.parentNode.insertBefore(b,sr.nextSibling)}
+  b.style.cssText='background:#fff8e6;border:1.5px solid #f0d68a;border-radius:12px;padding:10px 14px;margin:10px 0;font-size:13px;line-height:1.7';
+  b.innerHTML='🔀 <b>전남광주 통합</b> — 관할이 「광주」 또는 「전남」으로 따로 지정된 임원·클럽승인 권한자 '+L.length+'명: '+L.map(d=>esc(d.data().name||'')+'('+esc(d.data().sido||d.data().clubAdminSido||'')+')').join(', ')
+    +(IS_OWNER?' <button class="pbtn" style="padding:5px 12px;font-size:12px;background:#b8860b" onclick="pmMergeJN()">전남광주로 일괄 변경</button>':' <span style="color:#8a919d">(오너 계정이 바꿀 수 있습니다)</span>');
+}
+async function pmMergeJN(){
+  const L=pmJnLegacy();if(!L.length)return;
+  if(!confirm(L.length+'명의 관할을 「전남광주」(광주·전남 통합)로 바꿉니다.\n시도임원은 자격 업무 관할(managedSido)에도 전남광주를 더합니다.\n\n계속할까요?'))return;
+  let ok=0,fail=0;
+  for(const d of L){const v=d.data();const u={};
+    if(['광주','전남','광주전남'].indexOf(v.sido)>=0)u.sido='전남광주';
+    if(['광주','전남','광주전남'].indexOf(v.clubAdminSido)>=0)u.clubAdminSido='전남광주';
+    if(pmHas(v,'sidoOfficer')){const cur=Array.isArray(v.managedSido)?v.managedSido:(v.managedSido?[v.managedSido]:[]);u.managedSido=[...new Set(cur.concat(PM_EXP['전남광주']))]}
+    try{await DB.collection('users').doc(d.id).update(u);ok++}catch(e){fail++;console.warn('pmMergeJN',d.id,e)}}
+  alert('✓ '+ok+'명을 전남광주로 바꿨습니다'+(fail?' · 실패 '+fail+'명 (오너 계정인지 확인)':''));await loadAll();
 }
 function renderFilters(){
   const flts=[['','전체'],['officer','임원·관리자만'],['member','일반회원만']];
@@ -219,7 +244,7 @@ function renderDetail(id){
       +(v.owner?'<div style="font-size:13px;font-weight:800;color:#111;padding:8px 0">👑 오너 — 모든 권한을 가집니다</div>':'')
       +'<label class="chkl"><input type="checkbox" id="pmR_admin"'+rc('admin')+(lockRole?' disabled':'')+' onchange="pmRoleUI()"> 👑 <b>중앙관리자</b> <span style="font-weight:600;color:#8a919d;font-size:12px">— 전국 모든 기능</span></label>'
       +'<label class="chkl"><input type="checkbox" id="pmR_sido"'+rc('sidoOfficer')+(lockRole?' disabled':'')+' onchange="pmRoleUI()"> 🏛 <b>시도연맹 임원</b> <span style="font-weight:600;color:#8a919d;font-size:12px">— 관할 시도 (상설)</span></label>'
-      +'<div id="pmSidoRow" style="display:none" class="fldrow"><span>관할 시도</span><select id="pmSido" class="fld" onchange="pmFillGugun()"><option value="">선택</option>'+PM_SIDOS.map(s=>'<option'+(v.sido===s?' selected':'')+'>'+s+'</option>').join('')+'</select></div>'
+      +'<div id="pmSidoRow" style="display:none" class="fldrow"><span>관할 시도</span><select id="pmSido" class="fld" onchange="pmFillGugun()"><option value="">선택</option>'+PM_SIDOS.map(s=>'<option'+(pmSidoUi(v.sido)===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'+pmSidoNote(v.sido)+'</div>'
       +'<label class="chkl"><input type="checkbox" id="pmR_gugun"'+rc('gugunOfficer')+(lockRole?' disabled':'')+' onchange="pmRoleUI()"> 🏛 <b>구·군연맹 임원</b> <span style="font-weight:600;color:#8a919d;font-size:12px">— 관할 시군구 (상설)</span></label>'
       +'<div id="pmGugunRow" style="display:none" class="fldrow"><span>관할 시군구</span><select id="pmGugun" class="fld"><option value="">시도를 먼저 선택</option></select></div>'
       +'<label class="chkl"><input type="checkbox" id="pmR_region"'+rc('regionAdmin')+(lockRole?' disabled':'')+' onchange="pmRoleUI()"> 🛡 <b>권역장</b> <span style="font-weight:600;color:#8a919d;font-size:12px">— 사업 기간 한정 위임</span></label>'
@@ -235,7 +260,7 @@ function renderDetail(id){
       +'<label class="chkl"><input type="checkbox" id="pmCal"'+(v.calendarEditor?' checked':'')+'> 📅 캘린더 편집 (연맹 일정 등록·수정)</label>'
       +'<label class="chkl"><input type="checkbox" id="pmBulk"'+(v.compBulkEntry?' checked':'')+'> 📋 대회 개인전 엑셀 일괄 신청 <span style="font-weight:600;color:#8a919d;font-size:12px">— 학교·클럽 담당자가 참가자를 엑셀로 한꺼번에 신청 (회원은 성명+생년월일로 연동, 나머지는 비회원)</span></label>'
       +'<label class="chkl"><input type="checkbox" id="pmVerify"'+(v.instructorVerified?' checked':'')+((v.instructorFor&&(v.instructorFor.school||v.instructorFor.after))?'':' disabled')+'> ✔ 검증 강사'+((v.instructorFor&&(v.instructorFor.school||v.instructorFor.after))?'':' <span style="font-size:11.5px;color:#8a919d">— 강사 지원자만</span>')+'</label>'
-      +'<div class="fldrow"><span>클럽승인 시도</span><select id="pmClubSido" class="fld"><option value="">권한 없음</option>'+PM_SIDOS.map(s=>'<option'+(v.clubAdminSido===s?' selected':'')+'>'+s+'</option>').join('')+'</select><span style="font-size:11.5px;color:#8a919d;min-width:0">구버전 방식 — 시도임원 등급이면 불필요</span></div></div>'
+      +'<div class="fldrow"><span>클럽승인 시도</span><select id="pmClubSido" class="fld"><option value="">권한 없음</option>'+PM_SIDOS.map(s=>'<option'+(pmSidoUi(v.clubAdminSido)===s?' selected':'')+'>'+s+'</option>').join('')+'</select><span style="font-size:11.5px;color:#8a919d;min-width:0">구버전 방식 — 시도임원 등급이면 불필요</span></div></div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
     +'<button class="pbtn" style="background:#153A77" onclick="savePerm(\''+id+'\')">💾 저장</button></div>';
   PM_CUR_GUGUN=v.gugun||'';
@@ -369,6 +394,6 @@ async function rejectReq(id){
   }catch(e){alert('반려 실패: '+e.message)}
 }
 </script>
-<script src="auth_ui.js?v=20260914a"></script>
+<script src="auth_ui.js?v=20260914b"></script>
 </body>
 </html>

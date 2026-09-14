@@ -88,7 +88,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
-<script src="kfdf.js?v=20260821"></script>
+<script src="kfdf.js?v=20260914a"></script>
 <script src="career.js?v=20260907a"></script>
 <script>
 KFDF.initApp();
@@ -1174,11 +1174,9 @@ async function loadApps(){
     if(IS_SIDO){
       const mine=((CMY&&CMY.sido)||'');
       if(!mine)throw new Error('관할 시도가 지정되어 있지 않습니다. 사무국에 관할 시도 지정을 요청해주세요.');
-      const two=await Promise.all([
-        DB.collection('schoolApplications').where('sidoKey','==',mine).get(),
-        DB.collection('schoolApplications').where('sidoKey','==','').get()
-      ]);
-      snap={docs:two[0].docs.concat(two[1].docs)};
+      // [전남광주 통합] 전남광주 임원은 광주·전남 신청서를 함께 봅니다 (시도 값마다 한 번씩 조회해 합침)
+      const two=await Promise.all(KFDF.sidoSet(mine).concat(['']).map(k=>DB.collection('schoolApplications').where('sidoKey','==',k).get()));
+      snap={docs:[].concat.apply([],two.map(x=>x.docs))};
     }else{
       snap=await DB.collection('schoolApplications').orderBy('createdAt','desc').get();
     }
@@ -1318,7 +1316,7 @@ function sameSidoApp(s){
   // [관할] 분류가 끝난 신청서는 관할 키(sidoKey)를 기준으로 봅니다 — 보안 규칙과 같은 기준입니다.
   //   빈 값('')은 '관할 미판정' 이라 어느 시도에도 잡히지 않으므로 함께 보여줍니다.
   //   아직 분류 전(항목 자체가 없음)인 신청서는 예전처럼 주소 문자열로 판정합니다.
-  if(typeof s.sidoKey==='string')return s.sidoKey===CMY.sido||s.sidoKey==='';
+  if(typeof s.sidoKey==='string')return KFDF.sidoMatch(CMY.sido,s.sidoKey)||s.sidoKey==='';   // [전남광주 통합] 관할 묶음
   return inSido(s.sido,CMY.sido) || inSido(s.city,CMY.sido) || inSido(s.school,CMY.sido) || inSido(s.region,CMY.sido);
 }
 function sameSidoClub(c){ return !IS_SIDO || inSido(c.sido,CMY.sido); }
@@ -2271,7 +2269,7 @@ function scMatchRow(r){
   r.err='';r.warn='';r.cands=[];r.pick='';r.status='';r.dupPending=null;
   if(!r.name)r.err='성명 없음';else if(!r.date)r.err='대회일자 없음·형식 오류';else if(!r.birth)r.warn='생년월일 없음';
   const si=scSchoolInfo(r);r.schoolCode=si.code;r.schoolSido=si.sido;r.schoolKnown=si.known;r.canon=si.canon;
-  if(!r.err&&IS_SIDO&&si.sido&&CMY&&CMY.sido&&si.sido!==CMY.sido)r.err='관할 밖 학교('+si.sido+')';
+  if(!r.err&&IS_SIDO&&si.sido&&CMY&&CMY.sido&&!KFDF.sidoMatch(CMY.sido,si.sido))r.err='관할 밖 학교('+si.sido+')';
   if(IS_SIDO&&!si.sido)r.warn=(r.warn?r.warn+' · ':'')+'학교 시도 판정 불가';
   const nm=scNorm(r.name);
   const consider=(d,v,who,name,birth,school,schoolCode,kid)=>{
@@ -2457,7 +2455,7 @@ async function scPendingList(){
   const b=scBoxEl();b.innerHTML='보류함을 불러오는 중…';
   try{
     const ps=await DB.collection('schoolClubResults').where('status','==','pending').limit(2000).get();
-    const list=ps.docs.map(d=>Object.assign({id:d.id},d.data())).filter(p=>!IS_SIDO||!p.schoolSido||!CMY||!CMY.sido||p.schoolSido===CMY.sido).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(a.school||'').localeCompare(String(b.school||'')));
+    const list=ps.docs.map(d=>Object.assign({id:d.id},d.data())).filter(p=>!IS_SIDO||!p.schoolSido||!CMY||!CMY.sido||KFDF.sidoMatch(CMY.sido,p.schoolSido)).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(a.school||'').localeCompare(String(b.school||'')));
     if(!list.length){b.innerHTML='<b style="color:#0f766e">보류 중인 기록이 없습니다.</b>';return}
     const byComp={};list.forEach(p=>{const k=(p.competitionName||'')+' ('+(p.date||'')+')';(byComp[k]=byComp[k]||[]).push(p)});
     b.innerHTML='<div style="font-weight:900;font-size:15.5px;margin-bottom:6px">⏳ 보류함 — 미가입 학생 기록 '+list.length+'건</div>'
@@ -3259,7 +3257,7 @@ function roleBadge(v){
   return out.join(' ');
 }
 const PM_REGIONS=['서울·경기','강원','충청','전라','경상','제주'];
-const PM_SIDOS=['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
+const PM_SIDOS=['서울','부산','대구','인천','전남광주','대전','울산','세종','경기','강원','충북','충남','전북','경북','경남','제주'];   // [전남광주 통합] 광주·전남 → 전남광주 (관할 판정은 KFDF.sidoSet)
 const PM_GUGUN={
  '서울':['강남구','강동구','강북구','강서구','관악구','광진구','구로구','금천구','노원구','도봉구','동대문구','동작구','마포구','서대문구','서초구','성동구','성북구','송파구','양천구','영등포구','용산구','은평구','종로구','중구','중랑구'],
  '부산':['강서구','금정구','기장군','남구','동구','동래구','부산진구','북구','사상구','사하구','서구','수영구','연제구','영도구','중구','해운대구'],
@@ -3278,6 +3276,9 @@ const PM_GUGUN={
  '경북':['경산시','경주시','고령군','구미시','김천시','문경시','봉화군','상주시','성주군','안동시','영덕군','영양군','영주시','영천시','예천군','울릉군','울진군','의성군','청도군','청송군','칠곡군','포항시'],
  '경남':['거제시','거창군','고성군','김해시','남해군','밀양시','사천시','산청군','양산시','의령군','진주시','창녕군','창원시','통영시','하동군','함안군','함양군','합천군'],
  '제주':['서귀포시','제주시']};
+PM_GUGUN['전남광주']=PM_GUGUN['광주'].concat(PM_GUGUN['전남']);   // [전남광주 통합] 광주 5개 구 + 전남 22개 시군
+function pmSidoUi(s){return ['광주','전남','광주전남'].indexOf(s)>=0?'전남광주':s}   // 예전 「광주」「전남」 지정은 「전남광주」로 보여 줌
+function pmSidoNote(s){return ['광주','전남','광주전남'].indexOf(s)>=0?'<span style="font-size:11.5px;color:#b8860b;font-weight:700;margin-left:6px">기존 「'+esc(s)+'」 → 저장하면 「전남광주」(광주·전남 통합)로 바뀝니다</span>':''}
 const PM_FEDS=['경기','강원','부산','경남','경북','전남광주','전북'];
 const PM_EXP={'경기':['경기','서울','인천'],'강원':['강원'],'부산':['부산','울산'],'경남':['경남'],'경북':['경북','대구'],'전남광주':['전남광주','광주전남','광주','전남'],'전북':['전북']};
 function permModal(uid){
@@ -3305,7 +3306,7 @@ function permModal(uid){
         .map(r=>'<label style="display:flex;gap:8px;align-items:center;font-size:13.5px;font-weight:800;color:'+r[2]+';padding:8px 11px;border:1.5px solid #e6eaf2;border-radius:9px'+(lockRole?';opacity:.6':'')+'">'
           +'<input type="checkbox" class="pmRoleChk" value="'+r[0]+'" style="width:auto"'+(hasRole(v,r[0])?' checked':'')+(lockRole?' disabled':'')+' onchange="pmRoleUI()"> '+r[1]+'</label>').join('')
       +'<div style="font-size:11.5px;color:#8a919d;font-weight:600">· 아무것도 체크하지 않으면 일반회원입니다 · 예: 시도임원 + 권역장 동시 선택 가능</div></div>'
-      +'<div id="pmSidoRow" style="display:none">'+row('관할 시도','<select id="pmSido" '+inp+' onchange="pmFillGugun()"><option value="">선택</option>'+PM_SIDOS.map(s=>'<option'+(v.sido===s?' selected':'')+'>'+s+'</option>').join('')+'</select>')+'</div>'
+      +'<div id="pmSidoRow" style="display:none">'+row('관할 시도','<select id="pmSido" '+inp+' onchange="pmFillGugun()"><option value="">선택</option>'+PM_SIDOS.map(s=>'<option'+(pmSidoUi(v.sido)===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'+pmSidoNote(v.sido))+'</div>'
       +'<div id="pmGugunRow" style="display:none">'+row('관할 시군구','<select id="pmGugun" '+inp+'><option value="">시도를 먼저 선택</option></select>')+'</div>'
       +'<div id="pmRegionRows" style="display:none">'
         +row('관할 권역','<select id="pmRegion" '+inp+'>'+PM_REGIONS.map(r=>'<option'+(v.managedRegion===r?' selected':'')+'>'+r+'</option>').join('')+'</select>')
@@ -3562,12 +3563,10 @@ async function loadDash(){
     // [관할] 시도연맹 임원은 관할 자료만 조회합니다. 전체 조회로는 규칙이 통과시키지 못해
     //   현황판이 통째로 '권한 없음' 으로 표시됩니다.
     const _mine=((typeof CMY!=='undefined'&&CMY&&CMY.sido)||'');
-    const _uq=(IS_SIDO&&_mine)
-      ? DB.collection('users').where('sidoKey','==',_mine).get()
-      : DB.collection('users').get();
-    const _aq=(IS_SIDO&&_mine)
-      ? DB.collection('schoolApplications').where('sidoKey','==',_mine).get()
-      : DB.collection('schoolApplications').get();
+    // [전남광주 통합] 관할 묶음(전남광주 = 광주·전남)마다 조회해 합칩니다
+    const _sq=col=>Promise.all(KFDF.sidoSet(_mine).map(k=>DB.collection(col).where('sidoKey','==',k).get())).then(r=>({docs:[].concat.apply([],r.map(x=>x.docs))}));
+    const _uq=(IS_SIDO&&_mine)?_sq('users'):DB.collection('users').get();
+    const _aq=(IS_SIDO&&_mine)?_sq('schoolApplications'):DB.collection('schoolApplications').get();
     // [성능·정확도 2026-09-11] 중앙 관리자는 실시간 명단을 그대로 씁니다(재조회 없음). 휴지통(삭제) 회원은 세지 않습니다
     //   — 예전에는 휴지통의 중복 가입 계정까지 '승인 대기' 로 세어 목록과 숫자가 달랐습니다.
     let us=null;
@@ -4748,8 +4747,8 @@ async function syncSidoFeds(){
     USERS.forEach(d=>{const v=d.data()||{};if(v.deleted||v.status!=='approved')return;const roles=[v.role].concat(v.roles||[]);
       if(v.owner===true||roles.indexOf('admin')>=0)central.push(d.id);
       const add=(s,kind)=>{const k=SCC.sidoNorm(s);if(!k)return;m[k]=m[k]||[];if(!m[k].some(x=>x.uid===d.id))m[k].push({uid:d.id,name:v.name||'',kind:kind})};
-      if(roles.indexOf('sidoOfficer')>=0&&v.sido)add(v.sido,'시도임원');
-      if(v.clubAdminSido)add(v.clubAdminSido,'클럽승인');
+      if(roles.indexOf('sidoOfficer')>=0&&v.sido)KFDF.sidoSet(v.sido).forEach(s=>add(s,'시도임원'));   // [전남광주 통합] 광주·전남 학교클럽·클럽 승인 경로에 모두 등록
+      if(v.clubAdminSido)KFDF.sidoSet(v.clubAdminSido).forEach(s=>add(s,'클럽승인'));
     });
     SIDOFEDS={sidos:m,central:central};
     const cur=await DB.collection('siteContent').doc('sidoFeds').get().catch(()=>null);
@@ -4773,11 +4772,9 @@ async function loadUsers(){
     if(IS_SIDO){
       const mine=((CMY&&CMY.sido)||'');
       if(!mine)throw new Error('관할 시도가 지정되어 있지 않습니다. 사무국에 관할 시도 지정을 요청해주세요.');
-      const two=await Promise.all([
-        DB.collection('users').where('sidoKey','==',mine).get(),
-        DB.collection('users').where('sidoKey','==','').get()
-      ]);
-      snap={docs:two[0].docs.concat(two[1].docs)};
+      // [전남광주 통합] 전남광주 임원은 광주·전남 회원을 함께 봅니다 (시도 값마다 한 번씩 조회해 합침)
+      const two=await Promise.all(KFDF.sidoSet(mine).concat(['']).map(k=>DB.collection('users').where('sidoKey','==',k).get()));
+      snap={docs:[].concat.apply([],two.map(x=>x.docs))};
     }else{
       snap=await DB.collection('users').orderBy('createdAt','desc').get();
     }
@@ -8400,10 +8397,10 @@ async function dlGoodsCerts(){
 }
 </script>
 <script src="schoolclub_core.js?v=20260914b"></script>
-<script src="post_alert.js?v=20260911a"></script>
-<script src="schoolclub_admin.js?v=20260914c"></script>
+<script src="post_alert.js?v=20260914a"></script>
+<script src="schoolclub_admin.js?v=20260914d"></script>
 <script src="logbook.js?v=20260914a"></script>
 <script src="consentdocs.js?v=20260914a"></script>
-<script src="auth_ui.js?v=20260914a"></script>
+<script src="auth_ui.js?v=20260914b"></script>
 </body>
 </html>

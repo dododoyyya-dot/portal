@@ -59,11 +59,17 @@
   function isApproved(d) { return !!(d && d.status === 'approved'); }
   // [겸직v3] canCalendar — 시도임원·권역장 모두 캘린더 편집 가능
   function canCalendar(d) { return isAdmin(d) || isSidoOfficer(d) || isRegionAdmin(d) || !!(d && d.calendarEditor === true); }
+  // [전남광주 통합 2026-09-14] 광주광역시·전라남도 통합 → 시도연맹 관할 「전남광주」 한 단위.
+  //   회원·클럽·학교클럽·신청서의 주소 기반 시도 값은 그대로 '광주'·'전남'(옛 표기 '광주전남')이고, 관할 판정에서만 함께 묶습니다.
+  //   보안 규칙 v32 의 sidoSetOf()/mySidos() 와 같은 기준입니다.
+  var SIDO_UNION = { '전남광주': ['전남광주', '광주전남', '광주', '전남'] };
+  function sidoSet(s) { s = String(s || ''); if (s === '광주전남') s = '전남광주'; return SIDO_UNION[s] ? SIDO_UNION[s].slice() : (s ? [s] : []); }
+  function sidoMatch(mine, target) { return !!target && sidoSet(mine).indexOf(String(target)) >= 0; }
   function canApproveClub(d, sido, gugun) {
     return isAdmin(d)
-      || (isSidoOfficer(d) && d && d.sido === sido)
-      || (isGugunOfficer(d) && d && d.sido === sido && d.gugun === gugun)
-      || !!(d && d.clubAdminSido === sido);
+      || (isSidoOfficer(d) && d && sidoMatch(d.sido, sido))
+      || (isGugunOfficer(d) && d && sidoMatch(d.sido, sido) && d.gugun === gugun)
+      || !!(d && d.clubAdminSido && sidoMatch(d.clubAdminSido, sido));
   }
 
   /* ─── ② 자격·활동 꼬리표 (caps, 여러 개 가능) ─── */
@@ -193,7 +199,7 @@
     // 등급
     roleOf: roleOf, isOwner: isOwner, isAdmin: isAdmin, isSidoOfficer: isSidoOfficer, isGugunOfficer: isGugunOfficer,
     isRegionAdmin: isRegionAdmin, regionActive: regionActive, isApproved: isApproved,
-    canCalendar: canCalendar, canApproveClub: canApproveClub,
+    canCalendar: canCalendar, canApproveClub: canApproveClub, sidoSet: sidoSet, sidoMatch: sidoMatch,
     // 자격
     isInstructor: isInstructor, isVerifiedInstructor: isVerifiedInstructor,
     isReferee: isReferee, isStaff: isStaff, isAthlete: isAthlete,

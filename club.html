@@ -330,7 +330,7 @@ body[data-view] #clHead{display:none}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
-<script src="kfdf.js?v=20260821"></script>
+<script src="kfdf.js?v=20260914a"></script>
 <script src="site_config.js"></script>
 <script src="region_map.js?v=20260910a"></script>
 <script src="schoolclub_core.js?v=20260914b"></script>
@@ -1126,11 +1126,11 @@ async function loadOfficer(){
   if(_ofSido||KMY.owner){
     try{
       // 복합 인덱스 회피: 단일 필드 조회 후 클라이언트 필터
-      const q=_ofSido
-        ? DB.collection('officerRequests').where('sido','==',KMY.sido||'__')
-        : DB.collection('officerRequests').where('status','==','대기');
-      const snap=await q.limit(80).get();
-      OFFICER_REQS=snap.docs.map(d=>({id:d.id,data:d.data()}))
+      // [전남광주 통합] 전남광주 임원은 광주·전남·전남광주로 들어온 신청을 모두 봅니다 (시도 값마다 조회해 합침)
+      const snaps=_ofSido
+        ? await Promise.all(KFDF.sidoSet(KMY.sido||'__').map(s=>DB.collection('officerRequests').where('sido','==',s).limit(80).get()))
+        : [await DB.collection('officerRequests').where('status','==','대기').limit(80).get()];
+      OFFICER_REQS=[].concat.apply([],snaps.map(x=>x.docs)).map(d=>({id:d.id,data:d.data()}))
         .filter(r=>r.data.status==='대기')
         .filter(r=>_ofSido?r.data.kind==='gugun':true); // 시도임원은 구군 신청만
       apprEl.innerHTML='<div style="font-size:12.5px;font-weight:800;color:#153A77;margin-bottom:6px">임원 등록 신청 승인 '+(OFFICER_REQS.length?'('+OFFICER_REQS.length+'건)':'')+'</div>'
@@ -1166,7 +1166,8 @@ async function cancelOfficerReq(id){
 }
 async function approveOfficer(id){
   const r=OFFICER_REQS.find(x=>x.id===id);if(!r)return;const d=r.data;
-  const upd=d.kind==='gugun'?{role:'gugunOfficer',sido:d.sido,gugun:d.gugun}:{role:'sidoOfficer',sido:d.sido};
+  const S=['광주','전남','광주전남'].indexOf(d.sido)>=0?'전남광주':d.sido;   // [전남광주 통합] 광주·전남 임원은 「전남광주」 관할로 등록
+  const upd=d.kind==='gugun'?{role:'gugunOfficer',sido:S,gugun:d.gugun}:{role:'sidoOfficer',sido:S};
   if(!confirm(d.name+' 님을 ['+d.sido+(d.gugun?' '+d.gugun:'')+'] '+ofTitleKo(d.kind)+'(으)로 승인할까요?'))return;
   try{
     await DB.collection('users').doc(d.uid).update(upd);
@@ -1191,7 +1192,7 @@ async function loadSidoApprovals(){
   const box=document.getElementById('sidoApproveBox');
   try{
     let q=DB.collection('clubs').where('status','==','대기');
-    if(sido&&!isAdm)q=q.where('sido','==',sido);
+    if(sido&&!isAdm)q=q.where('sido','in',KFDF.sidoSet(sido));   // [전남광주 통합]
     const snap=await q.limit(80).get();
     let docs=snap.docs;
     if(gugun)docs=docs.filter(d=>(d.data().gugun||'')===gugun); // 구군임원은 자기 시군구만
@@ -1213,7 +1214,7 @@ async function loadSidoApprovals(){
   // [학교스포츠클럽 승인 2026-09-11] 지도교사가 신청한 학교클럽(schoolClubs status '대기') — 관할 시도연맹이 승인
   try{
     let q2=DB.collection('schoolClubs').where('status','==','대기');
-    if(sido&&!isAdm)q2=q2.where('sido','==',sido);
+    if(sido&&!isAdm)q2=q2.where('sido','in',KFDF.sidoSet(sido));   // [전남광주 통합]
     const s2=await q2.limit(80).get();
     const list=document.getElementById('sidoApproveList');
     if(s2.size&&list){box.style.display='block';
@@ -1721,6 +1722,6 @@ function cmVsCard(m,done){
 function _kfdfBind(){try{if(!window.KFDF_VIEW)return;const tq=new URLSearchParams(location.search).get('tab');const byTab={'1':'mine','2':'find','3':'create','4':'meet'};const toTab={find:'2',create:'3',mine:'1',meet:'4'};KFDF_VIEW.apply({def:byTab[tq]||'find',menu:'클럽',menuHref:'club.html?view=find',views:{find:{title:'클럽 찾기 · 가입',desc:'시도·시군구별 클럽을 찾아 가입 신청합니다. 가입 승인은 클럽장이 합니다.'},create:{title:'클럽 만들기',desc:'승인 회원이면 클럽을 만들 수 있습니다. 연맹 승인 후 정식 클럽이 됩니다.'},mine:{title:'내 클럽 · 가입 승인',desc:'내가 속한 클럽과 가입 신청 현황을 관리합니다. 클럽장은 가입 승인·구성원 관리를 합니다.'},meet:{title:'클럽 교류전',desc:'클럽 간 교류전 도전장·결과·전적을 기록합니다.'}},onView:function(v){const t=document.getElementById('clTabs');if(t)t.classList.add('kv-tabs');if(typeof showClTab==='function')showClTab(toTab[v]||'2')}});}catch(e){console.warn("view",e)}}
 if(window.KFDF_VIEW)_kfdfBind();else document.addEventListener("DOMContentLoaded",_kfdfBind);
 </script>
-<script src="auth_ui.js?v=20260914a"></script>
+<script src="auth_ui.js?v=20260914b"></script>
 </body>
 </html>

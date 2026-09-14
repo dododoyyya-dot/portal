@@ -1,4 +1,4 @@
-// v20260911a · 공고 지역 알림 — 대회 참가 모집·심판·운영요원 모집·단기 강사 구인 공고가 올라오면
+// v20260914a · 공고 지역 알림 — 대회 참가 모집·심판·운영요원 모집·단기 강사 구인 공고가 올라오면
 //   회원의 주소지·거점·활동 지역(시도)과 맞는 회원에게 알림(🔔)을 보냅니다. 학생회원·미성년은 제외(자격 취득·활동 불가).
 //   ① 올리는 순간(push): 올린 사람이 볼 수 있는 회원(중앙=전체, 시도임원=관할 시도)에게 바로
 //   ② 들어오는 순간(pull): 그 밖의 회원은 사이트에 들어올 때 최근 14일 공고 중 내 지역 것을 찾아 스스로 알림을 만듭니다
@@ -10,6 +10,7 @@
   function uniq(a){var o=[],s={};a.forEach(function(x){if(x&&!s[x]){s[x]=1;o.push(x)}});return o}
   function sidosIn(t){
     t=String(t||'').replace(/경기장/g,'');if(!t)return [];var out=[];   // 「사직경기장」의 경기 ≠ 경기도
+    if(/전남광주|광주전남/.test(t))out.push('광주','전남');   // [전남광주 통합] 한 단위 표기 → 광주·전남 모두
     Object.keys(FULL).forEach(function(k){if(t.indexOf(k)>=0)out.push(FULL[k])});
     SIDOS.forEach(function(s){if(new RegExp('^'+s+'|(^|[^가-힣])'+s+'(?=$|[^가-힣]|시|도|광역|특별)').test(t))out.push(s)});   // 「해운대구」의 대구처럼 다른 낱말 속 글자는 제외
     Object.keys(REG).forEach(function(r){if(t===r||t.indexOf(r+'권')>=0||t===r+' 권역')out=out.concat(REG[r])});
@@ -57,7 +58,9 @@
       var isSido=meDoc&&(meDoc.role==='sidoOfficer'||(meDoc.roles||[]).indexOf('sidoOfficer')>=0);
       try{
         if(isAdm){var s=await DB.collection('users').get();users=s.docs.map(function(d){return {id:d.id,data:d.data()}})}
-        else if(isSido&&meDoc.sido){var r=await Promise.all([DB.collection('users').where('sidoKey','==',meDoc.sido).get(),DB.collection('users').where('sidoKey','==','').get().catch(function(){return {docs:[]}})]);users=r[0].docs.concat(r[1].docs).map(function(d){return {id:d.id,data:d.data()}})}
+        else if(isSido&&meDoc.sido){var ks=(window.KFDF&&KFDF.sidoSet)?KFDF.sidoSet(meDoc.sido):[meDoc.sido];   // [전남광주 통합] 관할 묶음마다 조회
+          var r=await Promise.all(ks.map(function(k){return DB.collection('users').where('sidoKey','==',k).get()}).concat([DB.collection('users').where('sidoKey','==','').get().catch(function(){return {docs:[]}})]));
+          users=[].concat.apply([],r.map(function(x){return x.docs})).map(function(d){return {id:d.id,data:d.data()}})}
         else users=[];
       }catch(e){users=[]}
     }

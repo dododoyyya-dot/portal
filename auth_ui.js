@@ -1,4 +1,4 @@
-// v20260914a · 전 페이지 공용: ① 상단 메뉴 일괄 렌더(A안) ② 로그인/로그아웃 전환 ③ 알림 배지
+// v20260914b · 전 페이지 공용: ① 상단 메뉴 일괄 렌더(A안) ② 로그인/로그아웃 전환 ③ 알림 배지
 (function(){
   var CFG={apiKey:"AIzaSyB-YuoXtSnuodHEbbjwHRyEjdShgNu4iLg",authDomain:"koreaflyingdiscfederation.firebaseapp.com",projectId:"koreaflyingdiscfederation",appId:"1:1081847355343:web:ca40ed9a52e13f607f64ba"};
 
@@ -331,7 +331,7 @@
     try{
       var go=function(){if(!(window.firebase&&firebase.firestore&&window.KFDF_POSTALERT))return;var db=firebase.firestore();
         db.collection('users').doc(u.uid).get().then(function(d){if(!d.exists)return;return KFDF_POSTALERT.pull(db,u.uid,d.data()).then(function(n){if(n)badge(u)})}).catch(function(){})};
-      if(window.KFDF_POSTALERT)go();else{var s=document.createElement('script');s.src='post_alert.js?v=20260911a';s.onload=go;document.head.appendChild(s)}
+      if(window.KFDF_POSTALERT)go();else{var s=document.createElement('script');s.src='post_alert.js?v=20260914a';s.onload=go;document.head.appendChild(s)}
     }catch(e){}
   }
   if(window.firebase&&firebase.auth){ready();return}

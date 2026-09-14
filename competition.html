@@ -302,10 +302,10 @@ body[data-view] #secLive>.sec-label,body[data-view] #secLive>.sec-title,body[dat
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
-<script src="kfdf.js?v=20260821"></script>
+<script src="kfdf.js?v=20260914a"></script>
 <script src="career.js?v=20260907a"></script>
 <script src="schoolclub_core.js?v=20260914b"></script>
-<script src="post_alert.js?v=20260911a"></script>
+<script src="post_alert.js?v=20260914a"></script>
 <script src="site_config.js"></script>
 <script>
 KFDF.initApp();
@@ -848,7 +848,7 @@ async function cfMatchMember(m,r){
   if(!m.birth)return null;
   try{const hit=await taLookupKey(m.name,m.birth);if(hit)return hit.uid?{uid:hit.uid}:{uid:hit.guardianUid,kidName:hit.kidName}}catch(e){}   // [회원 색인] 관할 무관
   const admin=(typeof _cc2Admin==='function')?_cc2Admin():false;
-  const scope=q=>admin?q:q.where('sidoKey','==',(CMY&&CMY.sido)||'__none__');
+  const _ss=KFDF.sidoSet((CMY&&CMY.sido)||'');const scope=q=>admin?q:(_ss.length>1?q.where('sidoKey','in',_ss):q.where('sidoKey','==',_ss[0]||'__none__'));   // [전남광주 통합]
   const nm=String(m.name||'').trim(),nn=nm.replace(/\s+/g,'');
   try{const q=await scope(DB.collection('users').where('name','==',nm).where('birth','==',m.birth)).limit(3).get();if(q.size===1)return {uid:q.docs[0].id}}catch(e){}
   try{const q=await scope(DB.collection('users').where('childKeys','array-contains',nn+'|'+m.birth)).limit(3).get();if(q.size===1)return {uid:q.docs[0].id,kidName:nm}}catch(e){}
@@ -2586,7 +2586,7 @@ async function cc2LoadMine(){
   try{
     const snap=await DB.collection('competitions').orderBy('dateStart','desc').limit(30).get();
     CC2_LIST=snap.docs.map(d=>({id:d.id,...d.data()}))
-      .filter(c=>_cc2Admin()||c.byUid===CME.uid||(cHasRole(CMY,'sidoOfficer')&&c.sido===CMY.sido));
+      .filter(c=>_cc2Admin()||c.byUid===CME.uid||(cHasRole(CMY,'sidoOfficer')&&KFDF.sidoMatch(CMY.sido,c.sido)));
     el.innerHTML=CC2_LIST.length?CC2_LIST.map(c=>'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#fff;border:1.5px solid #d3e0f2;border-radius:10px;padding:8px 13px;margin-top:6px;font-size:13px">'
       +'<b>'+cesc(c.title||'')+'</b><span style="color:#6b7280;font-size:12px">📅 '+cesc(c.dateStart||'')+(c.dateEnd&&c.dateEnd!==c.dateStart?'~'+cesc(c.dateEnd):'')+' · 📍 '+cesc(c.place||'')+'</span>'
       +'<span style="flex:1"></span>'
@@ -4660,6 +4660,6 @@ function tbRemoveMember(ti,mi){
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="region_map.js?v=20260910a"></script>
-<script src="auth_ui.js?v=20260914a"></script>
+<script src="auth_ui.js?v=20260914b"></script>
 </body>
 </html>

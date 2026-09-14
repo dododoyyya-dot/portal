@@ -73,7 +73,7 @@
   function routeTxt(c){var f=(typeof SIDOFEDS!=='undefined'&&SIDOFEDS)?SIDOFEDS.sidos[c.sido]||[]:null;if(!f)return '';return f.length?('관할 '+c.sido+' 시도연맹 승인 대상'):'중앙 승인 대상 (시도연맹 없음)'}
   window.sccDecide=async function(id,ok){
     var c=CLUBS.find(function(x){return x.id===id});if(!c)return;
-    if(isSido()&&c.sido!==mySido()){alert('관할 시도가 아닙니다.');return}
+    if(isSido()&&!KFDF.sidoMatch(mySido(),c.sido)){alert('관할 시도가 아닙니다.');return}
     var f=(typeof SIDOFEDS!=='undefined'&&SIDOFEDS)?(SIDOFEDS.sidos[c.sido]||[]):[];
     if(!isSido()&&f.length&&!confirm('['+(c.teamName||id)+'] 은(는) 관할 '+c.sido+' 시도연맹('+f.map(function(x){return x.name}).join('·')+') 승인 대상입니다.\n중앙에서 대신 처리할까요?'))return;
     var reason=ok?'':(prompt('반려 사유 (지도교사에게 전달됩니다)','')||'');if(!ok&&!reason.trim())return;
@@ -241,7 +241,7 @@
         if(type==='ros'&&!r.name&&!r.err)r.err='성명 없음';
         if(type==='ros'&&!r.birth&&!r.err)r.warn='생년월일 없음 (개인 발자취 연결은 가입 후 본인 확인)';
       }
-      if(!r.err&&isSido()&&r.sido&&r.sido!==mySido())r.err='관할 밖('+r.sido+')';
+      if(!r.err&&isSido()&&r.sido&&!KFDF.sidoMatch(mySido(),r.sido))r.err='관할 밖('+r.sido+')';
     });
   }
   window.sccPick=function(k,v){UP.pick[k]=v;build();renderUp()};
