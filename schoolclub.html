@@ -419,6 +419,7 @@ async function scTeamLoad(id){
     right+='<div class="tp" style="margin-top:0"><h3>경기 기록<small>'+matches.length+'경기</small></h3>'+matches.slice(0,20).map(m=>{const side=idset.has((m.a||{}).scid)?'a':'b';const me=m[side]||{},op=m[side==='a'?'b':'a']||{};const res=+me.score>+op.score?'w':(+me.score<+op.score?'l':'d');
       return '<div class="mt"><span class="d" style="font-size:12px;color:#6b7280;font-weight:700">'+E(String(m.date||'').replace(/-/g,'.'))+'</span><span><a href="schoolclub.html?id='+encodeURIComponent(op.scid||'')+'" style="color:#141d51;font-weight:800;text-decoration:none">vs '+E(op.school||'')+'</a><span style="display:block;font-size:11.5px;color:#6b7280">'+E((m.round?m.round+' · ':'')+(m.eventName||''))+(m.source==='teacher'&&!m.verified?' · 비공식':'')+'</span></span><span class="sc">'+E(me.score)+' : '+E(op.score)+'</span><span class="wl '+res+'">'+(res==='w'?'승':res==='l'?'패':'무')+'</span></div>'}).join('')+'</div>'}
   const seasons=(seas?seas.docs:[]).map(x=>x.data()).sort((a,b)=>(b.year||0)-(a.year||0));
+  CUR.seasonYears=seasons.filter(s=>(s.rosterN||(s.roster||[]).length||s.count||s.confirmedAt)).map(s=>+s.year);   // [4단계] 올해 명단 여부
   if(seasons.length){right+='<div class="tp"'+(matches.length?'':' style="margin-top:0"')+'><h3>학년도 명단<small>이름은 가림 표기</small></h3><div class="sc-seg" id="rosYr" style="flex-wrap:wrap">'+seasons.map((s,i)=>'<button data-i="'+i+'"'+(i?'':' class="on"')+'>'+E(s.year)+'</button>').join('')+'</div><div id="rosBox"></div></div>'}
   h+='<div>'+(right||'<div class="tp" style="margin-top:0"><h3>경기 기록 · 명단</h3><div style="font-size:13px;color:#6b7280">경기 점수와 학년도 명단이 정리되면 여기에 표시됩니다.</div></div>')+'<div id="scFromClub"></div><div id="scAlumni"></div></div></div>';
   box.innerHTML=h;
@@ -461,7 +462,9 @@ async function scStyleRender(){
 function scCoachTools(){
   const el=document.getElementById('scCoach');if(!el)return;
   if(!(ME&&CUR&&CUR.c.coachUid===ME.uid)){el.innerHTML='';return}
-  el.innerHTML='<div class="coach"><b>지도교사 도구</b><button class="btn4" onclick="scTacticsOpen()">전술 태그 고르기</button><button class="btn4" onclick="scMatchOpen()">경기 기록 입력 (연습경기 · 교류전)</button><button class="btn4" onclick="scMyMatches()">내가 입력한 경기</button><span style="font-size:12px;color:#6b7280">입력한 경기는 비공식 기록으로 따로 표시됩니다</span></div><div id="scCoachBox"></div>';
+  const cy=scRosterYear(),miss=(CUR.seasonYears||[]).indexOf(cy)<0;
+  el.innerHTML=(miss?'<div class="banner" style="margin-bottom:8px">📋 '+cy+'학년도 선수 명단이 아직 없습니다 — [학년도 명단 관리]에서 지난 학년도 명단을 가져와(학년 올리기) 확정해 주세요.</div>':'')
+    +'<div class="coach"><b>지도교사 도구</b><button class="btn4" onclick="scRosterOpen()">학년도 명단 관리</button><button class="btn4" onclick="scTacticsOpen()">전술 태그 고르기</button><button class="btn4" onclick="scMatchOpen()">경기 기록 입력 (연습경기 · 교류전)</button><button class="btn4" onclick="scMyMatches()">내가 입력한 경기</button><span style="font-size:12px;color:#6b7280">입력한 경기는 비공식 기록으로 따로 표시됩니다</span></div><div id="scCoachBox"></div>';
 }
 function scModal(html){const d=document.createElement('div');d.className='scm-bg';d.id='scM';d.onclick=e=>{if(e.target===d)d.remove()};d.innerHTML='<div class="scm">'+html+'</div>';document.body.appendChild(d);return d}
 function scTacticsOpen(){
@@ -504,6 +507,89 @@ async function scMyMatches(){
   catch(e){box.innerHTML='<div class="tp" style="color:#b3202e">불러오기 실패: '+E(e.message)+'</div>'}
 }
 async function scDelMatch(mid){if(!confirm('이 경기 기록을 지울까요?'))return;try{await DB.collection('scMatches').doc(mid).delete();scTeamLoad(CUR.id)}catch(e){alert('삭제 실패: '+(e.code==='permission-denied'?'권한이 없습니다 (보안 규칙 v29 게시 확인)':e.message))}}
+// ── [4단계 · 2026-09-14] 지도교사: 학년도 명단 관리 — 실명 명단(scRosters: 지도교사·연맹만 열람)과 공개 명단(scSeasons: 가림 표기+학년)을 함께 씁니다 ──
+//   · 학년도 전환: 지난 학년도 명단을 가져와 학년을 1씩 올리고, 졸업 학년(초6·중3·고3)은 빼서 「졸업」으로 알려 줍니다.
+//   · 생년월일을 적으면 학생 발자취(성명+생년월일)로 이어집니다 — 연맹이 [👣 발자취 색인]을 갱신하면 학생·보호자 마이페이지에 나타납니다.
+//   · 보안 규칙: scRosters·scSeasons 는 이 팀의 지도교사(schoolClubs.coachUid)가 쓸 수 있습니다(v28 scCoachOf).
+let RS=null;
+function scRosterYear(){return SCC.schoolYear(new Date().toISOString().slice(0,10))}
+function scRsDate(x){x=String(x||'').trim();let m=x.match(/^(\d{4})[.\-\/년\s]*(\d{1,2})[.\-\/월\s]*(\d{1,2})일?$/);if(m)return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');const d=x.replace(/[^0-9]/g,'');if(d.length===8)return d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8);return ''}
+async function scRosterOpen(yr){
+  const old=document.getElementById('scM');if(old)old.remove();
+  yr=+yr||scRosterYear();RS={year:yr,rows:[],grads:[],confirmedAt:null};
+  let d=null;try{d=await DB.collection('scRosters').doc(CUR.id+'_'+yr).get()}catch(e){alert('명단을 불러오지 못했습니다: '+(e.code==='permission-denied'?'권한이 없습니다 (이 팀의 지도교사 계정으로 연결됐는지 연맹에 확인해 주세요)':e.message));return}
+  if(d&&d.exists){const x=d.data();RS.rows=(x.members||[]).map(m=>({name:m.name||'',birth:m.birth||'',grade:String(m.grade||''),gender:m.gender||'',imp:m.imp||''}));RS.confirmedAt=x.confirmedAt||null}
+  const cy=scRosterYear();const years=[...new Set([yr,cy,cy+1,cy-1].concat(CUR.seasonYears||[]))].sort((a,b)=>b-a);
+  scModal('<h3>학년도 명단 관리</h3>'
+    +'<div style="font-size:12.5px;color:#6b7280;line-height:1.7">실명 명단은 지도교사와 연맹만 봅니다. 공개 화면에는 이름을 가려(홍○동) 학년과 함께 싣습니다. <b>생년월일</b>을 적으면 학생이 진학·졸업한 뒤에도 기록이 이어집니다.</div>'
+    +'<div class="row"><div><label>학년도</label><select id="rsYear" onchange="scRosterOpen(this.value)">'+years.map(y=>'<option value="'+y+'"'+(y===yr?' selected':'')+'>'+y+'학년도</option>').join('')+'</select></div>'
+    +'<div><label>학년도 전환</label><button class="btn4" style="width:100%" onclick="scRosterPromote()">'+(yr-1)+'학년도 명단 가져오기 (학년 올리기)</button></div></div>'
+    +'<div id="rsInfo" style="font-size:12.5px;font-weight:800;margin-top:10px"></div>'
+    +'<div id="rsList" style="margin-top:6px"></div>'
+    +'<button class="btn4" style="margin-top:6px" onclick="RS.rows.push({name:\'\',birth:\'\',grade:\'\',gender:\'\',imp:\'teacher\'});scRosterRender()">+ 한 명 추가</button>'
+    +'<details style="margin-top:10px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800">엑셀에서 붙여넣기</summary><div style="font-size:12px;color:#6b7280;margin:4px 0">한 줄에 한 명 — 성명, 생년월일, 학년, 성별 (탭·쉼표·빈칸으로 구분). 예) 홍길동 2012-05-05 2 남</div><textarea id="rsPaste" rows="4" style="width:100%"></textarea><button class="btn4" onclick="scRosterPaste()">명단에 더하기</button></details>'
+    +'<div id="rsMsg" style="font-size:12.5px;font-weight:800;margin-top:8px"></div>'
+    +'<div style="display:flex;gap:8px;margin-top:12px"><button class="btn2" style="flex:1;justify-content:center" onclick="document.getElementById(\'scM\').remove()">닫기</button><button class="btn3" style="flex:2;margin-top:0" onclick="scRosterSave()">명단 확정 · 저장</button></div>');
+  scRosterRender();
+}
+function scRosterRender(){
+  const el=document.getElementById('rsList');if(!el||!RS)return;const lv=CUR.c.level||'';
+  const named=RS.rows.filter(r=>String(r.name||'').trim());const nb=named.filter(r=>r.birth).length;
+  const info=document.getElementById('rsInfo');
+  if(info)info.innerHTML=RS.year+'학년도 '+named.length+'명'+(named.length?' · 생년월일 '+nb+'/'+named.length:'')
+    +(RS.confirmedAt?' · <span style="color:#0f766e">확정 '+E(String(RS.confirmedAt).slice(0,10))+'</span>':' · <span style="color:#b8860b">미확정</span>')
+    +(RS.grads.length?'<div style="font-weight:600;color:#6b7280">🎓 졸업 학년이라 뺀 학생 '+RS.grads.length+'명: '+E(RS.grads.map(g=>g.name).join(', '))+'</div>':'');
+  const gOpts=((lv==='중'||lv==='고')?['','1','2','3']:['','1','2','3','4','5','6']);
+  el.innerHTML=RS.rows.length?'<div style="max-height:300px;overflow:auto;border:1px solid #e2e7f0;border-radius:10px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr style="background:#f6f8fb"><th style="padding:6px">성명</th><th>생년월일</th><th>학년</th><th>성별</th><th></th></tr>'
+    +RS.rows.map((r,i)=>'<tr><td style="padding:3px"><input value="'+E(r.name)+'" oninput="RS.rows['+i+'].name=this.value" style="width:100%;min-width:70px"></td>'
+      +'<td><input type="date" value="'+E(r.birth)+'" onchange="scRsBirth('+i+',this.value)"></td>'
+      +'<td><select onchange="RS.rows['+i+'].grade=this.value">'+gOpts.map(g=>'<option value="'+g+'"'+(String(r.grade)===g?' selected':'')+'>'+(g?g+'학년':'-')+'</option>').join('')+'</select></td>'
+      +'<td><select onchange="RS.rows['+i+'].gender=this.value">'+['','남','여'].map(g=>'<option value="'+g+'"'+(r.gender===g?' selected':'')+'>'+(g||'-')+'</option>').join('')+'</select></td>'
+      +'<td><button class="btn4" style="padding:3px 8px" onclick="RS.rows.splice('+i+',1);scRosterRender()">×</button></td></tr>').join('')+'</table></div>'
+    :'<div style="font-size:12.5px;color:#6b7280;padding:8px 0">아직 명단이 없습니다. 지난 학년도 명단을 가져오거나 한 명씩 추가하세요.</div>';
+}
+function scRsBirth(i,v){const r=RS.rows[i];if(!r)return;r.birth=v;if(!r.grade&&v){r.grade=SCC.gradeOf(RS.year,v,CUR.c.level||'')||'';scRosterRender()}}
+// 학년도 전환 — 지난 학년도 실명 명단에서 학년 +1, 졸업 학년은 제외
+async function scRosterPromote(){
+  const prev=RS.year-1;let d=null;
+  try{d=await DB.collection('scRosters').doc(CUR.id+'_'+prev).get()}catch(e){alert('불러오기 실패: '+(e.code==='permission-denied'?'권한이 없습니다':e.message));return}
+  const mem=(d&&d.exists)?(d.data().members||[]):[];
+  if(!mem.length){alert(prev+'학년도 실명 명단이 없습니다. 한 명씩 추가하거나 붙여넣어 주세요.');return}
+  const lv=CUR.c.level||'';const mg=SCC.maxGrade(lv)||6;
+  const have={};RS.rows.forEach(r=>{have[String(r.name||'').replace(/\s+/g,'')+'|'+(r.birth||'')]=1});
+  let add=0,skip=0;RS.grads=[];
+  mem.forEach(m=>{const g=parseInt(m.grade,10)||parseInt(SCC.gradeOf(prev,m.birth,lv),10)||0;
+    if(g&&g>=mg){RS.grads.push({name:m.name||'',birth:m.birth||''});return}
+    const k=String(m.name||'').replace(/\s+/g,'')+'|'+(m.birth||'');if(have[k]){skip++;return}have[k]=1;
+    RS.rows.push({name:m.name||'',birth:m.birth||'',grade:g?String(g+1):'',gender:m.gender||'',imp:'promote:'+prev});add++});
+  scRosterRender();
+  const msg=document.getElementById('rsMsg');msg.style.color='#0f766e';
+  msg.textContent=prev+'학년도에서 '+add+'명을 가져와 학년을 올렸습니다'+(RS.grads.length?' · 졸업 학년 '+RS.grads.length+'명은 뺐습니다':'')+(skip?' · 이미 있는 '+skip+'명은 건너뜀':'')+'. 전입·탈퇴를 고친 뒤 [명단 확정 · 저장]을 누르세요.';
+}
+function scRosterPaste(){
+  const ta=document.getElementById('rsPaste');const t=(ta.value||'').trim();if(!t)return;let add=0;
+  t.split(/\r?\n/).forEach(line=>{const p=line.split(/\t|,/).length>1?line.split(/\t|,/):line.split(/\s+/);const q=p.map(x=>String(x).trim()).filter(Boolean);if(!q.length)return;
+    let name=q[0],birth='',grade='',gender='';
+    q.slice(1).forEach(x=>{const bd=scRsDate(x);if(bd){birth=bd;return}const gm=x.match(/^([1-6])(학년)?$/);if(gm){grade=gm[1];return}if(/^(남|여)(자)?$/.test(x)){gender=x[0];return}});
+    if(!grade&&birth)grade=SCC.gradeOf(RS.year,birth,CUR.c.level||'')||'';
+    RS.rows.push({name:name,birth:birth,grade:String(grade||''),gender:gender,imp:'teacher'});add++});
+  ta.value='';scRosterRender();const msg=document.getElementById('rsMsg');msg.style.color='#0f766e';msg.textContent=add+'명을 더했습니다.';
+}
+async function scRosterSave(){
+  const m=document.getElementById('rsMsg');const c=CUR.c;
+  const rows=RS.rows.map(r=>({name:String(r.name||'').trim(),birth:r.birth||'',grade:String(r.grade||''),gender:r.gender||'',imp:r.imp||'teacher'})).filter(r=>r.name);
+  const seen={},dup=[];rows.forEach(r=>{const k=r.name.replace(/\s+/g,'')+'|'+r.birth;if(seen[k])dup.push(r.name);seen[k]=1});
+  if(dup.length){m.textContent='같은 사람이 두 번 있습니다: '+dup.join(', ');m.style.color='#b3202e';return}
+  const noB=rows.filter(r=>!r.birth).length;
+  if(!confirm(RS.year+'학년도 명단 '+rows.length+'명을 확정합니다.'+(noB?'\n생년월일이 없는 '+noB+'명은 학생 발자취로 이어지지 않습니다.':'')+'\n\n공개 화면에는 이름을 가려(홍○동) 학년과 함께 싣습니다. 계속할까요?'))return;
+  const id=CUR.id+'_'+RS.year,FV=firebase.firestore.FieldValue,now=new Date().toISOString();
+  const pub=rows.map(r=>({n:SCC.mask(r.name),g:r.grade||'',s:r.gender||'',imp:r.imp||''}));
+  try{
+    await DB.collection('scRosters').doc(id).set({scid:CUR.id,year:RS.year,members:rows,confirmedAt:now,confirmedBy:(MY&&MY.name)||'',confirmedUid:ME.uid,updatedAt:FV.serverTimestamp()},{merge:true});
+    await DB.collection('scSeasons').doc(id).set({scid:CUR.id,year:RS.year,roster:pub,rosterN:pub.length,count:pub.length,countM:rows.filter(r=>r.gender==='남').length,countF:rows.filter(r=>r.gender==='여').length,coachName:c.coachName||(MY&&MY.name)||'',confirmedAt:now,updatedAt:FV.serverTimestamp()},{merge:true});
+    document.getElementById('scM').remove();alert('✓ '+RS.year+'학년도 명단 '+rows.length+'명을 확정했습니다.');scTeamLoad(CUR.id);
+  }catch(e){m.textContent='저장 실패: '+(e.code==='permission-denied'?'권한이 없습니다 (이 팀의 지도교사 계정이 연결됐는지 연맹에 확인해 주세요)':e.message);m.style.color='#b3202e'}
+}
 // ── [2단계] 전적 · 순위 (공개 순위 = 입상 점수제) ──
 let RK=null;
 async function scRankLoad(){

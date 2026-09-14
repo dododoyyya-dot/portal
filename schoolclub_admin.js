@@ -1,4 +1,4 @@
-// v20260911b · 관리자 [학교스포츠클럽] 탭 — 학교클럽 등록·목록·통합, 과거 자료 4종 업로드(미리보기→백업→시험 1곳→나머지→되돌리기), 통계 다시 계산, 일반 클럽 연결
+// v20260914c · 관리자 [학교스포츠클럽] 탭 (3단계 발자취 색인 · 4단계 사업 성과·명단 확정 요청 포함) — 학교클럽 등록·목록·통합, 과거 자료 4종 업로드(미리보기→백업→시험 1곳→나머지→되돌리기), 통계 다시 계산, 일반 클럽 연결
 //   admin.html 의 전역(DB, esc, CMY, IS_SIDO, ExcelJS, scLoadXlsx, scCell, scDate, scDownload, KFDF)을 씁니다. 계산 규칙은 schoolclub_core.js(SCC)
 //   컬렉션: schoolClubs/{학교코드_종목_부} · scSeasons/{ID_학년도}(공개, 이름 가림) · scRosters/{ID_학년도}(비공개 실명) · scMatches/{결정적 ID} · scImports/{업로드 ID}
 //           대회 결과는 기존 schoolClubEvents(대회 결과 페이지 공개)에 합칩니다 — 팀마다 scid·rank, 문서에 scids[]·stage·year
@@ -486,6 +486,96 @@
       m.textContent='저장 중…';await commit(ops,function(t){m.textContent=t});
       m.innerHTML='<b style="color:#0f766e">✓ 저장했습니다</b> — '+n+'명 갱신';PR=null;
     }catch(e){m.innerHTML='<b style="color:#C41E2F">저장 실패: '+E(e.message)+'</b>'}
+  };
+
+  // ══════════ ⑧ [4단계] 사업 성과 지표 · 학년도 명단 확정 요청 ══════════
+  //   성과 지표는 저장하지 않고 그때그때 모읍니다(쓰기 0건). 발자취·출신 회원 지표는 [👣 발자취 색인]과 학생·보호자의 「내 기록으로 연결」이 쌓일수록 정확해집니다.
+  var PF=null,RR=null;
+  function curYear(){return SCC.schoolYear(new Date().toISOString().slice(0,10))}
+  function liveClub(c){return !c.mergedInto&&['숨김','반려','대기','통합'].indexOf(c.status)<0}
+  function ageB(b){var d=new Date(String(b||'')+'T00:00:00');if(isNaN(d))return -1;var n=new Date();var a=n.getFullYear()-d.getFullYear();if(n.getMonth()<d.getMonth()||(n.getMonth()===d.getMonth()&&n.getDate()<d.getDate()))a--;return a}
+  function seasonN(s){return +(s.count||s.rosterN||(s.roster||[]).length||0)}
+  async function allDocs(col,lim){try{return (await DB.collection(col).limit(lim||20000).get()).docs.map(function(d){return Object.assign({id:d.id},d.data())})}catch(e){return null}}
+  window.sccPerf=async function(){
+    if(isSido()){alert('사업 성과 지표는 중앙 사무국 화면입니다.');return}
+    var b=box();b.innerHTML='학교클럽·명단·대회·발자취 기록을 모으는 중…';
+    try{
+      await loadClubs(true);var cy=curYear();var L=CLUBS.filter(liveClub);var byId={};CLUBS.forEach(function(c){byId[c.id]=c});
+      var se=await allDocs('scSeasons'),ev=await allDocs('schoolClubEvents',5000),pe=await allDocs('scPersons'),al=await allDocs('scAlumni');
+      var byY={};(se||[]).forEach(function(s){var y=+s.year;if(!y)return;var n=seasonN(s);if(!n)return;var x=byY[y]=byY[y]||{n:0,teams:0,conf:0,m:0,f:0};x.n+=n;x.teams++;if(s.confirmedAt)x.conf++;x.m+=+(s.countM||0);x.f+=+(s.countF||0)});
+      var hasCur={};(se||[]).forEach(function(s){if(+s.year===cy&&seasonN(s))hasCur[s.scid]=1});
+      var withRoster=L.filter(function(c){return hasCur[c.id]}).length;
+      var schools={};L.forEach(function(c){if(c.schoolCode)schools[c.schoolCode]=1});
+      var bySido={};L.forEach(function(c){var k=c.sido||'미상';var x=bySido[k]=bySido[k]||{teams:0,schools:{},roster:0,students:0,coach:0};x.teams++;if(c.schoolCode)x.schools[c.schoolCode]=1;if(hasCur[c.id])x.roster++;if(c.coachUid)x.coach++});
+      (se||[]).forEach(function(s){if(+s.year!==cy)return;var c=byId[s.scid];var k=(c&&c.sido)||'미상';if(bySido[k])bySido[k].students+=seasonN(s)});
+      var evY=(ev||[]).filter(function(e){return +(e.year||SCC.schoolYear(e.date))===cy});var ent=0,aw=0,win=0;
+      evY.forEach(function(e){Object.keys(e.divisions||{}).forEach(function(dv){var T=(e.divisions[dv]||{}).teams||{};Object.keys(T).forEach(function(k){var t=T[k];ent++;var r=t.rank!=null?t.rank:SCC.rankOf(t.result);if(r&&r<=3)aw++;if(r===1)win++})})});
+      var P=(pe||[]).filter(function(p){return (p.stints||[]).length});
+      var multi=P.filter(function(p){var s={};p.stints.forEach(function(x){if(x.level)s[x.level]=1});return Object.keys(s).length>=2}).length;
+      var linked=P.filter(function(p){return p.links&&Object.keys(p.links).length}).length;
+      var grown=P.filter(function(p){return ageB(p.birth)>=19}).length;
+      var A=al||[];var inClub=A.filter(function(a){return (a.clubs||[]).length}).length;
+      var lead={},ref={};var au=A.map(function(a){return a.uid||a.id}).filter(Boolean);
+      for(var i=0;i<au.length;i+=10){try{var ls=await DB.collection('licenses').where('uid','in',au.slice(i,i+10)).get();ls.docs.forEach(function(d){var x=d.data();if(x.status&&x.status!=='유효')return;if(/심판/.test(x.type||''))ref[x.uid]=1;else lead[x.uid]=1})}catch(e){}}
+      var nLead=Object.keys(lead).length,nRef=Object.keys(ref).length;
+      var pct=function(a,z){return z?(Math.round(a/z*1000)/10)+'%':'-'};
+      var K=[
+        ['운영 학교클럽',L.length+'팀','참여 학교 '+Object.keys(schools).length+'교 · 지도교사 연결 '+L.filter(function(c){return c.coachUid}).length+'팀'],
+        [cy+'학년도 명단 확정',withRoster+' / '+L.length+'팀',pct(withRoster,L.length)+' — 명단이 올라온 팀'],
+        [cy+'학년도 등록 학생',((byY[cy]||{}).n||0)+'명',(byY[cy]?'남 '+byY[cy].m+' · 여 '+byY[cy].f:'명단 정리 전')],
+        [cy+'학년도 대회 출전',ent+'팀·회','대회 '+evY.length+'건 · 입상 '+aw+' (우승 '+win+')'],
+        ['발자취 학생',P.length+'명','본인·보호자 연결 '+linked+'명 ('+pct(linked,P.length)+')'],
+        ['진학 연계',multi+'명',pct(multi,P.length)+' — 두 학교급 이상 학교클럽에서 뛴 학생'],
+        ['학교클럽 출신 연맹 회원',A.length+'명','본인이 발자취를 연결한 회원'],
+        ['성인 연계 (일반 클럽 활동)',inClub+'명','출신 회원 중 '+pct(inClub,A.length)+' · 만 19세 이상 발자취 학생 '+grown+'명 대비 '+pct(inClub,grown)],
+        ['학교클럽 출신 지도자 · 심판',nLead+' · '+nRef+'명','유효 자격 보유 (연맹 자격 대장 기준)']];
+      var ys=Object.keys(byY).map(Number).sort(function(a,z){return z-a});
+      var sk=Object.keys(bySido).sort(function(a,z){return bySido[z].teams-bySido[a].teams});
+      PF={cy:cy,K:K,byY:byY,ys:ys,bySido:bySido,sk:sk};
+      var th='style="padding:6px 8px;background:#f6f8fb;text-align:left"',td='style="padding:6px 8px;border-top:1px solid #eef1f5"';
+      b.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:15px">📈 학교스포츠클럽 사업 성과 — '+cy+'학년도 기준</b><span style="flex:1"></span><button class="btn-sub" style="background:#0f766e" onclick="sccPerfCsv()">⬇ CSV</button></div>'
+        +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin:10px 0">'+K.map(function(k){return '<div style="border:1.5px solid #e2e7f0;border-radius:12px;padding:10px 12px;background:#fbfcfe"><div style="font-size:11.5px;font-weight:800;color:#6b7280">'+E(k[0])+'</div><div style="font-size:20px;font-weight:900;color:#141d51;margin:2px 0">'+E(k[1])+'</div><div style="font-size:11.5px;color:#6b7280">'+E(k[2])+'</div></div>'}).join('')+'</div>'
+        +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">'
+        +'<div><b style="font-size:13px">학년도별 등록 학생</b><table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px"><tr><th '+th+'>학년도</th><th '+th+'>명단 팀</th><th '+th+'>학생</th><th '+th+'>남 · 여</th><th '+th+'>지도교사 확정</th></tr>'
+          +(ys.length?ys.map(function(y){var x=byY[y];return '<tr><td '+td+'>'+y+'</td><td '+td+'>'+x.teams+'</td><td '+td+'><b>'+x.n+'</b></td><td '+td+'>'+x.m+' · '+x.f+'</td><td '+td+'>'+x.conf+'</td></tr>'}).join(''):'<tr><td '+td+' colspan="5">명단 자료가 아직 없습니다</td></tr>')+'</table></div>'
+        +'<div><b style="font-size:13px">시도별 ('+cy+'학년도)</b><table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px"><tr><th '+th+'>시도</th><th '+th+'>팀</th><th '+th+'>학교</th><th '+th+'>명단 확정</th><th '+th+'>학생</th><th '+th+'>지도교사</th></tr>'
+          +sk.map(function(k){var x=bySido[k];return '<tr><td '+td+'>'+E(k)+'</td><td '+td+'>'+x.teams+'</td><td '+td+'>'+Object.keys(x.schools).length+'</td><td '+td+'>'+x.roster+' ('+pct(x.roster,x.teams)+')</td><td '+td+'>'+x.students+'</td><td '+td+'>'+x.coach+'</td></tr>'}).join('')+'</table></div></div>'
+        +'<div style="font-size:12px;color:#6b7280;line-height:1.7;margin-top:10px">· 저장하지 않고 지금 기록으로 계산합니다. 명단은 지도교사 확정·과거 자료 업로드·연맹 대회 단체전 명단이 모두 들어갑니다.<br>· 발자취·진학 연계는 [👣 발자취 색인]을 갱신한 시점 기준입니다. 출신 회원·성인 연계·출신 지도자·심판은 본인이 마이페이지에서 「내 기록으로 연결」한 회원만 셉니다.'+(se===null||pe===null||al===null?'<br><b style="color:#C41E2F">일부 자료를 읽지 못했습니다 — 보안 규칙 v31 게시 여부를 확인하세요.</b>':'')+'</div>';
+    }catch(e){b.innerHTML='<b style="color:#C41E2F">계산 실패: '+E(e.message)+'</b>'}
+  };
+  window.sccPerfCsv=function(){
+    if(!PF)return;var rows=[['구분','항목','값','비고']];
+    PF.K.forEach(function(k){rows.push(['핵심 지표',k[0],k[1],k[2]])});
+    PF.ys.forEach(function(y){var x=PF.byY[y];rows.push(['학년도별',y+'학년도','학생 '+x.n+'명','명단 팀 '+x.teams+' · 남 '+x.m+' · 여 '+x.f+' · 지도교사 확정 '+x.conf])});
+    PF.sk.forEach(function(k){var x=PF.bySido[k];rows.push(['시도별('+PF.cy+')',k,'팀 '+x.teams,'학교 '+Object.keys(x.schools).length+' · 명단 확정 '+x.roster+' · 학생 '+x.students+' · 지도교사 '+x.coach])});
+    var csv='﻿'+rows.map(function(r){return r.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"'}).join(',')}).join('\n');
+    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='학교스포츠클럽_사업성과_'+PF.cy+'학년도.csv';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},1000);
+  };
+  window.sccRosterRemind=async function(){
+    if(isSido()){alert('명단 확정 요청은 중앙 사무국이 보냅니다.');return}
+    var b=box();b.innerHTML='올해 학년도 명단을 확인하는 중…';
+    try{await loadClubs(true);var cy=curYear();var se=await allDocs('scSeasons');var has={};(se||[]).forEach(function(s){if(+s.year===cy&&seasonN(s))has[s.scid]=1});
+      var L=CLUBS.filter(liveClub).filter(function(c){return !has[c.id]});
+      var wc=L.filter(function(c){return c.coachUid}),nc=L.filter(function(c){return !c.coachUid});
+      RR={cy:cy,list:wc};
+      var row=function(c){return '<tr><td><a href="schoolclub.html?id='+encodeURIComponent(c.id)+'" target="_blank" style="font-weight:800">'+E(c.teamName||c.schoolName||c.id)+'</a></td><td>'+E(c.schoolName||'')+'</td><td>'+E(c.sido||'')+'</td><td>'+E(c.coachName||'-')+'</td><td>'+(c.rosterRemindAt?E(String(c.rosterRemindAt).slice(0,10)):'-')+'</td></tr>'};
+      b.innerHTML='<b style="font-size:15px">📣 '+cy+'학년도 명단 확정 요청</b>'
+        +'<div style="font-size:12.5px;color:#6b7280;line-height:1.7;margin:6px 0">올해 학년도 명단이 아직 없는 운영 팀입니다. 지도교사 계정이 연결된 팀에는 알림을 보내 팀 홈의 「학년도 명단 관리」에서 지난 학년도 명단을 가져와(학년 올리기) 확정하도록 안내합니다.</div>'
+        +'<div style="font-size:13.5px;margin:6px 0">알림 대상 <b>'+wc.length+'</b>팀 · 지도교사 미연결 <b style="color:#b8860b">'+nc.length+'</b>팀 (학교클럽 목록에서 지도교사를 연결하거나 과거 자료로 명단을 올려 주세요)</div>'
+        +(wc.length?'<div style="overflow-x:auto;max-height:320px"><table class="rtbl"><thead><tr><th>팀</th><th>학교</th><th>시도</th><th>지도교사</th><th>지난 요청</th></tr></thead><tbody>'+wc.map(row).join('')+'</tbody></table></div>'
+          +'<button class="btn-sub" style="background:#b8860b;margin-top:8px" onclick="sccRosterRemindGo()">📣 '+wc.length+'팀 지도교사에게 알림 보내기</button>':'<div class="bempty">알림을 보낼 팀이 없습니다.</div>')
+        +(nc.length?'<details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px">지도교사 미연결 '+nc.length+'팀</summary><div style="overflow-x:auto"><table class="rtbl"><tbody>'+nc.map(row).join('')+'</tbody></table></div></details>':'')
+        +'<div id="sccRrMsg" style="margin-top:8px;font-size:13px"></div>';
+    }catch(e){b.innerHTML='<b style="color:#C41E2F">확인 실패: '+E(e.message)+'</b>'}
+  };
+  window.sccRosterRemindGo=async function(){
+    if(!RR||!RR.list.length)return;var m=document.getElementById('sccRrMsg');
+    if(!confirm(RR.list.length+'팀 지도교사에게 '+RR.cy+'학년도 명단 확정 요청 알림을 보낼까요?'))return;
+    var ok=0,fail=0,now=new Date().toISOString();
+    for(var i=0;i<RR.list.length;i++){var c=RR.list[i];if(m)m.textContent='보내는 중… '+(i+1)+'/'+RR.list.length;
+      try{await KFDF.notify(c.coachUid,'🏫 ['+(c.teamName||c.schoolName||'')+'] '+RR.cy+'학년도 선수 명단을 확정해 주세요 — 팀 홈 › 지도교사 도구 › 「학년도 명단 관리」에서 지난 학년도 명단을 가져와 학년을 올릴 수 있습니다','schoolclub.html?id='+encodeURIComponent(c.id));
+        await DB.collection('schoolClubs').doc(c.id).update({rosterRemindAt:now}).catch(function(){});ok++}catch(e){fail++}}
+    if(m)m.innerHTML='<b style="color:#0f766e">✓ '+ok+'팀에 보냈습니다</b>'+(fail?' · 실패 '+fail:'');
   };
 
   // ══════════ ⑥ 일반 클럽 중 학교 동아리 ══════════
