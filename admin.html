@@ -4044,13 +4044,22 @@ async function delApp(id){
   if(s.code)await DB.collection('appStatus').doc(s.code).delete().catch(()=>{});
   loadApps();loadDash();
 }
+// 회원 데이터 파기 — 휴지통 자동 파기·완전 삭제(함수 미배포 시) 공용. 반환: 처리 항목 목록
 async function purgeUserDoc(uid){
+  const done=[];let v={};
+  try{const ud=await DB.collection('users').doc(uid).get();v=ud.exists?(ud.data()||{}):{}}catch(e){}
   const acts=await DB.collection('users').doc(uid).collection('activities').get();
   for(const a of acts.docs)await a.ref.delete();
+  if(acts.size)done.push('활동 이력 '+acts.size+'건 삭제');
   await DB.collection('certs').doc('KFDF-2026-EDU-'+uid.slice(0,6).toUpperCase()).delete().catch(()=>{});
-  try{const ud=await DB.collection('users').doc(uid).get();const ph=String((ud.data()||{}).phone||'').replace(/[^0-9]/g,'');
-    if(ph)await DB.collection('phoneIndex').doc(ph).delete().catch(()=>{});}catch(e){}
-  await DB.collection('users').doc(uid).delete();
+  const ph=String(v.phone||'').replace(/[^0-9]/g,'');
+  if(ph){try{const pi=await DB.collection('phoneIndex').doc(ph).get();if(pi.exists&&(!pi.data().uid||pi.data().uid===uid)){await pi.ref.delete();done.push('전화번호 인덱스 해제')}}catch(e){}}
+  // [재가입 가능하게 2026-09-14] 이름|생년월일 색인·아이디 매핑·주민번호도 파기 — 남아 있으면 같은 정보로 다시 가입할 때 「이미 가입된 계정」으로 막힙니다
+  try{const mk=await DB.collection('memberKeys').where('uid','==',uid).get();for(const d of mk.docs)await d.ref.delete().catch(()=>{});if(mk.size)done.push('회원 색인 '+mk.size+'건 해제')}catch(e){}
+  if(v.loginId){try{const li=await DB.collection('loginIds').doc(String(v.loginId)).get();if(li.exists&&li.data().uid===uid){await li.ref.delete();done.push('아이디 「'+v.loginId+'」 해제')}}catch(e){}}
+  await DB.collection('privateInfo').doc(uid).delete().catch(()=>{});
+  await DB.collection('users').doc(uid).delete();done.push('회원 정보 삭제');
+  return done;
 }
 async function purgeOldTrash(){
   try{
@@ -7190,15 +7199,35 @@ async function withdrawPurge(uid,name){
       }
     }catch(e){}
     if(ownerClubs.length&&!confirm('⚠ 이 회원이 클럽장인 클럽이 있습니다: '+ownerClubs.join(', ')+'\n삭제하면 클럽이 주인 없는 상태가 됩니다.\n\n그래도 계속할까요? (권장: 회장 인수인계 먼저)'))return;
-    const fn=FUNCS.httpsCallableFromURL('https://admindeletemember-1081847355343.asia-northeast3.run.app');
-    const res=await fn({targetUid:uid});
-    const done=(res&&res.data&&res.data.done)||[];
+    // 로그인 계정 정보 — 함수가 없을 때 콘솔 삭제 안내용 (삭제 전에 읽어 둠)
+    let _acct={};try{const ud=await DB.collection('users').doc(uid).get();const x=ud.exists?(ud.data()||{}):{};_acct={email:x.email||'',loginId:x.loginId||'',contactEmail:x.contactEmail||''}}catch(e){}
+    let done=[],authGone=false,fnErr='';
+    try{
+      const fn=FUNCS.httpsCallableFromURL('https://admindeletemember-1081847355343.asia-northeast3.run.app');
+      const res=await fn({targetUid:uid});
+      done=(res&&res.data&&res.data.done)||[];authGone=true;
+      // 함수가 남기는 색인·아이디 매핑도 정리 (구버전 함수 대비 — 이미 지워졌으면 그냥 넘어감)
+      try{const extra=await purgeUserDoc(uid).catch(()=>[]);done=done.concat(extra.filter(x=>/색인|아이디/.test(x)))}catch(e){}
+    }catch(e){
+      fnErr=(e&&(e.code||e.message))||String(e);
+      // [함수 미배포·오류] 회원 데이터는 관리자 권한으로 직접 파기하고, 로그인 계정만 콘솔에서 지우도록 안내
+      done=await purgeUserDoc(uid);
+    }
     await updateLeaderboard().catch(()=>{});
     const m=document.getElementById('wdModal');if(m)m.remove();
-    alert('✓ ['+name+'] 완전 삭제 완료\n\n'+(done.length?'· '+done.join('\n· '):'')+'\n\n같은 이메일·전화번호로 재가입할 수 있습니다.');
+    if(authGone){alert('✓ ['+name+'] 완전 삭제 완료\n\n'+(done.length?'· '+done.join('\n· '):'')+'\n\n같은 이메일·전화번호·아이디로 재가입할 수 있습니다.')}
+    else{
+      const info='UID: '+uid+(_acct.email?'\n로그인 이메일: '+_acct.email:'')+(_acct.loginId?'\n아이디: '+_acct.loginId:'');
+      try{await navigator.clipboard.writeText(uid)}catch(e2){}
+      alert('✓ ['+name+'] 회원 정보는 모두 삭제했습니다.\n'+(done.length?'· '+done.join('\n· '):'')
+        +'\n\n⚠ 로그인 계정(Authentication)은 남아 있습니다 — 자동 삭제 기능(Cloud Function)이 아직 배포되지 않았습니다 ('+fnErr+').\n'
+        +'Firebase 콘솔 › Authentication › 사용자에서 아래 계정을 검색해 삭제해 주세요. (UID는 클립보드에 복사했습니다)\n\n'+info
+        +'\n\n계정을 지우기 전까지는 같은 이메일로 다시 가입할 수 없습니다.');
+      try{window.open('https://console.firebase.google.com/project/koreaflyingdiscfederation/authentication/users','_blank')}catch(e3){}
+    }
     loadDash();loadUsers();
   }catch(e){
-    alert('완전 삭제 실패: '+(e.message||e)+'\n\n※ Cloud Function(adminDeleteMember)이 아직 배포되지 않았다면\n[🚪 탈퇴 처리(휴지통)] 후 Firebase 콘솔에서 계정을 삭제해주세요.');
+    alert('완전 삭제 실패: '+(e.message||e)+'\n\n회원 정보가 일부만 지워졌을 수 있습니다. 회원 목록을 새로고침해 확인해 주세요.');
   }
 }
 async function withdrawHold(uid,name){
