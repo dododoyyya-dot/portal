@@ -1,4 +1,4 @@
-// v20260914c · 관리자 [학교스포츠클럽] 탭 (3단계 발자취 색인 · 4단계 사업 성과·명단 확정 요청 포함) — 학교클럽 등록·목록·통합, 과거 자료 4종 업로드(미리보기→백업→시험 1곳→나머지→되돌리기), 통계 다시 계산, 일반 클럽 연결
+// v20260914e · 관리자 [학교스포츠클럽] 탭 (3단계 발자취 색인 · 4단계 사업 성과·명단 확정 요청 포함) — 학교클럽 등록·목록·통합, 과거 자료 4종 업로드(미리보기→백업→시험 1곳→나머지→되돌리기), 통계 다시 계산, 일반 클럽 연결
 //   admin.html 의 전역(DB, esc, CMY, IS_SIDO, ExcelJS, scLoadXlsx, scCell, scDate, scDownload, KFDF)을 씁니다. 계산 규칙은 schoolclub_core.js(SCC)
 //   컬렉션: schoolClubs/{학교코드_종목_부} · scSeasons/{ID_학년도}(공개, 이름 가림) · scRosters/{ID_학년도}(비공개 실명) · scMatches/{결정적 ID} · scImports/{업로드 ID}
 //           대회 결과는 기존 schoolClubEvents(대회 결과 페이지 공개)에 합칩니다 — 팀마다 scid·rank, 문서에 scids[]·stage·year
@@ -10,6 +10,12 @@
   function E(s){return SCC.esc(s)}
   window.__sccState=function(){return UP};   // 점검용(읽기 전용)
   function box(){var b=document.getElementById('sccBox');b.style.display='block';return b}
+  // Firestore 한 번 조회 상한은 10,000건입니다. 많아질 수 있는 컬렉션은 문서 ID 순으로 5,000건씩 나눠 끝까지 읽습니다
+  //   (예전에는 limit(20000) 을 한 번에 요청해 「Limit value … over the maximum value of 10000」 오류가 났고, limit(5000) 등은 넘치면 조용히 잘렸습니다)
+  async function readAll(col,page){page=page||5000;var out=[],last=null;
+    for(var i=0;i<400;i++){var q=DB.collection(col).orderBy(firebase.firestore.FieldPath.documentId()).limit(page);if(last)q=q.startAfter(last);
+      var s=await q.get();out=out.concat(s.docs);if(s.docs.length<page)break;last=s.docs[s.docs.length-1]}
+    return out}
   function isSido(){return (typeof IS_SIDO!=='undefined')&&IS_SIDO}
   function mySido(){return (typeof CMY!=='undefined'&&CMY&&CMY.sido)||''}
   function me(){return (typeof CMY!=='undefined'&&CMY&&CMY.name)||'관리자'}
@@ -405,8 +411,8 @@
     var b=box();b.innerHTML='학교클럽·대회·경기 기록을 읽는 중…';
     try{
       await schoolDB();await loadClubs(true);
-      var evs=(await DB.collection('schoolClubEvents').limit(3000).get()).docs.map(function(d){return {id:d.id,data:d.data()}});
-      var mts=(await DB.collection('scMatches').limit(10000).get()).docs.map(function(d){return d.data()});
+      var evs=(await readAll('schoolClubEvents')).map(function(d){return {id:d.id,data:d.data()}});
+      var mts=(await readAll('scMatches')).map(function(d){return d.data()});
       var byId={};CLUBS.forEach(function(c){byId[c.id]=c});
       var root=function(id){var seen=0;while(byId[id]&&byId[id].mergedInto&&seen<10){id=byId[id].mergedInto;seen++}return id};
       var rows={},evPatch=[],unresolved={},create={};
@@ -449,14 +455,14 @@
   async function buildPersons(){
     await loadClubs(true);var byId={};CLUBS.forEach(function(c){byId[c.id]=c});
     var root=function(id){var seen=0;while(byId[id]&&byId[id].mergedInto&&seen<10){id=byId[id].mergedInto;seen++}return id};
-    var ro=(await DB.collection('scRosters').limit(5000).get()).docs;var P={},skip=0;
+    var ro=await readAll('scRosters');var P={},skip=0;
     ro.forEach(function(d){var x=d.data();var m0=String(d.id).match(/^(.*)_(\d{4})$/);var sc=root(x.scid||(m0?m0[1]:d.id));var c=byId[sc]||{};var yr=+x.year||(m0?+m0[2]:0);
       (x.members||[]).forEach(function(m){if(!m||!m.name)return;if(!m.birth){skip++;return}var k=SCC.personKey(m.name,m.birth);
         var p=P[k]=P[k]||{name:String(m.name).trim(),birth:m.birth,gender:m.gender||'',stints:[]};
         if(!p.gender&&m.gender)p.gender=m.gender;
         if(!p.stints.some(function(s){return s.scid===sc&&s.year===yr}))p.stints.push({scid:sc,year:yr,grade:String(m.grade||SCC.gradeOf(yr,m.birth,c.level||'')||''),school:c.schoolName||'',team:c.teamName||'',level:c.level||'',sport:c.sport||'',div:c.division||'',sido:c.sido||''})})});
     Object.keys(P).forEach(function(k){P[k].stints.sort(function(a,b){return (a.year-b.year)||String(a.scid).localeCompare(String(b.scid))})});
-    var ex={};(await DB.collection('scPersons').limit(20000).get()).docs.forEach(function(d){ex[d.id]=d.data()});
+    var ex={};(await readAll('scPersons')).forEach(function(d){ex[d.id]=d.data()});
     return {P:P,ex:ex,rosters:ro.length,skip:skip};
   }
   window.sccPersons=async function(){
@@ -495,7 +501,7 @@
   function liveClub(c){return !c.mergedInto&&['숨김','반려','대기','통합'].indexOf(c.status)<0}
   function ageB(b){var d=new Date(String(b||'')+'T00:00:00');if(isNaN(d))return -1;var n=new Date();var a=n.getFullYear()-d.getFullYear();if(n.getMonth()<d.getMonth()||(n.getMonth()===d.getMonth()&&n.getDate()<d.getDate()))a--;return a}
   function seasonN(s){return +(s.count||s.rosterN||(s.roster||[]).length||0)}
-  async function allDocs(col,lim){try{return (await DB.collection(col).limit(lim||20000).get()).docs.map(function(d){return Object.assign({id:d.id},d.data())})}catch(e){return null}}
+  async function allDocs(col){try{return (await readAll(col)).map(function(d){return Object.assign({id:d.id},d.data())})}catch(e){return null}}
   window.sccPerf=async function(){
     if(isSido()){alert('사업 성과 지표는 중앙 사무국 화면입니다.');return}
     var b=box();b.innerHTML='학교클럽·명단·대회·발자취 기록을 모으는 중…';
