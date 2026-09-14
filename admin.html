@@ -3908,6 +3908,27 @@ async function adSaveLog(id){
     if(box){box.style.display='none';toggleLogs(l._appId)}
   }catch(e){m.textContent='저장 실패: '+(e.code||e.message)+' — 보안 규칙에서 사무국의 sessionLogs 수정이 막혀 있을 수 있습니다.';m.style.color='#C41E2F'}
 }
+// [운영일지 PDF 2026-09-14] 학교 단위 운영일지 보고서(logbook.js) — 표지·현황표·회차별 사진 기록·확인란
+async function adLogbook(id){
+  var w=KFDF_LOGBOOK.prep();if(!w)return;
+  try{
+    var doc=APPS.find(function(d){return d.id===id});var s=doc?doc.data():{};
+    var snap=await DB.collection('sessionLogs').where('appId','==',id).get();
+    var logs=snap.docs.map(function(d){return Object.assign({_id:d.id},d.data())});
+    var uid=s.assignedUid||(logs[0]||{}).uid||'';
+    var ins={name:s.assignedName||(logs[0]||{}).name||'',sign:'',signSrc:''};
+    if(uid){
+      var u=USERS.find(function(x){return x.id===uid});var ud=u?u.data():null;
+      if(!ud){try{var g=await DB.collection('users').doc(uid).get();ud=g.exists?g.data():null}catch(e){}}
+      if(ud){
+        var ag=ud.contracts&&ud.contracts[id];
+        if(ag&&ag.sign){ins.sign=ag.sign;ins.signSrc='contract'}else if(ud.signatureImg){ins.sign=ud.signatureImg;ins.signSrc='profile'}
+        ins.name=ins.name||ud.name||'';
+      }
+    }
+    KFDF_LOGBOOK.render(w,{app:s,appId:id,logs:logs,instructor:ins,printedBy:(CMY&&CMY.name)||'',printedRole:VIEWER_IS_ADMIN?'사무국':'시도 담당'});
+  }catch(e){KFDF_LOGBOOK.fail(w,e)}
+}
 async function toggleLogs(id){
   const el=document.getElementById('logs_'+id);
   if(el.style.display==='block'){el.style.display='none';return}
@@ -3918,7 +3939,7 @@ async function toggleLogs(id){
     logs.forEach(function(l){ALOGS[l._id]=Object.assign({},l,{_appId:id})});   // [일지 정정] 수정창에서 참조
     if(!logs.length){el.innerHTML='<span style="font-size:13px;color:var(--gray)">아직 제출된 일지가 없습니다. 배정된 강사(마이페이지 › 운영일지)가 직접 회차 보고를 등록해야 이곳에 표시됩니다 — 강사에게 제출을 안내해주세요.</span>';return}
     const cfmN=logs.filter(l=>l.teacherConfirm).length;
-    el.innerHTML='<b style="font-size:13.5px">운영일지 '+logs.length+'건 (강사: '+esc(logs[0].name)+')</b> <span style="font-size:12px;font-weight:800;color:'+(cfmN===logs.length?'#0f766e':'#C41E2F')+'">· 교사확인 '+cfmN+'/'+logs.length+'</span>'
+    el.innerHTML='<b style="font-size:13.5px">운영일지 '+logs.length+'건 (강사: '+esc(logs[0].name)+')</b> <span style="font-size:12px;font-weight:800;color:'+(cfmN===logs.length?'#0f766e':'#C41E2F')+'">· 교사확인 '+cfmN+'/'+logs.length+'</span>'+' <button class="btn-sub" style="padding:3px 12px;font-size:12px;background:#16181d;margin-left:6px" title="표지·요약 통계·회차별 사진 기록·확인란이 담긴 운영일지를 PDF로 저장합니다" onclick="adLogbook(\''+id+'\')">🖨 운영일지 PDF</button>'
       +logs.map(l=>'<div style="border-top:1px dashed #d5d9e0;padding:8px 0;font-size:13px">'
         +'<b>'+l.session+'회차</b> · '+esc(l.date)+(l.count?' · 👥 '+l.count+'명':'')+' — '+esc(l.content)
         +(l.note?' · <span style="color:#C41E2F">'+esc(l.note)+'</span>':'')
@@ -8298,6 +8319,7 @@ async function dlGoodsCerts(){
 <script src="schoolclub_core.js?v=20260914a"></script>
 <script src="post_alert.js?v=20260911a"></script>
 <script src="schoolclub_admin.js?v=20260911b"></script>
+<script src="logbook.js?v=20260914a"></script>
 <script src="auth_ui.js?v=20260914a"></script>
 </body>
 </html>

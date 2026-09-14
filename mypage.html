@@ -2866,6 +2866,19 @@ function printAthleteCert(sel){
   })();
 }
 
+// [운영일지 PDF 2026-09-14] 학교 단위 운영일지 보고서(logbook.js)
+function myLogbook(appId){
+  var w=KFDF_LOGBOOK.prep();if(!w)return;
+  try{
+    var x=(MYASG||[]).find(function(d){return d.id===appId});
+    var logs=(MYLOGS||[]).filter(function(l){return l.appId===appId});
+    var a=x?x.data():{school:(logs[0]||{}).school,type:(logs[0]||{}).type};
+    var ag=(MYD.contracts||{})[appId];
+    var ins={name:MYD.name||'',sign:'',signSrc:''};
+    if(ag&&ag.sign){ins.sign=ag.sign;ins.signSrc='contract'}else if(MYD.signatureImg){ins.sign=MYD.signatureImg;ins.signSrc='profile'}
+    KFDF_LOGBOOK.render(w,{app:a,appId:appId,logs:logs,instructor:ins,printedBy:MYD.name||'',printedRole:'강사'});
+  }catch(e){KFDF_LOGBOOK.fail(w,e)}
+}
 async function loadMyLogs(){
   const el=document.getElementById('lgList');
   try{
@@ -2889,8 +2902,8 @@ async function loadMyLogs(){
       return '<div style="border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px">'
         +'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">'
         +'<b style="font-size:15px">'+esc(g.school)+' <span style="font-size:12.5px;color:var(--gray);font-weight:600">· '+g.logs.length+'회차 제출</span></b>'
-        +(pend.length?'<button class="btn-sub" style="background:#153A77" onclick="reqConfirmBatch(\''+appId+'\')">📱 교사 확인 요청 (미확인 '+pend.length+'회차)</button>'
-                     :'<span style="font-size:12.5px;font-weight:800;color:#0f766e">✓ 전 회차 교사확인 완료</span>')
+        +'<span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+(pend.length?'<button class="btn-sub" style="background:#153A77" onclick="reqConfirmBatch(\''+appId+'\')">📱 교사 확인 요청 (미확인 '+pend.length+'회차)</button>'
+                     :'<span style="font-size:12.5px;font-weight:800;color:#0f766e">✓ 전 회차 교사확인 완료</span>')+'<button class="btn-sub" style="background:#16181d" title="표지·요약 통계·회차별 사진 기록·확인란이 담긴 운영일지를 PDF로 저장합니다" onclick="myLogbook(\''+appId+'\')">🖨 운영일지 PDF</button></span>'
         +'</div>'
         +g.logs.map(l=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:13px;align-items:center;flex-wrap:wrap">'
           +'<span><b>'+esc(l.session)+'회차</b> <span style="color:var(--gray)">'+esc(l.date)+'</span>'+(l.count?' · 👥'+esc(l.count):'')
@@ -3441,6 +3454,7 @@ function copyCfm(){var t=document.getElementById('cfmLink').value;
 document.getElementById('cfmModal').addEventListener('click',function(e){if(e.target===this)closeCfm()});
 document.getElementById('sigModal').addEventListener('click',function(e){if(e.target===this)closeSigModal()});
 </script>
+<script src="logbook.js?v=20260914a"></script>
 <script src="auth_ui.js?v=20260914a"></script>
 </body>
 </html>
