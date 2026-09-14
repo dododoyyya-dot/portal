@@ -1,4 +1,4 @@
-// v20260914e · 관리자 [학교스포츠클럽] 탭 (3단계 발자취 색인 · 4단계 사업 성과·명단 확정 요청 포함) — 학교클럽 등록·목록·통합, 과거 자료 4종 업로드(미리보기→백업→시험 1곳→나머지→되돌리기), 통계 다시 계산, 일반 클럽 연결
+// v20260914f · 관리자 [학교스포츠클럽] 탭 (3단계 발자취 색인 · 4단계 사업 성과·명단 확정 요청 포함) — 학교클럽 등록·목록·통합, 과거 자료 4종 업로드(미리보기→백업→시험 1곳→나머지→되돌리기), 통계 다시 계산, 일반 클럽 연결
 //   admin.html 의 전역(DB, esc, CMY, IS_SIDO, ExcelJS, scLoadXlsx, scCell, scDate, scDownload, KFDF)을 씁니다. 계산 규칙은 schoolclub_core.js(SCC)
 //   컬렉션: schoolClubs/{학교코드_종목_부} · scSeasons/{ID_학년도}(공개, 이름 가림) · scRosters/{ID_학년도}(비공개 실명) · scMatches/{결정적 ID} · scImports/{업로드 ID}
 //           대회 결과는 기존 schoolClubEvents(대회 결과 페이지 공개)에 합칩니다 — 팀마다 scid·rank, 문서에 scids[]·stage·year
@@ -132,7 +132,8 @@
       if(!ED.code){m.textContent='학교를 검색해 목록에서 골라 주세요';m.style.color='#C41E2F';return}
       var s=BY_CODE[ED.code];var sp=g('sccSport')||'FD',dv=g('sccDiv')||'X';var id=SCC.scid(ED.code,sp,dv);
       if(isSido()&&SCC.sidoOf(ED.code)!==mySido()){m.textContent='관할 밖 학교입니다';m.style.color='#C41E2F';return}
-      var ex=await DB.collection('schoolClubs').doc(id).get();if(ex.exists){m.innerHTML='이미 같은 학교·종목·부 팀이 있습니다: <a href="schoolclub.html?id='+encodeURIComponent(id)+'" target="_blank">'+E(ex.data().teamName||id)+'</a>';m.style.color='#C41E2F';return}
+      var ex=await DB.collection('schoolClubs').doc(id).get();if(ex.exists&&ED.fromClubId){sccAbsorb(id,ED.fromClubId);return}   // [겹침] 과거 기록 등으로 이미 있는 팀 → 새로 만들지 않고 합치기
+      if(ex.exists){m.innerHTML='이미 같은 학교·종목·부 팀이 있습니다: <a href="schoolclub.html?id='+encodeURIComponent(id)+'" target="_blank">'+E(ex.data().teamName||id)+'</a>';m.style.color='#C41E2F';return}
       var doc=Object.assign({scid:id,schoolCode:ED.code,schoolName:s?s.name:g('sccSch'),level:SCC.levelOf(s&&s.kind),sido:SCC.sidoOf(ED.code),sport:SCC.sportName(sp),sportCode:sp,division:dv,status:'운영',source:ED.fromClubId?'club':'manual',importIds:[],createdAt:FV().serverTimestamp()},patch);
       if(!doc.teamName)doc.teamName=defaultTeam(doc.schoolName,sp);
       if(ED.fromClubId)doc.fromClubId=ED.fromClubId;
@@ -151,7 +152,22 @@
     var to=prompt('['+(c.teamName||id)+'] 의 기록을 합칠 대상 팀 ID를 입력하세요.\n(이 팀은 「통합」으로 표시되고 공개 화면에서 대상 팀으로 넘어갑니다. 대회 기록은 통계 다시 계산 때 대상 팀에 합산됩니다)'+hint,same[0]?same[0].id:'');
     if(!to)return;to=to.trim();if(to===id)return;var t=CLUBS.find(function(x){return x.id===to});if(!t){alert('대상 팀을 찾을 수 없습니다: '+to);return}
     if(t.mergedInto){alert('대상 팀도 이미 다른 팀에 통합되어 있습니다.');return}
-    try{var b=DB.batch();b.update(DB.collection('schoolClubs').doc(id),{mergedInto:to,status:'통합',updatedAt:FV().serverTimestamp()});b.update(DB.collection('schoolClubs').doc(to),{aliases:FV().arrayUnion(id),updatedAt:FV().serverTimestamp()});
+    // [겹침 2026-09-14] 일반 클럽에서 넘어온 팀을 합칠 때 — 두 팀 중 일반 클럽을 더 최근에 연결한 쪽의 프로필(엠블럼·팀명·소개·지도교사 등)을 남깁니다.
+    //   두 클럽의 기록 연결(fromClubIds)은 어느 경우든 합치고, 없어지는 팀에 연결됐던 일반 클럽의 안내도 남는 팀으로 돌립니다.
+    var linkAt=function(x){var v=x.absorbedAt||(x.fromClubId?x.createdAt:null);try{var n=v?(v.toMillis?v.toMillis():(v.seconds?v.seconds*1000:new Date(v).getTime())):0;return isNaN(n)?0:n}catch(e){return 0}};
+    var links=[c.fromClubId].concat(c.fromClubIds||[]).filter(Boolean);
+    var tp=links.length?{fromClubIds:FV().arrayUnion.apply(null,links.concat(t.fromClubId?[t.fromClubId]:[]))}:null;
+    var srcNewer=!!(c.fromClubId||c.emblem)&&(!t.fromClubId||linkAt(c)>linkAt(t));
+    var prof=null;
+    if(srcNewer&&confirm('['+(c.teamName||id)+'] 쪽이 일반 클럽을 더 최근에 연결한 팀입니다.\n이 팀의 프로필(엠블럼·팀명·소개·시군구·창단·지도교사·대표 클럽 연결)을 남는 팀 ['+(t.teamName||to)+'] 으로 옮길까요?\n\n· 확인 = 최근 클럽 정보로 바꿈 (권장)\n· 취소 = 남는 팀 프로필을 그대로 둠\n\n대회·경기·명단 기록과 두 클럽의 기록 연결은 어느 쪽이든 합쳐집니다.')){
+      prof={};['emblem','teamName','intro','gugun','foundedYear','homeGround','eduOffice','coachUid','coachName'].forEach(function(k){if(c[k])prof[k]=c[k]});
+      if(c.fromClubId)prof.fromClubId=c.fromClubId;
+    }
+    var tUpd=(tp||prof)?Object.assign({updatedAt:FV().serverTimestamp()},tp||{},prof||{}):null;
+    try{var b=DB.batch();b.update(DB.collection('schoolClubs').doc(id),{mergedInto:to,status:'통합',updatedAt:FV().serverTimestamp()});
+      if(tUpd)b.update(DB.collection('schoolClubs').doc(to),tUpd);
+      links.forEach(function(cid){b.update(DB.collection('clubs').doc(cid),{schoolClubId:to,schoolClubLinkedAt:FV().serverTimestamp()})});   /* 옛 클럽 홈 안내 → 남는 팀 */
+      b.update(DB.collection('schoolClubs').doc(to),{aliases:FV().arrayUnion(id),updatedAt:FV().serverTimestamp()});
       CLUBS.filter(function(x){return x.mergedInto===id}).forEach(function(x){b.update(DB.collection('schoolClubs').doc(x.id),{mergedInto:to});b.update(DB.collection('schoolClubs').doc(to),{aliases:FV().arrayUnion(x.id)})});
       await b.commit();alert('✓ 통합했습니다. [📊 통계 다시 계산]을 누르면 기록이 합산됩니다.');await loadClubs(true);renderList()}catch(e){alert('통합 실패: '+e.message)}
   };
@@ -584,6 +600,80 @@
     if(m)m.innerHTML='<b style="color:#0f766e">✓ '+ok+'팀에 보냈습니다</b>'+(fail?' · 실패 '+fail:'');
   };
 
+  // ══════════ ⑨ 일반 클럽 → 기존 학교클럽 통합 (과거 기록 업로드로 이미 만들어진 팀과 겹칠 때) ══════════
+  //   · 팀 ID(학교코드_종목_부)가 같으면 같은 팀입니다. 이미 있는 팀에 일반 클럽을 연결하면 새 팀을 만들지 않고 합칩니다.
+  //   · 기록: 학교클럽의 대회·경기·명단 기록은 그대로, 일반 클럽의 입상·교류전 기록은 팀 홈 「일반 클럽 시절 기록」으로 함께 보입니다(fromClubId · fromClubIds).
+  //   · 프로필: 엠블럼·팀명·소개·시군구·창단·홈 구장·지도교사는 기본으로 최근 활동한 일반 클럽 값으로 바꿉니다(항목마다 끌 수 있음).
+  var AB=null;
+  function clubYear(v){var m=String(v||'').match(/(19|20)\d{2}/);return m?+m[0]:''}
+  function userOf(uid){var d=(typeof USERS!=='undefined'?USERS:[]).find(function(x){return x.id===uid});return d?d.data():null}
+  function absorbFields(cl,sc){
+    var owner=cl.ownerUid?userOf(cl.ownerUid):null;var isT=!!(owner&&(owner.accountType==='teacher'||owner.workSchool));
+    var F=[['emblem','엠블럼(아이콘)',cl.symbol||'',sc.emblem||'',1],['teamName','팀명',cl.name||'',sc.teamName||'',1],['intro','소개',String(cl.intro||'').slice(0,120),sc.intro||'',1],
+      ['gugun','시군구',cl.gugun||'',sc.gugun||'',1],['foundedYear','창단 학년도',clubYear(cl.foundedAt),sc.foundedYear||'',1],['homeGround','홈 구장',cl.homeGround||'',sc.homeGround||'',1],
+      ['coach','지도교사',cl.ownerUid?((cl.ownerName||'')+(isT?' (교사 회원)':' (클럽장 · 교사 회원 아님)')):'',sc.coachName||'',isT]];
+    return F.map(function(f){return {k:f[0],label:f[1],nv:f[2],ov:f[3],on:!!(f[2]&&String(f[2])!==String(f[3])&&f[4])}});
+  }
+  window.sccAbsorb=async function(scid,clubId){
+    var b=box();b.innerHTML='팀과 클럽 정보를 읽는 중…';
+    try{
+      var sd=await DB.collection('schoolClubs').doc(scid).get();if(!sd.exists){b.innerHTML='<b style="color:#C41E2F">학교클럽을 찾을 수 없습니다: '+E(scid)+'</b>';return}
+      var cd=await DB.collection('clubs').doc(clubId).get();if(!cd.exists){b.innerHTML='<b style="color:#C41E2F">일반 클럽을 찾을 수 없습니다</b>';return}
+      var sc=sd.data(),cl=cd.data();
+      if(sc.mergedInto){b.innerHTML='<b>이 팀은 '+E(sc.mergedInto)+' 로 통합되어 있습니다.</b> 그 팀으로 다시 합쳐 주세요. <button class="btn-sub" style="background:#7c3aed" onclick="sccAbsorb(\''+E(sc.mergedInto)+'\',\''+E(clubId)+'\')">'+E(sc.mergedInto)+' 에 합치기</button>';return}
+      var aw=0;try{aw=(await DB.collection('clubAwards').where('clubId','==',clubId).get()).size}catch(e){}
+      AB={scid:scid,clubId:clubId,sc:sc,cl:cl,f:absorbFields(cl,sc)};
+      var st=sc.stats||{},tt=st.titles||{};
+      var sh=function(k,v){return k==='emblem'?(v?'<img src="'+E(v)+'" alt="" style="height:34px;border-radius:6px">':'-'):E(v||'-')};
+      b.innerHTML='<b style="font-size:15px">🔗 일반 클럽 → 기존 학교클럽 통합</b>'
+        +'<div style="font-size:12.5px;color:#6b7280;line-height:1.7;margin:6px 0 10px">['+E(cl.name||'')+'] 일반 클럽을 이미 있는 학교클럽 <b>'+E(sc.teamName||scid)+'</b> ('+E(scid)+')에 합칩니다. 새 팀은 만들지 않습니다.</div>'
+        +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;font-size:13px;margin-bottom:10px">'
+          +'<div style="border:1.5px solid #cfe3d8;border-radius:10px;padding:9px 12px"><b>학교클럽 기록 — 그대로 유지</b><br>대회 '+(st.events||0)+'회 · 입상 '+((tt[1]||0)+(tt[2]||0)+(tt[3]||0))+'회 · 경기 '+(st.games||0)+'</div>'
+          +'<div style="border:1.5px solid #e8d9b0;border-radius:10px;padding:9px 12px"><b>일반 클럽 기록 — 팀 홈에 함께 표시</b><br>입상·참가 '+aw+'건 · 회원 '+((cl.memberUids||[]).length)+'명 · 클럽 홈·게시판 유지</div></div>'
+        +'<table class="rtbl"><thead><tr><th>바꾸기</th><th>항목</th><th>지금 학교클럽</th><th>일반 클럽 (최근)</th></tr></thead><tbody>'
+        +AB.f.map(function(x,i){return '<tr><td style="text-align:center"><input type="checkbox" style="width:auto"'+(x.on?' checked':'')+(x.nv?'':' disabled')+' onchange="AB_set('+i+',this.checked)"></td><td>'+E(x.label)+'</td><td>'+sh(x.k,x.ov)+'</td><td>'+sh(x.k,x.nv)+'</td></tr>'}).join('')
+        +'</tbody></table>'
+        +'<div style="font-size:12px;color:#6b7280;margin-top:6px;line-height:1.7">· 체크한 항목만 일반 클럽 값으로 바꿉니다. 지도교사는 클럽장이 교사 회원일 때만 기본 선택됩니다.<br>· 통합 뒤 일반 클럽은 「클럽 찾기」 목록에서 빠지고, 클럽 홈에는 학교클럽으로 가는 안내가 붙습니다.</div>'
+        +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn-sub" style="background:#0f766e" onclick="sccAbsorbSave()">✅ 통합 저장</button><button class="btn-sub" style="background:#8a919d" onclick="sccClubCands()">취소</button></div><div id="sccAbMsg" style="font-size:12.5px;font-weight:700;margin-top:8px"></div>';
+    }catch(e){b.innerHTML='<b style="color:#C41E2F">읽기 실패: '+E(e.message)+'</b>'}
+  };
+  window.AB_set=function(i,on){if(AB&&AB.f[i])AB.f[i].on=!!on};
+  window.sccAbsorbSave=async function(){
+    if(!AB)return;var m=document.getElementById('sccAbMsg');
+    var prev=AB.sc.fromClubId&&AB.sc.fromClubId!==AB.clubId?AB.sc.fromClubId:'';
+    if(prev&&!confirm('이 팀은 이미 다른 일반 클럽('+prev+')과 연결되어 있습니다.\n두 클럽 기록을 모두 팀 홈에 보이고, 대표 연결은 이번 클럽으로 바꿀까요?'))return;
+    var p={fromClubId:AB.clubId,fromClubIds:FV().arrayUnion.apply(null,[AB.clubId].concat(prev?[prev]:[])),absorbedAt:FV().serverTimestamp(),updatedAt:FV().serverTimestamp(),by:me()};
+    AB.f.forEach(function(x){if(!x.on||!x.nv)return;if(x.k==='coach'){p.coachUid=AB.cl.ownerUid;p.coachName=AB.cl.ownerName||''}else p[x.k]=(x.k==='foundedYear')?(+x.nv||x.nv):x.nv});
+    try{
+      if(m){m.textContent='저장 중…';m.style.color='#8a919d'}
+      await DB.collection('schoolClubs').doc(AB.scid).update(p);
+      await DB.collection('clubs').doc(AB.clubId).update({schoolClubId:AB.scid,schoolClubLinkedAt:FV().serverTimestamp()});
+      if(m){m.innerHTML='✓ 통합했습니다 — <a href="schoolclub.html?id='+encodeURIComponent(AB.scid)+'" target="_blank">팀 홈 보기</a>';m.style.color='#0f766e'}
+      try{await loadClubs(true)}catch(e){}
+    }catch(e){if(m){m.textContent='저장 실패: '+e.message;m.style.color='#C41E2F'}}
+  };
+  // 일반 클럽 한 줄 (후보 목록 · 이름 검색 공용)
+  function clubRow(c){
+    return '<tr><td><a href="clubhome.html?id='+encodeURIComponent(c.id)+'" target="_blank" style="font-weight:800">'+E(c.name)+'</a>'+(c.schoolClubAsked?'<div style="font-size:11px;color:#b8860b">확인 요청함</div>':'')+'</td><td>'+E((c.sido||'')+' '+(c.gugun||''))+'</td><td>'+E(c.ownerName||'')+'</td><td>'+((c.memberUids||[]).length)+'</td><td>'+E(c.status||'')+'</td>'
+      +'<td style="white-space:nowrap">'+(c.schoolClubId?'<a href="schoolclub.html?id='+encodeURIComponent(c.schoolClubId)+'" target="_blank" style="font-size:12px;font-weight:800;color:#0f766e">연결됨 → '+E(c.schoolClubId)+'</a> '
+        :'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#b8860b" onclick="sccAskOwner(\''+c.id+'\')">클럽장에게 확인 요청</button> <button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#0f766e" onclick="sccLinkClub(\''+c.id+'\',\''+E(String(c.name||'').replace(/'/g,''))+'\')">새 학교클럽으로 연결</button> ')
+      +'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#7c3aed" onclick="sccAbsorbPick(\''+c.id+'\')">기존 학교클럽에 합치기</button></td></tr>';
+  }
+  var CLUB_TH='<thead><tr><th>클럽</th><th>지역</th><th>클럽장</th><th>회원</th><th>상태</th><th></th></tr></thead>';
+  // 클럽 이름으로 찾기 — 후보 목록에 없는 클럽(학교 이름이 없는 클럽 등)도 연결·통합
+  window.sccClubSearch=function(q){
+    var el=document.getElementById('sccCsRes');if(!el)return;q=SCC.norm(q||'');if(!q){el.innerHTML='';return}
+    var all=(window.__sccClubs||[]).filter(function(c){return SCC.norm(c.name).indexOf(q)>=0||SCC.norm(c.ownerName).indexOf(q)>=0}).slice(0,30);
+    el.innerHTML=all.length?'<div style="overflow-x:auto"><table class="rtbl">'+CLUB_TH+'<tbody>'+all.map(clubRow).join('')+'</tbody></table></div>':'<div class="bempty">일치하는 클럽이 없습니다.</div>';
+  };
+  window.sccAbsorbPick=async function(clubId){
+    var c=(window.__sccClubs||[]).find(function(x){return x.id===clubId})||{};try{await loadClubs()}catch(e){}
+    var key=SCC.canon(String(c.name||'').replace(/(플라잉디스크|얼티미트|스포츠클럽|클럽|동아리|팀)/g,'').replace(/부$/,''));
+    var cand=(CLUBS||[]).filter(function(x){if(x.mergedInto)return false;var s=SCC.canon(x.schoolName);return key&&s&&(s.indexOf(key)>=0||key.indexOf(s)>=0)}).slice(0,12);
+    var to=prompt('['+(c.name||'')+'] 을(를) 합칠 학교클럽 ID를 입력하세요.'+(cand.length?'\n\n이름이 비슷한 팀:\n'+cand.map(function(x){return '  '+x.id+'  '+(x.teamName||'')+' · '+(x.sport||'')+' '+(SCC.DIV[x.division]||'')}).join('\n'):'\n(이름이 비슷한 팀을 찾지 못했습니다 — [📋 학교클럽 목록]에서 ID를 확인해 주세요)'),cand[0]?cand[0].id:'');
+    if(!to)return;sccAbsorb(to.trim(),clubId);
+  };
+
   // ══════════ ⑥ 일반 클럽 중 학교 동아리 ══════════
   window.sccClubCands=async function(){
     var b=box();b.innerHTML='일반 클럽 목록을 읽는 중…';
@@ -593,8 +683,8 @@
       var linked=all.filter(function(c){return c.schoolClubId});
       b.innerHTML='<b style="font-size:15px">🔁 일반 클럽으로 등록된 학교 동아리 후보 '+cands.length+'곳</b>'
         +'<div style="font-size:12.5px;color:#6b7280;line-height:1.7;margin:6px 0 10px">클럽 이름·소개에 학교 관련 말이 들어간 클럽입니다. <b>클럽장에게 먼저 확인</b>한 뒤 [학교스포츠클럽으로 연결]을 누르세요. 연결하면 학교스포츠클럽 팀이 생기고, 일반 클럽은 「클럽 찾기」 목록에서 빠지되 회원·교류전·입상 기록은 그대로 남아 팀 홈에 함께 표시됩니다.</div>'
-        +(cands.length?'<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th>클럽</th><th>지역</th><th>클럽장</th><th>회원</th><th>상태</th><th></th></tr></thead><tbody>'+cands.map(function(c){return '<tr><td><a href="clubhome.html?id='+encodeURIComponent(c.id)+'" target="_blank" style="font-weight:800">'+E(c.name)+'</a>'+(c.schoolClubAsked?'<div style="font-size:11px;color:#b8860b">확인 요청함</div>':'')+'</td><td>'+E((c.sido||'')+' '+(c.gugun||''))+'</td><td>'+E(c.ownerName||'')+'</td><td>'+((c.memberUids||[]).length)+'</td><td>'+E(c.status||'')+'</td>'
-          +'<td style="white-space:nowrap"><button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#b8860b" onclick="sccAskOwner(\''+c.id+'\')">클럽장에게 확인 요청</button> <button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#0f766e" onclick="sccLinkClub(\''+c.id+'\',\''+E(String(c.name||'').replace(/'/g,''))+'\')">학교스포츠클럽으로 연결</button></td></tr>'}).join('')+'</tbody></table></div>':'<div class="bempty">후보가 없습니다.</div>')
+        +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;background:#f6f3fd;border:1.5px solid #ddd2f5;border-radius:10px;padding:9px 12px"><b style="font-size:13px">🔍 클럽 이름으로 찾기</b><input placeholder="클럽 이름 또는 클럽장 — 후보에 없는 클럽도 찾습니다" oninput="sccClubSearch(this.value)" style="flex:1;min-width:220px;padding:7px 10px;font-size:13px"><span style="font-size:12px;color:#6b7280">이미 과거 기록으로 만들어진 학교클럽이 있으면 [기존 학교클럽에 합치기]</span></div><div id="sccCsRes" style="margin-bottom:12px"></div>'
+        +(cands.length?'<div style="overflow-x:auto"><table class="rtbl">'+CLUB_TH+'<tbody>'+cands.map(clubRow).join('')+'</tbody></table></div>':'<div class="bempty">후보가 없습니다.</div>')
         +(linked.length?'<div style="margin-top:12px;font-size:13px"><b>이미 연결된 클럽 '+linked.length+'곳</b><br>'+linked.map(function(c){return E(c.name)+' → <a href="schoolclub.html?id='+encodeURIComponent(c.schoolClubId)+'" target="_blank">'+E(c.schoolClubId)+'</a>'}).join('<br>')+'</div>':'');
       window.__sccClubs=all;
     }catch(e){b.innerHTML='<b style="color:#C41E2F">조회 실패: '+E(e.message)+'</b>'}
