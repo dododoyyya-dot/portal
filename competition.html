@@ -423,7 +423,7 @@ function latestClaim(s,uid){
 }
 // 내 유효 신청 목록 (참가 대회에서 자녀 여러 명 신청 가능)
 function myEntries(s){
-  const mineKeys=[...new Set((s.claimed||[]).filter(c=>c.uid===CME.uid).map(ckey))];
+  const mineKeys=[...new Set((s.claimed||[]).filter(c=>c.uid===CME.uid&&!c.bulk).map(ckey))];   // [개인전 일괄 신청] 일괄 건은 제외(일괄 신청 창에서 관리)
   return mineKeys.filter(k=>activeOfKey(s,k)).map(k=>{
     const arr=(s.claimed||[]).filter(c=>ckey(c)===k);
     return arr[arr.length-1];
@@ -675,7 +675,7 @@ async function exportRosterCsv(id){
       }
       rows.push({grp:'개인',name:c.name||'',birth:c.birth||'',gender:c.gender||'',st:stLbl(ageState(c)),
         org:c.school||c.club||'',phone:phone,addr:addr,gphone:c.kid?(c.guardianPhone||''):'',
-        part:(c.prefs||[]).map(p=>p+(divDateLbl(s,p)?' ('+divDateLbl(s,p)+')':'')).join('·'),consent:ok?'O':'X',nonMember:'',leader:''});
+        part:(c.prefs||[]).map(p=>p+(divDateLbl(s,p)?' ('+divDateLbl(s,p)+')':'')).join('·'),consent:ok?'O':'X',nonMember:c.nonMember?'비회원':'',leader:c.bulk?('일괄 신청: '+(c.bulkByName||'')):''});
     }
   }
   if(!rows.length){alert('내보낼 참가자가 없습니다.');return}
@@ -784,7 +784,7 @@ async function setClaimReview(slotId,key,st,name,uid){
         else KFDF.notify(uid,'❌ ['+ttl+'] '+(name?name+' 님 ':'')+'참가 신청이 반려되었습니다'+(reason.trim()?' — 사유: '+reason.trim():''),'competition.html?slot='+slotId);
         // [보호자 승인] 보호자가 서명해 접수한 자녀 계정 신청(키=자녀 계정 uid)은 자녀 본인에게도 결과를 알립니다
         const _k=String(key||'');
-        if(_k&&_k!==uid&&_k.indexOf('#')<0&&_k.indexOf('team_')!==0)
+        if(_k&&_k!==uid&&_k.indexOf('#')<0&&_k.indexOf('team_')!==0&&_k.indexOf('bk_')!==0)
           KFDF.notify(_k,(st==='승인'?'✅ ['+ttl+'] 참가 신청이 승인되었습니다':'❌ ['+ttl+'] 참가 신청이 반려되었습니다'+(reason.trim()?' — 사유: '+reason.trim():''))+' (보호자 신청)','competition.html?slot='+slotId);
       }catch(e){}
     }
@@ -812,7 +812,7 @@ async function openCompFinish(id){
   const s=doc.data();const list=compClaimList(s).filter(c=>c.status!=='반려');
   if(!list.length){alert('참가 신청자가 없습니다.');return}
   const prev=s.results||{};
-  CF={id:id,rows:list.map(c=>{const key=c.pid||c.uid;const pv=prev[key]||{};return {key:key,uid:c.uid,name:c.name||'',team:!!c.team,teamType:c.teamType||'',members:(c.roster||[]).length,roster:(c.roster||[]),selfPlays:!!(c.roster||[]).some(x=>x&&x.self&&x.uid===c.uid),kid:!!c.kid,div:(c.prefs||[])[0]||'',club:c.club||'',clubId:c.clubId||'',teamOrgId:c.teamOrgId||'',teamOrg:c.teamOrg||'',teamSchoolCode:c.teamSchoolCode||'',teamSchoolClubId:c.teamSchoolClubId||'',on:pv.on!==false,award:pv.award||''}})};
+  CF={id:id,rows:list.map(c=>{const key=c.pid||c.uid;const pv=prev[key]||{};return {key:key,uid:c.uid,name:c.name||'',team:!!c.team,teamType:c.teamType||'',members:(c.roster||[]).length,roster:(c.roster||[]),selfPlays:!!(c.roster||[]).some(x=>x&&x.self&&x.uid===c.uid),kid:!!c.kid,div:(c.prefs||[])[0]||'',club:c.club||'',clubId:c.clubId||'',teamOrgId:c.teamOrgId||'',teamOrg:c.teamOrg||'',teamSchoolCode:c.teamSchoolCode||'',teamSchoolClubId:c.teamSchoolClubId||'',bulk:!!c.bulk,memberUid:c.memberUid||'',guardianUid:c.guardianUid||'',birth:c.birth||'',school:c.school||'',gender:c.gender||'',on:pv.on!==false,award:pv.award||''}})};
   const old=document.getElementById('cfModal');if(old)old.remove();
   const div=document.createElement('div');div.id='cfModal';div.className='cmodal-bg';
   div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.65);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
@@ -875,8 +875,28 @@ async function cfSave(){
   const btn=document.getElementById('cfSaveBtn');btn.disabled=true;btn.textContent='기록 중…';
   const msg=document.getElementById('cfMsg');const say=(t,bad)=>{if(msg){msg.textContent=t;msg.style.color=bad?'#C41E2F':'#0f766e'}};
   const sportOf=d=>String(d||'').split(' ')[0]||(s.title||'');
-  let ok=0,fail=0,teamOk=0,teamHold=0,teamFail=0;   // [팀원 경력 연동] 팀원 기록·보류·실패 건수
+  let ok=0,fail=0,teamOk=0,teamHold=0,teamFail=0;let bulkOk=0,bulkHold=0;   // [개인전 일괄 신청] 회원 연동·보류 건수   // [팀원 경력 연동] 팀원 기록·보류·실패 건수
   for(const r of rows){
+    // [개인전 일괄 신청] 신청 기록의 uid 는 등록한 담당자입니다. 경력은 참가자 본인(회원)·보호자(자녀)에게, 못 찾으면 보류함으로.
+    if(r.bulk){
+      try{
+        const hit=await cfMatchMember({name:r.name,birth:r.birth,memberUid:r.memberUid,guardianUid:r.guardianUid},r);
+        const bb={name:r.name,date:s.date||'',competitionName:s.title||'',sport:sportOf(r.div),location:(s.place||'')+(s.region?' ('+s.region+')':''),host:s.host||'',organizer:s.organizer||s.host||'',coorganizer:s.organizer||'',division:r.div,slotId:CF.id,source:'comp-bulk',schoolName:r.school||'',gender:r.gender||''};
+        if(hit){
+          const mb=Object.assign({},bb,{uid:hit.uid,kidName:hit.kidName||''});
+          await CAREER.write(DB,Object.assign({},mb,{role:'선수'}),(CMY&&CMY.name)||'');
+          if(r.award)await CAREER.write(DB,Object.assign({},mb,{role:'입상',result:r.award}),(CMY&&CMY.name)||'');
+          try{await KFDF.notify(hit.uid,'🏅 ['+(s.title||'')+'] '+(hit.kidName?hit.kidName+' ':'')+'참가'+(r.award?' · '+r.award+' 입상 🏆':'')+' — 경력에 기록되었습니다. 마이페이지 [경력 여정]에서 확인하세요','mypage.html#careerBox')}catch(e){}
+          bulkOk++;
+        }else{
+          await DB.collection('schoolClubResults').add({competitionName:s.title||'',organizer:bb.organizer,date:s.date||'',sport:bb.sport,division:r.div||'',school:r.school||'',schoolNorm:String(r.school||'').replace(/\s+/g,'').replace(/(초등학교|중학교|고등학교|초교|중교|고교|학교)$/,''),schoolCode:'',schoolSido:s.region||'',team:'',
+            name:r.name,nameNorm:String(r.name).replace(/\s+/g,''),birth:r.birth||'',gender:r.gender||'',result:r.award||'참가',note:'대회 종료 처리(개인전 일괄 신청)',status:'pending',importId:'comp:'+CF.id,source:'comp-bulk',by:(CMY&&CMY.name)||'',byUid:CME.uid,at:new Date().toISOString()});
+          bulkHold++;
+        }
+        ok++;
+      }catch(e){fail++;console.warn('bulk career',r.name,e)}
+      continue;
+    }
     if(!r.uid)continue;
     const base={uid:r.uid,name:r.name,date:s.date||'',competitionName:s.title||'',sport:sportOf(r.div),location:(s.place||'')+(s.region?' ('+s.region+')':''),host:s.host||'',organizer:s.organizer||s.host||'',coorganizer:s.organizer||'',division:r.div,slotId:CF.id,source:'comp-complete',kidName:r.kid?r.name:''};
     try{
@@ -942,7 +962,7 @@ async function cfSave(){
       gmsg='\n사진첩 초안이 '+(g.updated?'갱신':'생성')+'되었습니다 — 사진첩 페이지(📝 초안)에서 사진을 더 올리고 공개하세요.';
     }
     document.getElementById('cfModal').remove();
-    alert('✅ 종료 처리 완료 — 이력 기록 '+ok+'명'+(fail?' / 실패 '+fail:'')+((teamOk||teamHold||teamFail)?'\n단체전 팀원: 회원 연동 기록 '+teamOk+'명 · 보류함(미가입) '+teamHold+'명'+(teamFail?' · 실패 '+teamFail:''):'')+'\n종료 보고를 저장했습니다.'+gmsg);
+    alert('✅ 종료 처리 완료 — 이력 기록 '+ok+'명'+(fail?' / 실패 '+fail:'')+((teamOk||teamHold||teamFail)?'\n단체전 팀원: 회원 연동 기록 '+teamOk+'명 · 보류함(미가입) '+teamHold+'명'+(teamFail?' · 실패 '+teamFail:''):'')+((bulkOk||bulkHold)?'\n개인전 일괄 신청: 회원 연동 기록 '+bulkOk+'명 · 보류함(미가입) '+bulkHold+'명':'')+'\n종료 보고를 저장했습니다.'+gmsg);
     loadSlots();
   }catch(e){btn.disabled=false;btn.textContent='✅ 종료 처리 → 이력 기록 · 보고 저장';say('저장 실패: '+(e.code||e.message)+(ok?' (이력 '+ok+'명은 기록됨)':''),true)}
 }
@@ -1035,7 +1055,7 @@ async function viewRoster(id){
           +'<td '+td+' style="text-align:center">'+stCell(c)+'</td>'
           +(entry?_payCell(id,c,td):'')+revCell(c)+'</tr>';
       }
-      return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b>'+tbadge(c)+consentBadge(c,ckey(c))+rosterMark(c.name,c.birth)+'</td>'
+      return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b>'+tbadge(c)+consentBadge(c,ckey(c))+rosterMark(c.name,c.birth)+ibBadge(c)+'</td>'
       +(entry?'<td '+td+'>'+cesc(c.birth||'-')+'</td><td '+td+'>'+cesc(c.gender||'-')+'</td><td '+td+'>'+cesc(c.school||c.club||'-')+'</td>':'')
       +'<td '+td+'>'+cesc(entry?((c.prefs||[]).map(p=>p+(divDateLbl(s,p)?' ('+divDateLbl(s,p)+')':'')).join(' · ')||'-'):((c.prefs||[]).map((p,j)=>(j+1)+'지망 '+p).join(' · ')||'-'))+'</td>'
       +'<td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
@@ -2012,6 +2032,279 @@ async function taXlsxTemplate(){
   ['· 1행(머리글)은 그대로 두고 2행부터 한 사람씩 적습니다. 예시 두 줄은 지우고 쓰세요.','· 생년월일은 2013-05-05 처럼 적습니다 (2013.05.05, 20130505, 130505 도 읽힙니다). 보호자 동의·연령 확인에 꼭 필요합니다.','· 성별은 남/여. 학교·소속은 학교 정식 명칭.','· 연락처·주소는 주최기관 참가자 명단에 필요할 때만 적습니다.','· 연맹 회원(또는 보호자 계정에 등록된 자녀)은 성명+생년월일이 같으면 회원 정보와 자동 연동됩니다.'].forEach(t=>g.addRow([t]));
   g.getColumn(1).width=100;
   const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.download='단체전_팀원명단_양식.xlsx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+}
+// ══ [개인전 엑셀 일괄 신청 2026-09-14] 사무국이 권한을 준 회원(학교·클럽 담당자 등)이 개인전 참가자를 엑셀 한 장으로 신청 ══
+//   · 회원 연동: 성명+생년월일로 회원 색인(memberKeys)을 찾습니다 — 회원 본인 계정이면 memberUid, 보호자 계정의 자녀면 guardianUid.
+//     색인 키가 '성명|생년월일' 이라 이름이 같아도 생년월일이 다르면 연동되지 않습니다(동명이인 오연동 방지).
+//   · 못 찾으면 비회원 참가자(nonMember)로 접수 — 대회 종료 처리 때 다시 찾아보고, 그래도 없으면 보류함 → 가입 후 [내 기록 찾기].
+//   · 신청 기록의 uid 는 등록한 사람입니다(보안 규칙: 한 번에 본인 명의 1건씩 추가). 참가자 키(pid)는 bk_ + 성명·생년월일 해시.
+//     그래서 한 줄씩 순서대로 저장하고, 대회 종료 처리(cfSave)는 uid 가 아니라 참가자 본인·보호자에게 경력을 기록합니다.
+//   · 미성년은 보호자 서면 동의서 제출 전제(needPaper) — 담당자가 명단의 [📄 수기동의서 확인완료]로 확정.
+//   · 권한: users.compBulkEntry=true (권한 관리 센터 perm.html · 관리자 회원 권한 창에서 부여) 또는 중앙관리자·오너.
+let IB={};
+function ibCan(){return !!(CMY&&(CMY.owner===true||cHasRole(CMY,'admin')||CMY.compBulkEntry===true))}
+function ibDivs(s){const t={};(s.teamDivs||[]).forEach(n=>t[String(n).trim()]=1);return slotDivs(s).filter(d=>!t[d.name])}
+function ibKey(name,birth){const str=taNorm(name)+'|'+(birth||'');let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return 'bk_'+(h>>>0).toString(36)+'_'+String(birth||'').replace(/[^0-9]/g,'')}
+function ibLatest(s,k){const a=(s.claimed||[]).filter(c=>ckey(c)===k);return a[a.length-1]}
+// 내가 일괄 신청한 참가자(유효 건)
+function ibMine(s){if(typeof CME==='undefined'||!CME)return [];return [...new Set((s.claimed||[]).filter(c=>c.bulk&&c.uid===CME.uid).map(ckey))].filter(k=>activeOfKey(s,k)).map(k=>ibLatest(s,k))}
+// 다른 사람이 일괄 신청으로 나(또는 내 자녀)를 등록한 건 — 내 화면에 '신청됨'으로 보이고, 같은 사람을 또 신청하지 않게
+function bulkMine(s){if(typeof CME==='undefined'||!CME)return [];return [...new Set((s.claimed||[]).filter(c=>c.bulk&&c.uid!==CME.uid&&(c.memberUid===CME.uid||c.guardianUid===CME.uid)).map(ckey))].filter(k=>activeOfKey(s,k)).map(k=>ibLatest(s,k))}
+function ibLinkTag(c){return c.nonMember?'<b style="color:#8a5a00;font-size:10.5px">🧾 비회원</b>':(c.guardianUid?'<b style="color:#153A77;font-size:10.5px">👨‍👧 회원 자녀</b>':'<b style="color:#153A77;font-size:10.5px">🔗 회원</b>')}
+function ibBadge(c){
+  if(!c||!c.bulk)return '';
+  return ' <b style="font-size:10.5px;color:#0f766e" title="'+cesc((c.bulkByName||'')+' 님이 엑셀 일괄 신청')+'">📋 일괄('+cesc(c.bulkByName||'')+')</b> '+ibLinkTag(c);
+}
+// 시트 → 행 목록. 머리글 이름으로 열을 찾으므로 열 순서가 달라도 됩니다.
+function ibParse(ws){
+  const HN=h=>String(h||'').replace(/\([^)]*\)/g,'').replace(/[\s*·.:]/g,'');
+  const NAME=/^(성명|이름|학생명|선수명|참가자|참가자명|참가자성명|선수이름|학생이름|성함)$/;
+  let hdrRow=0,H=[];
+  ws.eachRow((row,n)=>{if(hdrRow)return;const v=(row.values||[]).map(x=>HN(taCell(x)));if(v.some(x=>NAME.test(x))){hdrRow=n;H=v}});
+  if(!hdrRow)return {rows:[],errors:['머리글 행을 찾지 못했습니다. 첫 줄에 「성명」 칸이 있어야 합니다. [엑셀 양식]을 내려받아 그 양식에 적어 주세요.']};
+  const col=f=>{for(let i=0;i<H.length;i++)if(H[i]&&f(H[i]))return i;return -1};
+  const C={name:col(h=>NAME.test(h)),birth:col(h=>/생년월일|생일|출생|birth/i.test(h)),gender:col(h=>/성별|남녀|gender/i.test(h)),
+    div:col(h=>/부문|종목|경기|division/i.test(h)),school:col(h=>/학교|소속/.test(h)&&!/클럽|보호자/.test(h)),club:col(h=>/클럽|팀/.test(h)),
+    phone:col(h=>/연락처|전화|휴대|핸드폰|phone/i.test(h)&&!/보호자/.test(h)),addr:col(h=>/주소/.test(h)),
+    gname:col(h=>/보호자/.test(h)&&!/연락처|전화|휴대|핸드폰/.test(h)),gphone:col(h=>/보호자/.test(h)&&/연락처|전화|휴대|핸드폰/.test(h)),
+    pc:col(h=>/명단제공|제공동의/.test(h)),note:col(h=>/비고|메모|특이/.test(h))};
+  const rows=[];
+  ws.eachRow((row,n)=>{if(n<=hdrRow)return;const v=row.values||[];const g=i=>i>=0?taCell(v[i]):'';
+    const name=g(C.name).replace(/\s+/g,' ').trim();if(!name)return;
+    if(/예시\s*—\s*지우고/.test(g(C.note)))return;   // 양식의 예시 줄을 지우지 않고 올려도 접수하지 않음
+    const braw=C.birth>=0?v[C.birth]:'';
+    const birth=taDate(braw instanceof Date?braw:(typeof braw==='object'&&braw?taCell(braw):braw));
+    let gender=g(C.gender);gender=/여|f|female|w/i.test(gender)?'여':(/남|m|male/i.test(gender)?'남':'');
+    rows.push({n:n,name:name,birth:birth,birthRaw:C.birth>=0?taCell(braw):'',gender:gender,divRaw:g(C.div),school:g(C.school),club:g(C.club),
+      phone:g(C.phone),addr:g(C.addr),gname:g(C.gname),gphone:g(C.gphone),pc:/^(o|○|◯|y|yes|예|동의|1|true)$/i.test(g(C.pc).trim()),note:g(C.note)});
+  });
+  return {rows:rows,errors:rows.length?[]:['2행부터 적힌 참가자가 없습니다.']};
+}
+// 행 검증 + 회원 연동(성명+생년월일)
+async function ibEvaluate(s,rows,say){
+  const divs=ibDivs(s);const nz=x=>String(x||'').replace(/\s+/g,'').toLowerCase();
+  const act={};compClaimList(s).filter(c=>!c.team).forEach(c=>{act[taNorm(c.name)+'|'+(c.birth||'')]=1});
+  const seen={};const out=[];let i=0;
+  for(const r of rows){
+    i++;if(say&&i%10===0)say('회원 확인 중… '+i+'/'+rows.length);
+    const e=Object.assign({},r,{errs:[],warn:[],prefs:[]});
+    if(!r.birth)e.errs.push(r.birthRaw?'생년월일 형식 오류('+r.birthRaw+')':'생년월일 없음');
+    const toks=String(r.divRaw||'').split(/[,，·\/;\n]+/).map(t=>t.trim()).filter(Boolean);
+    if(!toks.length&&divs.length===1)e.prefs=[divs[0].name];
+    toks.forEach(t=>{const nt=nz(t);let m=divs.find(d=>nz(d.name)===nt);
+      if(!m){const c=divs.filter(d=>nz(d.name).indexOf(nt)>=0||nt.indexOf(nz(d.name))>=0);if(c.length===1)m=c[0]}
+      if(m){if(e.prefs.indexOf(m.name)<0)e.prefs.push(m.name)}else e.errs.push('부문 「'+t+'」을(를) 찾지 못함')});
+    if(!e.prefs.length&&!toks.length)e.errs.push('참가 부문 없음');
+    if(e.prefs.length>4)e.errs.push('부문은 4개까지');
+    const k=taNorm(r.name)+'|'+(r.birth||'');
+    if(r.birth&&seen[k])e.errs.push(seen[k]+'행과 같은 사람');else if(r.birth)seen[k]=r.n;
+    if(r.birth&&act[k])e.errs.push('이미 신청된 참가자');
+    e.age=r.birth?ageOf(r.birth):null;e.minor=e.age!=null&&e.age<18;
+    if(e.minor&&!r.gname)e.warn.push('보호자 성명 없음');
+    if(e.minor&&!r.gphone)e.warn.push('보호자 연락처 없음');
+    if(r.birth&&!e.errs.length){const hit=await taLookupKey(r.name,r.birth);if(hit){if(hit.uid)e.memberUid=hit.uid;else if(hit.guardianUid)e.guardianUid=hit.guardianUid}}
+    e.key=r.birth?ibKey(r.name,r.birth):'';
+    out.push(e);
+  }
+  return out;
+}
+async function openBulkIndiv(id){
+  if(!ibCan()){alert('개인전 엑셀 일괄 신청은 사무국이 권한을 준 회원만 쓸 수 있습니다.\n필요하면 사무국(031-984-3248)에 권한을 요청해 주세요.');return}
+  const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;const s=doc.data();
+  const divs=ibDivs(s);
+  if(!divs.length){alert('이 대회에는 개인전 부문이 없습니다.');return}
+  IB={id:id,rows:[],bid:'b'+Date.now().toString(36)};
+  const old=document.getElementById('ibModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='ibModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.6);backdrop-filter:blur(3px);z-index:999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
+  const today=new Date().toISOString().slice(0,10);
+  const closed=!!(s.deadline&&today>s.deadline);
+  div.innerHTML='<div class="cmodal" style="max-width:880px">'
+    +'<div class="mhead"><div class="mt">📋 개인전 엑셀 일괄 신청</div><div class="ms">'+cesc(s.title)+' · '+cesc(s.region||'')+' · '+cesc(s.date||'')+(s.deadline?' · 마감 '+cesc(s.deadline):'')+'</div></div>'
+    +'<div class="mbody">'
+    +'<div style="background:#f3f8f6;border:1.5px solid #cfe3d8;border-radius:12px;padding:11px 14px;font-size:12.5px;line-height:1.75;color:#24463d">'
+      +'· 참가자를 엑셀 한 장으로 한꺼번에 신청합니다. <b>성명·생년월일·참가 부문</b>은 꼭 적어 주세요.<br>'
+      +'· 연맹 회원(또는 보호자 계정에 등록된 자녀)은 <b>성명과 생년월일이 모두 같을 때만</b> 회원 정보와 연동됩니다. 이름이 같아도 생년월일이 다르면 연동하지 않습니다.<br>'
+      +'· 회원이 아니면 <b>비회원 참가자</b>로 접수됩니다. 나중에 같은 성명·생년월일로 가입하면 대회 기록이 경력에 연결됩니다.<br>'
+      +'· 만 18세 미만은 <b>보호자 서면 동의서</b>를 대회 담당자에게 내야 참가가 확정됩니다.</div>'
+    +'<div style="font-size:12.5px;margin:10px 0 4px;line-height:2"><b>개인전 부문</b> '+divs.map(d=>'<span class="ctag">'+cesc(d.name)+(d.cap?' <b>'+divActiveCount(s,d.name)+'/'+d.cap+'</b>':'')+'</span>').join(' ')+' <span style="color:#8a919d">· 전체 신청 '+activeCount(s)+'/'+s.quota+'</span></div>'
+    +(closed?'<div style="color:#C41E2F;font-weight:800;font-size:13px;margin:8px 0">⏳ 신청 마감일이 지났습니다 — 새 신청은 받지 않고, 아래 목록의 취소만 할 수 있습니다.</div>'
+      :'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">'
+      +'<button type="button" class="cbtn cbtn-soft" onclick="ibTemplate(\''+id+'\')">⬇ 엑셀 양식 내려받기</button>'
+      +'<label class="cbtn cbtn-main" style="cursor:pointer;display:inline-flex;align-items:center">⬆ 작성한 엑셀 올리기<input type="file" accept=".xlsx,.csv" style="display:none" onchange="ibFile(this)"></label></div>'
+      +'<div id="ibPrev"></div>')
+    +'<div id="ibMsg" style="font-size:12.5px;font-weight:800;margin-top:6px"></div>'
+    +'<div style="font-size:13px;font-weight:900;margin:16px 0 6px">내가 일괄 신청한 참가자</div><div id="ibMine"></div>'
+    +'<div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="cbtn" style="background:#eceff4;color:#555" onclick="document.getElementById(\'ibModal\').remove()">닫기</button></div>'
+    +'</div></div>';
+  document.body.appendChild(div);
+  ibRenderMine();
+}
+function ibSay(t,bad){const m=document.getElementById('ibMsg');if(m){m.textContent=t||'';m.style.color=bad?'#C41E2F':'#0f766e'}}
+async function ibFile(input){
+  const f=input&&input.files&&input.files[0];if(!f)return;input.value='';
+  if(typeof ExcelJS==='undefined'){alert('엑셀 라이브러리를 아직 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');return}
+  try{
+    ibSay('파일 읽는 중…');
+    const fname=String(f.name||'').toLowerCase();let P=null;
+    if(/\.csv$/.test(fname)||/text\/csv/.test(f.type||'')){
+      let txt='';const buf=await f.arrayBuffer();
+      try{txt=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){try{txt=new TextDecoder('euc-kr').decode(buf)}catch(e2){txt=new TextDecoder('utf-8').decode(buf)}}
+      const grid=txt.replace(/^﻿/,'').split(/\r?\n/).filter(l=>l.trim()).map(l=>l.split(l.indexOf('\t')>=0?'\t':',').map(x=>x.replace(/^"|"$/g,'').trim()));
+      P=ibParse({eachRow:function(fn){grid.forEach((r,i)=>fn({values:[''].concat(r)},i+1))}});
+    }else if(/\.xls$/.test(fname)){
+      throw new Error('구형 엑셀(.xls) 파일은 읽을 수 없습니다. 엑셀에서 [다른 이름으로 저장] → 「Excel 통합 문서(*.xlsx)」로 저장한 뒤 다시 올려 주세요.');
+    }else{
+      const wb=await taLoadXlsx(await f.arrayBuffer());
+      for(const w of wb.worksheets){const p=ibParse(w);if(p.rows.length){P=p;break}if(!P)P=p}
+      if(!P)P={rows:[],errors:['시트가 없습니다.']};
+    }
+    if(!P.rows.length){ibSay(P.errors[0]||'읽을 명단이 없습니다.',true);return}
+    const doc=CSLOTS.find(d=>d.id===IB.id);if(!doc)return;
+    IB.rows=await ibEvaluate(doc.data(),P.rows,ibSay);IB.file=f.name;
+    ibRenderPrev();ibSay('');
+  }catch(e){ibSay('엑셀 읽기 실패: '+(e.message||e),true)}
+}
+function ibRenderPrev(){
+  const el=document.getElementById('ibPrev');if(!el)return;
+  const R=IB.rows||[];const ok=R.filter(r=>!r.errs.length);
+  const nMem=ok.filter(r=>r.memberUid).length,nKid=ok.filter(r=>r.guardianUid).length,nNon=ok.length-nMem-nKid,nMin=ok.filter(r=>r.minor).length;
+  const td='style="padding:6px 7px;border-bottom:1px solid #eef1f5;font-size:12px;vertical-align:top;text-align:left"';
+  el.innerHTML='<div style="font-size:13px;font-weight:900;margin:6px 0">미리보기 — '+cesc(IB.file||'')+' · '+R.length+'명</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;font-size:12px;font-weight:800">'
+      +'<span class="ctag">신청 가능 <b>'+ok.length+'</b>명</span><span class="ctag" style="color:#153A77">🔗 회원 '+nMem+'</span><span class="ctag" style="color:#153A77">👨‍👧 회원 자녀 '+nKid+'</span><span class="ctag" style="color:#8a5a00">🧾 비회원 '+nNon+'</span>'
+      +(nMin?'<span class="ctag" style="color:#C41E2F">미성년 '+nMin+'</span>':'')+(R.length-ok.length?'<span class="ctag" style="color:#C41E2F">⚠ 제외 '+(R.length-ok.length)+'</span>':'')+'</div>'
+    +'<div style="max-height:320px;overflow:auto;border:1.5px solid #e2e7f0;border-radius:10px"><table style="width:100%;border-collapse:collapse;min-width:640px">'
+    +'<tr style="background:#f6f8fb"><th '+td+'>행</th><th '+td+'>성명</th><th '+td+'>생년월일</th><th '+td+'>참가 부문</th><th '+td+'>학교·소속</th><th '+td+'>연동</th><th '+td+'>확인</th></tr>'
+    +R.map(r=>'<tr style="'+(r.errs.length?'background:#fff5f5':'')+'"><td '+td+'>'+r.n+'</td><td '+td+'><b>'+cesc(r.name)+'</b>'+(r.gender?' <span style="color:#8a919d">'+cesc(r.gender)+'</span>':'')+'</td>'
+      +'<td '+td+'>'+cesc(r.birth||r.birthRaw||'-')+(r.age!=null?' <span style="color:'+(r.minor?'#C41E2F':'#8a919d')+'">만 '+r.age+'세</span>':'')+'</td>'
+      +'<td '+td+'>'+cesc(r.prefs.join(' · ')||r.divRaw||'-')+'</td><td '+td+'>'+cesc(r.school||r.club||'-')+'</td>'
+      +'<td '+td+'>'+(r.errs.length?'-':ibLinkTag({nonMember:!(r.memberUid||r.guardianUid),guardianUid:r.guardianUid}))+'</td>'
+      +'<td '+td+'>'+(r.errs.length?'<b style="color:#C41E2F">⚠ '+cesc(r.errs.join(' · '))+'</b>':'<b style="color:#0f766e">✓</b>'+(r.minor?' <span style="color:#C41E2F">보호자 동의서 필요</span>':''))
+      +(r.warn.length?'<div style="color:#8a5a00">'+cesc(r.warn.join(' · '))+'</div>':'')+'</td></tr>').join('')
+    +'</table></div>'
+    +(ok.length?'<div style="margin-top:10px;font-size:12.5px;line-height:1.7">'
+      +'<label style="display:flex;gap:8px;align-items:flex-start;font-weight:800;color:#153A77"><input type="checkbox" id="ibAtt1" style="width:auto;margin-top:4px"><span>참가자(미성년은 보호자)에게 대회 참가와 <b>개인정보 수집·이용</b>(성명·생년월일·성별·소속·연락처 / 대회 참가 관리·단체보험·기록 관리 / 2026. 12. 31.까지) 동의를 받았습니다.</span></label>'
+      +(nMin?'<label style="display:flex;gap:8px;align-items:flex-start;font-weight:800;color:#C41E2F;margin-top:4px"><input type="checkbox" id="ibAtt2" style="width:auto;margin-top:4px"><span>만 18세 미만 참가자 '+nMin+'명의 <b>보호자(법정대리인) 서면 동의서</b>를 받아 대회 담당자에게 내겠습니다. 담당자가 확인하기 전까지 참가가 확정되지 않습니다.</span></label>':'')
+      +'<div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="cbtn cbtn-main" id="ibGo" onclick="ibSubmit()">'+ok.length+'명 참가 신청</button></div></div>':'');
+}
+async function ibSubmit(){
+  const R=(IB.rows||[]).filter(r=>!r.errs.length);if(!R.length)return;
+  const a1=document.getElementById('ibAtt1'),a2=document.getElementById('ibAtt2');
+  if(!a1||!a1.checked){alert('참가자(보호자)에게 개인정보 수집·이용 동의를 받았는지 확인해 주세요.');return}
+  if(a2&&!a2.checked){alert('미성년 참가자의 보호자 서면 동의서 제출을 확인해 주세요.');return}
+  const nMem=R.filter(r=>r.memberUid||r.guardianUid).length;
+  if(!confirm(R.length+'명을 개인전 참가자로 신청합니다.\n(회원 연동 '+nMem+'명 · 비회원 '+(R.length-nMem)+'명)\n\n계속할까요?'))return;
+  const btn=document.getElementById('ibGo');if(btn){btn.disabled=true;btn.textContent='신청 중…'}
+  const ref=DB.collection('compSlots').doc(IB.id);
+  const title=(((CSLOTS.find(d=>d.id===IB.id)||{data:function(){return{}}}).data())||{}).title||'';
+  const me=(CMY&&CMY.name)||'';
+  let ok=0,stop='';const skip=[];
+  for(let i=0;i<R.length;i++){
+    const r=R[i];ibSay('신청 중… '+(i+1)+'/'+R.length+' ('+r.name+')');
+    try{
+      await DB.runTransaction(async tx=>{
+        const d=await tx.get(ref);const s=d.data();
+        const today=new Date().toISOString().slice(0,10);
+        if(s.deadline&&today>s.deadline)throw new Error('STOP:신청 마감일이 지났습니다');
+        if(activeCount(s)>=s.quota)throw new Error('STOP:대회 정원이 마감되었습니다');
+        if(activeOfKey(s,r.key))throw new Error('SKIP:이미 신청됨');
+        const k=taNorm(r.name)+'|'+r.birth;
+        if(compClaimList(s).some(c=>!c.team&&(taNorm(c.name)+'|'+(c.birth||''))===k))throw new Error('SKIP:같은 성명·생년월일로 이미 신청됨');
+        for(const nm of r.prefs){const dv=slotDivs(s).find(x=>x.name===nm);if(dv&&dv.cap&&divActiveCount(s,dv.name)>=dv.cap)throw new Error('SKIP:['+nm+'] 부문 정원 마감')}
+        const c={uid:CME.uid,pid:r.key,name:r.name,birth:r.birth,gender:r.gender||'',school:r.school||'',club:r.club||'',clubId:'',kid:false,special:[],
+          guardian:r.gname||'',guardianPhone:r.gphone||'',adultAcct:false,pconsent:!!r.pc,phone:r.phone||'',address:r.addr||'',
+          prefs:r.prefs.slice(),consent:true,signed:false,bulk:true,bulkBy:CME.uid,bulkByName:me,bulkId:IB.bid,bulkAttest:true,
+          memberUid:r.memberUid||'',guardianUid:r.guardianUid||'',nonMember:!(r.memberUid||r.guardianUid),note:r.note||'',at:new Date().toISOString()};
+        if(r.minor)c.needPaper=true;
+        const claimed=(s.claimed||[]).slice();claimed.push(c);
+        tx.update(ref,{claimed:claimed});
+      });
+      ok++;
+      // 연동된 회원·보호자에게 알림 (본인이 본인을 올린 경우 제외)
+      try{
+        if(r.memberUid&&r.memberUid!==CME.uid)Promise.resolve(KFDF.notify(r.memberUid,'📋 ['+title+'] '+me+' 님이 회원님을 개인전 참가자('+r.prefs.join('·')+')로 신청했습니다','competition.html?slot='+IB.id)).catch(function(){});
+        else if(r.guardianUid&&r.guardianUid!==CME.uid)Promise.resolve(KFDF.notify(r.guardianUid,'📋 ['+title+'] '+me+' 님이 자녀 '+r.name+'을(를) 개인전 참가자로 신청했습니다'+(r.minor?' — 보호자 서면 동의서 제출이 필요합니다':''),'competition.html?slot='+IB.id)).catch(function(){});
+      }catch(e){}
+    }catch(e){
+      const m=String((e&&e.message)||e);
+      if(m.indexOf('STOP:')===0){stop=m.slice(5);break}
+      if(/permission|insufficient/i.test(m)){stop='저장 권한이 없습니다 — 회원 승인 상태와 일괄 신청 권한을 확인해 주세요';break}
+      skip.push(r.name+' — '+(m.indexOf('SKIP:')===0?m.slice(5):cErrMsg(e)));
+    }
+  }
+  const left=R.length-ok-skip.length;
+  alert('📋 일괄 신청 결과\n\n· 신청 완료 '+ok+'명'
+    +(skip.length?'\n· 건너뜀 '+skip.length+'명\n  '+skip.slice(0,10).join('\n  ')+(skip.length>10?'\n  … 외 '+(skip.length-10)+'명':''):'')
+    +(stop?'\n\n⛔ 중단: '+stop+(left>0?' — 남은 '+left+'명은 신청되지 않았습니다':''):'')
+    +(R.some(r=>r.minor)?'\n\n만 18세 미만 참가자는 보호자 서면 동의서를 대회 담당자에게 내 주세요.':''));
+  try{await _refreshSlot(IB.id)}catch(e){}
+  IB.rows=[];const p=document.getElementById('ibPrev');if(p)p.innerHTML='';ibSay('');
+  ibRenderMine();loadSlots();
+}
+function ibRenderMine(){
+  const el=document.getElementById('ibMine');if(!el)return;
+  const doc=CSLOTS.find(d=>d.id===IB.id);if(!doc){el.innerHTML='';return}
+  const s=doc.data();const L=ibMine(s);
+  if(!L.length){el.innerHTML='<div style="font-size:12.5px;color:#8a919d">아직 없습니다.</div>';return}
+  const td='style="padding:6px 7px;border-bottom:1px solid #eef1f5;font-size:12px;vertical-align:top;text-align:left"';
+  el.innerHTML='<div style="font-size:12px;color:#6b7280;margin-bottom:6px">'+L.length+'명 · 승인·반려 결과는 이 목록과 알림으로 확인할 수 있습니다.</div>'
+    +'<div style="max-height:260px;overflow:auto;border:1.5px solid #e2e7f0;border-radius:10px"><table style="width:100%;border-collapse:collapse;min-width:580px">'
+    +L.map((c,i)=>{const q=claimState(s,c);
+      return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name)+'</b> '+ibLinkTag(c)+'</td><td '+td+'>'+cesc(c.birth||'-')+'</td><td '+td+'>'+cesc((c.prefs||[]).join(' · '))+'</td>'
+        +'<td '+td+'><b style="color:'+q.col+'">'+q.t+'</b>'+(c.needPaper?'<div style="color:#C41E2F;font-size:11px">보호자 서면 동의서 제출</div>':'')+'</td>'
+        +'<td '+td+'><button onclick="ibCancel(\''+cesc(ckey(c))+'\')" style="border:1.5px solid #C41E2F;background:#fff;color:#C41E2F;border-radius:8px;padding:2px 9px;font-size:11px;font-weight:800;cursor:pointer">취소</button></td></tr>'}).join('')
+    +'</table></div>';
+}
+async function ibCancel(key){
+  const doc=CSLOTS.find(d=>d.id===IB.id);const s0=doc?doc.data():{};const c0=ibLatest(s0,key)||{};
+  if(!confirm((c0.name||'')+' 참가 신청을 취소할까요?'))return;
+  const ref=DB.collection('compSlots').doc(IB.id);
+  try{
+    await DB.runTransaction(async tx=>{
+      const d=await tx.get(ref);const s=d.data();
+      if(!activeOfKey(s,key))throw new Error('신청 내역이 없습니다');
+      const cancels=(s.cancels||[]).slice();cancels.push({uid:CME.uid,pid:key,at:new Date().toISOString(),reason:'일괄 신청 취소'});
+      tx.update(ref,{cancels:cancels});
+    });
+    try{await _refreshSlot(IB.id)}catch(e){}
+    ibRenderMine();loadSlots();
+  }catch(e){alert(cErrMsg(e))}
+}
+async function ibTemplate(id){
+  if(typeof ExcelJS==='undefined'){alert('엑셀 라이브러리를 아직 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');return}
+  const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;const s=doc.data();const divs=ibDivs(s);
+  const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet('참가자 명단');
+  const cols=[['성명',11,1],['생년월일',13,1],['성별',7,0],['참가 부문',26,1],['학교·소속',20,0],['소속 클럽',16,0],['연락처',15,0],['주소',32,0],['보호자 성명',11,0],['보호자 연락처',15,0],['명단제공 동의(O/X)',12,0],['비고',16,0]];
+  ws.columns=cols.map(c=>({header:c[0],width:c[1]}));
+  const hr=ws.getRow(1);hr.height=22;
+  cols.forEach((c,i)=>{const cell=hr.getCell(i+1);cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:c[2]?'FFFDE8EA':'FFF1F4F8'}};cell.font={bold:true,color:{argb:c[2]?'FFC41E2F':'FF16181D'}};cell.alignment={vertical:'middle',horizontal:'center'}});
+  const d0=divs[0]?divs[0].name:'';
+  ws.addRow(['홍길동','2013-05-05','남',d0,'대한초등학교','','','','홍부모','010-1234-5678','O','예시 — 지우고 쓰세요']);
+  ws.addRow(['김영희','1990-03-01','여',divs.slice(0,2).map(d=>d.name).join(', '),'','○○클럽','010-0000-0000','','','','X','예시 — 지우고 쓰세요']);
+  ws.views=[{state:'frozen',ySplit:1}];
+  const dl=wb.addWorksheet('부문 목록');dl.columns=[{header:'개인전 부문 (이 이름 그대로 적기)',width:40}];divs.forEach(d=>dl.addRow([d.name]));dl.getRow(1).font={bold:true};
+  const rng="'부문 목록'!$A$2:$A$"+(divs.length+1);
+  for(let r=2;r<=400;r++){
+    ws.getCell('B'+r).numFmt='@';
+    ws.getCell('C'+r).dataValidation={type:'list',allowBlank:true,formulae:['"남,여"']};
+    ws.getCell('D'+r).dataValidation={type:'list',allowBlank:true,showErrorMessage:false,formulae:[rng]};
+    ws.getCell('K'+r).dataValidation={type:'list',allowBlank:true,formulae:['"O,X"']};
+  }
+  const g=wb.addWorksheet('작성 안내');g.getColumn(1).width=112;
+  ['[대회] '+(s.title||'')+' · '+(s.date||'')+(s.deadline?' · 신청 마감 '+s.deadline:''),'',
+   '· 1행(머리글)은 그대로 두고 2행부터 한 사람씩 적습니다. 예시 두 줄은 지우고 쓰세요. 빨간 머리글(성명·생년월일·참가 부문)은 꼭 적어야 합니다.',
+   '· 생년월일은 2013-05-05 처럼 적습니다 (2013.05.05, 20130505 도 읽힙니다).',
+   '· 참가 부문은 「부문 목록」 시트의 이름을 그대로 고르거나 적습니다. 여러 부문이면 쉼표(,)로 나눕니다 (최대 4개).',
+   '· 연맹 회원(또는 보호자 계정에 등록된 자녀)은 성명과 생년월일이 모두 같을 때만 회원 정보와 연동됩니다. 나머지는 비회원 참가자로 접수됩니다.',
+   '· 만 18세 미만은 보호자 성명·연락처를 적고, 보호자 서면 동의서를 대회 담당자에게 내야 참가가 확정됩니다.',
+   '· 명단제공 동의(O/X): 주최기관에 참가자 명단으로 연락처·주소를 넘기는 데 동의했으면 O. 비우면 X 로 봅니다.',
+   '· 연락처·주소는 주최기관 명단에 필요할 때만 적습니다.'].forEach(t=>g.addRow([t]));
+  g.getRow(1).font={bold:true,size:12};
+  const buf=await wb.xlsx.writeBuffer();
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  a.download='개인전_일괄신청_'+String(s.title||'대회').replace(/[\\\/:*?"<>|]+/g,'').slice(0,40)+'.xlsx';
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
 }
 async function taLoadClubRoster(){
   const sel=document.getElementById('taOrg');if(!sel||!sel.value)return;
@@ -3123,7 +3416,7 @@ function compRow(r,today){
 }
 function compRowOfSlot(d,today,comp){
   const s=d.data();const c=comp||{};
-  const mine=(typeof CME!=='undefined'&&CME)?(myEntries(s).length>0||guardEntries(s).length>0):false;
+  const mine=(typeof CME!=='undefined'&&CME)?(myEntries(s).length>0||guardEntries(s).length>0||bulkMine(s).length>0):false;
   return compRow({key:d.id,href:'competition.html?slot='+d.id,date:s.date||c.dateStart||'',end:c.dateEnd||s.date||'',title:s.title||c.title||'',place:s.place||c.place||'',host:s.host||c.host||'',region:s.region||c.sido||'',deadline:s.deadline||'',closed:!!(s.deadline&&s.deadline<today)||activeCount(s)>=s.quota,applied:mine,team:!!((s.teamDivs||[]).length)},today);
 }
 let HUB_STAFF=null;   // [공고 허브] 심판·운영 공고 (로그인 후 읽을 수 있음 · null=비로그인)
@@ -3174,9 +3467,9 @@ function hubApply(){
 function renderMyEntryBox(){
   const box=document.getElementById('myEntryBox');if(!box)return;
   const today=new Date().toISOString().slice(0,10);
-  const mine=(CSLOTS||[]).filter(d=>d.data().role==='참가'&&(myEntries(d.data()).length||guardEntries(d.data()).length));
+  const mine=(CSLOTS||[]).filter(d=>d.data().role==='참가'&&(myEntries(d.data()).length||guardEntries(d.data()).length||bulkMine(d.data()).length));
   if(!mine.length){box.innerHTML='';return}
-  box.innerHTML='<div class="myent"><h3>내 신청 현황 ('+mine.length+'건)</h3>'+mine.map(d=>{const s=d.data();const names=myEntries(s).concat(guardEntries(s)).map(m=>m.name).filter(Boolean);
+  box.innerHTML='<div class="myent"><h3>내 신청 현황 ('+mine.length+'건)</h3>'+mine.map(d=>{const s=d.data();const names=myEntries(s).concat(guardEntries(s)).concat(bulkMine(s)).map(m=>m.name).filter(Boolean);
     return compRow({key:'',href:'competition.html?slot='+d.id,date:s.date||'',end:s.date||'',title:s.title||'',place:names.join(' · '),host:'',region:s.region||'',deadline:s.deadline||'',closed:!!(s.deadline&&s.deadline<today),applied:true,team:!!(myEntries(s).some(m=>m.team))},today)}).join('')+'</div>';
 }
 // ══ [권역 지도 2026-09-09] 공고 목록을 권역별로 — 시도명(경남 등)·지역 문자열을 6개 권역으로 묶어 지도에 건수를 표시하고, 누르면 그 권역만 남김 ══
@@ -3266,7 +3559,7 @@ function slotCardCompact(d,today){
   const act=activeCount(s);
   const closed=(s.deadline&&today>s.deadline)||act>=s.quota;
   const rc=ROLE_COLOR[s.role]||'#153A77';
-  const applied=myEntries(s).length>0||guardEntries(s).length>0;   // [보호자 승인] 보호자가 서명한 내 신청 포함
+  const applied=myEntries(s).length>0||guardEntries(s).length>0||bulkMine(s).length>0;   // [보호자 승인] 보호자가 서명한 내 신청 포함
   // [공고 시인성] 날짜 배지 + 제목 + 메타 한 줄 (항목은 종전과 동일)
   const dm=String(s.date||'').match(/^\d{4}-(\d{2})-(\d{2})$/);
   const dateBadge='<div class="cdate"><b>'+(dm?(+dm[1])+'.'+dm[2]:'-')+'</b><span>'+(dm?cc2DowOf(s.date):'')+'</span></div>';
@@ -3371,6 +3664,7 @@ function slotCard(d,today){
         +divGroupsHtml(s,entry)
         +'<div class="cact">'+action
         +((s.teamDivs&&s.teamDivs.length&&s.role==='참가'&&!closed)?'<button class="cbtn cbtn-soft" onclick="openTeamApply(\''+d.id+'\')">👥 단체전 참가 신청</button>':'')
+        +((entry&&ibCan()&&ibDivs(s).length&&(!closed||ibMine(s).length))?'<button class="cbtn cbtn-soft" style="background:#eef7f4;color:#0f766e" onclick="openBulkIndiv(\''+d.id+'\')">📋 개인전 엑셀 일괄 신청'+(ibMine(s).length?' ('+ibMine(s).length+'명)':'')+'</button>':'')+(bulkMine(s).length?'<span class="cpill" style="background:#e3f4ef;color:#0f766e">📋 '+cesc(bulkMine(s)[0].bulkByName||'')+' 님이 '+cesc(bulkMine(s).map(b=>b.name).join('·'))+' 참가 신청함</span>':'')
         +(myTeamEntries(s).length?'<button class="cbtn cbtn-ghost" onclick="teamConsentUpload(\''+d.id+'\')">📎 동의서 관리 (추가·삭제)</button>':'')
         +'<button class="cbtn cbtn-ghost" onclick="viewRoster(\''+d.id+'\')">👥 신청 현황</button></div></div>';
   }
@@ -3592,7 +3886,7 @@ async function openApply(id){
     const parts=(FAMREQ?[{pid:FAMREQ.childUid,name:FAMREQ.childName||'',label:(FAMREQ.childName||'자녀')+' · 자녀(승인 진행)',birth:FAMREQ.childBirth||'',gender:FAMREQ.childGender||'',school:FAMREQ.childSchool||'',kid:true}]
       :((selfMinor&&!PAPER_MODE)?[]:[{pid:CME.uid+'#self',name:CMY.name||'',label:(CMY.name||'본인')+' · 본인',birth:CMY.birth||'',gender:CMY.gender||'',school:'',kid:false}]))
       .concat(FAMREQ?[]:(CMY.children||[]).map((k,i)=>({pid:CME.uid+'#k'+i,name:k.name,label:k.name+' · 자녀',birth:k.birth||'',gender:k.gender||'',school:k.school||'',kid:true})));
-    APPLY_PARTS=parts.filter(p=>!activeOfKey(s,p.pid)||p.pid===EDIT_KEY); // [신청수정] 수정 대상 참가자는 목록에 포함
+    APPLY_PARTS=parts.filter(p=>(!activeOfKey(s,p.pid)||p.pid===EDIT_KEY)&&!bulkMine(s).some(b=>taNorm(b.name)===taNorm(p.name)&&(!p.birth||!b.birth||b.birth===p.birth)));   // [개인전 일괄 신청] 이미 일괄로 신청된 사람 제외 // [신청수정] 수정 대상 참가자는 목록에 포함
     const clubOpts=(MY_CLUBS||[]).map(c=>'<option value="'+cesc(c.id)+'">'+cesc(c.name)+'</option>').join('');
     inner='<div class="cmodal">'
       +'<div class="mhead"><div class="mt">🏃 대회 개인전 참가 신청서</div><div class="ms">'+cesc(s.title)+' · '+cesc(s.region)+' · '+cesc(s.date)+(s.place?' · 📍 '+cesc(s.place):'')+(s.note?' · 📌 '+cesc(String(s.note).replace(/\s+/g,' ').slice(0,80)):'')+'</div></div>'

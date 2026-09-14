@@ -161,18 +161,19 @@ function roleKo(v){
   return all.length?all[0]:null;
 }
 function renderStats(){
-  const c={admin:0,sido:0,gugun:0,region:0,cal:0,club:0,verify:0};
+  const c={admin:0,sido:0,gugun:0,region:0,cal:0,club:0,verify:0,bulk:0};
   USERS.forEach(d=>{const v=d.data();
     if(pmHas(v,'admin')||v.owner)c.admin++;
     if(pmHas(v,'sidoOfficer'))c.sido++;
     if(pmHas(v,'gugunOfficer'))c.gugun++;
     if(pmHas(v,'regionAdmin'))c.region++;
     if(v.calendarEditor)c.cal++;
+    if(v.compBulkEntry)c.bulk++;
     if(v.clubAdminSido)c.club++;
     if(v.instructorVerified)c.verify++;});
   document.getElementById('statRow').innerHTML=[
     ['👑 중앙관리자',c.admin],['🏛 시도임원',c.sido],['🏛 구군임원',c.gugun],['🛡 권역장',c.region],
-    ['📅 캘린더 권한',c.cal],['🛡 클럽승인(구)',c.club],['✔ 검증강사',c.verify]
+    ['📅 캘린더 권한',c.cal],['📋 엑셀 일괄 신청',c.bulk],['🛡 클럽승인(구)',c.club],['✔ 검증강사',c.verify]
   ].map(x=>'<div class="stat2"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>').join('');
 }
 function renderFilters(){
@@ -184,7 +185,7 @@ function renderList(){
   const el=document.getElementById('mlist');
   const rows=USERS.filter(d=>{
     const v=d.data();
-    const hasRole=!!(v.owner||pmRoles(v).length||v.calendarEditor||v.clubAdminSido||v.instructorVerified);
+    const hasRole=!!(v.owner||pmRoles(v).length||v.calendarEditor||v.compBulkEntry||v.clubAdminSido||v.instructorVerified);
     if(FLT==='officer'&&!hasRole)return false;
     if(FLT==='member'&&hasRole)return false;
     if(q){const hay=[v.name,v.email,v.sido,v.region,v.gugun].map(x=>String(x||'').toLowerCase()).join(' ');if(hay.indexOf(q)<0)return false;}
@@ -232,6 +233,7 @@ function renderDetail(id){
       +'</div>'
     +'<div class="subbox"><div class="st">② 부가 권한 <span style="font-weight:600;color:#8a919d">(등급과 무관하게 따로 부여)</span></div>'
       +'<label class="chkl"><input type="checkbox" id="pmCal"'+(v.calendarEditor?' checked':'')+'> 📅 캘린더 편집 (연맹 일정 등록·수정)</label>'
+      +'<label class="chkl"><input type="checkbox" id="pmBulk"'+(v.compBulkEntry?' checked':'')+'> 📋 대회 개인전 엑셀 일괄 신청 <span style="font-weight:600;color:#8a919d;font-size:12px">— 학교·클럽 담당자가 참가자를 엑셀로 한꺼번에 신청 (회원은 성명+생년월일로 연동, 나머지는 비회원)</span></label>'
       +'<label class="chkl"><input type="checkbox" id="pmVerify"'+(v.instructorVerified?' checked':'')+((v.instructorFor&&(v.instructorFor.school||v.instructorFor.after))?'':' disabled')+'> ✔ 검증 강사'+((v.instructorFor&&(v.instructorFor.school||v.instructorFor.after))?'':' <span style="font-size:11.5px;color:#8a919d">— 강사 지원자만</span>')+'</label>'
       +'<div class="fldrow"><span>클럽승인 시도</span><select id="pmClubSido" class="fld"><option value="">권한 없음</option>'+PM_SIDOS.map(s=>'<option'+(v.clubAdminSido===s?' selected':'')+'>'+s+'</option>').join('')+'</select><span style="font-size:11.5px;color:#8a919d;min-width:0">구버전 방식 — 시도임원 등급이면 불필요</span></div></div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
@@ -314,6 +316,7 @@ async function savePerm(uid){
   }
   const cal=document.getElementById('pmCal').checked;
   if(cal!==!!v.calendarEditor)upd.calendarEditor=cal;
+  const bk=document.getElementById('pmBulk');if(bk&&bk.checked!==!!v.compBulkEntry)upd.compBulkEntry=bk.checked;   // [개인전 일괄 신청] 권한
   const vfEl=document.getElementById('pmVerify');
   if(!vfEl.disabled&&vfEl.checked!==!!v.instructorVerified)upd.instructorVerified=vfEl.checked;
   const cs=document.getElementById('pmClubSido').value;
