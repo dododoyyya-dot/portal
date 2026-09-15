@@ -699,7 +699,7 @@ function compClaimList(s){
   return keys.map(k=>{
     const arr=(s.claimed||[]).filter(c=>ckey(c)===k);
     return arr[arr.length-1];
-  }).sort((a,b)=>String(a.at||'').localeCompare(String(b.at||'')));
+  }).sort((a,b)=>String(a.origAt||a.at||'').localeCompare(String(b.origAt||b.at||'')));   // [취소 되살리기] 되살린 건은 원래 신청 시각 순서
 }
 // [입금관리] 참가 신청자 입금대기/입금확인 토글 (권한자 전용)
 function _payCell(slotId,c,td){
@@ -1015,7 +1015,8 @@ async function viewRoster(id){
       +(staff?' <button onclick="markPaper(\''+id+'\',\''+key+'\',\''+cesc(c.name||'')+'\')" style="border:1.5px solid #e6b422;background:#fffbeb;color:#8a5a00;border-radius:8px;padding:2px 8px;font-size:10.5px;font-weight:800;cursor:pointer" title="담당자가 서면(수기) 동의서를 수령한 경우 클릭">📄 수기동의서 확인완료</button>':'');
   };
   // [참가자 상태] 상태 표시 + 담당자용 승인·반려 버튼
-  const stCell=c=>{const q=claimState(s,c);return '<b style="color:'+q.col+'">'+q.t+'</b>'+(q.reason?'<div style="font-size:10.5px;color:#8a919d;margin-top:2px">'+cesc(q.reason)+'</div>':'')};
+  const stCell=c=>{const q=claimState(s,c);return '<b style="color:'+q.col+'">'+q.t+'</b>'+(q.reason?'<div style="font-size:10.5px;color:#8a919d;margin-top:2px">'+cesc(q.reason)+'</div>':'')
+    +(c.restored?'<div style="font-size:10.5px;color:#0f766e;font-weight:800;margin-top:2px" title="'+cesc(String(c.restoredAt||'').slice(0,10))+'">↩ 되살림'+(c.restoredBy?' · '+cesc(c.restoredBy):'')+'</div>':'')};
   const _rvb='border-radius:8px;padding:2px 8px;font-size:10.5px;font-weight:800;cursor:pointer;white-space:nowrap';
   const revCell=c=>{const key=ckey(c);const q=claimState(s,c);const ruid=cesc(c.uid||'');
     return '<td '+td+' style="text-align:center;white-space:nowrap">'
@@ -1030,6 +1031,12 @@ async function viewRoster(id){
     .map(k=>{const arr=(s.claimed||[]).filter(c=>ckey(c)===k);return arr[arr.length-1];})
     .filter(c=>!isConfirmedClaim(s,c))
     .sort((a,b)=>String(a.at||'').localeCompare(String(b.at||''))):[];
+  // [취소 되살리기 2026-09-15] 신청자가 취소한 신청(반려 제외) — 실수로 취소했을 때 담당자가 확인하고 되살릴 수 있게 따로 모읍니다
+  const canList=staff?[...new Set((s.claimed||[]).map(ckey))]
+    .filter(k=>!activeOfKey(s,k)&&((((s.reviewStatus||{})[k])||{}).st!=='반려'))
+    .map(k=>{const arr=(s.claimed||[]).filter(c=>ckey(c)===k);const xs=(s.cancels||[]).filter(x=>ckey(x)===k);return {c:arr[arr.length-1],x:xs[xs.length-1]||{}}})
+    .sort((a,b)=>String(b.x.at||'').localeCompare(String(a.x.at||''))):[];
+  const kst=t=>{try{const d=new Date(t);return isNaN(d)?'':d.toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return ''}};
   let rows;
   if(!list.length)rows='<tr><td '+td+' colspan="10" style="text-align:center;color:#8a919d">아직 신청자가 없습니다</td></tr>';
   else if(staff){
@@ -1051,14 +1058,14 @@ async function viewRoster(id){
                 +' <button onclick="markPaper(\''+id+'\',\''+ckey(c)+'_'+j+'\',\''+cesc(r.name)+'\')" style="border:1.5px solid #e6b422;background:#fffbeb;color:#8a5a00;border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:800;cursor:pointer">📄 수기동의서 확인완료</button>';
             })()).join('<br>')+'</div></details>'
           +'<div style="margin-top:6px"><button onclick="openRosterEdit(\''+id+'\',\''+ckey(c)+'\')" style="border:1.5px solid #153A77;background:#fff;color:#153A77;border-radius:8px;padding:3px 10px;font-size:11.5px;font-weight:800;cursor:pointer">✏️ 명단 수정 (추가·제거)</button></div></td>'
-          +'<td '+td+'>'+cesc((c.prefs||[])[0]||'-')+'</td><td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
+          +'<td '+td+'>'+cesc((c.prefs||[])[0]||'-')+'</td><td '+td+'>'+cesc(String(c.origAt||c.at||'').slice(0,10))+'</td>'
           +'<td '+td+' style="text-align:center">'+stCell(c)+'</td>'
           +(entry?_payCell(id,c,td):'')+revCell(c)+'</tr>';
       }
       return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b>'+tbadge(c)+consentBadge(c,ckey(c))+rosterMark(c.name,c.birth)+ibBadge(c)+'</td>'
       +(entry?'<td '+td+'>'+cesc(c.birth||'-')+'</td><td '+td+'>'+cesc(c.gender||'-')+'</td><td '+td+'>'+cesc(c.school||c.club||'-')+'</td>':'')
       +'<td '+td+'>'+cesc(entry?((c.prefs||[]).map(p=>p+(divDateLbl(s,p)?' ('+divDateLbl(s,p)+')':'')).join(' · ')||'-'):((c.prefs||[]).map((p,j)=>(j+1)+'지망 '+p).join(' · ')||'-'))+'</td>'
-      +'<td '+td+'>'+cesc(String(c.at||'').slice(0,10))+'</td>'
+      +'<td '+td+'>'+cesc(String(c.origAt||c.at||'').slice(0,10))+'</td>'
       +'<td '+td+' style="text-align:center">'+stCell(c)+'</td>'
       +(entry?_payCell(id,c,td):'')+revCell(c)+'</tr>';
     }).join('');
@@ -1082,7 +1089,7 @@ async function viewRoster(id){
     :'<tr><th '+th+'>연번</th><th '+th+'>성명</th><th '+th+'>'+(entry?'부문':'임무')+'</th><th '+th+'>상태</th></tr>';
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:'+(staff?'720px':'480px')+';width:100%;max-height:90vh;overflow:auto;padding:24px">'
     +'<b style="font-size:16px">👥 신청 현황 — '+cesc(s.title)+'</b>'
-    +'<div style="font-size:12.5px;color:#666;margin:4px 0 4px">'+cesc(s.date||'')+' · '+cesc(s.role)+(entry?' (선수)':'요원')+' · 신청 '+list.length+'/'+s.quota+'명'+(sumTxt?' — '+sumTxt:'')+(staff&&rejList.length?' · 반려 '+rejList.length+'건(명단·정원 제외, 아래 별도 확인)':'')+'</div>'
+    +'<div style="font-size:12.5px;color:#666;margin:4px 0 4px">'+cesc(s.date||'')+' · '+cesc(s.role)+(entry?' (선수)':'요원')+' · 신청 '+list.length+'/'+s.quota+'명'+(sumTxt?' — '+sumTxt:'')+(staff&&rejList.length?' · 반려 '+rejList.length+'건(명단·정원 제외, 아래 별도 확인)':'')+(staff&&canList.length?' · 취소 '+canList.length+'건(아래에서 되살리기)':'')+'</div>'
     +(staff?'<div style="font-size:12px;color:#0f766e;font-weight:700;margin-bottom:8px">🔓 권한자 보기 — 세부정보가 표시됩니다. <a href="admin.html" style="color:#153A77;font-weight:800">관리자 페이지에서 수정 →</a></div>'
            :'<div style="font-size:12px;color:#8a919d;margin-bottom:8px">개인정보 보호를 위해 성명은 일부 가려서 표시됩니다.</div>')
     +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">'+head+rows+'</table></div>'
@@ -1098,12 +1105,24 @@ async function viewRoster(id){
             +'<td '+td+' style="text-align:center"><button onclick="clearClaimReview(\''+id+'\',\''+key+'\')" style="border:1px solid #dfe5ee;background:#fff;color:#8a919d;'+_rvb+'">↩ 되돌리기</button></td></tr>';
         }).join('')
       +'</table></div></details>'):'')
+    +(canList.length?('<details style="margin-top:14px;border-top:1px dashed #e5e9f0;padding-top:10px">'
+      +'<summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#0f766e">↩ 취소된 신청 ('+canList.length+'건) — 명단·정원에서는 제외됨 · 실수로 취소했다면 되살리기</summary>'
+      +'<div style="overflow-x:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse">'
+      +'<tr><th '+th+'>성명·팀</th><th '+th+'>부문</th><th '+th+'>취소</th><th '+th+'>심사</th><th '+th+'></th></tr>'
+      +canList.map(function(o){const c=o.c,x=o.x,key=ckey(c);const rv=(s.reviewStatus||{})[key]||{};
+          return '<tr><td '+td+'>'+(c.team?'👥 <b>'+cesc(c.name||'')+'</b> <span style="font-size:11px;color:#8a919d">인솔 '+cesc(c.leader||'')+' · '+(c.rosterN||0)+'명</span>':'<b>'+cesc(c.name||'')+'</b>')+'</td>'
+            +'<td '+td+'>'+cesc((c.prefs||[]).join(' · ')||'-')+'</td>'
+            +'<td '+td+' style="white-space:nowrap;font-size:11.5px">'+cesc(kst(x.at))+'<br><span style="color:#8a919d">'+(x.uid&&x.uid===c.uid?'신청 계정이 취소':'다른 계정 '+cesc(String(x.uid||'').slice(0,8)))+(x.reason?' · '+cesc(x.reason):'')+'</span></td>'
+            +'<td '+td+' style="text-align:center;font-size:11.5px">'+(rv.st?cesc(rv.st):'-')+'</td>'
+            +'<td '+td+' style="text-align:center"><button onclick="restoreClaim(\''+id+'\',\''+cesc(key)+'\')" style="border:1.5px solid #0f766e;background:#e4f2ef;color:#0f766e;'+_rvb+'">↩ 되살리기</button></td></tr>';
+        }).join('')
+      +'</table></div><div style="font-size:11.5px;color:#8a919d;margin-top:6px">되살리면 취소 전 마지막 신청 내용(명단·부문·서명·동의 기록)이 그대로 명단에 돌아오고 심사 상태도 이어집니다. 신청자에게 알림이 갑니다.</div></details>'):'')
     +(staff?(function(){const all=(s.claimed||[]).slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));if(!all.length)return '';const cancels=(s.cancels||[]);
         return '<details style="margin-top:14px;border-top:1px dashed #e5e9f0;padding-top:10px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#6b7280">전체 신청 이력 '+all.length+'건 (취소·반려·수정 기록 포함) — 명단에 없는 신청을 찾을 때</summary>'
         +'<div style="overflow-x:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse"><tr><th '+th+'>신청 시각</th><th '+th+'>성명·팀</th><th '+th+'>계정</th><th '+th+'>부문</th><th '+th+'>상태</th></tr>'
         +all.map(c=>{const key=ckey(c);const rv=((s.reviewStatus||{})[key])||{};const canc=cancels.filter(k=>ckey(k)===key).length;const later=(s.claimed||[]).filter(x=>ckey(x)===key&&String(x.at||'')>String(c.at||'')).length;
           const st=rv.st==='반려'?'반려':(canc>=(s.claimed||[]).filter(x=>ckey(x)===key).length?'취소됨':(later?'수정 전 기록':(activeOfKey(s,key)?'명단 표시 중':'제외')));
-          return '<tr><td '+td+' style="white-space:nowrap">'+cesc(String(c.at||'').replace('T',' ').slice(0,16))+'</td><td '+td+'>'+(c.team?'<b>팀</b> ':'')+cesc(c.name||'')+(c.team&&c.leader?' <span style="color:#6b7280">(인솔 '+cesc(c.leader)+(c.rosterN?' · '+c.rosterN+'명':'')+')</span>':'')+'</td><td '+td+' style="font-size:11px;color:#8a919d">'+cesc(String(c.uid||'').slice(0,8))+'</td><td '+td+'>'+cesc((c.prefs||[]).join(', ')||'-')+'</td><td '+td+' style="white-space:nowrap">'+st+'</td></tr>'}).join('')
+          return '<tr><td '+td+' style="white-space:nowrap">'+cesc(String(c.at||'').replace('T',' ').slice(0,16))+'</td><td '+td+'>'+(c.team?'<b>팀</b> ':'')+cesc(c.name||'')+(c.restored?' <b style="color:#0f766e;font-size:10.5px">↩ 되살림</b>':'')+(c.team&&c.leader?' <span style="color:#6b7280">(인솔 '+cesc(c.leader)+(c.rosterN?' · '+c.rosterN+'명':'')+')</span>':'')+'</td><td '+td+' style="font-size:11px;color:#8a919d">'+cesc(String(c.uid||'').slice(0,8))+'</td><td '+td+'>'+cesc((c.prefs||[]).join(', ')||'-')+'</td><td '+td+' style="white-space:nowrap">'+st+'</td></tr>'}).join('')
         +'</table></div><div style="font-size:11.5px;color:#8a919d;margin-top:6px">신청자가 「신청 완료」를 봤는데 여기에도 없다면 다른 공고(같은 대회의 다른 슬롯이나 심판 공고)에 신청했거나 저장이 거부된 경우입니다. 신청자 마이페이지의 [내 신청 현황]과 대조해 주세요.</div></details>'})():'')
     +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">'
     +(staff&&entry?'<button class="cbtn" style="background:#153A77;color:#fff" onclick="exportRosterCsv(\''+id+'\')" title="주최기관 제출용 — 명단 제공에 동의한 참가자만 연락처·주소가 채워집니다">📥 참가자 명단 엑셀</button>':'')
@@ -1111,6 +1130,37 @@ async function viewRoster(id){
     +(staff&&entry?'<button class="cbtn" style="background:'+(s.finished?'#0f766e':'#7c3aed')+';color:#fff" onclick="document.getElementById(\'rosterModal\').remove();openCompFinish(\''+id+'\')" title="참가·입상 이력 기록 + 약식 종료 보고 + 사진첩 초안"><span style="display:inline-flex;align-items:center;gap:5px">'+CAREER.svg('flag',{size:14,color:'#fff',stroke:2.2})+(s.finished?'종료 처리됨 (결과 수정)':'대회 종료 · 결과 입력')+'</span></button>':'')
     +'<button class="cbtn cbtn-ghost" onclick="document.getElementById(\'rosterModal\').remove()">닫기</button></div></div>';
   document.body.appendChild(div);
+}
+// ── [취소 되살리기 2026-09-15] 신청자가 (실수로) 취소한 신청을 담당자가 취소 전 내용 그대로 되살립니다 ──
+//   claimed 는 쌓기만 하는 이력이라 마지막 신청을 복사해 한 건 더 붙이면(신청 수 > 취소 수) 명단에 돌아옵니다.
+//   심사 상태(reviewStatus)·수기동의(paperConsents)는 키(pid) 단위라 그대로 이어집니다. 원래 신청 시각은 origAt 에 남깁니다.
+async function restoreClaim(slotId,key){
+  if(!isCompStaff()){alert('권한자만 되살릴 수 있습니다');return}
+  const d0=CSLOTS.find(d=>d.id===slotId);const s0=d0?d0.data():{};
+  const arr0=(s0.claimed||[]).filter(c=>ckey(c)===key);const last0=arr0[arr0.length-1];
+  if(!last0){alert('신청 기록을 찾지 못했습니다');return}
+  if(activeOfKey(s0,key)){alert('이미 명단에 있는 신청입니다');return}
+  const warn=[];
+  try{if(s0.quota&&activeCount(s0)>=s0.quota)warn.push('대회 정원('+activeCount(s0)+'/'+s0.quota+')이 차 있습니다');
+    (last0.prefs||[]).forEach(p=>{const dv=slotDivs(s0).find(x=>x.name===p);if(dv&&dv.cap&&divActiveCount(s0,dv.name)>=dv.cap)warn.push('['+p+'] 부문 정원이 차 있습니다')})}catch(e){}
+  if(!confirm('['+(last0.name||'')+'] '+(last0.team?'팀 신청 (명단 '+(last0.rosterN||0)+'명)':'참가 신청')+'\n\n취소 전 내용 그대로 되살릴까요?\n\n· 명단·부문·서명·동의 기록을 그대로 씁니다\n· 심사 상태(승인 등)도 이어집니다\n· 되살린 처리자·시각이 남고, 신청자에게 알림이 갑니다'+(warn.length?'\n\n⚠ '+warn.join('\n⚠ ')+' — 되살리면 정원을 넘습니다':'')))return;
+  const ref=DB.collection('compSlots').doc(slotId);const now=new Date().toISOString();
+  try{
+    await DB.runTransaction(async tx=>{
+      const d=await tx.get(ref);const s=d.data();
+      if(activeOfKey(s,key))throw new Error('이미 명단에 있는 신청입니다');
+      const arr=(s.claimed||[]).filter(c=>ckey(c)===key);const last=arr[arr.length-1];if(!last)throw new Error('신청 기록을 찾지 못했습니다');
+      const claimed=(s.claimed||[]).slice();
+      /* 취소가 신청보다 많이 쌓인 드문 경우도 명단에 돌아올 때까지(최대 5건) 붙입니다 — 시각을 1ms씩 달리해 입금 표시 등 건 식별이 겹치지 않게 */
+      for(let n=0;n<5;n++){claimed.push(Object.assign({},last,{at:new Date(Date.parse(now)+n).toISOString(),origAt:last.origAt||last.at||'',restored:true,restoredAt:now,restoredBy:(CMY&&CMY.name)||'',restoredByUid:CME.uid}));if(activeOfKey(Object.assign({},s,{claimed:claimed}),key))break}
+      tx.update(ref,{claimed:claimed});
+    });
+  }catch(e){alert(/permission|insufficient/i.test(String((e&&e.message)||e))?'되살리기 권한이 없습니다 — 관리자 또는 이 대회 관할 시도임원만 할 수 있습니다.':'되살리기 실패: '+cErrMsg(e));return}
+  try{if(last0.uid&&last0.uid!==CME.uid)Promise.resolve(KFDF.notify(last0.uid,'↩ ['+(s0.title||'대회')+'] 취소되었던 「'+(last0.name||'')+'」 '+(last0.team?'팀 ':'')+'신청을 담당자가 되살렸습니다','competition.html?slot='+slotId)).catch(function(){})}catch(e){}
+  try{await _refreshSlot(slotId)}catch(e){}
+  const m=document.getElementById('rosterModal');if(m)m.remove();
+  try{await viewRoster(slotId)}catch(e){}
+  alert('↩ ['+(last0.name||'')+'] 신청을 되살렸습니다.');
 }
 // ── [수기동의] 보호자 서면(수기) 동의서 수령 확인 — 담당자 클릭 시 동의완료 처리 (compSlots.paperConsents) ──
 async function _refreshSlot(id){
@@ -4438,19 +4488,25 @@ async function cancelClaim(id){
   const s0=doc0.data();
   const mines=myEntries(s0);
   if(!mines.length){alert('신청 내역이 없습니다');return}
-  let targetPid=null;
+  let targetPid=null,tgt=null;
   if(s0.role==='참가'&&mines.length>1){
-    const names=mines.map((m,i)=>(i+1)+'. '+m.name).join('\n');
+    const names=mines.map((m,i)=>(i+1)+'. '+(m.team?'👥 ':'')+m.name).join('\n');
     const pick=prompt('취소할 참가자 번호를 입력하세요:\n\n'+names,'1');
     if(pick===null)return;
     const sel=mines[parseInt(pick.trim())-1];
     if(!sel){alert('잘못된 번호입니다.');return}
-    targetPid=ckey(sel);
-    if(!confirm(sel.name+' 참가 신청을 취소할까요?\n(마감 전이라면 다시 신청할 수 있습니다)'))return;
+    targetPid=ckey(sel);tgt=sel;
   }else{
-    targetPid=ckey(mines[0]);
-    if(!confirm((s0.role==='참가'?mines[0].name+' 참가':'이 대회')+' 신청을 취소할까요?\n(마감 전이라면 다시 신청할 수 있습니다)'))return;
+    targetPid=ckey(mines[0]);tgt=mines[0];
   }
+  // [승인 신청 취소 경고 2026-09-15] 담당자가 이미 승인·확정한 신청은 설명하다 잘못 누르는 일이 없도록 「취소」를 직접 입력해야 취소됩니다
+  const _what=(s0.role==='참가'?(tgt.team?'👥 ['+tgt.name+'] 팀 참가 신청 (명단 '+(tgt.rosterN||0)+'명)':'['+tgt.name+'] 참가 신청'):'이 대회 신청');
+  const _conf=isConfirmedClaim(s0,tgt),_appr=_conf||((((s0.reviewStatus||{})[targetPid])||{}).st==='승인');
+  if(_appr){
+    const t=prompt('⚠ 담당자가 이미 '+(_conf?'확정':'승인')+'한 신청입니다.\n'+_what+'\n\n취소하면 명단에서 빠지고'+(tgt.team?' 팀 명단·서명·동의 기록도 함께 빠집니다.':' 서명·동의 기록도 함께 빠집니다.')+'\n다시 신청하면 처음부터 입력하고 심사를 다시 받아야 합니다.\n\n정말 취소하려면 아래 칸에 「취소」를 입력하세요.','');
+    if(t===null)return;
+    if(String(t).replace(/\s+/g,'')!=='취소'){alert('「취소」가 입력되지 않아 신청을 그대로 두었습니다.');return}
+  }else if(!confirm(_what+'\n\n이 신청을 취소할까요?\n(마감 전이라면 다시 신청할 수 있습니다)'))return;
   const ref=DB.collection('compSlots').doc(id);
   try{
     await DB.runTransaction(async tx=>{
