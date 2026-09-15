@@ -535,7 +535,7 @@ function eduWho(v){return (v.name||'')+' ('+(v.birth||'생년월일 없음')+' �
         <button class="btn-sub" style="background:#0e7490" onclick="showSlotAdmin()">📢 학교 공고 관리</button>
         <button class="btn-sub" style="background:#C41E2F" onclick="applyGateScan()">🚦 강습신청 접수 마감·재개</button>
         <button class="btn-sub" style="background:#b8860b" onclick="dlDeliveryCsv()">🚚 배송명단 CSV</button>
-        <button class="btn-sub" style="background:#0f766e" onclick="dlSmsCsv()" title="담당교사 휴대전화·링크·문자 문구 — 대량문자 서비스(알리고·뿌리오 등)에 올리는 용도">📱 용품링크 문자명단 CSV</button>
+        <button class="btn-sub" style="background:#0f766e" onclick="goodsPrepAll()" title="선정·배정완료 학교 전체의 용품 문서를 만들고 담당교사 휴대전화·이메일을 채웁니다 — 배정 강사·담당교사가 마이페이지 [활동·계약]에서 배송지·수령 확인">📦 용품 수령 준비 (선정교 전체)</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="dlSizesXlsx()">👕 강사복 사이즈 (엑셀·집계·그래프)</button>
         <button class="btn-sub" style="background:#153A77" onclick="dlGoodsCerts()">🧾 수령확인증 일괄 다운로드</button>
         <button class="btn-sub" style="background:#7c3aed" onclick="showGigs()">🔎 단기공고 승인<span id="gigCntBadge" style="display:none;background:#C41E2F;border-radius:999px;padding:1px 7px;font-size:11px;margin-left:5px"></span></button>
@@ -1505,7 +1505,7 @@ function renderApps(){
       +(tcShow&&tc==='unknown'?' <span style="font-size:11px;font-weight:700;color:#6b7280;background:#eef1f5;padding:2px 8px;border-radius:999px" title="본인지도 희망 건입니다. 희망 요일·시간 텍스트 형식을 자동으로 해석하지 못해 정규수업시간 겹침 여부를 판단할 수 없습니다. 필요시 담당교사에게 직접 확인해주세요.">⏰ 시간 확인필요</span>':'')
       +(s.support==='용품만'?' <span style="font-size:11px;font-weight:800;color:#fff;background:#0f766e;padding:2px 8px;border-radius:999px">🎁 용품만</span>':'')
       +' <span style="font-size:11px;font-weight:800;color:#fff;background:'+(appTypeOf(s).indexOf('방과후')>=0?'#0f766e':'#8c1622')+';padding:2px 8px;border-radius:999px">'+(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+'</span>'
-      +((st==='선정'||st==='배정완료')?' <span style="font-size:11px;font-weight:800;color:'+(gc&&gc.delivery?'#0f766e':'#C41E2F')+'" title="'+(gc&&gc.delivery?esc(((gc.delivery.addr||'')+' '+(gc.delivery.addr2||'')).trim())+' · '+esc(gc.delivery.receiver||'')+' '+esc(gc.delivery.phone||''):'배송지 미입력 — 📦 버튼으로 링크를 교사에게 전달하세요')+'">🚚 배송지 '+(gc&&gc.delivery?'O':'X')+'</span>':'')
+      +((st==='선정'||st==='배정완료')?' <span style="font-size:11px;font-weight:800;color:'+(gc&&gc.delivery?'#0f766e':'#C41E2F')+'" title="'+(gc&&gc.delivery?esc(((gc.delivery.addr||'')+' '+(gc.delivery.addr2||'')).trim())+' · '+esc(gc.delivery.receiver||'')+' '+esc(gc.delivery.phone||''):'배송지 미입력 — 배정 강사·담당교사가 마이페이지 [활동·계약]에서 입력 (10월 중순 발송)')+'">🚚 배송지 '+(gc&&gc.delivery?'O':'X')+'</span>':'')
       +((st==='선정'||st==='배정완료')?' <span style="font-size:11px;font-weight:800;color:'+(gc&&gc.teacherConfirm?'#0f766e':'#C41E2F')+'" title="'+(gc&&gc.teacherConfirm?esc(gc.teacherConfirm.name)+' 수령확인'+(gc.teacherConfirm.photo?' · 사진첨부':' · 사진없음(구양식)'):'용품 수령 미확인')+'">📦 수령 '+(gc&&gc.teacherConfirm?'O':'X')+'</span>':'')
       +((st==='선정'||st==='배정완료')?mailBadge(s.email):'')  // [메일로그] 발송 성공✓/실패✗/기록없음−
       +'<div class="sub3">'+(s.code?'<b>'+esc(s.code)+'</b> · ':'')+esc(s.region)+(s.city?' · <b style="color:#1F4E9C">📍'+esc(s.city)+'</b>':' · <b style="color:#C41E2F">시군구 미입력</b>')+' · '+esc(s.students)+' <button class="btn-sub" style="background:'+((s.studentsM!=null||s.studentsF!=null)?'#0e7490':'#8a919d')+';padding:1px 8px;font-size:11px" title="실적보고서 수혜자 남/여·학년-반 (월별 현황보고서에 그대로 기입)" onclick="setBenef(\''+d.id+'\')">👥 '+((s.studentsM!=null||s.studentsF!=null)?('남 '+(s.studentsM||0)+' · 여 '+(s.studentsF||0)):'수혜자 미입력')+(s.grade?' · '+esc(s.grade):'')+'</button>'+(s.start&&s.start.indexOf('8월')>=0?' · <b style="color:#C41E2F">⚡8월 방학 개강 희망</b>':'')+' · 희망 '+esc(s.d1)
@@ -1521,7 +1521,7 @@ function renderApps(){
       +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:#0f766e;color:#fff" title="회원을 검색해 이 학교의 강사로 직접 배정 (본인지도 신청자가 비로그인으로 제출한 경우 등)" onclick="assignInstructor(\''+d.id+'\')">🎯 강사 직접 배정</button>':'')
       +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:#fff;color:#8a919d;border:1.5px solid #8a919d" onclick="cancelSchool(\''+d.id+'\')">학교취소</button>':'')
       +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:#1F4E9C" onclick="copyNotice(\''+d.id+'\')">📋 통보문</button>':'')
-      +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:'+(gc&&gc.teacherConfirm?'#0f766e':(gc&&gc.delivery?'#b8860b':'#C41E2F'))+'" title="배송지 입력과 수령 확인을 같은 링크 하나로 처리합니다" onclick="reqGoods(\''+d.id+'\')">📦 '+(gc&&gc.teacherConfirm?'수령완료✓':(gc&&gc.delivery?'배송지O · 수령대기':'용품 링크 전달'))+'</button>':'')
+      +((st==='선정'||st==='배정완료')?'<button class="btn-sub" style="background:'+(gc&&gc.teacherConfirm?'#0f766e':(gc&&gc.delivery?'#b8860b':'#C41E2F'))+'" title="배정 강사·담당교사가 마이페이지 [활동·계약]에서 배송지 입력·수령 확인을 합니다 — 상태 보기·알림" onclick="reqGoods(\''+d.id+'\')">📦 '+(gc&&gc.teacherConfirm?'수령완료✓':(gc&&gc.delivery?'배송지O · 수령대기':'용품 안내'))+'</button>':'')
       +'<button class="btn-sub" style="background:'+(s.start&&s.start.indexOf('8월')>=0?'#C41E2F':'#8a919d')+'" onclick="setStart(\''+d.id+'\')">'+(s.start&&s.start.indexOf('8월')>=0?'⚡긴급(방학)':s.start?'일반(9월)':'개강시기?')+'</button>'
       +'<button class="btn-sub" style="background:'+(s.city?'#8a919d':'#C41E2F')+'" onclick="setCity(\''+d.id+'\')">📍시군구</button>'
       +'<button class="btn-sub" style="background:#fff;color:#7c3aed;border:1.5px solid #7c3aed" title="학교체육 ↔ 방과후 유형 전환" onclick="chgType(\''+d.id+'\')">🔁 유형</button>'
@@ -8098,27 +8098,20 @@ async function givePt(){
     © 2026 KOREA FLYING DISC FEDERATION. All rights reserved. &nbsp;|&nbsp; <a href="privacy.html" style="color:#9aa1ad">개인정보처리방침</a>
   </div>
 </div></footer>
-<!-- 용품 수령 확인 요청 QR 모달 -->
+<!-- 용품 배송·수령 안내 모달 [2026-09-15 링크 폐지 → 배정 강사·담당교사가 마이페이지에서 처리] -->
 <div id="agqModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:20px">
-  <div style="background:#fff;border-radius:18px;max-width:360px;width:100%;padding:26px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.25)">
-    <h3 style="margin:0 0 4px;font-size:18px;font-weight:900">📦 용품 수령 링크</h3>
-    <div id="agqSub" style="font-size:13px;font-weight:800;color:#153A77;margin-bottom:6px"></div>
-    <p style="font-size:13px;color:#6b7280;margin:0 0 16px;line-height:1.6">학교 담당교사에게 아래 <b>QR 또는 링크를 전달</b>하세요.<br>같은 링크 하나로 <b>① 배송지 입력</b> → 용품 도착 후 <b>② 사진·서명 수령 확인</b>까지 처리되며, 완료 시 자동 반영됩니다.</p>
-    <div id="agqQr" style="display:flex;justify-content:center;margin-bottom:14px;min-height:190px;align-items:center"></div>
-    <input id="agqLink" readonly onclick="this.select()" style="width:100%;padding:10px;border:1.5px solid #e3e6ea;border-radius:9px;font-size:12px;text-align:center;color:#153A77">
-    <div style="display:flex;gap:8px;margin-top:12px">
-      <button class="btn-sub" style="flex:1;background:#153A77" onclick="copyAgq()">🔗 링크 복사</button>
-      <button class="btn-sub" style="flex:1;background:#8a919d" onclick="document.getElementById('agqModal').style.display='none'">닫기</button>
-    </div>
-    <!-- [링크전달] 담당교사에게 바로 보내기 — 문자(휴대폰에서 문자앱 열림) · 카톡 문구 복사 · 메일(EmailJS) · 배정강사에게 전달 요청 -->
-    <div id="agqTeacher" style="margin-top:14px;padding:10px 12px;background:#f6f8fb;border-radius:10px;font-size:12.5px;text-align:left;line-height:1.6"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-      <button class="btn-sub" style="background:#0f766e" onclick="agqSms()">📱 문자 보내기</button>
-      <button class="btn-sub" style="background:#f7c600;color:#3b1e1e" onclick="agqKakao()">💬 카톡 문구 복사</button>
-      <button class="btn-sub" id="agqMailBtn" style="background:#1F4E9C" onclick="agqMail()">📧 메일 보내기</button>
-      <button class="btn-sub" id="agqInsBtn" style="background:#7c3aed" onclick="agqNotifyIns()">👤 배정강사에게 전달 요청</button>
+  <div style="background:#fff;border-radius:18px;max-width:420px;width:100%;padding:24px;text-align:left;box-shadow:0 20px 50px rgba(0,0,0,.25)">
+    <h3 style="margin:0 0 4px;font-size:18px;font-weight:900">📦 강습용품 배송·수령</h3>
+    <div id="agqSub" style="font-size:13px;font-weight:800;color:#153A77;margin-bottom:8px"></div>
+    <p style="font-size:13px;color:#6b7280;margin:0 0 10px;line-height:1.7">링크 대신 <b>배정 강사</b> 또는 <b>담당교사(회원)</b>가 마이페이지 <b>[활동·계약] › 📦 강습용품</b>에서 ① 배송지 입력 → ② 도착 후 사진·서명 수령 확인을 합니다. 용품은 <b>10월 중순</b>에 일괄 발송됩니다.</p>
+    <div id="agqTeacher" style="padding:10px 12px;background:#f6f8fb;border-radius:10px;font-size:12.5px;line-height:1.7"></div>
+    <div id="agqDetail" style="margin-top:8px;font-size:12.5px;line-height:1.7"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+      <button class="btn-sub" id="agqInsBtn" style="background:#7c3aed" onclick="agqNotifyIns()">👤 배정 강사에게 알림</button>
+      <button class="btn-sub" id="agqTchBtn" style="background:#0f766e" onclick="agqNotifyTch()">👩‍🏫 담당교사(회원)에게 알림</button>
     </div>
     <div id="agqMsg" style="font-size:12px;font-weight:800;margin-top:8px;min-height:16px"></div>
+    <div style="text-align:right;margin-top:6px"><button class="btn-sub" style="background:#8a919d" onclick="document.getElementById('agqModal').style.display='none'">닫기</button></div>
   </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -8127,108 +8120,53 @@ async function givePt(){
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script>
+// ══════════ [용품 배송·수령 2026-09-15] 링크 폐지 → 배정 강사·담당교사가 마이페이지 [활동·계약]에서 처리 ══════════
+//   goodsConfirms/{강습신청ID} 에 담당교사 휴대전화(숫자만)·이메일(소문자)을 함께 두어, 같은 번호·이메일로 가입한 회원이
+//   마이페이지에서 자기 학교를 찾게 합니다(보안 규칙 v33). 배정 강사는 강습신청의 assignedUid·selfUid 로 확인합니다.
+function goodsItemsOf(s){return (appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' 강습 용품 세트 (50만원 상당)'}
+function goodsBase(s){return {school:s.school||'',region:s.region||'',type:s.type||'',items:goodsItemsOf(s),code:s.code||'',
+  teacherName:s.teacher||'',teacherPhone:String(s.phone||'').replace(/\D/g,''),teacherEmail:String(s.email||'').trim().toLowerCase(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}}
+function goodsTeacherMember(s){const p=String(s.phone||'').replace(/\D/g,''),e=String(s.email||'').trim().toLowerCase();
+  return USERS.filter(function(d){const v=d.data()||{};return (p.length>=9&&String(v.phone||'').replace(/\D/g,'')===p)||(!!e&&String(v.email||'').toLowerCase()===e)}).map(function(d){return {id:d.id,v:d.data()}})}
 async function reqGoods(appId){
-  const doc=APPS.find(x=>x.id===appId);if(!doc)return;
-  const s=doc.data();
-  const items=(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' 강습 용품 세트 (50만원 상당)';
-  try{
-    await DB.collection('goodsConfirms').doc(appId).set({
-      school:s.school,region:s.region||'',type:s.type||'',items:items,
-      updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-    if(!window.GOODS)window.GOODS={};
-    window.GOODS[appId]=Object.assign({},window.GOODS[appId]||{},{school:s.school,region:s.region,type:s.type,items:items});
-  }catch(e){alert('생성 실패: '+e.message);return}
-  const url=new URL('confirm.html?goods='+appId,location.href).href;
-  document.getElementById('agqLink').value=url;
-  window._AGQ={appId:appId,s:s,url:url};
-  agqRenderTeacher();
-  const _gc=window.GOODS[appId]||{};
-  document.getElementById('agqSub').textContent=s.school+' · '+(_gc.teacherConfirm?'✅ 수령 확인 완료':(_gc.delivery?'🚚 배송지 입력됨 · 수령 확인 대기':'배송지 입력 전'));
-  const qr=document.getElementById('agqQr');qr.innerHTML='';
-  if(window.QRCode){try{new QRCode(qr,{text:url,width:190,height:190,correctLevel:QRCode.CorrectLevel.M})}catch(e){qr.textContent='링크를 이용해주세요'}}
-  else qr.innerHTML='<span style="font-size:12px;color:#999">QR 로딩 중 — 링크를 복사해 전달하세요</span>';
+  const doc=APPS.find(x=>x.id===appId);if(!doc)return;const s=doc.data();
+  try{const b=goodsBase(s);await DB.collection('goodsConfirms').doc(appId).set(b,{merge:true});if(!window.GOODS)window.GOODS={};window.GOODS[appId]=Object.assign({},window.GOODS[appId]||{},b)}
+  catch(e){alert('준비 실패: '+e.message);return}
+  const gc=window.GOODS[appId]||{};const tm=goodsTeacherMember(s);window._AGQ={appId:appId,s:s,tm:tm};
+  document.getElementById('agqSub').textContent=(s.school||'')+' · '+(gc.teacherConfirm?'✅ 수령 확인 완료':(gc.delivery?'🚚 배송지 입력됨 · 수령 확인 대기':'배송지 입력 전'));
+  document.getElementById('agqTeacher').innerHTML='<b>담당교사</b> '+esc(s.teacher||'-')+' · 📞 '+esc(s.phone||'-')+(s.email?' · ✉ '+esc(s.email):'')
+    +'<br>'+(tm.length?'<b style="color:#0f766e">회원 확인됨</b> — '+tm.map(function(x){return esc(x.v.name||'')+(x.v.status!=='approved'?' (승인 대기)':'')}).join(', ')+' · 마이페이지에서 직접 처리할 수 있습니다'
+      :'<span style="color:#b8860b">회원이 아니거나 휴대전화·이메일이 달라 담당교사는 처리할 수 없습니다 — 배정 강사가 처리하거나 신청서 번호로 가입을 안내해 주세요</span>')
+    +'<br>'+(s.assignedUid?'<b>배정 강사</b> '+esc(s.assignedName||''):'<span style="color:#8a919d">배정 강사 없음</span>');
+  const dl=gc.delivery,tc=gc.teacherConfirm;
+  document.getElementById('agqDetail').innerHTML=(dl?'🚚 '+esc(((dl.addr||'')+' '+(dl.addr2||'')).trim())+' · '+esc(dl.receiver||'')+' '+esc(dl.phone||''):'')+(tc?'<br>📦 '+esc(tc.name||'')+(tc.role?' ('+esc(tc.role)+')':'')+' · '+esc(String(tc.at||'').slice(0,16).replace('T',' ')):'');
+  const ib=document.getElementById('agqInsBtn');if(ib){ib.disabled=!s.assignedUid;ib.style.opacity=s.assignedUid?'1':'.45'}
+  const tb=document.getElementById('agqTchBtn');if(tb){tb.disabled=!tm.length;tb.style.opacity=tm.length?'1':'.45'}
+  const m=document.getElementById('agqMsg');if(m)m.textContent='';
   document.getElementById('agqModal').style.display='flex';
 }
-// ══════════ [링크전달] 용품 수령 링크를 담당교사에게 보내는 수단 ══════════
-//  담당교사는 회원이 아닌 경우가 대부분 → 신청서의 휴대전화(필수)로 문자, 이메일(선택)로 메일, 배정강사 경유 알림.
-function agqText(){
-  const a=window._AGQ||{};const s=a.s||{};
-  return '[대한민국플라잉디스크연맹] '+(s.school||'')+' 강습 용품 수령 안내\n'
-    +(s.teacher?s.teacher+' 선생님, ':'담당교사님, ')+'아래 링크에서 ① 배송지 입력 → ② 용품 도착 후 수령 확인을 부탁드립니다. (휴대폰으로 바로 됩니다)\n'
-    +a.url+'\n문의 031-984-3248';
-}
-function agqRenderTeacher(){
-  const a=window._AGQ||{};const s=a.s||{};const el=document.getElementById('agqTeacher');if(!el)return;
-  el.innerHTML='<b>담당교사</b> '+esc(s.teacher||'-')+' · 📞 '+esc(s.phone||'-')+' · ✉ '+(s.email?esc(s.email):'<span style="color:#C41E2F">이메일 없음</span>')
-    +(s.assignedName?'<br><b>배정 강사</b> '+esc(s.assignedName):'<br><span style="color:#8a919d">배정 강사 없음</span>');
-  const mb=document.getElementById('agqMailBtn');if(mb){mb.disabled=!s.email;mb.style.opacity=s.email?'1':'.45'}
-  const ib=document.getElementById('agqInsBtn');if(ib){ib.disabled=!s.assignedUid;ib.style.opacity=s.assignedUid?'1':'.45'}
-  const m=document.getElementById('agqMsg');if(m)m.textContent='';
-}
-function agqSms(){
-  const a=window._AGQ||{};const s=a.s||{};const m=document.getElementById('agqMsg');
-  const num=String(s.phone||'').replace(/[^0-9+]/g,'');
-  const body=encodeURIComponent(agqText());
-  const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const mobile=ios||/Android/i.test(navigator.userAgent);
-  if(!mobile){
-    // PC에서는 문자앱이 없으므로 문구를 복사해 두고, 휴대폰에서 누르라고 안내
-    agqCopy(agqText(),m,'PC에서는 문자앱을 열 수 없어 문구를 복사했습니다 — 휴대폰 문자·카톡에 붙여넣거나, 휴대폰으로 관리자 페이지에 접속해 이 버튼을 누르세요.');return;
-  }
-  location.href='sms:'+num+(ios?'&':'?')+'body='+body;
-  if(m){m.style.color='#0f766e';m.textContent='문자앱이 열립니다 — 내용 확인 후 전송하세요.'}
-}
-function agqKakao(){agqCopy(agqText(),document.getElementById('agqMsg'),'✓ 문구를 복사했습니다 — 카카오톡 대화창에 붙여넣어 보내세요.')}
-function agqCopy(t,m,okMsg){
-  function done(){if(m){m.style.color='#0f766e';m.textContent=okMsg}}
-  function fb(){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done()}catch(e){if(m){m.style.color='#C41E2F';m.textContent='복사 실패 — 링크 칸을 길게 눌러 복사하세요.'}}document.body.removeChild(ta)}
-  if(navigator.clipboard)navigator.clipboard.writeText(t).then(done).catch(fb);else fb();
-}
-async function agqMail(){
-  const a=window._AGQ||{};const s=a.s||{};const m=document.getElementById('agqMsg');
-  if(!s.email){if(m){m.style.color='#C41E2F';m.textContent='신청서에 이메일이 없습니다 — 문자로 보내주세요.'}return}
-  if(!window.kfdfMail){if(m){m.style.color='#C41E2F';m.textContent='메일 발송 설정(EmailJS)이 없습니다.'}return}
-  if(!confirm(s.email+' 로 용품 수령 안내 메일을 보낼까요?'))return;
-  if(m){m.style.color='#8a919d';m.textContent='보내는 중…'}
-  try{await window.kfdfMail(s.email,'['+(s.school||'')+'] 강습 용품 배송지 입력·수령 확인 안내',agqText());if(m){m.style.color='#0f766e';m.textContent='✓ 메일을 보냈습니다.'}}
-  catch(e){if(m){m.style.color='#C41E2F';m.textContent='메일 실패: '+(e&&e.message||e)}}
-}
-async function agqNotifyIns(){
-  const a=window._AGQ||{};const s=a.s||{};const m=document.getElementById('agqMsg');
+const GOODS_NOTE=' — 용품은 10월 중순 발송 예정입니다. 마이페이지 [활동·계약] › 📦 강습용품에서 ① 배송지 입력, 도착 후 ② 수령 확인을 해 주세요';
+async function agqNotifyIns(){const a=window._AGQ||{};const s=a.s||{};const m=document.getElementById('agqMsg');
   if(!s.assignedUid){if(m){m.style.color='#C41E2F';m.textContent='배정된 강사가 없습니다.'}return}
-  if(!confirm('배정 강사 '+(s.assignedName||'')+' 님에게 "담당교사께 용품 링크를 전달해 주세요" 알림을 보낼까요?\n(강사 마이페이지에 링크 복사·문자 버튼이 표시됩니다)'))return;
-  try{await KFDF.notify(s.assignedUid,'📦 ['+(s.school||'')+'] 담당교사께 용품 수령 링크를 전달해 주세요 — 마이페이지 [학교 용품 수령 링크]에서 복사·문자 전송','mypage.html#goodsLinkBox');
-    if(m){m.style.color='#0f766e';m.textContent='✓ 강사에게 알림을 보냈습니다.'}}
-  catch(e){if(m){m.style.color='#C41E2F';m.textContent='알림 실패: '+(e&&e.message||e)}}
-}
-// 대량 문자 발송용 명단 (알리고·뿌리오 등 대량문자 서비스에 올리는 CSV) — 선정·배정완료 학교 전체, 링크가 없는 학교는 먼저 만들어 줌
-async function dlSmsCsv(){
-  const targets=APPS.filter(d=>{const st=d.data().status;return st==='선정'||st==='배정완료'});
+  try{await KFDF.notify(s.assignedUid,'📦 ['+(s.school||'')+'] 강습용품 배송지를 입력해 주세요'+GOODS_NOTE,'mypage.html#goodsBox');if(m){m.style.color='#0f766e';m.textContent='✓ 배정 강사에게 알림을 보냈습니다.'}}
+  catch(e){if(m){m.style.color='#C41E2F';m.textContent='알림 실패: '+((e&&e.message)||e)}}}
+async function agqNotifyTch(){const a=window._AGQ||{};const s=a.s||{};const tm=a.tm||[];const m=document.getElementById('agqMsg');
+  if(!tm.length){if(m){m.style.color='#C41E2F';m.textContent='담당교사가 회원이 아니거나 휴대전화·이메일이 달라 알림을 보낼 수 없습니다.'}return}
+  try{for(const x of tm)await KFDF.notify(x.id,'📦 ['+(s.school||'')+'] 강습용품 배송지를 입력해 주세요'+GOODS_NOTE,'mypage.html#goodsBox');if(m){m.style.color='#0f766e';m.textContent='✓ 담당교사에게 알림을 보냈습니다.'}}
+  catch(e){if(m){m.style.color='#C41E2F';m.textContent='알림 실패: '+((e&&e.message)||e)}}}
+// 선정·배정완료 학교 전체의 용품 문서를 만들거나 담당교사 정보를 채움 — 이미 입력된 배송지·수령 확인은 그대로
+async function goodsPrepAll(){
+  const targets=APPS.filter(function(d){const st=d.data().status;return st==='선정'||st==='배정완료'});
   if(!targets.length){alert('선정·배정완료 학교가 없습니다.');return}
-  if(!confirm('선정·배정완료 학교 '+targets.length+'곳의 담당교사 문자 발송 명단(CSV)을 만들까요?\n아직 용품 링크가 없는 학교는 링크를 함께 생성합니다.'))return;
-  if(!window.GOODS)window.GOODS={};
-  let made=0;
-  for(const d of targets){
-    if(window.GOODS[d.id])continue;
-    const s=d.data();const items=(appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' 강습 용품 세트 (50만원 상당)';
-    try{await DB.collection('goodsConfirms').doc(d.id).set({school:s.school,region:s.region||'',type:s.type||'',items:items,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-      window.GOODS[d.id]={school:s.school,region:s.region,type:s.type,items:items};made++}catch(e){}
-  }
-  const rows=[['학교명','담당교사','휴대전화','이메일','배정강사','수령 상태','링크','문자 내용']];
-  targets.forEach(d=>{const s=d.data();const gc=window.GOODS[d.id]||{};
-    const url=new URL('confirm.html?goods='+d.id,location.href).href;
-    window._AGQ={appId:d.id,s:s,url:url};
-    rows.push([s.school||'',s.teacher||'',s.phone||'',s.email||'',s.assignedName||'',gc.teacherConfirm?'수령 확인 완료':(gc.delivery?'배송지 입력됨·수령 대기':'배송지 입력 전'),url,agqText().replace(/\n/g,' ')]);
-  });
-  window._AGQ=null;
-  const csv='\ufeff'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download='용품링크_문자발송명단_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
-  if(made)alert('링크를 새로 만든 학교 '+made+'곳 포함, '+targets.length+'곳 명단을 내려받았습니다.');
-}
-function copyAgq(){var t=document.getElementById('agqLink').value;
-  if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){alert('✓ 링크가 복사되었습니다.')}).catch(fb)}else fb();
-  function fb(){var i=document.getElementById('agqLink');i.select();try{document.execCommand('copy');alert('✓ 복사되었습니다.')}catch(e){alert('링크를 길게 눌러 복사해주세요.')}}
+  const tmOf=function(d){return goodsTeacherMember(d.data()).length>0};
+  const tmN=targets.filter(tmOf).length,insN=targets.filter(function(d){return !!d.data().assignedUid}).length;
+  const none=targets.filter(function(d){return !tmOf(d)&&!d.data().assignedUid}).map(function(d){return d.data().school||''});
+  if(!confirm('선정·배정완료 학교 '+targets.length+'곳의 용품 수령 문서를 준비할까요?\n(이미 입력된 배송지·수령 확인은 그대로 둡니다)\n\n· 배정 강사가 있는 학교 '+insN+'곳\n· 담당교사가 회원으로 확인되는 학교 '+tmN+'곳\n· 둘 다 없는 학교 '+none.length+'곳 — 사무국이 챙겨야 합니다'))return;
+  if(!window.GOODS)window.GOODS={};let ok=0,fail=0;
+  for(const d of targets){try{const b=goodsBase(d.data());await DB.collection('goodsConfirms').doc(d.id).set(b,{merge:true});window.GOODS[d.id]=Object.assign({},window.GOODS[d.id]||{},b);ok++}catch(e){fail++}}
+  alert('📦 용품 수령 준비 '+ok+'곳'+(fail?' · 실패 '+fail+'곳':'')+'\n\n배정 강사·담당교사가 마이페이지 [활동·계약]에서 배송지를 입력하고, 10월 중순 발송 뒤 수령 확인을 합니다.'
+    +(none.length?'\n\n강사·교사 회원이 모두 없는 학교 '+none.length+'곳: '+none.slice(0,15).join(', ')+(none.length>15?' 외':''):''));
+  try{if(typeof loadApps==='function')loadApps()}catch(e){}
 }
 document.getElementById('agqModal').addEventListener('click',function(e){if(e.target===this)this.style.display='none'});
 // ══════════ 용품 배송명단 CSV · 수령확인증 일괄 다운로드 (체육회 보고용) ══════════
@@ -8247,7 +8185,7 @@ function dlDeliveryCsv(){
       del?(del.receiver||''):(tc?tc.name||'':''),del?(del.phone||''):(s.phone||''),del?(del.note||''):'',
       del?gfmt(del.at):'',tc?((tc.name||'')+' / '+gfmt(tc.at)):'(수령 확인 전)']);
   });
-  if(!list.length){alert('배송지 입력 또는 수령 확인된 학교가 아직 없습니다.\n학교 카드의 [📦 용품 링크 전달] 버튼으로 링크를 교사에게 보내면 배송지가 입력됩니다.');return}
+  if(!list.length){alert('배송지 입력 또는 수령 확인된 학교가 아직 없습니다.\n[📦 용품 수령 준비]를 누른 뒤 배정 강사·담당교사가 마이페이지 [활동·계약]에서 배송지를 입력하면 여기에 나옵니다.');return}
   const rows=[['접수번호','학교명','유형','품목','우편번호','배송 주소','수령 담당자','연락처','요청사항','배송지 입력일','수령 확인(성명/일시)']].concat(list);
   const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
@@ -8472,7 +8410,7 @@ async function dlGoodsCerts(){
   APPS.forEach(d=>{const s=d.data();const gc=(window.GOODS||{})[d.id];
     if(gc&&gc.teacherConfirm)targets.push({id:d.id,s:s,gc:gc});
   });
-  if(!targets.length){alert('수령 확인이 완료된 학교가 아직 없습니다.\n(교사가 링크에서 ② 수령 확인까지 마친 학교만 확인증이 생성됩니다)');return}
+  if(!targets.length){alert('수령 확인이 완료된 학교가 아직 없습니다.\n(배정 강사·담당교사가 마이페이지에서 ② 수령 확인까지 마친 학교만 확인증이 생성됩니다)');return}
   if(!window.JSZip){alert('압축 라이브러리 로딩 중입니다. 잠시 후 다시 시도해주세요.');return}
   let seal=null;try{seal=await gimg(new URL('직인.png',location.href).href)}catch(e){}
   const zip=new JSZip();let n=0;

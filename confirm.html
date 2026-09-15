@@ -168,13 +168,11 @@ function exportSign(){
 // [배송지 기능] STEP1: 배송지 입력(주소검색·수령인·연락처) → STEP2: 용품 도착 후 수령 확인(성명·사진 1장 필수·서명)
 let GOODS=null,GOODS_PHOTO='';
 async function bootGoods(id){
-  const stage=document.getElementById('stage');
-  try{
-    const doc=await DB.collection('goodsConfirms').doc(id).get();
-    if(!doc.exists){stage.innerHTML='<div class="state">확인 대상을 찾을 수 없습니다. 링크를 다시 확인해주세요.</div>';return}
-    GOODS=Object.assign({_id:id},doc.data());
-    renderGoodsFlow();
-  }catch(e){stage.innerHTML='<div class="state">불러오기 실패: '+esc(e.message)+'</div>'}
+  // [2026-09-15] 용품 배송지·수령 확인은 마이페이지 [활동·계약]에서 (배정 강사·담당교사 로그인) — 예전 링크는 안내만 합니다
+  document.getElementById('stage').innerHTML='<h1>📦 강습용품 배송지 · 수령 확인</h1>'
+    +'<p class="lead">강습용품 배송지 입력과 수령 확인은 이제 <b>홈페이지 로그인 후 마이페이지 [활동·계약] › 📦 강습용품</b>에서 합니다.<br>선정 학교의 <b>배정 강사</b> 또는 <b>담당교사</b>(강습 신청서의 휴대전화·이메일로 가입한 회원)가 처리할 수 있습니다.<br><br>🚚 <b>강습용품은 10월 중순에 일괄 발송됩니다.</b></p>'
+    +'<a class="btn" href="mypage.html#goodsBox" style="display:block;text-align:center;text-decoration:none">마이페이지로 가기</a>'
+    +'<div style="font-size:12.5px;color:#8a919d;margin-top:12px;line-height:1.6">회원이 아니시면 배정 강사에게 요청하시거나 사무국(031-984-3248)으로 연락해 주세요.</div>';
 }
 function renderGoodsFlow(){
   if(GOODS.teacherConfirm)renderGoodsDone();

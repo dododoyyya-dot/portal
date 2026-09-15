@@ -585,10 +585,11 @@ function orgChip(o,region,title,fed){
     <div class="board" id="contractList"></div>
     <div class="note" style="margin-top:14px">계약서를 확인한 뒤 <b>화면에 직접 서명</b>하면 서면 서명을 대체하는 전자서명·동의 일시가 기록되며, 언제든 계약서를 인쇄·PDF 저장할 수 있습니다. 수당 지급 정보(계좌·주민등록번호)는 프로필에서 등록합니다.</div>
   </div>
-  <div id="goodsLinkBox" style="display:none;margin-top:44px">
-    <h3 class="sub">📦 학교 용품 수령 링크 (담당교사께 전달)</h3>
-    <div class="board" id="goodsLinkList"></div>
-    <div class="note" style="margin-top:14px">배정 학교의 <b>담당교사</b>가 이 링크에서 ① 배송지 입력 → ② 용품 도착 후 수령 확인을 합니다. 학교 방문 시 <b>[문자로 보내기]</b>를 누르거나 링크를 복사해 카톡으로 전달해 주세요. 담당교사는 로그인 없이 휴대폰에서 바로 처리할 수 있습니다.</div>
+  <div id="goodsBox" style="display:none;margin-top:44px"><span id="goodsLinkBox"></span>
+    <h3 class="sub">📦 강습용품 배송지 · 수령 확인</h3>
+    <div style="background:#eef6ff;border:1.5px solid #c9dcf5;border-radius:12px;padding:11px 14px;font-size:13px;line-height:1.7;color:#153A77;margin-bottom:10px">🚚 <b>강습용품은 10월 중순에 학교로 일괄 발송됩니다.</b> 그 전에 ① 배송지를 입력해 주시고, 용품이 도착하면 ② 사진·서명으로 수령 확인을 해 주세요.</div>
+    <div class="board" id="goodsList"></div>
+    <div class="note" style="margin-top:14px">선정 학교의 <b>배정 강사</b>와 <b>담당교사</b>(강습 신청서의 휴대전화·이메일로 가입한 회원)만 이곳에서 처리할 수 있습니다. 두 분 중 한 분이 입력하면 함께 반영됩니다. 학교가 보이지 않으면 사무국(031-984-3248)으로 연락해 주세요.</div>
   </div>
   <div id="compContractBox" style="display:none;margin-top:44px">
     <h3 class="sub">위촉 계약 (대회 심판·운영요원)</h3>
@@ -1471,7 +1472,7 @@ function showMyTab(k){
   if(tb){const r=tb.getBoundingClientRect();if(r.top<0||r.top>window.innerHeight-80)tb.scrollIntoView({block:'start'});}
 }
 // [알림 이동 2026-09-10] #상자 해시 → 해당 탭을 열고 스크롤·강조. 페이지 진입 시와 같은 페이지 안에서 해시가 바뀔 때(알림함의 [확인 →]) 모두 동작
-const MY_HASH_TAB={alarmBox:'Alarm',famReqBox:'Alarm',profileBox:'Profile',kidsBox:'Family',certBox:'Career',licBox:'Career',claimBox:'Career',careerBox:'Journey',athBox:'Journey',contractBox:'Work',compContractBox:'Work',staffCareerBox:'Work',goodsLinkBox:'Work',logBox:'Work',actList:'Work',consentBox:'Work'};
+const MY_HASH_TAB={alarmBox:'Alarm',famReqBox:'Alarm',profileBox:'Profile',kidsBox:'Family',certBox:'Career',licBox:'Career',claimBox:'Career',careerBox:'Journey',athBox:'Journey',contractBox:'Work',compContractBox:'Work',staffCareerBox:'Work',goodsBox:'Work',goodsLinkBox:'Work',logBox:'Work',actList:'Work',consentBox:'Work'};
 function gotoMyHash(h,delay){
   h=String(h||'').replace('#','');if(!h)return false;
   const tab=MY_HASH_TAB[h];if(tab&&typeof showMyTab==='function')showMyTab(tab);
@@ -2088,10 +2089,10 @@ AUTH.onAuthStateChanged(async u=>{
       document.getElementById('lgApp').innerHTML=MYASG.map(x=>'<option value="'+x.id+'">'+esc(x.data().school)+' ('+esc(x.data().type)+')</option>').join('');
       document.getElementById('lgDate').value=new Date().toISOString().slice(0,10);
       loadMyLogs();
-      renderGoodsLinks();
       renderHireDocs(d);
     }
   }catch(e){}
+  renderGoods().catch(function(){});   // [용품 배송·수령] 배정 강사·담당교사
   try{
     const cs=await DB.collection('compSlots').where('confirmed','array-contains',u.uid).get();
     MYCOMP=cs.docs;
@@ -2355,45 +2356,118 @@ async function submitLog(){
   }catch(e){m.textContent='제출 실패: '+e.message;m.className='msg err'}
   LGBUSY=false;
 }
-// [용품링크] 배정 학교마다 사무국이 만든 용품 수령 링크(goodsConfirms/{강습신청ID})를 보여주고, 담당교사에게 문자·복사로 전달
-function goodsLinkText(s,url){
-  return '[대한민국플라잉디스크연맹] '+(s.school||'')+' 강습 용품 수령 안내\n'
-    +(s.teacher?s.teacher+' 선생님, ':'담당교사님, ')+'아래 링크에서 ① 배송지 입력 → ② 용품 도착 후 수령 확인을 부탁드립니다. (휴대폰으로 바로 됩니다)\n'
-    +url+'\n문의 031-984-3248';
+// ══════════ [용품 배송·수령 2026-09-15] 마이페이지 [활동·계약]에서 배정 강사·담당교사가 직접 ① 배송지 입력 → ② 수령 확인 ══════════
+//   예전 링크(confirm.html?goods=)는 누구나 열 수 있어 헷갈려 폐지 — 이제 로그인한 배정 강사(강습신청 assignedUid·selfUid)와
+//   신청서 담당교사(휴대전화·이메일이 같은 회원 — goodsConfirms.teacherPhone·teacherEmail)만 봅니다(보안 규칙 v33).
+//   용품 문서(goodsConfirms/{강습신청ID})는 사무국이 [📦 용품 수령 준비]로 선정교 전체에 만들어 둡니다. 용품은 10월 중순 발송.
+let GD={list:[],cur:null,photo:''};
+function gdDigits(s){return String(s||'').replace(/\D/g,'')}
+async function renderGoods(){
+  const box=document.getElementById('goodsBox'),list=document.getElementById('goodsList');if(!box||!list||!AUTH.currentUser)return;
+  const found={};const asg=(typeof MYASG!=='undefined'&&MYASG)||[];
+  // ① 배정 강사 — 배정 학교마다 문서 한 건
+  for(const x of asg){try{const gd=await DB.collection('goodsConfirms').doc(x.id).get();found[x.id]={id:x.id,g:gd.exists?gd.data():null,s:x.data(),role:'강사'}}catch(e){found[x.id]={id:x.id,g:null,s:x.data(),role:'강사'}}}
+  // ② 담당교사 — 신청서 휴대전화(숫자만)·이메일이 내 계정과 같은 학교 (보안 규칙 v33 게시 후 조회됨)
+  const ph=gdDigits(MYD&&MYD.phone),em=String((MYD&&MYD.email)||'').toLowerCase();const qs=[];
+  if(ph.length>=9)qs.push(DB.collection('goodsConfirms').where('teacherPhone','==',ph).get());
+  if(em.indexOf('@')>0)qs.push(DB.collection('goodsConfirms').where('teacherEmail','==',em).get());
+  for(const q of qs){try{const r=await q;r.docs.forEach(function(d){if(!found[d.id])found[d.id]={id:d.id,g:d.data(),s:null,role:'담당교사'}})}catch(e){}}
+  GD.list=Object.values(found);
+  if(!GD.list.length){box.style.display='none';return}
+  const tb=document.querySelector('.mytab[data-pane="Work"]');if(tb)tb.style.display='';
+  list.innerHTML=GD.list.map(function(o,i){const g=o.g||{};const sc=g.school||(o.s&&o.s.school)||'';const d=g.delivery||{};const tc=g.teacherConfirm;
+    const st=!o.g?'<span style="color:#8a919d;font-weight:800">⏳ 사무국 준비 중 — 곧 입력할 수 있습니다</span>'
+      :(tc?'<span style="color:#0f766e;font-weight:800">✅ 수령 확인 완료</span>'
+      :(g.delivery?'<span style="color:#b8860b;font-weight:800">🚚 배송지 입력됨 · 10월 중순 발송 · 도착하면 수령 확인</span>':'<span style="color:#C41E2F;font-weight:800">📮 배송지 입력 필요</span>'));
+    return '<div class="brow" style="padding:12px 14px"><div style="display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center"><b style="font-size:14px">'+esc(sc)+'</b>'
+      +'<span style="font-size:11.5px;font-weight:800;color:#fff;background:'+(o.role==='강사'?'#153A77':'#0f766e')+';border-radius:999px;padding:2px 9px">'+(o.role==='강사'?'배정 강사':'담당교사')+'</span>'+st+'</div>'
+      +(g.items?'<div style="font-size:12.5px;color:#6b7280;margin-top:4px">품목 '+esc(g.items)+'</div>':'')
+      +(d.addr?'<div style="font-size:12.5px;color:#374151;margin-top:3px">배송지 '+esc(((d.addr||'')+' '+(d.addr2||'')).trim())+' · '+esc(d.receiver||'')+' '+esc(d.phone||'')+'</div>':'')
+      +(tc?'<div style="font-size:12.5px;color:#0f766e;margin-top:3px">수령 확인 '+esc(tc.name||'')+(tc.role?' ('+esc(tc.role)+')':'')+' · '+esc(String(tc.at||'').slice(0,10))+'</div>'
+        :(o.g?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button class="btn-sub" style="background:#153A77" onclick="gdOpen('+i+',1)">🚚 '+(g.delivery?'배송지 수정':'배송지 입력')+'</button>'
+          +(g.delivery?'<button class="btn-sub" style="background:#0f766e" onclick="gdOpen('+i+',2)">📦 수령 확인 (도착 후)</button>':'')+'</div>':''))
+      +'</div>'}).join('');
+  box.style.display='block';
 }
-function goodsCopy(i){
-  const g=window._GL&&window._GL[i];if(!g)return;const t=goodsLinkText(g.s,g.url);
-  const done=()=>{const m=document.getElementById('glMsg'+i);if(m){m.style.color='#0f766e';m.textContent='✓ 문구를 복사했습니다 — 카톡에 붙여넣어 보내세요.'}};
-  const fb=()=>{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done()}catch(e){}document.body.removeChild(ta)};
-  if(navigator.clipboard)navigator.clipboard.writeText(t).then(done).catch(fb);else fb();
-}
-function goodsSms(i){
-  const g=window._GL&&window._GL[i];if(!g)return;
-  const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent);const mobile=ios||/Android/i.test(navigator.userAgent);
-  if(!mobile){goodsCopy(i);const m=document.getElementById('glMsg'+i);if(m)m.textContent='PC에서는 문자앱이 없어 문구를 복사했습니다 — 휴대폰에서 누르면 문자앱이 바로 열립니다.';return}
-  location.href='sms:'+String(g.s.phone||'').replace(/[^0-9+]/g,'')+(ios?'&':'?')+'body='+encodeURIComponent(goodsLinkText(g.s,g.url));
-}
-async function renderGoodsLinks(){
-  const box=document.getElementById('goodsLinkBox'),list=document.getElementById('goodsLinkList');if(!box||!list)return;
-  const rows=[];window._GL=[];
-  for(const x of MYASG){
-    const s=x.data();let gc=null;
-    try{const gd=await DB.collection('goodsConfirms').doc(x.id).get();if(gd.exists)gc=gd.data()}catch(e){}
-    if(!gc)continue;   // 사무국이 아직 링크를 만들지 않은 학교는 표시하지 않음
-    const url=new URL('confirm.html?goods='+x.id,location.href).href;
-    const i=window._GL.length;window._GL.push({s:s,url:url});
-    const st=gc.teacherConfirm?'<span style="color:#0f766e;font-weight:800">✅ 수령 확인 완료</span>':(gc.delivery?'<span style="color:#b8860b;font-weight:800">🚚 배송지 입력됨 · 수령 확인 대기</span>':'<span style="color:#C41E2F;font-weight:800">📮 배송지 입력 전 — 담당교사께 링크 전달 필요</span>');
-    rows.push('<div class="brow" style="padding:12px 14px">'
-      +'<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center"><b style="font-size:14px">'+esc(s.school||'')+'</b><span style="font-size:12px;color:#6b7280">담당 '+esc(s.teacher||'-')+' · '+esc(s.phone||'-')+'</span>'+st+'</div>'
-      +(gc.teacherConfirm?'':'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'
-        +'<button class="btn-sub" style="background:#0f766e" onclick="goodsSms('+i+')">📱 문자로 보내기</button>'
-        +'<button class="btn-sub" style="background:#f7c600;color:#3b1e1e" onclick="goodsCopy('+i+')">💬 카톡 문구 복사</button>'
-        +'<a class="btn-sub" style="background:#153A77;text-decoration:none" href="'+url+'" target="_blank">🔗 링크 열기</a>'
-        +'</div><div id="glMsg'+i+'" style="font-size:12px;font-weight:800;margin-top:6px;min-height:14px"></div>')
-      +'</div>');
+function gdClose(){const x=document.getElementById('gdModal');if(x)x.remove()}
+function gdOpen(i,step){
+  const o=GD.list[i];if(!o||!o.g)return;GD.cur=o;GD.photo='';gdClose();
+  const g=o.g,d=g.delivery||{};
+  const inp='width:100%;padding:10px 12px;border:1.5px solid #d5dce8;border-radius:10px;font-size:14px;box-sizing:border-box';
+  const lbl=function(t){return '<label style="display:block;font-size:13px;font-weight:800;margin:12px 0 5px">'+t+'</label>'};
+  let h='<div style="background:#fff;border-radius:16px;max-width:480px;width:100%;padding:20px 22px">'
+    +'<b style="font-size:16px">'+(step===1?'🚚 배송지 입력':'📦 수령 확인')+' — '+esc(g.school||'')+'</b>'
+    +'<div style="font-size:12.5px;color:#6b7280;margin:4px 0 8px;line-height:1.6">'+(step===1?'강습용품은 <b>10월 중순</b>에 일괄 발송됩니다. 받으실 학교 주소와 담당자를 입력해 주세요. 수령 확인 전까지 고칠 수 있습니다.':'용품이 학교에 도착했으면 ① 사진 1장 → ② 수령자 성명 → ③ 서명 순서로 제출해 주세요. 제출 후에는 고칠 수 없습니다.')+'</div>'
+    +'<div style="font-size:12.5px;background:#f6f8fb;border-radius:9px;padding:8px 10px">품목 '+esc(g.items||'강습 용품 세트')+'</div>';
+  if(step===1){
+    h+=lbl('학교 주소 (배송지)')+'<div style="display:flex;gap:8px"><input id="gdZip" placeholder="우편번호" readonly style="'+inp+';flex:0 0 110px;background:#f7f9fc" value="'+esc(d.zip||'')+'"><button type="button" class="btn-sub" style="background:#153A77" onclick="gdPostcode()">🔍 주소 검색</button></div>'
+      +'<div id="gdPcWrap" style="display:none;margin-top:8px;border:1.5px solid #d5dce8;border-radius:12px;overflow:hidden;position:relative;height:420px"><button type="button" onclick="gdPcClose()" style="position:absolute;top:6px;right:6px;z-index:5;width:30px;height:30px;border:none;border-radius:50%;background:#333;color:#fff;font-weight:800;cursor:pointer">×</button><div id="gdPcBox" style="width:100%;height:100%"></div></div>'
+      +'<input id="gdAddr" placeholder="[주소 검색]을 눌러 선택해 주세요" readonly style="'+inp+';margin-top:8px;background:#f7f9fc" value="'+esc(d.addr||'')+'">'
+      +'<input id="gdAddr2" placeholder="상세 주소 (예: 본관 교무실 / 체육관 앞)" style="'+inp+';margin-top:8px" value="'+esc(d.addr2||'')+'">'
+      +lbl('수령 담당자 성명')+'<input id="gdName" maxlength="20" style="'+inp+'" value="'+esc(d.receiver||g.teacherName||'')+'">'
+      +lbl('담당자 연락처')+'<input id="gdPhone" inputmode="tel" placeholder="010-1234-5678" style="'+inp+'" value="'+esc(d.phone||'')+'">'
+      +lbl('배송 메모 (선택)')+'<input id="gdNote" maxlength="60" placeholder="예: 부재 시 경비실에 맡겨 주세요" style="'+inp+'" value="'+esc(d.note||'')+'">';
+  }else{
+    h+='<div style="font-size:12.5px;margin-top:8px">배송지 '+esc(((d.addr||'')+' '+(d.addr2||'')).trim())+' · '+esc(d.receiver||'')+'</div>'
+      +lbl('📷 받으신 용품 사진 <span style="color:#C41E2F">*필수 1장</span>')+'<input type="file" id="gdPhoto" accept="image/*" capture="environment" onchange="gdPickPhoto(this)" style="font-size:13px"><div id="gdPhotoPrev" style="margin-top:8px;text-align:center"></div>'
+      +lbl('수령자 성명')+'<input id="gdRcv" maxlength="20" style="'+inp+'" value="'+esc(d.receiver||(MYD&&MYD.name)||'')+'">'
+      +lbl('서명')+'<div style="position:relative;border:1.5px dashed #b9c2d0;border-radius:12px;background:#fbfcfe"><canvas id="gdSig" style="display:block;width:100%;height:140px;border-radius:12px;touch-action:none"></canvas><div id="gdSigHint" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#b0b7c3;font-size:13px;pointer-events:none">여기에 서명</div></div>'
+      +'<div style="text-align:right;margin-top:4px"><button type="button" onclick="gdSigClear()" style="border:none;background:none;color:#8a919d;font-size:12px;cursor:pointer">✕ 다시</button></div>';
   }
-  if(!rows.length){box.style.display='none';return}
-  list.innerHTML=rows.join('');box.style.display='block';
+  h+='<div id="gdMsg" style="font-size:12.5px;font-weight:800;margin-top:10px;min-height:16px"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn-sub" style="background:#8a919d" onclick="gdClose()">닫기</button>'
+    +'<button class="btn-sub" id="gdGo" style="background:'+(step===1?'#153A77':'#0f766e')+'" onclick="'+(step===1?'gdSaveDelivery()':'gdSaveReceipt()')+'">'+(step===1?'배송지 저장':'수령 확인 제출')+'</button></div></div>';
+  const ov=document.createElement('div');ov.id='gdModal';ov.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:flex-start;justify-content:center;padding:24px 14px;overflow:auto';
+  ov.innerHTML=h;document.body.appendChild(ov);
+  if(step===2)setTimeout(gdSigInit,30);
+}
+function gdPcClose(){const w=document.getElementById('gdPcWrap');if(w){w.style.display='none';document.getElementById('gdPcBox').innerHTML=''}}
+function gdPostcode(){
+  const go=function(){const w=document.getElementById('gdPcWrap'),b=document.getElementById('gdPcBox');if(!w||!b)return;b.innerHTML='';w.style.display='block';
+    new daum.Postcode({width:'100%',height:'100%',oncomplete:function(x){document.getElementById('gdZip').value=x.zonecode||'';document.getElementById('gdAddr').value=(x.roadAddress||x.jibunAddress||'');gdPcClose();const a2=document.getElementById('gdAddr2');if(a2)a2.focus()}}).embed(b)};
+  if(window.daum&&window.daum.Postcode)return go();
+  const s=document.createElement('script');s.src='https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';s.onload=go;
+  s.onerror=function(){['gdZip','gdAddr'].forEach(function(id){const e=document.getElementById(id);if(e){e.removeAttribute('readonly');e.style.background='#fff'}});alert('주소 검색을 불러오지 못했습니다. 우편번호와 주소를 직접 입력해 주세요.')};
+  document.head.appendChild(s);
+}
+let GDS={ctx:null,cv:null,on:false,last:null,drawn:false};
+function gdSigInit(){const cv=document.getElementById('gdSig');if(!cv)return;const r=cv.getBoundingClientRect();const dpr=window.devicePixelRatio||1;cv.width=r.width*dpr;cv.height=140*dpr;
+  const c=cv.getContext('2d');c.scale(dpr,dpr);c.lineWidth=2.4;c.lineCap='round';c.lineJoin='round';c.strokeStyle='#12233f';GDS={ctx:c,cv:cv,on:false,last:null,drawn:false};
+  const pos=function(e){const b=cv.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return {x:t.clientX-b.left,y:t.clientY-b.top}};
+  const st=function(e){e.preventDefault();GDS.on=true;GDS.last=pos(e);if(!GDS.drawn){GDS.drawn=true;const hn=document.getElementById('gdSigHint');if(hn)hn.style.display='none'}};
+  const mv=function(e){if(!GDS.on)return;e.preventDefault();const p=pos(e);c.beginPath();c.moveTo(GDS.last.x,GDS.last.y);c.lineTo(p.x,p.y);c.stroke();GDS.last=p};
+  const en=function(){GDS.on=false};
+  cv.onmousedown=st;cv.onmousemove=mv;cv.onmouseup=en;cv.onmouseleave=en;cv.ontouchstart=st;cv.ontouchmove=mv;cv.ontouchend=en}
+function gdSigClear(){if(!GDS.ctx)return;GDS.ctx.clearRect(0,0,GDS.cv.width,GDS.cv.height);GDS.drawn=false;const hn=document.getElementById('gdSigHint');if(hn)hn.style.display='flex'}
+function gdSigExport(){try{const o=document.createElement('canvas');o.width=360;o.height=120;o.getContext('2d').drawImage(GDS.cv,0,0,o.width,o.height);let s=o.toDataURL('image/png');if(s.length>190000)s=o.toDataURL('image/jpeg',0.7);return s}catch(e){return ''}}
+// 사진 자동 압축(긴 변 1000px·JPEG, 약 350KB 이하) — 문서 한 건 용량 안에
+function gdPickPhoto(input){const f=input.files&&input.files[0];const prev=document.getElementById('gdPhotoPrev');GD.photo='';if(!f){prev.innerHTML='';return}
+  const rd=new FileReader();rd.onload=function(ev){const img=new Image();img.onload=function(){let w=img.width,h=img.height;const MAX=1000;if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r)}
+      const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);let q=0.8,out=cv.toDataURL('image/jpeg',q);while(out.length>350*1024*1.37&&q>0.4){q-=0.1;out=cv.toDataURL('image/jpeg',q)}
+      GD.photo=out;prev.innerHTML='<img src="'+out+'" style="max-width:100%;max-height:200px;border-radius:10px;border:1px solid #e3e6ea"><div style="font-size:12px;color:#0f766e;font-weight:800;margin-top:4px">✓ 사진 첨부 완료</div>'};
+    img.onerror=function(){prev.innerHTML='<div style="font-size:12.5px;color:#C41E2F;font-weight:700">사진을 읽지 못했습니다. 다른 사진으로 시도해 주세요.</div>'};img.src=ev.target.result};
+  rd.readAsDataURL(f)}
+function gdErr(e,what){return /permission|insufficient/i.test(String((e&&e.message)||e))?what:((e&&e.message)||String(e))}
+async function gdSaveDelivery(){
+  const o=GD.cur;if(!o)return;const msg=document.getElementById('gdMsg');const v=function(id){return (document.getElementById(id).value||'').trim()};const bad=function(t){msg.style.color='#C41E2F';msg.textContent=t};
+  if(!v('gdAddr'))return bad('[주소 검색]으로 학교 주소를 선택해 주세요');
+  if(!v('gdName'))return bad('수령 담당자 성명을 입력해 주세요');
+  if(v('gdPhone').replace(/\D/g,'').length<9)return bad('담당자 연락처를 입력해 주세요');
+  const dv={zip:v('gdZip'),addr:v('gdAddr'),addr2:v('gdAddr2'),receiver:v('gdName'),phone:v('gdPhone'),note:v('gdNote'),at:new Date().toISOString()};
+  const b=document.getElementById('gdGo');b.disabled=true;msg.style.color='#8a919d';msg.textContent='저장 중…';
+  try{await DB.collection('goodsConfirms').doc(o.id).update({delivery:dv});gdClose();alert('🚚 배송지를 저장했습니다.\n강습용품은 10월 중순에 발송됩니다. 도착하면 이곳에서 [📦 수령 확인]을 해 주세요.');renderGoods().catch(function(){})}
+  catch(e){b.disabled=false;bad('저장 실패: '+gdErr(e,'권한이 없거나 이미 수령 확인된 학교입니다 (배정 강사·담당교사만 입력할 수 있습니다)'))}
+}
+async function gdSaveReceipt(){
+  const o=GD.cur;if(!o)return;const msg=document.getElementById('gdMsg');const bad=function(t){msg.style.color='#C41E2F';msg.textContent=t};const name=(document.getElementById('gdRcv').value||'').trim();
+  if(!GD.photo)return bad('받으신 용품 사진 1장을 먼저 첨부해 주세요 (필수)');
+  if(!name)return bad('수령자 성명을 입력해 주세요');
+  if(!GDS.drawn)return bad('서명을 입력해 주세요');
+  if(!confirm('['+(o.g.school||'')+'] 용품 수령 확인을 제출할까요?\n제출 후에는 고칠 수 없습니다.'))return;
+  const tc={name:name,at:new Date().toISOString(),sign:gdSigExport(),photo:GD.photo,role:o.role,byUid:AUTH.currentUser.uid,byName:(MYD&&MYD.name)||''};
+  const b=document.getElementById('gdGo');b.disabled=true;msg.style.color='#8a919d';msg.textContent='제출 중…';
+  try{await DB.collection('goodsConfirms').doc(o.id).update({teacherConfirm:tc});gdClose();alert('✅ 수령 확인을 제출했습니다. 감사합니다!');renderGoods().catch(function(){})}
+  catch(e){b.disabled=false;bad('제출 실패: '+gdErr(e,'권한이 없거나 이미 수령 확인된 학교입니다'))}
 }
 // ══════════ [위촉 서류] 겸직 허가서 · 범죄경력 조회 동의 · 연맹 확인 — 운영일지와 같은 화면의 버튼 ══════════
 //  저장 위치: users/{uid}.submitDocs.moonlight = {url, name, at, status:'대기'|'확인'|'반려', note}
