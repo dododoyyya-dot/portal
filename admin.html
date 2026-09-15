@@ -4097,6 +4097,20 @@ async function purgeUserDoc(uid){
   await DB.collection('users').doc(uid).delete();done.push('회원 정보 삭제');
   return done;
 }
+// [로그인 계정까지 2026-09-15] 회원 영구삭제는 완전 삭제 함수(adminDeleteMember)로 로그인 계정까지 지웁니다.
+//   회원 정보만 지우면 로그인 계정이 남아, 같은 이메일로 여러 번 가입된 학생이 그 빈 계정으로 로그인하게 됩니다(「사무국 승인 후 이용」 화면).
+//   함수가 없거나 실패하면(시도임원 권한 등) 종전처럼 회원 정보만 지우고 결과에 알립니다.
+async function purgeUserFull(uid){
+  try{
+    const fn=FUNCS.httpsCallableFromURL('https://admindeletemember-1081847355343.asia-northeast3.run.app');
+    const r=await fn({targetUid:uid});
+    try{await purgeUserDoc(uid)}catch(e){}   /* 함수가 남긴 것 정리 — 대부분 이미 없음 */
+    return {ok:true,done:(r&&r.data&&r.data.done)||[]};
+  }catch(e){
+    const done=await purgeUserDoc(uid).catch(function(){return []});
+    return {ok:false,err:(e&&(e.code||e.message))||String(e),done:done};
+  }
+}
 async function purgeOldTrash(){
   try{
     const cut=Date.now()/1000-7*86400;
@@ -4105,7 +4119,7 @@ async function purgeOldTrash(){
       if(!sn)continue;
       for(const d of sn.docs){
         const t=d.data().deletedAt;
-        if(t&&t.seconds<cut){ if(col==='users')await purgeUserDoc(d.id).catch(()=>{}); else await d.ref.delete().catch(()=>{}); }
+        if(t&&t.seconds<cut){ if(col==='users')await purgeUserFull(d.id).catch(()=>{}); else await d.ref.delete().catch(()=>{}); }   // [로그인 계정까지]
       }
     }
   }catch(e){}
@@ -4139,8 +4153,10 @@ async function restoreTrash(col,id){
   document.getElementById('trashBox').style.display='none';showTrash();
 }
 async function purgeNow(col,id){
-  if(!confirm('지금 즉시 완전히 삭제합니다. 복구할 수 없습니다.'))return;
-  if(col==='users')await purgeUserDoc(id).catch(()=>{});else await DB.collection(col).doc(id).delete().catch(()=>{});
+  if(!confirm('지금 즉시 완전히 삭제합니다'+(col==='users'?' (로그인 계정 포함)':'')+'. 복구할 수 없습니다.'))return;
+  if(col==='users'){const r=await purgeUserFull(id);
+    if(!r.ok)alert('회원 정보는 삭제했지만 로그인 계정은 지우지 못했습니다 ('+r.err+').\nFirebase 콘솔 › Authentication 에서 아래 UID를 삭제해 주세요.\n\n'+id)}
+  else await DB.collection(col).doc(id).delete().catch(()=>{});
   await loadApps();await loadUsers();
   document.getElementById('trashBox').style.display='none';showTrash();
 }
