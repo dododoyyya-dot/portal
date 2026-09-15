@@ -266,7 +266,7 @@ AUTH.onAuthStateChanged(async u=>{
   const g=document.getElementById('jGate');
   if(!u){g.style.display='block';g.innerHTML='🔒 승인 회원 전용입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a>';return}
   JME=u;const d=await DB.collection('users').doc(u.uid).get();JMY=d.data();
-  if(!JMY||JMY.status!=='approved'){g.style.display='block';g.innerHTML='⏳ 사무국 승인 후 이용 가능합니다.';return}
+  if(!JMY||JMY.status!=='approved'){g.style.display='block';g.innerHTML=(JMY&&JMY.dupOf)?'👥 중복 가입으로 정리된 계정으로 로그인되었습니다 (승인된 계정 아이디 「'+String(JMY.dupKeepId||'').replace(/[<>&"']/g,'')+'」). <a href="mypage.html" style="font-weight:800;color:var(--red)">마이페이지 안내 보기 →</a>':'⏳ 사무국 승인 후 이용 가능합니다.';   /* [로그인 충돌 2026-09-15] */return}
   document.getElementById('jBody').style.display='block';renderApply();showMyRegions();loadMyRegion();loadGigs();loadSlots();
 });
 // ── [강사 공고] 선정학교 강사 모집 공고 (지명 게시판 복원 2026-08-24) ──

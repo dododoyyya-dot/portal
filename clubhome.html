@@ -207,7 +207,7 @@ AUTH.onAuthStateChanged(async u=>{
   if(!u){g.style.display='block';g.innerHTML='🔒 승인 회원 전용입니다. <a href="login.html" style="font-weight:800;color:var(--red)">로그인 →</a> 후 이용할 수 있습니다.';return}
   CHME=u;
   const d=await DB.collection('users').doc(u.uid).get();CHMY=d.data();
-  if(!CHMY||CHMY.status!=='approved'){g.style.display='block';g.innerHTML='⏳ 사무국 승인 후 이용할 수 있습니다.';return}
+  if(!CHMY||CHMY.status!=='approved'){g.style.display='block';g.innerHTML=(CHMY&&CHMY.dupOf)?'👥 중복 가입으로 정리된 계정으로 로그인되었습니다 (승인된 계정 아이디 「'+String(CHMY.dupKeepId||'').replace(/[<>&"']/g,'')+'」). <a href="mypage.html" style="font-weight:800;color:var(--red)">마이페이지 안내 보기 →</a>':'⏳ 사무국 승인 후 이용할 수 있습니다.';   /* [로그인 충돌 2026-09-15] */return}
   await loadClub();
 });
 

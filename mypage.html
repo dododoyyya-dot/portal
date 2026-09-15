@@ -2142,7 +2142,8 @@ AUTH.onAuthStateChanged(async u=>{
   if(d.status==='거절'||d.rejectReason){
     const pb=document.getElementById('pendBox');
     pb.style.display='block';pb.style.background='#fdf3f4';pb.style.border='1.5px solid #f1c7cc';pb.style.color='#8c1622';
-    pb.innerHTML='🚫 <b>가입 승인이 보류/거절되었습니다.</b>'
+    pb.innerHTML=d.dupOf?('👥 <b>중복 가입으로 정리된 계정으로 로그인되었습니다.</b><br><span style="font-size:13px;line-height:1.8">가입 버튼이 여러 번 눌려 같은 아이디의 계정이 여러 개 만들어졌고, <b>승인된 계정(아이디 「'+esc(d.dupKeepId||d.loginId||'')+'」)은 따로 있습니다.</b><br>사무국이 중복 계정을 정리하면 같은 아이디·비밀번호로 로그인할 때 승인된 계정으로 들어갑니다. 재검토 요청은 필요 없습니다.<br>이 안내가 계속 보이면 사무국(031-984-3248)에 「중복 계정 정리」를 요청해 주세요.</span>')   // [로그인 충돌 2026-09-15]
+      :'🚫 <b>가입 승인이 보류/거절되었습니다.</b>'
       +(d.rejectReason?'<br>📄 사유: <b>'+esc(d.rejectReason)+'</b>':'')
       +'<br><span style="font-size:12.5px">아래에서 해당 내용을 수정·보완한 뒤 [재검토 요청]을 눌러주세요. 충족되면 사무국이 승인합니다.</span>'
       +(d.status==='거절'?'<br><button class="btn-sub" style="background:#0f766e;margin-top:8px" onclick="requestReview()">✅ 보완 완료 — 재검토 요청</button>':'')

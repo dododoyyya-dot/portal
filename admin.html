@@ -7727,9 +7727,10 @@ function selfKidList(){
     (v.children||[]).forEach((k,i)=>{const kk=String(k.name||'').replace(/\s+/g,'')+'|'+String(k.birth||'').trim();const self=!!(me&&kk===me);if(self||stu)out.push({id:d.id,v:v,k:k,i:i,self:self,stu:stu})})});
   return out;
 }
-function dupBadge(){const b=document.getElementById('dupCntBadge');if(!b)return;const n=dupGroups().length+selfKidList().length;b.style.display=n?'':'none';b.textContent=n}
+function dupBadge(){const b=document.getElementById('dupCntBadge');if(!b)return;const n=dupGroups().length+selfKidList().length+loginDupGroups().length;b.style.display=n?'':'none';b.textContent=n}
 function dupScan(){
   const groups=dupGroups(),selfs=selfKidList();window.__DUPG=groups;
+  const ldg=loginDupGroups();window.__LDG=ldg;   // [로그인 충돌 정리]
   let ov=document.getElementById('dupOv');if(ov)ov.remove();
   ov=document.createElement('div');ov.id='dupOv';ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:30px 12px;overflow:auto';
   const typeName=v=>({general:'일반',athlete:'선수',student:'학생',instructor:'지도자',teacher:'교사',natcert:'국가자격'}[v.accountType]||v.accountType||'-');
@@ -7740,6 +7741,15 @@ function dupScan(){
     +(groups.length?'<button class="btn-sub" style="background:#C41E2F" onclick="dupResolveAll()">추천(선택)대로 모두 정리 — '+groups.length+'건</button>':'')
     +'<button class="btn-sub" style="background:#153A77" onclick="mkBackfill()" title="기존 회원 전원을 회원 색인(성명|생년월일)에 등록 — 다른 기기에서 같은 정보로 다시 가입하려 해도 차단됩니다">🔑 회원 색인 채우기</button>'
     +'<button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'dupOv\').remove()">닫기</button></div>'
+    +(ldg.length?'<div style="border:2px solid #C41E2F;background:#fff7f7;border-radius:12px;padding:12px 14px;margin:12px 0">'
+      +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="font-size:15px">🔐 로그인 충돌 — 같은 아이디로 로그인 계정이 여러 개 <span style="color:#C41E2F">'+ldg.length+'명 · 중복 로그인 계정 '+ldg.reduce(function(n,x){return n+x.del.length},0)+'개</span></b><span style="flex:1"></span>'
+      +'<button class="btn-sub" style="background:#C41E2F" onclick="loginDupFix()">중복 로그인 계정 모두 삭제</button></div>'
+      +'<p style="font-size:12.5px;color:#6b7280;line-height:1.7;margin:6px 0 8px">가입 버튼을 여러 번 눌러 같은 이메일·아이디·비밀번호의 계정이 여러 개 생긴 회원입니다. 아이디로 로그인해도 <b>승인된 계정이 아니라 중복 계정으로 들어갈 수 있어</b> 「사무국 승인 후 이용」 화면이 뜹니다. 승인된 계정만 남기고 나머지 로그인 계정을 완전 삭제하면, 같은 아이디·비밀번호로 승인 계정에 들어갑니다. 이메일이 같아도 이름·생년월일·아이디가 다른 계정(보호자 이메일을 같이 쓰는 형제 등)은 지우지 않습니다.</p>'
+      +ldg.map(function(x,i){return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 10px;background:#fff;border:1px solid #f1c7cc;border-radius:9px;margin-bottom:5px;font-size:12.5px"><b>'+esc(x.keep.v.name||'')+'</b><span style="color:#6b7280">'+esc(x.keep.v.birth||'')+' · 아이디 '+esc(x.keep.v.loginId||'-')+'</span>'
+        +'<span>남길 계정 '+stName(x.keep.v)+'</span><span style="color:#C41E2F;font-weight:800">삭제 '+x.del.length+'개 (대기 '+x.del.filter(function(y){return y.v.status==='pending'}).length+' · 거절 '+x.del.filter(function(y){return y.v.status==='거절'}).length+')</span>'
+        +(x.otherN?'<span style="color:#b8860b;font-weight:800">같은 이메일의 다른 회원 '+x.otherN+'명 — 그대로 둠</span>':'')
+        +'<span style="flex:1"></span><button class="btn-sub" style="background:#C41E2F;padding:3px 10px;font-size:11.5px" onclick="loginDupFix('+i+')">이 회원만 정리</button> <a href="javascript:void(0)" onclick="showMemberModal(\''+x.keep.id+'\')" style="font-size:11.5px;color:#153A77;font-weight:700">상세</a></div>'}).join('')
+      +'<div id="ldMsg" style="font-size:12.5px;font-weight:800;margin-top:6px"></div></div>':'')
     +'<h4 style="margin:14px 0 4px;font-size:15px">① 중복 가입 계정 <span style="color:#C41E2F">'+groups.length+'건</span></h4>'
     +'<p style="font-size:12.5px;color:#6b7280;line-height:1.7;margin:0 0 12px">같은 <b>성명·생년월일</b>로 만들어진 계정이 2개 이상이면 묶여 나옵니다. <b>남길 계정</b>을 고르고 정리하면 나머지는 휴지통(복구 가능)으로 가고 「거절」 상태가 되어, 그 아이디로 로그인한 회원에게 <b>남긴 아이디로 로그인하라는 안내</b>가 뜹니다. 남긴 계정에 보호자 연동이 없고 다른 계정에 있으면 연동 정보를 옮겨 옵니다. 정리 뒤 남긴 계정을 평소처럼 [승인]하면 됩니다.<br>추천 순서: 승인됨 › 보호자 연동 › 회원번호 › 정보 많은 순 › 먼저 가입한 순.</p>';
   if(!groups.length)h+='<div style="padding:12px 14px;background:#f0f7f4;border-radius:10px;font-weight:800;color:#0f766e">✓ 중복 가입 계정이 없습니다.</div>';
@@ -7757,6 +7767,50 @@ function dupScan(){
     +'<span style="font-weight:900;color:#C41E2F">'+(s.self?'본인을 자녀로 등록':'학생회원의 자녀 등록')+'</span><span style="color:#555">→ 자녀 항목: '+esc(s.k.name||'')+' '+esc(s.k.birth||'')+(s.k.school?' · '+esc(s.k.school):'')+'</span><span style="flex:1"></span>'
     +'<button class="btn-sub" style="background:#C41E2F;padding:4px 12px;font-size:12px" onclick="delChildAdmin(\''+s.id+'\','+s.i+').then(ok=>{if(ok)dupScan()})">🗑 자녀 항목 삭제</button><button class="btn-sub" style="background:#153A77;padding:4px 12px;font-size:12px" onclick="showMemberModal(\''+s.id+'\')">상세</button></div>'});
   h+='</div>';ov.innerHTML=h;ov.addEventListener('click',e=>{if(e.target===ov)ov.remove()});document.body.appendChild(ov);
+}
+// ══════════ [로그인 충돌 정리 2026-09-15] 같은 이메일·아이디·비밀번호의 로그인 계정이 여러 개 ══════════
+//   가입 버튼 연타(09-11 연타 방지 전)로 같은 학생 계정이 5~11개씩 만들어졌습니다. 「중복 가입 정리」는 나머지를 휴지통·거절로만 돌려,
+//   아이디로 로그인해도 승인된 계정이 아니라 중복 계정으로 들어가는 일이 생깁니다(재검토 요청 → 「사무국 승인 후 이용」 화면).
+//   승인된 계정 하나만 남기고 나머지 로그인 계정을 완전 삭제(adminDeleteMember)해야 해결됩니다.
+//   · 지우는 대상: 남길 계정과 이메일·아이디·성명·생년월일이 모두 같은 거절·대기 계정만 (보호자 이메일을 같이 쓰는 형제 등 다른 사람은 그대로)
+//   · 삭제 전에 ① 아이디 연결(loginIds)이 중복 계정을 가리키면 남길 계정으로 옮기고 ② 중복 계정의 전화번호 칸을 비웁니다(보호자 번호의 중복가입 색인을 지우지 않도록)
+function loginDupGroups(){
+  /* 묶음 = 이메일 + 아이디 + 성명·생년월일이 모두 같은 계정들 (같은 이메일을 쓰는 형제는 다른 묶음) — 묶음 안 승인 계정이 정확히 하나일 때만 나머지를 지웁니다 */
+  const byE={},g={};
+  USERS.concat((typeof TRASH!=='undefined'&&TRASH.users)||[]).forEach(function(d){const v=d.data()||{};const e=String(v.email||'').trim().toLowerCase();const dk=dupKey(v);if(!e)return;byE[e]=(byE[e]||0)+1;if(!dk)return;
+    const k=JSON.stringify([e,String(v.loginId||''),dk]);(g[k]=g[k]||[]).push({id:d.id,v:v})});
+  return Object.keys(g).filter(function(k){return g[k].length>1}).map(function(k){const L=g[k];const e=JSON.parse(k)[0];
+    const ap=L.filter(function(x){return x.v.status==='approved'&&!x.v.deleted});const keep=ap.length===1?ap[0]:null;
+    const del=keep?L.filter(function(x){return x.id!==keep.id&&x.v.status!=='approved'&&x.v.owner!==true&&x.v.role!=='admin'}):[];
+    return {email:e,keep:keep,del:del,otherN:byE[e]-L.length}}).filter(function(x){return x.del.length});
+}
+async function loginDupFix(idx){
+  if(typeof IS_SIDO!=='undefined'&&IS_SIDO){alert('중앙 사무국만 할 수 있습니다.');return}
+  const G=window.__LDG||loginDupGroups();const list=(idx==null?G:[G[idx]]).filter(Boolean);
+  const n=list.reduce(function(a,x){return a+x.del.length},0);if(!n){alert('지울 중복 로그인 계정이 없습니다.');return}
+  const t=prompt('⛔ 중복 로그인 계정 '+n+'개를 완전 삭제합니다 ('+list.length+'명).\n\n· 남기는 계정: 각 회원의 「승인」 계정 — 아이디·비밀번호 그대로 로그인\n· 지우는 계정: 이메일·아이디·성명·생년월일이 같은 거절·대기 계정 (로그인 계정까지 삭제 · 복구 불가)\n· 대회 신청 기록 등 보존 자료는 남습니다\n\n진행하려면 「삭제」를 입력하세요.','');
+  if(t===null)return;if(String(t).replace(/\s+/g,'')!=='삭제'){alert('「삭제」가 입력되지 않아 취소했습니다.');return}
+  const say=function(s){const m=document.getElementById('ldMsg');if(m)m.textContent=s};
+  const fn=FUNCS.httpsCallableFromURL('https://admindeletemember-1081847355343.asia-northeast3.run.app');
+  let ok=0,moved=0,streak=0;const fail=[];
+  for(const g of list){
+    /* ① 아이디 연결이 중복 계정을 가리키면 남길 계정으로 — 이메일·비밀번호가 같아 연결 내용은 그대로 쓸 수 있습니다 */
+    try{const lid=String(g.keep.v.loginId||'');if(lid){const li=await DB.collection('loginIds').doc(lid).get();if(li.exists&&(li.data()||{}).uid!==g.keep.id){await DB.collection('loginIds').doc(lid).update({uid:g.keep.id,movedFrom:(li.data()||{}).uid||'',movedAt:firebase.firestore.FieldValue.serverTimestamp()});moved++}}}
+    catch(e){fail.push((g.keep.v.name||'')+' — 아이디 연결 옮기기 실패('+((e&&(e.code||e.message))||e)+') · 이 회원은 건너뜀');continue}
+    for(const x of g.del){
+      say('삭제 중… '+(ok+fail.length+1)+'/'+n+' ('+(x.v.name||'')+')');
+      try{
+        if(x.v.phone)await DB.collection('users').doc(x.id).update({phone:''}).catch(function(){});   /* ② 보호자 번호일 수 있는 전화번호 — 삭제 함수가 그 번호의 중복가입 색인을 지우지 않게 */
+        await fn({targetUid:x.id});ok++;streak=0;
+      }catch(e){fail.push((x.v.name||'')+' '+x.id.slice(0,6)+' — '+((e&&(e.code||e.message))||e));if(++streak>=3)break}
+    }
+    if(streak>=3)break;
+  }
+  say('');
+  alert('🔐 로그인 충돌 정리 결과\n\n· 중복 로그인 계정 삭제 '+ok+'개'+(moved?'\n· 아이디 연결을 승인 계정으로 옮김 '+moved+'건':'')
+    +(fail.length?'\n· 실패 '+fail.length+'건\n  '+fail.slice(0,8).join('\n  ')+(streak>=3?'\n\n연속 실패로 멈췄습니다 — 완전 삭제 함수(adminDeleteMember) 상태를 확인해 주세요.':''):'')
+    +(ok?'\n\n해당 회원은 이제 같은 아이디·비밀번호로 로그인하면 승인된 계정으로 들어갑니다.':''));
+  await loadUsers();dupScan();
 }
 async function dupResolve(gi,silent){
   if(typeof IS_SIDO!=='undefined'&&IS_SIDO){alert('중복 가입 정리는 중앙 사무국만 할 수 있습니다.');return false}
