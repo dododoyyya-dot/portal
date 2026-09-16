@@ -3361,6 +3361,7 @@ function maskNm(n){n=String(n||'');return n.length<2?n:n[0]+'*'.repeat(Math.max(
 // [자격 자동 찾기 2026-09-16] 성명·생년월일이 모두 같은 미연결 자격을 찾아 버튼 한 번으로 연결합니다.
 //   이름만 같은 경우(동명이인)는 보여주지 않습니다 — 학생 회원과 자격 보유자의 이름이 겹치는 일이 많습니다.
 //   연결 쓰기는 기존 claimLic 과 같은 세 필드(uid·claimedByName·claimedAt)만 바꿉니다(보안 규칙 본인 연동 조건).
+//   생년월일은 공개 대장이 아닌 licenseBirth 에 있고, 규칙 v34 상 「내 성명·생년월일과 같은 문서」만 읽힙니다.
 var LF_FOUND=[];
 function lfBirth(s){var d=String(s||'').replace(/\D/g,'');return d.length===8?d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8):''}
 async function autoFindLics(){
@@ -3374,9 +3375,13 @@ async function autoFindLics(){
     var seen={};
     for(var i=0;i<names.length;i++){
       var snap=await DB.collection('licenses').where('name','==',names[i]).limit(10).get();
+      var cand=[];
       snap.forEach(function(d){var l=d.data()||{};
-        if(seen[d.id]||l.uid||l.status==='이관'||l.birth!==b)return;
-        seen[d.id]=1;LF_FOUND.push({id:d.id,l:l});});
+        if(seen[d.id]||l.uid||l.status==='이관')return;
+        seen[d.id]=1;cand.push({id:d.id,l:l});});
+      for(var j=0;j<cand.length;j++){   // 읽히면 본인 자격, 거부되면 동명이인
+        try{var pb=await DB.collection('licenseBirth').doc(cand[j].id).get();if(pb.exists)LF_FOUND.push(cand[j])}catch(e){}
+      }
     }
     if(!LF_FOUND.length)return;
     var today=new Date().toISOString().slice(0,10);
