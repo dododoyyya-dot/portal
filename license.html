@@ -1296,13 +1296,36 @@ async function bulkIssue(){
 // ── 관리: 갱신 ──
 // [갱신 절차] 시도연맹이 갱신을 '요청' 하면(자격 문서의 renewReq 에 기록) 중앙이 최종 승인합니다.
 //   유효기간을 직접 늘리는 쓰기는 보안 규칙이 시도연맹에게 허용하지 않습니다.
+// [자격번호 정규화 2026-09-16] 회원마다 번호 표기가 달라(하이픈 누락 · KFDF 접두어 · 심판 번호에 급수 접두어)
+//   완전일치 조회가 자주 실패했습니다. 입력값에서 후보 번호를 만들어 순서대로 찾습니다.
+function licCands(raw){
+  var v=String(raw==null?'':raw).toUpperCase().replace(/[\s.]/g,'');
+  v=v.replace(/^KFDF-?/,'').replace(/^[LR]-/,'');
+  var c=[v];
+  if(/^\d{12}$/.test(v))c.push(v.slice(0,4)+'-'+v.slice(4));
+  if(/^\d{10}$/.test(v))c.push(v.slice(0,4)+'-'+v.slice(4));
+  if(/^\d{8}$/.test(v))c.push(v.slice(0,2)+'-'+v.slice(2));
+  var m=/^\d{2}-(\d{6})$/.exec(v);
+  if(m)c.push(m[1]);
+  return c.filter(function(x,i,a){return x&&x.indexOf('/')<0&&a.indexOf(x)===i});
+}
+async function licFind(raw){
+  var c=licCands(raw);
+  for(var i=0;i<c.length;i++){
+    var d=await DB.collection('licenses').doc(c[i]).get();
+    if(d.exists)return {no:c[i],doc:d};
+  }
+  return {no:c[0]||'',doc:null};
+}
 async function renewLic(){
   const m=document.getElementById('rnMsg');
   if(!LICWRITE){alert('자격 갱신은 연맹 관리자 업무입니다.');return}
-  const no=document.getElementById('rnNo').value.trim().toUpperCase();
+  let no=document.getElementById('rnNo').value.trim().toUpperCase();
   if(!no){m.textContent='자격번호를 입력하세요';m.style.color='#C41E2F';return}
-  const doc=await DB.collection('licenses').doc(no).get();
-  if(!doc.exists){m.textContent='등록되지 않은 자격번호입니다';m.style.color='#C41E2F';return}
+  const found=await licFind(no);
+  no=found.no;
+  const doc=found.doc;
+  if(!doc){m.textContent='등록되지 않은 자격번호입니다';m.style.color='#C41E2F';return}
   const l=doc.data();
   const base=(l.expireAt&&l.expireAt>=new Date().toISOString().slice(0,10))?l.expireAt:new Date().toISOString().slice(0,10);
   const newExp=plus4y(base);

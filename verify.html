@@ -205,18 +205,41 @@ async function verify(){
 }
 document.getElementById('vfCode').addEventListener('keydown',e=>{if(e.key==='Enter')verify()});
 let LAST_LIC=null;
+// [자격번호 정규화 2026-09-16] 회원마다 번호 표기가 달라(하이픈 누락 · KFDF 접두어 · 심판 번호에 급수 접두어)
+//   완전일치 조회가 자주 실패했습니다. 입력값에서 후보 번호를 만들어 순서대로 찾습니다.
+function licCands(raw){
+  var v=String(raw==null?'':raw).toUpperCase().replace(/[\s.]/g,'');
+  v=v.replace(/^KFDF-?/,'').replace(/^[LR]-/,'');
+  var c=[v];
+  if(/^\d{12}$/.test(v))c.push(v.slice(0,4)+'-'+v.slice(4));
+  if(/^\d{10}$/.test(v))c.push(v.slice(0,4)+'-'+v.slice(4));
+  if(/^\d{8}$/.test(v))c.push(v.slice(0,2)+'-'+v.slice(2));
+  var m=/^\d{2}-(\d{6})$/.exec(v);
+  if(m)c.push(m[1]);
+  return c.filter(function(x,i,a){return x&&x.indexOf('/')<0&&a.indexOf(x)===i});
+}
+async function licFind(raw){
+  var c=licCands(raw);
+  for(var i=0;i<c.length;i++){
+    var d=await DB.collection('licenses').doc(c[i]).get();
+    if(d.exists)return {no:c[i],doc:d};
+  }
+  return {no:c[0]||'',doc:null};
+}
 // 성명 대조: 대장 실명은 노출하지 않고 일치 여부만 판정 (공백 무시)
 function nameEq(a,b){return String(a||'').replace(/\s/g,'')===String(b||'').replace(/\s/g,'')}
 async function verifyLic(){
   const el=document.getElementById('vlResult');
-  const code=document.getElementById('vlCode').value.trim().toUpperCase().replace(/\s/g,'');
+  const rawCode=document.getElementById('vlCode').value.trim().toUpperCase().replace(/\s/g,'');
   const inName=(document.getElementById('vlName').value||'').trim();
   // 지도자: 0000-000000(00) · 심판: 00-000000 또는 000000(구형)
-  if(!/^(\d{4}-\d{6,8}(_\d+)?|\d{2}-\d{6}(_\d+)?|\d{6}(_\d+)?)$/.test(code)){el.innerHTML='<span style="color:var(--red);font-weight:700;font-size:14px">자격번호 형식이 올바르지 않습니다 (지도자 예: 0301-09080001 · 심판 예: 01-230001)</span>';return}
+  if(!licCands(rawCode).some(function(c){return /^(\d{4}-\d{6,8}(_\d+)?|\d{2}-\d{6}(_\d+)?|\d{6}(_\d+)?)$/.test(c)})){el.innerHTML='<span style="color:var(--red);font-weight:700;font-size:14px">자격번호 형식이 올바르지 않습니다 (지도자 예: 0301-09080001 · 심판 예: 01-230001)</span>';return}
   el.innerHTML='<span style="font-size:14px;color:var(--gray)">확인 중…</span>';
   try{
-    const doc=await DB.collection('licenses').doc(code).get();
-    if(!doc.exists){
+    const found=await licFind(rawCode);
+    const code=found.no;
+    const doc=found.doc;
+    if(!doc){
       LAST_LIC=null;
       el.innerHTML='<div style="background:#fdf3f4;border:2px solid var(--red);border-radius:12px;padding:20px 22px">'
         +'<b style="color:var(--red);font-size:17px">❌ 등록되지 않은 자격번호입니다</b>'

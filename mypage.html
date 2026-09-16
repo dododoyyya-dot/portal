@@ -1666,6 +1666,27 @@ async function delKid(i){
     if(!ok){alert('이미 삭제된 자녀입니다.');renderKids();}
   }catch(e){alert('삭제 실패: '+e.message)}
 }
+// [자격번호 정규화 2026-09-16] 회원마다 번호 표기가 달라(하이픈 누락 · KFDF 접두어 · 심판 번호에 급수 접두어)
+//   완전일치 조회가 자주 실패했습니다. 입력값에서 후보 번호를 만들어 순서대로 찾습니다.
+function licCands(raw){
+  var v=String(raw==null?'':raw).toUpperCase().replace(/[\s.]/g,'');
+  v=v.replace(/^KFDF-?/,'').replace(/^[LR]-/,'');
+  var c=[v];
+  if(/^\d{12}$/.test(v))c.push(v.slice(0,4)+'-'+v.slice(4));
+  if(/^\d{10}$/.test(v))c.push(v.slice(0,4)+'-'+v.slice(4));
+  if(/^\d{8}$/.test(v))c.push(v.slice(0,2)+'-'+v.slice(2));
+  var m=/^\d{2}-(\d{6})$/.exec(v);
+  if(m)c.push(m[1]);
+  return c.filter(function(x,i,a){return x&&x.indexOf('/')<0&&a.indexOf(x)===i});
+}
+async function licFind(raw){
+  var c=licCands(raw);
+  for(var i=0;i<c.length;i++){
+    var d=await DB.collection('licenses').doc(c[i]).get();
+    if(d.exists)return {no:c[i],doc:d};
+  }
+  return {no:c[0]||'',doc:null};
+}
 async function saveProfile(){
   if(PFBUSY)return;PFBUSY=true;
   const m=document.getElementById('pfMsg');
@@ -1831,10 +1852,12 @@ async function saveProfile(){
     // 연맹 자격증 번호 자동 매칭 (입력했을 때만)
     if(qualLeader||qualRef){
       const nums=[qualLeader,qualRef].filter(Boolean);
-      for(const no of nums){
+      for(const noIn of nums){
         try{
-          const doc=await DB.collection('licenses').doc(no).get();
-          if(doc.exists){
+          const found=await licFind(noIn);
+          const no=found.no;
+          const doc=found.doc;
+          if(doc){
             const l=doc.data();
             if(!l.uid){
               const match=(l.maskName===maskNm(MYD.name));
@@ -3335,12 +3358,14 @@ function certNo(){return 'KFDF-2026-EDU-'+AUTH.currentUser.uid.slice(0,6).toUppe
 function maskNm(n){n=String(n||'');return n.length<2?n:n[0]+'*'.repeat(Math.max(1,n.length-2))+(n.length>2?n[n.length-1]:'')}
 async function claimLic(){
   const m=document.getElementById('clMsg');
-  const no=document.getElementById('clNo').value.trim().toUpperCase().replace(/\s/g,'');
+  let no=document.getElementById('clNo').value.trim().toUpperCase().replace(/\s/g,'');
   if(!no){m.textContent='자격번호를 입력하세요';m.style.color='#C41E2F';return}
   if(!MYD||MYD.status!=='approved'){m.textContent='사무국 승인 후 이용할 수 있습니다';m.style.color='#C41E2F';return}
   try{
-    const doc=await DB.collection('licenses').doc(no).get();
-    if(!doc.exists){m.textContent='등록되지 않은 자격번호입니다. 번호 확인 후 다시 시도하거나 사무국에 문의하세요.';m.style.color='#C41E2F';return}
+    const found=await licFind(no);
+    no=found.no;
+    const doc=found.doc;
+    if(!doc){m.textContent='등록되지 않은 자격번호입니다. 번호 확인 후 다시 시도하거나 사무국에 문의하세요.';m.style.color='#C41E2F';return}
     const l=doc.data();
     if(l.uid){m.textContent=(l.uid===AUTH.currentUser.uid?'이미 내 계정에 연결된 자격입니다.':'이미 다른 회원에게 연결된 자격입니다. 본인 자격이 맞다면 사무국에 문의하세요.');m.style.color='#C41E2F';return}
     const match=(l.maskName===maskNm(MYD.name));
