@@ -542,6 +542,7 @@ function orgChip(o,region,title,fed){
   </div>
   <div id="claimBox" style="margin-top:26px;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:18px 20px">
     <h3 style="margin:0 0 6px;font-size:15.5px">🔗 기존 자격증 연결 (지도자 · 심판)</h3>
+    <div id="lfBox" style="display:none;margin:0 0 12px;background:#f0fdf9;border:1.5px solid #0f766e;border-radius:12px;padding:14px 16px"></div>
     <p style="font-size:12.5px;color:var(--gray);margin:0 0 10px;line-height:1.7">홈페이지 개설 이전에 발급받은 연맹 지도자·심판 자격이 있다면 자격증에 기재된 <b>자격번호</b>로 연결을 신청하세요. 관할 연맹 확인 후 이곳에 자격증이 표시되고 온라인 발급이 가능해집니다.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <input id="clNo" placeholder="자격번호 (예: 0301-09080001 / 01-230001)" style="flex:1;min-width:220px;padding:10px 13px;border:1.5px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit;text-transform:uppercase">
@@ -2080,6 +2081,7 @@ AUTH.onAuthStateChanged(async u=>{
   fillProfile(d);
   loadMyLics(u.uid);
   loadMyClaims();
+  autoFindLics();
   // 승인됐지만 아직 어떤 분야에도 지원하지 않은 회원 안내
   const fApplied=d.instructorFor&&(d.instructorFor.school||d.instructorFor.after||d.instructorFor.referee||d.instructorFor.staff);
   const pfIncomplete=pfGate(d);
@@ -3356,6 +3358,46 @@ function printContract(id){
 function certNo(){return 'KFDF-2026-EDU-'+AUTH.currentUser.uid.slice(0,6).toUpperCase()}
 // ── 기존 자격 연결 신청 ──
 function maskNm(n){n=String(n||'');return n.length<2?n:n[0]+'*'.repeat(Math.max(1,n.length-2))+(n.length>2?n[n.length-1]:'')}
+// [자격 자동 찾기 2026-09-16] 성명·생년월일이 모두 같은 미연결 자격을 찾아 버튼 한 번으로 연결합니다.
+//   이름만 같은 경우(동명이인)는 보여주지 않습니다 — 학생 회원과 자격 보유자의 이름이 겹치는 일이 많습니다.
+//   연결 쓰기는 기존 claimLic 과 같은 세 필드(uid·claimedByName·claimedAt)만 바꿉니다(보안 규칙 본인 연동 조건).
+var LF_FOUND=[];
+function lfBirth(s){var d=String(s||'').replace(/\D/g,'');return d.length===8?d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8):''}
+async function autoFindLics(){
+  var box=document.getElementById('lfBox');if(!box)return;
+  box.style.display='none';box.innerHTML='';LF_FOUND=[];
+  try{
+    if(!MYD||MYD.status!=='approved')return;
+    var b=lfBirth(MYD.birth);if(!b)return;
+    var n0=String(MYD.name||'').trim();if(!n0)return;
+    var names=[n0];var ns=n0.replace(/\s/g,'');if(ns!==n0)names.push(ns);
+    var seen={};
+    for(var i=0;i<names.length;i++){
+      var snap=await DB.collection('licenses').where('name','==',names[i]).limit(10).get();
+      snap.forEach(function(d){var l=d.data()||{};
+        if(seen[d.id]||l.uid||l.status==='이관'||l.birth!==b)return;
+        seen[d.id]=1;LF_FOUND.push({id:d.id,l:l});});
+    }
+    if(!LF_FOUND.length)return;
+    var today=new Date().toISOString().slice(0,10);
+    box.innerHTML='<div style="font-weight:900;font-size:15px;margin-bottom:6px">🔎 내 이름·생년월일로 등록된 자격 '+LF_FOUND.length+'건을 찾았습니다</div>'
+      +'<div style="font-size:13px;line-height:1.9">'+LF_FOUND.map(function(x){var l=x.l;var ex=(l.status==='만료')||(l.expireAt?l.expireAt<today:true);
+        return '· '+esc(l.type||'')+' '+esc(l.grade||'')+' — '+esc(x.id)+(l.expireAt?' (유효기간 ~'+esc(l.expireAt)+')':'')+(ex?' <b style="color:#C41E2F">만료</b>':' <b style="color:#0f766e">유효</b>');}).join('<br>')+'</div>'
+      +'<div style="margin-top:10px"><button class="btn-sub" style="background:#0f766e" onclick="linkFoundLics()">내 자격이 맞습니다 — 연결하기</button></div>'
+      +'<div style="font-size:12px;color:var(--gray);margin-top:6px">본인 자격이 아니면 연결하지 마세요. 자격번호를 몰라도 되며, 찾지 못한 자격은 아래에서 자격번호로 신청할 수 있습니다.</div>'
+      +'<div id="lfMsg" style="font-size:13px;font-weight:700;margin-top:6px"></div>';
+    box.style.display='block';
+  }catch(e){console.warn('autoFindLics',e)}
+}
+async function linkFoundLics(){
+  var m=document.getElementById('lfMsg');var ok=0,fail=0;
+  for(var i=0;i<LF_FOUND.length;i++){
+    try{await DB.collection('licenses').doc(LF_FOUND[i].id).update({uid:AUTH.currentUser.uid,claimedByName:MYD.name,claimedAt:firebase.firestore.FieldValue.serverTimestamp()});ok++}
+    catch(e){fail++}
+  }
+  if(m){m.textContent=ok?('✓ '+ok+'건 연결되었습니다. 위 자격증 목록에 표시됩니다.'+(fail?' ('+fail+'건 실패 — 사무국 문의)':'')):'연결에 실패했습니다. 사무국(031-984-3248)에 문의해 주세요.';m.style.color=ok?'#0f766e':'#C41E2F'}
+  if(ok){loadMyLics(AUTH.currentUser.uid);setTimeout(autoFindLics,1500)}
+}
 async function claimLic(){
   const m=document.getElementById('clMsg');
   let no=document.getElementById('clNo').value.trim().toUpperCase().replace(/\s/g,'');
