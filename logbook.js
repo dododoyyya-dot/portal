@@ -1,4 +1,4 @@
-// logbook.js v20260914a · 학교강습 운영일지 보고서(인쇄 → PDF로 저장)
+// logbook.js v20260916a · 학교강습 운영일지 보고서(인쇄 → PDF로 저장) + 일지 삭제·복원(기록 보존)
 //   관리자 강습신청관리 › 📒 일지 패널, 강사 마이페이지 › 운영일지 에서 학교 단위로 엽니다.
 //   홈페이지에 입력된 일지(sessionLogs) 항목만 씁니다: 회차·수업일·인원(남/여)·수업 내용·특이사항·안전 지도 점검 4항목·
 //   활동 사진(최대 3장)·담당교사 확인(성명·시각·전자서명)·정정 이력 + 강습 신청(schoolApplications) 기본 정보.
@@ -277,8 +277,21 @@
         +'<div class="sb"><div><i>담당교사</i><b>'+esc(teacherName||'')+'</b><small>'+(lastTC?'최근 전자서명 확인 '+ts(lastTC.at):'전자서명 확인 전')+(cfm<logs.length?'<br><span style="color:#C41E2F">확인 전 '+(logs.length-cfm)+'회차</span>':'')+'</small></div><div class="sg">'+(tcSig?'<img src="'+tcSig+'" alt="">':'')+'</div></div>'
       +'</div>'
       +'<div class="issuer"><img src="'+esc(WM)+'" alt="대한민국플라잉디스크연맹"><div>사단법인 대한민국플라잉디스크연맹 · 031-984-3248 · kfdf60@hanmail.net</div></div>'
-      +'<div class="fine">※ 본 운영일지는 강사가 연맹 홈페이지에 회차별로 제출한 보고와 담당교사의 전자서명 확인 기록을 그대로 옮긴 것입니다. 교사확인 시각·서명과 정정 이력(정정 전 값)은 연맹 시스템에 보존됩니다.<br>'
+      +'<div class="fine">※ 본 운영일지는 강사가 연맹 홈페이지에 회차별로 제출한 보고와 담당교사의 전자서명 확인 기록을 그대로 옮긴 것입니다. 교사확인 시각·서명과 정정 이력(정정 전 값), 삭제된 회차 기록은 연맹 시스템에 보존됩니다.<br>'
       +'※ 문서번호 '+esc(docNo)+' · 출력 '+ts(now)+(o.printedBy?' · '+esc(o.printedRole||'')+' '+esc(o.printedBy):'')+'</div>'});
+
+    // ── 5. 삭제된 회차 기록 (있을 때만 · 규칙 v35 sessionLogArchive) ──
+    var DEL=(o.deleted||[]).slice().sort(function(a,b){return (a.session||0)-(b.session||0)});
+    if(DEL.length){
+      pages.push({flow:true,html:'<h2 class="sec">삭제된 회차 기록<small>'+DEL.length+'건 · 원본과 사유는 연맹 시스템에 보존</small></h2>'
+        +'<p class="lede">겸직 허가 시기 정정 등으로 삭제된 회차 보고입니다. 앞의 운영 실적(회차·인원)에는 포함되지 않습니다.</p>'
+        +'<table class="tb"><colgroup><col style="width:11mm"><col style="width:22mm"><col style="width:12mm"><col style="width:22mm"><col style="width:30mm"><col></colgroup>'
+        +'<tr><th>회차</th><th>원 수업일</th><th>인원</th><th>삭제일</th><th>삭제자</th><th>사유</th></tr>'
+        +DEL.map(function(a){var g=a.log||{};return '<tr><td class="c sn">'+esc(a.session)+'</td><td class="c">'+fds(a.date)+'</td><td class="c">'+esc(g.count||'-')+'</td>'
+          +'<td class="c">'+esc(String(a.deletedAtIso||'').slice(0,10).replace(/-/g,'. '))+'</td><td class="c">'+esc(a.deletedRole||'')+' '+esc(a.deletedByName||'')+'</td>'
+          +'<td>'+esc(a.reason||'')+(a.hadConfirm?' <span class="no-t">(교사확인 있던 회차)</span>':'')+'</td></tr>'}).join('')
+        +'</table>'});
+    }
 
     // ── 조립 ──
     var P=pages.length;
@@ -301,5 +314,30 @@
       +body+'<script>'+boot+'<'+'/script></body></html>');
     w.document.close();
   }
-  window.KFDF_LOGBOOK={prep:prep,render:render,fail:fail};
+  // [일지 삭제 2026-09-16] 삭제는 반드시 기록(sessionLogArchive/{같은 ID})과 한 묶음으로 — 규칙 v35.
+  //   원본 전체(내용·사진 주소·교사확인 서명·정정 이력)·사유·삭제자를 남기고 일지를 지웁니다. 둘 중 하나만 되는 일은 없습니다.
+  function removeLog(db,fb,id,log,who){
+    var src={};Object.keys(log||{}).forEach(function(k){if(k.charAt(0)!=='_')src[k]=log[k]});
+    who=who||{};
+    var b=db.batch();
+    b.set(db.collection('sessionLogArchive').doc(id),{
+      log:src,uid:src.uid||'',appId:src.appId||'',school:src.school||'',session:(src.session==null?null:src.session),
+      date:src.date||'',name:src.name||'',hadConfirm:!!src.teacherConfirm,
+      deletedAt:fb.firestore.FieldValue.serverTimestamp(),deletedAtIso:new Date().toISOString(),
+      deletedBy:who.uid||'',deletedByName:who.name||'',deletedRole:who.role||'',reason:String(who.reason||'').slice(0,500)});
+    b.delete(db.collection('sessionLogs').doc(id));
+    return b.commit();
+  }
+  // 사무국 복원 — 원래 ID 는 다시 쓰지 않고 새 ID 로 되살립니다(기록 1건 = 삭제 1건 원칙 유지).
+  function restoreLog(db,fb,arch,who){
+    var aid=arch._id||arch.id;who=who||{};
+    var ref=db.collection('sessionLogs').doc();
+    var data={};var s=arch.log||{};Object.keys(s).forEach(function(k){data[k]=s[k]});
+    data.restoredFrom=aid;
+    var b=db.batch();
+    b.set(ref,data);
+    b.update(db.collection('sessionLogArchive').doc(aid),{restoredAt:fb.firestore.FieldValue.serverTimestamp(),restoredBy:who.uid||'',restoredByName:who.name||'',restoredTo:ref.id});
+    return b.commit().then(function(){return ref.id});
+  }
+  window.KFDF_LOGBOOK={prep:prep,render:render,fail:fail,removeLog:removeLog,restoreLog:restoreLog};
 })();

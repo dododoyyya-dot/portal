@@ -3941,8 +3941,50 @@ async function adLogbook(id){
         ins.name=ins.name||ud.name||'';
       }
     }
-    KFDF_LOGBOOK.render(w,{app:s,appId:id,logs:logs,instructor:ins,printedBy:(CMY&&CMY.name)||'',printedRole:VIEWER_IS_ADMIN?'사무국':'시도 담당'});
+    var deleted=[];if(VIEWER_IS_ADMIN){try{var ds=await DB.collection('sessionLogArchive').where('appId','==',id).get();deleted=ds.docs.map(function(d){return Object.assign({_id:d.id},d.data())}).filter(function(x){return !x.restoredAt})}catch(e){}}
+    KFDF_LOGBOOK.render(w,{app:s,appId:id,logs:logs,deleted:deleted,instructor:ins,printedBy:(CMY&&CMY.name)||'',printedRole:VIEWER_IS_ADMIN?'사무국':'시도 담당'});
   }catch(e){KFDF_LOGBOOK.fail(w,e)}
+}
+// ── [일지 삭제 2026-09-16] 사무국 삭제·복원 — 원본·사유는 sessionLogArchive 에 보존 (규칙 v35) ──
+var AARCH={};
+function adArchBlock(appId){
+  var arr=(AARCH[appId]||[]).slice().sort(function(a,b){return (a.session||0)-(b.session||0)});
+  if(!arr.length)return '';
+  return '<div style="margin-top:10px;border-top:2px solid #e4e7ec;padding-top:8px"><b style="font-size:13px;color:#6b7280">🗑 삭제된 회차 기록 '+arr.length+'건</b> <span style="font-size:11.5px;color:#8a919d">— 집계·운영일지 실적에서 제외 · 원본과 사유 보존</span>'
+    +arr.map(function(a){var g=a.log||{};
+      return '<div style="border-top:1px dashed #d5d9e0;padding:6px 0;font-size:12.5px;color:#555">'
+        +'<b>'+esc(String(a.session||''))+'회차</b> · 원 수업일 '+esc(a.date||'-')+(g.count?' · 👥 '+esc(String(g.count))+'명':'')+' — '+esc(g.content||'')
+        +(a.hadConfirm?' · <span style="color:#b8860b;font-weight:700">교사확인 있던 회차('+esc((g.teacherConfirm||{}).name||'')+')</span>':'')
+        +'<br><span style="color:#8a919d">삭제 '+esc(String(a.deletedAtIso||'').replace('T',' ').slice(0,16))+' · '+esc(a.deletedRole||'')+' '+esc(a.deletedByName||'')+' · 사유: <b style="color:#16181d">'+esc(a.reason||'')+'</b></span>'
+        +(a.restoredAt?' <b style="color:#0f766e">· 복원됨('+esc(a.restoredByName||'')+')</b>'
+          :' <button class="btn-sub" style="padding:2px 9px;font-size:11.5px;background:#0f766e" title="이 회차를 일지로 되살립니다(새 번호로). 삭제 기록은 그대로 남습니다" onclick="adRestoreLog(\''+appId+'\',\''+a._id+'\')">↩ 복원</button>')
+        +'</div>'}).join('')
+    +'</div>';
+}
+function adDeleteLog(id){
+  if(!VIEWER_IS_ADMIN){alert('일지 삭제는 중앙 사무국만 할 수 있습니다.');return}
+  var l=ALOGS[id];if(!l){alert('일지를 다시 불러온 뒤 시도해주세요. (📒 일지를 닫았다 다시 열기)');return}
+  var reason=prompt('['+(l.school||'')+'] '+(l.session||'')+'회차 일지를 삭제합니다 (강사 '+(l.name||'')+' · '+(l.date||'')+').\n\n'
+    +'· 원본(내용·사진·교사확인 서명)과 삭제 사유는 기록으로 보존됩니다.\n'
+    +'· 삭제한 회차는 집계에서 빠지며, 강사가 같은 회차를 다시 작성할 수 있습니다.'+(l.teacherConfirm?'\n· 교사확인이 끝난 회차입니다.':'')+'\n\n삭제 사유를 입력하세요 (필수)','겸직 허가 이전 운영분 — 강사 요청');
+  if(reason===null)return;
+  reason=String(reason).trim();
+  if(reason.length<2){alert('삭제 사유를 2자 이상 입력해 주세요.');return}
+  var appId=l._appId||l.appId;
+  KFDF_LOGBOOK.removeLog(DB,firebase,id,l,{uid:(AUTH.currentUser||{}).uid||'',name:(CMY&&CMY.name)||'',role:'사무국',reason:reason})
+    .then(function(){alert('✓ '+(l.session||'')+'회차 일지를 삭제했습니다(기록 보존).');var box=document.getElementById('logs_'+appId);if(box){box.style.display='none';toggleLogs(appId)}})
+    .catch(function(e){alert('삭제 실패: '+(e.code||e.message)+(e.code==='permission-denied'?'\n보안 규칙 v35 게시 여부를 확인해 주세요.':''))});
+}
+function adRestoreLog(appId,aid){
+  if(!VIEWER_IS_ADMIN)return;
+  var a=(AARCH[appId]||[]).find(function(x){return x._id===aid});if(!a)return;
+  var dup=Object.keys(ALOGS).map(function(k){return ALOGS[k]}).filter(function(x){return (x._appId||x.appId)===appId&&x.session===a.session});
+  if(!confirm('['+(a.school||'')+'] '+a.session+'회차 일지를 복원합니다.\n사유였던 내용: '+(a.reason||'')+'\n\n'
+    +(dup.length?'⚠ 같은 '+a.session+'회차 일지가 이미 '+dup.length+'건 있습니다(강사가 다시 작성한 것일 수 있음). 복원하면 같은 회차가 겹칩니다.\n\n':'')
+    +'삭제 기록에는 「복원됨」이 표시되고, 일지는 새 번호로 되살아납니다. 계속할까요?'))return;
+  KFDF_LOGBOOK.restoreLog(DB,firebase,a,{uid:(AUTH.currentUser||{}).uid||'',name:(CMY&&CMY.name)||''})
+    .then(function(){alert('✓ 복원했습니다.');var box=document.getElementById('logs_'+appId);if(box){box.style.display='none';toggleLogs(appId)}})
+    .catch(function(e){alert('복원 실패: '+(e.code||e.message))});
 }
 async function toggleLogs(id){
   const el=document.getElementById('logs_'+id);
@@ -3951,20 +3993,25 @@ async function toggleLogs(id){
   try{
     const snap=await DB.collection('sessionLogs').where('appId','==',id).get();
     const logs=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).sort((a,b)=>(a.session||0)-(b.session||0));
+    Object.keys(ALOGS).forEach(function(k){if(ALOGS[k]&&ALOGS[k]._appId===id)delete ALOGS[k]});   // [일지 삭제] 지운 회차가 남지 않게 이 학교분을 새로 채움
     logs.forEach(function(l){ALOGS[l._id]=Object.assign({},l,{_appId:id})});   // [일지 정정] 수정창에서 참조
+    AARCH[id]=[];if(VIEWER_IS_ADMIN){try{const as=await DB.collection('sessionLogArchive').where('appId','==',id).get();AARCH[id]=as.docs.map(d=>Object.assign({_id:d.id},d.data()))}catch(e){}}   // [일지 삭제] 규칙 v35 전이면 빈 목록
+    if(!logs.length&&AARCH[id].length){el.innerHTML='<span style="font-size:13px;color:var(--gray)">현재 제출된 일지가 없습니다 (삭제된 회차만 있음).</span>'+adArchBlock(id);return}
     if(!logs.length){el.innerHTML='<span style="font-size:13px;color:var(--gray)">아직 제출된 일지가 없습니다. 배정된 강사(마이페이지 › 운영일지)가 직접 회차 보고를 등록해야 이곳에 표시됩니다 — 강사에게 제출을 안내해주세요.</span>';return}
     const cfmN=logs.filter(l=>l.teacherConfirm).length;
     el.innerHTML='<b style="font-size:13.5px">운영일지 '+logs.length+'건 (강사: '+esc(logs[0].name)+')</b> <span style="font-size:12px;font-weight:800;color:'+(cfmN===logs.length?'#0f766e':'#C41E2F')+'">· 교사확인 '+cfmN+'/'+logs.length+'</span>'+' <button class="btn-sub" style="padding:3px 12px;font-size:12px;background:#16181d;margin-left:6px" title="표지·요약 통계·회차별 사진 기록·확인란이 담긴 운영일지를 PDF로 저장합니다" onclick="adLogbook(\''+id+'\')">🖨 운영일지 PDF</button>'
       +logs.map(l=>'<div style="border-top:1px dashed #d5d9e0;padding:8px 0;font-size:13px">'
         +'<b>'+l.session+'회차</b> · '+esc(l.date)+(l.count?' · 👥 '+l.count+'명':'')+' — '+esc(l.content)
         +(l.note?' · <span style="color:#C41E2F">'+esc(l.note)+'</span>':'')
-        +(VIEWER_IS_ADMIN?' <button class="btn-sub" style="padding:2px 9px;font-size:11.5px;background:#b8860b" title="사무국 정정 — 수업일·인원·내용·비고. 교사확인은 그대로 남으며 정정 이력이 기록됩니다" onclick="adEditLog(\''+l._id+'\')">✏️ 수정</button>':'')
+        +(VIEWER_IS_ADMIN?' <button class="btn-sub" style="padding:2px 9px;font-size:11.5px;background:#b8860b" title="사무국 정정 — 수업일·인원·내용·비고. 교사확인은 그대로 남으며 정정 이력이 기록됩니다" onclick="adEditLog(\''+l._id+'\')">✏️ 수정</button>'
+          +' <button class="btn-sub" style="padding:2px 9px;font-size:11.5px;background:#C41E2F" title="사무국 삭제 — 원본과 사유는 기록으로 남습니다" onclick="adDeleteLog(\''+l._id+'\')">🗑 삭제</button>':'')
         +'<div style="margin-top:4px">'+(l.teacherConfirm
             ?'<span style="font-weight:800;color:#0f766e">✓ 교사확인: '+esc(l.teacherConfirm.name)+'</span>'+(l.teacherConfirm.at?' <span style="color:#8a919d;font-size:11.5px">('+esc(String(l.teacherConfirm.at).replace("T"," ").slice(0,16))+')</span>':'')+(l.teacherConfirm.sign?' <a href="'+l.teacherConfirm.sign+'" target="_blank"><img src="'+l.teacherConfirm.sign+'" style="height:26px;vertical-align:middle;border:1px solid #eee;border-radius:4px;margin-left:4px"></a>':'')
             :'<span style="font-weight:800;color:#C41E2F">⚠ 교사 미확인</span>')+'</div>'
         +adEditBadge(l)
         +(l.photos&&l.photos.length?'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">'+l.photos.map(p=>'<a href="'+p+'" target="_blank"><img src="'+p+'" style="width:90px;height:66px;object-fit:cover;border-radius:8px"></a>').join('')+'</div>':'')
-        +'</div>').join('');
+        +'</div>').join('')
+        +adArchBlock(id);
   }catch(e){el.innerHTML='<span style="font-size:13px;color:var(--red)">불러오기 실패: '+esc(e.message)+'</span>'}
 }
 async function unassign(id){
@@ -8430,7 +8477,7 @@ async function dlGoodsCerts(){
 <script src="schoolclub_core.js?v=20260914b"></script>
 <script src="post_alert.js?v=20260914a"></script>
 <script src="schoolclub_admin.js?v=20260914f"></script>
-<script src="logbook.js?v=20260914a"></script>
+<script src="logbook.js?v=20260916a"></script>
 <script src="consentdocs.js?v=20260914a"></script>
 <script src="auth_ui.js?v=20260914b"></script>
 </body>
