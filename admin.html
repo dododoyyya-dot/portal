@@ -552,6 +552,7 @@ function eduWho(v){return (v.name||'')+' ('+(v.birth||'생년월일 없음')+' �
         <button class="btn-sub" style="background:#153A77" onclick="reviewHist()">📋 이력 승인·포인트 전환</button>
         <button class="btn-sub" style="background:#b8860b" onclick="payrollCSV()">💰 월 지급 계산 CSV</button>
         <button class="btn-sub" style="background:#0f766e" onclick="rptDownload()" title="유소년 월별 현황보고서 양식에 누적 실적을 자동 기입해 내려받습니다 (양식·수식은 그대로). 강습을 시작한(일지가 있는) 학교만 들어갑니다">📊 월별 현황보고서 (빈 양식에 기입)</button>
+        <button id="rosterBtn" class="btn-sub" style="background:#8c1622;display:none" onclick="exportAssignRoster()" title="공문 「파견 강사 범죄경력조회 처리 및 겸직 안내」 붙임 2 — 배정완료 학교의 강사 명단 (중앙 사무국 전용)">📋 배정 강사 명단(엑셀)</button>
         <label class="btn-sub" style="background:#0f766e;cursor:pointer;display:inline-block" title="지난달 제출한 보고서(.xlsx)를 고르면 그 파일 위에 이번 달 누적을 갱신합니다 — 이미 있는 학교는 남/여·학년을 그대로 두고 월별 횟수·회차만 갱신, 새로 시작한 학교만 아래에 추가">📊 지난달 보고서 기준으로 갱신<input type="file" accept=".xlsx" style="display:none" onchange="rptDownload(this.files[0]);this.value=''"></label>
         <label class="btn-sub" style="background:#0e7490;cursor:pointer;display:inline-block" title="지난달 제출한 보고서(.xlsx)의 학년-반·남·여를 학교별 수혜자 정보로 저장">📥 이전 보고서에서 수혜자 정보 가져오기<input type="file" accept=".xlsx" style="display:none" onchange="rptImportPrev(this)"></label>
         <button class="btn-sub" style="background:#555" onclick="closeWaitlist()">⏳ 대기자 일괄 종료</button>
@@ -665,6 +666,7 @@ AUTH.onAuthStateChanged(async u=>{
   IS_SIDO=isSido&&!isAdmin;
   IS_OWNER=md.owner===true;
   VIEWER_IS_ADMIN=isAdmin;
+  (function(){var rb=document.getElementById('rosterBtn');if(rb)rb.style.display=isAdmin?'':'none'})();   // [공문 붙임2] 중앙 사무국만
   document.getElementById('adminBody').style.display='block';loadDash();
   try{const _t=parseInt(new URLSearchParams(location.search).get('tab')||'',10);if(_t>=1&&_t<=10)tab(_t)}catch(e){}   // [화면 주소] admin.html?tab=번호 로 바로 열기
   // [관할] 시도연맹 임원에게만 조회 범위 전환(관할 / 미판정)을 보여줍니다.
@@ -3639,6 +3641,122 @@ async function syncLogPoints(){
   if(done)await updateLeaderboard();
   alert(done?('반영 완료 — '+done+'개교, 총 '+pts+'P 지급'):'반영할 신규 일지가 없습니다.');
   loadApps();
+}
+// ══ [공문 붙임2 2026-09-17] 학교별 배정 강사 명단(엑셀) — 「파견 강사 범죄경력조회 처리 및 겸직 안내」 공문 붙임 ══
+//   학교가 명단의 강사에게 범죄경력회보서 발급시스템 기관ID·검증번호를 직접 전달하는 용도입니다.
+//   시트1 배정완료(신청 건 단위) · 시트2 미배정(선정). 학교별 파일(zip)은 다른 학교 강사 연락처가 섞이지 않게 합니다.
+//   엑셀은 이미 불러온 ExcelJS(머리글 굵게·배경색 지원), 압축은 JSZip 을 씁니다 — CDN 추가 없음. 중앙 사무국 전용.
+const ROSTER_H1=['연번','권역','시도','시군구','학교명','유형','강사 성명','강사 연락처','본인지도','담당교사','담당교사 연락처','배정 상태','비고'];
+const ROSTER_W1=[6,10,8,12,18,11,10,14,8,10,14,10,24];
+const ROSTER_H2=['연번','권역','시도','학교명','유형','담당교사','담당교사 연락처','비고'];
+const ROSTER_W2=[6,10,8,18,11,10,14,14];
+function rosterSido(s){
+  if(typeof s.sidoKey==='string'&&s.sidoKey)return s.sidoKey;
+  return kfdfSidoKey({baseCity:[s.sido,s.city,s.school].filter(Boolean).join(' ')})||'';
+}
+function rosterCity(s,sido){   // 「경상남도 창원시」처럼 시도가 앞에 붙은 경우 시도는 떼고 시군구만
+  var p=String(s.city||'').trim().split(/\s+/).filter(Boolean);
+  if(p.length>1&&sido&&kfdfSidoKey({baseCity:p[0]})===sido)p.shift();
+  return p.join(' ');
+}
+function rosterType(s){return appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육'}
+function rosterSort(a,b){
+  var ra=KFDF_REGIONS.indexOf(a['권역']),rb=KFDF_REGIONS.indexOf(b['권역']);
+  if(ra<0)ra=99;if(rb<0)rb=99;
+  return (ra-rb)||String(a['시도']).localeCompare(String(b['시도']),'ko')||String(a['학교명']).localeCompare(String(b['학교명']),'ko')||String(a['유형']).localeCompare(String(b['유형']),'ko');
+}
+async function buildAssignRoster(){
+  var um={};(USERS||[]).forEach(function(d){um[d.id]=d.data()||{}});
+  var docs=(APPS||[]).map(function(d){return {id:d.id,s:d.data()||{}}}).filter(function(x){return !x.s.deleted});
+  var asg=docs.filter(function(x){return x.s.status==='배정완료'});
+  // 회원 명단(USERS)에 없는 강사만 한 번씩 단건 조회
+  var miss=asg.map(function(x){return x.s.assignedUid}).filter(function(u,i,a){return u&&!um[u]&&a.indexOf(u)===i});
+  for(var i=0;i<miss.length;i++){try{var g=await DB.collection('users').doc(miss[i]).get();if(g.exists)um[miss[i]]=g.data()||{}}catch(e){}}
+  var key=function(s,sido){return String(s.school||'').replace(/\s/g,'')+'|'+sido};
+  var cnt={};asg.forEach(function(x){var k=key(x.s,rosterSido(x.s));cnt[k]=(cnt[k]||0)+1});
+  var r1=asg.map(function(x){
+    var s=x.s,sido=rosterSido(s),uid=s.assignedUid||'',u=uid?um[uid]:null,note=[];
+    var ph=(u&&u.phone)?String(u.phone):'';
+    if(!uid)note.push(s.assignedName?'회원 미연결':'강사 정보 없음');
+    if(!ph)note.push('연락처 없음');
+    if(cnt[key(s,sido)]>1)note.push(cnt[key(s,sido)]+'건 배정');
+    var r={_key:key(s,sido)};
+    r['권역']=appRegion(s);r['시도']=sido;r['시군구']=rosterCity(s,sido);r['학교명']=s.school||'';r['유형']=rosterType(s);
+    r['강사 성명']=(u&&u.name)||s.assignedName||'';r['강사 연락처']=ph;
+    r['본인지도']=(s.selfTeach&&s.support!=='용품만')?'O':'';
+    r['담당교사']=s.teacher||'';r['담당교사 연락처']=s.phone?String(s.phone):'';
+    r['배정 상태']='배정완료';r['비고']=note.join(' · ');
+    return r;
+  }).sort(rosterSort);
+  var r2=docs.filter(function(x){return x.s.status==='선정'}).map(function(x){
+    var s=x.s,sido=rosterSido(s),r={};
+    r['권역']=appRegion(s);r['시도']=sido;r['학교명']=s.school||'';r['유형']=rosterType(s);
+    r['담당교사']=s.teacher||'';r['담당교사 연락처']=s.phone?String(s.phone):'';
+    r['비고']=s.support==='용품만'?'용품만':'강사 미배정';
+    return r;
+  }).sort(rosterSort);
+  r1.forEach(function(r,i){r['연번']=i+1});r2.forEach(function(r,i){r['연번']=i+1});
+  return {assigned:r1,selected:r2};
+}
+function rosterSheet(wb,title,head,widths,rows){
+  var ws=wb.addWorksheet(title,{views:[{state:'frozen',ySplit:1}]});
+  ws.columns=head.map(function(h,i){return {header:h,key:'c'+i,width:widths[i]}});
+  head.forEach(function(h,i){if(/연락처/.test(h))ws.getColumn(i+1).numFmt='@'});   // 연락처는 문자열(앞자리 0 유지)
+  rows.forEach(function(r){ws.addRow(head.map(function(h){return r[h]==null?'':r[h]}))});
+  var hr=ws.getRow(1);hr.font={bold:true};
+  hr.eachCell(function(c){c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD9D9D9'}}});
+  return ws;
+}
+function rosterWorkbook(assigned,selected){
+  var wb=new ExcelJS.Workbook();
+  rosterSheet(wb,'배정완료',ROSTER_H1,ROSTER_W1,assigned);
+  if(selected)rosterSheet(wb,'미배정(선정)',ROSTER_H2,ROSTER_W2,selected);
+  return wb.xlsx.writeBuffer();
+}
+function rosterYmd(){var d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')}
+function rosterSafe(s){return String(s||'').replace(/[\\\/:*?"<>|\s]+/g,'')}
+function exportAssignRoster(){
+  if(!VIEWER_IS_ADMIN){alert('배정 강사 명단은 중앙 사무국만 내려받을 수 있습니다.');return}
+  if(!APPS||!APPS.length){alert('강습 신청 목록을 먼저 불러와 주세요. (↻ 새로고침)');return}
+  var old=document.getElementById('rosterModal');if(old)old.remove();
+  var div=document.createElement('div');div.id='rosterModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:440px;width:100%;padding:22px">'
+    +'<b style="font-size:16px">📋 학교별 배정 강사 명단 (공문 붙임 2)</b>'
+    +'<div style="font-size:12.5px;color:#555;margin:6px 0 14px;line-height:1.6">강사 연락처가 들어갑니다. 학교에 보낼 때는 <b>학교별 파일</b>을 쓰면 다른 학교 강사 연락처가 섞이지 않습니다.</div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px">'
+    +'<button class="btn-sub" style="background:#0f766e" onclick="rosterGo(\'all\')">전체 명단 — 파일 1개 (배정완료 · 미배정 시트)</button>'
+    +'<button class="btn-sub" style="background:#153A77" onclick="rosterGo(\'each\')">학교별 파일로 — zip 1개 (학교마다 자기 행만)</button>'
+    +'<button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'rosterModal\').remove()">닫기</button>'
+    +'</div><div id="rosterMsg" style="font-size:12.5px;font-weight:700;margin-top:10px"></div></div>';
+  div.addEventListener('click',function(e){if(e.target===div)div.remove()});
+  document.body.appendChild(div);
+}
+async function rosterGo(mode){
+  var m=document.getElementById('rosterMsg');
+  if(!VIEWER_IS_ADMIN)return;
+  if(typeof ExcelJS==='undefined'||(mode==='each'&&typeof JSZip==='undefined')){alert('엑셀·압축 라이브러리를 아직 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');return}
+  if(!confirm('강사 연락처가 포함된 명단입니다. 공문 발송 목적으로만 사용하세요.'))return;
+  try{
+    if(m){m.textContent='명단을 만드는 중…';m.style.color='#8a919d'}
+    var R=await buildAssignRoster(),ymd=rosterYmd();
+    if(mode==='all'){
+      var buf=await rosterWorkbook(R.assigned,R.selected);
+      scDownload('붙임2_학교별_배정강사_명단_'+ymd+'.xlsx',new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+      if(m){m.textContent='✓ 배정완료 '+R.assigned.length+'건 · 미배정 '+R.selected.length+'건';m.style.color='#0f766e'}
+      return;
+    }
+    var groups={};R.assigned.forEach(function(r){(groups[r._key]=groups[r._key]||[]).push(r)});
+    var zip=new JSZip(),used={},keys=Object.keys(groups);
+    for(var i=0;i<keys.length;i++){
+      var rows=groups[keys[i]].map(function(r,j){var c=Object.assign({},r);c['연번']=j+1;return c});
+      var base='붙임2_배정강사_'+rosterSafe(rows[0]['시도'])+'_'+rosterSafe(rows[0]['학교명']);
+      var fn=base,n=2;while(used[fn])fn=base+'_'+(n++);used[fn]=1;
+      zip.file(fn+'.xlsx',await rosterWorkbook(rows,null));
+    }
+    scDownload('붙임2_학교별_개별_'+ymd+'.zip',await zip.generateAsync({type:'blob'}));
+    if(m){m.textContent='✓ 학교 '+keys.length+'곳 파일을 묶었습니다 (배정 '+R.assigned.length+'건)';m.style.color='#0f766e'}
+  }catch(e){if(m){m.textContent='만들기 실패: '+e.message;m.style.color='#C41E2F'}else alert('만들기 실패: '+e.message)}
 }
 // ══ [월별 현황보고서 2026-09-10] 매월 5일 제출용 — 양식(files/report_template_2026.xlsx)의 입력 칸만 채웁니다 ══
 //   · 양식 파일을 그대로 zip 으로 열어 sheet1.xml 의 값 셀만 바꿉니다 → 서식·수식(색칠 칸)·메모·「사업 성과」 시트 모두 보존
