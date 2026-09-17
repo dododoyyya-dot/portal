@@ -608,6 +608,8 @@ function orgChip(o,region,title,fed){
     <!-- [위촉 서류] 선정 강사가 일지를 쓰는 같은 화면에서 서류를 처리 — 겸직 허가서 업로드 · 아동청소년 성범죄 경력조회 동의(전자동의) · 연맹 확인 상태 -->
     <div id="hireDocsRow" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#fff8e6;border:1.5px solid #f1dfa6;border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:13px"></div>
     <input type="file" id="hdMoonFile" accept="image/*,application/pdf" style="display:none" onchange="hdMoonUpload(this)">
+    <div id="crimBox" style="margin:-6px 0 14px"></div>
+    <input type="file" id="crimFile" accept="image/*" style="display:none" onchange="crimUpload(this)">
     <div style="background:#eef3fa;border:1.5px solid #b9cdec;border-radius:12px;padding:13px 17px;margin-bottom:14px;font-size:13px;line-height:1.75;color:#1a2b4a">
       📋 <b>회차 보고 안내</b> — 수업일·회차·참여 인원과 아래 <b>안전 지도 점검</b>을 확인해 제출해 주세요. 강사수당 지급·실적보고의 기초자료가 됩니다. (미제출 회차는 수당 산정 제외 · 사진은 활동 장면 1~3장 권장)
     </div>
@@ -2514,13 +2516,62 @@ function renderHireDocs(d){
     +'</span>';}
   // ② 아동·청소년 성범죄 경력 조회 — 동의(전자동의) + 연맹 확인
   h+='<span style="display:inline-flex;align-items:center;gap:6px;border:1.5px solid #e2e7f0;background:#fff;border-radius:10px;padding:6px 10px">'
-    +'<span style="font-weight:800">🛡 성범죄 경력 조회</span>'
+    +'<span style="font-weight:800">🛡 경력조회 협조 동의</span>'
     +(consented?hdBadge('동의 완료','#0f766e'):hdBadge('동의 필요','#C41E2F'))
-    +(d.crimDoc?hdBadge('연맹 확인 ✓','#0f766e'):'<span style="font-size:11.5px;color:#8a919d;font-weight:700">연맹 확인 대기</span>')
+    +(d.crimDoc?hdBadge('경력확인 ✓','#0f766e'):'<span style="font-size:11.5px;color:#8a919d;font-weight:700">학교별 조회는 아래 카드</span>')
     +(consented?'':'<button class="btn-sub" style="background:#C41E2F;padding:6px 12px;font-size:12px" onclick="var e=document.getElementById(\'consentWrap\');if(e){e.scrollIntoView({block:\'center\',behavior:\'smooth\'})}">✍ 전자동의 하러 가기</button>')
     +'</span>';
   h+='<span id="hdMsg" style="font-size:12px;font-weight:800;min-width:60px"></span>';
   row.innerHTML=h;
+  renderCrimCards().catch(function(){});   // [범죄경력조회 증빙] 배정 학교별 카드
+}
+// ══════════ [범죄경력조회 증빙 2026-09-17] 배정 학교별 「발급동의 완료 화면」 사진 — 공문 붙임 1 ③ · crimcheck.js · 규칙 v36 ══════════
+//   절차(기관ID 전달·시스템 동의·학교 조회·적격 회신)는 학교↔강사가 직접 하고, 연맹은 이 사진만 증빙으로 보관합니다.
+var CRIM_TARGET='';
+async function renderCrimCards(){
+  const box=document.getElementById('crimBox');if(!box||!window.KFDF_CRIM||!AUTH.currentUser)return;
+  const asg=(typeof MYASG!=='undefined'&&MYASG)||[];
+  if(!asg.length){box.innerHTML='';return}
+  const docs=await Promise.all(asg.map(x=>DB.collection('crimChecks').doc(x.id).get().then(g=>g.exists?g.data():null).catch(()=>null)));
+  box.innerHTML=asg.map((x,i)=>{
+    const a=x.data(),chk=docs[i],c=chk&&chk.consent,st=KFDF_CRIM.status(chk,null),done=!!(chk&&chk.schoolDone);
+    return '<div style="border:1.5px solid #e2e7f0;background:#fff;border-radius:12px;padding:10px 14px;margin-top:8px;font-size:13px">'
+      +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>🛡 범죄경력 조회 — '+esc(a.school||'')+'</b><span style="font-size:11.5px;color:#8a919d">'+esc(a.type||'')+'</span>'+KFDF_CRIM.chip(st)
+      +(c?'<span style="font-size:11.5px;color:#8a919d">제출 '+esc(String(c.at||'').slice(0,10))+'</span> <button class="btn-sub" style="background:#fff;color:#153A77;border:1.5px solid #153A77;padding:4px 10px;font-size:11.5px" onclick="crimView(\''+x.id+'\')">내 사진 보기</button>':'')+'</div>'
+      +(c&&c.status==='반려'?'<div style="font-size:12px;color:#C41E2F;font-weight:800;margin-top:4px">반려 사유: '+esc(c.note||'')+' — 다시 올려 주세요</div>':'')
+      +(done?'<div style="font-size:12px;color:#0f766e;font-weight:700;margin-top:4px">학교 조회가 끝났습니다. 더 하실 일은 없습니다.</div>'
+        :'<details style="margin-top:6px"'+(c?'':' open')+'><summary style="cursor:pointer;font-weight:800;color:#153A77">진행 방법 · 주의</summary>'+KFDF_CRIM.guideHtml()+'</details>'
+        +'<label style="display:flex;gap:7px;align-items:flex-start;margin-top:8px;font-size:12.5px;font-weight:700"><input type="checkbox" id="crimOk_'+x.id+'" style="width:auto;margin-top:3px">이 사진은 「발급동의 신청 완료 화면」이며 회보서가 아닙니다. 주민등록번호는 가렸습니다.</label>'
+        +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px"><button class="btn-sub" style="background:#153A77;padding:6px 12px;font-size:12px" onclick="crimPick(\''+x.id+'\')">📷 완료 화면 사진 '+(c?'다시 ':'')+'올리기</button><span id="crimMsg_'+x.id+'" style="font-size:12px;font-weight:800"></span></div>')
+      +'</div>';
+  }).join('');
+}
+function crimPick(id){
+  const ok=document.getElementById('crimOk_'+id);
+  const m=document.getElementById('crimMsg_'+id);
+  if(!ok||!ok.checked){if(m){m.textContent='먼저 위 확인란에 체크해 주세요';m.style.color='#C41E2F'}return}
+  CRIM_TARGET=id;const f=document.getElementById('crimFile');if(f){f.value='';f.click()}
+}
+async function crimUpload(inp){
+  const id=CRIM_TARGET,f=inp.files&&inp.files[0];if(!id||!f)return;
+  const m=document.getElementById('crimMsg_'+id);const say=(t,bad)=>{if(m){m.textContent=t;m.style.color=bad?'#C41E2F':'#0f766e'}};
+  const x=(MYASG||[]).find(d=>d.id===id);if(!x)return;
+  say('올리는 중…');
+  try{
+    await KFDF_CRIM.upload({db:DB,fb:firebase,uid:AUTH.currentUser.uid,name:(MYD&&MYD.name)||'',app:{id:id,school:x.data().school||''},file:f,compress:compressImg});
+    await renderCrimCards();
+    const m2=document.getElementById('crimMsg_'+id);if(m2){m2.textContent='✓ 올렸습니다 — 연맹이 증빙으로 보관합니다.';m2.style.color='#0f766e'}
+  }catch(e){say('올리기 실패: '+((e&&e.code)==='permission-denied'?'권한이 없습니다 — 사무국에 문의해 주세요':(e&&e.message||e)),true)}
+  inp.value='';
+}
+async function crimView(id){
+  const w=window.open('','_blank');
+  try{
+    const g=await DB.collection('crimChecks').doc(id).get();const c=g.exists&&g.data().consent;
+    if(!c||!c.path)throw new Error('올린 사진이 없습니다');
+    const url=await KFDF_CRIM.photoUrl(firebase,c.path);
+    if(w)w.location.href=url;else location.href=url;
+  }catch(e){if(w)w.close();alert('사진을 열 수 없습니다: '+(e.code||e.message))}
 }
 async function hdMoonUpload(inp){
   const f=inp.files&&inp.files[0];if(!f)return;
@@ -3794,6 +3845,7 @@ document.getElementById('sigModal').addEventListener('click',function(e){if(e.ta
 </script>
 <script src="schoolclub_core.js?v=20260914b"></script>
 <script src="logbook.js?v=20260916a"></script>
+<script src="crimcheck.js?v=20260917a"></script>
 <script src="auth_ui.js?v=20260914b"></script>
 </body>
 </html>
