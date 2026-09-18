@@ -621,6 +621,7 @@ function openPostForm(editId){
   PF_COMP_DAYS={};   // [시간대 연결] 폼을 새로 열 때 초기화
   PF_POSTERS=(ed&&ed.posters)?ed.posters.slice():[];
   PF_CIMGS=(ed&&ed.consentImgs)?ed.consentImgs.map(u=>({url:u})):[];
+  PF_PIMGS=(ed&&ed.pledgeImgs)?ed.pledgeImgs.map(u=>({url:u})):[];   // [서약서]
   PF_OVL={};if(ed&&ed.consentOverlays)Object.keys(ed.consentOverlays).forEach(k=>{PF_OVL[k]=(ed.consentOverlays[k]||[]).map(f=>Object.assign({},f))});
   PF_DATES=(ed&&ed.dates)?ed.dates.map(d=>d.date).sort():[];
   const base=PF_DATES.length?new Date(PF_DATES[0]+'T00:00:00'):new Date();
@@ -687,6 +688,11 @@ function openPostForm(editId){
     +'<input type="file" id="pfCImg" accept="image/*,.pdf" multiple style="display:block;margin-top:5px;font-size:13px" onchange="pfAddCImgs(this)">'
     +'<div style="font-size:11.5px;color:#8a919d;margin-top:3px">사진·스캔 이미지 또는 PDF (PDF 는 장별 이미지로 자동 변환). 한글 파일은 [파일 → PDF로 저장] 후 올려 주세요.</div>'
     +'<div id="pfCImgList" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>'
+    // [서약서 2026-09-18] 동의서와 같은 형식 — 비워 두면 서약서 없는 공고
+    +'<label class="stlabel">서약서 문안 <span style="font-weight:600;color:#8a919d;font-size:11px">— 선택 · 입력하면 신청 화면 동의서 아래에 표시되고 서약 체크가 있어야 제출됩니다</span></label><textarea id="pfPText" rows="3" class="stfield" placeholder="예: 본인은 대회 규정을 준수하고 공정하게 판정하며, 품위를 지킬 것을 서약합니다. (비우면 서약서 없음)">'+esc(ed?(ed.pledgeText||''):'')+'</textarea>'
+    +'<label class="stlabel">서약서 스캔 이미지 (선택 — 업로드 시 문안과 함께 표시)</label>'
+    +'<input type="file" id="pfPImg" accept="image/*,.pdf" multiple style="display:block;margin-top:5px;font-size:13px" onchange="pfAddPImgs(this)">'
+    +'<div id="pfPImgList" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>'
     +'<label class="stlabel">📂 동의서 보관함 <span style="font-weight:600;color:#8a919d;font-size:11px">— 대회 공고와 같은 보관함</span></label>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
     +'<select id="pfTplSel" class="stfield" style="min-width:200px;flex:1"><option value="">불러오는 중…</option></select>'
@@ -712,7 +718,7 @@ function openPostForm(editId){
   window.PF_ED=ed||null;
   if(!ed)PF_OVL={};
   renderCal();pfDates();pfRenderPosters();
-  pfRenderCImgs();pfTplFill();pfPaperChips();
+  pfRenderCImgs();pfRenderPImgs();pfTplFill();pfPaperChips();   // [서약서]
   pfFillComps(ed);  // [v7] 상위 대회 목록 로드
 }
 // 심판복 라디오 — "미제공" 선택 시 준비물 [심판복] 자동 체크
@@ -1014,6 +1020,85 @@ async function pfOvlOcr(){
     say(n?('✓ '+n+'개 항목을 글자 옆에 놓았습니다 ('+Object.keys(placed).map(k=>PF_OVL_FIELDS[k]||k).join('·')+') — 위치가 어긋나면 끌어서 맞추세요.'):'항목 이름(성명·생년월일·서명…)을 찾지 못했습니다 — 이미지가 선명한지 확인하거나 [⚡ 기본 배치]를 쓰세요.',!n);
   }catch(e){say('인식 실패: '+(e&&e.message||e),true)}
 }
+// ══════════ [서약서 2026-09-18] 공고별 서약서 — 동의서와 같은 형식(문안 pledgeText · 스캔 이미지 pledgeImgs[]) ══════════
+//   공고에 서약서가 있으면 신청 화면 ② 동의서 아래에 보여 주고, 서약 체크가 있어야 제출됩니다(staffApplications.agree.pledge=true).
+//   담당자는 공고 상세의 [📜 서약서 일괄 출력]으로 전 신청자분을 서명과 함께 한 번에 뽑습니다(인쇄 창 → PDF로 저장).
+let PF_PIMGS=[];
+function hasPledge(p){return !!(p&&((p.pledgeImgs&&p.pledgeImgs.length)||String(p.pledgeText||'').trim()))}
+function pfAddPImgs(input){
+  const files=[...input.files];
+  if(PF_PIMGS.length+files.length>10){alert('서약서 이미지는 최대 10장까지 첨부할 수 있습니다.');input.value='';return}
+  files.forEach(f=>{
+    const isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name);
+    if(/\.(hwp|hwpx|docx?)$/i.test(f.name)){alert(f.name+' — 한글·워드 파일은 브라우저가 열 수 없습니다.\n한글에서 [파일 → PDF로 저장] 한 뒤 그 PDF 를 올려 주세요.');return}
+    if(!isPdf&&!/^image\//.test(f.type)){alert(f.name+' — 이미지 또는 PDF 만 올릴 수 있습니다.');return}
+    if(isPdf){
+      const el=document.getElementById('pfPImgList');if(el)el.insertAdjacentHTML('beforeend','<div style="font-size:12px;color:#153A77;font-weight:800">PDF 를 이미지로 변환 중… ('+esc(f.name)+')</div>');
+      CAREER.pdfPages(f,{maxPages:10}).then(pages=>{pages.forEach(pg=>PF_PIMGS.push({file:pg.blob,name:pg.name,dataUrl:pg.dataUrl}));pfRenderPImgs();if(pages.length&&pages[0].pages>10)alert('PDF 가 '+pages[0].pages+'장이라 앞 10장만 넣었습니다.')})
+        .catch(e=>{pfRenderPImgs();alert('PDF 변환 실패: '+(e&&e.message||e)+'\n이미지(JPG·PNG)로 저장해 올려 주세요.')});
+      return;
+    }
+    const x={file:f,name:f.name};PF_PIMGS.push(x);
+    try{const fr=new FileReader();fr.onload=()=>{x.dataUrl=fr.result;pfRenderPImgs()};fr.readAsDataURL(f)}catch(e){}
+  });
+  input.value='';pfRenderPImgs();
+}
+function pfRenderPImgs(){
+  const el=document.getElementById('pfPImgList');if(!el)return;
+  el.innerHTML=PF_PIMGS.length?PF_PIMGS.map((x,i)=>{
+    const src=x.url||x.dataUrl||'';
+    return '<div style="position:relative;display:inline-flex">'
+      +(src?'<img class="stthumb" src="'+esc(src)+'" onclick="window.open(this.src)">':'<div class="stthumb" style="display:flex;align-items:center;justify-content:center;font-size:10px;color:#8a919d;background:#f6f8fb;padding:4px;text-align:center;word-break:break-all">'+esc(x.name||'이미지')+'</div>')
+      +'<button type="button" onclick="PF_PIMGS.splice('+i+',1);pfRenderPImgs()" style="position:absolute;top:-6px;right:-6px;border:none;background:#C41E2F;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;font-weight:900">×</button></div>';
+  }).join(''):'<span style="font-size:12px;color:#8a919d">이미지 없음 (문안만 사용)</span>';
+}
+// 신청 화면 ② 동의서 아래
+function pledgeApplyHtml(p,checked){
+  if(!hasPledge(p))return '';
+  return '<div style="font-size:13px;font-weight:800;margin-top:16px">서약서</div>'
+    +'<div style="border:1.5px solid #e2e7f0;border-radius:10px;padding:10px 12px;margin-top:6px;background:#fff">'
+    +(String(p.pledgeText||'').trim()?'<div style="font-size:12.5px;line-height:1.8;white-space:pre-wrap">'+esc(p.pledgeText)+'</div>':'')
+    +(p.pledgeImgs||[]).map((u,i)=>'<img src="'+esc(u)+'" alt="서약서 '+(i+1)+'" style="width:100%;display:block;border:1px solid #e2e7f0;border-radius:8px;margin-top:8px">').join('')
+    +'</div>'
+    +'<label style="display:flex;gap:7px;align-items:center;cursor:pointer;font-size:12.5px;line-height:2.1;margin-top:5px"><input type="checkbox" id="apPledge" style="width:auto"'+(checked?' checked':'')+'> (필수) 위 서약서 내용을 확인하였으며 이를 지킬 것을 서약합니다</label>';
+}
+// 담당자 일괄 출력(onlyUid 가 있으면 본인 것) — 맨 앞 목록 1장 + 신청자별 서약서(성명·연락처·임무·서약 여부·일자·전자서명)
+function printPledgeDocs(postId,onlyUid){
+  const p=POSTS.find(x=>x.id===postId);if(!p||!hasPledge(p))return;
+  let apps=(APPS[p.id]||[]).slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+  if(onlyUid)apps=apps.filter(a=>a.uid===onlyUid);
+  if(!apps.length){alert('신청 내역이 없습니다.');return}
+  const th='style="border:1px solid #666;background:#f2f2f2;padding:7px;font-size:13px"',td='style="border:1px solid #666;padding:7px;font-size:13px"';
+  const stOf=a=>{const v=Object.values(a.status||{});return v.indexOf('확정')>=0?'확정':(v.length&&v.every(x=>x==='거절')?'거절':'대기')};
+  const dutyOf=a=>(a.days||[]).map(d=>fmtD(d)+((a.prefs&&a.prefs[d]&&a.prefs[d].length)?' '+a.prefs[d].join('·'):'')).join(' / ');
+  const pages=[];
+  if(!onlyUid)pages.push('<div style="page-break-after:always;font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:30px 10px">'
+    +'<h2 style="text-align:center;border:2px solid #333;padding:12px">서약서 일괄 출력 목록</h2>'
+    +'<div style="text-align:center;color:#555;font-size:13.5px;margin:8px 0 14px">'+esc(p.competitionName||'')+' · 심판·운영요원 · 출력일 '+new Date().toISOString().slice(0,10)+' · 총 '+apps.length+'명</div>'
+    +'<table style="width:100%;border-collapse:collapse"><tr><th '+th+'>연번</th><th '+th+'>성명</th><th '+th+'>연락처</th><th '+th+'>상태</th><th '+th+'>신청일</th><th '+th+'>서약</th><th '+th+'>전자서명</th></tr>'
+    +apps.map((a,i)=>{const g=a.agree||{};return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'>'+esc(a.name||'')+'</td><td '+td+'>'+esc(a.phone||'')+'</td><td '+td+'>'+stOf(a)+'</td><td '+td+'>'+esc(String(g.at||'').slice(0,10))+'</td><td '+td+'>'+(g.pledge===true?'○':'-')+'</td><td '+td+'>'+(g.signature?'○':'-')+'</td></tr>'}).join('')
+    +'</table><div style="font-size:12px;color:#555;margin-top:10px;line-height:1.7">※ 서약 「-」: 서약서가 공고에 추가되기 전에 접수된 신청입니다(신청자가 신청을 다시 열어 저장하면 서약이 기록됩니다). 전자서명은 신청 화면에서 선택 항목입니다.</div></div>');
+  apps.forEach(a=>{
+    const g=a.agree||{};
+    pages.push('<div style="page-break-after:always;font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:30px 10px">'
+      +'<h2 style="text-align:center;letter-spacing:8px;border:2px solid #333;padding:12px">서 약 서</h2>'
+      +'<div style="text-align:center;color:#555;font-size:13.5px;margin:8px 0 14px">'+esc(p.competitionName||'')+' · 심판·운영요원</div>'
+      +'<table style="width:100%;border-collapse:collapse"><tr><th '+th+' style="width:110px">성 명</th><td '+td+'>'+esc(a.name||'')+'</td><th '+th+' style="width:110px">연락처</th><td '+td+'>'+esc(a.phone||'')+'</td></tr>'
+      +'<tr><th '+th+'>보유 자격</th><td '+td+'>'+esc(a.lic||'-')+'</td><th '+th+'>상 태</th><td '+td+'>'+stOf(a)+'</td></tr>'
+      +'<tr><th '+th+'>참여 일자·임무</th><td '+td+' colspan="3">'+esc(dutyOf(a)||'-')+'</td></tr></table>'
+      +(String(p.pledgeText||'').trim()?'<div style="font-size:13px;line-height:1.9;border:1px solid #999;padding:14px 18px;margin-top:14px;white-space:pre-wrap">'+esc(p.pledgeText)+'</div>':'')
+      +(p.pledgeImgs||[]).map(u=>'<img src="'+esc(u)+'" style="width:100%;display:block;border:1px solid #999;margin-top:10px">').join('')
+      +'<div style="font-size:13px;margin-top:10px">위 서약서 내용을 확인하였으며 이를 지킬 것을 서약합니다. <b>'+(g.pledge===true?'서약함 ☑':'서약함 □')+'</b></div>'
+      +'<div style="text-align:right;margin-top:24px;font-size:14px">'+(g.pledge===true?esc(pcFmtDate(g.pledgeAt||g.at)):'20&nbsp;&nbsp;&nbsp;.&nbsp;&nbsp;&nbsp;.&nbsp;&nbsp;&nbsp;.')+'</div>'
+      +'<div style="text-align:right;margin-top:8px;font-size:15px">서약인&nbsp;&nbsp;<b>'+esc(a.name||'')+'</b>&nbsp;&nbsp;'+(g.signature?'<img src="'+esc(g.signature)+'" style="height:44px;vertical-align:middle">':'(서명)')+'</div>'
+      +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">'+esc((p.author&&p.author.organization)||'대한민국플라잉디스크연맹')+' 귀하</div></div>');
+  });
+  const w=window.open('','_blank');
+  if(!w){alert('팝업이 차단되어 인쇄 창을 열 수 없습니다. 주소창의 팝업 차단을 해제해주세요.');return}
+  const PRN='(function(){var d=0,go=function(){if(d)return;d=1;setTimeout(function(){window.print()},500)};var im=[].slice.call(document.images),n=im.length,c=0,f=function(){if(++c>=n)go()};if(!n)return go();im.forEach(function(i){if(i.complete)f();else{i.onload=f;i.onerror=f}});setTimeout(go,20000)})()';
+  w.document.write('<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(p.competitionName||'')+' 서약서'+(onlyUid?'':' 일괄')+'</title></head><body>'+pages.join('')+'<script>'+PRN+'<\/script></body></html>');
+  w.document.close();
+}
 function pfRenderCImgs(){
   const el=document.getElementById('pfCImgList');if(!el)return;
   el.innerHTML=PF_CIMGS.length?PF_CIMGS.map((p,i)=>{
@@ -1242,6 +1327,15 @@ async function savePost(editId){
       await ref.put(blob,{contentType:'image/jpeg'});
       consentImgs.push(await ref.getDownloadURL());
     }
+    const pledgeImgs=[];   // [서약서]
+    for(const x of PF_PIMGS){
+      if(x.url){pledgeImgs.push(x.url);continue}
+      btn.textContent='서약서 이미지 업로드 중… ('+(pledgeImgs.length+1)+')';
+      const blob=await stCompress(x.file);
+      const ref=firebase.storage().ref('quals/'+SME.uid+'/staffpledge_'+Date.now()+'_'+pledgeImgs.length+'.jpg');
+      await ref.put(blob,{contentType:'image/jpeg'});
+      pledgeImgs.push(await ref.getDownloadURL());
+    }
     const instant=isAdminU()||isSidoU();
     const data={
       competitionName:name,startDate:dates[0],endDate:dates[dates.length-1],dates:dateArr,
@@ -1250,6 +1344,7 @@ async function savePost(editId){
       meal:(document.querySelector('input[name=pfMeal]:checked')||{}).value||'제공',
       uniform:uniform,lodging:lodging,
       supplies:supplies,posters:posters,description:v('pfDesc'),contactInfo:v('pfContact'),
+      pledgeText:v('pfPText'),pledgeImgs:pledgeImgs,   // [서약서]
       consentText:v('pfCText'),consentImgs:consentImgs,consentForm:v('pfForm')||'none',consentFormUrl:v('pfFormUrl'),consentFormName:v('pfFormName'),consentOverlays:pfOvlPack(),   // [동의서·서류]
       recruitType:(document.querySelector('input[name=pfRecruitType]:checked')||{}).value||'심판·운영요원',  // [모집유형 라벨] 대회참가자 모집과 구분
       compId:PF_COMPID||((editId&&(POSTS.find(x=>x.id===editId)||{}).compId)||''),  // [v7] 상위 대회 연결
@@ -1412,10 +1507,12 @@ async function _renderDetailInner(isStale){
     +(manage?'<button class="stbtn stbtn-soft" onclick="document.getElementById(\'dtModal\').remove();openPostForm(\''+p.id+'\')">✏️ 공고 수정</button><button class="stbtn stbtn-ghost" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button>':'')
     // [UI 정리] '수당지급 엑셀'은 아래 '수당지급내역서(서식·서명)'와 내용이 중복되어 숨김 처리.
     //           함수(exportPayExcel)는 그대로 두어 필요 시 되살릴 수 있습니다.
+    +((_decide&&hasPledge(p)&&(APPS[p.id]||[]).length)?'<button class="stbtn" style="background:#f5f3ff;color:#5b21b6;border:1.5px solid #ddd6fe" onclick="printPledgeDocs(\''+p.id+'\',\'\')" title="전 신청자의 서약서를 서명과 함께 한 번에 — 인쇄 창에서 「PDF로 저장」하면 파일 하나로 보관됩니다">📜 서약서 일괄 출력</button>':'')
     +((_decide&&payConsentReady(p))?'<button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #b9cdec" onclick="printPayConsent(\''+p.id+'\',\'\')" title="확정된 신청자의 수당 정보·전자서명이 기입된 동의서를 한 번에 인쇄">📄 수당 동의서 출력</button>':'')
   +(_decide?'<button class="stbtn" style="background:'+(p.reportId?'#f0fdf4':'#f5f3ff')+';color:'+(p.reportId?'#0f766e':'#5b21b6')+';border:1.5px solid '+(p.reportId?'#a7f3d0':'#ddd6fe')+'" onclick="openStaffReport(\''+p.id+'\')" title="약식 종료 보고 — 기록 보관 + 사진첩 초안"><span style="display:inline-flex;align-items:center;gap:5px">'+CAREER.svg('doc',{size:14,stroke:2.2})+(p.reportId?'종료 보고 완료 (수정)':'종료 보고')+'</span></button>':'')
   +(_decide?'<button class="stbtn" style="background:#fffbeb;color:#8a5a00;border:1.5px solid #fde68a" onclick="exportPayReport(\''+p.id+'\')">📄 수당지급내역서 (서식·서명)</button><button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="openNotifyModal(\''+p.id+'\')">📣 확정자 단체 알림</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="exportLicZip(\''+p.id+'\')">📦 자격증 일괄 다운로드</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
     +'<button class="stbtn stbtn-main" style="padding:11px 26px" onclick="openApplyForm(\''+p.id+'\')">✍️ 신청하기 (날짜 선택)</button>'
+    +((hasPledge(p)&&SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid))?'<button class="stbtn stbtn-soft" style="padding:11px 18px" onclick="printPledgeDocs(\''+p.id+'\',SME.uid)">📜 내 서약서 출력</button>':'')
     +((payConsentReady(p)&&SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid&&a.payInfo))?'<button class="stbtn stbtn-soft" style="padding:11px 18px" onclick="printPayConsent(\''+p.id+'\',SME.uid)" title="내 수당 정보와 전자서명이 기입된 동의서">📄 내 수당 동의서 인쇄</button>':'')
     +'</div></div>';
   // div는 await 전에 이미 DOM에 추가됨 — innerHTML 설정만으로 내용 갱신
@@ -1472,6 +1569,7 @@ function openApplyForm(id){
     +'<label style="display:flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="apAg2" style="width:auto"> (필수) 대회 참여 규정을 준수하겠습니다</label>'
     +'<label style="display:flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="apAg3" style="width:auto"> (필수) 안전 수칙을 준수하겠습니다</label>'
     +'</div>'
+    +pledgeApplyHtml(p,!!(my&&my.agree&&my.agree.pledge===true))   // [서약서]
     +'<div style="font-size:13px;font-weight:800;margin-top:16px">③ 서명 <span style="font-size:11.5px;font-weight:600;color:#8a919d">(선택 — 아래 박스에 손가락/마우스로 서명)</span></div>'
     +'<div style="position:relative;border:1.5px solid #dfe5ee;border-radius:10px;background:#f9fafb;margin:7px 0 4px">'
     +'<canvas id="sigCanvas" width="480" height="110" style="display:block;width:100%;height:110px;touch-action:none;cursor:crosshair;border-radius:10px"></canvas>'
@@ -1574,6 +1672,8 @@ async function submitApply(postId){
   }
   if(!document.getElementById('apAg1').checked||!document.getElementById('apAg2').checked||!document.getElementById('apAg3').checked){
     alert('필수 동의 3건에 모두 체크해주세요.');return}
+  const _plEl=document.getElementById('apPledge');   // [서약서] 공고에 서약서가 있을 때만 칸이 있습니다
+  if(_plEl&&!_plEl.checked){alert('서약서 내용을 확인하고 서약란에 체크해주세요.');return}
   // [v4] 심판 임무 자격 검증 — 유효 심판자격 미보유 시 심판 임무 신청 차단 (운영요원 임무는 통과)
   if(!hasValidRefLic()){
     for(const d of days){
@@ -1607,7 +1707,7 @@ async function submitApply(postId){
     const data={postId:postId,competitionName:p.competitionName||'',
       uid:SME.uid,name:SMY.name||'',phone:SMY.phone||'',lic:MYLIC||'',
       days:days,prefs:prefs,status:status,
-      agree:{privacy:true,rules:true,safety:true,signature:agSig,signed:!!agSig,at:new Date().toISOString()},
+      agree:Object.assign({privacy:true,rules:true,safety:true,signature:agSig,signed:!!agSig,at:new Date().toISOString()},(_plEl&&_plEl.checked)?{pledge:true,pledgeAt:new Date().toISOString()}:{}),   // [서약서]
       // [v4] 수당지급 정보 (미입력 시 이전 값 유지)
       payInfo:anyPay?{bank:pfBank,account:pfAcct,rrn:pfRrn,agreePrivacy:pfAg1,agreeThird:pfAg2,signature:pfSig,at:new Date().toISOString()}:((my&&my.payInfo)||null),
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
