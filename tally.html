@@ -96,6 +96,8 @@ AUTH.onAuthStateChanged(async u=>{
   if(!v||(!tHas('admin')&&!tHas('regionAdmin'))){
     g.style.display='block';g.innerHTML='⛔ 관리자·권역장 권한이 없습니다.';return;
   }
+  // [열람 범위 2026-09-18] 신청서 원본 집계는 중앙 사무국만 — 권역장은 권역 관리 페이지에서 관할 선정교 이름만 봅니다
+  if(!tHas('admin')){g.style.display='block';g.innerHTML='총집계 현황은 중앙 사무국만 볼 수 있습니다. <a href="region.html" style="font-weight:800;color:var(--red)">관할 선정교 목록 →</a>';return}
   // 중앙관리자를 겸하면 전 권역, 권역장만이면 관할 권역으로 제한
   if(!tHas('admin')&&tHas('regionAdmin')&&v.managedRegion&&KFDF_REGIONS.indexOf(v.managedRegion)>=0)SCOPE_R=v.managedRegion;
   document.getElementById('body').style.display='block';

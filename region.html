@@ -236,10 +236,33 @@ AUTH.onAuthStateChanged(async u=>{
     const t=document.getElementById('rgSchTitle');if(t)t.textContent='신청 학교 ('+RSCOPE+' 권역)';
   }
   document.getElementById('rgBadge').textContent='— '+esc(RMY.name||'')+' 님 ('+(RSCOPE?RSCOPE+' 권역':'전 권역')+')';
+  if(!rgIsAdmin(RMY)){await rgSelOnly();return}   // [열람 범위 2026-09-18] 권역장은 관할 선정교 이름만
   document.getElementById('rgBody').style.display='block';
   await Promise.all([loadSchools(),loadInst()]);
 });
 
+
+// ══════════ [열람 범위 2026-09-18] 권역장 — 관할 권역 선정교 이름만 ══════════
+//   담당교사·배정 강사 등 세부 정보와 배정·점검 업무는 중앙 사무국만 합니다(보안 규칙 v37).
+async function rgSelOnly(){
+  const b=document.getElementById('rgBody');b.style.display='block';
+  const box=m=>'<div class="pending-banner" style="display:block">'+m+'</div>';
+  if(!RSCOPE){b.innerHTML=box('관할 권역이 지정되어 있지 않습니다. 사무국(오너)에 관할 권역 지정을 요청해주세요.');return}
+  b.innerHTML='<div class="bempty">불러오는 중…</div>';
+  try{
+    const s=await DB.collection('selectedSchools').where('region','==',RSCOPE).get();
+    const rows=s.docs.map(d=>d.data()||{}).sort((a,b)=>String(a.type||'').localeCompare(String(b.type||''))||String(a.city||'').localeCompare(String(b.city||''))||String(a.school||'').localeCompare(String(b.school||'')));
+    const byType={};rows.forEach(r=>{const t=r.type||'기타';(byType[t]=byType[t]||[]).push(r)});
+    b.innerHTML='<div style="background:#fff;border:1.5px solid #e4e8ef;border-radius:16px;padding:20px 22px">'
+      +'<h2 class="sec-title" style="font-size:22px">'+esc(RSCOPE)+' 권역 선정교 <span style="color:#6b7280;font-size:15px">'+rows.length+'교</span></h2>'
+      +'<div style="font-size:13px;color:#6b7280;margin:6px 0 12px;line-height:1.6">담당교사·배정 강사 등 세부 정보는 개인정보 보호를 위해 <b>중앙 사무국만</b> 열람합니다. 이 화면에는 관할 권역 선정교의 학교명만 표시됩니다.</div>'
+      +(rows.length?Object.keys(byType).map(t=>'<div style="margin-top:12px"><b>'+esc(t)+' · '+byType[t].length+'교</b>'
+        +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13.5px;margin-top:6px"><tr><th style="text-align:left;padding:6px 8px;background:#f4f6fa;width:56px">번호</th><th style="text-align:left;padding:6px 8px;background:#f4f6fa">학교명</th><th style="text-align:left;padding:6px 8px;background:#f4f6fa">시군구</th></tr>'
+        +byType[t].map((r,i)=>'<tr><td style="padding:6px 8px;border-bottom:1px solid #eef1f5">'+(i+1)+'</td><td style="padding:6px 8px;border-bottom:1px solid #eef1f5"><b>'+esc(r.school||'')+'</b></td><td style="padding:6px 8px;border-bottom:1px solid #eef1f5">'+esc(r.city||'')+'</td></tr>').join('')+'</table></div></div>').join('')
+        :'<div style="color:#8a919d">관할 선정교가 아직 없습니다.</div>')
+      +'</div>';
+  }catch(e){b.innerHTML=box('🔒 관할 선정교 목록을 불러오지 못했습니다. 사무국에 문의해주세요. (오류: '+esc(e.message)+')')}
+}
 
 function rgFilter(f,btn){
   RFL=f;

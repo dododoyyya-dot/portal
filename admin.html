@@ -1169,7 +1169,66 @@ function appFilter(f,btn){
   document.querySelectorAll('.afl').forEach(b=>{b.style.background=b.dataset.f===f?'':'#8a919d'});
   renderApps();
 }
+// ══════════ [열람 범위 2026-09-18] 선정교 목록(selectedSchools) — 학교명만 ══════════
+//   중앙 사무국 외에는(시도연맹 임원·권역장 포함) 담당교사·배정 강사 정보를 볼 수 없고, 자기 관할 선정교 이름만 봅니다.
+//   selectedSchools/{신청ID} = {school, city, region, sidoKey, type} — 담당교사·연락처·배정 강사는 담지 않습니다.
+//   중앙 관리자가 강습 신청 목록을 열면 바뀐 것만 맞춰 씁니다(선정·배정완료 건만, 취소·삭제 건은 지움).
+function selSchHtml(rows,scope){
+  rows=rows.slice().sort((a,b)=>String(a.type||'').localeCompare(String(b.type||''))||String(a.city||'').localeCompare(String(b.city||''))||String(a.school||'').localeCompare(String(b.school||'')));
+  const byType={};rows.forEach(r=>{const t=r.type||'기타';(byType[t]=byType[t]||[]).push(r)});
+  return '<div style="background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:18px 20px">'
+    +'<div style="font-size:17px;font-weight:900;color:#153A77">🏫 '+esc(scope)+' 선정교 <span style="color:#6b7280;font-size:14px">'+rows.length+'교</span></div>'
+    +'<div style="font-size:12.5px;color:#6b7280;margin:6px 0 12px;line-height:1.6">담당교사·배정 강사 등 세부 정보는 개인정보 보호를 위해 <b>중앙 사무국만</b> 열람합니다. 이 화면에는 관할 선정교의 학교명만 표시됩니다.</div>'
+    +(rows.length?Object.keys(byType).map(t=>'<div style="margin-top:10px"><b style="font-size:13.5px">'+esc(t)+' · '+byType[t].length+'교</b>'
+      +'<div style="overflow-x:auto"><table class="tbl" style="font-size:13px;margin-top:6px"><tr><th style="width:50px">번호</th><th>학교명</th><th>시군구</th></tr>'
+      +byType[t].map((r,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+esc(r.school||'')+'</b></td><td>'+esc(r.city||'')+'</td></tr>').join('')+'</table></div></div>').join('')
+      :'<div style="color:#8a919d;font-size:13px">관할 선정교가 아직 없습니다.</div>')
+    +'</div>';
+}
+async function sidoSelLoad(){
+  const v3=document.getElementById('v3');if(!v3)return;
+  const mine=((CMY&&CMY.sido)||'');
+  if(!mine){v3.innerHTML='<div class="bempty" style="color:#7a5b00;background:#fff8e6;border-radius:12px;padding:16px 18px;font-weight:700">관할 시도가 지정되어 있지 않습니다. 사무국에 관할 시도 지정을 요청해주세요.</div>';return}
+  v3.innerHTML='<div class="bempty">불러오는 중…</div>';
+  try{
+    const r=await Promise.all(KFDF.sidoSet(mine).map(k=>DB.collection('selectedSchools').where('sidoKey','==',k).get()));
+    const seen={},rows=[];r.forEach(x=>x.docs.forEach(d=>{if(!seen[d.id]){seen[d.id]=1;rows.push(d.data()||{})}}));
+    v3.innerHTML=selSchHtml(rows,mine+' 관할');
+  }catch(e){
+    v3.innerHTML='<div class="bempty" style="color:#7a5b00;background:#fff8e6;border-radius:12px;padding:16px 18px;font-weight:700">🔒 관할 선정교 목록을 불러오지 못했습니다.<div style="font-weight:600;font-size:12.5px;margin-top:6px">사무국에 문의해주세요. (오류: '+esc(e.message)+')</div></div>';
+  }
+}
+let __selSyncAt=0,__selSyncTimer=null,__selSyncing=false;
+function selSchSync(){
+  if(!VIEWER_IS_ADMIN)return;
+  const wait=30000-(Date.now()-__selSyncAt);
+  if(wait>0){if(!__selSyncTimer)__selSyncTimer=setTimeout(()=>{__selSyncTimer=null;selSchSync()},wait);return}
+  if(__selSyncing)return;
+  __selSyncing=true;__selSyncAt=Date.now();
+  (async()=>{
+    try{
+      const all=await DB.collection('schoolApplications').get();
+      const want={};
+      all.docs.forEach(d=>{const s=d.data()||{};if(s.deleted||(s.status!=='선정'&&s.status!=='배정완료'))return;
+        const sk=(typeof s.sidoKey==='string')?s.sidoKey:(kfdfSidoKey({baseCity:String(s.sido||'')+' '+String(s.city||'')})||'');
+        want[d.id]={school:String(s.school||''),city:String(s.city||''),region:appRegion(s),sidoKey:sk,type:appTypeOf(s)};});
+      const cur=await DB.collection('selectedSchools').get();
+      const have={};cur.docs.forEach(d=>have[d.id]=d.data()||{});
+      const ops=[];
+      Object.keys(want).forEach(id=>{const w=want[id],h=have[id];if(!h||['school','city','region','sidoKey','type'].some(k=>h[k]!==w[k]))ops.push([id,w])});
+      Object.keys(have).forEach(id=>{if(!want[id])ops.push([id,null])});
+      for(let i=0;i<ops.length;i+=400){
+        const b=DB.batch();
+        ops.slice(i,i+400).forEach(o=>{const ref=DB.collection('selectedSchools').doc(o[0]);if(o[1])b.set(ref,Object.assign({},o[1],{updatedAt:firebase.firestore.FieldValue.serverTimestamp()}));else b.delete(ref)});
+        await b.commit();
+      }
+      if(ops.length)console.info('[선정교 목록] '+ops.length+'건 맞춤');
+    }catch(e){console.warn('selSchSync',e&&e.message)}
+    finally{__selSyncing=false}
+  })();
+}
 async function loadApps(){
+  if(IS_SIDO){await sidoSelLoad();return}   // [열람 범위 2026-09-18] 시도연맹 임원은 관할 선정교 이름만
   // [관할] 시도연맹 임원은 관할 신청서만 조회합니다. 예전에는 여기서 전체를 불러와
   //   규칙이 통과시키지 못했고, 오류 안내도 없어 목록이 그냥 비어 보였습니다.
   //   회원 명단과 같은 방식으로 '관할' 과 '관할 미판정('')' 을 나눠 두 번 조회해 합칩니다.
@@ -1193,6 +1252,7 @@ async function loadApps(){
   }
   TRASH.apps=snap.docs.filter(d=>{const s=d.data();return s.deleted&&sameSidoApp(s);});
   APPS=snap.docs.filter(d=>{const s=d.data();return !s.deleted&&sameSidoApp(s);});
+  selSchSync();   // [열람 범위] 시도연맹 임원·권역장용 선정교 목록 맞춤 (중앙 관리자만, 30초에 한 번)
   try{const g=await DB.collection('goodsConfirms').get();window.GOODS={};g.docs.forEach(x=>window.GOODS[x.id]=x.data());}catch(e){window.GOODS={};}
   await loadMailLog();  // [메일로그] 발송 이력 → 학교 카드 📧 뱃지용
   await loadSchoolHoursPolicy();  // ▶ [시간대검증] 정규수업시간 기준 정책 로드 (2026-08-28)
@@ -3570,7 +3630,7 @@ async function loadDash(){
     // [전남광주 통합] 관할 묶음(전남광주 = 광주·전남)마다 조회해 합칩니다
     const _sq=col=>Promise.all(KFDF.sidoSet(_mine).map(k=>DB.collection(col).where('sidoKey','==',k).get())).then(r=>({docs:[].concat.apply([],r.map(x=>x.docs))}));
     const _uq=(IS_SIDO&&_mine)?_sq('users'):DB.collection('users').get();
-    const _aq=(IS_SIDO&&_mine)?_sq('schoolApplications'):DB.collection('schoolApplications').get();
+    const _aq=(IS_SIDO&&_mine)?_sq('selectedSchools'):DB.collection('schoolApplications').get();   // [열람 범위] 시도연맹 임원은 선정교 목록만
     // [성능·정확도 2026-09-11] 중앙 관리자는 실시간 명단을 그대로 씁니다(재조회 없음). 휴지통(삭제) 회원은 세지 않습니다
     //   — 예전에는 휴지통의 중복 가입 계정까지 '승인 대기' 로 세어 목록과 숫자가 달랐습니다.
     let us=null;
@@ -3583,7 +3643,7 @@ async function loadDash(){
     document.getElementById('dash').innerHTML=
       (us?(box(u.filter(x=>x.status==='pending').length,'승인 대기 회원','#e6b422')
       +box(u.filter(x=>x.status==='approved').length,'승인 회원','#0f766e')):'')
-      +(ap?(box(a.filter(x=>String(x.type||'').indexOf('방과후')<0).length,'🏫 학교체육 신청','#8c1622')
+      +(ap?(IS_SIDO?box(a.length,'🏫 관할 선정교','#1F4E9C'):box(a.filter(x=>String(x.type||'').indexOf('방과후')<0).length,'🏫 학교체육 신청','#8c1622')
       +box(a.filter(x=>String(x.type||'').indexOf('방과후')>=0).length,'🌱 방과후·늘봄 신청','#0f766e')
       +box(a.filter(x=>x.status==='대기').length,'⏳ 정원초과 대기','#e6b422')
       +box(a.filter(x=>x.status==='선정').length,'선정 (배정 대기)','#1F4E9C')

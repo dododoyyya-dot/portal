@@ -1780,8 +1780,15 @@ async function unlinkLic(id){
 let LUSERS=null;
 async function _lusers(){
   if(LUSERS)return LUSERS;
-  const s=await DB.collection('users').get();
-  LUSERS=s.docs.map(d=>Object.assign({id:d.id},d.data()));
+  // [열람 범위 2026-09-18] 중앙이 아니면 관할 시도 회원만 조회합니다(보안 규칙 v37 — 관할 밖 회원 목록은 거부)
+  let docs;
+  if(CENTRAL){docs=(await DB.collection('users').get()).docs}
+  else{
+    const ks=[...new Set([].concat.apply([],MSIDOS.map(x=>KFDF.sidoSet(x))))];
+    const r=await Promise.all(ks.map(k=>DB.collection('users').where('sidoKey','==',k).get().catch(()=>({docs:[]}))));
+    const seen={};docs=[];r.forEach(x=>x.docs.forEach(d=>{if(!seen[d.id]){seen[d.id]=1;docs.push(d)}}));
+  }
+  LUSERS=docs.map(d=>Object.assign({id:d.id},d.data()));
   return LUSERS;
 }
 async function linkLic(id){
