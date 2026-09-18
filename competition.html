@@ -534,7 +534,7 @@ async function loadStaffEmbed(){
       DB.collection('competitionStaff').limit(100).get(),
       DB.collection('staffApplications').where('uid','==',CME.uid).limit(100).get()
     ]);
-    const myIds=new Set(myAppSnap.docs.map(d=>d.data().postId));
+    const myIds=new Set(myAppSnap.docs.filter(d=>d.data().cancelled!==true).map(d=>d.data().postId));   // [신청 취소] 취소한 심판·운영 신청은 「신청함」에서 제외
     const posts=newSnap.docs.map(x=>({id:x.id,...x.data()}))
       .filter(p=>p.approved||isSidoOfficer())
       .sort((a,b)=>String(b.startDate||'').localeCompare(String(a.startDate||'')));

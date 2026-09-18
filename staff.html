@@ -197,6 +197,7 @@ const REF_ONLY_DUTIES=['주심','부심 (선심)','기록원','점수원'];
 function isRefDuty(r){r=String(r||'');return REF_ONLY_DUTIES.indexOf(r)>=0||r.indexOf('심판')>=0;}
 function hasValidRefLic(){return Array.isArray(MYLIC_DOCS._valid)&&MYLIC_DOCS._valid.some(l=>String(l.type||'').indexOf('심판')>=0);}
 
+let APPS_CANCELLED={};   // [신청 취소] 취소된 신청(기록 보존용) — 공고ID → []
 let SME=null,SMY=null,POSTS=[],APPS={},MYLIC='',MYLIC_DOCS=[],LIC_CACHE={};
 // [겸직] 대표 등급(role)이 아니어도 roles[] 에 admin 이 있으면 관리자로 봅니다
 function isAdminU(){return !!(SMY&&(SMY.owner===true||SMY.role==='admin'||(Array.isArray(SMY.roles)&&SMY.roles.indexOf('admin')>=0)))}
@@ -282,7 +283,8 @@ async function loadPosts(){
     APPS={};
     try{
       const as=await DB.collection('staffApplications').limit(1000).get();
-      as.docs.forEach(x=>{const a={id:x.id,...x.data()};(APPS[a.postId]=APPS[a.postId]||[]).push(a)});
+      APPS_CANCELLED={};
+      as.docs.forEach(x=>{const a={id:x.id,...x.data()};const T=a.cancelled===true?APPS_CANCELLED:APPS;(T[a.postId]=T[a.postId]||[]).push(a)});   // [신청 취소] 취소 건은 집계·명단에서 제외
     }catch(e){}
     // [1공고 1상세] 목록에서 특정 공고를 눌러 들어오면(?post=id) 그 공고 하나만 보여줍니다.
     const _qp=new URLSearchParams(location.search).get('post');
@@ -1542,6 +1544,7 @@ async function _renderDetailInner(isStale){
     +'</div>'
     +confirmPanelHtml(Object.assign({_postId:p.id},dd),dayApps,_decide,manage)   // [확정현황] 역할별 인원수·명단 패널 (+임무 완료 버튼) · manage=false 면 인원수만
     +'</div>'
+    +(manage?cancelledListHtml(p):'')   // [신청 취소] 담당자에게만 취소 기록
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">'
     // [권한개선] 공고 수정·복사 = canManage / 수당엑셀·자격확인·경력등록 = canDecide
     +(manage?'<button class="stbtn stbtn-soft" onclick="document.getElementById(\'dtModal\').remove();openPostForm(\''+p.id+'\')">✏️ 공고 수정</button><button class="stbtn stbtn-ghost" onclick="copyRoster(\''+p.id+'\')">📋 공고문 복사 (확정 명단)</button>':'')
@@ -1551,7 +1554,8 @@ async function _renderDetailInner(isStale){
     +((_decide&&payConsentReady(p))?'<button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #b9cdec" onclick="printPayConsent(\''+p.id+'\',\'\')" title="확정된 신청자의 수당 정보·전자서명이 기입된 동의서를 한 번에 인쇄">📄 수당 동의서 출력</button>':'')
   +(_decide?'<button class="stbtn" style="background:'+(p.reportId?'#f0fdf4':'#f5f3ff')+';color:'+(p.reportId?'#0f766e':'#5b21b6')+';border:1.5px solid '+(p.reportId?'#a7f3d0':'#ddd6fe')+'" onclick="openStaffReport(\''+p.id+'\')" title="약식 종료 보고 — 기록 보관 + 사진첩 초안"><span style="display:inline-flex;align-items:center;gap:5px">'+CAREER.svg('doc',{size:14,stroke:2.2})+(p.reportId?'종료 보고 완료 (수정)':'종료 보고')+'</span></button>':'')
   +(_decide?'<button class="stbtn" style="background:#fffbeb;color:#8a5a00;border:1.5px solid #fde68a" onclick="exportPayReport(\''+p.id+'\')">📄 수당지급내역서 (서식·서명)</button><button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="openNotifyModal(\''+p.id+'\')">📣 확정자 단체 알림</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="exportLicZip(\''+p.id+'\')">📦 자격증 일괄 다운로드</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
-    +'<button class="stbtn stbtn-main" style="padding:11px 26px" onclick="openApplyForm(\''+p.id+'\')">✍️ 신청하기 (날짜 선택)</button>'
+    +((SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid))?'<button class="stbtn" style="padding:11px 18px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="cancelApply(\''+p.id+'\')">🚫 신청 취소</button>':'')
+    +'<button class="stbtn stbtn-main" style="padding:11px 26px" onclick="openApplyForm(\''+p.id+'\')">'+((SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid))?'✏️ 신청 내용 수정':'✍️ 신청하기 (날짜 선택)')+'</button>'
     +((hasPledge(p)&&SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid))?'<button class="stbtn stbtn-soft" style="padding:11px 18px" onclick="printPledgeDocs(\''+p.id+'\',SME.uid)">📜 내 서약서 출력</button>':'')
     +((payConsentReady(p)&&SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid&&a.payInfo))?'<button class="stbtn stbtn-soft" style="padding:11px 18px" onclick="printPayConsent(\''+p.id+'\',SME.uid)" title="내 수당 정보와 전자서명이 기입된 동의서">📄 내 수당 동의서 인쇄</button>':'')
     +'</div></div>';
@@ -1697,6 +1701,47 @@ function _rrnUnlock(){
   el.readOnly=false;el.style.background='';el.dataset.locked='';el.focus();
   if(note){note.innerHTML='✏️ 직접 입력 모드입니다. 입력한 값으로 이번 신청서가 작성됩니다.';note.style.color='#8a5a00';}
 }
+// ══════════ [신청 취소 2026-09-18] 신청자 본인이 신청을 취소 — 문서는 지우지 않고 cancelled 표시(서명·서약·취소 사유 기록 보존) ══════════
+//   취소된 신청은 APPS 에서 빠져 인원 집계·확정 명단·수당·서약서 출력에 나오지 않습니다(APPS_CANCELLED 에 따로 보관 — 담당자 화면 「취소된 신청」).
+//   다시 신청하면 같은 문서를 되살립니다(취소 이력 cancelLog 유지, 상태는 대기부터).
+async function cancelApply(postId){
+  const p=POSTS.find(x=>x.id===postId);if(!p||!SME)return;
+  const my=(APPS[postId]||[]).find(a=>a.uid===SME.uid);
+  if(!my){alert('취소할 신청이 없습니다.');return}
+  const today=new Date(Date.now()+9*3600*1000).toISOString().slice(0,10);
+  const lastDay=(my.days||[]).slice().sort().pop()||p.endDate||'';
+  if(lastDay&&lastDay<today){alert('이미 지난 대회의 신청은 취소할 수 없습니다. 담당자에게 문의해 주세요.');return}
+  const confirmedDays=Object.keys(my.status||{}).filter(d=>my.status[d]==='확정');
+  if(confirmedDays.length){
+    const t=prompt('⚠ 이미 확정된 날짜가 있습니다: '+confirmedDays.map(d=>fmtD(d)).join(', ')+'\n'
+      +'취소하면 담당자에게 알림이 가고, 확정도 함께 풀립니다.\n\n정말 취소하려면 「취소」를 입력하세요.');
+    if(t===null||t.trim()!=='취소')return;
+  }else if(!confirm('['+(p.competitionName||'')+'] 심판·운영요원 신청을 취소할까요?\n(취소한 뒤에도 모집 기간 안에는 다시 신청할 수 있습니다)'))return;
+  const reason=(prompt('취소 사유를 적어 주세요. (선택 — 담당자에게 전달됩니다)','')||'').trim().slice(0,200);
+  const now=new Date().toISOString();
+  try{
+    await DB.collection('staffApplications').doc(my.id).update({
+      cancelled:true,cancelledAt:now,cancelReason:reason,cancelledStatus:my.status||{},
+      cancelLog:firebase.firestore.FieldValue.arrayUnion({at:now,reason:reason,days:my.days||[],hadConfirmed:confirmedDays})
+    });
+    try{if(p.author&&p.author.uid&&p.author.uid!==SME.uid)KFDF.notify(p.author.uid,'🚫 ['+(p.competitionName||'')+'] 심판·운영요원 신청 취소 — '+(SMY.name||'')+(confirmedDays.length?' (확정 '+confirmedDays.map(d=>fmtD(d.slice(5))).join(', ')+' 포함)':'')+(reason?' · 사유: '+reason:''),'staff.html?post='+postId)}catch(e){}
+    const dm=document.getElementById('dtModal');if(dm)dm.remove();
+    alert('신청이 취소되었습니다.');
+    loadPosts();
+  }catch(e){alert('취소 실패: '+e.message)}
+}
+// 담당자 화면 — 취소된 신청 목록(접이식)
+function cancelledListHtml(p){
+  const list=(APPS_CANCELLED[p.id]||[]).slice().sort((a,b)=>String(b.cancelledAt||'').localeCompare(String(a.cancelledAt||'')));
+  if(!list.length)return '';
+  return '<details style="margin-top:12px;border:1.5px solid #f1d6d9;border-radius:10px;padding:8px 12px;background:#fffafa"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#8c1622">🚫 취소된 신청 '+list.length+'건</summary>'
+    +list.map(a=>{const had=Object.keys(a.cancelledStatus||{}).filter(d=>a.cancelledStatus[d]==='확정');
+      return '<div style="font-size:12.5px;border-top:1px solid #f6e3e5;padding:6px 0;margin-top:6px"><b>'+esc(a.name||'')+'</b> <span style="color:#6b7280">'+esc(a.phone||'')+'</span>'
+        +' · 취소 '+esc(String(a.cancelledAt||'').replace('T',' ').slice(0,16))
+        +(had.length?' · <b style="color:#C41E2F">확정됐던 날짜 '+had.map(d=>esc(fmtD(d.slice(5)))).join(', ')+'</b>':'')
+        +'<div style="color:#555">신청 날짜: '+esc((a.days||[]).map(d=>fmtD(d.slice(5))).join(', ')||'-')+(a.cancelReason?' · 사유: '+esc(a.cancelReason):'')+'</div></div>'}).join('')
+    +'</details>';
+}
 async function submitApply(postId){
   const p=POSTS.find(x=>x.id===postId);if(!p)return;
   const days=[...document.querySelectorAll('.apDay:checked')].map(x=>x.value);
@@ -1754,7 +1799,9 @@ async function submitApply(postId){
       // [v4] 수당지급 정보 (미입력 시 이전 값 유지)
       payInfo:anyPay?{bank:pfBank,account:pfAcct,rrn:pfRrn,agreePrivacy:pfAg1,agreeThird:pfAg2,signature:pfSig,at:new Date().toISOString()}:((my&&my.payInfo)||null),
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+    const _old=!my&&(APPS_CANCELLED[postId]||[]).find(a=>a.uid===SME.uid);   // [신청 취소] 취소했던 신청을 다시 내면 같은 문서를 되살림
     if(my)await DB.collection('staffApplications').doc(my.id).update(data);
+    else if(_old)await DB.collection('staffApplications').doc(_old.id).update(Object.assign(data,{cancelled:false,reappliedAt:new Date().toISOString(),assign:{}}));
     else{data.createdAt=firebase.firestore.FieldValue.serverTimestamp();await DB.collection('staffApplications').add(data);}
     if(p.author&&p.author.uid)KFDF.notify(p.author.uid,'✍️ ['+p.competitionName+'] 심판·운영요원 신청 접수 — '+(SMY.name||'')+' ('+days.map(d=>fmtD(d.slice(5))).join(', ')+')','staff.html');
     document.getElementById('apModal').remove();
