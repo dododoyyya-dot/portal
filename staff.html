@@ -1610,7 +1610,7 @@ function openApplyForm(id){
     +'<label style="display:flex;gap:7px;align-items:center;cursor:pointer"><input type="checkbox" id="apAg3" style="width:auto"> (필수) 안전 수칙을 준수하겠습니다</label>'
     +'</div>'
     +pledgeApplyHtml(p,!!(my&&my.agree&&my.agree.pledge===true))   // [서약서]
-    +'<div style="font-size:13px;font-weight:800;margin-top:16px">③ 서명 <span style="font-size:11.5px;font-weight:600;color:#8a919d">(선택 — 아래 박스에 손가락/마우스로 서명)</span></div>'
+    +'<div style="font-size:13px;font-weight:800;margin-top:16px">③ 서명 <span style="font-size:11.5px;font-weight:800;color:#C41E2F">(필수)</span> <span style="font-size:11.5px;font-weight:600;color:#8a919d">— 아래 박스에 손가락/마우스로 서명하거나 [저장된 서명 사용하기]. 동의서·서약서에 함께 날인됩니다</span></div>'
     +'<div style="position:relative;border:1.5px solid #dfe5ee;border-radius:10px;background:#f9fafb;margin:7px 0 4px">'
     +'<canvas id="sigCanvas" width="480" height="110" style="display:block;width:100%;height:110px;touch-action:none;cursor:crosshair;border-radius:10px"></canvas>'
     +'<button type="button" onclick="_sigClear()" style="position:absolute;top:6px;right:6px;font-size:11px;padding:3px 9px;border:1px solid #dfe5ee;border-radius:6px;background:#fff;cursor:pointer;z-index:1">지우기</button>'
@@ -1730,6 +1730,9 @@ async function submitApply(postId){
   const pfAg2=!!(_e('apPayAg2')&&_e('apPayAg2').checked);
   const agSigNew=_getSigData(); // [서명유지수정] ③ 동의서 서명 — 재신청 시 빈 캔버스로 열리므로 미리 확보
   const pfSigNew=_getSigDataPay();
+  // [서명 필수 2026-09-18] 동의서·서약서에 전자서명이 찍혀야 하므로 ③ 서명은 필수입니다 — 이미 서명해 둔 신청을 고칠 때는 그 서명을 그대로 씁니다
+  {const _mine=(APPS[postId]||[]).find(a=>a.uid===SME.uid);
+   if(!agSigNew&&!(_mine&&_mine.agree&&_mine.agree.signature)){alert('③ 서명이 필요합니다.'+String.fromCharCode(10)+'서명란에 직접 서명하거나 [🖊 저장된 서명 사용하기]를 눌러 주세요.'+String.fromCharCode(10)+'(동의서·서약서에 함께 날인됩니다)');try{document.getElementById('sigCanvas').scrollIntoView({block:'center'})}catch(e){}return}}
   const anyPay=!!(pfBank||pfAcct||pfRrn||pfSigNew||pfAg1||pfAg2);
   if(anyPay){
     if(!pfBank||!pfAcct){alert('수당지급 정보를 제출하려면 은행명과 계좌번호를 모두 입력해주세요.');return}
