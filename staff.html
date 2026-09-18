@@ -211,16 +211,17 @@ function isRegionActiveU(){
   try{var t=e.toDate?e.toDate():new Date(e);return new Date()<t;}catch(_){return true;}
 }
 // ── canManage: 신청현황 열람 + 공고 수정·복사 (기존 동작 유지) ──
-function canManage(p){return isAdminU()||isSidoU()||(SME&&p.author&&p.author.uid===SME.uid)}
+// [관할 한정 2026-09-18] 시도임원은 본인이 올린 공고 + 관할 시도 공고만 관리합니다(다른 시도 공고는 일반 회원처럼 보기·신청만) — 보안 규칙 v38
+function stMineSido(p){return !!(isSidoU()&&SMY&&SMY.sido&&p&&p.sido&&KFDF.sidoMatch(SMY.sido,p.sido))}
+function canManage(p){return isAdminU()||stMineSido(p)||!!(SME&&p.author&&p.author.uid===SME.uid)}
 // ── canDecide: 확정·보류·거절·수당엑셀·경력등록 ──
 // admin=전체 / 시도임원=본인 시도 공고만 / 권역장=담당 권역 공고만
 // 하위호환: sido·region 필드 없는 구 공고·구 계정은 기존처럼 허용
 function canDecide(p){
   if(isAdminU())return true;
   if(isSidoU()){
-    if(!SMY.sido)return true;     // sido 미설정 기존 계정 — 하위호환
-    if(!p.sido)return true;       // sido 필드 없는 구 공고 — 하위호환
-    return KFDF.sidoMatch(SMY.sido,p.sido);     // 신규: 본인 시도 공고만 ([전남광주 통합] 광주·전남 묶음)
+    // [관할 한정 2026-09-18] 관할 시도 공고 또는 본인이 올린 공고만 — 관할이 비어 있는 공고는 중앙·작성자만 (예전의 '빈 값이면 허용' 하위호환 제거)
+    return stMineSido(p)||!!(SME&&p.author&&p.author.uid===SME.uid);
   }
   // [겸직v3] 권역장: 담당 권역 공고만 결정권
   if(isRegionActiveU()){
@@ -1400,6 +1401,8 @@ async function savePost(editId){
     if(editId){
       const ed0=POSTS.find(x=>x.id===editId);
       if(ed0&&ed0.author)data.author=Object.assign({},ed0.author,{organization:(v('pfHost')||ed0.author.organization||'')});
+      // [관할 한정] 수정해도 공고의 관할(sido)은 그대로 — 예전에는 수정한 사람의 시도로 덮어써졌습니다. 관할이 비어 있던 본인 공고만 자기 시도로 채웁니다
+      if(ed0&&(ed0.sido||!(ed0.author&&ed0.author.uid===SME.uid)))data.sido=ed0.sido||null;
       await DB.collection('competitionStaff').doc(editId).update(data);
     }else{
       data.approved=instant;
