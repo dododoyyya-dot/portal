@@ -622,6 +622,7 @@ function openPostForm(editId){
   PF_POSTERS=(ed&&ed.posters)?ed.posters.slice():[];
   PF_CIMGS=(ed&&ed.consentImgs)?ed.consentImgs.map(u=>({url:u})):[];
   PF_PIMGS=(ed&&ed.pledgeImgs)?ed.pledgeImgs.map(u=>({url:u})):[];   // [서약서]
+  _OVL_SWAP=null;PF_POVL={};if(ed&&ed.pledgeOverlays)Object.keys(ed.pledgeOverlays).forEach(k=>{PF_POVL[k]=(ed.pledgeOverlays[k]||[]).map(f=>Object.assign({},f))});
   PF_OVL={};if(ed&&ed.consentOverlays)Object.keys(ed.consentOverlays).forEach(k=>{PF_OVL[k]=(ed.consentOverlays[k]||[]).map(f=>Object.assign({},f))});
   PF_DATES=(ed&&ed.dates)?ed.dates.map(d=>d.date).sort():[];
   const base=PF_DATES.length?new Date(PF_DATES[0]+'T00:00:00'):new Date();
@@ -978,7 +979,7 @@ function pfOvlAuto(){
   add('date',0.22,0.80,9);add('name',0.22,0.88,9);add('rrn',0.55,0.88,9);add('sign',0.62,0.905,30);
   OVL_SEL=-1;pfOvlChips();
 }
-function pfOvlDone(){const m=document.getElementById('ovlModal');if(m)m.remove();document.removeEventListener('keydown',pfOvlKey);pfRenderCImgs()}
+function pfOvlDone(){const m=document.getElementById('ovlModal');if(m)m.remove();document.removeEventListener('keydown',pfOvlKey);pfOvlSwapBack();pfRenderCImgs()}   // [서약서] 서약서 편집이었으면 원래 대상으로 되돌림
 const PF_OCR_KEYS=[
   ['acct',/계좌\s*번호|계좌/],['holder',/예금주/],['bank',/은\s*행|금융기관/],
   ['rrn',/주민\s*등록\s*번호|주민번호|생년월일/],['phone',/연락처|전화|휴대폰|휴대전화/],['addr',/주\s*소/],
@@ -1023,7 +1024,20 @@ async function pfOvlOcr(){
 // ══════════ [서약서 2026-09-18] 공고별 서약서 — 동의서와 같은 형식(문안 pledgeText · 스캔 이미지 pledgeImgs[]) ══════════
 //   공고에 서약서가 있으면 신청 화면 ② 동의서 아래에 보여 주고, 서약 체크가 있어야 제출됩니다(staffApplications.agree.pledge=true).
 //   담당자는 공고 상세의 [📜 서약서 일괄 출력]으로 전 신청자분을 서명과 함께 한 번에 뽑습니다(인쇄 창 → PDF로 저장).
-let PF_PIMGS=[];
+let PF_PIMGS=[],PF_POVL={},_OVL_SWAP=null;   // PF_POVL = pledgeOverlays (동의서 consentOverlays 와 같은 형식)
+function pfPOvlOpen(i){
+  if(_OVL_SWAP||!PF_PIMGS[i])return;
+  _OVL_SWAP={imgs:PF_CIMGS,ovl:PF_OVL};PF_CIMGS=PF_PIMGS;PF_OVL=PF_POVL;
+  pfOvlOpen(i);
+  if(!document.getElementById('ovlModal'))pfOvlSwapBack();
+}
+function pfOvlSwapBack(){
+  if(!_OVL_SWAP)return;
+  PF_PIMGS=PF_CIMGS;PF_POVL=PF_OVL;PF_CIMGS=_OVL_SWAP.imgs;PF_OVL=_OVL_SWAP.ovl;_OVL_SWAP=null;pfRenderPImgs();
+}
+function pfPOvlShift(removed){const o={};Object.keys(PF_POVL).forEach(k=>{const i=+k;if(i<removed)o[k]=PF_POVL[k];else if(i>removed)o[String(i-1)]=PF_POVL[k]});PF_POVL=o}
+function pfPOvlPack(){const o={};Object.keys(PF_POVL).forEach(k=>{if((PF_POVL[k]||[]).length)o[k]=PF_POVL[k].map(f=>Object.assign({f:f.f,x:+f.x.toFixed(4),y:+f.y.toFixed(4),fs:f.fs},f.v?{v:f.v}:{},f.a?{a:f.a}:{}))});return o}
+function pledgeOvlReady(p){return !!(p&&p.pledgeImgs&&p.pledgeImgs.length&&p.pledgeOverlays&&Object.keys(p.pledgeOverlays).some(k=>(p.pledgeOverlays[k]||[]).length))}
 function hasPledge(p){return !!(p&&((p.pledgeImgs&&p.pledgeImgs.length)||String(p.pledgeText||'').trim()))}
 function pfAddPImgs(input){
   const files=[...input.files];
@@ -1046,11 +1060,13 @@ function pfAddPImgs(input){
 function pfRenderPImgs(){
   const el=document.getElementById('pfPImgList');if(!el)return;
   el.innerHTML=PF_PIMGS.length?PF_PIMGS.map((x,i)=>{
-    const src=x.url||x.dataUrl||'';
-    return '<div style="position:relative;display:inline-flex">'
+    const src=x.url||x.dataUrl||'';const n=(PF_POVL[String(i)]||[]).length;
+    return '<div style="position:relative;display:inline-flex;flex-direction:column;align-items:center;gap:4px">'
       +(src?'<img class="stthumb" src="'+esc(src)+'" onclick="window.open(this.src)">':'<div class="stthumb" style="display:flex;align-items:center;justify-content:center;font-size:10px;color:#8a919d;background:#f6f8fb;padding:4px;text-align:center;word-break:break-all">'+esc(x.name||'이미지')+'</div>')
-      +'<button type="button" onclick="PF_PIMGS.splice('+i+',1);pfRenderPImgs()" style="position:absolute;top:-6px;right:-6px;border:none;background:#C41E2F;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;font-weight:900">×</button></div>';
-  }).join(''):'<span style="font-size:12px;color:#8a919d">이미지 없음 (문안만 사용)</span>';
+      +'<button type="button" onclick="pfPOvlOpen('+i+')" style="border:none;background:'+(n?'#0f766e':'#7c3aed')+';color:#fff;border-radius:7px;padding:4px 10px;cursor:pointer;font-weight:800;font-size:11.5px" title="성명·날짜·서명이 찍힐 자리를 지정">🎯 '+(n?'위치 '+n+'개 ✓':'서명·기입 위치 지정')+'</button>'
+      +'<button type="button" onclick="PF_PIMGS.splice('+i+',1);pfPOvlShift('+i+');pfRenderPImgs()" style="position:absolute;top:-6px;right:-6px;border:none;background:#C41E2F;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;font-weight:900">×</button></div>';
+  }).join('')+'<div style="font-size:12px;color:#8a919d;width:100%;margin-top:4px">각 장의 [🎯]로 성명·날짜·서명 자리를 정해 두면, 서약한 신청자의 정보와 전자서명이 그 자리에 자동 기입된 서약서를 출력할 수 있습니다.</div>'
+  :'<span style="font-size:12px;color:#8a919d">이미지 없음 (문안만 사용)</span>';
 }
 // 신청 화면 ② 동의서 아래
 function pledgeApplyHtml(p,checked){
@@ -1063,7 +1079,7 @@ function pledgeApplyHtml(p,checked){
     +'<label style="display:flex;gap:7px;align-items:center;cursor:pointer;font-size:12.5px;line-height:2.1;margin-top:5px"><input type="checkbox" id="apPledge" style="width:auto"'+(checked?' checked':'')+'> (필수) 위 서약서 내용을 확인하였으며 이를 지킬 것을 서약합니다</label>';
 }
 // 담당자 일괄 출력(onlyUid 가 있으면 본인 것) — 맨 앞 목록 1장 + 신청자별 서약서(성명·연락처·임무·서약 여부·일자·전자서명)
-function printPledgeDocs(postId,onlyUid){
+async function printPledgeDocs(postId,onlyUid){
   const p=POSTS.find(x=>x.id===postId);if(!p||!hasPledge(p))return;
   let apps=(APPS[p.id]||[]).slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
   if(onlyUid)apps=apps.filter(a=>a.uid===onlyUid);
@@ -1078,8 +1094,33 @@ function printPledgeDocs(postId,onlyUid){
     +'<table style="width:100%;border-collapse:collapse"><tr><th '+th+'>연번</th><th '+th+'>성명</th><th '+th+'>연락처</th><th '+th+'>상태</th><th '+th+'>신청일</th><th '+th+'>서약</th><th '+th+'>전자서명</th></tr>'
     +apps.map((a,i)=>{const g=a.agree||{};return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'>'+esc(a.name||'')+'</td><td '+td+'>'+esc(a.phone||'')+'</td><td '+td+'>'+stOf(a)+'</td><td '+td+'>'+esc(String(g.at||'').slice(0,10))+'</td><td '+td+'>'+(g.pledge===true?'○':'-')+'</td><td '+td+'>'+(g.signature?'○':'-')+'</td></tr>'}).join('')
     +'</table><div style="font-size:12px;color:#555;margin-top:10px;line-height:1.7">※ 서약 「-」: 서약서가 공고에 추가되기 전에 접수된 신청입니다(신청자가 신청을 다시 열어 저장하면 서약이 기록됩니다). 전자서명은 신청 화면에서 선택 항목입니다.</div></div>');
+  const ovlMode=pledgeOvlReady(p);
+  // [위치 지정] 창을 먼저 열어 두고(팝업 차단 회피) 주소·예금주 보완용 회원 정보를 읽습니다
+  const w=window.open('','_blank');
+  if(!w){alert('팝업이 차단되어 인쇄 창을 열 수 없습니다. 주소창의 팝업 차단을 해제해주세요.');return}
+  const um={};
+  if(ovlMode){
+    try{w.document.write('<div style="font-family:Malgun Gothic,sans-serif;padding:40px;font-size:15px">서약서를 만드는 중입니다… 창을 닫지 마세요.</div>')}catch(e){}
+    await Promise.all([...new Set(apps.map(a=>a.uid))].map(async uid=>{try{const d=await DB.collection('users').doc(uid).get();if(d.exists)um[uid]=d.data()}catch(e){}}));
+  }
   apps.forEach(a=>{
     const g=a.agree||{};
+    if(ovlMode){
+      // 서약하지 않은 신청(서약서 추가 전 접수)은 성명·연락처만 찍고 날짜·서명·체크는 비워 둡니다
+      const pi=a.payInfo||{},u=um[a.uid]||{},did=g.pledge===true;
+      const sign=did?(g.signature||pi.signature||''):'';
+      const vals={name:a.name||u.name||'',rrn:pi.rrn||'',phone:a.phone||u.phone||'',addr:u.address||'',bank:pi.bank||u.bank||'',acct:pi.account||u.accountNum||'',holder:u.accountHolder||a.name||'',date:did?pcFmtDate(g.pledgeAt||g.at):'',sign:''};
+      (p.pledgeImgs||[]).forEach((img,i)=>{
+        const spans=((p.pledgeOverlays||{})[String(i)]||[]).map(f=>{
+          const inner=f.f==='check'?(did?CAREER.checkMark(f.fs||18):''):f.f==='num'?esc(f.v||''):f.f==='sign'?(sign?'<img src="'+esc(sign)+'" style="height:calc(var(--ovk,1)*'+(f.fs||30)+'px);display:block">':(did?'(서명)':'')):esc(vals[f.f]||'');
+          return '<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:calc(var(--ovk,1)*'+(f.fs||14)+'px);font-weight:500;color:#111;white-space:nowrap;line-height:1.3;'+(f.a==='c'?'transform:translate(-50%,-50%);':'')+'">'+inner+'</span>';
+        }).join('');
+        pages.push('<div style="page-break-after:always;font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:20px 10px">'
+          +'<div style="font-size:11px;color:#666;margin-bottom:6px">'+esc(p.competitionName||'')+' · 서약서 · '+esc(a.name||'')+' · '+(i+1)+'/'+(p.pledgeImgs.length)+(did?'':' · <b style="color:#C41E2F">서약 전(서약서 추가 전 접수)</b>')+'</div>'
+          +'<div class="ovl-wrap" style="position:relative"><img src="'+esc(img)+'" style="width:100%;display:block;border:1px solid #999">'+spans+'</div></div>');
+      });
+      return;
+    }
     pages.push('<div style="page-break-after:always;font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:30px 10px">'
       +'<h2 style="text-align:center;letter-spacing:8px;border:2px solid #333;padding:12px">서 약 서</h2>'
       +'<div style="text-align:center;color:#555;font-size:13.5px;margin:8px 0 14px">'+esc(p.competitionName||'')+' · 심판·운영요원</div>'
@@ -1093,10 +1134,9 @@ function printPledgeDocs(postId,onlyUid){
       +'<div style="text-align:right;margin-top:8px;font-size:15px">서약인&nbsp;&nbsp;<b>'+esc(a.name||'')+'</b>&nbsp;&nbsp;'+(g.signature?'<img src="'+esc(g.signature)+'" style="height:44px;vertical-align:middle">':'(서명)')+'</div>'
       +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">'+esc((p.author&&p.author.organization)||'대한민국플라잉디스크연맹')+' 귀하</div></div>');
   });
-  const w=window.open('','_blank');
-  if(!w){alert('팝업이 차단되어 인쇄 창을 열 수 없습니다. 주소창의 팝업 차단을 해제해주세요.');return}
   const PRN='(function(){var d=0,go=function(){if(d)return;d=1;setTimeout(function(){window.print()},500)};var im=[].slice.call(document.images),n=im.length,c=0,f=function(){if(++c>=n)go()};if(!n)return go();im.forEach(function(i){if(i.complete)f();else{i.onload=f;i.onerror=f}});setTimeout(go,20000)})()';
-  w.document.write('<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(p.competitionName||'')+' 서약서'+(onlyUid?'':' 일괄')+'</title></head><body>'+pages.join('')+'<script>'+PRN+'<\/script></body></html>');
+  w.document.open();
+  w.document.write('<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{-webkit-text-size-adjust:100%;text-size-adjust:100%}</style><title>'+esc(p.competitionName||'')+' 서약서'+(onlyUid?'':' 일괄')+'</title></head><body style="margin:0">'+pages.join('')+'<script>'+CAREER.OVL_PRINT_JS+PRN+'<\/script></body></html>');
   w.document.close();
 }
 function pfRenderCImgs(){
@@ -1344,7 +1384,7 @@ async function savePost(editId){
       meal:(document.querySelector('input[name=pfMeal]:checked')||{}).value||'제공',
       uniform:uniform,lodging:lodging,
       supplies:supplies,posters:posters,description:v('pfDesc'),contactInfo:v('pfContact'),
-      pledgeText:v('pfPText'),pledgeImgs:pledgeImgs,   // [서약서]
+      pledgeText:v('pfPText'),pledgeImgs:pledgeImgs,pledgeOverlays:pfPOvlPack(),   // [서약서]
       consentText:v('pfCText'),consentImgs:consentImgs,consentForm:v('pfForm')||'none',consentFormUrl:v('pfFormUrl'),consentFormName:v('pfFormName'),consentOverlays:pfOvlPack(),   // [동의서·서류]
       recruitType:(document.querySelector('input[name=pfRecruitType]:checked')||{}).value||'심판·운영요원',  // [모집유형 라벨] 대회참가자 모집과 구분
       compId:PF_COMPID||((editId&&(POSTS.find(x=>x.id===editId)||{}).compId)||''),  // [v7] 상위 대회 연결
