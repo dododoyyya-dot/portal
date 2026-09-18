@@ -1730,6 +1730,7 @@ async function openTeamApply(id){
     +'<label style="display:flex;gap:7px;align-items:flex-start;margin-top:8px;font-weight:800;color:#153A77"><input type="checkbox" id="taPledge" style="width:auto;margin-top:3px"> 인솔자로서 미성년 팀원 전원의 보호자 동의를 받았으며(또는 대회 전까지 수합·제출하며), 명단이 사실임을 확인합니다.</label>'
     // [명단제공] 팀원 연락처·주소를 주최기관 명단에 싣는 데 대한 동의 — 인솔자가 팀원 전원에게 받아 확인합니다.
     +'<label style="display:flex;gap:7px;align-items:flex-start;margin-top:6px;font-weight:800;color:#153A77"><input type="checkbox" id="taPconsent" style="width:auto;margin-top:3px"> 팀원 전원으로부터 주최기관 참가자 명단(성명·생년월일·성별·연락처·주소) 제공 동의를 받았음을 확인합니다. <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 체크하지 않으면 명단에서 연락처·주소는 빠집니다</span></label></div>'
+    +pledgeSecHtml(s,'taPledgeDoc',true)   // [서약서]
     +'<div style="font-size:13px;font-weight:800;margin:14px 0 4px">④ 인솔자 서명</div>'
     +'<div class="sigwrap"><canvas id="taSig" width="520" height="110" style="width:100%;height:110px;touch-action:none;display:block"></canvas></div>'
     +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px"><button type="button" class="cbtn cbtn-soft" style="padding:4px 12px;font-size:11.5px" onclick="taClearSig()">서명 지우기</button> '+savedSigBtn('taSig','taSigMsg','TA_DRAWN=true')+'</div>'
@@ -2514,6 +2515,7 @@ async function submitTeam(){
       +'\n\n생년월일이 없으면 미성년 여부를 확인할 수 없어 보호자 동의 대상에서 누락될 수 있습니다.\n'
       +'특히 초·중·고 재학생은 반드시 생년월일을 입력해 주세요.\n\n이대로 신청할까요?'))return;
   if(!document.getElementById('taPledge').checked)return alert('보호자 동의 수합 확인란에 체크해주세요.');
+  if(!pledgeCheck('taPledgeDoc'))return;   // [서약서]
   if(!TA_DRAWN)return alert('인솔자 서명이 필요합니다.');
   const cv=document.getElementById('taSig');
   let sign=SAVED_SIG_URL.taSig||cv.toDataURL('image/png');if(sign.length>150000&&sign.indexOf('data:')===0)sign=cv.toDataURL('image/jpeg',0.7);   // [저장된 서명] 폴백이면 원본 링크
@@ -2538,7 +2540,7 @@ async function submitTeam(){
         teamGender:(function(){const g=document.getElementById('taGender');return (g&&g.value)||taGenderOf(divName)})(),   // [팀 구분 자동] 선택칸이 없어도 부문명에서 읽음
         leader:CMY.name||'',leaderRole:document.getElementById('taRole').value,leaderPhone:CMY.phone||'',
         staff:taStaffList(),   // [추가 인솔자] 감독·코치·지도자
-        roster:roster,rosterN:roster.length,prefs:[divName],consent:true,signed:true,
+        roster:roster,rosterN:roster.length,prefs:[divName],consent:true,signed:true,pledge:PLEDGE_OK,
         pconsent:!!(document.getElementById('taPconsent')&&document.getElementById('taPconsent').checked),   // [명단제공] 팀원 연락처·주소 제공 동의
         leaderAddress:(CMY.address||''),
         edited:!!TA_EDIT,                                   // [팀원 후속 추가] 수정 신청 표식
@@ -2676,7 +2678,7 @@ async function openMinorReq(id){
 let CCOMPS=[];
 // ══════════ [대회이전] 대회 참가모집 공고 등록·관리 (관리자 위저드 이전판, cc2 접두어) ══════════
 const CC2_SIDOS=['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
-let CC2_ENTRY=null,CC2_DATES=[],CC2_Y=0,CC2_M=0,CC2_ATTACH=[],CC2_CIMGS=[],CC2_EDIT=null,CC2_LIST=[];
+let CC2_ENTRY=null,CC2_DATES=[],CC2_Y=0,CC2_M=0,CC2_ATTACH=[],CC2_CIMGS=[],CC2_PIMGS=[],CC2_EDIT=null,CC2_LIST=[];
 function _cc2Admin(){return cHasRole(CMY,'admin')}
 async function cc2LoadMine(){
   const el=document.getElementById('cc2MyList');if(!el)return;
@@ -2906,13 +2908,13 @@ function cc2PickFile(input,arr,renderFn){
   [...(input.files||[])].forEach(f=>{
     const isImg=/^image\//.test(f.type);
     const isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name);
-    const isConsent=(typeof CC2_CIMGS!=='undefined'&&arr===CC2_CIMGS);
+    const isConsent=(typeof CC2_CIMGS!=='undefined'&&arr===CC2_CIMGS)||(typeof CC2_PIMGS!=='undefined'&&arr===CC2_PIMGS);   // [서약서] 서약서 칸도 PDF → 장별 이미지
     if(!isImg&&!isPdf){alert(f.name+(/\.(hwp|hwpx|docx?)$/i.test(f.name)?' — 한글·워드 파일은 브라우저가 열 수 없습니다.\n한글에서 [파일 → PDF로 저장] 한 뒤 그 PDF 를 올려 주세요. (PDF 는 자동으로 장별 이미지로 바뀝니다)':' — 이미지 또는 PDF만 첨부할 수 있습니다.'));return}
     if(isPdf&&!isConsent&&f.size>1.9*1024*1024){alert(f.name+' — PDF는 2MB 이하만 가능합니다. 용량을 줄이거나 이미지로 변환해 첨부해주세요.');return}
     if(isPdf&&isConsent&&f.size>30*1024*1024){alert(f.name+' — 30MB 이하 PDF만 가능합니다.');return}
     // [PDF 동의서] 동의서 칸에 PDF 를 올리면 장별 이미지로 변환해 넣습니다 (좌표 지정·서명 기입 가능)
     if(isPdf&&isConsent){
-      const list=document.getElementById('cc2CImgList');if(list)list.insertAdjacentHTML('beforeend','<div id="cc2PdfBusy" style="font-size:12px;color:#153A77;font-weight:800;margin-top:6px">PDF 를 이미지로 변환 중… ('+cesc(f.name)+')</div>');
+      const list=document.getElementById(arr===CC2_PIMGS?'cc2PImgList':'cc2CImgList');if(list)list.insertAdjacentHTML('beforeend','<div id="cc2PdfBusy" style="font-size:12px;color:#153A77;font-weight:800;margin-top:6px">PDF 를 이미지로 변환 중… ('+cesc(f.name)+')</div>');
       CAREER.pdfPages(f,{maxPages:10}).then(pages=>{pages.forEach(p=>arr.push({name:p.name,kind:'동의서',dataUrl:p.dataUrl}));renderFn();if(pages.length&&pages[0].pages>10)alert('PDF 가 '+pages[0].pages+'장이라 앞 10장만 넣었습니다.')})
         .catch(e=>{const b=document.getElementById('cc2PdfBusy');if(b)b.remove();alert('PDF 변환 실패: '+(e&&e.message||e)+'\n이미지(JPG·PNG)로 저장해 올려 주세요.')});
       return;
@@ -2942,6 +2944,43 @@ function cc2AttachRender(){
     +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+cesc(x.name)+(x.url?' <span style="color:#0f766e;font-size:11px">(업로드됨)</span>':'')+'</span>'
     +'<button type="button" onclick="CC2_ATTACH.splice('+i+',1);cc2AttachRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:6px;width:22px;height:22px;cursor:pointer;font-weight:900">×</button></div>').join('')
   :'<div style="font-size:12px;color:#8a919d;margin-top:4px">첨부 없음</div>';
+}
+// ══════════ [서약서 2026-09-18] 공고별 서약서 — 동의서와 같은 형식(문안 pledgeText · 스캔 이미지 pledgeImgs[]) ══════════
+//   공고에 서약서가 있으면 개인·팀 신청 화면의 동의서 아래에 보여 주고, 서약 체크가 있어야 제출됩니다(claimed[].pledge=true). 없는 공고는 종전과 같습니다.
+function cc2PImgRender(){
+  const el=document.getElementById('cc2PImgList');if(!el)return;
+  el.innerHTML=CC2_PIMGS.length?CC2_PIMGS.map((x,i)=>'<div style="display:inline-flex;flex-direction:column;align-items:center;gap:4px;margin:6px 10px 0 0;padding:6px;border:1.5px solid #e2e7f0;border-radius:10px">'
+      +'<img src="'+cesc(x.url||x.dataUrl)+'" style="height:92px;border-radius:6px;border:1px solid #e2e7f0">'
+      +'<button type="button" onclick="CC2_PIMGS.splice('+i+',1);cc2PImgRender()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:7px;padding:3px 10px;cursor:pointer;font-weight:900;font-size:12px">× 빼기</button></div>').join('')
+  :'<span style="font-size:12px;color:#8a919d">이미지 없음 (문안만 사용)</span>';
+}
+function pledgeImgsOf(s){return (s&&Array.isArray(s.pledgeImgs))?s.pledgeImgs:[]}
+function hasPledge(s){return !!(s&&(pledgeImgsOf(s).length||String(s.pledgeText||'').trim()))}
+let PLEDGE_OK=false;
+// 신청 화면 — id: 체크박스 id, team: 팀 신청(인솔자 대표 서약)
+function pledgeSecHtml(s,id,team){
+  if(!hasPledge(s))return '';
+  const imgs=pledgeImgsOf(s);
+  return '<div class="docsec" style="margin-top:12px"><div class="dtitle">서약서</div>'
+    +(imgs.length?imgs.map((x,i)=>'<img src="'+cesc(x)+'" alt="서약서 '+(i+1)+'페이지" style="width:100%;display:block;border:1px solid #e2e7f0;border-radius:8px;margin-bottom:8px">').join('')
+        +(imgs.length>1?'<div style="font-size:11.5px;color:#8a919d;font-weight:700;margin-bottom:8px">총 '+imgs.length+'페이지 — 전체 내용을 확인 후 서약해주세요</div>':'')
+      :'<div style="font-size:12.5px;color:#374151;line-height:1.9;white-space:pre-wrap;border:1px solid #e2e7f0;border-radius:8px;padding:12px 14px;margin-bottom:10px;background:#fff">'+cesc(s.pledgeText)+'</div>')
+    +'<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;font-weight:800;color:#153A77">'
+    +'<input type="checkbox" id="'+id+'" style="width:auto;margin-top:3px"><span>'+(team?'인솔자로서 팀원 전원을 대표하여 위 서약서 내용을 확인하였으며 이를 지킬 것을 서약합니다.':'위 서약서 내용을 확인하였으며 이를 지킬 것을 서약합니다.')+'</span></label></div>';
+}
+function pledgeCheck(id){
+  const e=document.getElementById(id);PLEDGE_OK=!!(e&&e.checked);
+  if(e&&!e.checked){alert('서약서 내용을 확인하고 서약란에 체크해주세요.');return false}
+  return true;
+}
+// 인쇄(신청서·오프라인 제출용) — 동의서 아래에 같은 모양으로
+function pledgePrintHtml(s,checked){
+  if(!hasPledge(s))return '';
+  const imgs=pledgeImgsOf(s);
+  return '<h3 style="text-align:center;font-size:16px;margin:18px 0 8px">서 약 서</h3>'
+    +(imgs.length?imgs.map(x=>'<img src="'+cesc(x)+'" style="width:100%;display:block;border:1px solid #999;margin-top:10px">').join('')
+      :'<div style="font-size:12.5px;line-height:1.9;border:1px solid #999;padding:12px 16px;white-space:pre-wrap">'+cesc(s.pledgeText)+'</div>')
+    +'<div style="font-size:12.5px;margin-top:6px">위 서약서 내용을 확인하였으며 이를 지킬 것을 서약합니다. <b>'+(checked?'서약함 ☑':'서약함 □')+'</b></div>';
 }
 function cc2CImgRender(){
   const el=document.getElementById('cc2CImgList');if(!el)return;
@@ -3357,6 +3396,11 @@ function cc2Open(editId){
       +'<label '+lb+'>동의서 스캔 이미지 (선택 — 업로드 시 문안 대신 표시)</label>'
       +'<input type="file" id="cc2CImg" accept="image/*" multiple onchange="cc2PickFile(this,CC2_CIMGS,cc2CImgRender)">'
       +'<div id="cc2CImgList" style="margin-top:6px"></div>'
+      // [서약서 2026-09-18] 동의서와 같은 형식 — 문안 또는 스캔 이미지. 비워 두면 신청 화면에 서약서가 나오지 않습니다
+      +'<label '+lb+'>서약서 문안 <span style="font-weight:600;color:#8a919d;font-size:11px">— 선택 · 입력하면 신청 화면 동의서 아래에 표시되고 서약 체크가 있어야 제출됩니다</span></label><textarea id="cc2PText" rows="4" '+inp+' placeholder="예: 본인은 대회 규정과 심판 판정을 존중하고, 스포츠맨십에 어긋나는 행위를 하지 않을 것을 서약합니다. (비우면 서약서 없음)">'+cesc(c.pledgeText||'')+'</textarea>'
+      +'<label '+lb+'>서약서 스캔 이미지 (선택 — 업로드 시 문안 대신 표시 · PDF 는 장별 이미지로 변환)</label>'
+      +'<input type="file" id="cc2PImg" accept="image/*,.pdf" multiple onchange="cc2PickFile(this,CC2_PIMGS,cc2PImgRender)">'
+      +'<div id="cc2PImgList" style="margin-top:6px"></div>'
       // [보관함] 자주 쓰는 동의서(문안·스캔 이미지·기입 위치·양식)를 저장해 두고 다음 공고에서 골라 쓰는 곳 (consentTemplates)
       +'<label '+lb+'>📂 동의서 보관함 <span style="font-weight:600;color:#8a919d;font-size:11px">— 저장해 둔 동의서를 골라 불러오거나, 지금 작성한 동의서를 저장</span></label>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
@@ -3387,6 +3431,7 @@ function cc2Open(editId){
   CC2_ATTACH=(c.attachments||[]).map(x=>({name:x.name||'',kind:x.kind||'기타',url:x.url||''}));
   cc2AttachRender();
   CC2_CIMGS=(c.consentImgs||[]).map(u=>({url:u}));
+  CC2_PIMGS=(c.pledgeImgs||[]).map(u=>({url:u}));cc2PImgRender();   // [서약서]
   CC2_OVL={};Object.keys(c.consentOverlays||{}).forEach(k=>{CC2_OVL[k]=(c.consentOverlays[k]||[]).map(f=>Object.assign({},f))});   // [서명 위치] 수정 시 기존 배치 유지
   cc2CImgRender();
 }
@@ -3422,6 +3467,8 @@ async function cc2Save(){
     for(const x of CC2_ATTACH)attachments.push({name:x.name,kind:x.kind,url:await upFile(x,'compdoc')});
     const consentImgs=[];
     for(const x of CC2_CIMGS)consentImgs.push(await upFile(x,'compconsent'));
+    const pledgeImgs=[];
+    for(const x of CC2_PIMGS)pledgeImgs.push(await upFile(x,'comppledge'));   // [서약서]
     const extras={prize:document.getElementById('cc2Prize').checked,souvenir:document.getElementById('cc2Souv').checked,
       insurance:document.getElementById('cc2Ins').checked,prizeNote:v('cc2PrizeNote'),
       // [공고규칙] 체크 안 하면 false — 기존 공고 동작 그대로
@@ -3438,6 +3485,7 @@ async function cc2Save(){
       opening:{time:v('cc2OpT'),place:v('cc2OpP')},time:v('cc2Time'),daySchedule:daySchedule,
       sports:sports,teamTypes:entry.teamUnits,fee:feeStr,deadline:v('cc2DL'),eligRegion:'',
       entry:entry,attachments:attachments,extras:extras,committee:committee,
+      pledgeText:v('cc2PText'),pledgeImgs:pledgeImgs,   // [서약서]
       consentText:v('cc2CText'),consentImgs:consentImgs,consentForm:(v('cc2Form')||'basic'),consentFormUrl:v('cc2FormUrl'),consentFormName:v('cc2FormName'),
       consentOverlays:cc2OvlPack(),status:'모집중'};   // [서명 위치] 공고 작성자가 지정한 기입 위치
     // 참가 슬롯 roles 생성
@@ -3456,6 +3504,7 @@ async function cc2Save(){
       teamDivs:teamDivs,teamTypes:entry.teamUnits,teamGenders:entry.teamGenders,entry:entry,divDates:divDates,
       host:base.host,organizer:base.organizer,sponsor:base.sponsor,partner:base.partner,
       opening:base.opening,time:base.time,daySchedule:daySchedule,attachments:attachments,extras:extras,committee:committee,
+      pledgeText:base.pledgeText,pledgeImgs:pledgeImgs,   // [서약서]
       consentText:base.consentText,consentImgs:consentImgs,consentOverlays:base.consentOverlays,consentForm:base.consentForm,consentFormUrl:base.consentFormUrl||'',consentFormName:base.consentFormName||''};
     if(CC2_EDIT){
       await DB.collection('competitions').doc(CC2_EDIT).update(base);
@@ -3860,6 +3909,7 @@ function openOfflineDocs(){
   if(imgs.length)body+=imgs.map(x=>'<img src="'+x+'" style="width:100%;margin-bottom:6mm">').join('');
   else if(s.consentText)body+='<div style="font-size:12.5px;line-height:1.9;white-space:pre-wrap;border:1px solid #ccc;padding:6mm">'+esc2(s.consentText)+'</div>';
   else body+='<div style="font-size:12.5px;line-height:1.9;border:1px solid #ccc;padding:6mm">□ 수집 항목: 성명·생년월일·성별·소속·연락처<br>□ 이용 목적: 대회 참가 관리, 행사 보험 가입, 기록 관리<br>□ 보유 기간: 대회 종료 후 1년<br>※ 동의를 거부할 권리가 있으며, 거부 시 참가에 제한이 있을 수 있습니다.</div>';
+  body+=pledgePrintHtml(s,false);   // [서약서]
   body+='<div style="margin-top:12mm;font-size:13.5px;text-align:right;line-height:2.4">'
     +'20&nbsp;&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;&nbsp;일<br>'
     +'신청인(참가자): ______________ (서명)<br>'
@@ -4044,6 +4094,7 @@ async function openApply(id){
       +'<input type="checkbox" id="cConsent3" style="width:auto;margin-top:3px"><span>주최기관(대회 운영위원회)에 참가자 명단으로 <b>성명·생년월일·성별·연락처·주소</b>를 제공하는 데 동의합니다. '
       +'<span style="font-weight:600;color:#8a919d;font-size:11.5px">— 동의하지 않으면 연락처·주소는 명단에서 빠집니다</span></span></label>'
       +'</div>'
+      +pledgeSecHtml(s,'cPledge')   // [서약서]
       +'<div style="font-size:13px;font-weight:800;margin:4px 0 6px"><span id="sigLabel">③ 본인 서명</span> <span style="font-weight:600;color:#888;font-size:11.5px">(마우스·손가락 — 신청서와 동의서에 함께 날인)</span> <button type="button" class="cbtn cbtn-soft" style="padding:4px 12px;font-size:11.5px" onclick="clearSig()">지우기</button> '+savedSigBtn('cSigPad','cSigMsg','SIG_DRAWN=true')+'</div>'
       +'<div class="sigwrap"><canvas id="cSigPad" width="520" height="120" style="width:100%;height:120px;touch-action:none;display:block"></canvas></div>'
       +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
@@ -4292,6 +4343,7 @@ async function submitEntry(){
   }
   if(!consentGate())return;
   if(!document.getElementById('cConsent').checked){alert('개인정보 수집·이용 동의가 필요합니다.');return}
+  if(!pledgeCheck('cPledge'))return;   // [서약서]
   if(!SIG_DRAWN){alert((p.kid?'보호자(법정대리인)':'본인')+' 서명이 필요합니다. 서명란에 서명해주세요.');return}
   const doc0=CSLOTS.find(d=>d.id===APPLY_ID);
   const s0=doc0?doc0.data():{};
@@ -4348,7 +4400,7 @@ async function submitEntry(){
         // [명단제공] 동의 여부와, 동의 시 명단에 실을 연락처·주소를 신청 시점 값으로 함께 저장합니다.
         pconsent:!!(document.getElementById('cConsent3')&&document.getElementById('cConsent3').checked),
         phone:(p.kid?'':(CMY.phone||'')),address:(CMY.address||''),
-        prefs:APPLY_SEL.slice(),consent:true,signed:true,at:new Date().toISOString()};
+        prefs:APPLY_SEL.slice(),consent:true,signed:true,pledge:PLEDGE_OK,at:new Date().toISOString()};
       // [수기동의 경로] 서면 동의서 제출 전제로 접수된 건 표시 — 명단에서 담당자가 바로 알아볼 수 있게 합니다.
       if(PAPER_MODE&&p.birth&&ageOf(p.birth)<18&&!p.kid)_newClaim.needPaper=true;
       if(isEdit)_newClaim.edited=true; // [버그수정] undefined 필드값은 Firestore가 거부 → 수정건에만 표기
@@ -4523,6 +4575,7 @@ function printMyEntryDocs(id,s){
           ?'<div style="font-size:12.5px;line-height:1.9;border:1px solid #999;padding:12px 16px;margin-top:10px;white-space:pre-wrap">'+cesc(s.consentText)+'\n\n동의함 ☑</div>'
           :'<div style="font-size:12.5px;line-height:1.9;border:1px solid #999;padding:12px 16px;margin-top:10px">'
           +'<b>□ 개인정보 수집·이용 동의</b> — 항목: 참가자 성명·생년월일·성별·소속·보호자 성명·연락처 / 목적: 대회 참가 관리·단체보험·기록 관리 / 보유기간: 2026. 12. 31.까지 <b>동의함 ☑</b></div>'))
+      +pledgePrintHtml(s,m.pledge===true)   // [서약서] 서약 체크 없이 접수된(서약서 추가 전) 신청은 빈 칸
       +'<div style="text-align:right;margin-top:24px;font-size:14px">'+cesc(dt.replace(/-/g,'. '))+'.</div>'
       +'<div style="text-align:right;margin-top:8px;font-size:15px">'+(m.kid?'법정대리인&nbsp;&nbsp;<b>'+cesc(m.guardian||CMY.name||'')+'</b>':'신청인&nbsp;&nbsp;<b>'+cesc(m.name)+'</b>')+'&nbsp;&nbsp;'+sig+'</div>'
       +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">'+cesc(s.title)+' 조직위원회 귀하</div></div>');
