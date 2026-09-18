@@ -240,6 +240,21 @@ body[data-view] #secLive>.sec-label,body[data-view] #secLive>.sec-title,body[dat
   </div>
   <div class="gbox" id="cGate" style="display:none"></div>
   <div id="cBody" style="display:none">
+    <!-- [공고 종류 선택 2026-09-18] 메뉴 대회 › 공고 등록·관리 — 대회 / 심판·운영요원 중 골라 각 화면으로 -->
+    <div id="pubChoose" style="display:none;margin-bottom:20px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">
+        <a href="competition.html?view=manage&pub=comp" style="display:block;text-decoration:none;background:#f0f5ff;border:2px solid #b9cdec;border-radius:16px;padding:22px 22px 20px;color:#111">
+          <div style="font-size:18px;font-weight:900;color:#153A77">🏆 대회 참가모집 공고</div>
+          <div style="font-size:13px;color:#5b6472;margin-top:6px;line-height:1.6">종목·부문, 참가비, 첨부자료, 보호자 동의서 — 팀·개인 참가 신청을 받는 공고</div>
+          <div style="margin-top:12px;font-size:13px;font-weight:800;color:#1F4E9C">등록·관리 화면으로 →</div>
+        </a>
+        <a href="staff.html?write=1" style="display:block;text-decoration:none;background:#f3f6fb;border:2px solid #d3e0f2;border-radius:16px;padding:22px 22px 20px;color:#111">
+          <div style="font-size:18px;font-weight:900;color:#153A77">🛡 심판·운영요원 모집 공고</div>
+          <div style="font-size:13px;color:#5b6472;margin-top:6px;line-height:1.6">날짜별 임무·인원, 수당, 집합 안내 — 심판·운영요원을 모집하는 공고</div>
+          <div style="margin-top:12px;font-size:13px;font-weight:800;color:#1F4E9C">등록 화면으로 →</div>
+        </a>
+      </div>
+    </div>
     <!-- [대회이전] 권한자 대회 참가모집 공고 등록·관리 -->
     <div id="compAdminBox" style="display:none;background:#f0f5ff;border:2px solid #b9cdec;border-radius:16px;padding:14px 18px;margin-bottom:20px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -247,7 +262,7 @@ body[data-view] #secLive>.sec-label,body[data-view] #secLive>.sec-title,body[dat
         <span style="font-size:12px;color:var(--gray)">종목·부문, 참가비, 첨부자료, 동의서까지 한 번에 — 등록 즉시 아래에 게시됩니다</span>
         <span style="flex:1"></span>
         <button class="cbtn cbtn-main" style="padding:8px 16px;font-size:13px" onclick="cc2Open()">+ 대회 공고 등록</button>
-        <a class="cbtn cbtn-soft" style="padding:8px 16px;font-size:13px;text-decoration:none" href="staff.html?write=1">+ 심판·운영요원 모집 공고 등록</a>
+        <a style="font-size:12.5px;font-weight:800;color:#1F4E9C;text-decoration:none" href="competition.html?view=manage">↩ 공고 종류 선택</a>
       </div>
       <div id="cc2MyList" style="margin-top:8px"></div>
     </div>
@@ -457,7 +472,7 @@ function _kfdfApplyView(){try{if(new URLSearchParams(location.search).get('slot'
   KFDF_VIEW.apply({def:'list',menu:'대회',menuHref:'competition.html?view=list',hashMap:{staff:'entry',entry:'entry',manage:'manage'},views:{
     list:{title:'대회 공고 · 일정',desc:'대회 참가 공고와 심판·운영요원 모집 공고를 권역 지도와 함께 한곳에서 봅니다. 공고를 누르면 상세 화면으로 이동합니다.'},
     entry:{title:'대회 참가 신청',desc:'승인 회원은 본인·자녀, 클럽·학교·팀 단위로 참가 신청할 수 있습니다. 아래 공고를 눌러 신청하세요.'},
-    manage:{title:'대회 공고 등록 · 관리',desc:'권한자 전용 — 대회 참가모집 공고 등록·수정과 보호자 동의서 보관함.'}}})}catch(e){}}
+    manage:{title:'대회 공고 등록 · 관리',desc:'권한자 전용 — 대회 참가모집 공고와 심판·운영요원 모집 공고 중 골라 등록·관리합니다.'}}})}catch(e){}}
 if(window.KFDF_VIEW)_kfdfApplyView();else document.addEventListener('DOMContentLoaded',_kfdfApplyView);
 AUTH.onAuthStateChanged(async u=>{
   loadLiveComps();  // [대회v2] 실시간 공고 피드 (비로그인 포함)
@@ -473,6 +488,7 @@ AUTH.onAuthStateChanged(async u=>{
   checkFamReq();
   initSoAdmin();
   initConsentArchive();
+  initPubChoose();   // [공고 종류 선택] 대회 / 심판·운영요원
 });
 // ── 👥 신청 현황 공개 (일반회원: 마스킹 명단 / 사무국·임원: 세부정보) ──
 function isCompStaff(){
@@ -491,6 +507,15 @@ function initConsentArchive(){
   const h=document.getElementById('pcArcHint');
   if(h)h.textContent=pcArcCentral()?'중앙관리자 — 전체 시도를 열람할 수 있습니다 (시도 선택 가능)'
     :('열람 범위: '+(pcArcScopeSidos().join(' · ')||'본인 등록 공고')+' — 담당 시도 대회만 표시됩니다');
+}
+// [공고 종류 선택 2026-09-18] ?view=manage 로 들어오면 두 갈래(대회 / 심판·운영요원)만 보이고,
+//   ?pub=comp 를 붙여 들어오면 종전대로 대회 공고 등록·관리 상자와 동의서 보관함을 보입니다.
+function initPubChoose(){
+  const q=new URLSearchParams(location.search);
+  if(q.get('view')!=='manage'||q.get('pub')==='comp')return;
+  if(!isSidoOfficer()&&!isCompStaff())return;
+  const c=document.getElementById('pubChoose');if(c)c.style.display='';
+  ['compAdminBox','pcArcBox'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none'});
 }
 function initSoAdmin(){
   if(!isSidoOfficer())return;
@@ -3533,7 +3558,7 @@ function hubApply(){
   const nC=all.filter(x=>x.getAttribute('data-kind')==='comp'&&x.getAttribute('data-open')==='1').length,nS=all.filter(x=>x.getAttribute('data-kind')==='staff'&&x.getAttribute('data-open')==='1').length;
   document.querySelectorAll('#hubKind .hk').forEach(b=>{const k=b.getAttribute('data-k');b.classList.toggle('on',k===HUB_KIND);const base=k===''?'전체':k==='comp'?'대회 참가':'심판 · 운영요원 모집';const n=k===''?(nC+nS):k==='comp'?nC:nS;b.innerHTML=base+'<small>'+(k==='staff'&&HUB_STAFF===null?'로그인':n)+'</small>'});
   const note=document.getElementById('hubKindNote');if(note)note.innerHTML=(HUB_STAFF===null)?'심판 · 운영요원 모집 공고는 <a href="login.html" style="font-weight:800;color:#1f5fb2">로그인</a> 후 표시됩니다'
-    :(HUB_KIND!=='comp'?'<a href="staff.html?write=1" style="font-weight:800;color:#1f5fb2;text-decoration:none">+ 심판·운영요원 모집 공고 등록</a>':'');   // [2026-09-18] 메뉴로 들어와도 등록 창으로
+    :'';
   compMapRender();
 }
 // [참가 신청 화면] 내 신청 현황 — 신청한 공고를 위에 모아 보여 줍니다
