@@ -661,7 +661,7 @@ async function exportRosterCsv(id){
       (c.roster||[]).forEach(r=>{
         rows.push({grp:'👥 '+(c.name||''),name:r.name||'',birth:r.birth||'',gender:r.gender||'',st:stLbl(ageState(r)),
           org:r.school||c.teamOrg||'',phone:r.phone||'',addr:r.address||'',gphone:'',
-          part:(c.prefs||[]).map(p=>p+(divDateLbl(s,p)?' ('+divDateLbl(s,p)+')':'')).join('·'),consent:ok?'O':'X',nonMember:r.nonMember?'비회원':'',leader:(c.leader||'')+(c.leaderPhone?' '+c.leaderPhone:'')});
+          part:(c.prefs||[]).map(p=>p+(divDateLbl(s,p)?' ('+divDateLbl(s,p)+')':'')).join('·'),consent:ok?'O':'X',nonMember:r.nonMember?'비회원':'',leader:(c.leader||'')+(c.leaderPhone?' '+c.leaderPhone:'')+(taStaffTxt(c)?' / '+taStaffTxt(c,true):'')});
       });
     }else{
       const ok=!!c.pconsent;
@@ -1042,7 +1042,7 @@ async function viewRoster(id){
   else if(staff){
     rows=list.map((c,i)=>{
       if(c.team){
-        return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+' colspan="'+(entry?'4':'1')+'"><b>👥 '+cesc(c.name)+'</b> <span style="font-size:11.5px;color:#8a919d">'+cesc(c.teamType||'팀')+(c.teamOrg?' · '+cesc(c.teamOrg):'')+' · 인솔 '+cesc(c.leader||'')+'('+cesc(c.leaderRole||'')+')'+(c.leaderPhone?' '+cesc(c.leaderPhone):'')+'</span>'
+        return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+' colspan="'+(entry?'4':'1')+'"><b>👥 '+cesc(c.name)+'</b> <span style="font-size:11.5px;color:#8a919d">'+cesc(c.teamType||'팀')+(c.teamOrg?' · '+cesc(c.teamOrg):'')+' · 인솔 '+cesc(c.leader||'')+'('+cesc(c.leaderRole||'')+')'+(c.leaderPhone?' '+cesc(c.leaderPhone):'')+(taStaffTxt(c)?' · '+cesc(taStaffTxt(c,true)):'')+'</span>'
           +'<details style="margin-top:4px"><summary style="cursor:pointer;font-size:12px;font-weight:800;color:#153A77">명단 '+(c.rosterN||0)+'명'+((c.consentFiles&&c.consentFiles.length)?' · 📎동의서 '+c.consentFiles.length:'')+'</summary>'
           +'<div style="font-size:12px;color:#4b5563;margin-top:4px">'+(c.roster||[]).map((r,j)=>(j+1)+'. '+cesc(r.name)+(r.self?' <span style="color:#068081;font-weight:800">본인</span>':'')+(r.birth?' ('+cesc(r.birth)+')':'')+(r.school?' · '+cesc(r.school):'')+rosterMark(r.name,r.birth)+(r.nonMember?' <b style="color:#8a5a00;font-size:10.5px">🧾 비회원 참가자</b>':'')
             +(function(){
@@ -1110,7 +1110,7 @@ async function viewRoster(id){
       +'<div style="overflow-x:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse">'
       +'<tr><th '+th+'>성명·팀</th><th '+th+'>부문</th><th '+th+'>취소</th><th '+th+'>심사</th><th '+th+'></th></tr>'
       +canList.map(function(o){const c=o.c,x=o.x,key=ckey(c);const rv=(s.reviewStatus||{})[key]||{};
-          return '<tr><td '+td+'>'+(c.team?'👥 <b>'+cesc(c.name||'')+'</b> <span style="font-size:11px;color:#8a919d">인솔 '+cesc(c.leader||'')+' · '+(c.rosterN||0)+'명</span>':'<b>'+cesc(c.name||'')+'</b>')+'</td>'
+          return '<tr><td '+td+'>'+(c.team?'👥 <b>'+cesc(c.name||'')+'</b> <span style="font-size:11px;color:#8a919d">인솔 '+cesc(c.leader||'')+(taStaffTxt(c)?' · '+cesc(taStaffTxt(c)):'')+' · '+(c.rosterN||0)+'명</span>':'<b>'+cesc(c.name||'')+'</b>')+'</td>'
             +'<td '+td+'>'+cesc((c.prefs||[]).join(' · ')||'-')+'</td>'
             +'<td '+td+' style="white-space:nowrap;font-size:11.5px">'+cesc(kst(x.at))+'<br><span style="color:#8a919d">'+(x.uid&&x.uid===c.uid?'신청 계정이 취소':'다른 계정 '+cesc(String(x.uid||'').slice(0,8)))+(x.reason?' · '+cesc(x.reason):'')+'</span></td>'
             +'<td '+td+' style="text-align:center;font-size:11.5px">'+(rv.st?cesc(rv.st):'-')+'</td>'
@@ -1684,6 +1684,9 @@ async function openTeamApply(id){
     +((s.teamGenders&&s.teamGenders.length)?'<select id="taGender" '+inp+' title="클럽(팀) 구분">'+s.teamGenders.map(x=>'<option>'+cesc(x)+'</option>').join('')+'</select>':'')+'</div>'
     +'<div id="taOrgRow" style="margin-top:8px"></div>'
     +'<div style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;font-weight:700">인솔자: '+cesc(CMY.name||'')+' <select id="taRole" '+inp+'><option>지도교사</option><option>클럽장</option><option>학부모</option><option>성인 인솔자</option></select><span style="font-size:11.5px;color:#8a919d">'+cesc(CMY.phone||'')+'</span></div>'
+    // [추가 인솔자 2026-09-18] 감독·코치·지도자 — 버튼으로 몇 명이든
+    +'<div id="taStaffBox"></div>'
+    +'<div style="margin-top:6px"><button type="button" class="cbtn cbtn-soft" style="padding:5px 12px;font-size:12.5px;background:#eef3fb;color:#153A77" onclick="taAddStaff()">+ 인솔자 추가 (감독·코치·지도자)</button></div>'
     +'<div style="font-size:13px;font-weight:800;margin:14px 0 4px">② 팀원 명단 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 인솔자 본인 · 클럽 명단 · 비회원 직접 입력 모두 가능</span></div>'
     +'<div id="taRosterBox" style="border:1px solid #e2e7f0;border-radius:10px;padding:8px"></div>'
     +'<div style="display:flex;gap:8px;margin-top:7px;flex-wrap:wrap;align-items:center"><span style="font-size:12px;font-weight:800;color:#5b6472">팀원 담기</span><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#e0f2f1;color:#068081" onclick="taAddSelf()">인솔자 본인도 선수로 참가</button><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#fff6e0;color:#8a5a00" onclick="taXlsxTemplate()">엑셀 양식</button><label class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#fff6e0;color:#8a5a00;cursor:pointer;margin:0">엑셀로 명단 불러오기<input type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" style="display:none" onchange="taImportXlsx(this)"></label><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px" onclick="taAddRow()">+ 비회원 팀원 추가</button>'
@@ -1715,6 +1718,7 @@ async function openTeamApply(id){
     const c=TA_EDIT;
     const setv=(id2,val)=>{const e=document.getElementById(id2);if(e&&val!=null&&val!=='')e.value=val};
     setv('taType',c.teamType);setv('taName',c.name);setv('taDiv',(c.prefs||[])[0]);setv('taGender',c.teamGender);setv('taRole',c.leaderRole);
+    (c.staff||[]).forEach(x=>taAddStaff(x));   // [추가 인솔자]
     taTypeUI();
     const org=document.getElementById('taOrg');
     if(org){if(org.tagName==='SELECT'){if(c.teamOrgId)org.value=c.teamOrgId}else{org.value=c.teamOrg||'';if(c.teamSchoolCode)org.dataset.code=c.teamSchoolCode}}
@@ -1926,6 +1930,22 @@ function taDivUI(){
     g.value=opt.value;
   }else g.style.display='';
 }
+// [추가 인솔자 2026-09-18] 감독·코치·지도자 — 버튼으로 몇 명이든 추가(구분·성명·연락처). 저장: claimed[].staff=[{role,name,phone}]
+const TA_STAFF_ROLES=['감독','코치','지도자'];
+function taAddStaff(v){
+  v=v||{};const box=document.getElementById('taStaffBox');if(!box)return;
+  const roles=TA_STAFF_ROLES.indexOf(v.role)<0&&v.role?TA_STAFF_ROLES.concat([v.role]):TA_STAFF_ROLES;
+  const st='padding:6px 9px;border:1.5px solid #dfe5ee;border-radius:8px;font-family:inherit;font-size:13px';
+  const d=document.createElement('div');d.className='taStaffRow';d.style.cssText='display:flex;gap:6px;align-items:center;margin-top:5px;flex-wrap:wrap';
+  d.innerHTML='<select class="taS-role" style="'+st+'">'+roles.map(r=>'<option'+(r===v.role?' selected':'')+'>'+cesc(r)+'</option>').join('')+'</select>'
+    +'<input class="taS-name" placeholder="성명" value="'+cesc(v.name||'')+'" style="'+st+';width:110px">'
+    +'<input class="taS-phone" placeholder="연락처" value="'+cesc(v.phone||'')+'" style="'+st+';width:140px">'
+    +'<button type="button" title="이 인솔자 빼기" onclick="this.parentNode.remove()" style="border:none;background:#fdf1f1;color:#C41E2F;border-radius:8px;padding:6px 10px;font-weight:900;cursor:pointer">×</button>';
+  box.appendChild(d);
+  const n=d.querySelector('.taS-name');if(n&&!v.name)n.focus();
+}
+function taStaffList(){return [...document.querySelectorAll('#taStaffBox .taStaffRow')].map(r=>({role:r.querySelector('.taS-role').value,name:r.querySelector('.taS-name').value.trim(),phone:r.querySelector('.taS-phone').value.trim()})).filter(x=>x.name)}
+function taStaffTxt(c,withPhone){return (c&&Array.isArray(c.staff)?c.staff:[]).map(x=>(x.role||'')+' '+(x.name||'')+(withPhone&&x.phone?' '+x.phone:'')).join(', ')}
 function taAddRow(v){
   v=v||{};
   const box=document.getElementById('taRosterBox');
@@ -2491,6 +2511,7 @@ async function submitTeam(){
       claimed.push({uid:CME.uid,pid:pid,team:true,name:teamName,teamType:teamType,teamOrg:teamOrg,teamOrgId:teamOrgId,teamSchoolCode:teamSchoolCode,teamSchoolClubId:(teamType==='학교팀'?(window.__TA_SCID||''):''),
         teamGender:(function(){const g=document.getElementById('taGender');return (g&&g.value)||taGenderOf(divName)})(),   // [팀 구분 자동] 선택칸이 없어도 부문명에서 읽음
         leader:CMY.name||'',leaderRole:document.getElementById('taRole').value,leaderPhone:CMY.phone||'',
+        staff:taStaffList(),   // [추가 인솔자] 감독·코치·지도자
         roster:roster,rosterN:roster.length,prefs:[divName],consent:true,signed:true,
         pconsent:!!(document.getElementById('taPconsent')&&document.getElementById('taPconsent').checked),   // [명단제공] 팀원 연락처·주소 제공 동의
         leaderAddress:(CMY.address||''),
