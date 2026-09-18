@@ -236,14 +236,14 @@ AUTH.onAuthStateChanged(async u=>{
     const t=document.getElementById('rgSchTitle');if(t)t.textContent='신청 학교 ('+RSCOPE+' 권역)';
   }
   document.getElementById('rgBadge').textContent='— '+esc(RMY.name||'')+' 님 ('+(RSCOPE?RSCOPE+' 권역':'전 권역')+')';
-  if(!rgIsAdmin(RMY)){await rgSelOnly();return}   // [열람 범위 2026-09-18] 권역장은 관할 선정교 이름만
   document.getElementById('rgBody').style.display='block';
-  await Promise.all([loadSchools(),loadInst()]);
+  // 규칙 v40 게시 전이거나 권한이 막힌 권역장 계정은 빈 화면 대신 관할 선정교 이름 목록을 보여 줍니다
+  try{await Promise.all([loadSchools(),loadInst()])}
+  catch(e){console.warn('region load',e&&e.message);if(!rgIsAdmin(RMY)){await rgSelOnly();return}throw e}
 });
 
 
-// ══════════ [열람 범위 2026-09-18] 권역장 — 관할 권역 선정교 이름만 ══════════
-//   담당교사·배정 강사 등 세부 정보와 배정·점검 업무는 중앙 사무국만 합니다(보안 규칙 v37).
+// ══════════ [대비용] 선정교 이름만 보는 화면 — 권역장은 관할 권역을 종전처럼 보고(v40) 다른 권역만 차단됩니다. 조회가 막혔을 때만 이 화면으로 대신합니다 ══════════
 async function rgSelOnly(){
   const b=document.getElementById('rgBody');b.style.display='block';
   const box=m=>'<div class="pending-banner" style="display:block">'+m+'</div>';
@@ -746,8 +746,14 @@ function exportSchools(){
 }
 
 async function loadInst(){
-  const snap=await DB.collection('users').where('status','==','approved').get();
-  RUSERS=snap.docs.filter(d=>!d.data().deleted);
+  // [관할 한정 2026-09-18] 권역장은 관할 권역 회원만 조회합니다(규칙 v40 — 전국 회원 목록은 거부). 거점 권역(region) + 활동 가능 권역(activityRegions) 두 번 조회해 합칩니다
+  let docs;
+  if(RSCOPE){
+    const base=DB.collection('users').where('status','==','approved');
+    const two=await Promise.all([base.where('region','==',RSCOPE).get(),base.where('activityRegions','array-contains',RSCOPE).get()]);
+    const seen={};docs=[];two.forEach(x=>x.docs.forEach(d=>{if(!seen[d.id]){seen[d.id]=1;docs.push(d)}}));
+  }else docs=(await DB.collection('users').where('status','==','approved').get()).docs;
+  RUSERS=docs.filter(d=>!d.data().deleted);
   renderInst();
 }
 let SHOW_ALL=false;
