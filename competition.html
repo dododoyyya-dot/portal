@@ -247,6 +247,7 @@ body[data-view] #secLive>.sec-label,body[data-view] #secLive>.sec-title,body[dat
         <span style="font-size:12px;color:var(--gray)">종목·부문, 참가비, 첨부자료, 동의서까지 한 번에 — 등록 즉시 아래에 게시됩니다</span>
         <span style="flex:1"></span>
         <button class="cbtn cbtn-main" style="padding:8px 16px;font-size:13px" onclick="cc2Open()">+ 대회 공고 등록</button>
+        <a class="cbtn cbtn-soft" style="padding:8px 16px;font-size:13px;text-decoration:none" href="staff.html?write=1">+ 심판·운영요원 모집 공고 등록</a>
       </div>
       <div id="cc2MyList" style="margin-top:8px"></div>
     </div>
@@ -3531,7 +3532,8 @@ function hubApply(){
   const all=[...document.querySelectorAll('#liveComps [data-kind]')];
   const nC=all.filter(x=>x.getAttribute('data-kind')==='comp'&&x.getAttribute('data-open')==='1').length,nS=all.filter(x=>x.getAttribute('data-kind')==='staff'&&x.getAttribute('data-open')==='1').length;
   document.querySelectorAll('#hubKind .hk').forEach(b=>{const k=b.getAttribute('data-k');b.classList.toggle('on',k===HUB_KIND);const base=k===''?'전체':k==='comp'?'대회 참가':'심판 · 운영요원 모집';const n=k===''?(nC+nS):k==='comp'?nC:nS;b.innerHTML=base+'<small>'+(k==='staff'&&HUB_STAFF===null?'로그인':n)+'</small>'});
-  const note=document.getElementById('hubKindNote');if(note)note.innerHTML=(HUB_STAFF===null)?'심판 · 운영요원 모집 공고는 <a href="login.html" style="font-weight:800;color:#1f5fb2">로그인</a> 후 표시됩니다':'';
+  const note=document.getElementById('hubKindNote');if(note)note.innerHTML=(HUB_STAFF===null)?'심판 · 운영요원 모집 공고는 <a href="login.html" style="font-weight:800;color:#1f5fb2">로그인</a> 후 표시됩니다'
+    :(HUB_KIND!=='comp'?'<a href="staff.html?write=1" style="font-weight:800;color:#1f5fb2;text-decoration:none">+ 심판·운영요원 모집 공고 등록</a>':'');   // [2026-09-18] 메뉴로 들어와도 등록 창으로
   compMapRender();
 }
 // [참가 신청 화면] 내 신청 현황 — 신청한 공고를 위에 모아 보여 줍니다
