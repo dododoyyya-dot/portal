@@ -1151,6 +1151,7 @@ async function viewRoster(id){
           return '<tr><td '+td+' style="white-space:nowrap">'+cesc(String(c.at||'').replace('T',' ').slice(0,16))+'</td><td '+td+'>'+(c.team?'<b>팀</b> ':'')+cesc(c.name||'')+(c.restored?' <b style="color:#0f766e;font-size:10.5px">↩ 되살림</b>':'')+(c.team&&c.leader?' <span style="color:#6b7280">(인솔 '+cesc(c.leader)+(c.rosterN?' · '+c.rosterN+'명':'')+')</span>':'')+'</td><td '+td+' style="font-size:11px;color:#8a919d">'+cesc(String(c.uid||'').slice(0,8))+'</td><td '+td+'>'+cesc((c.prefs||[]).join(', ')||'-')+'</td><td '+td+' style="white-space:nowrap">'+st+'</td></tr>'}).join('')
         +'</table></div><div style="font-size:11.5px;color:#8a919d;margin-top:6px">신청자가 「신청 완료」를 봤는데 여기에도 없다면 다른 공고(같은 대회의 다른 슬롯이나 심판 공고)에 신청했거나 저장이 거부된 경우입니다. 신청자 마이페이지의 [내 신청 현황]과 대조해 주세요.</div></details>'})():'')
     +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">'
+    +(staff&&entry?'<button class="cbtn" style="background:#7c3aed;color:#fff" onclick="printAllEntryDocs(\''+id+'\')" title="전 신청자(개인·팀)의 참가 신청서·동의서·서약서를 서명과 함께 한 번에 — 인쇄 창에서 「PDF로 저장」하면 파일 하나로 보관됩니다">🖨 신청서·동의서·서약서 일괄 출력</button>':'')
     +(staff&&entry?'<button class="cbtn" style="background:#153A77;color:#fff" onclick="exportRosterCsv(\''+id+'\')" title="주최기관 제출용 — 명단 제공에 동의한 참가자만 연락처·주소가 채워집니다">📥 참가자 명단 엑셀</button>':'')
     +(staff&&entry?'<button class="cbtn" style="background:#0f766e;color:#fff" onclick="document.getElementById(\'rosterModal\').remove();openTeamBuilder(\''+id+'\')">🧩 팀 구성 (개인 참가자)</button>':'')
     +(staff&&entry?'<button class="cbtn" style="background:'+(s.finished?'#0f766e':'#7c3aed')+';color:#fff" onclick="document.getElementById(\'rosterModal\').remove();openCompFinish(\''+id+'\')" title="참가·입상 이력 기록 + 약식 종료 보고 + 사진첩 초안"><span style="display:inline-flex;align-items:center;gap:5px">'+CAREER.svg('flag',{size:14,color:'#fff',stroke:2.2})+(s.finished?'종료 처리됨 (결과 수정)':'대회 종료 · 결과 입력')+'</span></button>':'')
@@ -4536,22 +4537,24 @@ async function printMyDocs(id){
   w.document.close();
 }
 // 참가(선수) 신청서·동의서 인쇄 — 내 참가자 전원
-function printMyEntryDocs(id,s){
-  const mines=myEntries(s);
-  if(!mines.length){alert('신청 내역이 없습니다.');return}
+// [일괄 출력 2026-09-18] list·udMap·win 을 주면 담당자용 일괄 출력(전 신청자분) — 안 주면 종전처럼 본인 신청분만
+function printMyEntryDocs(id,s,list,udMap,win){
+  const mines=list||myEntries(s);
+  if(!mines.length){if(win)try{win.close()}catch(e){}alert('신청 내역이 없습니다.');return}
   const th='style="border:1px solid #666;background:#f2f2f2;padding:7px;width:110px;font-size:13px"';
   const td='style="border:1px solid #666;padding:7px;font-size:13px"';
   let pages=[];
   mines.forEach(m=>{
-    const sfx=(ckey(m).split('#')[1])||'self';
-    const ap=(CMY.contracts||{})['compapply_'+id+'_'+sfx]||{};
+    const U=(udMap&&udMap[m.uid])||(list?{}:CMY);   // 신청자 계정(서명·연락처) — 일괄 출력에서는 그 신청을 넣은 회원
+    const sfx=m.team?(m.pid||''):((ckey(m).split('#')[1])||'self');   // 팀 신청 서명 키는 compapply_{공고}_{팀 pid}
+    const ap=(U.contracts||{})['compapply_'+id+'_'+sfx]||{};
     const dt=(ap.agreedAt||m.at||'').slice(0,10);
     const sig=ap.sign?'<img src="'+ap.sign+'" style="height:44px;vertical-align:middle">':(ap.agreedAt?'<b style="color:#C41E2F">⚠ 서명 저장 실패</b>':'(전자서명)');
     // 필드배치(오버레이) — 참가자·보호자 기준 값
     // [서명 위치] 공고 작성자가 지정한 항목에 맞춰 채웁니다 — 성명·생년월일·성별·소속·연락처·보호자·보호자 연락처·날짜·서명
-    const eVals={name:m.name||'',birth:m.birth||'',gender:m.gender||'',school:m.school||m.club||'',rrn:'',phone:(m.kid?(m.guardianPhone||CMY.phone||''):(m.phone||CMY.phone||'')),
-      guardian:m.kid?(m.guardian||CMY.name||''):'',gphone:m.kid?(m.guardianPhone||CMY.phone||''):'',
-      bank:'',acct:'',holder:m.kid?(m.guardian||CMY.name||''):(m.name||''),date:dt.replace(/-/g,'. ')+'.',sign:''};
+    const eVals={name:m.name||'',birth:m.birth||'',gender:m.gender||'',school:m.school||m.club||'',rrn:'',phone:(m.kid?(m.guardianPhone||U.phone||''):(m.phone||U.phone||'')),
+      guardian:m.kid?(m.guardian||U.name||''):'',gphone:m.kid?(m.guardianPhone||U.phone||''):'',
+      bank:'',acct:'',holder:m.kid?(m.guardian||U.name||''):(m.name||''),date:dt.replace(/-/g,'. ')+'.',sign:''};
     const eOvl=i=>((s.consentOverlays&&s.consentOverlays[String(i)])||[]).map(f=>{
       const inner=f.f==='check'?CAREER.checkMark(f.fs||18):f.f==='num'?cesc(f.v||''):f.f==='sign'?(ap.sign?'<img src="'+ap.sign+'" style="height:calc(var(--ovk,1)*'+(f.fs||30)+'px);display:block">':(ap.agreedAt?'<b style="color:#C41E2F;font-size:11px">⚠서명실패</b>':'(서명)')):cesc(eVals[f.f]||'');
       return '<span style="position:absolute;left:'+((f.x||0)*100)+'%;top:'+((f.y||0)*100)+'%;font-size:calc(var(--ovk,1)*'+(f.fs||14)+'px);font-weight:500;color:#111;white-space:nowrap;line-height:1.3;'+(f.a==='c'?'transform:translate(-50%,-50%);':'')+'">'+inner+'</span>';
@@ -4559,12 +4562,20 @@ function printMyEntryDocs(id,s){
     pages.push('<div style="page-break-after:always;font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:30px 10px">'
       +'<h2 style="text-align:center;letter-spacing:6px;border:2px solid #333;padding:12px">대 회 참 가 신 청 서</h2>'
       +'<div style="text-align:center;color:#555;font-size:13.5px;margin:8px 0 14px">'+cesc(s.title)+' · '+cesc(s.region)+' · '+cesc(s.date)+'</div>'
+      +(m.team?'<table style="width:100%;border-collapse:collapse">'
+        +'<tr><th '+th+'>팀 명</th><td '+td+'>'+cesc(m.name)+'</td><th '+th+'>구 분</th><td '+td+'>'+cesc(m.teamType||'팀')+(m.teamOrg?' · '+cesc(m.teamOrg):'')+(m.teamGender?' · '+cesc(m.teamGender):'')+'</td></tr>'
+        +'<tr><th '+th+'>인솔자</th><td '+td+'>'+cesc(m.leader||'')+(m.leaderRole?' ('+cesc(m.leaderRole)+')':'')+(m.leaderPhone?' '+cesc(m.leaderPhone):'')+'</td><th '+th+'>참가 부문</th><td '+td+'>'+cesc((m.prefs||[]).join(' · ')||'-')+'</td></tr>'
+        +(taStaffTxt(m)?'<tr><th '+th+'>감독·코치·지도자</th><td '+td+' colspan="3">'+cesc(taStaffTxt(m,true))+'</td></tr>':'')
+        +'</table>'
+        +'<table style="width:100%;border-collapse:collapse;margin-top:10px"><tr><th '+th+' style="width:44px">연번</th><th '+th+'>성명</th><th '+th+'>생년월일</th><th '+th+'>성별</th><th '+th+'>소속(학교)</th></tr>'
+        +(m.roster||[]).map((r,i)=>'<tr><td '+td+'>'+(i+1)+'</td><td '+td+'>'+cesc(r.name||'')+'</td><td '+td+'>'+cesc(r.birth||'-')+'</td><td '+td+'>'+cesc(r.gender||'-')+'</td><td '+td+'>'+cesc(r.school||'-')+'</td></tr>').join('')
+        +'</table><div style="display:none">':'')
       +'<table style="width:100%;border-collapse:collapse">'
       +'<tr><th '+th+'>참가자</th><td '+td+'>'+cesc(m.name)+'</td><th '+th+'>생년월일</th><td '+td+'>'+cesc(m.birth||'-')+'</td></tr>'
       +'<tr><th '+th+'>성 별</th><td '+td+'>'+cesc(m.gender||'-')+'</td><th '+th+'>소속(학교)</th><td '+td+'>'+cesc(m.school||(m.kid?'-':'(성인)'))+'</td></tr>'
       +'<tr><th '+th+'>소속 클럽</th><td '+td+'>'+cesc(m.club||'-')+'</td><th '+th+'>참가 부문</th><td '+td+'>'+cesc((m.prefs||[]).join(' · ')||'-')+'</td></tr>'
       +(m.kid?'<tr><th '+th+'>보호자</th><td '+td+'>'+cesc(m.guardian||'')+' (법정대리인)</td><th '+th+'>보호자 연락처</th><td '+td+'>'+cesc(m.guardianPhone||'')+'</td></tr>':'')
-      +'</table>'
+      +'</table>'+(m.team?'</div>':'')
       +'<div style="font-size:12.5px;line-height:1.9;border:1px solid #999;padding:12px 16px;margin-top:14px">'
       +'① 참가자는 대회 규정과 안전 수칙을 준수하며, 주최 측의 경기 운영에 따릅니다.<br>'
       +'② 대회 중 촬영된 기록·사진·영상은 연맹 홍보 자료로 활용될 수 있음에 동의합니다.<br>'
@@ -4577,12 +4588,39 @@ function printMyEntryDocs(id,s){
           +'<b>□ 개인정보 수집·이용 동의</b> — 항목: 참가자 성명·생년월일·성별·소속·보호자 성명·연락처 / 목적: 대회 참가 관리·단체보험·기록 관리 / 보유기간: 2026. 12. 31.까지 <b>동의함 ☑</b></div>'))
       +pledgePrintHtml(s,m.pledge===true)   // [서약서] 서약 체크 없이 접수된(서약서 추가 전) 신청은 빈 칸
       +'<div style="text-align:right;margin-top:24px;font-size:14px">'+cesc(dt.replace(/-/g,'. '))+'.</div>'
-      +'<div style="text-align:right;margin-top:8px;font-size:15px">'+(m.kid?'법정대리인&nbsp;&nbsp;<b>'+cesc(m.guardian||CMY.name||'')+'</b>':'신청인&nbsp;&nbsp;<b>'+cesc(m.name)+'</b>')+'&nbsp;&nbsp;'+sig+'</div>'
+      +'<div style="text-align:right;margin-top:8px;font-size:15px">'+(m.kid?'법정대리인&nbsp;&nbsp;<b>'+cesc(m.guardian||U.name||'')+'</b>':(m.team?'인솔자&nbsp;&nbsp;<b>'+cesc(m.leader||U.name||'')+'</b>':'신청인&nbsp;&nbsp;<b>'+cesc(m.name)+'</b>'))+'&nbsp;&nbsp;'+sig+'</div>'
       +'<div style="text-align:center;font-weight:800;font-size:15px;margin-top:26px;border-top:2px solid #333;padding-top:12px">'+cesc(s.title)+' 조직위원회 귀하</div></div>');
   });
-  const w=window.open('','_blank');
-  w.document.write('<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{-webkit-text-size-adjust:100%;text-size-adjust:100%}</style><title>'+cesc(s.title)+' 참가 신청서</title></head><body>'+pages.join('')+'<script>'+CAREER.OVL_PRINT_JS+'setTimeout(function(){window.print()},600)<\/script></body></html>');
+  if(list){   // [일괄 출력] 맨 앞 장 — 제출·보관용 목록(서명·서약 여부)
+    const sg=m=>{const U2=(udMap&&udMap[m.uid])||{};const k=m.team?(m.pid||''):((ckey(m).split('#')[1])||'self');return !!((U2.contracts||{})['compapply_'+id+'_'+k]||{}).sign};
+    pages.unshift('<div style="page-break-after:always;font-family:Malgun Gothic,sans-serif;max-width:680px;margin:0 auto;padding:30px 10px">'
+      +'<h2 style="text-align:center;border:2px solid #333;padding:12px">참가 신청서 · 동의서'+(hasPledge(s)?' · 서약서':'')+' 일괄 출력 목록</h2>'
+      +'<div style="text-align:center;color:#555;font-size:13.5px;margin:8px 0 14px">'+cesc(s.title)+' · '+cesc(s.date||'')+' · 출력일 '+new Date().toISOString().slice(0,10)+' · 총 '+mines.length+'건</div>'
+      +'<table style="width:100%;border-collapse:collapse"><tr><th '+th+' style="width:44px">연번</th><th '+th+'>구분</th><th '+th+'>성명·팀명</th><th '+th+'>참가 부문</th><th '+th+'>신청일</th><th '+th+'>전자서명</th>'+(hasPledge(s)?'<th '+th+'>서약</th>':'')+'</tr>'
+      +mines.map((m,i)=>'<tr><td '+td+'>'+(i+1)+'</td><td '+td+'>'+(m.team?'팀 ('+(m.rosterN||(m.roster||[]).length)+'명)':(m.bulk?'개인(일괄)':'개인'))+'</td><td '+td+'>'+cesc(m.name||'')+(m.team&&m.leader?' <span style="font-size:11.5px;color:#555">인솔 '+cesc(m.leader)+'</span>':'')+'</td><td '+td+'>'+cesc((m.prefs||[]).join(' · '))+'</td><td '+td+'>'+cesc(String(m.at||'').slice(0,10))+'</td><td '+td+'>'+(sg(m)?'○':'-')+'</td>'+(hasPledge(s)?'<td '+td+'>'+(m.pledge===true?'○':'-')+'</td>':'')+'</tr>').join('')
+      +'</table><div style="font-size:12px;color:#555;margin-top:10px;line-height:1.7">※ 전자서명 「-」: 서명 기록을 불러오지 못했거나(권한·탈퇴) 일괄·서면 접수 건입니다. 서약 「-」: 서약서가 공고에 추가되기 전에 접수된 신청입니다.</div></div>');
+  }
+  const w=win||window.open('','_blank');
+  if(!w){alert('팝업이 차단되어 인쇄 창을 열 수 없습니다. 주소창의 팝업 차단을 해제해주세요.');return}
+  // 이미지(동의서·서약서 스캔본·서명)가 다 뜬 뒤 인쇄 — 장수가 많아도 빈 그림으로 찍히지 않게 (최대 20초 대기)
+  const PRN='(function(){var d=0,go=function(){if(d)return;d=1;setTimeout(function(){window.print()},500)};var im=[].slice.call(document.images),n=im.length,c=0,f=function(){if(++c>=n)go()};if(!n)return go();im.forEach(function(i){if(i.complete)f();else{i.onload=f;i.onerror=f}});setTimeout(go,20000)})()';
+  w.document.open();
+  w.document.write('<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{-webkit-text-size-adjust:100%;text-size-adjust:100%}</style><title>'+cesc(s.title)+' 참가 신청서'+(list?' 일괄':'')+'</title></head><body>'+pages.join('')+'<script>'+CAREER.OVL_PRINT_JS+PRN+'<\/script></body></html>');
   w.document.close();
+}
+// [일괄 출력 2026-09-18] 담당자 — 이 공고의 전 신청자(개인·팀) 신청서·동의서·서약서를 한 번에. 인쇄 창에서 「PDF로 저장」하면 파일 하나로 보관됩니다.
+async function printAllEntryDocs(id){
+  if(!isCompStaff()){alert('대회 담당자만 사용할 수 있습니다.');return}
+  const w=window.open('','_blank');
+  if(!w){alert('팝업이 차단되어 인쇄 창을 열 수 없습니다. 주소창의 팝업 차단을 해제해주세요.');return}
+  w.document.write('<div style="font-family:Malgun Gothic,sans-serif;padding:40px;font-size:15px">신청 기록과 서명을 불러오는 중입니다… 창을 닫지 마세요.</div>');
+  try{
+    const d=await DB.collection('compSlots').doc(id).get();const s=d.data()||{};
+    const list=compClaimList(s);
+    const udMap={};
+    await Promise.all([...new Set(list.map(c=>c.uid).filter(Boolean))].map(async uid=>{try{const u=await DB.collection('users').doc(uid).get();if(u.exists)udMap[uid]=u.data()||{}}catch(e){}}));
+    printMyEntryDocs(id,s,list,udMap,w);
+  }catch(e){try{w.close()}catch(_){}alert('일괄 출력 실패: '+cErrMsg(e))}
 }
 async function cancelClaim(id){
   const doc0=CSLOTS.find(d=>d.id===id);if(!doc0)return;
