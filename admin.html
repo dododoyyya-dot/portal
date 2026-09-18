@@ -541,6 +541,7 @@ function eduWho(v){return (v.name||'')+' ('+(v.birth||'생년월일 없음')+' �
         <button class="btn-sub" style="background:#7c3aed" onclick="showGigs()">🔎 단기공고 승인<span id="gigCntBadge" style="display:none;background:#C41E2F;border-radius:999px;padding:1px 7px;font-size:11px;margin-left:5px"></span></button>
         <button class="btn-sub" style="background:#0e7490" onclick="showInspections()">📋 점검 제출현황</button>
         <button class="btn-sub" style="background:#8c1622" onclick="appKeyScan()">🏫 강습 신청서 관할 채우기</button>
+        <button class="btn-sub" style="background:#153A77" onclick="spmScan()" title="심판·운영요원 신청서 안의 은행·계좌·주민등록번호를 비공개 보관소로 옮깁니다 (중앙 전용 · 보안 규칙 v39 필요)">🔐 심판 수당정보 비공개 전환</button>
         <button class="btn-sub" style="background:#8a919d" onclick="showTrash()">🗑 휴지통</button>
         <details style="display:inline-block">
           <summary style="cursor:pointer;padding:9px 16px;background:#8a919d;color:#fff;border-radius:10px;font-weight:800;font-size:13.5px;list-style:none">🧰 관리 도구 더보기 ▾</summary>
@@ -1226,6 +1227,83 @@ function selSchSync(){
     }catch(e){console.warn('selSchSync',e&&e.message)}
     finally{__selSyncing=false}
   })();
+}
+// ══════════ [심판 수당정보 비공개 전환 2026-09-18] staffApplications.payInfo → staffPayInfo/{신청ID} (보안 규칙 v39 필요) ══════════
+//   안전판: ①미리보기 ②백업(JSON) ③1건 시험 ④전체 적용 ⑤되돌리기. 첫 적용 때 settings/staffPay.private=true 로 스위치를 켭니다
+//   (켜진 뒤 새 신청은 비공개 보관소에만 저장, 아직 옮기지 않은 신청은 종전 값 그대로 읽힘 — 섞여 있어도 동작).
+let SPM={rows:[],moved:0,priv:false,backed:false};
+function spmBox(){const b=document.getElementById('appKeyBox');b.style.display='block';return b}
+async function spmScan(){
+  if(!VIEWER_IS_ADMIN){alert('중앙관리자만 실행할 수 있습니다.');return}
+  const b=spmBox();b.innerHTML='심판·운영요원 신청서를 확인하는 중…';
+  try{
+    let ruleOk=true;try{SPM.moved=(await DB.collection('staffPayInfo').get()).size}catch(e){ruleOk=false;SPM.moved=0}
+    const st=await DB.collection('settings').doc('staffPay').get();SPM.priv=!!(st.exists&&(st.data()||{}).private===true);
+    const s=await DB.collection('staffApplications').get();
+    SPM.rows=s.docs.filter(d=>{const v=d.data()||{};return v.payInfo&&typeof v.payInfo==='object'}).map(d=>({id:d.id,v:d.data()}));
+    const rrn=SPM.rows.filter(r=>r.v.payInfo.rrn).length;
+    const btn=(l,bg,fn,dis)=>'<button class="btn-sub" style="background:'+bg+(dis?';opacity:.45;pointer-events:none':'')+'" onclick="'+fn+'">'+l+'</button>';
+    b.innerHTML='<b style="font-size:15px">🔐 심판 수당정보 비공개 전환</b>'
+      +'<div style="font-size:12.5px;color:#374151;line-height:1.8;margin:6px 0 10px">신청서는 로그인한 회원이면 읽을 수 있어, 그 안의 <b>수당지급 정보(은행·계좌·주민등록번호)</b>를 비공개 보관소로 옮깁니다. 옮긴 뒤에는 <b>중앙 · 신청자 본인 · 공고 작성자 · 관할 시도임원</b>만 볼 수 있고, 수당지급내역서·동의서 출력은 그대로 됩니다.</div>'
+      +(ruleOk?'':'<div style="background:#fdf1f1;border:1.5px solid #f1c7cc;border-radius:10px;padding:9px 12px;color:#8c1622;font-weight:800;margin-bottom:10px">⛔ 보안 규칙 v39 가 아직 게시되지 않았습니다. 먼저 게시해 주세요 (게시 전에는 옮길 수 없습니다).</div>')
+      +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px">'
+      +'<div style="border:1.5px solid var(--line);border-radius:10px;padding:10px 12px"><b style="font-size:20px;color:#C41E2F">'+SPM.rows.length+'</b><div style="font-size:12px;color:#6b7280">옮길 신청 (그중 주민번호 '+rrn+'건)</div></div>'
+      +'<div style="border:1.5px solid var(--line);border-radius:10px;padding:10px 12px"><b style="font-size:20px;color:#0f766e">'+SPM.moved+'</b><div style="font-size:12px;color:#6b7280">이미 비공개 보관 중</div></div>'
+      +'<div style="border:1.5px solid var(--line);border-radius:10px;padding:10px 12px"><b style="font-size:16px">'+(SPM.priv?'켜짐 ✓':'꺼짐')+'</b><div style="font-size:12px;color:#6b7280">새 신청 비공개 저장</div></div></div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+      +btn('① 백업 파일 받기','#153A77','spmBackup()',!SPM.rows.length)
+      +btn('② 1건만 시험','#b8860b','spmApply(true)',!ruleOk||!SPM.rows.length)
+      +btn('③ 전체 적용 ('+SPM.rows.length+'건)','#0f766e','spmApply(false)',!ruleOk||!SPM.rows.length)
+      +btn('↩ 되돌리기','#fff;color:#C41E2F;border:1.5px solid #C41E2F','spmUndo()',!ruleOk||(!SPM.moved&&!SPM.priv))
+      +btn('↻ 다시 확인','#8a919d','spmScan()')+'</div>'
+      +'<div style="font-size:12px;color:#8a919d;margin-top:8px;line-height:1.7">대회 당일·전날처럼 수당 서류를 뽑아야 하는 때는 피해서 실행하세요. 문제가 생기면 [↩ 되돌리기]로 원래대로 돌아갑니다(백업 파일은 만일을 위한 사본).</div>';
+  }catch(e){b.innerHTML='<b style="color:#C41E2F">확인 실패: '+esc(e.message)+'</b>'}
+}
+function spmBackup(){
+  const data={job:'staffPayPrivate',at:new Date().toISOString(),count:SPM.rows.length,rows:SPM.rows.map(r=>({id:r.id,uid:r.v.uid||'',postId:r.v.postId||'',name:r.v.name||'',payInfo:r.v.payInfo}))};
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));
+  a.download='백업_심판수당정보_'+new Date().toISOString().slice(0,10)+'.json';a.click();SPM.backed=true;
+  alert('백업 파일을 내려받았습니다. 주민등록번호가 들어 있으니 안전한 곳에 보관하고, 전환이 끝나 확인되면 삭제하세요.');
+}
+async function spmApply(one){
+  if(!VIEWER_IS_ADMIN)return;
+  if(!SPM.backed){alert('먼저 [① 백업 파일 받기]를 눌러 주세요.');return}
+  const rows=one?SPM.rows.slice(0,1):SPM.rows.slice();
+  if(!rows.length)return;
+  if(!confirm((one?'1건만 시험으로':'전체 '+rows.length+'건을')+' 비공개 보관소로 옮깁니다.\n(신청서에서는 수당 정보가 지워지고, 새 신청도 비공개로 저장되도록 스위치가 켜집니다)\n\n진행할까요?'))return;
+  try{
+    await DB.collection('settings').doc('staffPay').set({private:true,at:new Date().toISOString(),by:(CMY&&CMY.name)||''},{merge:true});
+    let done=0;
+    for(let i=0;i<rows.length;i+=200){
+      const b=DB.batch();
+      rows.slice(i,i+200).forEach(r=>{
+        b.set(DB.collection('staffPayInfo').doc(r.id),{uid:r.v.uid||'',postId:r.v.postId||'',pay:r.v.payInfo,migratedAt:new Date().toISOString()});
+        b.update(DB.collection('staffApplications').doc(r.id),{payInfo:firebase.firestore.FieldValue.delete(),hasPay:true});
+      });
+      await b.commit();done+=Math.min(200,rows.length-i);
+    }
+    // 확인 — 옮긴 건이 신청서에서 지워지고 보관소에 있는지
+    const chk=rows[0];const a=await DB.collection('staffApplications').doc(chk.id).get();const p=await DB.collection('staffPayInfo').doc(chk.id).get();
+    const okv=a.exists&&!(a.data()||{}).payInfo&&p.exists&&!!(p.data()||{}).pay;
+    alert((okv?'✓ ':'⚠ 확인 필요 — ')+done+'건을 옮겼습니다.'+(one?'\n\n심판·운영요원 모집 페이지에서 그 공고의 수당지급내역서가 종전처럼 나오는지 확인한 뒤 [③ 전체 적용]을 눌러 주세요.':''));
+    spmScan();
+  }catch(e){alert('적용 실패: '+e.message+'\n(일부만 옮겨졌을 수 있습니다 — [↻ 다시 확인] 후 이어서 적용하거나 [↩ 되돌리기] 하세요)');spmScan()}
+}
+async function spmUndo(){
+  if(!VIEWER_IS_ADMIN)return;
+  if(!confirm('비공개 보관소의 수당 정보를 신청서로 되돌리고, 새 신청도 종전 방식으로 저장되게 합니다.\n(다시 로그인 회원이 읽을 수 있는 상태가 됩니다)\n\n되돌릴까요?'))return;
+  try{
+    const have=new Set((await DB.collection('staffApplications').get()).docs.map(d=>d.id));
+    const all=(await DB.collection('staffPayInfo').get()).docs.filter(d=>have.has(d.id));let n=0;   // 신청서가 이미 삭제된 건은 건드리지 않음
+    const s={docs:all};
+    for(let i=0;i<s.docs.length;i+=200){
+      const b=DB.batch();
+      s.docs.slice(i,i+200).forEach(d=>{const v=d.data()||{};b.update(DB.collection('staffApplications').doc(d.id),{payInfo:v.pay||null});b.delete(d.ref);n++});
+      await b.commit();
+    }
+    await DB.collection('settings').doc('staffPay').set({private:false,undoneAt:new Date().toISOString()},{merge:true});
+    alert('↩ '+n+'건을 되돌렸습니다.');spmScan();
+  }catch(e){alert('되돌리기 실패: '+e.message);spmScan()}
 }
 async function loadApps(){
   if(IS_SIDO){await sidoSelLoad();return}   // [열람 범위 2026-09-18] 시도연맹 임원은 관할 선정교 이름만

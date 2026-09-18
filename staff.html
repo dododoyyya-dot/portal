@@ -266,6 +266,22 @@ async function loadMyLic(){
 }
 // ══════════════ 목록 ══════════════
 let COMPMAP={}; // [연동공고 보강] compId → 대회 데이터 (연동 공고의 빈 안내문·포스터·장소 폴백용)
+// ══════════ [수당정보 비공개 2026-09-18] staffPayInfo/{신청ID} = {uid, postId, pay:{bank,account,rrn,…}} ══════════
+//   신청서(staffApplications)는 로그인 회원이면 읽을 수 있어, 수당지급 정보(주민번호·계좌)는 따로 보관합니다(보안 규칙 v39).
+//   읽을 수 있는 사람: 중앙 · 신청자 본인 · 그 공고 작성자 · 그 공고 관할 시도임원. 읽은 값은 APPS 의 payInfo 에 끼워 넣어 기존 화면·출력이 그대로 동작합니다.
+//   settings/staffPay.private 가 true 일 때만 작동 — 그 전에는 종전과 같습니다(전환은 관리자 화면 [🔐 심판 수당정보 비공개 전환]).
+let PAY_PRIVATE=false;
+async function payMerge(){
+  try{const st=await DB.collection('settings').doc('staffPay').get();PAY_PRIVATE=!!(st.exists&&(st.data()||{}).private===true)}catch(e){PAY_PRIVATE=false}
+  if(!PAY_PRIVATE||!SME)return;
+  const put=d=>{const v=d.data()||{};const a=(APPS[v.postId]||[]).concat(APPS_CANCELLED[v.postId]||[]).find(x=>x.id===d.id);if(a&&!a.payInfo&&v.pay)a.payInfo=v.pay};
+  try{
+    if(isAdminU()){(await DB.collection('staffPayInfo').get()).docs.forEach(put);return}
+    const jobs=[DB.collection('staffPayInfo').where('uid','==',SME.uid).get()];
+    POSTS.filter(p=>canManage(p)).forEach(p=>jobs.push(DB.collection('staffPayInfo').where('postId','==',p.id).get()));
+    (await Promise.all(jobs.map(j=>j.catch(e=>{console.warn('payMerge',e&&e.message);return {docs:[]}})))).forEach(s=>s.docs.forEach(put));
+  }catch(e){console.warn('payMerge',e&&e.message)}
+}
 async function loadPosts(){
   const el=document.getElementById('stList');
   try{
@@ -287,6 +303,7 @@ async function loadPosts(){
       APPS_CANCELLED={};
       as.docs.forEach(x=>{const a={id:x.id,...x.data()};const T=a.cancelled===true?APPS_CANCELLED:APPS;(T[a.postId]=T[a.postId]||[]).push(a)});   // [신청 취소] 취소 건은 집계·명단에서 제외
     }catch(e){}
+    await payMerge();   // [수당정보 비공개] 볼 수 있는 사람에게만 수당 정보를 끼워 넣음 (스위치 꺼져 있으면 아무 일도 안 함)
     // [1공고 1상세] 목록에서 특정 공고를 눌러 들어오면(?post=id) 그 공고 하나만 보여줍니다.
     const _qp=new URLSearchParams(location.search).get('post');
     if(_qp){renderPostDetail(_qp);try{window.scrollTo(0,0)}catch(e){}}else renderList();   // [1공고 1상세] 상세만 · 맨 위로
@@ -1804,7 +1821,19 @@ async function submitApply(postId){
       payInfo:anyPay?{bank:pfBank,account:pfAcct,rrn:pfRrn,agreePrivacy:pfAg1,agreeThird:pfAg2,signature:pfSig,at:new Date().toISOString()}:((my&&my.payInfo)||null),
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
     const _old=!my&&(APPS_CANCELLED[postId]||[]).find(a=>a.uid===SME.uid);   // [신청 취소] 취소했던 신청을 다시 내면 같은 문서를 되살림
-    if(my)await DB.collection('staffApplications').doc(my.id).update(data);
+    if(PAY_PRIVATE){
+      // [수당정보 비공개] 수당 정보는 신청서에서 빼고 staffPayInfo/{신청ID} 에 — 한 묶음(batch)으로 저장
+      const _pay=data.payInfo||null;delete data.payInfo;data.hasPay=!!_pay;
+      const _col=DB.collection('staffApplications');
+      const _ref=my?_col.doc(my.id):(_old?_col.doc(_old.id):_col.doc());
+      const _b=DB.batch();
+      if(my)_b.update(_ref,data);
+      else if(_old)_b.update(_ref,Object.assign(data,{cancelled:false,reappliedAt:new Date().toISOString(),assign:{}}));
+      else{data.createdAt=firebase.firestore.FieldValue.serverTimestamp();_b.set(_ref,data)}
+      if(_pay)_b.set(DB.collection('staffPayInfo').doc(_ref.id),{uid:SME.uid,postId:postId,pay:_pay,updatedAt:new Date().toISOString()});
+      await _b.commit();
+    }
+    else if(my)await DB.collection('staffApplications').doc(my.id).update(data);
     else if(_old)await DB.collection('staffApplications').doc(_old.id).update(Object.assign(data,{cancelled:false,reappliedAt:new Date().toISOString(),assign:{}}));
     else{data.createdAt=firebase.firestore.FieldValue.serverTimestamp();await DB.collection('staffApplications').add(data);}
     if(p.author&&p.author.uid)KFDF.notify(p.author.uid,'✍️ ['+p.competitionName+'] 심판·운영요원 신청 접수 — '+(SMY.name||'')+' ('+days.map(d=>fmtD(d.slice(5))).join(', ')+')','staff.html');
