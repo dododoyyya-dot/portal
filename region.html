@@ -416,9 +416,8 @@ function instRegs(v){
 // 권역장 관할 내 강사 여부: 활동가능 권역에 관할 포함, 또는 거점·거주가 관할 권역
 function instInScope(v){
   if(!RSCOPE)return true;
-  if(instRegs(v).indexOf(RSCOPE)>=0)return true;
-  const sd=sidoOf(v.baseCity);
-  if(sd&&SIDO2REG[sd]===RSCOPE)return true;
+  // [타 권역 제외 2026-09-18] 권역장 화면에는 거점 권역(region)이 내 관할인 강사만 — 활동 가능 권역으로 내 권역을 고른 타 권역 강사는 나오지 않습니다
+  //   (타 권역 강사 배정은 중앙 사무국이 합니다 · 보안 규칙 v41 도 같은 기준)
   return String(v.region||'')===RSCOPE;
 }
 // ── 인접 권역 정의 ──
@@ -746,13 +745,9 @@ function exportSchools(){
 }
 
 async function loadInst(){
-  // [관할 한정 2026-09-18] 권역장은 관할 권역 회원만 조회합니다(규칙 v40 — 전국 회원 목록은 거부). 거점 권역(region) + 활동 가능 권역(activityRegions) 두 번 조회해 합칩니다
-  let docs;
-  if(RSCOPE){
-    const base=DB.collection('users').where('status','==','approved');
-    const two=await Promise.all([base.where('region','==',RSCOPE).get(),base.where('activityRegions','array-contains',RSCOPE).get()]);
-    const seen={};docs=[];two.forEach(x=>x.docs.forEach(d=>{if(!seen[d.id]){seen[d.id]=1;docs.push(d)}}));
-  }else docs=(await DB.collection('users').where('status','==','approved').get()).docs;
+  // [관할 한정 2026-09-18] 권역장은 거점 권역이 내 관할인 회원만 조회합니다(규칙 v41 — 전국·타 권역 회원 목록은 거부)
+  const base=DB.collection('users').where('status','==','approved');
+  const docs=(await (RSCOPE?base.where('region','==',RSCOPE):base).get()).docs;
   RUSERS=docs.filter(d=>!d.data().deleted);
   renderInst();
 }
