@@ -593,6 +593,11 @@ function orgChip(o,region,title,fed){
     <div class="board" id="goodsList"></div>
     <div class="note" style="margin-top:14px">선정 학교의 <b>배정 강사</b>와 <b>담당교사</b>(강습 신청서의 휴대전화·이메일로 가입한 회원)만 이곳에서 처리할 수 있습니다. 두 분 중 한 분이 입력하면 함께 반영됩니다. 학교가 보이지 않으면 사무국(031-984-3248)으로 연락해 주세요.</div>
   </div>
+  <div id="tlogBox" style="display:none;margin-top:44px">
+    <h3 class="sub">📒 우리 학교 운영일지 (담당교사)</h3>
+    <div style="background:#f0fdf9;border:1.5px solid #bfe3da;border-radius:12px;padding:11px 14px;font-size:13px;line-height:1.7;color:#0f5b52;margin-bottom:10px">강사가 올린 회차별 운영일지를 확인하고 <b>확인 서명</b>을 해 주세요. 내용이 실제와 다르면 고치지 말고 <b>[정정 요청]</b>으로 사유를 남기면 강사가 정정한 뒤 다시 확인을 요청합니다.</div>
+    <div id="tlogList"></div>
+  </div>
   <div id="compContractBox" style="display:none;margin-top:44px">
     <h3 class="sub">위촉 계약 (대회 심판·운영요원)</h3>
     <div class="board" id="compContractList"></div>
@@ -1476,7 +1481,7 @@ function showMyTab(k){
   if(tb){const r=tb.getBoundingClientRect();if(r.top<0||r.top>window.innerHeight-80)tb.scrollIntoView({block:'start'});}
 }
 // [알림 이동 2026-09-10] #상자 해시 → 해당 탭을 열고 스크롤·강조. 페이지 진입 시와 같은 페이지 안에서 해시가 바뀔 때(알림함의 [확인 →]) 모두 동작
-const MY_HASH_TAB={alarmBox:'Alarm',famReqBox:'Alarm',profileBox:'Profile',kidsBox:'Family',certBox:'Career',licBox:'Career',claimBox:'Career',careerBox:'Journey',athBox:'Journey',contractBox:'Work',compContractBox:'Work',staffCareerBox:'Work',goodsBox:'Work',goodsLinkBox:'Work',logBox:'Work',actList:'Work',consentBox:'Work'};
+const MY_HASH_TAB={alarmBox:'Alarm',famReqBox:'Alarm',profileBox:'Profile',kidsBox:'Family',certBox:'Career',licBox:'Career',claimBox:'Career',careerBox:'Journey',athBox:'Journey',contractBox:'Work',compContractBox:'Work',staffCareerBox:'Work',goodsBox:'Work',goodsLinkBox:'Work',tlogBox:'Work',logBox:'Work',actList:'Work',consentBox:'Work'};
 function gotoMyHash(h,delay){
   h=String(h||'').replace('#','');if(!h)return false;
   const tab=MY_HASH_TAB[h];if(tab&&typeof showMyTab==='function')showMyTab(tab);
@@ -2329,6 +2334,7 @@ async function saveLogEdit(id){
       date:date,count:cnt,male:male,female:female,content:content,
       note:document.getElementById('elNote').value.trim(),
       photos:photos,
+      fixReq:firebase.firestore.FieldValue.delete(),   // [담당교사 정정 요청] 정정하면 요청 표시 해제 (요청이 없으면 아무 변화 없음)
       teacherConfirm:null,   // [서명 후 정정] 없었으면 그대로 null, 있었으면 해제해 재확인 대상으로
       editHistory:firebase.firestore.FieldValue.arrayUnion({
         at:new Date().toISOString(),by:(MYD&&MYD.name)||'',uid:(AUTH.currentUser||{}).uid||'',role:'강사',
@@ -2399,8 +2405,12 @@ async function renderGoods(){
   const ph=gdDigits(MYD&&MYD.phone),em=String((MYD&&MYD.email)||'').toLowerCase();const qs=[];
   if(ph.length>=9)qs.push(DB.collection('goodsConfirms').where('teacherPhone','==',ph).get());
   if(em.indexOf('@')>0)qs.push(DB.collection('goodsConfirms').where('teacherEmail','==',em).get());
+  const _me=AUTH.currentUser.uid;   // [학교 연동] 사무국이 맞춘 연동 목록 — 연락처가 달라도 연결된 담당교사
+  qs.push(DB.collection('goodsConfirms').where('teacherUids','array-contains',_me).get());
+  qs.push(DB.collection('goodsConfirms').where('teacherUidsManual','array-contains',_me).get());
   for(const q of qs){try{const r=await q;r.docs.forEach(function(d){if(!found[d.id])found[d.id]={id:d.id,g:d.data(),s:null,role:'담당교사'}})}catch(e){}}
   GD.list=Object.values(found);
+  renderTeacherLogs().catch(function(){});   // [담당교사 운영일지]
   if(!GD.list.length){box.style.display='none';return}
   const tb=document.querySelector('.mytab[data-pane="Work"]');if(tb)tb.style.display='';
   list.innerHTML=GD.list.map(function(o,i){const g=o.g||{};const sc=g.school||(o.s&&o.s.school)||'';const d=g.delivery||{};const tc=g.teacherConfirm;
@@ -2496,6 +2506,91 @@ async function gdSaveReceipt(){
   const b=document.getElementById('gdGo');b.disabled=true;msg.style.color='#8a919d';msg.textContent='제출 중…';
   try{await DB.collection('goodsConfirms').doc(o.id).update({teacherConfirm:tc});gdClose();alert('✅ 수령 확인을 제출했습니다. 감사합니다!');renderGoods().catch(function(){})}
   catch(e){b.disabled=false;bad('제출 실패: '+gdErr(e,'권한이 없거나 이미 수령 확인된 학교입니다'))}
+}
+// ══════════ [담당교사 운영일지 2026-09-21] 선정교 담당교사(학교 연동 문서 goodsConfirms 로 확인된 회원)가 자기 학교 일지를 보고 확인 서명·정정 요청 ══════════
+//   · 보기: sessionLogs where appId == 학교(강습신청 ID) — 규칙 v42 가 담당교사에게 그 학교 일지 목록을 열어 줍니다(게시 전에는 안내만 표시).
+//   · 확인: 고른 회차에 teacherConfirm {name, at, sign, byUid, via:'mypage'} — 링크(confirm.html) 확인과 같은 필드.
+//   · 정정 요청: 교사는 일지를 직접 고치지 않고 fixReq {by, byUid, reason, at} 만 남깁니다 → 강사·사무국 알림. 강사가 정정하면 표시가 풀리고 재확인 대상이 됩니다.
+let TL={schools:[]};
+async function renderTeacherLogs(){
+  const box=document.getElementById('tlogBox'),list=document.getElementById('tlogList');if(!box||!list)return;
+  const mine=(GD.list||[]).filter(function(o){return o.role==='담당교사'&&o.g});
+  if(!mine.length){box.style.display='none';return}
+  TL.schools=[];
+  for(const o of mine){let logs=[],err='';
+    try{const q=await DB.collection('sessionLogs').where('appId','==',o.id).get();logs=q.docs.map(function(d){return Object.assign({_id:d.id},d.data())}).sort(function(x,y){return (x.session||0)-(y.session||0)||String(x.date||'').localeCompare(String(y.date||''))})}
+    catch(e){err=String((e&&(e.code||e.message))||e)}
+    TL.schools.push({id:o.id,g:o.g,logs:logs,err:err})}
+  tlDraw();box.style.display='block';
+  const tb=document.querySelector('.mytab[data-pane="Work"]');if(tb)tb.style.display='';
+}
+function tlDraw(){
+  const list=document.getElementById('tlogList');if(!list)return;
+  list.innerHTML=TL.schools.map(function(S,si){const g=S.g||{};const L=S.logs;const un=L.filter(function(l){return !l.teacherConfirm});
+    let h='<div class="brow" style="padding:14px 16px;margin-bottom:12px"><div style="display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center"><b style="font-size:15px">'+esc(g.school||'')+'</b>'
+      +'<span style="font-size:12px;color:#6b7280">'+esc(g.type||'')+(g.instructorName?' · 강사 '+esc(g.instructorName):'')+'</span>'
+      +'<span style="font-size:12.5px;font-weight:800;color:#153A77">총 '+L.length+'회차 · 확인 '+(L.length-un.length)+' · <span style="color:'+(un.length?'#C41E2F':'#0f766e')+'">미확인 '+un.length+'</span></span></div>';
+    if(S.err)return h+'<div style="font-size:12.5px;color:#8a5a00;background:#fffbeb;border-radius:10px;padding:10px 12px;margin-top:8px">'+(/permission|insufficient/i.test(S.err)?'운영일지 열람은 준비 중입니다 — 곧 이곳에서 확인할 수 있습니다. 그 전까지는 강사가 보내는 확인 링크로 서명해 주세요.':'일지를 불러오지 못했습니다: '+esc(S.err))+'</div></div>';
+    if(!L.length)return h+'<div style="font-size:12.5px;color:#8a919d;margin-top:8px">아직 강사가 올린 일지가 없습니다.</div></div>';
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 6px">'
+      +(un.length?'<button class="btn-sub" style="background:#0f766e" onclick="tlConfirmOpen('+si+')">✅ 선택 회차 확인 서명</button><button class="btn-sub" style="background:#8a919d" onclick="tlCheckAll('+si+')">미확인 전체 선택</button>':'')
+      +'<button class="btn-sub" style="background:#153A77" onclick="tlPdf('+si+')">📄 운영일지 PDF</button></div>';
+    h+=L.map(function(l,li){const tc=l.teacherConfirm;const mf=(l.male!=null||l.female!=null)?' (남 '+(l.male||0)+' · 여 '+(l.female||0)+')':'';
+      return '<details style="border-top:1px solid #eef1f5;padding:8px 0"><summary style="cursor:pointer;display:flex;gap:8px;align-items:center;flex-wrap:wrap;list-style:none">'
+        +(tc?'<span style="width:18px"></span>':'<input type="checkbox" class="tlck'+si+'" value="'+li+'" onclick="event.stopPropagation()" style="width:auto;margin:0">')
+        +'<b style="white-space:nowrap">'+esc(l.session)+'회차</b><span style="color:#6b7280;white-space:nowrap">'+esc(l.date||'')+'</span><span style="white-space:nowrap">👥 '+esc(l.count!=null?l.count:'-')+mf+'</span>'
+        +(l.photos&&l.photos.length?'<span style="color:#0f766e;font-weight:800;white-space:nowrap">📷'+l.photos.length+'</span>':'')
+        +'<span style="flex:1"></span>'
+        +(l.fixReq?'<b style="color:#C41E2F;font-size:12px;white-space:nowrap">✏️ 정정 요청 중</b>':'')
+        +(tc?'<b style="color:#0f766e;font-size:12.5px;white-space:nowrap">✓ 확인 '+esc(tc.name||'')+'</b>':'<b style="color:#C41E2F;font-size:12.5px;white-space:nowrap">미확인</b>')+'</summary>'
+        +'<div style="font-size:13px;line-height:1.8;color:#374151;margin:8px 0 4px 26px;white-space:pre-wrap">'+esc(l.content||'(내용 없음)')+(l.note?'\n<span style="color:#6b7280">비고: '+esc(l.note)+'</span>':'')+'</div>'
+        +((l.photos||[]).length?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px 26px">'+l.photos.map(function(u){return '<a href="'+esc(u)+'" target="_blank"><img src="'+esc(u)+'" alt="" loading="lazy" style="width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid #e3e6ea"></a>'}).join('')+'</div>':'')
+        +(l.fixReq?'<div style="font-size:12.5px;color:#C41E2F;margin:4px 0 0 26px">정정 요청('+esc(String(l.fixReq.at||'').slice(0,10))+'): '+esc(l.fixReq.reason||'')+'</div>':'')
+        +'<div style="margin:8px 0 2px 26px"><button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc;padding:4px 12px;font-size:12px" onclick="tlFixReq('+si+','+li+')">✏️ 정정 요청</button></div></details>'}).join('');
+    return h+'</div>'}).join('');
+}
+function tlCheckAll(si){document.querySelectorAll('.tlck'+si).forEach(function(c){c.checked=true})}
+function tlConfirmOpen(si){
+  const S=TL.schools[si];if(!S)return;const idx=[].slice.call(document.querySelectorAll('.tlck'+si+':checked')).map(function(c){return +c.value});
+  if(!idx.length){alert('확인할 회차를 먼저 체크해 주세요. ([미확인 전체 선택]을 누르면 한 번에 고를 수 있습니다)');return}
+  gdClose();const inp='width:100%;padding:10px 12px;border:1.5px solid #d5dce8;border-radius:10px;font-size:14px;box-sizing:border-box';
+  const ov=document.createElement('div');ov.id='gdModal';ov.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:flex-start;justify-content:center;padding:24px 14px;overflow:auto';
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;max-width:480px;width:100%;padding:20px 22px"><b style="font-size:16px">✅ 운영일지 확인 — '+esc((S.g||{}).school||'')+'</b>'
+    +'<div style="font-size:12.5px;color:#6b7280;margin:4px 0 8px;line-height:1.6">'+idx.map(function(i){return S.logs[i].session+'회차('+(S.logs[i].date||'')+')'}).join(' · ')+' — 총 '+idx.length+'회차를 확인합니다. 확인 후에는 고칠 수 없습니다(강사가 정정하면 다시 확인 대상이 됩니다).</div>'
+    +'<label style="display:block;font-size:13px;font-weight:800;margin:10px 0 5px">담당교사 성명</label><input id="tlName" maxlength="20" style="'+inp+'" value="'+esc((MYD&&MYD.name)||'')+'">'
+    +'<label style="display:block;font-size:13px;font-weight:800;margin:12px 0 5px">서명</label><div style="position:relative;border:1.5px dashed #b9c2d0;border-radius:12px;background:#fbfcfe"><canvas id="gdSig" style="display:block;width:100%;height:140px;border-radius:12px;touch-action:none"></canvas><div id="gdSigHint" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#b0b7c3;font-size:13px;pointer-events:none">여기에 서명</div></div>'
+    +'<div style="text-align:right;margin-top:4px"><button type="button" onclick="gdSigClear()" style="border:none;background:none;color:#8a919d;font-size:12px;cursor:pointer">✕ 다시</button></div>'
+    +'<div id="gdMsg" style="font-size:12.5px;font-weight:800;margin-top:8px;min-height:16px"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn-sub" style="background:#8a919d" onclick="gdClose()">닫기</button><button class="btn-sub" id="gdGo" style="background:#0f766e" onclick="tlConfirmSave('+si+',['+idx.join(',')+'])">확인 서명 제출</button></div></div>';
+  document.body.appendChild(ov);setTimeout(gdSigInit,30);
+}
+async function tlConfirmSave(si,idx){
+  const S=TL.schools[si];if(!S)return;const msg=document.getElementById('gdMsg');const name=(document.getElementById('tlName').value||'').trim();
+  const bad=function(t){msg.style.color='#C41E2F';msg.textContent=t};
+  if(!name)return bad('담당교사 성명을 입력해 주세요');if(!GDS.drawn)return bad('서명을 입력해 주세요');
+  const tc={name:name,at:new Date().toISOString(),sign:gdSigExport(),byUid:AUTH.currentUser.uid,via:'mypage'};
+  const b=document.getElementById('gdGo');b.disabled=true;let ok=0,fail=0;
+  for(const i of idx){const l=S.logs[i];msg.style.color='#8a919d';msg.textContent='기록 중… '+(ok+fail+1)+'/'+idx.length;
+    try{await DB.collection('sessionLogs').doc(l._id).update({teacherConfirm:tc});l.teacherConfirm=tc;ok++}catch(e){fail++}}
+  gdClose();alert('✅ '+ok+'회차를 확인했습니다.'+(fail?'\n'+fail+'회차는 기록하지 못했습니다(이미 확인되었거나 권한 없음).':''));tlDraw();
+  try{const ins=(S.g||{}).instructorUid;if(ok&&ins&&ins!==AUTH.currentUser.uid)KFDF.notify(ins,'✅ ['+((S.g||{}).school||'')+'] 담당교사가 운영일지 '+ok+'회차를 확인했습니다','mypage.html#logBox')}catch(e){}
+}
+async function tlFixReq(si,li){
+  const S=TL.schools[si];if(!S)return;const l=S.logs[li];if(!l)return;
+  const reason=prompt('['+l.session+'회차 · '+(l.date||'')+'] 어떤 부분을 정정해야 하나요?\n(예: 수업일이 9/12가 아니라 9/11입니다 · 참여 인원은 24명이었습니다)\n\n강사와 사무국에 전달되고, 강사가 정정하면 다시 확인 요청이 옵니다.',(l.fixReq&&l.fixReq.reason)||'');
+  if(reason===null)return;if(reason.trim().length<4){alert('정정할 내용을 조금 더 자세히 적어 주세요.');return}
+  const fr={by:(MYD&&MYD.name)||'',byUid:AUTH.currentUser.uid,reason:reason.trim().slice(0,400),at:new Date().toISOString()};
+  try{await DB.collection('sessionLogs').doc(l._id).update({fixReq:fr});l.fixReq=fr}
+  catch(e){alert('정정 요청을 남기지 못했습니다: '+(/permission|insufficient/i.test(String(e&&e.message))?'권한이 아직 열리지 않았습니다(사무국에 문의해 주세요)':((e&&e.message)||e)));return}
+  const t='✏️ ['+((S.g||{}).school||'')+'] '+l.session+'회차 운영일지 정정 요청 — '+fr.reason.slice(0,60);
+  try{if(l.uid)KFDF.notify(l.uid,t,'mypage.html#logBox')}catch(e){}
+  try{if(window.SCC&&SCC.loadFeds)SCC.loadFeds(DB).then(function(f){(f.central||[]).slice(0,5).forEach(function(u){try{KFDF.notify(u,t,'admin.html')}catch(e){}})})}catch(e){}
+  alert('✏️ 정정 요청을 전달했습니다. 강사가 정정하면 이 회차가 다시 「미확인」으로 돌아옵니다.');tlDraw();
+}
+function tlPdf(si){
+  const S=TL.schools[si];if(!S)return;var w=KFDF_LOGBOOK.prep();if(!w)return;
+  try{const g=S.g||{};KFDF_LOGBOOK.render(w,{app:{school:g.school,type:g.type,region:g.region,teacher:g.teacherName},appId:S.id,logs:S.logs,instructor:{name:g.instructorName||((S.logs[0]||{}).name)||'',sign:'',signSrc:''},printedBy:(MYD&&MYD.name)||'',printedRole:'담당교사'})}
+  catch(e){KFDF_LOGBOOK.fail(w,e)}
 }
 // ══════════ [위촉 서류] 겸직 허가서 · 범죄경력 조회 동의 · 연맹 확인 — 운영일지와 같은 화면의 버튼 ══════════
 //  저장 위치: users/{uid}.submitDocs.moonlight = {url, name, at, status:'대기'|'확인'|'반려', note}
@@ -3250,6 +3345,7 @@ async function loadMyLogs(){
           +'<span><b>'+esc(l.session)+'회차</b> <span style="color:var(--gray)">'+esc(l.date)+'</span>'+(l.count?' · 👥'+esc(l.count):'')
             +(l.photos&&l.photos.length?' · <b style="color:#0f766e">📷'+l.photos.length+'</b>':' · <b style="color:#C41E2F">📷 사진 없음</b>')+'</span>'
           +'<span style="display:flex;gap:6px;align-items:center">'
+          +(l.fixReq?'<b style="color:#fff;background:#C41E2F;border-radius:999px;padding:1px 9px;font-size:11.5px" title="'+esc((l.fixReq.by||'')+' 선생님: '+(l.fixReq.reason||''))+'">✏️ 교사 정정 요청</b>':'')
           +(l.teacherConfirm?'<b style="color:#0f766e">✓ '+esc(l.teacherConfirm.name)+'</b>'
               :'<b style="color:#C41E2F">'+(((l.editHistory||[]).some(function(x){return x&&x.voidedConfirm}))?'정정 후 재확인 필요':'미확인')+'</b>')
           +'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:'+(l.teacherConfirm?'#8a919d':'#b8860b')+'" title="'+(l.teacherConfirm?'교사확인 후 정정 — 저장하면 확인이 해제되어 재확인이 필요합니다':'회차 보고 수정')+'" onclick="editLog(\''+l._id+'\')">✏️ 수정</button>'

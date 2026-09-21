@@ -1332,6 +1332,7 @@ async function loadApps(){
   APPS=snap.docs.filter(d=>{const s=d.data();return !s.deleted&&sameSidoApp(s);});
   selSchSync();   // [열람 범위] 시도연맹 임원·권역장용 선정교 목록 맞춤 (중앙 관리자만, 30초에 한 번)
   try{const g=await DB.collection('goodsConfirms').get();window.GOODS={};g.docs.forEach(x=>window.GOODS[x.id]=x.data());}catch(e){window.GOODS={};}
+  goodsLinkSync();   // [학교 연동] 담당교사 회원·배정 강사 연동 문서 자동 맞춤 (중앙 관리자만 · 바뀐 곳만)
   await loadMailLog();  // [메일로그] 발송 이력 → 학교 카드 📧 뱃지용
   await loadSchoolHoursPolicy();  // ▶ [시간대검증] 정규수업시간 기준 정책 로드 (2026-08-28)
   renderApps();
@@ -8504,6 +8505,7 @@ async function givePt(){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
       <button class="btn-sub" id="agqInsBtn" style="background:#7c3aed" onclick="agqNotifyIns()">👤 배정 강사에게 알림</button>
       <button class="btn-sub" id="agqTchBtn" style="background:#0f766e" onclick="agqNotifyTch()">👩‍🏫 담당교사(회원)에게 알림</button>
+      <button class="btn-sub" style="background:#153A77;grid-column:1/-1" onclick="agqLinkTeacher()" title="신청서 연락처와 가입 정보가 달라 자동 연결이 안 되는 담당교사를 회원 명단에서 골라 연결합니다 (교사 교체 시에도 사용)">🔗 담당교사 직접 연결</button>
     </div>
     <div id="agqMsg" style="font-size:12px;font-weight:800;margin-top:8px;min-height:16px"></div>
     <div style="text-align:right;margin-top:6px"><button class="btn-sub" style="background:#8a919d" onclick="document.getElementById('agqModal').style.display='none'">닫기</button></div>
@@ -8519,26 +8521,68 @@ async function givePt(){
 //   goodsConfirms/{강습신청ID} 에 담당교사 휴대전화(숫자만)·이메일(소문자)을 함께 두어, 같은 번호·이메일로 가입한 회원이
 //   마이페이지에서 자기 학교를 찾게 합니다(보안 규칙 v33). 배정 강사는 강습신청의 assignedUid·selfUid 로 확인합니다.
 function goodsItemsOf(s){return (appTypeOf(s).indexOf('방과후')>=0?'방과후·늘봄':'학교체육')+' 강습 용품 세트 (50만원 상당)'}
-function goodsBase(s){return {school:s.school||'',region:s.region||'',type:s.type||'',items:goodsItemsOf(s),code:s.code||'',
-  teacherName:s.teacher||'',teacherPhone:String(s.phone||'').replace(/\D/g,''),teacherEmail:String(s.email||'').trim().toLowerCase(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}}
+// [학교 연동 2026-09-21] goodsConfirms/{강습신청ID} 는 「학교 ↔ 배정 강사 ↔ 담당교사」 연동 문서를 겸합니다.
+//   · instructorUid/instructorName = 배정 강사(본인지도면 그 교사)  · teacherUids = 신청서 휴대전화·이메일이 같은 승인 회원(자동)
+//   · teacherUidsManual = 사무국이 직접 연결한 담당교사(연락처가 달라 자동 연결이 안 될 때)  — 규칙 v42 가 이 목록으로 권한을 줍니다.
+function goodsBase(s){const b={school:s.school||'',region:s.region||'',type:s.type||'',items:goodsItemsOf(s),code:s.code||'',
+  teacherName:s.teacher||'',teacherPhone:String(s.phone||'').replace(/\D/g,''),teacherEmail:String(s.email||'').trim().toLowerCase(),
+  instructorUid:s.assignedUid||s.selfUid||'',instructorName:s.assignedName||s.selfName||'',updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  if(typeof USERS!=='undefined'&&USERS.length)b.teacherUids=goodsTeacherMember(s).filter(function(x){return x.v.status==='approved'}).map(function(x){return x.id});   /* 회원 목록을 못 읽은 상태에서는 기존 값을 건드리지 않음 */
+  return b}
+// 자동 맞춤 — 중앙 관리자가 강습 신청 탭을 열 때, 선정·배정완료 학교의 연동 문서를 바뀐 곳만 갱신(담당교사 신규 가입·강사 배정 변경 반영). 배송지·수령 확인은 건드리지 않습니다.
+let __glsAt=0,__glsBusy=false,__glsTry=0;
+function goodsLinkSync(){
+  if(typeof VIEWER_IS_ADMIN==='undefined'||!VIEWER_IS_ADMIN||__glsBusy||Date.now()-__glsAt<60000)return;
+  if(typeof USERS==='undefined'||!USERS.length){if(__glsTry++<6)setTimeout(goodsLinkSync,8000);return}
+  __glsBusy=true;__glsAt=Date.now();
+  (async function(){try{const keys=['school','region','type','items','code','teacherName','teacherPhone','teacherEmail','instructorUid','instructorName'];let n=0;
+    for(const d of APPS){const s=d.data();if(s.status!=='선정'&&s.status!=='배정완료')continue;const b=goodsBase(s);const cur=(window.GOODS||{})[d.id]||null;
+      const same=cur&&keys.every(function(k){return String(cur[k]||'')===String(b[k]||'')})&&JSON.stringify((cur.teacherUids||[]).slice().sort())===JSON.stringify((b.teacherUids||[]).slice().sort());
+      if(same)continue;
+      await DB.collection('goodsConfirms').doc(d.id).set(b,{merge:true});if(!window.GOODS)window.GOODS={};window.GOODS[d.id]=Object.assign({},cur||{},b);n++}
+    if(n)console.log('[학교 연동] 연동 문서 갱신 '+n+'곳')}catch(e){console.warn('goodsLinkSync',e)}__glsBusy=false})();
+}
 function goodsTeacherMember(s){const p=String(s.phone||'').replace(/\D/g,''),e=String(s.email||'').trim().toLowerCase();
   return USERS.filter(function(d){const v=d.data()||{};return (p.length>=9&&String(v.phone||'').replace(/\D/g,'')===p)||(!!e&&String(v.email||'').toLowerCase()===e)}).map(function(d){return {id:d.id,v:d.data()}})}
 async function reqGoods(appId){
   const doc=APPS.find(x=>x.id===appId);if(!doc)return;const s=doc.data();
   try{const b=goodsBase(s);await DB.collection('goodsConfirms').doc(appId).set(b,{merge:true});if(!window.GOODS)window.GOODS={};window.GOODS[appId]=Object.assign({},window.GOODS[appId]||{},b)}
   catch(e){alert('준비 실패: '+e.message);return}
-  const gc=window.GOODS[appId]||{};const tm=goodsTeacherMember(s);window._AGQ={appId:appId,s:s,tm:tm};
+  const gc=window.GOODS[appId]||{};
+  const tm=goodsTeacherMember(s).concat((gc.teacherUidsManual||[]).map(function(u){const d=USERS.find(function(x){return x.id===u});return d?{id:u,v:d.data(),manual:true}:null}).filter(Boolean));window._AGQ={appId:appId,s:s,tm:tm};
   document.getElementById('agqSub').textContent=(s.school||'')+' · '+(gc.teacherConfirm?'✅ 수령 확인 완료':(gc.delivery?'🚚 배송지 입력됨 · 수령 확인 대기':'배송지 입력 전'));
   document.getElementById('agqTeacher').innerHTML='<b>담당교사</b> '+esc(s.teacher||'-')+' · 📞 '+esc(s.phone||'-')+(s.email?' · ✉ '+esc(s.email):'')
     +'<br>'+(tm.length?'<b style="color:#0f766e">회원 확인됨</b> — '+tm.map(function(x){return esc(x.v.name||'')+(x.v.status!=='approved'?' (승인 대기)':'')}).join(', ')+' · 마이페이지에서 직접 처리할 수 있습니다'
       :'<span style="color:#b8860b">회원이 아니거나 휴대전화·이메일이 달라 담당교사는 처리할 수 없습니다 — 배정 강사가 처리하거나 신청서 번호로 가입을 안내해 주세요</span>')
     +'<br>'+(s.assignedUid?'<b>배정 강사</b> '+esc(s.assignedName||''):'<span style="color:#8a919d">배정 강사 없음</span>');
+  const _man=tm.filter(function(x){return x.manual});
+  if(_man.length)document.getElementById('agqTeacher').innerHTML+='<br><b style="color:#153A77">직접 연결된 담당교사</b> '+_man.map(function(x){return esc(x.v.name||'')}).join(', ')+' <a href="javascript:void(0)" onclick="agqUnlinkTeacher()" style="font-size:11.5px;font-weight:800;color:#C41E2F">연결 해제</a>';
   const dl=gc.delivery,tc=gc.teacherConfirm;
   document.getElementById('agqDetail').innerHTML=(dl?'🚚 '+esc(((dl.addr||'')+' '+(dl.addr2||'')).trim())+' · '+esc(dl.receiver||'')+' '+esc(dl.phone||''):'')+(tc?'<br>📦 '+esc(tc.name||'')+(tc.role?' ('+esc(tc.role)+')':'')+' · '+esc(String(tc.at||'').slice(0,16).replace('T',' ')):'');
   const ib=document.getElementById('agqInsBtn');if(ib){ib.disabled=!s.assignedUid;ib.style.opacity=s.assignedUid?'1':'.45'}
   const tb=document.getElementById('agqTchBtn');if(tb){tb.disabled=!tm.length;tb.style.opacity=tm.length?'1':'.45'}
   const m=document.getElementById('agqMsg');if(m)m.textContent='';
   document.getElementById('agqModal').style.display='flex';
+}
+// [학교 연동] 담당교사 직접 연결 — 성명·아이디로 회원을 찾아 이 학교의 담당교사로 연결(배송지·운영일지 확인 권한, 규칙 v42)
+async function agqLinkTeacher(){
+  const a=window._AGQ||{};if(!a.appId)return;const m=document.getElementById('agqMsg');
+  const q=(prompt('['+((a.s||{}).school||'')+'] 담당교사로 연결할 회원의 성명 또는 아이디를 입력하세요.','')||'').replace(/\s+/g,'').toLowerCase();if(!q)return;
+  const c=USERS.filter(function(d){const v=d.data()||{};return v.status==='approved'&&(String(v.name||'').replace(/\s+/g,'').toLowerCase().indexOf(q)>=0||String(v.loginId||'').toLowerCase()===q)}).slice(0,12);
+  if(!c.length){alert('승인 회원 중에 일치하는 사람이 없습니다. (가입·승인 여부를 확인해 주세요)');return}
+  let pick=c[0];
+  if(c.length>1){const n=prompt('연결할 회원 번호를 입력하세요:\n\n'+c.map(function(d,i){const v=d.data();return (i+1)+'. '+(v.name||'')+' · '+(v.workSchool||v.school||'-')+' · '+String(v.phone||'').replace(/\d(?=\d{4})/g,'*')+' · '+(v.loginId||'')}).join('\n'),'1');if(n===null)return;pick=c[parseInt(n,10)-1];if(!pick){alert('잘못된 번호입니다.');return}}
+  const v=pick.data();if(!confirm('['+(v.name||'')+'] 회원을 ['+((a.s||{}).school||'')+'] 담당교사로 연결할까요?\n\n· 마이페이지 [활동·계약]에서 이 학교의 배송지 입력·수령 확인, 운영일지 확인·정정 요청을 할 수 있게 됩니다.'))return;
+  try{await DB.collection('goodsConfirms').doc(a.appId).set({teacherUidsManual:firebase.firestore.FieldValue.arrayUnion(pick.id),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    const cur=window.GOODS[a.appId]||{};cur.teacherUidsManual=(cur.teacherUidsManual||[]).concat([pick.id]);window.GOODS[a.appId]=cur;
+    try{await KFDF.notify(pick.id,'🏫 ['+((a.s||{}).school||'')+'] 담당교사로 연결되었습니다 — 마이페이지 [활동·계약]에서 강습용품 배송지와 운영일지를 확인해 주세요','mypage.html#goodsBox')}catch(e){}
+    reqGoods(a.appId)}
+  catch(e){if(m){m.style.color='#C41E2F';m.textContent='연결 실패: '+((e&&e.message)||e)}}
+}
+async function agqUnlinkTeacher(){
+  const a=window._AGQ||{};if(!a.appId)return;if(!confirm('직접 연결한 담당교사를 모두 해제할까요? (신청서 연락처로 자동 연결된 교사는 그대로입니다)'))return;
+  try{await DB.collection('goodsConfirms').doc(a.appId).set({teacherUidsManual:[],updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});const cur=window.GOODS[a.appId]||{};cur.teacherUidsManual=[];window.GOODS[a.appId]=cur;reqGoods(a.appId)}
+  catch(e){alert('해제 실패: '+((e&&e.message)||e))}
 }
 const GOODS_NOTE=' — 용품은 10월 중순 발송 예정입니다. 마이페이지 [활동·계약] › 📦 강습용품에서 ① 배송지 입력, 도착 후 ② 수령 확인을 해 주세요';
 async function agqNotifyIns(){const a=window._AGQ||{};const s=a.s||{};const m=document.getElementById('agqMsg');
