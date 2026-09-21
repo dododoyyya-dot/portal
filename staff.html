@@ -58,12 +58,24 @@ body.onepost #stWriteBox{display:none!important}   /* [1공고 1상세] PC 에�
 }
 /* [모바일] 신청현황 표는 가로 스크롤로 — 좁은 화면에서 칸이 뭉개지지 않도록 */
 .sttbl-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+/* [모바일 2026-09-21] 담당자 신청자 표: 줄 → 카드 (번호·머리글 숨김, 칸 세로 배치) */
+@media (max-width:640px){
+  .sttbl.strs,.sttbl.strs tbody{display:block}
+  .sttbl.strs tr{display:block;border:1.5px solid #dfe5ee;border-radius:12px;margin:8px 0;padding:6px 8px;background:#fff}
+  .sttbl.strs tr:first-child{display:none}
+  .sttbl.strs td{display:block;border:none!important;padding:3px 4px!important;white-space:normal!important;text-align:left!important;min-width:0!important}
+  .sttbl.strs td:first-child{display:none}
+  .sttbl.strs td[colspan]{display:block}
+  .sttbl.strs td br{display:none}
+  #dtModal>div{padding:16px 12px!important}
+}
 @media (max-width:820px){
   /* [모바일 표 넘침 수정] min-width:640px 를 모든 .sttbl 에 걸면, 수당표처럼 폭이 좁은
      2단 표까지 640px 로 늘어나 카드 밖으로 밀려나(금액 칸이 화면 밖으로 사라짐) 버립니다.
      가로 스크롤 컨테이너(.sttbl-wrap) 안에 있는 넓은 표에만 적용합니다. */
   .sttbl{font-size:12px}
   .sttbl-wrap .sttbl{min-width:640px}
+  .sttbl-wrap .sttbl.strs{min-width:0}
   .sttbl th,.sttbl td{padding:6px 7px}
   .sttbl td{white-space:nowrap}
 }
@@ -248,8 +260,7 @@ AUTH.onAuthStateChanged(async u=>{
       ?'중앙·시도연맹 임원 — 즉시 게시됩니다'
       :'일반 회원·클럽장 — 등록 후 관리자 승인을 거쳐 게시됩니다';
   }
-  loadMyLic();
-  loadPosts();
+  loadMyLic().catch(function(){}).then(loadPosts);   // [자격 검증 2026-09-21] 자격을 먼저 읽어야 [신청하기] 버튼 잠금이 맞게 그려집니다
 });
 async function loadMyLic(){
   MYLIC_DOCS._valid=[];  // 안전 초기값 — fetch 실패해도 빈 배열 유지
@@ -485,7 +496,7 @@ function expandRowHtml(p){
         +'<button class="stbtn" style="padding:5px 11px;font-size:12px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="delPost(\''+p.id+'\')">삭제</button>'
       :'')
     +((SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid))?'<button class="stbtn" style="padding:8px 16px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="cancelApply(\''+p.id+'\')">🚫 신청 취소</button>':'')   // [신청 취소]
-    +'<button class="stbtn stbtn-main" style="padding:8px 20px" onclick="openApplyForm(\''+p.id+'\')">'+((SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid))?'✏️ 신청 내용 수정':'✍️ 신청하기')+'</button>'
+    +stApplyBtn(p,'padding:8px 20px','✍️ 신청하기')
     +'</div>';
 }
 // [배치개편] 공고 상세 포스터 여러 장 ◀▶ 넘기기 (대회 페이지 pstNav와 동일한 방식)
@@ -1434,6 +1445,79 @@ async function savePost(editId){
 }
 // ══════════════ 상세 (날짜별 탭) ══════════════
 let DT_ID=null,DT_DAY=0,_rdToken=0;
+// ══════════ [심판 신청자 관리 2026-09-21] 프로필 연동(나이·거점 지역) · 심판 경력(2026 이전 수기 + 시스템 기록 통합) · 지역별 보기 · 선발용 CSV · 자격 만료 신청 잠금 ══════════
+//   신청서(staffApplications)에는 성명·연락처·희망 임무만 있어, 담당자 화면에서 회원 문서(생년월일·거점)와 경력(staffCareer)을 함께 읽습니다.
+//   경력은 한 컬렉션에 수기 등록(source manual/import, 2026 이전)과 시스템 기록(staff-complete 등)이 함께 있어 날짜순으로 합쳐 보이고 출처만 표시합니다.
+const ST_SIDO2=[['서울','서울'],['부산','부산'],['대구','대구'],['인천','인천'],['광주','광주'],['대전','대전'],['울산','울산'],['세종','세종'],['경기','경기'],['강원','강원'],['충청북','충북'],['충북','충북'],['충청남','충남'],['충남','충남'],['전라북','전북'],['전북','전북'],['전라남','전남'],['전남','전남'],['경상북','경북'],['경북','경북'],['경상남','경남'],['경남','경남'],['제주','제주']];
+function stSido2(v){v=String(v||'').replace(/\s+/g,'');for(const [k,n] of ST_SIDO2){if(v.indexOf(k)===0)return n}return ''}
+function stRegionOf(u){u=u||{};return stSido2(u.sidoKey)||stSido2(u.sido)||stSido2(u.baseCity)||stSido2((u.activityRegions||[])[0])||stSido2(u.address)||'미상'}
+function stAge(b){const m=String(b||'').match(/^(\d{4})-(\d{2})-(\d{2})/);if(!m)return '';const t=new Date();let a=t.getFullYear()-m[1];if(t.getMonth()+1<+m[2]||(t.getMonth()+1==+m[2]&&t.getDate()<+m[3]))a--;return (a>=0&&a<120)?a:''}
+const STRS={view:'all',prof:{},career:{}};   // view: 'all' | 'group' | 지역명 (신청 현황 표에만 적용, 확정 현황·집계는 전체)
+async function stEnrich(apps){
+  await Promise.all((apps||[]).filter(a=>a.uid&&!STRS.prof[a.uid]).map(async a=>{
+    const p={birth:'',age:'',region:'미상'};
+    try{const d=await DB.collection('users').doc(a.uid).get();const u=d.exists?(d.data()||{}):{};p.birth=u.birth||'';p.age=stAge(u.birth);p.region=stRegionOf(u)}catch(e){p.region='열람 불가'}
+    STRS.prof[a.uid]=p}));
+}
+function stSetView(v){STRS.view=v||'all';renderDetail()}
+function stPill(t,bg){return '<span style="display:inline-block;font-size:10.5px;font-weight:900;color:#fff;background:'+bg+';border-radius:999px;padding:1px 8px;vertical-align:1px;white-space:nowrap">'+t+'</span>'}
+function stIsLegacy(x){return /manual|import|legacy/.test(String(x.source||''))||String(x.date||'')<'2026-01-01'}
+function stStaffish(x){return ['심판','운영','위원','봉사'].indexOf(x.group)>=0||x.kind==='staff'}
+async function stToggle(appId,uid){
+  const tr=document.getElementById('strs_'+appId);if(!tr)return;
+  if(tr.style.display!=='none'){tr.style.display='none';return}
+  tr.style.display='';const cell=tr.firstElementChild;
+  if(!STRS.career[uid]){cell.innerHTML='<div style="font-size:12.5px;color:#8a919d;padding:6px 0">경력을 불러오는 중…</div>';
+    try{const q=await DB.collection('staffCareer').where('uid','==',uid).limit(400).get();STRS.career[uid]={ok:true,list:q.docs.map(d=>d.data()).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))}}
+    catch(e){STRS.career[uid]={ok:false,err:(e&&(e.code||e.message))||String(e),list:[]}}}
+  cell.innerHTML=stDetailHtml(uid);
+}
+function stDetailHtml(uid){
+  const p=STRS.prof[uid]||{};const C=STRS.career[uid]||{list:[]};const L=(LIC_CACHE[uid]||{}).ref;const today=new Date().toISOString().slice(0,10);
+  const ref=C.list.filter(x=>x.group==='심판'),oth=C.list.filter(x=>stStaffish(x)&&x.group!=='심판'),legacyN=ref.filter(stIsLegacy).length;
+  const days=arr=>arr.reduce((n,x)=>n+(+x.days||1),0);
+  const kv=(k,v)=>'<div style="display:flex;gap:8px;font-size:12.5px"><span style="flex:0 0 78px;color:#6b7280;font-weight:700">'+k+'</span><span style="font-weight:700">'+v+'</span></div>';
+  const lv=L?(L.status!=='만료'&&(!L.expireAt||String(L.expireAt).slice(0,10)>=today)):false;
+  let h='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 16px;padding:8px 4px;border-bottom:1px dashed #e5e9f0;margin-bottom:8px">'
+    +kv('생년월일',esc(p.birth||'-')+(p.age!==''?' (만 '+p.age+'세)':''))+kv('거점 지역',esc(p.region||'-'))
+    +kv('심판 자격',L?esc((L.type||'')+' '+(L.grade||''))+(L.expireAt?' · 유효기간 '+esc(String(L.expireAt).slice(0,10)):'')+(lv?' <span style="color:#0f766e">유효</span>':' <span style="color:#C41E2F">만료</span>'):'<span style="color:#C41E2F">등록된 심판 자격 없음</span>')
+    +kv('심판 경력',C.ok===false?'<span style="color:#C41E2F">열람 권한 없음</span>':(ref.length?ref.length+'건 · '+days(ref)+'일'+(legacyN?' <span style="color:#8a5a00">(2026 이전 수기 '+legacyN+'건)</span>':'')+' · 최근 '+esc(ref[0].date||''):'<span style="color:#8a919d">기록 없음</span>'))
+    +(oth.length?kv('운영·기타',oth.length+'건'):'')+'</div>';
+  if(C.ok===false)return h+'<div style="font-size:12px;color:#8a919d">'+esc(C.err||'')+'</div>';
+  const rows=C.list.filter(stStaffish);
+  if(!rows.length)return h+'<div style="font-size:12.5px;color:#8a919d">심판·운영 활동 경력이 없습니다.</div>';
+  return h+'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:0"><tr><th style="text-align:left;padding:4px 6px;background:#f6f8fb">일자</th><th style="text-align:left;padding:4px 6px;background:#f6f8fb">대회</th><th style="text-align:left;padding:4px 6px;background:#f6f8fb">역할</th><th style="text-align:left;padding:4px 6px;background:#f6f8fb">출처</th></tr>'
+    +rows.slice(0,60).map(x=>'<tr><td style="padding:4px 6px;border-top:1px solid #f0f2f6;white-space:nowrap">'+esc(String(x.date||'').slice(0,10))+(+x.days>1?' ('+x.days+'일)':'')+'</td><td style="padding:4px 6px;border-top:1px solid #f0f2f6">'+esc(x.competitionName||x.title||'')+(x.location?' <span style="color:#8a919d">'+esc(x.location)+'</span>':'')+'</td><td style="padding:4px 6px;border-top:1px solid #f0f2f6;white-space:nowrap">'+esc((x.group&&x.group!==x.role?x.group+' · ':'')+(x.role||''))+'</td><td style="padding:4px 6px;border-top:1px solid #f0f2f6;white-space:nowrap">'+(stIsLegacy(x)?'<span style="color:#8a5a00;font-weight:800">수기</span>':'<span style="color:#0f766e;font-weight:800">시스템</span>')+'</td></tr>').join('')
+    +'</table>'+(rows.length>60?'<div style="font-size:11.5px;color:#8a919d;margin-top:4px">최근 60건만 표시 · 전체 '+rows.length+'건</div>':'')+'</div>';
+}
+// 선발 검토용 CSV — 이 공고 전체 신청자(모든 날짜): 지역·나이·자격·심판 경력 건수
+async function stCsv(postId){
+  const p=POSTS.find(x=>x.id===postId);if(!p)return;const apps=APPS[postId]||[];
+  const btn=document.getElementById('stCsvBtn');if(btn){btn.disabled=true;btn.textContent='집계 중…'}
+  await stEnrich(apps);const today=new Date().toISOString().slice(0,10);
+  for(const a of apps){if(!LIC_CACHE[a.uid]){try{const q=await DB.collection('licenses').where('uid','==',a.uid).get();const ls=q.docs.map(d=>d.data());const rs=ls.filter(l=>(l.type||'').includes('심판')).sort((x,y)=>(_LIC_R_RANK[x.grade]??99)-(_LIC_R_RANK[y.grade]??99));LIC_CACHE[a.uid]={ref:rs[0]||null,ins:null}}catch(e){LIC_CACHE[a.uid]={ref:null,ins:null}}}
+    if(!STRS.career[a.uid]){try{const q=await DB.collection('staffCareer').where('uid','==',a.uid).limit(400).get();STRS.career[a.uid]={ok:true,list:q.docs.map(d=>d.data())}}catch(e){STRS.career[a.uid]={ok:false,list:[]}}}}
+  const rows=[['연번','성명','연락처','거점 지역','생년월일','나이','심판 자격','유효기간','자격 상태','심판 경력(건)','2026 이전 수기(건)','최근 활동일','신청 날짜','희망 임무','상태(날짜별)']];
+  apps.forEach((a,i)=>{const pr=STRS.prof[a.uid]||{};const L=(LIC_CACHE[a.uid]||{}).ref;const lv=L?(L.status!=='만료'&&(!L.expireAt||String(L.expireAt).slice(0,10)>=today)):false;
+    const C=(STRS.career[a.uid]||{list:[]}).list.filter(x=>x.group==='심판').sort((x,y)=>String(y.date||'').localeCompare(String(x.date||'')));
+    const prefs=(a.days||[]).map(d=>d.slice(5)+': '+((a.prefs||{})[d]||[]).join('/')).join(' · ');const sts=(a.days||[]).map(d=>d.slice(5)+': '+((a.status||{})[d]||'대기')).join(' · ');
+    rows.push([i+1,a.name||'',a.phone||'',pr.region||'',pr.birth||'',pr.age===''?'':pr.age,L?((L.type||'')+' '+(L.grade||'')).trim():'없음',L?String(L.expireAt||'').slice(0,10):'',L?(lv?'유효':'만료'):'',C.length,C.filter(stIsLegacy).length,C[0]?C[0].date:'',(a.days||[]).join(' · '),prefs,sts])});
+  const csv='\ufeff'+rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const el=document.createElement('a');el.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));el.download=(p.competitionName||'요원')+'_신청자_'+new Date().toISOString().slice(0,10)+'.csv';el.click();
+  if(btn){btn.disabled=false;btn.textContent='📥 신청자 명단 CSV'}
+}
+// ③ [신청하기] 버튼 — 심판 전용 공고(모든 날짜의 정원이 심판·관리위원뿐)는 유효한 심판 자격이 없으면 잠그고 사유를 보여 줍니다.
+//   운영·봉사 정원이 함께 있는 공고는 신청은 열어 두고(운영요원 임무는 자격 불필요) 심판 임무 제한만 안내합니다. 제출 시 검증(submitApply)은 그대로 유지.
+function stRefOnly(p){const ds=(p&&p.dates)||[];if(!ds.length)return false;return ds.every(dd=>{const q=dd.quota||{};return ((+q.referee||0)+(+q.manager||0))>0&&((+q.staff||0)+(+q.volunteer||0))===0})}
+function stRefLicMsg(){const refs=(MYLIC_DOCS||[]).filter(l=>String(l.type||'').indexOf('심판')>=0&&l.status!=='이관');if(!refs.length)return '등록된 심판 자격이 없어 신청할 수 없습니다. 자격 취득·연결 후 신청해 주세요.';const exp=refs.map(l=>String(l.expireAt||'').slice(0,10)).sort().pop()||'';return '자격이 만료되었습니다'+(exp?' ('+exp+')':'')+'. 갱신 후 신청해 주세요.'}
+function stApplyBtn(p,pad,label){
+  const mine=!!(SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid));
+  if(SME&&!mine&&!hasValidRefLic()&&stRefOnly(p)){const m=stRefLicMsg();
+    return '<button class="stbtn stbtn-main" style="'+pad+';opacity:.45;cursor:not-allowed" disabled title="'+esc(m)+'">'+label+'</button>'
+      +'<span style="display:block;flex-basis:100%;font-size:12.5px;font-weight:800;color:#C41E2F;margin-top:4px">⛔ '+esc(m)+' <a href="license.html" style="color:#153A77">자격 안내 →</a></span>'}
+  return '<button class="stbtn stbtn-main" style="'+pad+'" onclick="openApplyForm(\''+p.id+'\')">'+(mine?'✏️ 신청 내용 수정':label)+'</button>'
+    +((SME&&!mine&&!hasValidRefLic()&&(p.dates||[]).some(dd=>(+((dd.quota||{}).referee)||0)>0))?'<span style="display:block;flex-basis:100%;font-size:12px;font-weight:800;color:#8a5a00;margin-top:4px">※ 유효한 심판 자격이 없어 심판 임무는 선택할 수 없습니다 — 운영요원 임무만 신청할 수 있습니다.</span>':'');
+}
 function openDetail(id){
   DT_ID=id;DT_DAY=0;LIC_CACHE={};renderDetail();
 }
@@ -1481,6 +1565,7 @@ async function _renderDetailInner(isStale){
       }));
     }
   }
+  if(manage&&dayApps.length)await stEnrich(dayApps);   // [신청자 관리] 생년월일·거점 지역
   // 자격 조회를 기다리는 사이 사용자가 다른 공고를 눌렀다면, 이 렌더는 폐기하고 화면을 건드리지 않음
   if(isStale()){const s=document.getElementById('dtModal');if(s===div)s.remove();return;}
   const licBadge=(l,today)=>{
@@ -1508,16 +1593,30 @@ async function _renderDetailInner(isStale){
   }
   else{
     const today=new Date().toISOString().slice(0,10);
-    appsHtml='<div class="sttbl-wrap"><table class="sttbl" style="margin-top:6px"><tr><th>번호</th><th>성명</th>'+(manage?'<th>연락처</th>':'')+(manage?'<th>심판 자격</th><th>지도자 자격</th>':'<th>자격증</th>')+'<th>희망 임무</th><th>상태</th>'+(manage?'<th>동의서</th>':'')+(manage?'<th>선정</th>':'')+'</tr>'
-      +dayApps.map((a,i)=>{
+    // [지역별 보기] 담당자: 전체 / 지역별 묶어 보기 / 특정 지역만 — 표에만 적용(집계·확정 현황은 전체)
+    const rgOf=a=>String((STRS.prof[a.uid]||{}).region||'미상');
+    let stRows=dayApps;let stBar='';
+    if(manage){const cnt={};dayApps.forEach(a=>{const r=rgOf(a);cnt[r]=(cnt[r]||0)+1});const regs=Object.keys(cnt).sort((x,y)=>x.localeCompare(y,'ko'));
+      if(STRS.view!=='all'&&STRS.view!=='group')stRows=dayApps.filter(a=>rgOf(a)===STRS.view);
+      if(STRS.view==='group')stRows=dayApps.slice().sort((x,y)=>rgOf(x).localeCompare(rgOf(y),'ko'));
+      stBar='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0 2px;background:#f6f8fb;border:1.5px solid #e2e7f0;border-radius:10px;padding:8px 12px"><b style="font-size:13px">📍 지역별 보기</b>'
+        +'<select onchange="stSetView(this.value)" style="padding:6px 10px;border:1.5px solid #d5dce8;border-radius:9px;font-size:13px"><option value="all"'+(STRS.view==='all'?' selected':'')+'>전체 ('+dayApps.length+'명)</option><option value="group"'+(STRS.view==='group'?' selected':'')+'>지역별 묶어 보기</option>'+regs.map(r=>'<option value="'+esc(r)+'"'+(STRS.view===r?' selected':'')+'>'+esc(r)+' ('+cnt[r]+'명)</option>').join('')+'</select>'
+        +'<span style="font-size:12px;color:#6b7280">'+regs.map(r=>esc(r)+' '+cnt[r]).join(' · ')+'</span><span style="flex:1"></span>'
+        +'<button id="stCsvBtn" class="stbtn" style="padding:5px 11px;font-size:12px;background:#153A77;color:#fff" onclick="stCsv(\''+p.id+'\')" title="이 공고 전체 신청자(모든 날짜) — 지역·나이·자격·심판 경력 건수">📥 신청자 명단 CSV</button></div>'
+        +'<div style="font-size:11.5px;color:#8a919d;margin:2px 0 0">성명 옆 [👤 상세·경력]: 생년월일·거점 지역·심판 자격(유효기간)·심판 활동 경력(2026 이전 수기 등록 + 이후 시스템 기록). 지역은 회원 정보의 거점(활동 지역·주소) 기준입니다.</div>'}
+    const stCols=manage?11:6;
+    appsHtml=stBar+'<div class="sttbl-wrap"><table class="sttbl'+(manage?' strs':'')+'" style="margin-top:6px"><tr><th>번호</th><th>성명</th>'+(manage?'<th>연락처</th><th>지역</th><th>나이</th>':'')+(manage?'<th>심판 자격</th><th>지도자 자격</th>':'<th>자격증</th>')+'<th>희망 임무</th><th>상태</th>'+(manage?'<th>동의서</th>':'')+(manage?'<th>선정</th>':'')+'</tr>'
+      +stRows.map((a,i)=>{
+        const _pr=manage?(STRS.prof[a.uid]||{}):{};const _rg=manage?rgOf(a):'';
+        const _gh=(manage&&STRS.view==='group'&&(i===0||rgOf(stRows[i-1])!==_rg))?'<tr><td colspan="'+stCols+'" style="background:#eef3fb;font-weight:900;color:#153A77">📍 '+esc(_rg)+' <span style="font-weight:700;color:#6b7280">'+stRows.filter(x=>rgOf(x)===_rg).length+'명</span></td></tr>':'';
         const st=(a.status&&a.status[dd.date])||'대기';
         const asg=a.assign&&a.assign[dd.date];
         const stHtml=st==='확정'?'<b style="color:#0f766e">✅ 확정'+(asg?' <span style="font-size:11px">('+esc(asg.duty)+')</span>':'')+'</b>':st==='거절'?'<b style="color:#C41E2F">❌ 거절</b>':st==='보류'?'<b style="color:#b8860b">⏳ 보류</b>':'<span style="color:#6b7280">대기</span>';
         const cache=manage?(LIC_CACHE[a.uid]||{}):{};
-        return '<tr>'
+        return _gh+'<tr>'
           +'<td style="text-align:center;color:#8a919d">'+(i+1)+'</td>'
-          +'<td><b>'+esc(manage?a.name:mname(a.name))+'</b></td>'
-          +(manage?'<td style="font-size:12px">'+esc(a.phone||'-')+'</td>':'')
+          +'<td><b>'+esc(manage?a.name:mname(a.name))+'</b>'+(manage?' <button onclick="stToggle(\''+a.id+'\',\''+esc(a.uid||'')+'\')" style="border:1.5px solid #c9d8ef;background:#fff;color:#153A77;border-radius:7px;padding:1px 7px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap">👤 상세·경력</button>':'')+'</td>'
+          +(manage?'<td style="font-size:12px">'+esc(a.phone||'-')+'</td><td style="font-size:12px;white-space:nowrap">'+stPill(esc(_pr.region||'미상'),_pr.region&&_pr.region!=='미상'&&_pr.region!=='열람 불가'?'#153A77':'#8a919d')+'</td><td style="font-size:12px;text-align:center">'+(_pr.age!==''&&_pr.age!=null?_pr.age:'-')+'</td>':'')
           +(manage?'<td style="min-width:90px">'+licBadge(cache.ref,today)+'</td><td style="min-width:90px">'+licBadge(cache.ins,today)+'</td>':'<td>'+esc(topLic(a.lic||'-'))+'</td>')
           +'<td style="font-size:12px">'+esc(((a.prefs||{})[dd.date]||[]).join(', ')||'-')+'</td>'
           +'<td style="text-align:center;white-space:nowrap">'+stHtml+'</td>'
@@ -1528,7 +1627,8 @@ async function _renderDetailInner(isStale){
             +'<button class="stbtn" style="padding:3px 7px;font-size:11px;background:#fdf6e3;color:#8a5a00;margin-top:3px" title="보류" onclick="decideApp(\''+a.id+'\',\''+dd.date+'\',\'보류\')">⏳ 보류</button> '
             +'<button class="stbtn" style="padding:3px 7px;font-size:11px;background:#fff;color:#C41E2F;border:1px solid #f1c7cc;margin-top:3px" title="거절" onclick="decideApp(\''+a.id+'\',\''+dd.date+'\',\'거절\')">❌ 거절</button>'
             +'</td>':(manage?'<td style="text-align:center;color:#8a919d;font-size:11.5px">열람만</td>':''))
-          +'</tr>';
+          +'</tr>'
+          +(manage?'<tr id="strs_'+a.id+'" style="display:none"><td colspan="'+stCols+'" style="background:#fbfcfe;padding:8px 12px">'+(STRS.career[a.uid]?stDetailHtml(a.uid):'')+'</td></tr>':'');
       }).join('')+'</table></div>';
   }
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:1020px;width:100%;padding:24px 26px;margin:10px 0">'
@@ -1576,7 +1676,7 @@ async function _renderDetailInner(isStale){
   +(_decide?'<button class="stbtn" style="background:'+(p.reportId?'#f0fdf4':'#f5f3ff')+';color:'+(p.reportId?'#0f766e':'#5b21b6')+';border:1.5px solid '+(p.reportId?'#a7f3d0':'#ddd6fe')+'" onclick="openStaffReport(\''+p.id+'\')" title="약식 종료 보고 — 기록 보관 + 사진첩 초안"><span style="display:inline-flex;align-items:center;gap:5px">'+CAREER.svg('doc',{size:14,stroke:2.2})+(p.reportId?'종료 보고 완료 (수정)':'종료 보고')+'</span></button>':'')
   +(_decide?'<button class="stbtn" style="background:#fffbeb;color:#8a5a00;border:1.5px solid #fde68a" onclick="exportPayReport(\''+p.id+'\')">📄 수당지급내역서 (서식·서명)</button><button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="openNotifyModal(\''+p.id+'\')">📣 확정자 단체 알림</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="exportLicZip(\''+p.id+'\')">📦 자격증 일괄 다운로드</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
     +((SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid))?'<button class="stbtn" style="padding:11px 18px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="cancelApply(\''+p.id+'\')">🚫 신청 취소</button>':'')
-    +'<button class="stbtn stbtn-main" style="padding:11px 26px" onclick="openApplyForm(\''+p.id+'\')">'+((SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid))?'✏️ 신청 내용 수정':'✍️ 신청하기 (날짜 선택)')+'</button>'
+    +stApplyBtn(p,'padding:11px 26px','✍️ 신청하기 (날짜 선택)')
     +((hasPledge(p)&&SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid))?'<button class="stbtn stbtn-soft" style="padding:11px 18px" onclick="printPledgeDocs(\''+p.id+'\',SME.uid)">📜 내 서약서 출력</button>':'')
     +((payConsentReady(p)&&SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid&&a.payInfo))?'<button class="stbtn stbtn-soft" style="padding:11px 18px" onclick="printPayConsent(\''+p.id+'\',SME.uid)" title="내 수당 정보와 전자서명이 기입된 동의서">📄 내 수당 동의서 인쇄</button>':'')
     +'</div></div>';
