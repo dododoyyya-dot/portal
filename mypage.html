@@ -2208,6 +2208,22 @@ AUTH.onAuthStateChanged(async u=>{
   var _pfs=document.getElementById('pfSchool');
   if(_pfs)_pfs.addEventListener('click',function(){pickSchoolInto('pfSchool')});
 });
+// ══════════ [활동·계약 묶음 2026-09-21] 학교 강습(위촉 계약 → 회차 보고 → 강습용품 → 담당교사 일지)과 대회(위촉 계약 → 심판·운영 경력)를 나눠 배치 ══════════
+//   종전에는 강습 계약·용품과 회차 보고 사이에 대회 계약·심판 경력이 끼어 있어 두 사업이 섞여 보였습니다. 상자를 새로 만들지 않고 순서만 바꿉니다.
+function workRegroup(){
+  const pane=document.getElementById('paneWork');if(!pane||document.getElementById('wgSchool'))return;
+  const mk=function(id,icon,title,sub,color){const h=document.createElement('div');h.id=id;h.style.cssText='display:none;margin-top:40px;padding:12px 16px;border-radius:12px;background:'+color+';color:#fff;font-weight:900;font-size:16px;line-height:1.4';h.innerHTML=icon+' '+title+'<span style="display:block;font-size:12px;font-weight:600;opacity:.85">'+sub+'</span>';return h};
+  const G=[[mk('wgSchool','🏫','학교 강습 (유소년 스포츠 기반구축사업)','위촉 계약 · 회차 보고(운영일지) · 강습용품 · 담당교사 확인','#153A77'),['contractBox','logBox','goodsBox','tlogBox']],
+           [mk('wgComp','🏆','대회 심판 · 운영요원','위촉 계약 · 심판·운영요원 경력','#7c3aed'),['compContractBox','staffCareerBox']]];
+  const moved=[].concat(G[0][1],G[1][1]);const anchor=[].slice.call(pane.children).find(function(c){return moved.indexOf(c.id)<0})||null;   /* 옮기지 않는 첫 요소(전자동의·활동 이력 등) 앞에 끼워 넣음 */
+  const frag=document.createDocumentFragment();
+  G.forEach(function(g){frag.appendChild(g[0]);g[1].forEach(function(id){const el=document.getElementById(id);if(el&&el.parentNode===pane){el.style.marginTop='18px';frag.appendChild(el)}})});
+  pane.insertBefore(frag,anchor);
+  const sync=function(){G.forEach(function(g){g[0].style.display=g[1].some(function(id){const el=document.getElementById(id);return el&&el.style.display!=='none'})?'block':'none'})};
+  try{const mo=new MutationObserver(sync);G.forEach(function(g){g[1].forEach(function(id){const el=document.getElementById(id);if(el)mo.observe(el,{attributes:true,attributeFilter:['style']})})})}catch(e){}
+  sync();
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',workRegroup);else workRegroup();
 // ── 거절 회원 보완 후 재검토 요청 (거절 → pending 복귀, 규칙에서 본인 한정 허용) ──
 async function requestReview(){
   if(!confirm('보완을 마치셨나요?\n재검토를 요청하면 사무국 승인 대기 상태로 전환됩니다.'))return;
@@ -3312,6 +3328,45 @@ function myArchBlock(appId){
       +(a.restoredAt?' <b style="color:#0f766e">· 사무국이 복원함</b>':'')+'</div>').join('')
     +'</details>';
 }
+// [일지 카드 2026-09-21] 내가 제출한 보고 — 운영일지 PDF(회차별 활동 기록)와 같은 양식: 회차 배지 · 수업일 · 참여 인원(남/여) · 수업 내용 · 활동 사진 · 안전 지도 점검 · 담당교사 확인
+function lgCss(){if(document.getElementById('lgCardCss'))return;const st=document.createElement('style');st.id='lgCardCss';
+  st.textContent='.lgcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px;margin-top:10px}'
+    +'.lgcard{border:1.5px solid #e2e7f0;border-radius:14px;background:#fff;overflow:hidden;display:flex;flex-direction:column}'
+    +'.lgcard .hd{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f6f8fb;border-bottom:1px solid #e9edf3}'
+    +'.lgcard .no{flex:none;width:44px;height:44px;border-radius:10px;background:#C41E2F;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900;font-size:17px;line-height:1}'
+    +'.lgcard .no small{font-size:9.5px;font-weight:700;margin-top:3px;opacity:.9}'
+    +'.lgcard .dt{font-weight:900;font-size:15px;white-space:nowrap}.lgcard .dt small{display:block;font-size:11.5px;font-weight:600;color:#6b7280}'
+    +'.lgcard .chip{margin-left:auto;font-size:11.5px;font-weight:900;border-radius:999px;padding:3px 10px;white-space:nowrap}'
+    +'.lgcard .bd{display:flex;gap:14px;padding:12px 14px}.lgcard .cnt{flex:none;min-width:64px}.lgcard .cnt i,.lgcard .tx i{display:block;font-style:normal;font-size:11px;font-weight:700;color:#8a919d;margin-bottom:2px}'
+    +'.lgcard .cnt b{font-size:24px;font-weight:900;line-height:1.1}.lgcard .cnt b small{font-size:13px}.lgcard .cnt span{display:block;font-size:11.5px;font-weight:700;color:#6b7280;white-space:nowrap}'
+    +'.lgcard .tx{min-width:0;font-size:13px;line-height:1.6;color:#1f2937}'
+    +'.lgcard .ph{display:flex;gap:6px;padding:0 14px 10px}.lgcard .ph img{flex:1 1 0;min-width:0;height:120px;object-fit:cover;border-radius:10px;border:1px solid #e3e6ea}'
+    +'.lgcard .ph .none{flex:1;height:54px;border:1.5px dashed #f1c7cc;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#C41E2F}'
+    +'.lgcard .ft{margin-top:auto;display:flex;gap:6px 10px;align-items:center;flex-wrap:wrap;padding:9px 14px;border-top:1px solid #eef1f5;font-size:12px}'
+    +'@media(max-width:640px){.lgcards{grid-template-columns:1fr}}';
+  document.head.appendChild(st)}
+function lgCardHtml(l){
+  lgCss();
+  const DOWK=['일','월','화','수','목','금','토'];let dow='';try{const d=new Date(String(l.date||'')+'T00:00:00');if(!isNaN(d))dow=' ('+DOWK[d.getDay()]+')'}catch(e){}
+  const ck=l.check;const ckN=Array.isArray(ck)?ck.filter(Boolean).length:(ck&&typeof ck==='object'?Object.keys(ck).filter(function(k){return ck[k]}).length:0);
+  const voided=(l.editHistory||[]).some(function(x){return x&&x.voidedConfirm});
+  const chip=l.fixReq?'<span class="chip" style="background:#C41E2F;color:#fff" title="'+esc((l.fixReq.by||'')+' 선생님: '+(l.fixReq.reason||''))+'">✏️ 교사 정정 요청</span>'
+    :(l.teacherConfirm?'<span class="chip" style="background:#e6f5f0;color:#0f766e">✓ 담당교사 확인 · '+esc(l.teacherConfirm.name||'')+'</span>'
+      :'<span class="chip" style="background:#fdf3f4;color:#C41E2F">'+(voided?'정정 후 재확인 필요':'교사 미확인')+'</span>');
+  const mf=(l.male!=null||l.female!=null)?'남 '+(l.male||0)+' · 여 '+(l.female||0):'<span style="color:#b8860b">남·여 미기입</span>';
+  const ph=(l.photos||[]).slice(0,3);
+  return '<div class="lgcard"><div class="hd"><div class="no">'+esc(String(l.session==null?'':l.session).padStart(2,'0'))+'<small>회차</small></div>'
+    +'<div class="dt">'+esc(String(l.date||'').replace(/-/g,'. '))+esc(dow)+'<small>'+esc(l.school||'')+'</small></div>'+chip+'</div>'
+    +'<div class="bd"><div class="cnt"><i>참여 인원</i><b>'+esc(l.count!=null?l.count:'-')+'<small>명</small></b><span>'+mf+'</span></div>'
+    +'<div class="tx"><i>수업 내용</i>'+esc(l.content||'-')+(l.note?'<div style="color:#6b7280;margin-top:3px">특이사항: '+esc(l.note)+'</div>':'')
+    +(l.fixReq?'<div style="color:#C41E2F;font-weight:700;margin-top:3px">정정 요청: '+esc(l.fixReq.reason||'')+'</div>':'')+'</div></div>'
+    +'<div class="ph">'+(ph.length?ph.map(function(u){return '<a href="'+esc(u)+'" target="_blank" style="flex:1 1 0;min-width:0;display:flex"><img src="'+esc(u)+'" alt="'+esc(l.session)+'회차 활동 사진" loading="lazy"></a>'}).join(''):'<div class="none">📷 활동 사진 없음 — [수정]에서 추가해 주세요</div>')+'</div>'
+    +'<div class="ft"><b style="color:'+(ckN>=4?'#0f766e':'#b8860b')+'">✔ 안전 지도 점검 '+ckN+'/4</b>'
+    +((l.editHistory||[]).length?'<span style="color:#b8860b;font-weight:700">✏️ 정정 '+(l.editHistory||[]).length+'회</span>':'')
+    +'<span style="flex:1"></span>'
+    +'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:'+(l.teacherConfirm?'#8a919d':'#b8860b')+'" title="'+(l.teacherConfirm?'교사확인 후 정정 — 저장하면 확인이 해제되어 재확인이 필요합니다':'회차 보고 수정')+'" onclick="editLog(\''+l._id+'\')">✏️ 수정</button>'
+    +'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#C41E2F" title="겸직 시기 정정 등으로 이 회차를 지우고 다시 작성 — 원본과 사유는 기록으로 남습니다" onclick="deleteLog(\''+l._id+'\')">🗑 삭제</button></div></div>';
+}
 async function loadMyLogs(){
   const el=document.getElementById('lgList');
   try{
@@ -3341,16 +3396,7 @@ async function loadMyLogs(){
         +'<span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+(pend.length?'<button class="btn-sub" style="background:#153A77" onclick="reqConfirmBatch(\''+appId+'\')">📱 교사 확인 요청 (미확인 '+pend.length+'회차)</button>'
                      :(g.logs.length?'<span style="font-size:12.5px;font-weight:800;color:#0f766e">✓ 전 회차 교사확인 완료</span>':''))+'<button class="btn-sub" style="background:#16181d" title="표지·요약 통계·회차별 사진 기록·확인란이 담긴 운영일지를 PDF로 저장합니다" onclick="myLogbook(\''+appId+'\')">🖨 운영일지 PDF</button></span>'
         +'</div>'
-        +g.logs.map(l=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:13px;align-items:center;flex-wrap:wrap">'
-          +'<span><b>'+esc(l.session)+'회차</b> <span style="color:var(--gray)">'+esc(l.date)+'</span>'+(l.count?' · 👥'+esc(l.count):'')
-            +(l.photos&&l.photos.length?' · <b style="color:#0f766e">📷'+l.photos.length+'</b>':' · <b style="color:#C41E2F">📷 사진 없음</b>')+'</span>'
-          +'<span style="display:flex;gap:6px;align-items:center">'
-          +(l.fixReq?'<b style="color:#fff;background:#C41E2F;border-radius:999px;padding:1px 9px;font-size:11.5px" title="'+esc((l.fixReq.by||'')+' 선생님: '+(l.fixReq.reason||''))+'">✏️ 교사 정정 요청</b>':'')
-          +(l.teacherConfirm?'<b style="color:#0f766e">✓ '+esc(l.teacherConfirm.name)+'</b>'
-              :'<b style="color:#C41E2F">'+(((l.editHistory||[]).some(function(x){return x&&x.voidedConfirm}))?'정정 후 재확인 필요':'미확인')+'</b>')
-          +'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:'+(l.teacherConfirm?'#8a919d':'#b8860b')+'" title="'+(l.teacherConfirm?'교사확인 후 정정 — 저장하면 확인이 해제되어 재확인이 필요합니다':'회차 보고 수정')+'" onclick="editLog(\''+l._id+'\')">✏️ 수정</button>'
-          +'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#C41E2F" title="겸직 시기 정정 등으로 이 회차를 지우고 다시 작성 — 원본과 사유는 기록으로 남습니다" onclick="deleteLog(\''+l._id+'\')">🗑 삭제</button>'
-          +'</span></div>').join('')
+        +'<div class="lgcards">'+g.logs.map(lgCardHtml).join('')+'</div>'
         +myArchBlock(appId)
         +'</div>';
     }).join('');
