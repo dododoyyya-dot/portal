@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>연맹 자격증 (지도자·심판) | 대한민국플라잉디스크연맹</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="style.css?v=20260909b">
+<link rel="stylesheet" href="style.css?v=20260921a">
 <style>
 .lcbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
 .lcchip{border:1.5px solid #dfe5ee;background:#fff;color:#5b6472;font-weight:800;font-size:13px;padding:8px 15px;border-radius:999px;cursor:pointer;transition:.15s}
 .lcchip:hover{border-color:#153A77;color:#153A77}
 .lcchip.on{background:#153A77;border-color:#153A77;color:#fff}
 .lccard{background:#fff;border:1.5px solid #e8ecf2;border-radius:14px;padding:15px 18px;margin-bottom:9px;transition:.15s;box-shadow:0 1px 3px rgba(15,20,40,.04)}
-.lccard,.lccard *{word-break:keep-all;overflow-wrap:anywhere}
+.lccard,.lccard *{word-break:keep-all;overflow-wrap:break-word}
 .lccard>div{min-width:0}
 .lccard b{white-space:normal}
 .lctag{white-space:nowrap;display:inline-block;margin:1px 0}
@@ -771,9 +771,12 @@ async function applyNotice(id){
 }
 async function loadMyApps(){
   if(!LME)return;
-  const snap=await DB.collection('licenseApps').where('uid','==',LME.uid).get();
-  if(snap.empty)return;
-  document.getElementById('myApps').style.display='block';try{const n=document.getElementById('myNote');if(n)n.style.display='none'}catch(e){}
+  const _note=document.getElementById('myNote');
+  let snap;try{snap=await DB.collection('licenseApps').where('uid','==',LME.uid).get()}
+  catch(e){if(_note)_note.innerHTML='신청 현황을 불러오지 못했습니다 ('+esc(e.code||e.message)+'). 잠시 후 다시 열어 주세요.';return}
+  // [2026-09-21] 로그인했는데 신청이 없으면 「로그인하면 표시됩니다」 대신 「아직 신청 내역이 없습니다」
+  if(snap.empty){if(_note)_note.innerHTML='아직 신청한 자격이 없습니다. <a href="license.html?view=notices" style="font-weight:800;color:var(--blue)">자격 공고 보기 →</a>';return}
+  document.getElementById('myApps').style.display='block';if(_note)_note.style.display='none';
   const stc={'접수':'#b8860b','접수완료':'#8a919d','합격':'#1F4E9C','발급완료':'#0f766e','불합격':'#C41E2F'};
   const stl={'접수':'신청 접수','접수완료':'시도 1차 검토 완료','합격':'중앙 최종 발급 승인','불합격':'심사 반려','발급완료':'발급 완료'};
   MYAPPS=snap.docs.filter(d=>!d.data().deleted);
