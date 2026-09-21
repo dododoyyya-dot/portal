@@ -87,6 +87,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
+<script src="liccert.js?v=20260921a"></script>
 <script src="career.js?v=20260907a"></script>
 <script src="region_map.js?v=20260910a"></script>
 <script>
@@ -3666,7 +3667,10 @@ let MYLICS=[];
 async function loadMyLics(uid){
   try{
     const snap=await DB.collection('licenses').where('uid','==',uid).get();
-    if(snap.empty){MYLICS=[];syncQualFromDB();return;}
+    if(snap.empty){MYLICS=[];syncQualFromDB();
+      // [2026-09-21] 연동된 자격이 없는 회원(타지역 발급·번호 표기 차이 등) — 상자를 열어 아래 [기존 자격증 연결]로 안내
+      try{document.getElementById('licBox').style.display='block';document.getElementById('licCards').innerHTML='<div class="bempty" style="text-align:left;line-height:1.8">아직 내 계정에 연결된 자격이 없습니다. 자격증이 있다면 아래 <b>[🔗 기존 자격증 연결]</b>에 자격번호를 입력해 연결하세요 — 하이픈·급수 표기가 달라도 찾아 줍니다. 연결되면 여기서 <b>PDF 파일 저장·인쇄</b>를 할 수 있습니다. <a href="#claimBox" style="font-weight:800;color:#153A77" onclick="document.getElementById(\'claimBox\').scrollIntoView({behavior:\'smooth\'});return false">자격번호로 연결하기 ↓</a></div>'}catch(e){}
+      return;}
     MYLICS=snap.docs;
     syncQualFromDB();
     const today=new Date().toISOString().slice(0,10);
@@ -3683,10 +3687,22 @@ async function loadMyLics(uid){
         +'<div style="font-size:13.5px;color:var(--gray);margin-top:6px">자격번호 <b>'+esc(d.id)+'</b>'+(l.issuedAt?' · 발급 '+esc(l.issuedAt):'')+(l.expireAt?' · 유효기간 ~'+esc(l.expireAt):'')
         +(warn?'<br><b style="color:#b8860b">⏳ 만료까지 '+dday+'일 — 갱신·보수(역량강화) 교육 공고를 확인하세요 (자격증 페이지)</b>':'')
         +(expired?'<br><b style="color:#C41E2F">만료된 자격입니다. 갱신 절차(갱신·보수 교육 이수 및 갱신료)를 통해 재활성화할 수 있습니다.</b>':'')+'</div></div>'
-        +'<button class="btn-sub" style="background:#b8860b;font-size:14px;padding:11px 20px" onclick="printLicense(\''+d.id+'\')">자격증 발급 (인쇄·PDF)</button>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sub" style="background:#153A77;font-size:14px;padding:11px 20px" onclick="licPdfSave(\''+d.id+'\')" title="자격증을 PDF 파일로 바로 저장합니다 — 휴대폰에서는 카카오톡·메일 등으로 공유">📄 PDF 파일 저장·공유</button>'
+        +'<button class="btn-sub" style="background:#b8860b;font-size:14px;padding:11px 20px" onclick="printLicense(\''+d.id+'\')" title="인쇄 대화상자에서 인쇄하거나 PDF로 저장 (PC 권장)">🖨 인쇄</button></div>'
         +'</div>';
     }).join('');
   }catch(e){}
+}
+// [PDF 파일 2026-09-21] 인쇄창 없이 자격증을 PDF 파일로 저장(휴대폰은 공유 시트) — 카카오톡 등 인앱 브라우저에서 인쇄창이 막히는 문제의 대안
+async function licPdfSave(no){
+  const doc=MYLICS.find(d=>d.id===no);if(!doc)return;const l=doc.data();
+  if(!window.KFDF_LICCERT){alert('자격증 생성 모듈을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.');return}
+  const btn=event&&event.currentTarget;if(btn){btn.disabled=true;btn.textContent='PDF 만드는 중…'}
+  try{
+    const r=await KFDF_LICCERT.savePdf([{no:no,type:l.type,grade:l.grade,name:(MYD&&MYD.name)||l.name||'',birth:(MYD&&MYD.birth)||l.birth||'',expireAt:l.expireAt,issuedAt:l.issuedAt,region:l.region}],null,'연맹 자격증 '+no);
+    if(r==='download')alert('📄 자격증 PDF 파일을 저장했습니다.\n(휴대폰은 「다운로드」 폴더 또는 파일 앱에서 찾을 수 있습니다)');
+  }catch(e){alert('PDF 저장 실패: '+(e&&e.message||e)+'\n\n[🖨 인쇄] 버튼으로 인쇄 대화상자에서 "PDF로 저장"을 이용해 주세요.')}
+  if(btn){btn.disabled=false;btn.textContent='📄 PDF 파일 저장·공유'}
 }
 function printLicense(no){
   const doc=MYLICS.find(d=>d.id===no);if(!doc)return;

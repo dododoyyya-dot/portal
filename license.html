@@ -119,6 +119,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
+<script src="liccert.js?v=20260921a"></script>
 <script src="site_config.js"></script>
 <script>
 KFDF.initApp();
@@ -278,6 +279,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
         <button class="lcbtn ghost" id="lsSelClear" style="display:none" onclick="lcSelClear()">선택 해제</button>
         <button class="lcbtn p" onclick="printLicCerts('sel')" title="체크한 자격증을 한 번에 인쇄·PDF 저장 (취합 제출용)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M6 9V4h12v5"/><rect x="3" y="9" width="18" height="9" rx="2"/><path d="M7 14h10v6H7z"/></svg>선택 출력</button>
         <button class="lcbtn s" onclick="printLicCerts('all')" title="현재 목록의 관할 자격증 전체를 한 번에 인쇄·PDF 저장"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M6 9V4h12v5"/><rect x="3" y="9" width="18" height="9" rx="2"/><path d="M7 14h10v6H7z"/></svg>목록 전체 출력</button>
+        <button class="lcbtn p" onclick="lcPdfSave('sel')" title="체크한 자격증을 PDF 파일로 바로 저장 (인쇄창 없이 · 휴대폰은 공유)">📄 PDF 파일 (선택)</button>
         <button class="lcbtn b" onclick="exportLics()">⬇ CSV</button>
         <button class="lcbtn w" onclick="expireCleanup()" id="lsCleanBtn" title="유효기간 정보가 없는 과거 자격을 일괄 정리">⏳ 기한미상 만료 정리</button>
         <span id="lsCount" style="font-size:13px;font-weight:800;color:#153A77"></span>
@@ -1884,7 +1886,7 @@ function renderLics(){
       +(l.regionMovedFrom?' · 이관: '+esc(l.regionMovedFrom)+'→'+esc(l.region):'')+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
       +(LC_PRINTABLE(l)?'<label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#153A77;cursor:pointer"><input type="checkbox" class="lcsel" value="'+esc(d.id)+'" style="width:auto;margin:0"'+(LC_SEL.has(d.id)?' checked':'')+' onchange="lcSelToggle(this.value,this.checked)"> 선택</label>'
-        +'<button class="lcbtn p" onclick="printLicCerts(\''+d.id+'\')" title="이 자격증을 인쇄·PDF 저장">'+LC_ICO_PRINT+'자격증 출력</button>':'')
+        +'<button class="lcbtn p" onclick="printLicCerts(\''+d.id+'\')" title="이 자격증을 인쇄·PDF 저장">'+LC_ICO_PRINT+'자격증 출력</button><button class="lcbtn s" onclick="lcPdfSave(\''+d.id+'\')" title="PDF 파일로 바로 저장 (인쇄창 없이)">📄 PDF</button>':'')
       +((LICWRITE&&inJurL(l.region))?'<button class="lcbtn b" onclick="editLic(\''+d.id+'\')" title="성명·종류·급수·발급일·유효기간·상태·발급연맹 수정">'+LC_ICO_EDIT+'정보 수정</button>':'')
       +(l.uid?'<button class="lcbtn ghost" onclick="showLicMember(\''+d.id+'\')">👤 연결회원</button>':((LICWRITE&&inJurL(l.region))?'<button class="lcbtn s" onclick="linkLic(\''+d.id+'\')">🔗 회원 연동</button>':''))
       +((l.uid&&LICWRITE&&inJurL(l.region))?'<button class="lcbtn d" onclick="unlinkLic(\''+d.id+'\')">🔗 연결 해제</button>':'')
@@ -2005,7 +2007,7 @@ async function expireCleanup(){
 //    본인 출력(mypage.html printLicense)과 같은 공식 양식·좌표. 여러 장을 고르면 A4 한 장씩 한 창에 이어서 출력합니다.
 //    생년월일은 회원 문서(단건 조회)에서, 성명은 대장 성명(없으면 회원 성명)을 씁니다.
 const LC_ICO_PRINT='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M6 9V4h12v5"/><rect x="3" y="9" width="18" height="9" rx="2"/><path d="M7 14h10v6H7z"/></svg>';
-function LC_PRINTABLE(l){return !!l&&l.status!=='이관'&&(CENTRAL||inJurL(l.region))}
+function LC_PRINTABLE(l){return !!l&&l.status!=='이관'&&(CENTRAL||LICALL||inJurL(l.region))}   // [2026-09-21] 시도임원은 타지역 자격도 출력 가능(조회 범위와 동일 · 발급·정정 권한은 그대로 관할만)
 // [생년월일 비공개 2026-09-16] 자격 보유자 생년월일은 공개 대장(licenses)이 아니라 licenseBirth 에 둡니다.
 //   licenses 는 진위확인 때문에 누구나 읽을 수 있어(get: true) 생년월일을 두면 그대로 공개됩니다(규칙 v34).
 //   licenseBirth 읽기·쓰기는 중앙 관리자만 — 그 외에는 조용히 빈 값으로 처리합니다.
@@ -2035,6 +2037,20 @@ function lcSelRefresh(){const c=document.getElementById('lsSelCnt'),b=document.g
 function lcSelToggle(no,on){if(on)LC_SEL.add(no);else LC_SEL.delete(no);lcSelRefresh()}
 function lcSelAll(on){LC_VIEW.forEach(no=>{if(on)LC_SEL.add(no);else LC_SEL.delete(no)});document.querySelectorAll('.lcsel').forEach(c=>{c.checked=LC_SEL.has(c.value)});lcSelRefresh()}   // [100건씩] 화면에 안 그린 검색 결과도 포함
 function lcSelClear(){LC_SEL.clear();document.querySelectorAll('.lcsel').forEach(c=>{c.checked=false});lcSelRefresh()}
+// [PDF 파일 2026-09-21] 인쇄창 없이 PDF 파일 저장 — 출력 대상 판정·성명·생년월일 규칙은 printLicCerts 와 같음
+async function lcPdfSave(which){
+  let nos=[];if(which==='sel')nos=Array.from(LC_SEL);else if(which==='all')nos=LC_VIEW.slice();else nos=[which];
+  const docs=nos.map(n=>LICS.find(d=>d.id===n)).filter(d=>d&&LC_PRINTABLE(d.data()));
+  if(!docs.length){alert(which==='sel'?'저장할 자격증을 먼저 체크해 주세요.':'저장할 수 있는 자격증이 목록에 없습니다.');return}
+  if(!window.KFDF_LICCERT){alert('자격증 생성 모듈을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.');return}
+  if(docs.length>30&&!confirm('자격증 '+docs.length+'장을 한 PDF 파일로 만듭니다. 시간이 걸릴 수 있습니다. 계속할까요?'))return;
+  const cards=[],noBirth=[];
+  for(const d of docs){const x=d.data();const m=await lcMemberOf(x.uid);const birth=(CENTRAL?await lcBirthOf(d.id):'')||x.birth||m.birth||'';if(!birth)noBirth.push(d.id+' '+(x.name||x.maskName||''));
+    cards.push({no:d.id,type:x.type,grade:x.grade,name:x.name||m.name||x.maskName||'',birth:birth,expireAt:x.expireAt,issuedAt:x.issuedAt,region:x.region})}
+  try{const r=await KFDF_LICCERT.savePdf(cards,cards.length===1?null:'자격증_'+cards.length+'장_'+new Date().toISOString().slice(0,10)+'.pdf','연맹 자격증');
+    if(r==='download')alert('📄 자격증 PDF '+cards.length+'장을 파일로 저장했습니다.'+(noBirth.length?'\n\n생년월일을 확인하지 못한 '+noBirth.length+'건은 생년월일 칸이 비어 있습니다:\n'+noBirth.slice(0,10).join('\n')+(noBirth.length>10?'\n…':'')+'\n(회원 미연결 또는 회원 정보에 생년월일 없음 — [정보 수정]에서 생년월일 입력 또는 [🔗 회원 연동] 후 다시 저장)':''))}
+  catch(e){alert('PDF 저장 실패: '+(e&&e.message||e)+'\n\n[자격증 출력](인쇄 대화상자)을 이용해 주세요.')}
+}
 async function printLicCerts(which){
   let nos=[];
   if(which==='sel')nos=Array.from(LC_SEL);   // [선택 유지] 검색을 바꿔가며 고른 것도 모두 포함
