@@ -491,6 +491,77 @@ AUTH.onAuthStateChanged(async u=>{
   initPubChoose();   // [공고 종류 선택] 대회 / 심판·운영요원
 });
 // ── 👥 신청 현황 공개 (일반회원: 마스킹 명단 / 사무국·임원: 세부정보) ──
+// ══════════ [심판·운영요원 신청자 관리 2026-09-21] 프로필 연동(나이·지역·자격) · 심판 경력(수기+시스템 통합) · 지역별 보기 ══════════
+//   신청 기록(claimed)에는 uid·성명·희망 임무만 있어, 담당자 화면에서 회원 문서(생년월일·거점)·자격 대장(licenses)·경력(staffCareer)을 함께 읽습니다.
+//   경력: staffCareer 는 2026 이전 수기 등록(source manual/import·경력 일괄등록)과 이후 시스템 기록(staff-complete 등)이 한 컬렉션에 있어 날짜순으로 합쳐 보이고 출처만 표시합니다.
+const RS={view:'all',prof:{},career:{}};   // view: 'all' | 'group' | 지역명
+function rsRegionOf(u){u=u||{};const raw=u.sidoKey||u.sido||u.baseCity||((u.activityRegions||[])[0])||'';const n=(window.SCC&&SCC.sidoNorm)?SCC.sidoNorm(raw):'';return n||String(raw).split(/[\s·]/)[0]||'미상'}
+function rsAge(birth){const a=ageOf(birth);return (a==null||isNaN(a))?'':a}
+function rsLicBest(ls){const today=new Date().toISOString().slice(0,10);const refs=(ls||[]).filter(l=>String(l.type||'').indexOf('심판')>=0&&l.status!=='이관');
+  if(!refs.length)return null;const g=l=>parseInt(String(l.grade||'').replace(/\D/g,''),10)||9;
+  refs.sort((a,b)=>{const va=(a.status!=='만료'&&(!a.expireAt||String(a.expireAt).slice(0,10)>=today))?0:1,vb=(b.status!=='만료'&&(!b.expireAt||String(b.expireAt).slice(0,10)>=today))?0:1;return (va-vb)||(g(a)-g(b))});
+  const l=refs[0];const valid=l.status!=='만료'&&(!l.expireAt||String(l.expireAt).slice(0,10)>=today);return {grade:l.grade||'',exp:String(l.expireAt||'').slice(0,10),valid:valid,no:l.no||''}}
+async function rsEnrich(list,s){
+  if(!isCompStaff()||s.role==='참가')return;
+  await Promise.all((list||[]).filter(c=>c.uid&&!c.team).map(async c=>{
+    if(RS.prof[c.uid]){c._p=RS.prof[c.uid];return}
+    const p={birth:'',age:'',region:'미상',lic:null,phone:'',acct:''};
+    try{if(!_UCACHE[c.uid]){const d=await DB.collection('users').doc(c.uid).get();_UCACHE[c.uid]=d.exists?(d.data()||{}):{}}
+      const u=_UCACHE[c.uid];p.birth=u.birth||'';p.age=rsAge(u.birth);p.region=rsRegionOf(u);p.phone=u.phone||'';p.acct=u.accountType||''}catch(e){}
+    if(s.role==='심판'){try{const q=await DB.collection('licenses').where('uid','==',c.uid).get();p.lic=rsLicBest(q.docs.map(d=>Object.assign({no:d.id},d.data())))}catch(e){p.lic=undefined}}   /* undefined = 열람 권한 없음 */
+    RS.prof[c.uid]=p;c._p=p;
+  }));
+}
+function rsSetView(id,v){RS.view=v||'all';const old=document.getElementById('rosterModal');if(old)old.remove();viewRoster(id)}
+function rsPill(t,bg){return '<span style="display:inline-block;font-size:10.5px;font-weight:900;color:#fff;background:'+bg+';border-radius:999px;padding:1px 8px;vertical-align:1px">'+t+'</span>'}
+function rsProfHtml(c){const p=c._p;if(!p)return '';const L=p.lic;
+  return ' '+rsPill(cesc(p.region),'#153A77')+(p.age!==''?' '+rsPill('만 '+p.age+'세','#6b7280'):'')
+    +(L===undefined?' '+rsPill('자격 열람 불가','#8a919d'):(L===null?' '+rsPill('심판 자격 없음','#C41E2F'):' '+rsPill('심판 '+cesc(L.grade||'')+(L.valid?(L.exp?' ~'+L.exp:''):' 만료'+(L.exp?' '+L.exp:'')),L.valid?'#0f766e':'#C41E2F')))}
+// 상세(아코디언): 나이·거점·자격 + 심판·운영 활동 경력(수기+시스템 통합, 날짜순)
+async function rsToggle(slotId,uid,key){
+  const tr=document.getElementById('rsd_'+key);if(!tr)return;
+  if(tr.style.display!=='none'){tr.style.display='none';return}
+  tr.style.display='';const cell=tr.firstElementChild;
+  if(RS.career[uid]){cell.innerHTML=rsDetailHtml(uid);return}
+  cell.innerHTML='<div style="font-size:12.5px;color:#8a919d;padding:6px 0">경력을 불러오는 중…</div>';
+  try{const q=await DB.collection('staffCareer').where('uid','==',uid).limit(400).get();
+    RS.career[uid]={ok:true,list:q.docs.map(d=>d.data()).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))}}
+  catch(e){RS.career[uid]={ok:false,err:(e&&(e.code||e.message))||String(e),list:[]}}
+  cell.innerHTML=rsDetailHtml(uid);
+}
+function rsDetailHtml(uid){
+  const p=RS.prof[uid]||{};const C=RS.career[uid]||{list:[]};const L=p.lic;
+  const isLegacy=x=>/manual|import|legacy/.test(String(x.source||''))||String(x.date||'')<'2026-01-01';
+  const staffish=x=>['심판','운영','위원','봉사'].indexOf(x.group)>=0||x.kind==='staff';
+  const ref=C.list.filter(x=>x.group==='심판');const oth=C.list.filter(x=>staffish(x)&&x.group!=='심판');const legacyN=ref.filter(isLegacy).length;
+  const days=arr=>arr.reduce((n,x)=>n+(+x.days||1),0);
+  const kv=(k,v)=>'<div style="display:flex;gap:8px;font-size:12.5px"><span style="flex:0 0 78px;color:#6b7280;font-weight:700">'+k+'</span><span style="font-weight:700">'+v+'</span></div>';
+  let h='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 16px;padding:8px 4px;border-bottom:1px dashed #e5e9f0;margin-bottom:8px">'
+    +kv('생년월일',cesc(p.birth||'-')+(p.age!==''&&p.age!=null?' (만 '+p.age+'세)':''))+kv('거점 지역',cesc(p.region||'-'))
+    +kv('심판 자격',L===undefined?'열람 권한 없음':(L===null?'<span style="color:#C41E2F">등록된 심판 자격 없음</span>':cesc('심판 '+(L.grade||''))+(L.exp?' · 유효기간 '+cesc(L.exp):'')+(L.valid?' <span style="color:#0f766e">유효</span>':' <span style="color:#C41E2F">만료</span>')+(L.no?' <span style="color:#8a919d">'+cesc(L.no)+'</span>':'')))
+    +kv('심판 경력',C.ok===false?'<span style="color:#C41E2F">열람 권한 없음</span>':(ref.length?ref.length+'건 · '+days(ref)+'일'+(legacyN?' <span style="color:#8a5a00">(2026 이전 수기 '+legacyN+'건)</span>':'')+' · 최근 '+cesc(ref[0].date||''):'<span style="color:#8a919d">기록 없음</span>'))
+    +(oth.length?kv('운영·기타',oth.length+'건'):'')+'</div>';
+  if(C.ok===false)return h+'<div style="font-size:12px;color:#8a919d">'+cesc(C.err||'')+'</div>';
+  const rows=C.list.filter(staffish);
+  if(!rows.length)return h+'<div style="font-size:12.5px;color:#8a919d">심판·운영 활동 경력이 없습니다.</div>';
+  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr><th style="text-align:left;padding:4px 6px;background:#f6f8fb">일자</th><th style="text-align:left;padding:4px 6px;background:#f6f8fb">대회</th><th style="text-align:left;padding:4px 6px;background:#f6f8fb">역할</th><th style="text-align:left;padding:4px 6px;background:#f6f8fb">출처</th></tr>'
+    +rows.slice(0,60).map(x=>'<tr><td style="padding:4px 6px;border-top:1px solid #f0f2f6;white-space:nowrap">'+cesc(String(x.date||'').slice(0,10))+(+x.days>1?' ('+x.days+'일)':'')+'</td><td style="padding:4px 6px;border-top:1px solid #f0f2f6">'+cesc(x.competitionName||x.title||'')+(x.location?' <span style="color:#8a919d">'+cesc(x.location)+'</span>':'')+'</td><td style="padding:4px 6px;border-top:1px solid #f0f2f6;white-space:nowrap">'+cesc((x.group&&x.group!==x.role?x.group+' · ':'')+(x.role||''))+'</td><td style="padding:4px 6px;border-top:1px solid #f0f2f6;white-space:nowrap">'+(isLegacy(x)?'<span style="color:#8a5a00;font-weight:800">수기</span>':'<span style="color:#0f766e;font-weight:800">시스템</span>')+'</td></tr>').join('')
+    +'</table>'+(rows.length>60?'<div style="font-size:11.5px;color:#8a919d;margin-top:4px">최근 60건만 표시 · 전체 '+rows.length+'건</div>':'')+'</div>';
+  return h;
+}
+// 담당자 명단 CSV (심판·운영요원 공고) — 선발 검토용: 지역·나이·자격·경력 건수
+async function rsCsv(id){
+  const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;const s=doc.data();const list=compClaimList(s).filter(c=>!c.team);
+  await rsEnrich(list,s);
+  const btn=document.getElementById('rsCsvBtn');if(btn){btn.disabled=true;btn.textContent='경력 집계 중…'}
+  for(const c of list){if(!c.uid||RS.career[c.uid])continue;try{const q=await DB.collection('staffCareer').where('uid','==',c.uid).limit(400).get();RS.career[c.uid]={ok:true,list:q.docs.map(d=>d.data())}}catch(e){RS.career[c.uid]={ok:false,list:[]}}}
+  const rows=[['연번','성명','거점 지역','생년월일','나이','심판 자격','유효기간','자격 상태','심판 경력(건)','2026 이전 수기(건)','최근 활동일','희망 임무','신청일','상태']];
+  list.forEach((c,i)=>{const p=c._p||{};const L=p.lic;const C=(RS.career[c.uid]||{list:[]}).list.filter(x=>x.group==='심판').sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    rows.push([i+1,c.name||'',p.region||'',p.birth||'',p.age===''?'':p.age,L?('심판 '+(L.grade||'')):(L===undefined?'열람불가':'없음'),L?L.exp:'',L?(L.valid?'유효':'만료'):'',C.length,C.filter(x=>/manual|import|legacy/.test(String(x.source||''))||String(x.date||'')<'2026-01-01').length,C[0]?C[0].date:'',(c.prefs||[]).join(' · '),String(c.origAt||c.at||'').slice(0,10),claimState(s,c).t])});
+  const csv='\ufeff'+rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=(s.title||'요원')+'_신청자_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  if(btn){btn.disabled=false;btn.textContent='📥 신청자 명단 CSV'}
+}
 function isCompStaff(){
   return !!(CMY&&(CMY.owner||['admin','regionAdmin','sidoOfficer','gugunOfficer'].indexOf(CMY.role)>=0));
 }
@@ -1003,9 +1074,14 @@ async function rosterSet(s,staff){
 async function viewRoster(id){
   const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
   const s=doc.data();
-  const list=compClaimList(s);
+  let list=compClaimList(s);
   const staff=isCompStaff();
-  await enrichAges(list);   // [성인표시] 생년월일 없는 예전 신청 건도 회원 정보로 성인 여부를 채웁니다
+  await enrichAges(list);
+  // [요원 신청자 관리] 심판·운영 공고: 회원 프로필(나이·거점·자격) 보강 + 지역별 보기
+  const rsMode=(staff&&s.role!=='참가');
+  if(rsMode){await rsEnrich(list,s);
+    if(RS.view!=='all'&&RS.view!=='group')list=list.filter(c=>c.team||((c._p||{}).region||'미상')===RS.view);
+    if(RS.view==='group')list=list.slice().sort((a,b)=>String((a._p||{}).region||'미상').localeCompare(String((b._p||{}).region||'미상'),'ko')||String(a.origAt||a.at||'').localeCompare(String(b.origAt||b.at||'')))}   // [성인표시] 생년월일 없는 예전 신청 건도 회원 정보로 성인 여부를 채웁니다
   // [학교스포츠클럽 연동] 관리자가 [경력 엑셀 업로드]로 먼저 올린 참가 명단과 신청자를 성명+생년월일로 대조 (연동 공고·관리자만)
   const ROSTER_SET=await rosterSet(s,staff);
   const rosterMark=(name,birth)=>{if(!ROSTER_SET)return '';const nm=String(name||'').replace(/\s+/g,'');return (ROSTER_SET.has(nm+'|'+(birth||''))||ROSTER_SET.has(nm+'|'))?' <b style="color:#0f766e;font-size:10.5px" title="주최 측 참가 명단과 일치">✓ 명단 확인</b>':' <b style="color:#b45309;font-size:10.5px" title="올려 둔 참가 명단에 없음 — 확인 필요 (신청을 막지는 않습니다)">⚠ 명단에 없음</b>'};
@@ -1014,6 +1090,8 @@ async function viewRoster(id){
   const old=document.getElementById('rosterModal');if(old)old.remove();
   const div=document.createElement('div');div.id='rosterModal';
   div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+  // [모바일 2026-09-21] 좁은 화면(≤640px): 표의 각 줄을 카드처럼 세로로, 창은 전체 폭·바닥 붙임
+  if(!document.getElementById('rsMobileCss')){const st=document.createElement('style');st.id='rsMobileCss';st.textContent='@media(max-width:640px){#rosterModal{padding:0!important;align-items:flex-end!important}#rosterModal>div{max-width:none!important;border-radius:16px 16px 0 0!important;max-height:96vh!important;padding:16px 12px!important}#rosterModal table.rsm{display:block}#rosterModal table.rsm thead,#rosterModal table.rsm th{display:none}#rosterModal table.rsm tbody,#rosterModal table.rsm tr{display:block}#rosterModal table.rsm tr{border:1.5px solid #dfe5ee;border-radius:12px;margin-bottom:8px;padding:6px 8px;background:#fff}#rosterModal table.rsm td{display:block;border:none!important;padding:3px 4px!important;font-size:13px!important}#rosterModal table.rsm td[colspan]{padding:6px!important}#rosterModal table.rsm td:first-child{font-size:11px!important;color:#8a919d}}';document.head.appendChild(st)}
   const th='style="border:1px solid #dfe5ee;padding:7px 9px;background:#f6f8fb;font-size:12.5px;white-space:nowrap"';
   const td='style="border:1px solid #dfe5ee;padding:7px 9px;font-size:12.5px"';
   // 임무·부문별 집계
@@ -1088,12 +1166,14 @@ async function viewRoster(id){
           +'<td '+td+' style="text-align:center">'+stCell(c)+'</td>'
           +(entry?_payCell(id,c,td):'')+revCell(c)+'</tr>';
       }
-      return '<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b>'+tbadge(c)+consentBadge(c,ckey(c))+rosterMark(c.name,c.birth)+ibBadge(c)+'</td>'
+      const _rg=rsMode?String((c._p||{}).region||'미상'):'';const _gh=(rsMode&&RS.view==='group'&&(i===0||String(((list[i-1]||{})._p||{}).region||'미상')!==_rg))?'<tr><td '+td+' colspan="9" style="background:#eef3fb;font-weight:900;color:#153A77">📍 '+cesc(_rg)+' <span style="font-weight:700;color:#6b7280">'+list.filter(x=>String((x._p||{}).region||'미상')===_rg).length+'명</span></td></tr>':'';
+      return _gh+'<tr><td '+td+'>'+(i+1)+'</td><td '+td+'><b>'+cesc(c.name||'')+'</b>'+tbadge(c)+consentBadge(c,ckey(c))+rosterMark(c.name,c.birth)+ibBadge(c)+(rsMode?rsProfHtml(c)+' <button onclick="rsToggle(\''+id+'\',\''+cesc(c.uid||'')+'\',\''+cesc(ckey(c))+'\')" style="border:1.5px solid #c9d8ef;background:#fff;color:#153A77;border-radius:7px;padding:1px 8px;font-size:11px;font-weight:800;cursor:pointer">👤 상세·경력</button>':'')+'</td>'
       +(entry?'<td '+td+'>'+cesc(c.birth||'-')+'</td><td '+td+'>'+cesc(c.gender||'-')+'</td><td '+td+'>'+cesc(c.school||c.club||'-')+'</td>':'')
       +'<td '+td+'>'+cesc(entry?((c.prefs||[]).map(p=>p+(divDateLbl(s,p)?' ('+divDateLbl(s,p)+')':'')).join(' · ')||'-'):((c.prefs||[]).map((p,j)=>(j+1)+'지망 '+p).join(' · ')||'-'))+'</td>'
       +'<td '+td+'>'+cesc(String(c.origAt||c.at||'').slice(0,10))+'</td>'
       +'<td '+td+' style="text-align:center">'+stCell(c)+'</td>'
-      +(entry?_payCell(id,c,td):'')+revCell(c)+'</tr>';
+      +(entry?_payCell(id,c,td):'')+revCell(c)+'</tr>'
+      +(rsMode?'<tr id="rsd_'+cesc(ckey(c))+'" style="display:none"><td colspan="9" style="border:1px solid #dfe5ee;background:#fbfcfe;padding:8px 12px"></td></tr>':'');
     }).join('');
   }else{
     rows=list.map((c,i)=>{
@@ -1118,7 +1198,13 @@ async function viewRoster(id){
     +'<div style="font-size:12.5px;color:#666;margin:4px 0 4px">'+cesc(s.date||'')+' · '+cesc(s.role)+(entry?' (선수)':'요원')+' · 신청 '+list.length+'/'+s.quota+'명'+(sumTxt?' — '+sumTxt:'')+(staff&&rejList.length?' · 반려 '+rejList.length+'건(명단·정원 제외, 아래 별도 확인)':'')+(staff&&canList.length?' · 취소 '+canList.length+'건(아래에서 되살리기)':'')+'</div>'
     +(staff?'<div style="font-size:12px;color:#0f766e;font-weight:700;margin-bottom:8px">🔓 권한자 보기 — 세부정보가 표시됩니다. <a href="admin.html" style="color:#153A77;font-weight:800">관리자 페이지에서 수정 →</a></div>'
            :'<div style="font-size:12px;color:#8a919d;margin-bottom:8px">개인정보 보호를 위해 성명은 일부 가려서 표시됩니다.</div>')
-    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">'+head+rows+'</table></div>'
+    +(rsMode?(function(){const all=compClaimList(s).filter(c=>!c.team);const cnt={};all.forEach(c=>{const r=String((c._p||{}).region||'미상');cnt[r]=(cnt[r]||0)+1});const regs=Object.keys(cnt).sort((a,b)=>a.localeCompare(b,'ko'));
+      return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 10px;background:#f6f8fb;border:1.5px solid #e2e7f0;border-radius:10px;padding:8px 12px"><b style="font-size:13px">📍 지역별 보기</b>'
+        +'<select onchange="rsSetView(\''+id+'\',this.value)" style="padding:6px 10px;border:1.5px solid #d5dce8;border-radius:9px;font-size:13px"><option value="all"'+(RS.view==='all'?' selected':'')+'>전체 ('+all.length+'명)</option><option value="group"'+(RS.view==='group'?' selected':'')+'>지역별 묶어 보기</option>'+regs.map(r=>'<option value="'+cesc(r)+'"'+(RS.view===r?' selected':'')+'>'+cesc(r)+' ('+cnt[r]+'명)</option>').join('')+'</select>'
+        +'<span style="font-size:12px;color:#6b7280">'+regs.map(r=>cesc(r)+' '+cnt[r]).join(' · ')+'</span>'
+        +'<span style="flex:1"></span><button id="rsCsvBtn" class="cbtn" style="padding:6px 12px;font-size:12px;background:#153A77;color:#fff" onclick="rsCsv(\''+id+'\')">📥 신청자 명단 CSV</button></div>'
+        +'<div style="font-size:11.5px;color:#8a919d;margin:-4px 0 8px">성명 옆 [👤 상세·경력]을 누르면 생년월일·거점 지역·심판 자격(유효기간)과 심판·운영 활동 경력(2026 이전 수기 등록 + 이후 시스템 기록)을 함께 봅니다.</div>'})():'')
+    +'<div style="overflow-x:auto"><table class="rsm" style="width:100%;border-collapse:collapse">'+head+rows+'</table></div>'
     +(rejList.length?('<details style="margin-top:14px;border-top:1px dashed #e5e9f0;padding-top:10px">'
       +'<summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#C41E2F">🗑 반려된 신청 ('+rejList.length+'건) — 명단·정원에서는 제외됨</summary>'
       +'<div style="overflow-x:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse">'
@@ -3610,6 +3696,8 @@ async function loadSlots(){
       DB.collection('settings').doc('global').get().catch(()=>null)
     ]);
     CSLOTS=snap.docs;
+    // [자격 검증] 심판 모집 공고가 있고 로그인 상태면 자격 상태를 먼저 확인해 [신청하기] 버튼을 잠급니다 (openApply 의 재검증은 그대로)
+    if(CME&&!__refLicState&&snap.docs.some(d=>d.data().role==='심판'))try{await refLicState()}catch(e){}
     const compEnabled=!!(cfg&&cfg.exists&&cfg.data().compEnabled);
     CCOMPS=(comps&&compEnabled)?comps.docs:[];
     if(snap.empty&&!CCOMPS.length){el.innerHTML='<div class="bempty">현재 모집 중인 대회가 없습니다. 확정 시 이곳에 게시됩니다.</div>';return}
@@ -3712,6 +3800,15 @@ function slotCard(d,today){
       }
       else if(closed)action='<span class="cpill" style="background:#8a919d;color:#fff">마감</span>';
       else if(!eligible)action='<span style="color:#8a919d;font-size:12.5px;font-weight:700">'+(s.role==='심판'?'심판':'운영')+'요원 분야 지원 후 신청 가능 — <a href="jobs.html" style="color:var(--blue);font-weight:800">강사 활동 지원 →</a></span>';
+      else if(s.role==='심판'&&__refLicState&&__refLicState.st!=='ok'){   // [자격 검증 2026-09-21] 만료·미보유는 버튼 잠금 + 안내 (툴팁·문구)
+        const _m=refLicMsg(__refLicState);
+        action='<button class="cbtn cbtn-main" disabled title="'+cesc(_m)+'" style="opacity:.45;cursor:not-allowed">✍ 신청하기</button>'
+          +'<span style="display:block;margin-top:6px;font-size:12.5px;font-weight:800;color:#C41E2F">⛔ '+cesc(_m)+' <a href="license.html" style="color:var(--blue)">자격 안내 →</a></span>';
+      }
+      else if(s.role==='심판'&&CMY&&(CMY.accountType==='teacher'||CMY.accountType==='natcert')){
+        action='<button class="cbtn cbtn-main" disabled title="교사·국가공인자격 회원은 KFDF 심판 자격 취득 후 신청할 수 있습니다" style="opacity:.45;cursor:not-allowed">✍ 신청하기</button>'
+          +'<span style="display:block;margin-top:6px;font-size:12.5px;font-weight:800;color:#8a5a00">교사·국가공인자격 회원은 KFDF 심판 자격 취득 후 신청할 수 있습니다 (운영요원 모집은 신청 가능)</span>';
+      }
       else action='<button class="cbtn cbtn-main" onclick="openApply(\''+d.id+'\')">'+(entry?'🏃 개인전 참가 신청':'✍ 신청하기')+'</button>';
       // [공고 시인성 2026-09-09] 핵심 정보를 라벨·값 표(.ckv)로 — 일시·장소·신청/마감·개회식·참가비·주최/주관·후원/협찬. 참가비는 한 곳에만(종전엔 상단 메타와 아래 상자에 중복 표기)
       const feeTxt=(s.entry&&s.entry.fees&&s.entry.fees.length)?s.entry.fees.map(f=>cesc(f.label+(f.amount?' '+f.amount:''))).join(' · '):(s.fee?cesc(s.fee):'');
@@ -3926,16 +4023,23 @@ function consentAnswers(){
   return out;
 }
 // [v4] 유효 심판자격증 보유 여부 (licenses 컬렉션 기준, 1회 캐시)
-let __refLicOK=null;
-async function hasValidRefLicComp(){
-  if(__refLicOK!==null)return __refLicOK;
+let __refLicOK=null,__refLicState=null;   // [자격 검증 2026-09-21] state: {st:'ok'|'expired'|'none', exp:최근 만료일}
+async function refLicState(){
+  if(__refLicState)return __refLicState;
+  if(!CME){return {st:'none',exp:''}}
   try{
     const snap=await DB.collection('licenses').where('uid','==',CME.uid).get();
     const today=new Date().toISOString().slice(0,10);
-    __refLicOK=snap.docs.some(d=>{const l=d.data();return String(l.type||'').indexOf('심판')>=0&&l.status!=='만료'&&(!l.expireAt||String(l.expireAt).slice(0,10)>=today)});
-  }catch(e){__refLicOK=false;}
-  return __refLicOK;
+    const refs=snap.docs.map(d=>d.data()).filter(l=>String(l.type||'').indexOf('심판')>=0&&l.status!=='이관');
+    const ok=refs.some(l=>l.status!=='만료'&&(!l.expireAt||String(l.expireAt).slice(0,10)>=today));
+    const exp=refs.map(l=>String(l.expireAt||'').slice(0,10)).sort().pop()||'';
+    __refLicState={st:ok?'ok':(refs.length?'expired':'none'),exp:exp};
+  }catch(e){__refLicState={st:'none',exp:'',err:true}}
+  __refLicOK=__refLicState.st==='ok';
+  return __refLicState;
 }
+async function hasValidRefLicComp(){return (await refLicState()).st==='ok'}
+function refLicMsg(st){return st.st==='expired'?'자격이 만료되었습니다'+(st.exp?' ('+st.exp+')':'')+'. 갱신 후 신청해 주세요.':'등록된 심판 자격이 없어 신청할 수 없습니다. 자격 취득·연결 후 신청해 주세요.'}
 async function openApply(id){
   const doc=CSLOTS.find(d=>d.id===id);if(!doc)return;
   const s=doc.data();
@@ -3944,7 +4048,7 @@ async function openApply(id){
   // [v4] 심판요원 신청은 유효한 심판 자격증 보유자만 (운영요원은 자격 검증 없음)
   if(s.role==='심판'){
     const ok=await hasValidRefLicComp();
-    if(!ok){alert('❌ 유효한 심판 자격증 보유자만 심판요원으로 신청할 수 있습니다.\n만료되었거나 등록된 심판 자격이 없습니다.\n\n운영요원 모집에는 자격 없이 신청하실 수 있습니다.\n자격 안내: license.html · certification.html');return}
+    if(!ok){alert('❌ '+refLicMsg(__refLicState||{st:'none'})+'\n\n운영요원 모집에는 자격 없이 신청하실 수 있습니다.\n자격 안내: license.html · certification.html');return}
   }
   if(s.role==='심판'&&CMY&&(CMY.accountType==='teacher'||CMY.accountType==='natcert')){
     alert('🏁 [교사(교원)] · [국가공인자격증 취득회원] 회원은 대회 심판으로 신청하실 수 없습니다.\n먼저 KFDF공인 심판 자격을 취득하시면 심판 신청이 가능합니다.\n\n지금은 운영요원으로 신청하실 수 있습니다.\n자격 안내: license.html · certification.html');
