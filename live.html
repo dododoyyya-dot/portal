@@ -66,6 +66,17 @@
 .op-sc .t{text-align:center;font-weight:900;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .op-sc .v{font-size:44px;font-weight:900;text-align:center;font-variant-numeric:tabular-nums;line-height:1.1}
 .op-sc .b{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.lv-clock{display:inline-block;font-variant-numeric:tabular-nums;font-weight:900;background:rgba(255,255,255,.14);border-radius:8px;padding:2px 9px;letter-spacing:.5px}
+.lv-card .lv-clock{background:#f1f4f8;color:#153A77;font-size:12px}
+.lv-ev{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+.lv-ev span{font-size:11.5px;font-weight:800;background:rgba(255,255,255,.12);border-radius:999px;padding:3px 10px;white-space:nowrap}
+.lv-ev span.a{border-left:3px solid #7EB8E8}.lv-ev span.b{border-right:3px solid #f4b0b8}
+.lv-sc-tag{font-size:11px;font-weight:900;color:#0f766e;background:#e6f5f0;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.ch-tabs{display:flex;gap:4px;margin-left:auto}.ch-tab{border:1.5px solid #dfe5ee;background:#fff;border-radius:999px;padding:3px 10px;font-size:11.5px;font-weight:800;cursor:pointer}.ch-tab.on{background:#153A77;color:#fff;border-color:#153A77}
+.sc-list{flex:1;overflow:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:13px;background:#fbfcfe}
+.sc-msg{display:flex;gap:8px;align-items:flex-start}.sc-msg .nm{font-weight:900;white-space:nowrap;color:#153A77;font-size:12.5px}.sc-msg .nm.op{color:#C41E2F}.sc-msg .tx{background:#fff;border:1px solid #e9edf3;border-radius:0 12px 12px 12px;padding:6px 10px;line-height:1.5;min-width:0;word-break:keep-all;overflow-wrap:break-word}.sc-msg .tm{font-size:10.5px;color:#8a919d;white-space:nowrap;align-self:flex-end}.sc-msg .del{border:none;background:none;color:#C41E2F;cursor:pointer;font-size:11px;font-weight:800}
+.sc-in{display:flex;gap:6px;padding:8px 10px;border-top:1px solid #eef1f5;background:#fff}.sc-in input{flex:1;min-width:0;padding:9px 11px;border:1.5px solid #d5dce8;border-radius:10px;font-size:13.5px;font-family:inherit}.sc-in button{border:none;background:#153A77;color:#fff;font-weight:900;border-radius:10px;padding:0 14px;cursor:pointer;font-family:inherit}
+.sc-note{padding:8px 12px;font-size:12px;color:#6b7280;border-top:1px solid #eef1f5;background:#fff;text-align:center}
 @media(max-width:960px){.lv-main{grid-template-columns:1fr}.lv-chat{height:420px}}
 @media(max-width:640px){.lv-wrap{padding:0 12px}.lv-now{padding:14px}.lv-now .sb{gap:8px}.op-sc .v{font-size:36px}}
 </style>
@@ -193,7 +204,7 @@
 KFDF.initApp();
 const DB=firebase.firestore(),AUTH=firebase.auth();
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let LIVE={},MATCHES=[],ME=null,MY=null,CAN_OP=false,STREAM=0,OP_OPEN=false;
+let LIVE={},MATCHES=[],ME=null,MY=null,CAN_OP=false,STREAM=0,OP_OPEN=false,CHAT=[],CHAT_TAB='',SCLUBS=null,CHAT_UNSUB=null;
 const STC={'진행':'#C41E2F','예정':'#8a919d','종료':'#153A77'};
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function hm(t){try{const d=t&&t.toDate?t.toDate():(t?new Date(t):null);return d&&!isNaN(d)?String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'):''}catch(e){return ''}}
@@ -207,19 +218,49 @@ function renderStream(){
   document.title=(on&&streams.length?'🔴 LIVE · ':'')+'라이브 중계 | 대한민국플라잉디스크연맹';
   const v=document.getElementById('lvVideo'),c=document.getElementById('lvChat'),tabs=document.getElementById('lvTabs');
   if(!(on&&streams.length)){v.innerHTML='<div class="off"><b>지금은 중계 중이 아닙니다</b><span>'+(LIVE.title?esc(LIVE.title)+' 중계가 시작되면 이 자리에 영상이 나옵니다.':'중계가 시작되면 이 자리에 영상이 나옵니다.')+' 아래 경기 결과는 계속 볼 수 있습니다.</span></div>';
-    c.innerHTML='<div class="ch">💬 실시간 채팅</div><div class="off">중계가 시작되면 채팅이 열립니다.</div>';tabs.style.display='none';return}
+    v.dataset.vid='';tabs.style.display='none';renderChat();return}
   if(STREAM>=streams.length)STREAM=0;const s=streams[STREAM];
   if(v.dataset.vid!==s.videoId){v.dataset.vid=s.videoId;
     v.innerHTML='<iframe src="https://www.youtube-nocookie.com/embed/'+esc(s.videoId)+'?autoplay=1&rel=0&playsinline=1" title="라이브 중계" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>';
-    c.innerHTML='<div class="ch">💬 실시간 채팅 <span style="font-size:11.5px;color:#8a919d;font-weight:700">유튜브 계정으로 참여</span><a href="https://www.youtube.com/watch?v='+esc(s.videoId)+'" target="_blank" rel="noopener" style="margin-left:auto;font-size:11.5px;font-weight:800;color:#C41E2F">유튜브에서 보기 ↗</a></div>'
-      +(LIVE.chat==='off'?'<div class="off">이 중계는 채팅을 열지 않았습니다.</div>':'<iframe src="https://www.youtube.com/live_chat?v='+esc(s.videoId)+'&embed_domain='+esc(location.hostname)+'" title="라이브 채팅"></iframe><div style="font-size:11px;color:#8a919d;padding:6px 12px;border-top:1px solid #eef1f5">채팅이 비어 보이면 「유튜브에서 보기」로 참여할 수 있습니다 (브라우저의 서드파티 차단 설정 때문일 수 있습니다).</div>')}
+    c.dataset.vid='';renderChat()}
   tabs.style.display=streams.length>1?'flex':'none';
   tabs.innerHTML=streams.map((x,i)=>'<button class="lv-tab'+(i===STREAM?' on':'')+'" onclick="STREAM='+i+';renderStream()">📺 '+esc(x.label||('중계 '+(i+1)))+'</button>').join('');
 }
+// ── 채팅: 유튜브 라이브 채팅(계정 필요) + 연맹 회원 채팅(liveChat, 승인 회원 로그인) — 설정 chat: 'both'(기본)|'youtube'|'site'|'off' ──
+function chatModes(){const m=LIVE.chat||'both';const on=!!(LIVE.on&&(LIVE.streams||[]).length);const r=[];if(on&&(m==='both'||m==='youtube'))r.push('youtube');if(m==='both'||m==='site')r.push('site');return r}
+function renderChat(){
+  const c=document.getElementById('lvChat');const modes=chatModes();const s=((LIVE.streams||[])[STREAM])||{};
+  if(!modes.length){c.innerHTML='<div class="ch">💬 실시간 채팅</div><div class="off">'+(LIVE.chat==='off'?'이 중계는 채팅을 열지 않았습니다.':'중계가 시작되면 채팅이 열립니다.')+'</div>';c.dataset.tab='';return}
+  if(modes.indexOf(CHAT_TAB)<0)CHAT_TAB=modes[0];
+  const key=CHAT_TAB+'|'+(s.videoId||'');if(c.dataset.tab===key&&CHAT_TAB==='youtube')return;   // 유튜브 iframe 은 다시 그리지 않음
+  const tabs=modes.length>1?'<span class="ch-tabs">'+modes.map(m=>'<button class="ch-tab'+(m===CHAT_TAB?' on':'')+'" onclick="CHAT_TAB=\''+m+'\';renderChat()">'+(m==='youtube'?'유튜브':'연맹 채팅')+'</button>').join('')+'</span>':'';
+  let body='';
+  if(CHAT_TAB==='youtube'){body='<div class="ch">💬 실시간 채팅 <span style="font-size:11.5px;color:#8a919d;font-weight:700">유튜브 계정으로 참여</span>'+tabs+'</div>'
+    +'<iframe src="https://www.youtube.com/live_chat?v='+esc(s.videoId)+'&embed_domain='+esc(location.hostname)+'" title="라이브 채팅"></iframe><div class="sc-note">채팅이 비어 보이면 <a href="https://www.youtube.com/watch?v='+esc(s.videoId)+'" target="_blank" rel="noopener" style="font-weight:800;color:#C41E2F">유튜브에서 보기 ↗</a>'+(modes.indexOf('site')>=0?' 또는 「연맹 채팅」 탭':'')+'</div>'}
+  else{const can=!!(ME&&MY&&MY.status==='approved');
+    body='<div class="ch">💬 연맹 채팅 <span style="font-size:11.5px;color:#8a919d;font-weight:700">홈페이지 회원</span>'+tabs+'</div><div class="sc-list" id="scList"></div>'
+      +(can?'<div class="sc-in"><input id="scIn" maxlength="300" placeholder="응원 메시지를 남겨 주세요 (300자)" onkeydown="if(event.key===\'Enter\')chatSend()"><button onclick="chatSend()">보내기</button></div><div class="sc-note">실명(가림)으로 표시됩니다 · 비방·개인정보는 사무국이 삭제합니다</div>'
+        :'<div class="sc-note">'+(ME?'사무국 승인 후 참여할 수 있습니다.':'<a href="login.html" style="font-weight:800;color:#153A77">로그인</a>하면 채팅에 참여할 수 있습니다.')+'</div>')}
+  c.innerHTML=body;c.dataset.tab=key;if(CHAT_TAB==='site')chatDraw();
+}
+function chatName(m){const n=String(m.name||'');if(m.op)return n;return n.length>=3?n[0]+'○'+n.slice(2):(n.length===2?n[0]+'○':n)}
+function chatDraw(){const el=document.getElementById('scList');if(!el)return;const atBottom=el.scrollHeight-el.scrollTop-el.clientHeight<40;
+  el.innerHTML=CHAT.length?CHAT.slice().reverse().map(m=>'<div class="sc-msg"><span class="nm'+(m.op?' op':'')+'">'+(m.op?'🎙 ':'')+esc(chatName(m))+'</span><span class="tx">'+esc(m.text||'')+'</span><span class="tm">'+esc(hm(m.at))+'</span>'+(CAN_OP?'<button class="del" onclick="chatDel(\''+m.id+'\')" title="삭제">✕</button>':'')+'</div>').join(''):'<div style="color:#8a919d;text-align:center;padding:20px 0;font-size:12.5px">첫 응원 메시지를 남겨 보세요!</div>';
+  if(atBottom||!el.dataset.init){el.scrollTop=el.scrollHeight;el.dataset.init='1'}}
+function chatListen(){if(CHAT_UNSUB)return;CHAT_UNSUB=DB.collection('liveChat').orderBy('at','desc').limit(150).onSnapshot(sn=>{CHAT=sn.docs.map(d=>Object.assign({id:d.id},d.data())).filter(m=>!m.del);chatDraw()},e=>{console.warn('liveChat',e);const el=document.getElementById('scList');if(el)el.innerHTML='<div style="color:#8a919d;text-align:center;padding:20px 0;font-size:12.5px">채팅을 불러오지 못했습니다 (보안 규칙 v44 게시 전)</div>'})}
+async function chatSend(){const i=document.getElementById('scIn');if(!i||!ME)return;const t=i.value.trim();if(!t)return;if(t.length>300){alert('300자 이내로 적어 주세요');return}
+  i.disabled=true;try{await DB.collection('liveChat').add({uid:ME.uid,name:(MY&&MY.name)||'',text:t,op:!!CAN_OP,at:firebase.firestore.FieldValue.serverTimestamp()});i.value=''}catch(e){alert('전송 실패: '+(/permission/i.test(String(e))?'권한이 없습니다 (승인 회원만 · 보안 규칙 v44)':(e.message||e)))}i.disabled=false;i.focus()}
+async function chatDel(id){if(!CAN_OP)return;try{await DB.collection('liveChat').doc(id).update({del:true,delBy:(MY&&MY.name)||''})}catch(e){alert('삭제 실패: '+(e.message||e))}}
+// ── 타이머·득점 기록 ──
+function clockMs(m){const c=m.clock||{};return (+c.base||0)+(c.running&&c.startedAt?Math.max(0,Date.now()-(+c.startedAt)):0)}
+function clockTxt(m){const t=Math.floor(clockMs(m)/1000);return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0')}
+function clockHtml(m){const c=m.clock||{};if(!c.running&&!(+c.base))return '';return '<span class="lv-clock" data-mid="'+esc(m.id)+'">'+(c.running?'⏱ ':'⏸ ')+clockTxt(m)+'</span>'}
+setInterval(function(){document.querySelectorAll('.lv-clock[data-mid]').forEach(function(el){const m=MATCHES.find(x=>x.id===el.dataset.mid);if(m&&(m.clock||{}).running)el.textContent='⏱ '+clockTxt(m)})},1000);
+function evHtml(m,n){const ev=(m.events||[]).slice(-(n||6));if(!ev.length)return '';return '<div class="lv-ev">'+ev.map(e=>'<span class="'+esc(e.side)+'">'+(e.d>0?'⚡ ':'↩ ')+esc(e.team||'')+' '+esc(e.score||'')+(e.clock?' · '+esc(e.clock):'')+'</span>').join('')+'</div>'}
 // ── 스코어 ──
 function scoreRow(m,side){const me=m[side]||{},op=m[side==='a'?'b':'a']||{};const win=m.status==='종료'&&(+me.score||0)>(+op.score||0);return '<div class="row'+(win?' w':'')+'"><span class="n">'+(win?'🏆 ':'')+esc(me.name||'-')+'</span><span class="s">'+esc(me.score!=null?me.score:0)+'</span></div>'}
 function card(m){return '<div class="lv-card'+(m.status==='진행'?' live':'')+'"><div class="hd"><span>'+esc([m.title,m.court].filter(Boolean).join(' · ')||'경기')+'</span><span><span class="lv-pill" style="background:'+STC[m.status]+'">'+esc(m.status)+'</span></span></div>'
-  +scoreRow(m,'a')+scoreRow(m,'b')+'<div class="ft">'+(m.period?'<b>'+esc(m.period)+'</b>':'')+(m.status==='예정'&&m.startAt?'<span>'+esc(hm(m.startAt))+' 시작 예정</span>':'')+(m.status==='종료'&&m.endAt?'<span>'+esc(hm(m.endAt))+' 종료</span>':'')+(m.note?'<span>'+esc(m.note)+'</span>':'')+(m.status==='진행'&&m.updatedAt?'<span style="margin-left:auto">'+esc(hm(m.updatedAt))+' 갱신</span>':'')+'</div></div>'}
+  +scoreRow(m,'a')+scoreRow(m,'b')+'<div class="ft">'+(m.period?'<b>'+esc(m.period)+'</b>':'')+clockHtml(m)+(m.scSynced?'<span class="lv-sc-tag">🏫 학교클럽 전적 반영</span>':'')+(m.status==='예정'&&m.startAt?'<span>'+esc(hm(m.startAt))+' 시작 예정</span>':'')+(m.status==='종료'&&m.endAt?'<span>'+esc(hm(m.endAt))+' 종료</span>':'')+(m.note?'<span>'+esc(m.note)+'</span>':'')+(m.status==='진행'&&m.updatedAt?'<span style="margin-left:auto">'+esc(hm(m.updatedAt))+' 갱신</span>':'')+'</div></div>'}
 function render(){
   const live=MATCHES.filter(m=>m.status==='진행').sort((a,b)=>(a.order||0)-(b.order||0));
   const next=MATCHES.filter(m=>m.status==='예정').sort((a,b)=>String(a.day||'').localeCompare(String(b.day||''))||(a.order||0)-(b.order||0));
@@ -228,7 +269,7 @@ function render(){
   const feat=MATCHES.find(m=>m.id===LIVE.featured&&m.status!=='종료')||live[0];const now=document.getElementById('lvNow');
   if(feat){now.style.display='block';now.innerHTML='<div class="lab">'+(feat.status==='진행'?'🔴 지금 경기':'🕒 다음 경기')+' · '+esc([feat.title,feat.court].filter(Boolean).join(' · '))+(feat.period?' · '+esc(feat.period):'')+'</div>'
     +'<div class="sb"><div class="tm">'+esc((feat.a||{}).name||'-')+'</div><div class="sc">'+esc((feat.a||{}).score||0)+'<em>:</em>'+esc((feat.b||{}).score||0)+'</div><div class="tm">'+esc((feat.b||{}).name||'-')+'</div></div>'
-    +'<div class="mt">'+(feat.note?esc(feat.note)+' · ':'')+(feat.updatedAt?esc(hm(feat.updatedAt))+' 갱신':'')+'</div>'}
+    +'<div class="mt">'+clockHtml(feat)+(feat.note?' '+esc(feat.note)+' · ':' ')+(feat.updatedAt?esc(hm(feat.updatedAt))+' 갱신':'')+'</div>'+evHtml(feat,6)}
   else now.style.display='none';
   const g=(id,cnt,arr)=>{document.getElementById(id).innerHTML=arr.map(card).join('');document.getElementById(cnt).textContent=arr.length?arr.length+'경기':''};
   g('gridLive','cntLive',live);g('gridNext','cntNext',next.slice(0,12));
@@ -243,33 +284,40 @@ function render(){
   document.getElementById('secDone').style.display=(doneAll.length||!MATCHES.length)?'':'none';
   document.getElementById('lvNone').style.display=MATCHES.length?'none':'block';
   if(OP_OPEN)opRender();
+  const hasSite=chatModes().indexOf('site')>=0;if(hasSite)chatListen();
 }
 DB.collection('siteContent').doc('live').onSnapshot(d=>{LIVE=d.exists?(d.data()||{}):{};renderStream();render()},e=>console.warn('live cfg',e));
 DB.collection('liveMatches').orderBy('updatedAt','desc').limit(200).onSnapshot(s=>{MATCHES=s.docs.map(d=>Object.assign({id:d.id},d.data()));render()},e=>{console.warn('liveMatches',e);document.getElementById('lvNone').style.display='block';document.getElementById('lvNone').textContent='경기 정보를 불러오지 못했습니다 (보안 규칙 v43 게시 전이면 표시되지 않습니다).'});
 // ── 운영 콘솔 (사무국·시도임원·스코어 입력 권한자) ──
 AUTH.onAuthStateChanged(async u=>{ME=u;if(!u)return;try{const d=await DB.collection('users').doc(u.uid).get();MY=d.exists?(d.data()||{}):{};
   const roles=[MY.role].concat(MY.roles||[]);CAN_OP=MY.owner===true||roles.indexOf('admin')>=0||roles.indexOf('sidoOfficer')>=0||MY.liveScorer===true;
-  if(CAN_OP){document.getElementById('opBar').style.display='block';if(/[?&]op=1/.test(location.search))opToggle()}}catch(e){}});
-function opToggle(){OP_OPEN=!OP_OPEN;document.getElementById('opBox').style.display=OP_OPEN?'block':'none';if(OP_OPEN)opRender()}
+  if(CAN_OP){document.getElementById('opBar').style.display='block';if(/[?&]op=1/.test(location.search))opToggle()}
+  const c=document.getElementById('lvChat');c.dataset.tab='';renderChat()}catch(e){}});
+function opToggle(){OP_OPEN=!OP_OPEN;document.getElementById('opBox').style.display=OP_OPEN?'block':'none';if(OP_OPEN){opRender();if(!SCLUBS)scLoad()}}
 function opRender(){
   const b=document.getElementById('opBox');if(!b||!OP_OPEN)return;const streams=LIVE.streams||[];
   const cfg='<h3>📺 중계 설정</h3><div class="op-row"><div><label>중계 ON/OFF</label><select id="opOn"><option value="1"'+(LIVE.on?' selected':'')+'>ON — 화면에 영상·채팅 표시</option><option value="0"'+(!LIVE.on?' selected':'')+'>OFF — 준비 중 표시</option></select></div>'
     +'<div><label>대회명</label><input id="opComp" value="'+esc(LIVE.comp||'')+'" placeholder="예: 제2회 경남연맹 회장기"></div><div><label>중계 제목</label><input id="opTitle" value="'+esc(LIVE.title||'')+'" placeholder="예: 얼티미트 결승"></div>'
-    +'<div><label>채팅</label><select id="opChat"><option value="youtube"'+(LIVE.chat!=='off'?' selected':'')+'>유튜브 채팅 표시</option><option value="off"'+(LIVE.chat==='off'?' selected':'')+'>채팅 숨김</option></select></div></div>'
+    +'<div><label>채팅</label><select id="opChat">'+[['both','유튜브 + 연맹 회원 채팅'],['youtube','유튜브 채팅만'],['site','연맹 회원 채팅만'],['off','채팅 숨김']].map(o=>'<option value="'+o[0]+'"'+((LIVE.chat||'both')===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select></div>'
+    +'<div><label>종목 (학교클럽 전적 반영용)</label><select id="opSport">'+['얼티미트','디스크골프','가츠','어큐러시','디스턴스','플라잉디스크'].map(x=>'<option'+((LIVE.sport||'얼티미트')===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div></div>'
     +'<label>유튜브 라이브 주소 (한 줄에 하나 · 「이름 | 주소」 형식이면 탭 이름이 됩니다 · 여러 코트를 동시에 중계할 때 여러 줄)</label><textarea id="opStreams" rows="3" style="width:100%;padding:9px 11px;border:1.5px solid #d5dce8;border-radius:10px;font-size:13px;font-family:inherit;box-sizing:border-box" placeholder="A코트 | https://www.youtube.com/watch?v=XXXXXXXXXXX">'+esc(streams.map(x=>(x.label?x.label+' | ':'')+'https://www.youtube.com/watch?v='+x.videoId).join('\n'))+'</textarea>'
     +'<label>안내 문구 (선택)</label><input id="opNote" value="'+esc(LIVE.note||'')+'" placeholder="예: 우천으로 30분 지연">'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="op-btn g" onclick="opSaveCfg()">💾 중계 설정 저장</button><span id="opMsg" style="font-size:12.5px;font-weight:800;align-self:center"></span></div>';
-  const add='<h3 style="margin-top:18px">➕ 경기 등록</h3><div class="op-row"><div><label>부문 · 라운드</label><input id="nTitle" placeholder="예: 남자고등부 결승"></div><div><label>코트</label><input id="nCourt" placeholder="예: A코트"></div><div><label>팀 A</label><input id="nA" placeholder="예: 섬강고"></div><div><label>팀 B</label><input id="nB" placeholder="예: 성남고"></div><div><label>순서</label><input id="nOrder" type="number" value="'+(MATCHES.filter(m=>m.day===today()).length+1)+'"></div><div><label>시작 예정</label><input id="nStart" type="time"></div></div>'
+  const dl=SCLUBS?'<datalist id="scDl">'+SCLUBS.map(c=>'<option value="'+esc(c.label)+'">').join('')+'</datalist>':'';
+  const add=dl+'<h3 style="margin-top:18px">➕ 경기 등록 <small style="font-size:12px;color:#6b7280;font-weight:700">팀 이름을 학교클럽 목록에서 고르면(자동완성) 종료 시 학교클럽 전적에 자동 반영됩니다'+(SCLUBS?'':' · <a href="javascript:void(0)" onclick="scLoad()">학교클럽 목록 불러오기</a>')+'</small></h3><div class="op-row"><div><label>부문 · 라운드</label><input id="nTitle" placeholder="예: 남자고등부 결승"></div><div><label>코트</label><input id="nCourt" placeholder="예: A코트"></div><div><label>팀 A</label><input id="nA" list="scDl" placeholder="예: 섬강고"></div><div><label>팀 B</label><input id="nB" list="scDl" placeholder="예: 성남고"></div><div><label>순서</label><input id="nOrder" type="number" value="'+(MATCHES.filter(m=>m.day===today()).length+1)+'"></div><div><label>시작 예정</label><input id="nStart" type="time"></div></div>'
     +'<div style="margin-top:10px"><button class="op-btn" onclick="opAdd()">경기 추가 (예정)</button></div>';
   const list=MATCHES.filter(m=>m.status!=='종료'||m.day===today()).sort((a,b)=>({'진행':0,'예정':1,'종료':2}[a.status]-{'진행':0,'예정':1,'종료':2}[b.status])||(a.order||0)-(b.order||0));
   const ms='<h3 style="margin-top:18px">🎯 스코어 입력 <small style="font-size:12px;color:#6b7280;font-weight:700">오늘 경기 '+list.length+'건 · 버튼을 누르면 바로 저장되고 시청 화면에 즉시 반영됩니다</small></h3>'
     +(list.length?list.map(m=>'<div class="op-m'+(m.status==='진행'?' live':'')+'"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px"><span class="lv-pill" style="background:'+STC[m.status]+'">'+esc(m.status)+'</span><b>'+esc([m.title,m.court].filter(Boolean).join(' · ')||'경기')+'</b><span style="color:#6b7280">#'+esc(m.order||'')+(m.period?' · '+esc(m.period):'')+'</span>'
       +(LIVE.featured===m.id?'<span class="lv-pill" style="background:#7c3aed">📺 화면 상단 표시</span>':'<button class="op-btn s" style="padding:3px 9px;font-size:11.5px" onclick="opFeature(\''+m.id+'\')">상단에 표시</button>')
-      +'<span style="flex:1"></span>'+(m.status==='예정'?'<button class="op-btn r" style="padding:5px 12px" onclick="opStatus(\''+m.id+'\',\'진행\')">▶ 경기 시작</button>':'')+(m.status==='진행'?'<button class="op-btn" style="padding:5px 12px" onclick="opStatus(\''+m.id+'\',\'종료\')">🏁 경기 종료</button>':'')+(m.status==='종료'?'<button class="op-btn y" style="padding:5px 12px" onclick="opStatus(\''+m.id+'\',\'진행\')">↩ 다시 진행으로</button>':'')
+      +((m.a||{}).scid&&(m.b||{}).scid?'<span class="lv-sc-tag">🏫 학교클럽 '+(m.scSynced?'반영됨':'연결됨')+'</span>':'<button class="op-btn s" style="padding:3px 9px;font-size:11.5px;background:#fff;color:#0f766e;border:1.5px solid #bfe3da" onclick="opLinkSc(\''+m.id+'\')" title="팀을 학교클럽에 연결하면 종료 시 전적에 자동 반영">🏫 학교클럽 연결</button>')
+      +clockHtml(m)+'<span style="flex:1"></span>'+(m.status==='예정'?'<button class="op-btn r" style="padding:5px 12px" onclick="opStatus(\''+m.id+'\',\'진행\')">▶ 경기 시작</button>':'')+(m.status==='진행'?'<button class="op-btn" style="padding:5px 12px" onclick="opStatus(\''+m.id+'\',\'종료\')">🏁 경기 종료</button>':'')+(m.status==='종료'?'<button class="op-btn y" style="padding:5px 12px" onclick="opStatus(\''+m.id+'\',\'진행\')">↩ 다시 진행으로</button>':'')
       +'<button class="op-btn s" style="padding:5px 10px" onclick="opEdit(\''+m.id+'\')">✏️</button><button class="op-btn s" style="padding:5px 10px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="opDel(\''+m.id+'\')">🗑</button></div>'
       +'<div class="op-sc"><div><div class="t">'+esc((m.a||{}).name||'A')+'</div><div class="v">'+esc((m.a||{}).score||0)+'</div><div class="b"><button class="op-btn s" onclick="opScore(\''+m.id+'\',\'a\',-1)">−1</button><button class="op-btn g big" onclick="opScore(\''+m.id+'\',\'a\',1)">+1</button></div></div>'
       +'<div><div class="t">'+esc((m.b||{}).name||'B')+'</div><div class="v">'+esc((m.b||{}).score||0)+'</div><div class="b"><button class="op-btn s" onclick="opScore(\''+m.id+'\',\'b\',-1)">−1</button><button class="op-btn g big" onclick="opScore(\''+m.id+'\',\'b\',1)">+1</button></div></div></div>'
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:12px;align-items:center"><span style="color:#6b7280">구간:</span>'+['전반','후반','연장','1세트','2세트','3세트','하프타임',''].map(p=>'<button class="op-btn s" style="padding:3px 9px;font-size:11.5px;background:'+(m.period===p&&p?'#153A77':'#8a919d')+'" onclick="opPeriod(\''+m.id+'\',\''+p+'\')">'+(p||'없음')+'</button>').join('')+'</div></div>').join(''):'<div class="lv-empty">등록된 경기가 없습니다. 위에서 경기를 추가하세요.</div>');
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:12px;align-items:center"><span style="color:#6b7280">타이머:</span>'+((m.clock||{}).running?'<button class="op-btn y" style="padding:3px 10px;font-size:11.5px" onclick="opClock(\''+m.id+'\',\'pause\')">⏸ 일시정지</button>':'<button class="op-btn g" style="padding:3px 10px;font-size:11.5px" onclick="opClock(\''+m.id+'\',\'start\')">▶ '+((+(m.clock||{}).base)?'재개':'시작')+'</button>')+'<button class="op-btn s" style="padding:3px 10px;font-size:11.5px" onclick="opClock(\''+m.id+'\',\'reset\')">↺ 0:00</button>'
+      +((m.events||[]).length?'<button class="op-btn s" style="padding:3px 10px;font-size:11.5px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="opUndo(\''+m.id+'\')" title="마지막 득점 기록 취소">↶ 마지막 득점 취소 ('+esc(((m.events||[]).slice(-1)[0]||{}).team||'')+')</button>':'')
+      +'<span style="color:#6b7280;margin-left:6px">구간:</span>'+['전반','후반','연장','1세트','2세트','3세트','하프타임',''].map(p=>'<button class="op-btn s" style="padding:3px 9px;font-size:11.5px;background:'+(m.period===p&&p?'#153A77':'#8a919d')+'" onclick="opPeriod(\''+m.id+'\',\''+p+'\')">'+(p||'없음')+'</button>').join('')+'</div></div>').join(''):'<div class="lv-empty">등록된 경기가 없습니다. 위에서 경기를 추가하세요.</div>');
   b.innerHTML=cfg+add+ms;
 }
 function opSay(t,bad){const m=document.getElementById('opMsg');if(m){m.textContent=t;m.style.color=bad?'#C41E2F':'#0f766e'}}
@@ -278,27 +326,55 @@ async function opSaveCfg(){
   lines.forEach(l=>{const p=l.split('|');const url=(p.length>1?p.slice(1).join('|'):p[0]).trim();const label=p.length>1?p[0].trim():'';const id=ytId(url);if(id)streams.push({videoId:id,label:label});else bad.push(l)});
   if(bad.length){opSay('유튜브 주소를 확인해 주세요: '+bad[0],true);return}
   const on=document.getElementById('opOn').value==='1';if(on&&!streams.length){opSay('중계 ON 이면 유튜브 주소가 필요합니다',true);return}
-  try{await DB.collection('siteContent').doc('live').set({on:on,comp:document.getElementById('opComp').value.trim(),title:document.getElementById('opTitle').value.trim(),chat:document.getElementById('opChat').value,streams:streams,note:document.getElementById('opNote').value.trim(),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:(MY&&MY.name)||''},{merge:true});opSay('✓ 저장했습니다 — 시청 화면에 바로 반영됩니다')}
+  try{await DB.collection('siteContent').doc('live').set({on:on,comp:document.getElementById('opComp').value.trim(),title:document.getElementById('opTitle').value.trim(),chat:document.getElementById('opChat').value,sport:document.getElementById('opSport').value,streams:streams,note:document.getElementById('opNote').value.trim(),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:(MY&&MY.name)||''},{merge:true});opSay('✓ 저장했습니다 — 시청 화면에 바로 반영됩니다')}
   catch(e){opSay('저장 실패: '+(/permission/i.test(String(e))?'권한이 없습니다 (보안 규칙 v43 게시 필요)':(e.message||e)),true)}
 }
 function opStamp(){return {updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:(MY&&MY.name)||''}}
 async function opAdd(){
   const v=id=>document.getElementById(id).value.trim();if(!v('nA')||!v('nB')){alert('팀 A·B 이름을 입력해 주세요');return}
   const st=v('nStart');let startAt=null;if(st){const d=new Date(today()+'T'+st+':00');if(!isNaN(d))startAt=firebase.firestore.Timestamp.fromDate(d)}
-  try{await DB.collection('liveMatches').add(Object.assign({day:today(),order:+v('nOrder')||0,title:v('nTitle'),court:v('nCourt'),a:{name:v('nA'),score:0},b:{name:v('nB'),score:0},status:'예정',period:'',note:'',startAt:startAt,endAt:null,createdAt:firebase.firestore.FieldValue.serverTimestamp()},opStamp()));['nTitle','nA','nB','nStart'].forEach(id=>document.getElementById(id).value='');document.getElementById('nOrder').value=String((+document.getElementById('nOrder').value||0)+1)}
+  const ta=scPick(v('nA')),tb=scPick(v('nB'));
+  try{await DB.collection('liveMatches').add(Object.assign({day:today(),order:+v('nOrder')||0,title:v('nTitle'),court:v('nCourt'),a:{name:ta.name,score:0,scid:ta.scid||''},b:{name:tb.name,score:0,scid:tb.scid||''},status:'예정',period:'',note:'',startAt:startAt,endAt:null,events:[],clock:{running:false,base:0,startedAt:0},createdAt:firebase.firestore.FieldValue.serverTimestamp()},opStamp()));['nTitle','nA','nB','nStart'].forEach(id=>document.getElementById(id).value='');document.getElementById('nOrder').value=String((+document.getElementById('nOrder').value||0)+1)}
   catch(e){alert('추가 실패: '+(/permission/i.test(String(e))?'권한이 없습니다 (보안 규칙 v43 게시 필요)':(e.message||e)))}
 }
-async function opScore(id,side,d){const m=MATCHES.find(x=>x.id===id);if(!m)return;const cur=+((m[side]||{}).score||0);const nv=Math.max(0,cur+d);const upd=opStamp();upd[side+'.score']=nv;if(m.status==='예정'&&d>0){upd.status='진행';upd.startAt=upd.startAt||firebase.firestore.FieldValue.serverTimestamp()}
+async function opScore(id,side,d){const m=MATCHES.find(x=>x.id===id);if(!m)return;const cur=+((m[side]||{}).score||0);const nv=Math.max(0,cur+d);if(nv===cur)return;const upd=opStamp();upd[side+'.score']=nv;if(m.status==='예정'&&d>0){upd.status='진행';upd.startAt=firebase.firestore.FieldValue.serverTimestamp()}
+  const sa=side==='a'?nv:+((m.a||{}).score||0),sb=side==='b'?nv:+((m.b||{}).score||0);
+  upd.events=firebase.firestore.FieldValue.arrayUnion({t:new Date().toISOString(),side:side,d:d,team:(m[side]||{}).name||'',score:sa+':'+sb,clock:((m.clock||{}).running||(+(m.clock||{}).base))?clockTxt(m):''});
+  try{await DB.collection('liveMatches').doc(id).update(upd);if(m.status==='종료')scSync(Object.assign({},m,{a:Object.assign({},m.a,{score:sa}),b:Object.assign({},m.b,{score:sb})}))}catch(e){alert('저장 실패: '+(e.message||e))}}
+async function opUndo(id){const m=MATCHES.find(x=>x.id===id);const ev=(m&&m.events||[]).slice();const last=ev.pop();if(!last)return;if(!confirm('마지막 득점 기록('+(last.team||'')+' '+(last.score||'')+')을 취소할까요? 점수가 '+(last.d>0?'1점 내려갑니다':'1점 올라갑니다')))return;
+  const cur=+((m[last.side]||{}).score||0);const upd=opStamp();upd[last.side+'.score']=Math.max(0,cur-(last.d||1));upd.events=ev;
   try{await DB.collection('liveMatches').doc(id).update(upd)}catch(e){alert('저장 실패: '+(e.message||e))}}
-async function opStatus(id,st){const upd=Object.assign({status:st},opStamp());if(st==='진행')upd.endAt=null;if(st==='종료')upd.endAt=firebase.firestore.FieldValue.serverTimestamp();if(st==='진행'){const m=MATCHES.find(x=>x.id===id);if(m&&!m.startAt)upd.startAt=firebase.firestore.FieldValue.serverTimestamp()}
-  try{await DB.collection('liveMatches').doc(id).update(upd)}catch(e){alert('저장 실패: '+(e.message||e))}}
+async function opClock(id,act){const m=MATCHES.find(x=>x.id===id);if(!m)return;const c=Object.assign({running:false,base:0,startedAt:0},m.clock||{});
+  if(act==='start'){c.running=true;c.startedAt=Date.now()}else if(act==='pause'){c.base=clockMs(m);c.running=false;c.startedAt=0}else{if(!confirm('타이머를 0:00 으로 되돌릴까요?'))return;c.running=false;c.base=0;c.startedAt=0}
+  try{await DB.collection('liveMatches').doc(id).update(Object.assign({clock:c},opStamp()))}catch(e){alert('저장 실패: '+(e.message||e))}}
+// ── 학교클럽 연결·전적 반영 ──
+//   schoolClubs 목록(공개)에서 팀을 고르면 a.scid/b.scid 에 저장 → 경기 종료 시 scMatches/live_{경기ID} 로 기록(같은 ID 로 덮어써 중복 없음, 점수 정정도 반영). 학교클럽 팀 홈·전적·라이벌에 바로 나타납니다.
+async function scLoad(){if(SCLUBS)return SCLUBS;try{const q=await DB.collection('schoolClubs').get();const DIV={M:'남자부',F:'여자부',X:'혼성부'};
+  SCLUBS=q.docs.map(d=>{const v=d.data();return {id:d.id,name:v.teamName||v.schoolName||d.id,school:v.schoolName||'',division:v.division||'',sport:v.sport||'',code:v.schoolCode||'',label:(v.teamName||v.schoolName||d.id)+' · '+(v.schoolName||'')+' · '+(DIV[v.division]||'')+' ['+d.id+']'}}).filter(c=>!/통합|숨김/.test(c.status||''));if(OP_OPEN)opRender();return SCLUBS}catch(e){alert('학교클럽 목록을 불러오지 못했습니다: '+(e.message||e));return []}}
+function scPick(txt){const t=String(txt||'').trim();const m=t.match(/\[([^\]]+)\]\s*$/);if(m&&SCLUBS){const c=SCLUBS.find(x=>x.id===m[1]);if(c)return {name:c.name,scid:c.id}}
+  const c=(SCLUBS||[]).find(x=>x.name===t||x.school===t);return c?{name:c.name,scid:c.id}:{name:t,scid:''}}
+async function opLinkSc(id){const m=MATCHES.find(x=>x.id===id);if(!m)return;await scLoad();if(!SCLUBS||!SCLUBS.length){alert('학교클럽 목록이 비어 있습니다.');return}
+  const ask=side=>{const cur=m[side]||{};const q=prompt('팀 '+side.toUpperCase()+' ['+(cur.name||'')+'] 을(를) 연결할 학교클럽 — 학교명 일부를 입력하세요 (비우면 연결 안 함)',cur.name||'');if(q===null)return null;const k=q.replace(/\s+/g,'');if(!k)return {scid:''};
+    const c=SCLUBS.filter(x=>(x.name+x.school).replace(/\s+/g,'').indexOf(k)>=0).slice(0,9);if(!c.length){alert('일치하는 학교클럽이 없습니다: '+q);return {scid:cur.scid||''}}
+    let pick=c[0];if(c.length>1){const n=prompt('번호를 고르세요:\n\n'+c.map((x,i)=>(i+1)+'. '+x.label).join('\n'),'1');if(n===null)return null;pick=c[parseInt(n,10)-1];if(!pick)return {scid:cur.scid||''}}return {scid:pick.id,name:pick.name}};
+  const A=ask('a');if(A===null)return;const B=ask('b');if(B===null)return;const upd=opStamp();upd['a.scid']=A.scid||'';upd['b.scid']=B.scid||'';if(A.name)upd['a.name']=A.name;if(B.name)upd['b.name']=B.name;
+  try{await DB.collection('liveMatches').doc(id).update(upd);const m2=Object.assign({},m,{a:Object.assign({},m.a,{scid:A.scid,name:A.name||m.a.name}),b:Object.assign({},m.b,{scid:B.scid,name:B.name||m.b.name})});if(m2.status==='종료')scSync(m2)}catch(e){alert('저장 실패: '+(e.message||e))}}
+async function scSync(m){const a=m.a||{},b=m.b||{};if(!a.scid||!b.scid)return false;await scLoad();const ca=(SCLUBS||[]).find(x=>x.id===a.scid)||{},cb=(SCLUBS||[]).find(x=>x.id===b.scid)||{};
+  const day=m.day||today();const mo=+day.slice(5,7);const DIV={M:'남자부',F:'여자부',X:'혼성부'};
+  const doc={eventName:[LIVE.comp,LIVE.title].filter(Boolean).join(' · ')||'라이브 중계 경기',date:day,year:mo>=3?+day.slice(0,4):+day.slice(0,4)-1,sport:LIVE.sport||ca.sport||'얼티미트',division:[m.title,DIV[ca.division]||''].filter(Boolean).join(' · '),divCode:ca.division||'',round:m.title||'',court:m.court||'',
+    a:{scid:a.scid,school:ca.school||a.name||'',code:ca.code||'',score:+a.score||0},b:{scid:b.scid,school:cb.school||b.name||'',code:cb.code||'',score:+b.score||0},scids:[a.scid,b.scid],source:'live',verified:true,liveMatchId:m.id,createdBy:(ME&&ME.uid)||'',updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  try{await DB.collection('scMatches').doc('live_'+m.id).set(doc,{merge:true});await DB.collection('liveMatches').doc(m.id).update({scSynced:true});return true}
+  catch(e){console.warn('scSync',e);alert('학교클럽 전적 반영 실패: '+(/permission/i.test(String(e))?'권한이 없습니다 (사무국·시도임원 또는 보안 규칙 v44 게시 필요) — 경기 결과 자체는 저장되었습니다':(e.message||e)));return false}}
+async function opStatus(id,st){const m=MATCHES.find(x=>x.id===id);const upd=Object.assign({status:st},opStamp());if(st==='진행')upd.endAt=null;if(st==='종료'){upd.endAt=firebase.firestore.FieldValue.serverTimestamp();if(m&&(m.clock||{}).running)upd.clock=Object.assign({},m.clock,{running:false,base:clockMs(m),startedAt:0})}if(st==='진행'&&m&&!m.startAt)upd.startAt=firebase.firestore.FieldValue.serverTimestamp();
+  try{await DB.collection('liveMatches').doc(id).update(upd);if(st==='종료'&&m&&(m.a||{}).scid&&(m.b||{}).scid)scSync(m)}catch(e){alert('저장 실패: '+(e.message||e))}}
 async function opPeriod(id,p){try{await DB.collection('liveMatches').doc(id).update(Object.assign({period:p},opStamp()))}catch(e){alert('저장 실패: '+(e.message||e))}}
 async function opFeature(id){try{await DB.collection('siteContent').doc('live').set({featured:id,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})}catch(e){alert('저장 실패: '+(e.message||e))}}
 async function opEdit(id){const m=MATCHES.find(x=>x.id===id);if(!m)return;
   const t=prompt('부문 · 라운드',m.title||'');if(t===null)return;const c=prompt('코트',m.court||'');if(c===null)return;const a=prompt('팀 A 이름',(m.a||{}).name||'');if(a===null)return;const b=prompt('팀 B 이름',(m.b||{}).name||'');if(b===null)return;
   const sa=prompt('팀 A 점수',String((m.a||{}).score||0));if(sa===null)return;const sb=prompt('팀 B 점수',String((m.b||{}).score||0));if(sb===null)return;const n=prompt('메모 (예: 연장 승부)',m.note||'');if(n===null)return;
-  try{await DB.collection('liveMatches').doc(id).update(Object.assign({title:t.trim(),court:c.trim(),'a.name':a.trim(),'b.name':b.trim(),'a.score':Math.max(0,parseInt(sa,10)||0),'b.score':Math.max(0,parseInt(sb,10)||0),note:n.trim()},opStamp()))}catch(e){alert('저장 실패: '+(e.message||e))}}
-async function opDel(id){const m=MATCHES.find(x=>x.id===id);if(!m)return;if(!confirm('['+((m.a||{}).name||'')+' vs '+((m.b||{}).name||'')+'] 경기를 삭제할까요? (되돌릴 수 없습니다)'))return;try{await DB.collection('liveMatches').doc(id).delete()}catch(e){alert('삭제 실패: '+(e.message||e))}}
+  try{await DB.collection('liveMatches').doc(id).update(Object.assign({title:t.trim(),court:c.trim(),'a.name':a.trim(),'b.name':b.trim(),'a.score':Math.max(0,parseInt(sa,10)||0),'b.score':Math.max(0,parseInt(sb,10)||0),note:n.trim()},opStamp()));
+    if(m.status==='종료')scSync(Object.assign({},m,{title:t.trim(),court:c.trim(),a:Object.assign({},m.a,{name:a.trim(),score:Math.max(0,parseInt(sa,10)||0)}),b:Object.assign({},m.b,{name:b.trim(),score:Math.max(0,parseInt(sb,10)||0)})}))}catch(e){alert('저장 실패: '+(e.message||e))}}
+async function opDel(id){const m=MATCHES.find(x=>x.id===id);if(!m)return;if(!confirm('['+((m.a||{}).name||'')+' vs '+((m.b||{}).name||'')+'] 경기를 삭제할까요? (되돌릴 수 없습니다)'))return;try{await DB.collection('liveMatches').doc(id).delete();if(m.scSynced)DB.collection('scMatches').doc('live_'+id).delete().catch(function(){})}catch(e){alert('삭제 실패: '+(e.message||e))}}
 </script>
 <script src="auth_ui.js?v=20260922a"></script>
 </body>
