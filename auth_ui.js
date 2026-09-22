@@ -12,7 +12,10 @@
     var v=d.exists?(d.data()||{}):{};var el=document.getElementById('kfdfLiveBar');var on=!!(v.on&&(v.streams||[]).length);
     if(!on){if(el)el.remove();return}
     if(!el){el=document.createElement('a');el.id='kfdfLiveBar';el.href='live.html';el.style.cssText='display:flex;align-items:center;justify-content:center;gap:10px;background:#C41E2F;color:#fff;font-weight:900;font-size:14px;padding:9px 14px;text-decoration:none;letter-spacing:.2px';var h=document.querySelector('header');if(h&&h.parentNode)h.parentNode.insertBefore(el,h.nextSibling);else document.body.insertBefore(el,document.body.firstChild)}
-    el.innerHTML='<span style="width:9px;height:9px;border-radius:50%;background:#fff;animation:kfdfLiveBlink 1s infinite"></span>LIVE 중계 중 · '+String([v.comp,v.title].filter(Boolean).join(' · ')||'대회 라이브').replace(/[<>&]/g,'')+' <span style="font-weight:700;opacity:.9">— 시청·채팅·실시간 스코어 →</span>';
+    var esc0=function(t){return String(t==null?'':t).replace(/[<>&"]/g,'')};var now=v.now||null;
+    el.innerHTML='<span style="width:9px;height:9px;border-radius:50%;background:#fff;animation:kfdfLiveBlink 1s infinite;flex:none"></span><span style="white-space:nowrap">LIVE</span>'
+      +(now?' <span style="background:rgba(0,0,0,.25);border-radius:999px;padding:3px 12px;white-space:nowrap">'+esc0(now.a)+' <b style="font-size:16px">'+esc0(now.sa)+' : '+esc0(now.sb)+'</b> '+esc0(now.b)+(now.period?' · '+esc0(now.period):'')+'</span>':' <span style="white-space:nowrap">'+esc0([v.comp,v.title].filter(Boolean).join(' · ')||'대회 라이브')+'</span>')
+      +' <span style="font-weight:800;text-decoration:underline;white-space:nowrap">중계 보러가기 →</span>';el.style.flexWrap='wrap';
     if(!document.getElementById('kfdfLiveCss')){var st=document.createElement('style');st.id='kfdfLiveCss';st.textContent='@keyframes kfdfLiveBlink{50%{opacity:.25}}';document.head.appendChild(st)}
   },function(){})}}catch(e){}
   window.KFDF_IDLOGIN=(function(){

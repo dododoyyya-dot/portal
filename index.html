@@ -207,6 +207,13 @@
       <div class="slogan-en">PLAY THE DISC, <em>MOVE TOGETHER</em></div>
       <h1>모두가 즐기는 원반 스포츠, <span class="pt">함께 만드는</span> 대한민국플라잉디스크연맹</h1>
       <p>대한민국플라잉디스크연맹은 플라잉디스크 종목을 관리·통할하는 국내 유일의 단체입니다. 학교체육에서 국제무대까지, 유소년부터 성인까지 누구나 즐기는 친환경 참여형 스포츠의 기반을 넓혀 갑니다.</p>
+      <a id="liveHero" href="live.html" style="display:none;margin-top:18px;text-decoration:none;color:#fff;background:linear-gradient(120deg,#C41E2F,#7a0d1a);border-radius:16px;padding:14px 18px;box-shadow:0 10px 30px rgba(196,30,47,.35)">
+        <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:900;letter-spacing:.5px"><span style="width:9px;height:9px;border-radius:50%;background:#fff;animation:kfdfLiveBlink 1s infinite"></span>LIVE 중계 중 <span id="lhTitle" style="font-weight:700;opacity:.9"></span></div>
+        <div id="lhScore" style="display:none;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-top:8px"><div id="lhA" style="font-size:clamp(15px,2vw,20px);font-weight:900;text-align:right;word-break:keep-all"></div><div id="lhS" style="font-size:clamp(30px,4.5vw,44px);font-weight:900;font-variant-numeric:tabular-nums;white-space:nowrap"></div><div id="lhB" style="font-size:clamp(15px,2vw,20px);font-weight:900;word-break:keep-all"></div></div>
+        <div id="lhMeta" style="font-size:12px;opacity:.9;margin-top:4px;text-align:center"></div>
+        <div style="margin-top:10px;text-align:center"><span style="display:inline-block;background:#fff;color:#C41E2F;font-weight:900;border-radius:999px;padding:8px 18px;font-size:13.5px">▶ 중계 보러가기 · 채팅 · 실시간 스코어</span></div>
+      </a>
+      <style>@keyframes kfdfLiveBlink{50%{opacity:.25}}</style>
       <div class="hcta">
         <a class="main" href="apply.html?type=school"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>학교 강습 신청</a>
         <a href="jobs.html" style="background:#068081;border-color:#068081"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>강사 신청</a>
@@ -786,6 +793,12 @@
   boot(0);
 })();
 </script>
-<script src="auth_ui.js?v=20260922a"></script>
+<script>
+// [라이브 중계 2026-09-22] 중계 ON 이면 히어로에 라이브 카드 — 대결 팀·스코어는 siteContent/live.now (운영 콘솔이 점수를 바꿀 때마다 갱신)
+try{firebase.firestore().collection('siteContent').doc('live').onSnapshot(function(d){var v=d.exists?(d.data()||{}):{};var el=document.getElementById('liveHero');if(!el)return;var on=!!(v.on&&(v.streams||[]).length);el.style.display=on?'block':'none';if(!on)return;
+  var t=function(id,x){var e=document.getElementById(id);if(e)e.textContent=x==null?'':String(x)};var now=v.now||null;t('lhTitle',[v.comp,v.title].filter(Boolean).join(' · '));
+  var sc=document.getElementById('lhScore');if(now){sc.style.display='grid';t('lhA',now.a);t('lhB',now.b);t('lhS',now.sa+' : '+now.sb);t('lhMeta',[now.title,now.court,now.period,now.status==='진행'?'진행 중':now.status].filter(Boolean).join(' · '))}else{sc.style.display='none';t('lhMeta',v.note||'경기 시작을 기다리고 있습니다')}},function(){})}catch(e){}
+</script>
+<script src="auth_ui.js?v=20260922b"></script>
 </body>
 </html>
