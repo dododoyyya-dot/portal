@@ -172,6 +172,7 @@ function renderStats(){
     if(pmHas(v,'regionAdmin'))c.region++;
     if(v.calendarEditor)c.cal++;
     if(v.compBulkEntry)c.bulk++;
+    if(v.liveScorer)c.live=(c.live||0)+1;
     if(v.clubAdminSido)c.club++;
     if(v.instructorVerified)c.verify++;});
   document.getElementById('statRow').innerHTML=[
@@ -210,7 +211,7 @@ function renderList(){
   const el=document.getElementById('mlist');
   const rows=USERS.filter(d=>{
     const v=d.data();
-    const hasRole=!!(v.owner||pmRoles(v).length||v.calendarEditor||v.compBulkEntry||v.clubAdminSido||v.instructorVerified);
+    const hasRole=!!(v.owner||pmRoles(v).length||v.calendarEditor||v.compBulkEntry||v.liveScorer||v.clubAdminSido||v.instructorVerified);
     if(FLT==='officer'&&!hasRole)return false;
     if(FLT==='member'&&hasRole)return false;
     if(q){const hay=[v.name,v.email,v.sido,v.region,v.gugun].map(x=>String(x||'').toLowerCase()).join(' ');if(hay.indexOf(q)<0)return false;}
@@ -259,6 +260,7 @@ function renderDetail(id){
     +'<div class="subbox"><div class="st">② 부가 권한 <span style="font-weight:600;color:#8a919d">(등급과 무관하게 따로 부여)</span></div>'
       +'<label class="chkl"><input type="checkbox" id="pmCal"'+(v.calendarEditor?' checked':'')+'> 📅 캘린더 편집 (연맹 일정 등록·수정)</label>'
       +'<label class="chkl"><input type="checkbox" id="pmBulk"'+(v.compBulkEntry?' checked':'')+'> 📋 대회 개인전 엑셀 일괄 신청 <span style="font-weight:600;color:#8a919d;font-size:12px">— 학교·클럽 담당자가 참가자를 엑셀로 한꺼번에 신청 (회원은 성명+생년월일로 연동, 나머지는 비회원)</span></label>'
+      +'<label class="chkl"><input type="checkbox" id="pmLive"'+(v.liveScorer?' checked':'')+'> 🔴 라이브 중계 스코어 입력 <span style="font-weight:600;color:#8a919d;font-size:12px">— 라이브 중계 페이지에서 중계 설정·경기 등록·실시간 스코어를 입력 (사무국·시도임원은 기본 가능)</span></label>'
       +'<label class="chkl"><input type="checkbox" id="pmVerify"'+(v.instructorVerified?' checked':'')+((v.instructorFor&&(v.instructorFor.school||v.instructorFor.after))?'':' disabled')+'> ✔ 검증 강사'+((v.instructorFor&&(v.instructorFor.school||v.instructorFor.after))?'':' <span style="font-size:11.5px;color:#8a919d">— 강사 지원자만</span>')+'</label>'
       +'<div class="fldrow"><span>클럽승인 시도</span><select id="pmClubSido" class="fld"><option value="">권한 없음</option>'+PM_SIDOS.map(s=>'<option'+(pmSidoUi(v.clubAdminSido)===s?' selected':'')+'>'+s+'</option>').join('')+'</select><span style="font-size:11.5px;color:#8a919d;min-width:0">구버전 방식 — 시도임원 등급이면 불필요</span></div></div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
@@ -342,6 +344,7 @@ async function savePerm(uid){
   const cal=document.getElementById('pmCal').checked;
   if(cal!==!!v.calendarEditor)upd.calendarEditor=cal;
   const bk=document.getElementById('pmBulk');if(bk&&bk.checked!==!!v.compBulkEntry)upd.compBulkEntry=bk.checked;   // [개인전 일괄 신청] 권한
+  const lv=document.getElementById('pmLive');if(lv&&lv.checked!==!!v.liveScorer)upd.liveScorer=lv.checked;   // [라이브 중계] 스코어 입력 권한
   const vfEl=document.getElementById('pmVerify');
   if(!vfEl.disabled&&vfEl.checked!==!!v.instructorVerified)upd.instructorVerified=vfEl.checked;
   const cs=document.getElementById('pmClubSido').value;
@@ -394,6 +397,6 @@ async function rejectReq(id){
   }catch(e){alert('반려 실패: '+e.message)}
 }
 </script>
-<script src="auth_ui.js?v=20260914b"></script>
+<script src="auth_ui.js?v=20260922a"></script>
 </body>
 </html>

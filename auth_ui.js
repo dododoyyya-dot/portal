@@ -7,6 +7,14 @@
   try{if(!document.querySelector('script[src^="icons.js"]')){var _ic=document.createElement('script');_ic.src='icons.js?v=20260910';document.head.appendChild(_ic)}}catch(e){}
   // ══ [아이디 로그인 2026-09-09] KFDF_IDLOGIN — 아이디 ↔ 로그인용 이메일. loginIds/{아이디} 문서에 비밀번호(PBKDF2→AES-GCM)로 잠근 실제 이메일을 두어, 비밀번호 없이는 이메일이 드러나지 않습니다.
   //   이메일이 없는 계정(학생회원·보호자가 만든 자녀 계정)은 합성 주소(아이디@member.kfdf.local / @kids.kfdf.local)를 그대로 씁니다.
+  // [라이브 중계 2026-09-22] siteContent/live.on 이면 모든 페이지 상단에 LIVE 띠 (live.html 제외) — 공개 읽기라 로그인 불필요
+  try{if(!/live\.html/.test(location.pathname)&&window.firebase&&firebase.firestore){firebase.firestore().collection('siteContent').doc('live').onSnapshot(function(d){
+    var v=d.exists?(d.data()||{}):{};var el=document.getElementById('kfdfLiveBar');var on=!!(v.on&&(v.streams||[]).length);
+    if(!on){if(el)el.remove();return}
+    if(!el){el=document.createElement('a');el.id='kfdfLiveBar';el.href='live.html';el.style.cssText='display:flex;align-items:center;justify-content:center;gap:10px;background:#C41E2F;color:#fff;font-weight:900;font-size:14px;padding:9px 14px;text-decoration:none;letter-spacing:.2px';var h=document.querySelector('header');if(h&&h.parentNode)h.parentNode.insertBefore(el,h.nextSibling);else document.body.insertBefore(el,document.body.firstChild)}
+    el.innerHTML='<span style="width:9px;height:9px;border-radius:50%;background:#fff;animation:kfdfLiveBlink 1s infinite"></span>LIVE 중계 중 · '+String([v.comp,v.title].filter(Boolean).join(' · ')||'대회 라이브').replace(/[<>&]/g,'')+' <span style="font-weight:700;opacity:.9">— 시청·채팅·실시간 스코어 →</span>';
+    if(!document.getElementById('kfdfLiveCss')){var st=document.createElement('style');st.id='kfdfLiveCss';st.textContent='@keyframes kfdfLiveBlink{50%{opacity:.25}}';document.head.appendChild(st)}
+  },function(){})}}catch(e){}
   window.KFDF_IDLOGIN=(function(){
     var DOM_MEMBER='@member.kfdf.local',DOM_KIDS='@kids.kfdf.local';
     function norm(id){return String(id||'').trim().toLowerCase()}
@@ -33,7 +41,7 @@
       ['방과후 · 늘봄','business.html?view=after'],['교원연수 · 교재개발','business.html?view=train'],['학교 강습 신청','apply.html']]},
     {t:'대회',h:'competition.html?view=list',d:[
       ['대회 일정 · 안내','competition.html?view=list'],['참가 신청','competition.html?view=entry'],
-      ['심판 · 운영요원 모집','competition.html?view=list&kind=staff'],['대회 결과','results.html'],['사진첩','gallery.html'],
+      ['심판 · 운영요원 모집','competition.html?view=list&kind=staff'],['라이브 중계','live.html'],['대회 결과','results.html'],['사진첩','gallery.html'],
       ['공고 등록 · 관리','competition.html?view=manage','','admin']]},
     {t:'클럽',h:'club.html?view=find',d:[
       ['클럽 찾기 · 가입','club.html?view=find'],['학교스포츠클럽','schoolclub.html'],['학교클럽 전적 · 순위','schoolclub.html?view=rank'],['클럽 만들기','club.html?view=create'],['내 클럽 · 가입 승인','club.html?view=mine'],['클럽 교류전','club.html?view=meet']]},
