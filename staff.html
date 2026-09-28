@@ -1491,6 +1491,31 @@ function stDetailHtml(uid){
     +'</table>'+(rows.length>60?'<div style="font-size:11.5px;color:#8a919d;margin-top:4px">최근 60건만 표시 · 전체 '+rows.length+'건</div>':'')+'</div>';
 }
 // 선발 검토용 CSV — 이 공고 전체 신청자(모든 날짜): 지역·나이·자격·심판 경력 건수
+// ── [확정 심판 사이즈 2026-09-28] 확정자(어느 날짜든 확정)의 피복 사이즈 — 회원 정보(가입 시 입력: clothingSize·sizePants·sizeShoe·sizeCap) 기준 ──
+async function stSizeXlsx(postId){
+  const p=POSTS.find(x=>x.id===postId);if(!p)return;
+  if(typeof XLSX==='undefined'){alert('엑셀 라이브러리를 아직 불러오는 중입니다. 잠시 후 다시 눌러 주세요.');return}
+  const apps=(APPS[postId]||[]).filter(a=>Object.values(a.status||{}).indexOf('확정')>=0);
+  if(!apps.length){alert('확정된 신청자가 없습니다.');return}
+  const btn=document.getElementById('stSizeBtn');if(btn){btn.disabled=true;btn.textContent='사이즈 모으는 중…'}
+  try{
+    const U={};await Promise.all(apps.map(async a=>{if(!a.uid||U[a.uid])return;try{const d=await DB.collection('users').doc(a.uid).get();U[a.uid]=d.exists?(d.data()||{}):{}}catch(e){U[a.uid]={_err:true}}}));
+    const rows=[['연번','성명','성별','연락처','확정 날짜','임무','상의','하의','신발','모자','심판복(공고)','비고']];const miss=[];
+    apps.sort((x,y)=>String(x.name||'').localeCompare(String(y.name||''),'ko')).forEach((a,i)=>{const u=U[a.uid]||{};
+      const days=Object.keys(a.status||{}).filter(d=>a.status[d]==='확정').sort();
+      const duty=days.map(d=>((a.assign||{})[d]||{}).duty||'').filter(Boolean).filter((v,j,arr)=>arr.indexOf(v)===j).join('/');
+      const sz=[u.clothingSize||'',u.sizePants||'',u.sizeShoe||'',u.sizeCap||''];const note=u._err?'회원 정보 열람 불가':(sz.every(x=>!x)?'사이즈 미입력 — 본인에게 확인 필요':(sz.some(x=>!x)?'일부 미입력':''));
+      if(note)miss.push(a.name);
+      rows.push([i+1,a.name||'',u.gender||'',a.phone||u.phone||'',days.map(d=>d.slice(5)).join(', '),duty,sz[0],sz[1],sz[2],sz[3],p.uniform||'',note])});
+    const tally=(k,label)=>{const m={};apps.forEach(a=>{const v=String(((U[a.uid]||{})[k])||'').trim()||'(미입력)';m[v]=(m[v]||0)+1});return Object.keys(m).sort((x,y)=>x==='(미입력)'?1:y==='(미입력)'?-1:x.localeCompare(y,'ko',{numeric:true})).map(v=>[label,v,m[v]])};
+    const agg=[['항목','사이즈','인원']].concat(tally('clothingSize','상의'),tally('sizePants','하의'),tally('sizeShoe','신발'),tally('sizeCap','모자'),[['합계','',apps.length]]);
+    const wb=XLSX.utils.book_new();const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[5,10,6,14,16,14,8,8,8,8,12,26].map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws,'확정 심판 사이즈');
+    const ws2=XLSX.utils.aoa_to_sheet(agg);ws2['!cols']=[{wch:8},{wch:12},{wch:8}];XLSX.utils.book_append_sheet(wb,ws2,'사이즈 집계');
+    XLSX.writeFile(wb,(p.competitionName||'대회')+'_확정심판_사이즈_'+new Date().toISOString().slice(0,10)+'.xlsx');
+    if(miss.length)alert('내려받았습니다. 사이즈가 비어 있거나 일부만 있는 인원 '+miss.length+'명: '+miss.join(', ')+'\n(회원 정보에 피복 사이즈를 입력하지 않은 경우입니다 — 비고란 참고)');
+  }catch(e){alert('만들기 실패: '+(e.code||e.message))}
+  if(btn){btn.disabled=false;btn.textContent='📏 확정 심판 사이즈 엑셀'}
+}
 async function stCsv(postId){
   const p=POSTS.find(x=>x.id===postId);if(!p)return;const apps=APPS[postId]||[];
   const btn=document.getElementById('stCsvBtn');if(btn){btn.disabled=true;btn.textContent='집계 중…'}
@@ -1602,7 +1627,8 @@ async function _renderDetailInner(isStale){
       stBar='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0 2px;background:#f6f8fb;border:1.5px solid #e2e7f0;border-radius:10px;padding:8px 12px"><b style="font-size:13px">📍 지역별 보기</b>'
         +'<select onchange="stSetView(this.value)" style="padding:6px 10px;border:1.5px solid #d5dce8;border-radius:9px;font-size:13px"><option value="all"'+(STRS.view==='all'?' selected':'')+'>전체 ('+dayApps.length+'명)</option><option value="group"'+(STRS.view==='group'?' selected':'')+'>지역별 묶어 보기</option>'+regs.map(r=>'<option value="'+esc(r)+'"'+(STRS.view===r?' selected':'')+'>'+esc(r)+' ('+cnt[r]+'명)</option>').join('')+'</select>'
         +'<span style="font-size:12px;color:#6b7280">'+regs.map(r=>esc(r)+' '+cnt[r]).join(' · ')+'</span><span style="flex:1"></span>'
-        +'<button id="stCsvBtn" class="stbtn" style="padding:5px 11px;font-size:12px;background:#153A77;color:#fff" onclick="stCsv(\''+p.id+'\')" title="이 공고 전체 신청자(모든 날짜) — 지역·나이·자격·심판 경력 건수">📥 신청자 명단 CSV</button></div>'
+        +'<button id="stCsvBtn" class="stbtn" style="padding:5px 11px;font-size:12px;background:#153A77;color:#fff" onclick="stCsv(\''+p.id+'\')" title="이 공고 전체 신청자(모든 날짜) — 지역·나이·자격·심판 경력 건수">📥 신청자 명단 CSV</button>'
+        +'<button id="stSizeBtn" class="stbtn" style="padding:5px 11px;font-size:12px;background:#0f766e;color:#fff" onclick="stSizeXlsx(\''+p.id+'\')" title="확정된 심판·운영요원의 피복 사이즈(상의·하의·신발·모자)와 사이즈별 집계 — 심판복 준비용 (엑셀)">📏 확정 심판 사이즈 엑셀</button></div>'
         +'<div style="font-size:11.5px;color:#8a919d;margin:2px 0 0">성명 옆 [👤 상세·경력]: 생년월일·거점 지역·심판 자격(유효기간)·심판 활동 경력(2026 이전 수기 등록 + 이후 시스템 기록). 지역은 회원 정보의 거점(활동 지역·주소) 기준입니다.</div>'}
     const stCols=manage?11:6;
     appsHtml=stBar+'<div class="sttbl-wrap"><table class="sttbl'+(manage?' strs':'')+'" style="margin-top:6px"><tr><th>번호</th><th>성명</th>'+(manage?'<th>연락처</th><th>지역</th><th>나이</th>':'')+(manage?'<th>심판 자격</th><th>지도자 자격</th>':'<th>자격증</th>')+'<th>희망 임무</th><th>상태</th>'+(manage?'<th>동의서</th>':'')+(manage?'<th>선정</th>':'')+'</tr>'
@@ -3070,6 +3096,6 @@ async function copyRoster(id){
   </div>
 </div></footer>
 <script src="region_map.js?v=20260910a"></script>
-<script src="auth_ui.js?v=20260922b"></script>
+<script src="auth_ui.js?v=20260928a"></script>
 </body>
 </html>

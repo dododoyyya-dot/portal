@@ -554,6 +554,8 @@ function eduWho(v){return (v.name||'')+' ('+(v.birth||'생년월일 없음')+' �
         <button class="btn-sub" style="background:#b8860b" onclick="payrollCSV()">💰 월 지급 계산 CSV</button>
         <button class="btn-sub" style="background:#0f766e" onclick="rptDownload()" title="유소년 월별 현황보고서 양식에 누적 실적을 자동 기입해 내려받습니다 (양식·수식은 그대로). 강습을 시작한(일지가 있는) 학교만 들어갑니다">📊 월별 현황보고서 (빈 양식에 기입)</button>
         <button id="crimBoardBtn" class="btn-sub" style="background:#8c1622;display:none" onclick="showCrimBoard()" title="배정완료 건별 강사 동의 사진 · 학교 회신(적격/부적격) — 중앙 사무국 전용">🛡 범죄경력 조회 현황</button>
+        <a id="logsPageBtn" class="btn-sub" href="schoollogs.html" target="_blank" style="background:#153A77;display:none;text-decoration:none" title="선정학교별 운영일지 모아보기(권역·시도·유형·진행별) — 중앙 사무국 전용 (새 창)">📒 학교별 운영일지</a>
+        <a class="btn-sub" href="selected.html" target="_blank" style="background:#0e7490;text-decoration:none" title="선정학교 현황 — 권역·시도·유형별 보기 (새 창)">🏫 선정학교 현황</a>
         <button id="rosterBtn" class="btn-sub" style="background:#8c1622;display:none" onclick="exportAssignRoster()" title="공문 「파견 강사 범죄경력조회 처리 및 겸직 안내」 붙임 2 — 배정완료 학교의 강사 명단 (중앙 사무국 전용)">📋 배정 강사 명단(엑셀)</button>
         <label class="btn-sub" style="background:#0f766e;cursor:pointer;display:inline-block" title="지난달 제출한 보고서(.xlsx)를 고르면 그 파일 위에 이번 달 누적을 갱신합니다 — 이미 있는 학교는 남/여·학년을 그대로 두고 월별 횟수·회차만 갱신, 새로 시작한 학교만 아래에 추가">📊 지난달 보고서 기준으로 갱신<input type="file" accept=".xlsx" style="display:none" onchange="rptDownload(this.files[0]);this.value=''"></label>
         <label class="btn-sub" style="background:#0e7490;cursor:pointer;display:inline-block" title="지난달 제출한 보고서(.xlsx)의 학년-반·남·여를 학교별 수혜자 정보로 저장">📥 이전 보고서에서 수혜자 정보 가져오기<input type="file" accept=".xlsx" style="display:none" onchange="rptImportPrev(this)"></label>
@@ -669,7 +671,7 @@ AUTH.onAuthStateChanged(async u=>{
   IS_SIDO=isSido&&!isAdmin;
   IS_OWNER=md.owner===true;
   VIEWER_IS_ADMIN=isAdmin;
-  (function(){['rosterBtn','crimBoardBtn'].forEach(function(id){var rb=document.getElementById(id);if(rb)rb.style.display=isAdmin?'':'none'})})();   // [공문 붙임2 · 범죄경력조회] 중앙 사무국만
+  (function(){['rosterBtn','crimBoardBtn','logsPageBtn'].forEach(function(id){var rb=document.getElementById(id);if(rb)rb.style.display=isAdmin?'':'none'})})();   // [공문 붙임2 · 범죄경력조회] 중앙 사무국만
   document.getElementById('adminBody').style.display='block';loadDash();
   try{const _t=parseInt(new URLSearchParams(location.search).get('tab')||'',10);if(_t>=1&&_t<=10)tab(_t)}catch(e){}   // [화면 주소] admin.html?tab=번호 로 바로 열기
   // [관할] 시도연맹 임원에게만 조회 범위 전환(관할 / 미판정)을 보여줍니다.
@@ -7509,9 +7511,12 @@ async function showCrimBoard(){
     (await DB.collection('crimChecks').get()).forEach(function(d){ck[d.id]=d.data()});
     (await DB.collection('crimResults').get()).forEach(function(d){rs[d.id]=d.data()});
     var um={};(USERS||[]).forEach(function(d){um[d.id]=d.data()||{}});
+    // [강습 시작 건 2026-09-28] 일지 회차 수 — 일지가 1회 이상 있으면 강습이 시작된 건으로 봅니다
+    var lc={};try{(await DB.collection('sessionLogs').get()).forEach(function(d){var a=d.data().appId;if(a)lc[a]=(lc[a]||0)+1})}catch(e){}
     CRIMB.rows=APPS.filter(function(d){return d.data().status==='배정완료'}).map(function(d){
-      var s=d.data(),sido=rosterSido(s),uid=s.assignedUid||s.selfUid||'';
-      return {appId:d.id,uid:uid,region:appRegion(s),sido:sido,school:s.school||'',type:rosterType(s),name:(uid&&um[uid]&&um[uid].name)||s.assignedName||'',chk:ck[d.id]||null,res:rs[d.id]||null};
+      var s=d.data(),sido=rosterSido(s),uid=s.assignedUid||s.selfUid||'',u=(uid&&um[uid])||null;
+      return {appId:d.id,uid:uid,region:appRegion(s),sido:sido,school:s.school||'',type:rosterType(s),name:(u&&u.name)||s.assignedName||'',chk:ck[d.id]||null,res:rs[d.id]||null,
+        logs:lc[d.id]||0,teacher:!!(u&&(u.accountType==='teacher'||u.workSchool)),moon:(u&&u.submitDocs&&u.submitDocs.moonlight)||null};
     }).sort(rosterSort2);
     renderCrimBoard();
   }catch(e){b.innerHTML='<b style="color:#C41E2F">불러오기 실패: '+esc(e.code||e.message)+'</b> <span style="font-size:12px;color:#8a919d">— 보안 규칙 v36 게시 여부를 확인해 주세요</span>'}
@@ -7522,29 +7527,66 @@ function rosterSort2(a,b){
 }
 function crimSetFilter(f){CRIMB.filter=f;renderCrimBoard()}
 function renderCrimBoard(){
-  var b=crimBoxEl(),rows=CRIMB.rows,cnt={all:rows.length,none:0,submitted:0,rejected:0,wait:0,fit:0,unfit:0};
-  rows.forEach(function(r){var k=KFDF_CRIM.status(r.chk,r.res).key;if(k==='none')cnt.none++;if(k==='submitted')cnt.submitted++;if(k==='rejected')cnt.rejected++;if(k==='fit')cnt.fit++;if(k==='unfit')cnt.unfit++;if(!(r.res&&r.res.result))cnt.wait++});
-  var F=[['all','전체'],['none','사진 미제출'],['submitted','사진 제출'],['rejected','사진 반려'],['wait','회신 대기'],['fit','적격'],['unfit','부적격']];
-  var list=rows.filter(function(r){var k=KFDF_CRIM.status(r.chk,r.res).key;var f=CRIMB.filter;return f==='all'||(f==='wait'?!(r.res&&r.res.result):k===f)});
+  var b=crimBoxEl(),rows=CRIMB.rows,cnt={all:rows.length,none:0,submitted:0,rejected:0,wait:0,fit:0,unfit:0,started:0};
+  rows.forEach(function(r){var k=KFDF_CRIM.status(r.chk,r.res).key;if(k==='none')cnt.none++;if(k==='submitted')cnt.submitted++;if(k==='rejected')cnt.rejected++;if(k==='fit')cnt.fit++;if(k==='unfit')cnt.unfit++;if(!(r.res&&r.res.result))cnt.wait++;if(crimNeedMark(r))cnt.started++});
+  var F=[['all','전체'],['none','사진 미제출'],['submitted','사진 제출'],['rejected','사진 반려'],['started','⚡ 강습 시작 · 미제출'],['wait','회신 대기'],['fit','적격'],['unfit','부적격']];
+  var list=rows.filter(function(r){var k=KFDF_CRIM.status(r.chk,r.res).key;var f=CRIMB.filter;return f==='all'||(f==='wait'?!(r.res&&r.res.result):f==='started'?crimNeedMark(r):k===f)});
   var today=new Date().toISOString().slice(0,10);
   b.innerHTML='<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center"><b style="font-size:15.5px">🛡 범죄경력 조회 현황 <span style="font-size:12px;color:#8a919d;font-weight:600">배정완료 '+rows.length+'건 · 학교↔강사가 직접 진행, 연맹은 사진 보관·회신 기록</span></b>'
-    +'<span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-sub" style="background:#0f766e" onclick="crimZip()">🗂 증빙 보관 zip</button><button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'crimBoardBox\').style.display=\'none\'">닫기</button></span></div>'
+    +'<span style="display:flex;gap:6px;flex-wrap:wrap">'+(cnt.started?'<button class="btn-sub" style="background:#7c3aed" onclick="crimMarkAll()" title="이미 강습이 시작된 건(일지 1회 이상)의 범죄경력 동의 사진과 교원 겸직 허가서를 「자료 업로드한 것」으로 일괄 처리합니다">📎 강습 시작 건 자료 제출 처리 ('+cnt.started+')</button>':'')+'<button class="btn-sub" style="background:#0f766e" onclick="crimZip()">🗂 증빙 보관 zip</button><button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'crimBoardBox\').style.display=\'none\'">닫기</button></span></div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0">'+F.map(function(x){return '<button class="btn-sub" style="padding:4px 11px;font-size:12px;background:'+(CRIMB.filter===x[0]?'#153A77':'#8a919d')+'" onclick="crimSetFilter(\''+x[0]+'\')">'+x[1]+' '+cnt[x[0]]+'</button>'}).join('')+'</div>'
     +'<div id="crimZipMsg" style="font-size:12.5px;font-weight:700;margin-bottom:6px"></div>'
-    +'<div style="overflow-x:auto"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:820px"><thead><tr><th>권역</th><th>시도</th><th>학교</th><th>유형</th><th>강사</th><th>동의 사진</th><th>학교 회신 (메일)</th><th></th></tr></thead><tbody>'
+    +'<div style="overflow-x:auto"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:820px"><thead><tr><th>권역</th><th>시도</th><th>학교</th><th>유형</th><th>강사</th><th>일지</th><th>동의 사진 · 겸직</th><th>학교 회신 (메일)</th><th></th></tr></thead><tbody>'
     +(list.length?list.map(function(r){
       var st=KFDF_CRIM.status(r.chk,r.res),c=r.chk&&r.chk.consent;
       return '<tr><td>'+esc(r.region)+'</td><td>'+esc(r.sido)+'</td><td><b>'+esc(r.school)+'</b></td><td>'+esc(r.type)+'</td><td>'+esc(r.name)+'</td>'
-        +'<td>'+(c?(c.status==='반려'?'<b style="color:#C41E2F">반려</b>':'<b style="color:#1F4E9C">제출</b>')+' '+esc(String(c.at||'').slice(5,10))+' <button class="btn-sub" style="padding:2px 8px;font-size:11px;min-height:0;background:#fff;color:#153A77;border:1.5px solid #153A77" onclick="crimBoardPhoto(\''+r.appId+'\')">보기</button>':'<span style="color:#C41E2F;font-weight:700">미제출</span>')+'</td>'
+        +'<td style="white-space:nowrap">'+(r.logs?'<b>'+r.logs+'</b>회':'<span style="color:#8a919d">0</span>')+'</td>'
+        +'<td>'+(c?(c.status==='반려'?'<b style="color:#C41E2F">반려</b>':c.adminMarked?'<b style="color:#7c3aed" title="'+esc(c.note||'')+'">제출 처리(사무국)</b>':'<b style="color:#1F4E9C">제출</b>')+' '+esc(String(c.at||'').slice(5,10))+(c.path?' <button class="btn-sub" style="padding:2px 8px;font-size:11px;min-height:0;background:#fff;color:#153A77;border:1.5px solid #153A77" onclick="crimBoardPhoto(\''+r.appId+'\')">보기</button>':''):'<span style="color:#C41E2F;font-weight:700">미제출</span>')
+          +(r.teacher?'<div style="font-size:11.5px;margin-top:2px">🧑‍🏫 겸직 '+(r.moon?(r.moon.status==='확인'?'<b style="color:#0f766e">확인'+(r.moon.adminMarked?'(사무국)':'')+'</b>':r.moon.status==='반려'?'<b style="color:#C41E2F">반려</b>':'<b style="color:#1F4E9C">대기</b>'):'<b style="color:#C41E2F">미제출</b>')+'</div>':'')
+          +(crimNeedMark(r)?'<div style="margin-top:3px"><button class="btn-sub" style="padding:2px 8px;font-size:11px;min-height:0;background:#7c3aed" onclick="crimMarkDone(\''+r.appId+'\')" title="강습이 이미 시작된 건 — 동의 사진'+(r.teacher?'·겸직 허가서':'')+'를 자료 업로드한 것으로 처리">📎 자료 제출 처리</button></div>':'')+'</td>'
         +'<td style="white-space:nowrap"><select id="cbr_'+r.appId+'" style="padding:3px 6px;font-size:12px"><option value="">—</option><option'+(r.res&&r.res.result==='적격'?' selected':'')+'>적격</option><option'+(r.res&&r.res.result==='부적격'?' selected':'')+'>부적격</option></select>'
           +' <input type="date" id="cbd_'+r.appId+'" value="'+esc((r.res&&r.res.repliedAt)||today)+'" style="padding:2px 5px;font-size:12px">'
           +' <button class="btn-sub" style="padding:3px 9px;font-size:11.5px;min-height:0" onclick="crimBoardSave(\''+r.appId+'\')">저장</button> '+KFDF_CRIM.chip(st)+'</td>'
         +'<td>'+(r.uid?'<button class="btn-sub" style="background:#153A77;padding:3px 10px;font-size:11.5px;min-height:0" onclick="ptOpen(\''+r.uid+'\')">📁</button>':'')+'</td></tr>';
-    }).join(''):'<tr><td colspan="8" style="text-align:center;color:#8a919d;padding:14px">해당하는 건이 없습니다</td></tr>')
+    }).join(''):'<tr><td colspan="9" style="text-align:center;color:#8a919d;padding:14px">해당하는 건이 없습니다</td></tr>')
     +'</tbody></table></div>';
+}
+// ── [강습 시작 건 2026-09-28] 자료 제출 처리 — 강습이 이미 시작된 건(일지 1회 이상)은 회보서(동의 사진)·겸직 허가서를 「업로드한 것」으로 처리 ──
+//   crimChecks.consent {status:'제출', path:'', adminMarked:true, note, byName} (이전 제출은 consentLog 로 보관) · 교원은 users.submitDocs.moonlight {status:'확인', adminMarked:true}
+//   이후 강사가 실제 사진을 올리면 그 사진이 최신 제출이 되고 사무국 처리 기록은 이력에 남습니다.
+function crimNeedMark(r){if(!r.logs||!r.uid)return false;var k=KFDF_CRIM.status(r.chk,r.res).key;var photoNeed=(k==='none'||k==='rejected');var moonNeed=r.teacher&&!(r.moon&&r.moon.status==='확인');return photoNeed||moonNeed}
+async function crimMarkOne(r){
+  var by=(CMY&&CMY.name)||'',now=new Date().toISOString(),done=[];
+  var k=KFDF_CRIM.status(r.chk,r.res).key;
+  if(k==='none'||k==='rejected'){
+    var consent={status:'제출',path:'',fileName:'',at:now,note:'강습 시작 후 사무국 제출 처리 — 자료 업로드한 것으로 갈음 ('+by+')',adminMarked:true,byName:by};
+    var ref=DB.collection('crimChecks').doc(r.appId);
+    if(r.chk){var upd={consent:consent,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};if(r.chk.consent)upd.consentLog=firebase.firestore.FieldValue.arrayUnion(r.chk.consent);await ref.update(upd)}
+    else await ref.set({uid:r.uid,appId:r.appId,school:r.school,name:r.name,consent:consent,consentLog:[],updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    r.chk=Object.assign({},r.chk||{},{consent:consent});done.push('동의 사진');
+  }
+  if(r.teacher&&!(r.moon&&r.moon.status==='확인')){
+    var rec=Object.assign({},r.moon||{},{status:'확인',note:'강습 시작 건 — 사무국 처리(자료 업로드 갈음)',adminMarked:true,checkedAt:now,checkedBy:(firebase.auth().currentUser||{}).email||''});
+    if(!rec.url)rec.url='';
+    await DB.collection('users').doc(r.uid).set({submitDocs:{moonlight:rec}},{merge:true});r.moon=rec;done.push('겸직 허가서');
+  }
+  return done;
+}
+async function crimMarkDone(appId){
+  var r=CRIMB.rows.find(function(x){return x.appId===appId});if(!r)return;
+  if(!crimNeedMark(r)){alert('처리할 항목이 없습니다.');return}
+  if(!confirm('['+r.school+'] '+r.name+' 강사 — 강습이 이미 시작된 건(일지 '+r.logs+'회)입니다.\n범죄경력 동의 사진'+(r.teacher?'과 겸직 허가서':'')+'를 「자료 업로드한 것」으로 처리할까요?\n\n(처리자·시각이 기록되고, 이후 강사가 실제 자료를 올리면 그 자료로 갱신됩니다)'))return;
+  try{var d=await crimMarkOne(r);renderCrimBoard();alert('✓ 처리했습니다: '+d.join(' · '))}catch(e){alert('처리 실패: '+(e.code||e.message))}
+}
+async function crimMarkAll(){
+  var list=CRIMB.rows.filter(crimNeedMark);if(!list.length){alert('처리할 건이 없습니다.');return}
+  if(!confirm('강습이 이미 시작된(일지 1회 이상) '+list.length+'건의 범죄경력 동의 사진·교원 겸직 허가서를 「자료 업로드한 것」으로 일괄 처리할까요?\n\n'+list.slice(0,12).map(function(r){return '· '+r.school+' — '+r.name+' (일지 '+r.logs+'회)'}).join('\n')+(list.length>12?'\n· … 외 '+(list.length-12)+'건':'')))return;
+  var ok=0,fail=[];for(var i=0;i<list.length;i++){try{await crimMarkOne(list[i]);ok++}catch(e){fail.push(list[i].school+' '+list[i].name+': '+(e.code||e.message))}}
+  renderCrimBoard();alert('✓ '+ok+'건 처리'+(fail.length?'\n실패 '+fail.length+'건:\n'+fail.join('\n'):''));
 }
 async function crimBoardPhoto(appId){
   var r=CRIMB.rows.find(function(x){return x.appId===appId});var c=r&&r.chk&&r.chk.consent;if(!c)return;
+  if(!c.path){alert('사무국이 제출 처리한 건입니다 — 사진 파일은 없습니다.');return}
   var w=window.open('','_blank');
   try{var url=await KFDF_CRIM.photoUrl(firebase,c.path);if(w)w.location.href=url;else location.href=url}
   catch(e){if(w)w.close();alert('사진을 열 수 없습니다: '+(e.code||e.message))}
@@ -8872,6 +8914,6 @@ async function dlGoodsCerts(){
 <script src="logbook.js?v=20260916a"></script>
 <script src="crimcheck.js?v=20260918a"></script>
 <script src="consentdocs.js?v=20260914a"></script>
-<script src="auth_ui.js?v=20260922b"></script>
+<script src="auth_ui.js?v=20260928a"></script>
 </body>
 </html>
