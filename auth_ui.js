@@ -133,6 +133,8 @@
       return v;
     }
     // 권한자 전용 링크(sn-admin) 켜기 — 페이지가 권한을 확인한 뒤 호출
+    // [권한자 링크 2026-09-28] hidden 속성이 서브내비·메가메뉴의 display 규칙에 밀려 보이던 문제 — 권한 확인 전에는 반드시 감춤
+    try{if(!document.getElementById('kfdfAdmLinkCss')){var __st=document.createElement('style');__st.id='kfdfAdmLinkCss';__st.textContent='[data-admin="1"][hidden]{display:none!important}';document.head.appendChild(__st)}}catch(e){}
     function showAdminLinks(){try{document.querySelectorAll('[data-admin="1"]').forEach(function(a){a.hidden=false;a.style.display=''})}catch(e){}}
     // 연속 구역 묶기: container 의 자식들을 startSel(예: .sec-label, h2.sec-title)마다 새 묶음으로 감싸 names 순서대로 이름 붙임 (첫 시작 앞의 요소는 첫 묶음)
     function groupRuns(container,startSel,names){var c=(typeof container==='string')?document.querySelector(container):container;var out={};if(!c)return out;var kids=Array.prototype.slice.call(c.children),groups=[],cur=null;kids.forEach(function(k){var isStart=k.matches(startSel);if(!cur||(isStart&&cur.hasStart)){cur=document.createElement('div');cur.className='kv-sec';cur.hasStart=false;groups.push(cur)}if(isStart)cur.hasStart=true;cur.appendChild(k)});groups.forEach(function(g,i){c.appendChild(g);var n=names[i]||('g'+i);g.setAttribute('data-sec',n);out[n]=g});return out}
