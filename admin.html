@@ -4022,10 +4022,11 @@ function rptPlace(a){
 function rptGender(a,list,maxPart,partOf,hasG){
   const manual=(a.studentsM!=null||a.studentsF!=null),imported=manual&&!!a.benefSrc;
   const aM=+a.studentsM||0,aF=+a.studentsF||0;
-  const gl=list.filter(hasG).sort(function(p,q){return partOf(q)-partOf(p)||String(q.date).localeCompare(String(p.date))})[0];
+  // [체육회 기준] 정원/실인원 = 그 학급의 남·여 실인원 → 일지에 적힌 남학생 최대·여학생 최대(출석이 가장 많았던 날 기준)
+  const gls=list.filter(hasG);const gl=gls.length?{male:gls.reduce(function(m,l){return Math.max(m,+l.male||0)},0),female:gls.reduce(function(m,l){return Math.max(m,+l.female||0)},0),n:gls.length}:null;
   const scale=function(m,f,to){const t=m+f;if(!t||t>=to)return [m,f,false];const nm=Math.round(to*m/t);return [nm,to-nm,true]};
   if(manual&&!imported&&(aM+aF)>0&&(aM+aF)>=maxPart)return {G:aM,H:aF,src:'admin',adj:false,note:''};
-  if(gl){const r=scale(+gl.male,+gl.female,maxPart);return {G:r[0],H:r[1],src:'log',adj:r[2],note:(manual&&!imported)?('관리자 입력('+aM+'/'+aF+')이 회차 최대 참여 '+maxPart+'명보다 적어 일지 기준으로 기입'):(r[2]?'남/여 미기입 회차의 참여 인원이 더 많아 비율대로 맞춤':'')}}
+  if(gl){const r=scale(+gl.male,+gl.female,maxPart);return {G:r[0],H:r[1],src:'log',adj:r[2],note:(manual&&!imported)?('관리자 입력('+aM+'/'+aF+')이 회차 최대 참여 '+maxPart+'명보다 적어 일지 기준으로 기입'):(r[2]?'남/여 미기입 회차의 참여 인원이 더 많아 비율대로 맞춤':('일지 '+gl.n+'회차의 남·여 최대 인원'))}}
   if(manual&&(aM+aF)>0){const r=scale(aM,aF,maxPart);return {G:r[0],H:r[1],src:imported?'import':'admin',adj:r[2],note:r[2]?'회차 최대 참여 인원에 맞춰 비율대로 늘림':''}}
   const total=maxPart||rptHead(a.students);
   if(!total)return {G:null,H:null,src:'none',adj:false,note:''};
@@ -4055,7 +4056,7 @@ function rptRowOf(a,logsRaw,U){
     orig:{F:gr.v,G:g.G,H:g.H}};
 }
 function rptWarn(r){const w=[];const F=String(r.vals.F||''),G=rptNum(r.vals.G),H=rptNum(r.vals.H);
-  if(!F)w.push('학년-반 없음');else if(F.indexOf('-')<0)w.push('학년-반에 「-」 없음');
+  if(!F)w.push('학년-반 없음');else if(F.indexOf('-')<0)w.push('학년-반에 「-」 없음');else if(!/^\d+\s*-\s*\d+/.test(F))w.push('학년-반 형식 확인(예: 3-2)');
   if(G==null||H==null)w.push('남/여 없음');
   else{if(r.src==='est')w.push('남/여 추정');if((G+H)<r.maxPart)w.push('정원 '+(G+H)+' < 회차 최대 '+r.maxPart)}
   if(!r.vals.C||!r.vals.D)w.push('시도·시군구 확인');
@@ -4150,12 +4151,27 @@ function rptApply(o){
   }
   return {sx:sx,s2:s2,wbx:wbx,count:{3:Object.keys(cnt[3]||{}).length,5:Object.keys(cnt[5]||{}).length},total:tot};
 }
+// [양식 일치] 글자 칸을 양식과 같은 공유 문자열(t="s")로 — sharedStrings.xml 에 항목을 덧붙이고 셀은 번호만 가리킵니다
+function rptShare(xmls,ssx){
+  const add=[],idx={};let base=(ssx.match(/<x:si>|<x:si /g)||[]).length,cells=0;
+  const out=xmls.map(function(x){return x.replace(/<x:c r="([A-Z]+\d+)"([^>]*?) t="inlineStr"><x:is><x:t[^>]*>([\s\S]*?)<\/x:t><\/x:is><\/x:c>/g,function(m,ref,attrs,txt){
+    if(!(txt in idx)){idx[txt]=base+add.length;add.push(txt)}cells++;
+    return '<x:c r="'+ref+'"'+attrs+' t="s"><x:v>'+idx[txt]+'</x:v></x:c>'})});
+  if(!add.length||ssx.indexOf('</x:sst>')<0)return {xmls:add.length?xmls:out,ssx:ssx,added:0};
+  let sx2=ssx.replace('</x:sst>',add.map(function(t){return '<x:si><x:t xml:space="preserve">'+t+'</x:t></x:si>'}).join('')+'</x:sst>');
+  sx2=sx2.replace(/<x:sst([^>]*)>/,function(m,a){
+    const c=+((a.match(/ count="(\d+)"/)||[])[1]||0);
+    a=a.replace(/ count="\d+"/,' count="'+(c+cells)+'"').replace(/ uniqueCount="\d+"/,' uniqueCount="'+(base+add.length)+'"');return '<x:sst'+a+'>'});
+  return {xmls:out,ssx:sx2,added:add.length};
+}
 async function rptBuild(ctx){
   const rows=rptFinalRows(ctx);
   if(rows.length>200)alert('양식 행(215행)을 넘어 '+(rows.length-200)+'개 행은 기입되지 않습니다.');
   const zip=ctx.zip;
   const s2f=zip.file('xl/worksheets/sheet2.xml');
   const r=rptApply({sx:ctx.sx,s2:s2f?await s2f.async('string'):'',wbx:await zip.file('xl/workbook.xml').async('string'),sst:ctx.sst,rows:rows.slice(0,200),mo:ctx.mo});
+  const ssf=zip.file('xl/sharedStrings.xml');
+  if(ssf){const sh=rptShare([r.sx,r.s2],await ssf.async('string'));r.sx=sh.xmls[0];r.s2=sh.xmls[1];zip.file('xl/sharedStrings.xml',sh.ssx)}
   zip.file('xl/worksheets/sheet1.xml',r.sx);if(s2f)zip.file('xl/worksheets/sheet2.xml',r.s2);zip.file('xl/workbook.xml',r.wbx);
   // 3번째 이후 시트가 1번 시트를 참조하면 이름만 맞춤
   const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -4177,7 +4193,8 @@ function rptReview(ctx){
     +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:17px">📋 '+esc(ctx.ym)+' 현황보고서 — 기입 전 점검</b><span style="font-size:12.5px;color:#6b7280">강습을 시작한(일지가 있는) 학교 '+rows.length+'곳'+(ctx.base?' · 기준 파일에 덧씀':' · 빈 양식')+'</span><span style="flex:1"></span><button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'rptRv\').remove()">닫기</button></div>'
     +'<div style="font-size:12.5px;color:#374151;line-height:1.7;margin:8px 0;background:#f6f8fb;border-radius:10px;padding:9px 12px">'
     +'· <b>학년-반</b>은 「3-2」처럼 <b>「-」가 들어가야</b> 양식의 남/여 칸이 오류로 표시되지 않습니다 (혼합반은 「3~6학년-혼합」).<br>'
-    +'· <b>남/여</b>는 관리자 입력 → 강사 일지(참여가 가장 많은 회차) → 이전 보고서 → 추정 순으로 채웠습니다. 정원(남+여)은 회차 최대 참여 인원 이상이어야 합니다.<br>'
+    +'· <b>남/여</b>는 관리자 입력 → 강사 일지(남·여 각각 가장 많았던 인원) → 기준 파일·이전 보고서 → 추정 순으로 채웠습니다. 정원(남+여)은 회차 최대 참여 인원 이상이어야 합니다.<br>'
+    +'· <b style="color:#C41E2F">추정(반반)</b>으로 표시된 학교는 실제 남·여 인원을 확인해 고쳐 주세요 — 체육회 확인 항목입니다.<br>'
     +'· 값을 고치고 <b>[저장하고 내려받기]</b>를 누르면 학교별 수혜자 정보로 저장되어 다음 달에도 그대로 쓰입니다.'
     +(nWarn?'<br><b style="color:#C41E2F">⚠ 확인이 필요한 학교 '+nWarn+'곳이 위쪽에 모여 있습니다.</b>':'')+'</div>'
     +'<div style="overflow:auto;max-height:60vh;border:1.5px solid #e2e7f0;border-radius:10px"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:980px"><thead><tr><th>#</th><th>유형</th><th>시도</th><th>시군구</th><th>기관명</th><th>학년-반</th><th>남</th><th>여</th><th>정원</th><th>회차 최대</th><th>회차</th><th>지도자<br>자격O/X</th><th>남/여 출처 · 확인</th></tr></thead><tbody>'
