@@ -552,12 +552,12 @@ function eduWho(v){return (v.name||'')+' ('+(v.birth||'생년월일 없음')+' �
         <button class="btn-sub" style="background:#7c3aed" onclick="syncLogPoints()">⚡ 일지 기준 포인트 반영</button>
         <button class="btn-sub" style="background:#153A77" onclick="reviewHist()">📋 이력 승인·포인트 전환</button>
         <button class="btn-sub" style="background:#b8860b" onclick="payrollCSV()">💰 월 지급 계산 CSV</button>
-        <button class="btn-sub" style="background:#0f766e" onclick="rptDownload()" title="유소년 월별 현황보고서 양식에 누적 실적을 자동 기입해 내려받습니다 (양식·수식은 그대로). 강습을 시작한(일지가 있는) 학교만 들어갑니다">📊 월별 현황보고서 (빈 양식에 기입)</button>
+        <button class="btn-sub" style="background:#0f766e" onclick="rptDownload()" title="유소년 월별 현황보고서 양식에 누적 실적을 자동 기입해 내려받습니다. 내려받기 전에 학교별 학년-반·남/여 점검표가 열립니다. 합계·요약 칸 계산값까지 함께 기입 · 강습을 시작한(일지가 있는) 학교만">📊 월별 현황보고서 (빈 양식에 기입)</button>
         <button id="crimBoardBtn" class="btn-sub" style="background:#8c1622;display:none" onclick="showCrimBoard()" title="배정완료 건별 강사 동의 사진 · 학교 회신(적격/부적격) — 중앙 사무국 전용">🛡 범죄경력 조회 현황</button>
         <a id="logsPageBtn" class="btn-sub" href="schoollogs.html" target="_blank" style="background:#153A77;display:none;text-decoration:none" title="선정학교별 운영일지 모아보기(권역·시도·유형·진행별) — 중앙 사무국 전용 (새 창)">📒 학교별 운영일지</a>
         <a class="btn-sub" href="selected.html" target="_blank" style="background:#0e7490;text-decoration:none" title="선정학교 현황 — 권역·시도·유형별 보기 (새 창)">🏫 선정학교 현황</a>
         <button id="rosterBtn" class="btn-sub" style="background:#8c1622;display:none" onclick="exportAssignRoster()" title="공문 「파견 강사 범죄경력조회 처리 및 겸직 안내」 붙임 2 — 배정완료 학교의 강사 명단 (중앙 사무국 전용)">📋 배정 강사 명단(엑셀)</button>
-        <label class="btn-sub" style="background:#0f766e;cursor:pointer;display:inline-block" title="지난달 제출한 보고서(.xlsx)를 고르면 그 파일 위에 이번 달 누적을 갱신합니다 — 이미 있는 학교는 남/여·학년을 그대로 두고 월별 횟수·회차만 갱신, 새로 시작한 학교만 아래에 추가">📊 지난달 보고서 기준으로 갱신<input type="file" accept=".xlsx" style="display:none" onchange="rptDownload(this.files[0]);this.value=''"></label>
+        <label class="btn-sub" style="background:#0f766e;cursor:pointer;display:inline-block" title="지난달 제출한 보고서(.xlsx)를 고르면 그 파일 위에 이번 달 누적을 갱신합니다 — 손으로 적은 유형1·2·4 행은 그대로, 유형3·5는 일지 기준으로 다시 기입(남/여는 관리자 입력·일지가 있으면 그 값, 없으면 파일 값 유지), 유형 순서로 다시 배열">📊 지난달 보고서 기준으로 갱신<input type="file" accept=".xlsx" style="display:none" onchange="rptDownload(this.files[0]);this.value=''"></label>
         <label class="btn-sub" style="background:#0e7490;cursor:pointer;display:inline-block" title="지난달 제출한 보고서(.xlsx)의 학년-반·남·여를 학교별 수혜자 정보로 저장">📥 이전 보고서에서 수혜자 정보 가져오기<input type="file" accept=".xlsx" style="display:none" onchange="rptImportPrev(this)"></label>
         <button class="btn-sub" style="background:#555" onclick="closeWaitlist()">⏳ 대기자 일괄 종료</button>
         <button class="btn-sub" style="background:#0f766e" onclick="showSupply()">🧭 권역별 수급 현황</button>
@@ -3938,7 +3938,7 @@ async function setBenef(id){
   const g=prompt('['+(s.school||'')+'] 학년-반 (예: 3-2, 1~2학년)',s.grade||'');if(g===null)return;
   const m=prompt('수혜자 남학생 수',(s.studentsM!=null?s.studentsM:''));if(m===null)return;
   const f=prompt('수혜자 여학생 수',(s.studentsF!=null?s.studentsF:''));if(f===null)return;
-  const upd={grade:g.trim(),studentsM:m.trim()===''?null:(parseInt(m)||0),studentsF:f.trim()===''?null:(parseInt(f)||0),benefAt:new Date().toISOString()};
+  const upd={grade:g.trim(),studentsM:m.trim()===''?null:(parseInt(m)||0),studentsF:f.trim()===''?null:(parseInt(f)||0),benefAt:new Date().toISOString(),benefSrc:firebase.firestore.FieldValue.delete()};
   try{await DB.collection('schoolApplications').doc(id).update(upd);await loadApps()}catch(e){alert('저장 실패: '+e.message)}
 }
 // [이전 보고서 가져오기] 지난달 제출한 현황보고서(.xlsx)의 유형3·5 행에서 학년-반·남·여를 읽어 학교(기관명)·유형이 같은 신청에 저장
@@ -3966,85 +3966,262 @@ async function rptImportPrev(input){
 }
 function rptCellText(row,ref,sst){const m=row.match(new RegExp('<x:c r="'+ref+'"( [^>]*?)?(?:/>|>([\\s\\S]*?)</x:c>)'));if(!m||!m[2])return '';const attrs=m[1]||'';const v=(m[2].match(/<x:v>([^<]*)<\/x:v>/)||[])[1];if(/ t="s"/.test(attrs))return sst[+v]||'';if(/ t="inlineStr"/.test(attrs))return ((m[2].match(/<x:t[^>]*>([^<]*)<\/x:t>/)||[])[1]||'');return v||''}
 function rptNorm(x){return String(x||'').replace(/\s+/g,'').replace(/초등학교$/,'초').replace(/중학교$/,'중').replace(/고등학교$/,'고')}
+// ══ [월별 현황보고서 2차 2026-09-28] 제출본 점검에서 나온 문제를 고친 생성 로직 ══
+//   ① 색칠된 수식 칸(합계·누적·유형별 요약·「사업 성과」 실적/달성률)에 계산값을 함께 기입 — 한셀·미리보기처럼 열 때 다시 계산하지 않는 프로그램에서도 맞게 보임
+//   ② 수혜자 남/여: 관리자 직접 입력 → 강사 일지의 남/여(참여가 가장 많은 회차) → 이전 보고서 값 → 추정(반반) 순. 정원(남+여)은 회차 최대 참여 인원보다 작지 않게
+//   ③ 학년-반(F): 양식 검사식이 「-」 포함을 요구 → 「3-2」 형식으로 맞춤(혼합반은 「3~6학년-혼합」)
+//   ④ 회차: 같은 회차 중복 일지는 1건으로, 수업일 순서대로 1회차 칸부터 빈칸 없이 · 월별 횟수 합 = 회차 칸 수
+//   ⑤ 시도는 짧은 이름(경기·부산…), 시군구만 · 유형 순서(1→5)로 다시 배열 · 지도자는 일지를 쓴 강사 수(체육지도자 자격 승인 여부로 구분)
+//   ⑥ 기입 전 점검표: 학년-반·남·여를 확인·수정한 뒤 내려받기
+const RPT_GOAL={3:{B:70,D:25,E:25,F:1680,G:600,H:33600},5:{B:30,D:25,E:25,F:720,G:600,H:14400}};   // 「사업 성과」 목표(8월 제출본 값) — 양식·기준 파일의 목표 칸이 비어 있을 때만 기입
+const RPT_S2={1:{goal:8,act:9,rate:10,first:'C',cnt:'B'},2:{goal:15,act:16,rate:17,first:'B',cnt:''},3:{goal:22,act:23,rate:24,first:'C',cnt:'B'},4:{goal:29,act:30,rate:31,first:'C',cnt:'B'},5:{goal:36,act:37,rate:38,first:'C',cnt:'B'}};
+const RPT_MCOLS=['R','S','T','U','V','W','X','Y','Z','AA','AB'];
+const RPT_SRC={admin:['관리자 입력','#0f766e'],log:['강사 일지','#153A77'],base:['기준 파일','#0e7490'],'import':['이전 보고서','#b8860b'],est:['추정(반반)','#C41E2F'],none:['없음','#C41E2F']};
+function rptColNum(s){let n=0;for(let i=0;i<s.length;i++)n=n*26+(s.charCodeAt(i)-64);return n}
+function rptValCols(){const c=['B','C','D','E','F','G','H','J','K','L','M'].concat(RPT_MCOLS);for(let k=31;k<=94;k++)c.push(rptColLetter(k));return c}
+function rptNum(v){if(v==null||v==='')return null;const n=+v;return isNaN(n)?null:n}
+function rptHead(t){const m=String(t||'').match(/(\d+)\s*명/);return m?+m[1]:0}
+function rptTypeNo(b){const m=String(b||'').match(/유형\s*(\d)/);return m?+m[1]:0}
+// 수식 칸에 계산값(캐시) 기입 — 수식은 그대로 두고 <x:v> 만 바꿉니다
+function rptSetF(xml,ref,val){
+  const re=new RegExp('<x:c r="'+ref+'"( [^>]*?)?>([\\s\\S]*?)</x:c>');const m=xml.match(re);if(!m)return xml;
+  const f=(m[2].match(/<x:f[^>]*\/>|<x:f[^>]*>[\s\S]*?<\/x:f>/)||[])[0];if(!f)return xml;
+  const attrs=(m[1]||'').replace(/ t="[^"]*"/,'');
+  const cell=(val===''||val==null)?('<x:c r="'+ref+'"'+attrs+' t="str">'+f+'<x:v/></x:c>'):('<x:c r="'+ref+'"'+attrs+'>'+f+'<x:v>'+val+'</x:v></x:c>');
+  return xml.replace(m[0],function(){return cell});
+}
+// 학년-반 — 양식의 남/여 칸 검사식: ISNUMBER(SEARCH("-",학년-반))
+function rptGrade(raw,studentsTxt){
+  const s=String(raw||'').trim();
+  const conv=function(t){t=String(t||'').trim();if(!t)return '';
+    let m=t.match(/(\d+)\s*학년\s*(\d+)\s*반/);if(m)return m[1]+'-'+m[2];
+    m=t.match(/(\d+)\s*[~∼–,·]\s*(\d+)\s*학년/);if(m)return m[1]+'~'+m[2]+'학년-혼합';
+    if(/\d+\s*-\s*\d+/.test(t))return t.replace(/\s+/g,'');
+    if(/전\s*학년/.test(t))return '전학년-혼합';
+    m=t.match(/(\d+)\s*학년/);if(m)return m[1]+'학년-전체';
+    return ''};
+  const a=conv(s);if(a)return {v:a,fixed:a!==s,from:''};
+  if(s&&s.indexOf('-')>=0)return {v:s,fixed:false,from:''};
+  if(s)return {v:s+'-혼합',fixed:true,from:''};
+  const b=conv(studentsTxt);if(b)return {v:b,fixed:true,from:'신청서'};
+  return {v:'',fixed:false,from:''};
+}
+// 시도(짧은 이름)·시군구
+function rptPlace(a){
+  const city=String(a.city||'').trim();
+  let sido=(typeof a.sidoKey==='string'&&a.sidoKey)||'';
+  if(!sido||!KFDF_SIDO_ALIAS[sido])sido=kfdfSidoKey({baseCity:[a.sido,city].filter(Boolean).join(' ')})||sido||(city.split(/\s+/)[0]||'');
+  let rest=String(a.sigungu||'').trim();
+  if(!rest){const tk=city.split(/\s+/).filter(Boolean);const al=KFDF_SIDO_ALIAS[sido]||[];if(tk.length&&al.some(function(x){return tk[0].indexOf(x)===0}))tk.shift();rest=tk.join(' ')}
+  let tk=rest.split(/\s+/).filter(Boolean);const al2=KFDF_SIDO_ALIAS[sido]||[];
+  if(tk.length&&al2.some(function(x){return tk[0].indexOf(x)===0})&&!/^세종시$/.test(tk[0]))tk.shift();
+  let gugun=tk.length?(tk[0]+((tk[1]&&/구$/.test(tk[1])&&/시$/.test(tk[0]))?' '+tk[1]:'')):'';
+  if(!gugun&&sido==='세종')gugun='세종시';
+  return {C:sido,D:gugun};
+}
+function rptGender(a,list,maxPart,partOf,hasG){
+  const manual=(a.studentsM!=null||a.studentsF!=null),imported=manual&&!!a.benefSrc;
+  const aM=+a.studentsM||0,aF=+a.studentsF||0;
+  const gl=list.filter(hasG).sort(function(p,q){return partOf(q)-partOf(p)||String(q.date).localeCompare(String(p.date))})[0];
+  const scale=function(m,f,to){const t=m+f;if(!t||t>=to)return [m,f,false];const nm=Math.round(to*m/t);return [nm,to-nm,true]};
+  if(manual&&!imported&&(aM+aF)>0&&(aM+aF)>=maxPart)return {G:aM,H:aF,src:'admin',adj:false,note:''};
+  if(gl){const r=scale(+gl.male,+gl.female,maxPart);return {G:r[0],H:r[1],src:'log',adj:r[2],note:(manual&&!imported)?('관리자 입력('+aM+'/'+aF+')이 회차 최대 참여 '+maxPart+'명보다 적어 일지 기준으로 기입'):(r[2]?'남/여 미기입 회차의 참여 인원이 더 많아 비율대로 맞춤':'')}}
+  if(manual&&(aM+aF)>0){const r=scale(aM,aF,maxPart);return {G:r[0],H:r[1],src:imported?'import':'admin',adj:r[2],note:r[2]?'회차 최대 참여 인원에 맞춰 비율대로 늘림':''}}
+  const total=maxPart||rptHead(a.students);
+  if(!total)return {G:null,H:null,src:'none',adj:false,note:''};
+  return {G:Math.ceil(total/2),H:Math.floor(total/2),src:'est',adj:false,note:'남/여 자료가 없어 반반으로 추정'};
+}
+function rptRowOf(a,logsRaw,U){
+  const logs=(logsRaw||[]).filter(function(l){return /^\d{4}-\d{2}-\d{2}/.test(String(l.date||''))});
+  const hasG=function(l){const m=rptNum(l.male),f=rptNum(l.female);return m!=null&&f!=null&&(m+f)>0};
+  const partOf=function(l){return hasG(l)?(rptNum(l.male)+rptNum(l.female)):(rptNum(l.count)||0)};
+  const by={};let extra=0,dup=0;
+  logs.forEach(function(l){const n=+l.session||0;const k=(n>=1&&n<=32)?('s'+n):('x'+(extra++));const cur=by[k];if(!cur){by[k]=l;return}
+    dup++;if((hasG(l)&&!hasG(cur))||(hasG(l)===hasG(cur)&&partOf(l)>partOf(cur)))by[k]=l});
+  const list=Object.keys(by).map(function(k){return by[k]}).sort(function(p,q){return String(p.date).localeCompare(String(q.date))||((+p.session||0)-(+q.session||0))}).slice(0,32);
+  const months={};list.forEach(function(l){const m=parseInt(String(l.date).slice(5,7),10);if(m)months[m]=(months[m]||0)+1});
+  const sessions=list.map(function(l,i){return {n:i+1,lead:1,part:partOf(l)||null,date:l.date}});
+  const maxPart=list.reduce(function(m,l){return Math.max(m,partOf(l))},0);
+  const g=rptGender(a,list,maxPart,partOf,hasG);
+  const uids=[];list.forEach(function(l){if(l.uid&&uids.indexOf(l.uid)<0)uids.push(l.uid)});
+  if(!uids.length&&(a.assignedUid||a.selfUid))uids.push(a.assignedUid||a.selfUid);
+  let L=0,M=0;uids.forEach(function(u){const v=U[u]||{};if(v.natCertApproved)L++;else M++});if(!uids.length)M=1;
+  const tno=(a.typeKey==='after'||String(a.type||'').indexOf('방과후')>=0||String(a.type||'').indexOf('돌봄')>=0||String(a.type||'').indexOf('늘봄')>=0)?5:3;
+  const gr=rptGrade(a.grade,a.students),pl=rptPlace(a);
+  const vals={B:RPT_TYPE[tno===5?'after':'school'],C:pl.C,D:pl.D,E:a.school||'',F:gr.v,G:g.G,H:g.H,J:0,K:0,L:L,M:M};
+  Object.keys(RPT_MONTH_COL).forEach(function(m){if(months[m])vals[RPT_MONTH_COL[m]]=months[m]});
+  sessions.forEach(function(x){const c1=31+(x.n-1)*2;vals[rptColLetter(c1)]=x.lead;if(x.part)vals[rptColLetter(c1+1)]=x.part});
+  return {appId:a.id,type:tno,key:(tno===5?'after':'school')+'|'+rptNorm(a.school),vals:vals,src:g.src,note:g.note,gradeFixed:gr.fixed,gradeRaw:String(a.grade||''),gradeFrom:gr.from,maxPart:maxPart,nSess:sessions.length,dup:dup,computed:true,
+    orig:{F:gr.v,G:g.G,H:g.H}};
+}
+function rptWarn(r){const w=[];const F=String(r.vals.F||''),G=rptNum(r.vals.G),H=rptNum(r.vals.H);
+  if(!F)w.push('학년-반 없음');else if(F.indexOf('-')<0)w.push('학년-반에 「-」 없음');
+  if(G==null||H==null)w.push('남/여 없음');
+  else{if(r.src==='est')w.push('남/여 추정');if((G+H)<r.maxPart)w.push('정원 '+(G+H)+' < 회차 최대 '+r.maxPart)}
+  if(!r.vals.C||!r.vals.D)w.push('시도·시군구 확인');
+  return w}
+async function rptCollect(ym){
+  const y=+ym.slice(0,4),mo=+ym.slice(5,7);
+  const fyStart=(mo>=4?y:y-1)+'-04-01';
+  const me=new Date(y,mo,0);const endStr=me.getFullYear()+'-'+String(me.getMonth()+1).padStart(2,'0')+'-'+String(me.getDate()).padStart(2,'0');
+  if(!APPS.length)await loadApps();
+  const ls=await DB.collection('sessionLogs').get();
+  const byApp={};ls.docs.forEach(function(d){const l=d.data();const dt=String(l.date||'');if(dt<fyStart||dt>endStr)return;(byApp[l.appId]=byApp[l.appId]||[]).push(l)});
+  const apps=APPS.map(function(d){return Object.assign({id:d.id},d.data())}).filter(function(a){return !a.deleted&&byApp[a.id]&&byApp[a.id].length});
+  const U={};const need=[];apps.forEach(function(a){(byApp[a.id]||[]).forEach(function(l){if(l.uid&&need.indexOf(l.uid)<0)need.push(l.uid)});if(a.assignedUid&&need.indexOf(a.assignedUid)<0)need.push(a.assignedUid)});
+  (typeof USERS!=='undefined'?USERS:[]).forEach(function(d){if(need.indexOf(d.id)>=0)U[d.id]=d.data()||{}});
+  for(const u of need){if(!U[u]){try{const d=await DB.collection('users').doc(u).get();U[u]=d.exists?(d.data()||{}):{}}catch(e){U[u]={}}}}
+  return {ym:ym,y:y,mo:mo,rows:apps.map(function(a){return rptRowOf(a,byApp[a.id],U)})};
+}
+// 양식·기준 파일 읽기 — 이미 적힌 행(16~215)을 값으로 읽어 둡니다
+async function rptOpen(ctx,baseFile){
+  let zip;
+  if(baseFile){zip=await JSZip.loadAsync(await baseFile.arrayBuffer())}
+  else{const res=await fetch('files/report_template_2026.xlsx?v='+Date.now());if(!res.ok)throw new Error('양식 파일(files/report_template_2026.xlsx)을 찾을 수 없습니다');zip=await JSZip.loadAsync(await res.arrayBuffer())}
+  const sf=zip.file('xl/worksheets/sheet1.xml');if(!sf)throw new Error('양식 첫 시트를 읽을 수 없습니다 (같은 양식의 .xlsx 인지 확인)');
+  const sx=await sf.async('string');
+  const ssx=zip.file('xl/sharedStrings.xml')?await zip.file('xl/sharedStrings.xml').async('string'):'';
+  const sst=(ssx.match(/<x:si>[\s\S]*?<\/x:si>/g)||[]).map(function(x){return (x.match(/<x:t[^>]*>([^<]*)<\/x:t>/g)||[]).map(function(t){return t.replace(/<[^>]+>/g,'')}).join('').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')});
+  const cols=rptValCols(),existing=[];
+  for(let n=16;n<=215;n++){const row=rptRowXml(sx,n);if(!row)continue;const B=rptCellText(row,'B'+n,sst);if(!B)continue;
+    const vals={};cols.forEach(function(c){const t=rptCellText(row,c+n,sst);if(t==='')return;vals[c]=(/^-?\d+(\.\d+)?$/.test(t)&&['B','C','D','E','F'].indexOf(c)<0)?+t:t});
+    const tno=rptTypeNo(B);existing.push({type:tno,vals:vals,idx:n,key:(tno===3?'school|':tno===5?'after|':'t'+tno+'|')+rptNorm(vals.E),computed:false})}
+  ctx.zip=zip;ctx.sx=sx;ctx.sst=sst;ctx.existing=existing;ctx.base=!!baseFile;
+  // 기준 파일에 이미 있는 유형3·5 행과 맞춰 봅니다 — 남/여·학년-반은 확실한 자료(관리자 입력·일지)가 있으면 그것으로, 없으면 기준 파일 값 유지
+  const used={};
+  ctx.rows.forEach(function(r){const ex=existing.find(function(x){return !used[x.idx]&&x.key===r.key});if(!ex)return;used[ex.idx]=1;r.baseIdx=ex.idx;
+    const eG=rptNum(ex.vals.G),eH=rptNum(ex.vals.H),eF=String(ex.vals.F||'');
+    if((r.src==='est'||r.src==='import'||r.src==='none')&&eG!=null&&eH!=null&&(eG+eH)>0&&(eG+eH)>=r.maxPart){r.vals.G=eG;r.vals.H=eH;r.src='base';r.note=''}
+    if((!r.vals.F||r.gradeFixed)&&eF.indexOf('-')>=0){r.vals.F=eF;r.gradeFixed=false}
+    if(['J','K','L','M'].some(function(c){return +ex.vals[c]>0})){['J','K','L','M'].forEach(function(c){r.vals[c]=+ex.vals[c]||0})}
+    r.orig={F:r.vals.F,G:r.vals.G,H:r.vals.H}});
+  ctx.kept=existing.filter(function(x){return !used[x.idx]});
+}
+function rptFinalRows(ctx){
+  const order=Object.keys(KFDF_SIDO_ALIAS);const all=ctx.kept.concat(ctx.rows);
+  all.sort(function(a,b){
+    if(a.type!==b.type)return (a.type||9)-(b.type||9);
+    if(a.type!==3&&a.type!==5&&!a.computed&&!b.computed)return a.idx-b.idx;
+    const sa=order.indexOf(a.vals.C),sb=order.indexOf(b.vals.C);
+    return ((sa<0?99:sa)-(sb<0?99:sb))||String(a.vals.D||'').localeCompare(String(b.vals.D||''),'ko')||String(a.vals.E||'').localeCompare(String(b.vals.E||''),'ko')});
+  return all;
+}
+// 시트 XML 에 기입 — 값 칸 + 수식 칸 계산값. 순수 함수(시험 가능): {sx,s2,wbx} → 바뀐 {sx,s2,wbx}
+function rptApply(o){
+  let sx=o.sx,s2=o.s2||'',wbx=o.wbx;const rows=o.rows,sst=o.sst,mo=o.mo;const cols=rptValCols();
+  const num=function(v){return (typeof v==='number')?v:((v!=null&&v!==''&&!isNaN(+v))?+v:0)};
+  const out={};const colSum={};const calc=[];
+  for(let n=16;n<=215;n++){let row=rptRowXml(sx,n);if(!row)continue;const r=rows[n-16];const v=r?r.vals:{};
+    cols.forEach(function(c){const val=v[c];row=rptSetCell(row,c+n,(val==null||val==='')?null:val)});
+    if(r)row=rptSetCell(row,'A'+n,n-15);
+    const G=num(v.G),H=num(v.H),J=num(v.J),K=num(v.K),L=num(v.L),M=num(v.M);
+    let Q=0;RPT_MCOLS.forEach(function(c){Q+=num(v[c])});let AC=0,AD=0;for(let k=31;k<=94;k++){const x=num(v[rptColLetter(k)]);if((k-31)%2===0)AC+=x;else AD+=x}
+    const f={I:G+H,N:J+K,O:J+L,P:J+K+L+M,Q:Q,AC:AC,AD:AD};
+    Object.keys(f).forEach(function(c){row=rptSetF(row,c+n,f[c])});
+    if(r){cols.forEach(function(c){if(['B','C','D','E','F'].indexOf(c)<0)colSum[c]=(colSum[c]||0)+num(v[c])});Object.keys(f).forEach(function(c){colSum[c]=(colSum[c]||0)+f[c]});calc.push({B:String(v.B||''),E:String(v.E||''),type:r.type,f:f,G:G,H:H})}
+    out[n]=row}
+  // 15행 합계
+  let r15=rptRowXml(sx,15);if(r15){for(let k=7;k<=94;k++){const c=rptColLetter(k);r15=rptSetF(r15,c+'15',colSum[c]||0)}out[15]=r15}
+  // 5~9행 유형별 요약, 10행 합계
+  const map={C:'G',D:'H',E:'I',F:'N',G:'O',H:'P',I:'Q',J:'AC',K:'AD'};const tot={};const sum1={};
+  for(let n=5;n<=9;n++){let row=rptRowXml(sx,n);if(!row)continue;const name=rptCellText(row,'B'+n,sst);const list=calc.filter(function(x){return x.B===name});sum1[n]={};
+    Object.keys(map).forEach(function(c){const src=map[c];const s=list.reduce(function(t,x){return t+(src==='G'?x.G:src==='H'?x.H:x.f[src])},0);sum1[n][c]=s;tot[c]=(tot[c]||0)+s;row=rptSetF(row,c+n,s)});out[n]=row}
+  let r10=rptRowXml(sx,10);if(r10){Object.keys(map).forEach(function(c){r10=rptSetF(r10,c+'10',tot[c]||0)});out[10]=r10}
+  sx=sx.replace(/<x:row r="(\d+)"[^>]*>[\s\S]*?<\/x:row>/g,function(m,n){return out[+n]||m});
+  sx=rptSetCell(sx,'C3','대한민국플라잉디스크연맹');
+  // 시트 이름·참조
+  const sheetName='플라잉디스크연맹 '+mo+'월 현황';
+  const oldName=((wbx.match(/<x:sheet name="([^"]*)" sheetId="1"/)||[])[1])||'';
+  wbx=wbx.replace(/<x:sheet name="[^"]*" sheetId="1"/,'<x:sheet name="'+sheetName+'" sheetId="1"');
+  if(/<x:calcPr /.test(wbx)&&!/fullCalcOnLoad/.test(wbx))wbx=wbx.replace(/<x:calcPr /,'<x:calcPr fullCalcOnLoad="1" ');
+  // 2번 시트 「사업 성과」
+  const cnt={};calc.forEach(function(x){(cnt[x.type]=cnt[x.type]||{})[rptNorm(x.E)]=1});
+  if(s2){
+    if(oldName&&oldName!==sheetName)s2=s2.split("'"+oldName+"'!").join("'"+sheetName+"'!");
+    const cell=function(ref){const n=+ref.replace(/\D/g,'');const row=rptRowXml(s2,n);return row?rptCellText(row,ref,sst):''};
+    Object.keys(RPT_S2).forEach(function(t){const d=RPT_S2[t];const nCols=(+t===2)?6:6;const first=rptColNum(d.first);
+      if(RPT_GOAL[t]){const empty=['B','C','D','E','F','G','H'].every(function(c){return cell(c+d.goal)===''});if(empty)Object.keys(RPT_GOAL[t]).forEach(function(c){s2=rptSetCell(s2,c+d.goal,RPT_GOAL[t][c])})}
+      const act={};
+      if(d.cnt){const c=Object.keys(cnt[t]||{}).length;const keep=rptNum(cell(d.cnt+d.act));const v=(+t===3||+t===5)?c:Math.max(c,0)||keep||0;s2=rptSetCell(s2,d.cnt+d.act,v);act[d.cnt]=v}
+      const src=['F','G','H','I','J','K'];
+      for(let i=0;i<nCols;i++){const c=rptColLetter(first+i);const v=(sum1[4+(+t)]||{})[src[i]]||0;s2=rptSetF(s2,c+d.act,v);act[c]=v}
+      Object.keys(act).forEach(function(c){const g=rptNum(cell(c+d.goal));s2=rptSetF(s2,c+d.rate,(g&&g>0)?(act[c]/g):'')});
+      ['B','C','D','E','F','G','H'].forEach(function(c){if(!(c in act)){s2=rptSetF(s2,c+d.rate,'')}})});
+  }
+  return {sx:sx,s2:s2,wbx:wbx,count:{3:Object.keys(cnt[3]||{}).length,5:Object.keys(cnt[5]||{}).length},total:tot};
+}
+async function rptBuild(ctx){
+  const rows=rptFinalRows(ctx);
+  if(rows.length>200)alert('양식 행(215행)을 넘어 '+(rows.length-200)+'개 행은 기입되지 않습니다.');
+  const zip=ctx.zip;
+  const s2f=zip.file('xl/worksheets/sheet2.xml');
+  const r=rptApply({sx:ctx.sx,s2:s2f?await s2f.async('string'):'',wbx:await zip.file('xl/workbook.xml').async('string'),sst:ctx.sst,rows:rows.slice(0,200),mo:ctx.mo});
+  zip.file('xl/worksheets/sheet1.xml',r.sx);if(s2f)zip.file('xl/worksheets/sheet2.xml',r.s2);zip.file('xl/workbook.xml',r.wbx);
+  // 3번째 이후 시트가 1번 시트를 참조하면 이름만 맞춤
+  const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=String(ctx.mo).padStart(2,'0')+'월_플라잉디스크_'+String(ctx.y).slice(2)+'년 유소년월별 현황보고서.xlsx';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},2000);
+  const c=ctx.rows,by=function(s){return c.filter(function(x){return x.src===s}).length};const warn=c.filter(function(x){return rptWarn(x).length});
+  alert('📊 '+ctx.ym+' 현황보고서를 내려받았습니다.\n· 전체 '+rows.length+'행 (유형3 '+r.count[3]+'교 · 유형5 '+r.count[5]+'교'+(ctx.kept.length?' · 그대로 둔 행 '+ctx.kept.length:'')+')'
+    +'\n· 수혜자 남/여 출처: 관리자 입력 '+by('admin')+' · 강사 일지 '+by('log')+' · 기준 파일 '+by('base')+' · 이전 보고서 '+by('import')+' · 추정 '+by('est')
+    +'\n· 합계·누적·유형별 요약·「사업 성과」 실적/달성률 칸에 계산값을 함께 넣었습니다 (엑셀·한셀 어느 쪽으로 열어도 같은 값)'
+    +(warn.length?'\n\n⚠ 확인이 필요한 학교 '+warn.length+'곳: '+warn.slice(0,8).map(function(x){return x.vals.E+'('+rptWarn(x).join(', ')+')'}).join(' / ')+(warn.length>8?' 외 '+(warn.length-8):''):''));
+}
+// 기입 전 점검표 — 학년-반·남·여 확인·수정
+function rptReview(ctx){
+  let ov=document.getElementById('rptRv');if(ov)ov.remove();
+  ov=document.createElement('div');ov.id='rptRv';ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(15,16,19,.55);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px 10px';
+  const rows=ctx.rows.slice().sort(function(a,b){return (rptWarn(b).length?1:0)-(rptWarn(a).length?1:0)||a.type-b.type||String(a.vals.E).localeCompare(String(b.vals.E),'ko')});
+  ctx.rv=rows;const nWarn=rows.filter(function(r){return rptWarn(r).length}).length;
+  const inp='padding:5px 7px;border:1.5px solid #d5dce8;border-radius:7px;font-size:13px;font-family:inherit';
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;max-width:1180px;width:100%;padding:18px 20px">'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:17px">📋 '+esc(ctx.ym)+' 현황보고서 — 기입 전 점검</b><span style="font-size:12.5px;color:#6b7280">강습을 시작한(일지가 있는) 학교 '+rows.length+'곳'+(ctx.base?' · 기준 파일에 덧씀':' · 빈 양식')+'</span><span style="flex:1"></span><button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'rptRv\').remove()">닫기</button></div>'
+    +'<div style="font-size:12.5px;color:#374151;line-height:1.7;margin:8px 0;background:#f6f8fb;border-radius:10px;padding:9px 12px">'
+    +'· <b>학년-반</b>은 「3-2」처럼 <b>「-」가 들어가야</b> 양식의 남/여 칸이 오류로 표시되지 않습니다 (혼합반은 「3~6학년-혼합」).<br>'
+    +'· <b>남/여</b>는 관리자 입력 → 강사 일지(참여가 가장 많은 회차) → 이전 보고서 → 추정 순으로 채웠습니다. 정원(남+여)은 회차 최대 참여 인원 이상이어야 합니다.<br>'
+    +'· 값을 고치고 <b>[저장하고 내려받기]</b>를 누르면 학교별 수혜자 정보로 저장되어 다음 달에도 그대로 쓰입니다.'
+    +(nWarn?'<br><b style="color:#C41E2F">⚠ 확인이 필요한 학교 '+nWarn+'곳이 위쪽에 모여 있습니다.</b>':'')+'</div>'
+    +'<div style="overflow:auto;max-height:60vh;border:1.5px solid #e2e7f0;border-radius:10px"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:980px"><thead><tr><th>#</th><th>유형</th><th>시도</th><th>시군구</th><th>기관명</th><th>학년-반</th><th>남</th><th>여</th><th>정원</th><th>회차 최대</th><th>회차</th><th>지도자<br>자격O/X</th><th>남/여 출처 · 확인</th></tr></thead><tbody>'
+    +rows.map(function(r,i){const w=rptWarn(r);const s=RPT_SRC[r.src]||RPT_SRC.none;
+      return '<tr id="rvr_'+i+'"'+(w.length?' style="background:#fff7f7"':'')+'><td>'+(i+1)+'</td><td>'+r.type+'</td><td>'+esc(r.vals.C)+'</td><td>'+esc(r.vals.D)+'</td><td class="nm"><b>'+esc(r.vals.E)+'</b></td>'
+        +'<td><input id="rvF_'+i+'" value="'+esc(r.vals.F||'')+'" placeholder="3-2" style="'+inp+';width:110px" oninput="rptRvCheck('+i+')">'+((r.gradeFixed&&r.gradeRaw)?'<div style="font-size:11px;color:#8a919d">원래: '+esc(r.gradeRaw)+'</div>':(r.gradeFrom?'<div style="font-size:11px;color:#8a919d">신청서 기준</div>':''))+'</td>'
+        +'<td><input id="rvG_'+i+'" type="number" min="0" value="'+(r.vals.G==null?'':r.vals.G)+'" style="'+inp+';width:62px" oninput="rptRvCheck('+i+')"></td>'
+        +'<td><input id="rvH_'+i+'" type="number" min="0" value="'+(r.vals.H==null?'':r.vals.H)+'" style="'+inp+';width:62px" oninput="rptRvCheck('+i+')"></td>'
+        +'<td id="rvT_'+i+'" style="font-weight:800">'+((+r.vals.G||0)+(+r.vals.H||0))+'</td><td>'+r.maxPart+'</td><td>'+r.nSess+(r.dup?'<div style="font-size:11px;color:#b8860b">중복 일지 '+r.dup+'건 제외</div>':'')+'</td><td>'+r.vals.L+' / '+r.vals.M+'</td>'
+        +'<td><span style="font-size:11px;font-weight:900;color:#fff;background:'+s[1]+';border-radius:999px;padding:2px 8px;white-space:nowrap">'+s[0]+'</span> <span id="rvW_'+i+'" style="color:#C41E2F;font-weight:700">'+esc(w.join(' · '))+'</span>'+(r.note?'<div style="font-size:11px;color:#6b7280">'+esc(r.note)+'</div>':'')+'</td></tr>'}).join('')
+    +'</tbody></table></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:12px;align-items:center"><span id="rvMsg" style="font-size:12.5px;font-weight:700;margin-right:auto"></span>'
+    +'<button class="btn-sub" style="background:#8a919d" onclick="rptRvGo(false)">저장 없이 이대로 내려받기</button><button class="btn-sub" style="background:#0f766e" onclick="rptRvGo(true)">💾 저장하고 내려받기</button></div></div>';
+  document.body.appendChild(ov);window.__rptCtx=ctx;
+}
+function rptRvRead(i){const r=window.__rptCtx.rv[i];const g=document.getElementById('rvG_'+i).value,h=document.getElementById('rvH_'+i).value;
+  r.vals.F=document.getElementById('rvF_'+i).value.trim();r.vals.G=g===''?null:Math.max(0,parseInt(g)||0);r.vals.H=h===''?null:Math.max(0,parseInt(h)||0);
+  r.edited=(r.vals.F!==(r.orig.F||''))||(r.vals.G!==r.orig.G)||(r.vals.H!==r.orig.H);if(r.edited&&(r.vals.G!==r.orig.G||r.vals.H!==r.orig.H)){r.src='admin';r.note=''}return r}
+function rptRvCheck(i){const r=rptRvRead(i);const w=rptWarn(r);document.getElementById('rvT_'+i).textContent=(+r.vals.G||0)+(+r.vals.H||0);document.getElementById('rvW_'+i).textContent=w.join(' · ');document.getElementById('rvr_'+i).style.background=w.length?'#fff7f7':(r.edited?'#f0fdf4':'')}
+async function rptRvGo(save){
+  const ctx=window.__rptCtx;if(!ctx)return;const m=document.getElementById('rvMsg');
+  ctx.rv.forEach(function(r,i){rptRvRead(i)});
+  const bad=ctx.rv.filter(function(r){return rptWarn(r).length});
+  if(bad.length&&!confirm('확인이 필요한 학교가 '+bad.length+'곳 남아 있습니다.\n'+bad.slice(0,10).map(function(r){return '· '+r.vals.E+' — '+rptWarn(r).join(', ')}).join('\n')+(bad.length>10?'\n· … 외 '+(bad.length-10):'')+'\n\n그대로 내려받을까요?'))return;
+  try{
+    if(save){const ed=ctx.rv.filter(function(r){return r.edited&&r.appId});let n=0;
+      for(const r of ed){const upd={grade:r.vals.F||'',benefAt:new Date().toISOString(),benefSrc:firebase.firestore.FieldValue.delete()};if(r.vals.G!=null)upd.studentsM=r.vals.G;if(r.vals.H!=null)upd.studentsF=r.vals.H;
+        if(m){m.textContent='저장 중… '+(++n)+' / '+ed.length;m.style.color='#8a919d'}await DB.collection('schoolApplications').doc(r.appId).update(upd)}
+      if(ed.length)loadApps()}
+    if(m){m.textContent='보고서를 만드는 중…';m.style.color='#8a919d'}
+    await rptBuild(ctx);document.getElementById('rptRv').remove();
+  }catch(e){if(m){m.textContent='실패: '+(e.code||e.message||e);m.style.color='#C41E2F'}else alert('보고서 생성 실패: '+(e.message||e))}
+}
 async function rptDownload(baseFile){
   if(typeof JSZip==='undefined'){alert('압축 라이브러리를 아직 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');return}
   const def=new Date().toISOString().slice(0,7);
-  const ym=prompt('보고 월을 입력하세요 (YYYY-MM)\n· 회계연도 4월부터 이 달 말까지의 누적 실적을 채웁니다',def);
+  const ym=prompt('보고 월을 입력하세요 (YYYY-MM)\n· 회계연도 4월부터 이 달 말까지의 누적 실적을 채웁니다\n· 다음 화면에서 학교별 학년-반·남/여를 확인한 뒤 내려받습니다',def);
   if(!ym)return;if(!/^\d{4}-\d{2}$/.test(ym)){alert('형식: 2026-09');return}
-  const y=+ym.slice(0,4),mo=+ym.slice(5,7);
-  const fyStart=(mo>=4?y:y-1)+'-04-01';
-  const monthEnd=new Date(y,mo,0);const endStr=monthEnd.getFullYear()+'-'+String(monthEnd.getMonth()+1).padStart(2,'0')+'-'+String(monthEnd.getDate()).padStart(2,'0');
   try{
-    if(!APPS.length)await loadApps();
-    const ls=await DB.collection('sessionLogs').get();
-    const byApp={};ls.docs.forEach(d=>{const l=d.data();const dt=String(l.date||'');if(dt<fyStart||dt>endStr)return;(byApp[l.appId]=byApp[l.appId]||[]).push(l)});
-    // [시행 학교만] 기간 안에 강사 일지가 있는 학교만 보고 (선정만 되고 시작 전인 학교는 제외)
-    const apps=APPS.map(d=>Object.assign({id:d.id},d.data())).filter(a=>!a.deleted&&byApp[a.id]&&byApp[a.id].length);
-    if(!apps.length){alert('보고할 학교가 없습니다. 이 기간에 제출된 강사 일지가 있는 학교만 기입됩니다.');return}
-    const U={};for(const a of apps){if(a.assignedUid&&!U[a.assignedUid]){try{const d=await DB.collection('users').doc(a.assignedUid).get();U[a.assignedUid]=d.exists?(d.data()||{}):{}}catch(e){U[a.assignedUid]={}}}}
-    const order={school:0,after:1};
-    apps.sort((p,q)=>((order[p.typeKey]||0)-(order[q.typeKey]||0))||String(p.city||'').localeCompare(String(q.city||''))||String(p.school||'').localeCompare(String(q.school||'')));
-    let noLog=0;const estList=[];
-    const rows=apps.map(a=>{
-      const logs=(byApp[a.id]||[]).slice().sort((p,q)=>(p.session||0)-(q.session||0));if(!logs.length)noLog++;
-      const months={};logs.forEach(l=>{const m=parseInt(String(l.date).slice(5,7),10);if(m)months[m]=(months[m]||0)+1});
-      const sess={};logs.forEach(l=>{const n=+l.session||0;if(!n)return;const c=(l.male!=null&&l.female!=null&&(l.male+l.female)>0)?(l.male+l.female):(+l.count||0);sess[n]=Math.max(sess[n]||0,c)});
-      // [수혜자 남/여] ① 관리자가 입력한 수혜자 정보 ② 강사 일지의 남/여(가장 최근 회차) ③ 둘 다 없으면 합계를 반반 분할하고 '추정'으로 표시
-      const mfLog=logs.slice().reverse().find(l=>l.male!=null&&l.female!=null&&(l.male+l.female)>0);
-      const sessions=Object.keys(sess).map(n=>({n:+n,lead:1,part:sess[n]||null}));
-      const city=String(a.city||'').trim();const sido=city.split(/\s+/)[0]||'';const gugun=city.slice(sido.length).trim();
-      const total=Math.max(parseInt(a.students)||0,...Object.values(sess),0);
-      const inst=a.assignedUid?U[a.assignedUid]:null;let L=0,M=0;
-      if(inst){if(inst.natCertApproved)L=1;else M=1}else if(a.selfTeach){M=1}
-      const type=RPT_TYPE[a.typeKey]||((String(a.type||'').indexOf('방과후')>=0||String(a.type||'').indexOf('돌봄')>=0)?RPT_TYPE.after:RPT_TYPE.school);
-      // 남녀: 신청서에 구분이 없어 합계를 반반으로 나눔 (홀수면 남 +1)
-      let male,female,src='est';
-      if(a.studentsM!=null||a.studentsF!=null){male=a.studentsM||0;female=a.studentsF||0;src='admin'}
-      else if(mfLog){male=mfLog.male;female=mfLog.female;src='log'}
-      else{male=total?Math.ceil(total/2):null;female=total?Math.floor(total/2):null;if(total)estList.push(a.school||'')}
-      return {B:type,C:sido,D:gugun,E:a.school||'',F:a.grade||'',G:male||null,H:female||null,J:0,K:0,L:L,M:M,months:months,sessions:sessions,typeKey:(type===RPT_TYPE.after?'after':'school'),src:src};
-    });
-    let zip;
-    if(baseFile){zip=await JSZip.loadAsync(await baseFile.arrayBuffer())}
-    else{const res=await fetch('files/report_template_2026.xlsx?v='+Date.now());if(!res.ok)throw new Error('양식 파일(files/report_template_2026.xlsx)을 찾을 수 없습니다');zip=await JSZip.loadAsync(await res.arrayBuffer())}
-    const sf=zip.file('xl/worksheets/sheet1.xml');if(!sf)throw new Error('양식 첫 시트를 읽을 수 없습니다 (같은 양식의 .xlsx 인지 확인)');
-    let sx=await sf.async('string');
-    // [기준 파일 갱신] 이미 적힌 학교(유형3·5, 기관명 일치)는 그 행에서 월별 횟수·회차만 갱신 — 남/여·학년·지도자 등 손으로 적은 값은 그대로
-    const ssx=zip.file('xl/sharedStrings.xml')?await zip.file('xl/sharedStrings.xml').async('string'):'';
-    const sst=(ssx.match(/<x:si>[\s\S]*?<\/x:si>/g)||[]).map(x=>(x.match(/<x:t[^>]*>([^<]*)<\/x:t>/g)||[]).map(t=>t.replace(/<[^>]+>/g,'')).join(''));
-    const existing={};let lastFilled=15;
-    for(let n=16;n<=215;n++){const row=rptRowXml(sx,n);if(!row)continue;const B=rptCellText(row,'B'+n,sst);if(!B)continue;lastFilled=n;const E=rptCellText(row,'E'+n,sst);const tk=/유형3/.test(B)?'school':(/유형5/.test(B)?'after':'');if(tk&&E)existing[tk+'|'+rptNorm(E)]=n}
-    let updated=0;const newRows=[];
-    rows.forEach(r=>{const n=existing[r.typeKey+'|'+rptNorm(r.E)];
-      if(n){let row=rptRowXml(sx,n);const old=row;const set=(col,v)=>{row=rptSetCell(row,col+n,v)};
-        Object.keys(RPT_MONTH_COL).forEach(m=>set(RPT_MONTH_COL[m],(r.months&&r.months[m])?r.months[m]:null));
-        (r.sessions||[]).forEach(x=>{if(!(x.n>=1&&x.n<=32))return;const c1=31+(x.n-1)*2;set(rptColLetter(c1),x.lead);set(rptColLetter(c1+1),x.part)});
-        sx=sx.replace(old,row);updated++;r.src='base'}
-      else newRows.push(r)});
-    const start=lastFilled+1;
-    if(start+newRows.length-1>215)alert('양식 행(215행)을 넘어 '+(start+newRows.length-1-215)+'개 학교는 기입되지 않습니다.');
-    sx=rptFill(sx,newRows,start);
-    const allKeys=new Set(Object.keys(existing));rows.forEach(r=>allKeys.add(r.typeKey+'|'+rptNorm(r.E)));
-    sx=rptSetCell(sx,'C3','대한민국플라잉디스크연맹');
-    zip.file('xl/worksheets/sheet1.xml',sx);
-    let wbx=await zip.file('xl/workbook.xml').async('string');
-    const sheetName='플라잉디스크연맹 '+mo+'월 현황';
-    const oldName=((wbx.match(/<x:sheet name="([^"]*)" sheetId="1"/)||[])[1])||'';
-    wbx=wbx.replace(/<x:sheet name="[^"]*" sheetId="1"/,'<x:sheet name="'+sheetName+'" sheetId="1"');
-    // [2번 시트 「사업 성과」] 유형별 학교 수(흰 칸)만 기입 — 나머지는 1번 시트를 참조하는 수식. 시트명이 바뀌므로 수식의 참조 이름도 함께 바꿉니다
-    const n3=[...allKeys].filter(k=>k.indexOf('school|')===0).length,n5=[...allKeys].filter(k=>k.indexOf('after|')===0).length;
-    for(const p of Object.keys(zip.files).filter(p=>/^xl\/worksheets\/sheet\d+\.xml$/.test(p))){
-      let x=await zip.file(p).async('string');let changed=false;
-      if(p==='xl/worksheets/sheet2.xml'){x=rptSetCell(x,'B23',n3||null);x=rptSetCell(x,'B37',n5||null);changed=true}
-      if(oldName&&oldName!==sheetName&&x.indexOf("'"+oldName+"'!")>=0){x=x.split("'"+oldName+"'!").join("'"+sheetName+"'!");changed=true}
-      if(changed)zip.file(p,x);
-    }
-    if(/<x:calcPr /.test(wbx)&&!/fullCalcOnLoad/.test(wbx))wbx=wbx.replace(/<x:calcPr /,'<x:calcPr fullCalcOnLoad="1" ');
-    zip.file('xl/workbook.xml',wbx);
-    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});   // 압축 (기본값은 무압축이라 파일이 8배 커짐)
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=String(mo).padStart(2,'0')+'월_플라잉디스크_'+String(y).slice(2)+'년 유소년월별 현황보고서.xlsx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
-    alert('📊 '+ym+' 현황보고서를 내려받았습니다.\n· 시행 중(일지 있음) 학교 '+rows.length+'개'+(baseFile?' — 기준 파일 행 갱신 '+updated+'개 · 새로 추가 '+newRows.length+'개 ('+start+'행부터)':' ('+start+'행부터)')+'\n· 수혜자 남/여: 관리자 입력 '+rows.filter(r=>r.src==='admin').length+'교 · 강사 일지 '+rows.filter(r=>r.src==='log').length+'교'+(estList.length?'\n  ⚠ 추정(반반 분할) '+estList.length+'교 — [👥 수혜자] 버튼이나 [이전 보고서 가져오기]로 실제 값을 넣어 주세요: '+estList.slice(0,10).join(', ')+(estList.length>10?' 외 '+(estList.length-10):''):'')+'\n· 「사업 성과」 시트의 유형3·유형5 학교 수도 함께 기입되며, 색칠된 수식 칸은 엑셀에서 열 때 자동 계산됩니다');
-  }catch(e){alert('보고서 생성 실패: '+(e.message||e))}
+    const ctx=await rptCollect(ym);
+    if(!ctx.rows.length&&!baseFile){alert('보고할 학교가 없습니다. 이 기간에 제출된 강사 일지가 있는 학교만 기입됩니다.');return}
+    await rptOpen(ctx,baseFile);
+    rptReview(ctx);
+  }catch(e){alert('보고서 준비 실패: '+(e.message||e))}
 }
 async function payrollCSV(){
   const ym=prompt('지급 계산할 월을 입력하세요 (YYYY-MM)',new Date().toISOString().slice(0,7));
@@ -5616,7 +5793,7 @@ async function updateLeaderboard(){
       rows:rows,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
     // ── 공개 사업현황 (학교명·숫자만, 개인정보 없음) ──
     const apps=await DB.collection('schoolApplications').get();
-    const regions={};let schoolSel=0,afterSel=0,schoolRecv=0,afterRecv=0,sessions=0;const schools=[];
+    const regions={};let schoolSel=0,afterSel=0,schoolRecv=0,afterRecv=0,sessions=0;const schools=[];const selIds={};
     apps.docs.forEach(d=>{
       const v=d.data();
       const isAfter0=String(v.type||'').indexOf('방과후')>=0;
@@ -5624,10 +5801,16 @@ async function updateLeaderboard(){
       if(['선정','배정완료'].indexOf(v.status)<0)return;
       const isAfter=String(v.type||'').indexOf('방과후')>=0;
       if(isAfter)afterSel++;else schoolSel++;
-      sessions+=v.doneSessions||0;
+      selIds[d.id]=1;
       regions[v.region]=regions[v.region]||{sel:0,inst:0};regions[v.region].sel++;
       if(schools.length<150)schools.push({n:v.school,r:v.region,t:isAfter?'after':'school',a:v.status==='배정완료'});
     });
+    // [운영 회차 2026-09-28] 신청서의 doneSessions 는 갱신되지 않아 늘 0 이었음 → 강사 일지(sessionLogs) 기준으로 셉니다
+    let partM=0,partF=0,partAll=0;
+    try{const lg=await DB.collection('sessionLogs').get();const seen={};
+      lg.docs.forEach(d=>{const l=d.data();if(!selIds[l.appId])return;const k=l.appId+'|'+(l.session||d.id);if(seen[k])return;seen[k]=1;sessions++;
+        const m=(l.male==null||l.male==='')?null:+l.male,f=(l.female==null||l.female==='')?null:+l.female;
+        if(m!=null&&f!=null&&!isNaN(m)&&!isNaN(f)&&(m+f)>0){partM+=m;partF+=f;partAll+=m+f}else partAll+=(+l.count||0)})}catch(e){console.warn('일지 집계 실패',e)}
     let instructors=0;
     snap.docs.forEach(u=>{
       const f=u.data().instructorFor||{};
@@ -5647,7 +5830,7 @@ async function updateLeaderboard(){
       updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
       schoolSel:schoolSel,schoolQuota:70,afterSel:afterSel,afterQuota:30,
       schoolRecv:schoolRecv,afterRecv:afterRecv,
-      members:snap.size,instructors:instructors,sessions:sessions,
+      members:snap.docs.filter(d=>!d.data().deleted).length,instructors:instructors,sessions:sessions,participants:partAll,participantsM:partM,participantsF:partF,
       schools:schools,regions:regions});
   }catch(e){console.warn('리더보드 갱신 실패',e)}
 }
