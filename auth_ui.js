@@ -42,7 +42,7 @@
     {t:'사업안내',h:'business.html?view=youth',d:[
       ['유소년 스포츠 기반구축사업','business.html?view=youth'],['학교체육 강습','business.html?view=school'],
       ['방과후 · 늘봄','business.html?view=after'],['교원연수 · 교재개발','business.html?view=train'],['학교 강습 신청','apply.html'],
-      ['선정학교 현황','selected.html','','admin'],['학교별 운영일지','schoollogs.html','','admin']]},
+      ['선정학교 현황','selected.html','','admin'],['학교별 운영일지','schoollogs.html','','admin'],['연맹 인트라넷','intranet.html','','admin']]},
     {t:'대회',h:'competition.html?view=list',d:[
       ['대회 일정 · 안내','competition.html?view=list'],['참가 신청','competition.html?view=entry'],
       ['심판 · 운영요원 모집','competition.html?view=list&kind=staff'],['라이브 중계','live.html'],['대회 결과','results.html'],['사진첩','gallery.html'],
@@ -326,7 +326,7 @@
     firebase.auth().onAuthStateChanged(function(u){
       // [권한자 링크 2026-09-28] 중앙·시도임원·권역장이면 메뉴의 권한자 전용 링크(sn-admin: 선정학교 현황·학교별 운영일지·공고 관리)를 켭니다
       if(u&&firebase.firestore){try{firebase.firestore().collection('users').doc(u.uid).get().then(function(d){var v=d.exists?(d.data()||{}):{};var rs=[v.role].concat(v.roles||[]);
-        if(v.owner===true||rs.indexOf('admin')>=0||rs.indexOf('sidoOfficer')>=0||(rs.indexOf('regionAdmin')>=0&&v.managedRegion))KFDF_VIEW.showAdminLinks()}).catch(function(){})}catch(e){}}
+        if(v.owner===true||rs.indexOf('admin')>=0||rs.indexOf('sidoOfficer')>=0||rs.indexOf('gugunOfficer')>=0||(rs.indexOf('regionAdmin')>=0&&v.managedRegion))KFDF_VIEW.showAdminLinks()}).catch(function(){})}catch(e){}}
       var el=document.getElementById('utilAuth');if(!el)return;
       if(u){
         el.textContent='로그아웃';el.href='#';
