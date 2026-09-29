@@ -90,6 +90,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
 <script src="career.js?v=20260907a"></script>
+<script src="seal.js?v=20260929a"></script>
 <script>
 KFDF.initApp();
 const AUTH = firebase.auth();
@@ -658,11 +659,11 @@ function eduWho(v){return (v.name||'')+' ('+(v.birth||'생년월일 없음')+' �
 <script>
 let USERS=[];
 let IS_OWNER=false,VIEWER_IS_ADMIN=false;
-// [직인 보호 2026-09-29] 직인 이미지는 공개 경로에 두지 않습니다 — 직인 관리자만 읽을 수 있는 intraSeals/central(연맹 인트라넷 › 기관 설정에서 등록)에서 읽습니다.
-//   읽을 권한이 없거나 등록 전이면 빈 그림(직인 없이 출력)입니다.
+// [직인 보호 2026-09-29] 직인 이미지는 홈페이지에 파일로 두지 않습니다 — 관리자 화면을 열 때 서버 함수(sealImage · seal.js)에서 받아 둡니다(발급 기록 남음).
+//   받지 못하면 빈 그림(직인 없이 출력)입니다.
 const KFDF_BLANK_IMG='data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 window.KFDF_SEAL_URL='';
-async function sealLoad(){try{const g=await DB.collection('intraSeals').doc('central').get();window.KFDF_SEAL_URL=(g.exists&&g.data().img)||''}catch(e){window.KFDF_SEAL_URL=''}return window.KFDF_SEAL_URL}
+async function sealLoad(){try{if(!window.KFDF_SEAL_URL)window.KFDF_SEAL_URL=await KFDF_SEAL.get('adminDoc','ADMIN')}catch(e){window.KFDF_SEAL_URL=''}return window.KFDF_SEAL_URL}
 function sealUrl(){return window.KFDF_SEAL_URL||KFDF_BLANK_IMG}
 let CMY=null,IS_SIDO=false;
 AUTH.onAuthStateChanged(async u=>{
@@ -677,7 +678,7 @@ AUTH.onAuthStateChanged(async u=>{
   IS_SIDO=isSido&&!isAdmin;
   IS_OWNER=md.owner===true;
   VIEWER_IS_ADMIN=isAdmin;
-  if(isAdmin)sealLoad();   // [직인 보호] 직인 관리자일 때만 읽힘
+  sealLoad();   // [직인 보호] 관리자·시도연맹 임원 출력용 직인 받아 두기
   (function(){['rosterBtn','crimBoardBtn','logsPageBtn'].forEach(function(id){var rb=document.getElementById(id);if(rb)rb.style.display=isAdmin?'':'none'})})();   // [공문 붙임2 · 범죄경력조회] 중앙 사무국만
   document.getElementById('adminBody').style.display='block';loadDash();
   try{const _t=parseInt(new URLSearchParams(location.search).get('tab')||'',10);if(_t>=1&&_t<=10)tab(_t)}catch(e){}   // [화면 주소] admin.html?tab=번호 로 바로 열기

@@ -89,6 +89,8 @@
 <script src="kfdf.js?v=20260914a"></script>
 <script src="liccert.js?v=20260921a"></script>
 <script src="career.js?v=20260907a"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+<script src="seal.js?v=20260929a"></script>
 <script src="region_map.js?v=20260910a"></script>
 <script>
 KFDF.initApp();
@@ -3200,7 +3202,7 @@ async function athClaim(auto){
 }
 // ── 경력증명서 3종: staff(심판·운영·위원·봉사) / coach(지도) / athlete(선수·입상 — 별도 서식·확인 문구) ──
 const CERT_GROUPS={staff:['위원','심판','운영','봉사'],coach:['지도'],athlete:['선수','입상']};
-function printCareerCert(kind){
+async function printCareerCert(kind){
   const d=MYD||{};const recs=(MYCAREER||[]).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
   const allowed=new Set(CERT_GROUPS[kind]||['위원','심판','운영','봉사','지도','선수','입상']);
   const sel=recs.filter(c=>allowed.has(c.group||CAREER.group(c.role||c.duty)));
@@ -3211,13 +3213,14 @@ function printCareerCert(kind){
   const no='KFDF-'+(kind==='coach'?'CC':'CR')+'-'+now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+'-'+String((AUTH.currentUser||{}).uid||'').slice(0,6).toUpperCase();
   const dateStr=now.getFullYear()+'년 '+(now.getMonth()+1)+'월 '+now.getDate()+'일';
   const lics=((typeof MYLICS!=='undefined'&&MYLICS)||[]).map(x=>x.data?x.data():x).map(l=>[(l.type||l.kind||l.category||'연맹 자격'),(l.grade||l.level||''),(l.no||l.number||''),(l.issuedAt||l.issued||'')].filter(Boolean).join(' · ')).filter(Boolean);
-  const stamp='',logo=new URL('kfdf_logo.png',location.href).href;   // [직인 보호] 직인 이미지는 회원 화면으로 내려보내지 않습니다
+  const logo=new URL('kfdf_logo.png',location.href).href;
   const grpRows=['위원','심판','운영','봉사','지도','선수','입상'].filter(g=>st.byGroup[g]).map(g=>'<tr><td>'+G[g]+' '+g+'</td><td style="text-align:right">'+st.byGroup[g]+'건</td><td style="text-align:right">'+sel.filter(c=>(c.group||CAREER.group(c.role||c.duty))===g).reduce((n,c)=>n+(+(c.days||1)||1),0)+'일</td></tr>').join('');
   const detail=sel.filter(c=>(c.group||CAREER.group(c.role||c.duty))!=='입상').map((c,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(c.date||'')+'</td><td class="l">'+esc(c.competitionName||'')+(c.kidName?' ('+esc(c.kidName)+')':'')+'</td><td>'+esc(CAREER.orgText(c)||'-')+'</td><td>'+esc(c.location||'-')+'</td><td>'+esc(c.sport||'-')+'</td><td>'+esc(c.role||c.duty||'-')+'</td><td>'+(c.verified?'✓':'')+'</td></tr>').join('');
   const title=kind==='coach'?'지 도 자 경 력 증 명 서':'경 력 증 명 서';
   const what=kind==='coach'?'지도자(감독·코치·인솔자)로 활동한 사실':'활동한 사실';
   const w=window.open('','_blank');
   if(!w){alert('팝업이 차단되어 증명서 창을 열 수 없습니다. 주소창의 팝업 차단을 해제해주세요.');return}
+  KFDF_SEAL.wait(w,'증명서를 준비하는 중…');const stamp=await KFDF_SEAL.get('careerCert',no);   // [직인 보호] 출력 순간에만 받아옴
   w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title.replace(/ /g,'')+' '+esc(d.name||'')+'</title>'
     +certCss()+'</head><body><div class="sheet">'
     +'<div class="hd"><img src="'+logo+'"><div class="no">발급번호 '+no+'<br>발급일 '+dateStr+'</div></div>'
@@ -3230,7 +3233,7 @@ function printCareerCert(kind){
     +'<table style="margin-top:8px"><tr><th>구분</th><th>건수</th><th>일수</th></tr>'+grpRows+'</table>'
     +(detail?'<div class="sec">Ⅱ. 활동 상세</div><table><tr><th style="width:5%">번호</th><th style="width:11%">일자</th><th>대회·행사명</th><th style="width:16%">주최·주관</th><th style="width:13%">장소</th><th style="width:10%">종목</th><th style="width:11%">역할</th><th style="width:6%">확인</th></tr>'+detail+'</table>':'')
     +'<div class="foot">위와 같이 대한민국플라잉디스크연맹이 주최·주관·승인한 대회 및 행사에서<br>'+what+'을 증명합니다.<br><br>'+dateStr+'<br>'
-    +'<div class="sig">사단법인 대한민국플라잉디스크연맹 회장 <small style="font-size:10.5px;color:#666;font-weight:500;margin-left:6px;letter-spacing:0">(직인 생략)</small></div></div>'
+    +'<div class="sig">사단법인 대한민국플라잉디스크연맹 회장'+(stamp?'<img src="'+stamp+'" alt="직인">':KFDF_SEAL.OMIT)+'</div></div>'
     +'<div class="small">· 본 증명서는 연맹 홈페이지에서 회원 본인이 발급한 것으로, 기록은 각 대회 운영진의 임무 완료·종료 처리로 등록된 이력에 근거합니다.<br>· 진위 확인: 사무국 031-984-3248 / kfdf60@hanmail.net (발급번호 '+no+')</div>'
     +'</div><script>window.onload=function(){setTimeout(function(){window.print()},400)}<'+'/script></body></html>');
   w.document.close();
@@ -3258,7 +3261,8 @@ function printAthleteCert(sel){
     const now=new Date();const pad=n=>String(n).padStart(2,'0');
     const no='KFDF-AC-'+now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+'-'+String((AUTH.currentUser||{}).uid||'').slice(0,6).toUpperCase();
     const dateStr=now.getFullYear()+'년 '+(now.getMonth()+1)+'월 '+now.getDate()+'일';
-    const stamp='',logo=new URL('kfdf_logo.png',location.href).href;   // [직인 보호] 직인 이미지는 회원 화면으로 내려보내지 않습니다
+    const logo=new URL('kfdf_logo.png',location.href).href;
+    const stamp=seal?await KFDF_SEAL.get('athleteCert',no):'';if(!stamp)seal=false;   // [직인 보호]
     // 같은 대회·같은 사람의 참가/입상을 한 줄로
     const rows={};sel.forEach(c=>{const k=[c.competitionName,c.date,c.kidName||'',c.team||''].join('|');const r=rows[k]=rows[k]||{date:c.date||'',comp:c.competitionName||'',org:CAREER.orgText(c),sport:c.sport||'',div:c.division||'',team:c.team||c.schoolName||'',kid:c.kidName||'',results:[],fed:!(c.source&&/schoolclub/.test(c.source))};
       const g=c.group||CAREER.group(c.role||c.duty);if(g==='입상')r.results.push(c.result||c.role||'입상');else r.results.unshift('참가')});
@@ -3281,7 +3285,7 @@ function printAthleteCert(sel){
       +'<div class="sec">Ⅱ. 대회 참가·입상 기록</div><table><tr><th style="width:5%">번호</th><th style="width:11%">일자</th><th>대회명</th><th style="width:18%">주최·주관 기관</th><th style="width:15%">종목·부문</th><th style="width:16%">당시 소속(학교·팀)</th><th style="width:11%">결과</th></tr>'+detail+'</table>'
       +'<div class="conf">위 내용은 사단법인 대한민국플라잉디스크연맹이 주최·주관한 대회의 결과와, 각 주최기관'+(ext.length?'('+ext.map(esc).join(', ')+')':'(교육청 등)')+'이 개최한 대회의 결과를 연맹이 기록·관리한 것으로, 연맹은 위 기록의 <b>관리 사실을 확인</b>합니다.'
       +(ext.length?'<br>※ 주최기관이 연맹이 아닌 대회의 기록은 해당 주최기관이 제공한 결과(참가·입상 명단)에 근거하며, 결과의 원본은 각 주최기관이 보관합니다.':'')+'</div>'
-      +'<div class="foot">'+dateStr+'<br><div class="sig">사단법인 대한민국플라잉디스크연맹 회장'+'</div>'+'<div style="font-size:10.5px;color:#666">(직인 생략)</div>'+'</div>'
+      +'<div class="foot">'+dateStr+'<br><div class="sig">사단법인 대한민국플라잉디스크연맹 회장'+(seal?'<img src="'+stamp+'" alt="직인">':'')+'</div>'+(seal?'':'<div style="font-size:10.5px;color:#666">(직인 생략)</div>')+'</div>'
       +'<div class="small">· 본 확인서는 연맹 홈페이지에서 회원 본인(보호자)이 발급한 것으로, 학교스포츠클럽 등 외부 대회 기록은 주최기관 명단을 연맹이 대조·등록한 것입니다.<br>· 진위 확인: 사무국 031-984-3248 / kfdf60@hanmail.net (발급번호 '+no+')</div>'
       +'</div><script>window.onload=function(){setTimeout(function(){window.print()},400)}<'+'/script></body></html>');
     w.document.close();
@@ -3557,13 +3561,14 @@ function renderCompContracts(){
       +'</div></div>';
   }).join('');
 }
-function printCompContract(id){
+async function printCompContract(id){
   const c=MYCOMP.find(x=>x.id===id).data();
   const ag=(MYD.contracts||{})['comp_'+id];
   const logo=new URL('kfdf_logo.png',location.href).href;
   const payClause=(c.role==='심판')?'심판 수당은 1일 70,000원 이내로 하며, 참여 시간이 4시간 이내인 경우 40,000원을 지급한다.':'운영요원 수당은 사업 예산 기준에 따라 산정하여 지급한다.';
   const w=window.open('','_blank');
   if(!w){alert('팝업이 차단되어 있습니다. 팝업 허용 후 다시 시도해주세요.');return}
+  KFDF_SEAL.wait(w,'계약서를 준비하는 중…');const seal=await KFDF_SEAL.get('compContract','COMP-'+String(id).slice(0,20));   // [직인 보호]
   w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>위촉계약서</title>'
   +'<style>@page{size:A4;margin:0}body{margin:0;font-family:"Malgun Gothic",sans-serif;display:flex;justify-content:center;background:#f2f2f2}'
   +'.doc{width:210mm;min-height:297mm;background:#fff;box-sizing:border-box;padding:22mm 20mm;font-size:13.5px;line-height:1.85;color:#222;word-break:keep-all}'
@@ -3593,17 +3598,18 @@ function printCompContract(id){
   +'<tr><td class="k">입금 계좌</td><td>'+(MYD.bank?esc(MYD.bank)+' '+esc(MYD.accountNum||'')+' (예금주: '+esc(MYD.accountHolder||'')+')':'<span style="color:#C41E2F">미등록 — 프로필에서 등록 필요</span>')+'</td></tr></table>'
   +'<table><tr><td class="k">갑</td><td>사단법인 대한민국플라잉디스크연맹 회장 &nbsp;(직인)</td></tr>'
   +'<tr><td class="k">을</td><td>'+esc(MYD.name)+(ag&&ag.sign?' <img src="'+ag.sign+'" style="height:34px;vertical-align:middle;margin:0 6px">':'')+' &nbsp;—&nbsp; '+((ag&&ag.sign)?'<b style="color:#0f766e">전자 서명 완료: '+fmtDate(ag.agreedAt)+'</b>':(ag?'<b style="color:#b8860b">(이전 방식으로 동의만 기록됨 — 다시 서명 필요)</b>':'(서명 전)'))+'</td></tr></table>'
-  +'<div class="org"><span class="orgwrap"><img class="lg" src="'+logo+'">대한민국플라잉디스크연맹<small style="font-size:10.5px;color:#666;font-weight:500;margin-left:6px;letter-spacing:0">(직인 생략)</small></span></div>'
+  +'<div class="org"><span class="orgwrap"><img class="lg" src="'+logo+'">대한민국플라잉디스크연맹'+(seal?'<img class="seal" src="'+seal+'">':KFDF_SEAL.OMIT)+'</span></div>'
   +'</div><script>window.onload=function(){window.print()}<'+'/script></body></html>');
   w.document.close();
 }
-function printContract(id){
+async function printContract(id){
   const a=MYASG.find(x=>x.id===id).data();
   const ag=(MYD.contracts||{})[id];
   const logo=new URL('kfdf_logo.png',location.href).href;
   const period=(a.start&&a.start.indexOf('8월')>=0)?'2026. 8. ~ 2026. 12.':'2026. 9. ~ 2026. 12.';
   const w=window.open('','_blank');
   if(!w){alert('\ud31d\uc5c5\uc774 \ucc28\ub2e8\ub418\uc5b4 \uc788\uc2b5\ub2c8\ub2e4. \ud31d\uc5c5 \ud5c8\uc6a9 \ud6c4 \ub2e4\uc2dc \uc2dc\ub3c4\ud574\uc8fc\uc138\uc694.');return}
+  KFDF_SEAL.wait(w);const seal=await KFDF_SEAL.get('contract','APP-'+String(id).slice(0,20));   // [직인 보호]
   w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>\uc704\ucd09\uacc4\uc57d\uc11c</title>'
   +'<style>@page{size:A4;margin:0}body{margin:0;font-family:"Malgun Gothic",sans-serif;display:flex;justify-content:center;background:#f2f2f2}'
   +'.doc{width:210mm;min-height:297mm;background:#fff;box-sizing:border-box;padding:22mm 20mm;font-size:13.5px;line-height:1.85;color:#222;word-break:keep-all}'
@@ -3636,7 +3642,7 @@ function printContract(id){
   +'<tr><td class="k">\uc785\uae08 \uacc4\uc88c</td><td>'+(MYD.bank?esc(MYD.bank)+' '+esc(MYD.accountNum||'')+' (\uc608\uae08\uc8fc: '+esc(MYD.accountHolder||'')+')':'<span style="color:#C41E2F">\ubbf8\ub4f1\ub85d \u2014 \ud504\ub85c\ud544\uc5d0\uc11c \ub4f1\ub85d \ud544\uc694</span>')+'</td></tr></table>'
   +'<table><tr><td class="k">\uac11</td><td>\uc0ac\ub2e8\ubc95\uc778 \ub300\ud55c\ubbfc\uad6d\ud50c\ub77c\uc789\ub514\uc2a4\ud06c\uc5f0\ub9f9 \ud68c\uc7a5 &nbsp;(\uc9c1\uc778)</td></tr>'
   +'<tr><td class="k">\uc744</td><td>'+esc(MYD.name)+(ag&&ag.sign?' <img src="'+ag.sign+'" style="height:34px;vertical-align:middle;margin:0 6px">':'')+' &nbsp;\u2014&nbsp; '+((ag&&ag.sign)?'<b style="color:#0f766e">\uc804\uc790 \uc11c\uba85 \uc644\ub8cc: '+fmtDate(ag.agreedAt)+'</b>':(ag?'<b style="color:#b8860b">(\uc774\uc804 \ubc29\uc2dd\uc73c\ub85c \ub3d9\uc758\ub9cc \uae30\ub85d\ub428 \u2014 \ub2e4\uc2dc \uc11c\uba85 \ud544\uc694)</b>':'(\uc11c\uba85 \uc804)'))+'</td></tr></table>'
-  +'<div class="org"><span class="orgwrap"><img class="lg" src="'+logo+'">\ub300\ud55c\ubbfc\uad6d\ud50c\ub77c\uc789\ub514\uc2a4\ud06c\uc5f0\ub9f9<small style="font-size:10.5px;color:#666;font-weight:500;margin-left:6px;letter-spacing:0">(직인 생략)</small></span></div>'
+  +'<div class="org"><span class="orgwrap"><img class="lg" src="'+logo+'">\ub300\ud55c\ubbfc\uad6d\ud50c\ub77c\uc789\ub514\uc2a4\ud06c\uc5f0\ub9f9'+(seal?'<img class="seal" src="'+seal+'">':KFDF_SEAL.OMIT)+'</span></div>'
   +'</div><script>window.onload=function(){window.print()}<'+'/script></body></html>');
   w.document.close();
 }
@@ -3923,6 +3929,7 @@ async function printCert(){
   const dateStr=today.getFullYear()+'\ub144 '+(today.getMonth()+1)+'\uc6d4 '+today.getDate()+'\uc77c';
   const w=window.open('','_blank');
   if(!w){alert('팝업이 차단되어 이수증 창을 열 수 없습니다.\n주소창 오른쪽의 팝업 차단 아이콘을 눌러 "허용"으로 바꾼 뒤 다시 시도해주세요.');return}
+  KFDF_SEAL.wait(w,'이수증을 준비하는 중…');const sealU=await KFDF_SEAL.get('eduCert',certNo());   // [직인 보호]
   w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>\uc774\uc218\uc99d</title>'
   +'<style>@page{size:A4;margin:0}body{margin:0;font-family:"Batang","Noto Serif KR",serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f2f2f2}'
   +'.cert{width:210mm;height:297mm;background:#fff;box-sizing:border-box;padding:26mm 22mm}'
@@ -3945,7 +3952,7 @@ async function printCert(){
   +'<div class="meta">\uacfc\uc815\uba85 : 2026\ub144 \uc720\uc18c\ub144 \uc2a4\ud3ec\uce20 \uae30\ubc18\uad6c\ucd95\uc0ac\uc5c5 \uad50\uc6d0\u00b7\uc9c0\ub3c4\uc790 \uc790\uc728\uc5f0\uc218<br>\uae30\u3000\uac04 : 2026. 7. 4. ~ 2026. 7. 5. (\ucd1d 10\uc2dc\uac04)<br>\uc7a5\u3000\uc18c : KT\ub300\uc804\uc778\uc7ac\uac1c\ubc1c\uc6d0</div>'
   +'<div class="body">위 사람은 문화체육관광부·국민체육진흥공단·대한체육회가<br>후원하는 2026년 유소년 스포츠 기반구축사업<br>교원·지도자 자율연수 과정을 성실히 이수하였음을 확인합니다.</div>'
   +'<div class="dt">'+dateStr+'</div>'
-  +'<div class="org"><span class="orgwrap"><img src="'+logo+'">\ub300\ud55c\ubbfc\uad6d\ud50c\ub77c\uc789\ub514\uc2a4\ud06c\uc5f0\ub9f9<small style="font-size:10.5px;color:#666;font-weight:500;margin-left:6px;letter-spacing:0">(직인 생략)</small></span></div>'
+  +'<div class="org"><span class="orgwrap"><img src="'+logo+'">\ub300\ud55c\ubbfc\uad6d\ud50c\ub77c\uc789\ub514\uc2a4\ud06c\uc5f0\ub9f9'+(sealU?'<img class="seal" src="'+sealU+'">':KFDF_SEAL.OMIT)+'</span></div>'
   +'<div class="vf">\ubcf8 \uc774\uc218\uc99d\uc740 \uc5f0\ub9f9 \ud648\ud398\uc774\uc9c0\uc5d0\uc11c \ubcf8\uc778 \uc778\uc99d \ud6c4 \ubc1c\uae09\ub418\uc5c8\uc2b5\ub2c8\ub2e4.<br>\uc9c4\uc704 \ud655\uc778: \ub300\ud55c\ubbfc\uad6d\ud50c\ub77c\uc789\ub514\uc2a4\ud06c\uc5f0\ub9f9.com/verify.html \uc5d0\uc11c \uc774\uc218\ubc88\ud638 \uc870\ud68c \u00b7 kfdf60@hanmail.net / 031-984-3248</div>'
   +'</div></div><script>window.onload=function(){window.print()}<'+'/script></body></html>');
   w.document.close();
