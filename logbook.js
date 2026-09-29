@@ -1,4 +1,4 @@
-// logbook.js v20260916a · 학교강습 운영일지 보고서(인쇄 → PDF로 저장) + 일지 삭제·복원(기록 보존)
+// logbook.js v20260929a · 학교강습 운영일지 보고서(인쇄 → PDF로 저장) + 일지 삭제·복원(기록 보존)
 //   관리자 강습신청관리 › 📒 일지 패널, 강사 마이페이지 › 운영일지 에서 학교 단위로 엽니다.
 //   홈페이지에 입력된 일지(sessionLogs) 항목만 씁니다: 회차·수업일·인원(남/여)·수업 내용·특이사항·안전 지도 점검 4항목·
 //   활동 사진(최대 3장)·담당교사 확인(성명·시각·전자서명)·정정 이력 + 강습 신청(schoolApplications) 기본 정보.
@@ -235,7 +235,7 @@
     function card(l){
       var tc=l.teacherConfirm,ph=(l.photos||[]).filter(function(p){return src(p)}).slice(0,3);
       var m=num(l.male),f=num(l.female),eh=edits(l),le=eh[eh.length-1]||{};
-      var st=tc?'<span class="pill ok">✓ 담당교사 확인</span>':(reconfirm(l)?'<span class="pill warn">정정 후 재확인 필요</span>':'<span class="pill no">담당교사 확인 전</span>');
+      var st=tc?'<span class="pill ok">✓ 담당교사 확인'+(tc.self?' · 본인 지도':'')+'</span>':(reconfirm(l)?'<span class="pill warn">정정 후 재확인 필요</span>':'<span class="pill no">담당교사 확인 전</span>');
       var photos=ph.length?ph.map(function(p){return '<figure><img src="'+src(p)+'" alt=""></figure>'}).join('')
         +(ph.length===1?'<div class="aside"><b style="color:#16181d;font-size:9pt">'+esc(l.session)+'회차 활동 사진</b>'+fd(l.date,true)+'<br>'+esc(school)+'</div>':'')
         :'<div class="noph">등록된 활동 사진이 없습니다</div>';

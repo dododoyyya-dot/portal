@@ -2325,13 +2325,14 @@ async function saveLogEdit(id){
   const m=document.getElementById('elMsg');
   const l=MYLOGS.find(x=>x._id===id);if(!l)return;
   const WASCFM=l.teacherConfirm||null;   // [서명 후 정정] 정정 전 교사확인 — 해제하고 이력에 보존
+  const SELF=!!selfTeachOf(l.appId);     // [본인 지도] 정정 뒤 담당교사 확인란을 본인 서명으로 다시 기입
   const date=document.getElementById('elDate').value;
   const elM=document.getElementById('elMale'),elF=document.getElementById('elFemale');
   const male=elM&&elM.value!==''?Math.max(0,parseInt(elM.value)||0):null,female=elF&&elF.value!==''?Math.max(0,parseInt(elF.value)||0):null;
   let cnt=parseInt(document.getElementById('elCount').value);if(male!=null&&female!=null&&male+female>0)cnt=male+female;
   const content=document.getElementById('elContent').value.trim();
   if(!date||!cnt||cnt<1||!content){m.textContent='수업일·참여 인원·수업 내용을 확인해주세요';m.style.color='#C41E2F';return}
-  if(WASCFM&&!confirm('['+(l.school||'')+'] '+l.session+'회차는 담당교사 확인(서명)이 끝난 회차입니다 — '+(WASCFM.name||'')+'.\n\n'
+  if(WASCFM&&!SELF&&!confirm('['+(l.school||'')+'] '+l.session+'회차는 담당교사 확인(서명)이 끝난 회차입니다 — '+(WASCFM.name||'')+'.\n\n'
     +'저장하면 교사확인이 「미확인」으로 되돌아가고, 기존 서명은 정정 이력에 보존됩니다.\n'
     +'저장 후 [📱 교사 확인 요청] 을 다시 눌러 담당교사에게 재확인을 받아주세요.\n\n계속할까요?'))return;
   try{
@@ -2357,11 +2358,36 @@ async function saveLogEdit(id){
         before:{date:l.date||'',count:(l.count!=null?l.count:null),male:(l.male!=null?l.male:null),female:(l.female!=null?l.female:null),content:l.content||'',note:l.note||'',photos:((l.photos||[]).length)},
         voidedConfirm:WASCFM}),
       editedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    let selfOk=false;
+    if(SELF){try{await DB.collection('sessionLogs').doc(id).update({teacherConfirm:selfConfirmRec(l.appId)});selfOk=true}catch(e){}}   // [본인 지도] 확인란 다시 기입(정정 저장과는 따로 — 보안 규칙상 한 번에 못 씀)
     document.getElementById('elModal').remove();
     alert('✓ '+l.session+'회차 보고가 수정되었습니다.'+(photos.length?'\n사진 '+photos.length+'장이 등록되었습니다.':'')
-      +(WASCFM?'\n\n⚠ 교사확인이 「미확인」으로 되돌아갔습니다.\n[📱 교사 확인 요청] 을 눌러 담당교사에게 다시 확인을 받아주세요.':''));
+      +(selfOk?'\n\n본인 지도 — 담당교사 확인란에 본인 서명을 다시 기입했습니다.'
+        :(WASCFM?'\n\n⚠ 교사확인이 「미확인」으로 되돌아갔습니다.\n[📱 교사 확인 요청] 을 눌러 담당교사에게 다시 확인을 받아주세요.':'')));
     loadMyLogs();
   }catch(e){m.textContent='저장 실패: '+e.message;m.style.color='#C41E2F'}
+}
+// ══ [본인 지도 2026-09-29] 담당교사 본인이 지도하는 학교 — 일지의 담당교사 확인란에 본인 성명·서명을 같이 기입 ══
+function selfTeachOf(appId){
+  const x=(MYASG||[]).find(function(d){return d.id===appId});if(!x||!AUTH.currentUser)return null;const a=x.data(),uid=AUTH.currentUser.uid;
+  if(!a.selfTeach||a.support==='용품만')return null;
+  if(a.selfUid?a.selfUid!==uid:a.assignedUid!==uid)return null;
+  const nm=function(s){return String(s||'').replace(/\s+/g,'')},dg=function(s){return String(s||'').replace(/\D/g,'')};
+  // 신청서 담당교사가 나인지 — 다른 교사가 담당교사로 적혀 있으면 그 교사의 확인을 받아야 하므로 자동 기입하지 않습니다
+  const same=(nm(a.teacher)&&nm(a.teacher)===nm(MYD&&MYD.name))||(dg(a.phone).length>=9&&dg(a.phone)===dg(MYD&&MYD.phone));
+  return same?a:null;
+}
+function selfConfirmRec(appId){
+  const ag=((MYD&&MYD.contracts)||{})[appId];let sign=(ag&&ag.sign)||'';
+  if(!sign||sign.length>=190000)sign=(MYD&&MYD.signatureImg)||'';if(sign.length>=190000)sign='';
+  return {name:(MYD&&MYD.name)||'',at:new Date().toISOString(),sign:sign,byUid:AUTH.currentUser.uid,via:'self',self:true};
+}
+// 이미 제출한 본인 지도 회차 중 확인란이 빈 것 — 마이페이지를 열 때 한 번 기입
+async function selfConfirmFill(logs){
+  if(window.__selfFillDone)return 0;window.__selfFillDone=true;
+  const todo=(logs||[]).filter(function(l){return !l.teacherConfirm&&!l.fixReq&&selfTeachOf(l.appId)});let n=0;
+  for(const l of todo){try{const tc=selfConfirmRec(l.appId);await DB.collection('sessionLogs').doc(l._id).update({teacherConfirm:tc});l.teacherConfirm=tc;n++}catch(e){}}
+  return n;
 }
 let LGBUSY=false;
 async function submitLog(){
@@ -2393,11 +2419,13 @@ async function submitLog(){
       const snap=await ref.put(blob,{contentType:'image/jpeg'});
       photos.push(await snap.ref.getDownloadURL());
     }
+    const selfTc=selfTeachOf(appId)?selfConfirmRec(appId):null;   // [본인 지도] 담당교사 확인란에 본인 성명·서명을 같이 기입
     await DB.collection('sessionLogs').add({
       appId:appId,school:a.school,type:a.type,uid:AUTH.currentUser.uid,name:MYD.name,
       session:sess,date:date,count:cnt,male:male,female:female,content:content,note:document.getElementById('lgNote').value.trim(),
-      check:chk,photos:photos,teacherConfirm:null,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-    m.textContent='✓ '+sess+'회차 보고가 제출되었습니다.'+(photos.length?' (사진 '+photos.length+'장 포함)':'')+' 사무국 확인 후 포인트가 반영됩니다.';m.className='msg ok';
+      check:chk,photos:photos,teacherConfirm:selfTc,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    m.textContent='✓ '+sess+'회차 보고가 제출되었습니다.'+(photos.length?' (사진 '+photos.length+'장 포함)':'')+' 사무국 확인 후 포인트가 반영됩니다.'
+      +(selfTc?(selfTc.sign?' · 본인 지도 — 담당교사 확인란에 같은 서명이 기입되었습니다.':' · 본인 지도 — 등록된 서명이 없어 담당교사 확인란에 성명만 기입했습니다(프로필에서 서명을 등록해 주세요).'):'');m.className='msg ok';
     document.getElementById('lgContent').value='';document.getElementById('lgNote').value='';document.getElementById('lgCount').value='';if(lgM)lgM.value='';if(lgF)lgF.value='';
     document.getElementById('lgSession').value='';
     document.getElementById('lgPhotos').value='';document.getElementById('lgPhotoState').textContent='';
@@ -3351,7 +3379,7 @@ function lgCardHtml(l){
   const ck=l.check;const ckN=Array.isArray(ck)?ck.filter(Boolean).length:(ck&&typeof ck==='object'?Object.keys(ck).filter(function(k){return ck[k]}).length:0);
   const voided=(l.editHistory||[]).some(function(x){return x&&x.voidedConfirm});
   const chip=l.fixReq?'<span class="chip" style="background:#C41E2F;color:#fff" title="'+esc((l.fixReq.by||'')+' 선생님: '+(l.fixReq.reason||''))+'">✏️ 교사 정정 요청</span>'
-    :(l.teacherConfirm?'<span class="chip" style="background:#e6f5f0;color:#0f766e">✓ 담당교사 확인 · '+esc(l.teacherConfirm.name||'')+'</span>'
+    :(l.teacherConfirm?'<span class="chip" style="background:#e6f5f0;color:#0f766e">✓ 담당교사 확인 · '+esc(l.teacherConfirm.name||'')+(l.teacherConfirm.self?' (본인 지도)':'')+'</span>'
       :'<span class="chip" style="background:#fdf3f4;color:#C41E2F">'+(voided?'정정 후 재확인 필요':'교사 미확인')+'</span>');
   const mf=(l.male!=null||l.female!=null)?'남 '+(l.male||0)+' · 여 '+(l.female||0):'<span style="color:#b8860b">남·여 미기입</span>';
   const ph=(l.photos||[]).slice(0,3);
@@ -3373,6 +3401,7 @@ async function loadMyLogs(){
     const snap=await DB.collection('sessionLogs').where('uid','==',AUTH.currentUser.uid).get();
     const logs=snap.docs.map(d=>Object.assign({_id:d.id},d.data()));
     MYLOGS=logs;   // 수정(editLog)에서 참조
+    try{const nSelf=await selfConfirmFill(logs);if(nSelf){const lm=document.getElementById('lgMsg');if(lm&&!lm.textContent){lm.textContent='본인 지도 '+nSelf+'회차의 담당교사 확인란에 본인 서명을 기입했습니다.';lm.className='msg ok'}}}catch(e){}   // [본인 지도]
     // [일지 삭제] 내가 삭제한 회차 기록 — 규칙 v35 게시 전이면 조용히 빈 목록
     try{const as=await DB.collection('sessionLogArchive').where('uid','==',AUTH.currentUser.uid).get();MYLOGARCH=as.docs.map(d=>Object.assign({_id:d.id},d.data()))}catch(e){MYLOGARCH=[]}
     // 다음 회차 자동 제안
@@ -4002,7 +4031,7 @@ document.getElementById('cfmModal').addEventListener('click',function(e){if(e.ta
 document.getElementById('sigModal').addEventListener('click',function(e){if(e.target===this)closeSigModal()});
 </script>
 <script src="schoolclub_core.js?v=20260922a"></script>
-<script src="logbook.js?v=20260916a"></script>
+<script src="logbook.js?v=20260929a"></script>
 <script src="crimcheck.js?v=20260918a"></script>
 <script src="auth_ui.js?v=20260928b"></script>
 </body>
