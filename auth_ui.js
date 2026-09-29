@@ -58,7 +58,7 @@
   ];
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
   // [개별 화면] 링크의 부가 속성 — x[2]: 인라인 스타일, x[3]==='admin': 권한자에게만(페이지가 .sn-admin 을 켬)
-  function linkAttr(x){return (x[2]?' style="'+x[2]+'"':'')+(x[3]==='admin'?' class="sn-admin" data-admin="1" hidden':'')}
+  function linkAttr(x){return (x[2]?' style="'+x[2]+'"':'')+(x[3]==='admin'?' class="sn-admin" data-admin="1" hidden':'')+(/^intranet.html/.test(x[1])?' target="_blank" rel="noopener"':'')}   // [인트라넷] 별도 창에서 열림
   function fileOf(h){return String(h||'').split('#')[0].split('?')[0].split('/').pop().toLowerCase()}
   function viewOf(h){var m=String(h||'').match(/[?&]view=([^&#]+)/);return m?m[1]:''}
   // 화면 기본값(뷰 이름이 없는 링크가 가리키는 화면)
