@@ -90,7 +90,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
 <script src="career.js?v=20260907a"></script>
-<script src="seal.js?v=20260929a"></script>
+<script src="seal.js?v=20260929b"></script>
 <script>
 KFDF.initApp();
 const AUTH = firebase.auth();
@@ -7232,8 +7232,9 @@ async function compLicenseDocs(id){
   if(warn&&!confirm('아래 사항을 확인해주세요.\n\n'+warn+'\n그대로 출력할까요?'))return;
   const dot=x=>String(x||'').replace(/-/g,'.');
   const base=location.href.replace(/[^/]*$/,'');
+  const BG={};try{for(const p of pages){const k=(p.l.type==='심판')?'referee':'leader';if(!BG[k])BG[k]=await KFDF_SEAL.bg(k)}}catch(e){alert(e.message);return}   // [직인 보호] 양식은 서버에서
   const body=pages.map(p=>{
-    const bg=base+'files/'+((p.l.type==='심판')?'cert_bg_referee.jpg':'cert_bg_leader.jpg');
+    const bg=BG[(p.l.type==='심판')?'referee':'leader'];
     return '<div class="paper">'
       +'<img class="bgimg" src="'+bg+'">'
       +(p.expired?'<div class="expmark">만&nbsp;료</div>':'')

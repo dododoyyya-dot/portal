@@ -87,10 +87,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="liccert.js?v=20260921a"></script>
+<script src="liccert.js?v=20260929a"></script>
 <script src="career.js?v=20260907a"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
-<script src="seal.js?v=20260929a"></script>
+<script src="seal.js?v=20260929b"></script>
 <script src="region_map.js?v=20260910a"></script>
 <script>
 KFDF.initApp();
@@ -3881,14 +3881,14 @@ async function licPdfSave(no){
   }catch(e){alert('PDF 저장 실패: '+(e&&e.message||e)+'\n\n[🖨 인쇄] 버튼으로 인쇄 대화상자에서 "PDF로 저장"을 이용해 주세요.')}
   if(btn){btn.disabled=false;btn.textContent='📄 PDF 파일 저장·공유'}
 }
-function printLicense(no){
+async function printLicense(no){
   const doc=MYLICS.find(d=>d.id===no);if(!doc)return;
   const l=doc.data();
   // 공식 양식 배경 (대한플라잉디스크연맹 자격증 원본 스캔 기반)
-  const bg=new URL('files/'+(l.type==='심판'?'cert_bg_referee.jpg':'cert_bg_leader.jpg'),location.href).href;
   const dot=s=>String(s||'').replace(/-/g,'.');
   const w=window.open('','_blank');
   if(!w){alert('팝업이 차단되어 자격증 창을 열 수 없습니다.\n주소창 오른쪽의 팝업 차단 아이콘을 눌러 "허용"으로 바꾼 뒤 다시 시도해주세요.');return}
+  KFDF_SEAL.wait(w,'자격증을 준비하는 중…');let bg='';try{bg=await KFDF_SEAL.bg(l.type)}catch(e){try{w.close()}catch(_){}alert(e.message);return}   // [직인 보호] 양식은 서버에서
   w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>자격증 '+no+'</title>'
   +'<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">'
   +'<style>@page{size:A4 portrait;margin:0}html,body{margin:0;padding:0;background:#eee}'

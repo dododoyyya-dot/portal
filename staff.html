@@ -178,6 +178,8 @@ body.onepost #stWriteBox{display:none!important}   /* [1공고 1상세] PC 에�
 <script src="kfdf.js?v=20260914a"></script>
 <script src="post_alert.js?v=20260914a"></script>
 <script src="career.js?v=20260907a"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+<script src="seal.js?v=20260929b"></script>
 <script src="site_config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
@@ -2563,7 +2565,7 @@ async function exportPayReport(postId){
 }
 // ══════════════ [v7] 확정자 자격증 일괄 다운로드 (공식 서식 이미지 → ZIP, 주최측 전달용) ══════════════
 async function _drawLicPng(name,birth,l,licNo){
-  const bgSrc='files/'+((String(l.type||'').indexOf('심판')>=0)?'cert_bg_referee.jpg':'cert_bg_leader.jpg');
+  const bgSrc=await KFDF_SEAL.bg(l.type);   // [직인 보호] 양식은 서버에서
   const bg=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=bgSrc;});
   const W=1240,H=1753;  // A4 150dpi
   const cv=document.createElement('canvas');cv.width=W;cv.height=H;

@@ -119,7 +119,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="liccert.js?v=20260921a"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+<script src="seal.js?v=20260929b"></script>
+<script src="liccert.js?v=20260929a"></script>
 <script src="site_config.js"></script>
 <script>
 KFDF.initApp();
@@ -2067,7 +2069,7 @@ async function printLicCerts(which){
   for(const d of docs){
     const l=d.data();const m=await lcMemberOf(l.uid);
     const birth=(CENTRAL?await lcBirthOf(d.id):'')||l.birth||m.birth||'';if(!birth)noBirth.push(d.id+' '+(l.name||l.maskName||''));   // 대장(비공개 저장소) 생년월일이 우선, 없으면 회원 정보
-    const bg=new URL('files/'+(String(l.type||'').indexOf('심판')>=0?'cert_bg_referee.jpg':'cert_bg_leader.jpg'),location.href).href;
+    let bg='';try{bg=await KFDF_SEAL.bg(l.type)}catch(e){try{w.close()}catch(_){}alert(e.message);return}   // [직인 보호] 양식은 서버에서
     pages.push('<div class="paper"><img class="bgimg" src="'+bg+'">'
       +'<div class="f" style="left:39.7%;top:33.6%;font-size:8.6mm">'+esc(l.grade||'')+'</div>'
       +'<div class="f" style="left:31.8%;top:40.5%;font-size:9.2mm;border-bottom:0.6mm solid #111;padding:0 3mm 1mm 1mm">'+esc(l.name||m.name||l.maskName||'')+'</div>'

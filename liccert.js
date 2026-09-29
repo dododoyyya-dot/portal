@@ -1,16 +1,16 @@
-// v20260921a · 연맹 자격증 파일 생성 공용 모듈 (mypage.html 본인 출력 · license.html 관리자 출력이 함께 씁니다)
+// v20260929a · 연맹 자격증 파일 생성 공용 모듈 (mypage.html 본인 출력 · license.html 관리자 출력이 함께 씁니다)
 //   인쇄 대화상자(→ "PDF로 저장") 방식은 휴대폰·카카오톡 안 브라우저에서 팝업·인쇄창이 막혀 실패하는 일이 잦아,
 //   자격증을 캔버스에 그려 PDF/이미지 「파일」로 바로 저장하거나 휴대폰 공유(카카오톡 등)로 보낼 수 있게 합니다.
 //   좌표·서식은 staff.html _drawLicPng · mypage.html printLicense 의 공식 양식과 같습니다.
 (function(){
   var W=1240,H=1753;   // A4 150dpi
-  function bgFor(type){return new URL('files/'+((String(type||'').indexOf('심판')>=0)?'cert_bg_referee.jpg':'cert_bg_leader.jpg'),location.href).href}
+  function bgFor(type){return KFDF_SEAL.bg(type)}   // [직인 보호] 양식 이미지는 공개 파일이 아니라 서버 함수에서 받아옵니다(Promise)
   function dot(s){return String(s||'').replace(/-/g,'.')}
   function loadImg(src){return new Promise(function(ok,no){var im=new Image();im.onload=function(){ok(im)};im.onerror=function(){no(new Error('자격증 배경 이미지를 불러오지 못했습니다'))};im.src=src})}
   function fontReady(){try{return document.fonts&&document.fonts.load?Promise.all([document.fonts.load('800 40px Pretendard'),document.fonts.load('600 30px Pretendard')]).catch(function(){}):Promise.resolve()}catch(e){return Promise.resolve()}}
   // c = {no, type, grade, name, birth, expireAt, issuedAt, region} → canvas
   async function draw(c){
-    var bg=await loadImg(bgFor(c.type));await fontReady();
+    var bg=await loadImg(await bgFor(c.type));await fontReady();
     var cv=document.createElement('canvas');cv.width=W;cv.height=H;var ctx=cv.getContext('2d');
     ctx.drawImage(bg,0,0,W,H);ctx.fillStyle='#111';
     var F='"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif';
