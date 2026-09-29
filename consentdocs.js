@@ -69,7 +69,7 @@
       +(extra||'')+'</table>';}
   function docNo(ctx,m,k){return 'KFDF-CD-'+ctx.ymd+'-'+String(m.uid||'').slice(0,6).toUpperCase()+'-'+k}
   function sigImg(u){var s=src(u);return s?'<img class="sg" src="'+s+'" alt="서명">':''}
-  function seal(){return '<div class="org"><span class="orgwrap"><img class="lg" src="'+esc(abs('kfdf_logo.png'))+'" alt="">대한민국플라잉디스크연맹<img class="seal" src="'+esc(abs('직인.png'))+'" alt="" onerror="this.style.display=\'none\'"></span></div>'}
+  function seal(){return '<div class="org"><span class="orgwrap"><img class="lg" src="'+esc(abs('kfdf_logo.png'))+'" alt="">대한민국플라잉디스크연맹'+(window.KFDF_SEAL_URL?'<img class="seal" src="'+esc(window.KFDF_SEAL_URL)+'" alt="">':'')+'</span></div>'}
 
   // ① 회원가입 동의 확인서
   function pgSignup(m,g,ctx){var v=m.v,sc=v.signupConsents||null;
