@@ -171,6 +171,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
       <button class="lcchip" data-t="apps" onclick="mgTab('apps',this)">📋 신청 처리·발급</button>
       <button class="lcchip" data-t="claims" onclick="mgTab('claims',this)">🔗 자격 연결 요청</button>
       <button class="lcchip" data-t="renew" onclick="mgTab('renew',this)">🔄 갱신 처리</button>
+      <button class="lcchip" data-t="retro" onclick="mgTab('retro',this)">📝 기존 자격 등록 (번호 자동)</button>
       <button class="lcchip" data-t="bulk" onclick="mgTab('bulk',this)">📥 기존 자격 일괄 등록</button>
       <button class="lcchip" data-t="list" onclick="mgTab('list',this)">📚 자격증 대장</button>
     </div>
@@ -237,6 +238,22 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
       <div id="rnReqList" style="margin-top:12px"></div>
     </div>
 
+    <div id="mg_retro" class="lccard" style="display:none">
+      <h3 style="margin:0 0 6px;font-size:16px">기존 자격 등록 — 번호·지역 자동</h3>
+      <p style="font-size:13px;color:var(--gray);line-height:1.7;margin:0 0 10px">홈페이지 없이 취득한 자격을 등록합니다. 명단만 붙여 넣으면 <b>대장에서 마지막 번호를 찾아 다음 번호를 붙이고</b>, 소속지역 코드를 넣고, 회원과 중복 자격을 확인해 보여 드립니다. 등록 전에 표에서 지역·번호를 고칠 수 있습니다.</p>
+      <div id="rtStat" style="font-size:12.5px;line-height:1.8;background:#f6f8fb;border:1.5px solid #e2e7f0;border-radius:10px;padding:10px 13px;margin-bottom:12px">대장 번호 현황을 불러오는 중…</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end">
+        <label style="font-size:13px;font-weight:700">종류<select id="rtType" class="lcin" onchange="rtRenum()"><option>지도자</option><option>심판</option></select></label>
+        <label style="font-size:13px;font-weight:700">급수<select id="rtGrade" class="lcin" onchange="rtRenum()"><option value="3">3급</option><option value="2">2급</option><option value="1">1급</option></select></label>
+        <label style="font-size:13px;font-weight:700">발급일(취득일)<input id="rtIssued" type="date" class="lcin" onchange="rtExpAuto();rtRenum()"></label>
+        <label style="font-size:13px;font-weight:700">유효기간<input id="rtExpire" type="date" class="lcin"></label>
+        <label style="font-size:13px;font-weight:700">번호<select id="rtMode" class="lcin" onchange="rtRenum()"><option value="auto">대장 다음 번호로 자동</option><option value="given">자격증에 적힌 번호 사용</option></select></label>
+      </div>
+      <label style="display:block;font-size:13px;font-weight:700;margin-top:12px">명단 <span style="font-weight:600;color:var(--gray)">— 한 줄에 한 명: 성명, 생년월일, 소속지역, 자격번호(자격증에 적힌 번호가 있을 때만). 엑셀에서 복사해 붙여도 됩니다.</span></label>
+      <textarea id="rtData" rows="6" class="lcin" placeholder="홍길동, 1990-01-01, 경남&#10;김철수, 850315, 부산광역시&#10;이영희, 1978.5.2, 강원, 0309-26072193"></textarea>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="lcbtn s" onclick="rtCheck()">명단 확인</button><button class="lcbtn w" id="rtGo" onclick="rtSave()" disabled>등록</button><span id="rtMsg" style="font-size:13px;font-weight:700"></span></div>
+      <div id="rtTable" style="margin-top:10px;overflow-x:auto"></div>
+    </div>
     <div id="mg_bulk" class="lccard" style="display:none">
       <h3 style="margin:0 0 8px;font-size:16px">기존 자격 일괄 등록 (엑셀 → 복사 붙여넣기)</h3>
       <p style="font-size:13px;color:var(--gray);line-height:1.7;margin:0 0 10px">
@@ -831,11 +848,12 @@ async function delMyApp(id){
 // ── 관리: 신청 처리·발급 ──
 function mgTab(t,btn){
   document.querySelectorAll('.lcchip').forEach(b=>b.classList.toggle('on',b===btn));
-  ['notice','apps','claims','renew','bulk','list'].forEach(x=>document.getElementById('mg_'+x).style.display=x===t?'block':'none');
+  ['notice','apps','claims','renew','retro','bulk','list'].forEach(x=>document.getElementById('mg_'+x).style.display=x===t?'block':'none');
   if(t==='list')loadLics();
   if(t==='claims')loadClaims();
   if(t==='renew')loadRenewReqs();
   if(t==='bulk')loadBulkReqs();
+  if(t==='retro')rtOpen();
 }
 // ── 자격 연결 요청 처리 ──
 let CLAIMS=[];
@@ -1486,6 +1504,127 @@ async function bulkImport(){
   rst.innerHTML=fail.length?('<b style="color:#C41E2F">실패 목록:</b><br>'+fail.map(esc).join('<br>')):'';
   if(r.ok)document.getElementById('bkData').value='';
 }
+// ══ [기존 자격 등록 — 번호·지역 자동 2026-09-30] ══
+const RT_REGIONS=['서울','부산','대구','인천','전남광주','대전','울산','경기','강원','충북','충남','전북','경북','경남','제주','세종','해외'];
+const RT_ALIAS={'서울':['서울'],'부산':['부산'],'대구':['대구'],'인천':['인천'],'전남광주':['전남광주','광주전남','광주','전남','전라남'],'대전':['대전'],'울산':['울산'],'경기':['경기'],'강원':['강원'],'충북':['충북','충청북'],'충남':['충남','충청남'],'전북':['전북','전라북'],'경북':['경북','경상북'],'경남':['경남','경상남'],'제주':['제주'],'세종':['세종'],'해외':['해외']};
+let RT_ALL=null,RT_ROWS=[];
+function rtRegion(t){t=String(t||'').replace(/\s+/g,'');if(!t)return '';for(const k of RT_REGIONS){if(RT_ALIAS[k].some(a=>t.indexOf(a)===0))return k}for(const k of RT_REGIONS){if(RT_ALIAS[k].some(a=>t.indexOf(a)>=0))return k}return ''}
+function rtBirth(t){t=String(t||'').trim().replace(/\.$/,'');if(!t)return '';let y,mo,d,m;
+  if((m=t.match(/^(\d{2})(\d{2})(\d{2})$/))){y=((+m[1]>new Date().getFullYear()%100)?'19':'20')+m[1];mo=m[2];d=m[3]}
+  else if((m=t.match(/^(\d{4})(\d{2})(\d{2})$/))){y=m[1];mo=m[2];d=m[3]}
+  else if((m=t.match(/^(\d{4})\s*[.\-\/]\s*(\d{1,2})\s*[.\-\/]\s*(\d{1,2})$/))){y=m[1];mo=m[2];d=m[3]}
+  else return '';
+  mo=String(mo).padStart(2,'0');d=String(d).padStart(2,'0');if(+mo<1||+mo>12||+d<1||+d>31)return '';return y+'-'+mo+'-'+d}
+function rtNo(t){return String(t||'').toUpperCase().replace(/\s+/g,'')}
+// 대장 번호에서 계열별 마지막 번호 — 지도자: 전국 누적 순번 · 심판 3급: 6자리 중 가장 최근 연도의 누적 순번 · 심판 1·2급: 급수별 누적 순번
+function rtLast(ids){const o={L:{seq:0,id:''},R3:{seq:0,yy:'',id:''},R2:{seq:0,id:''},R1:{seq:0,id:''}},r3={};
+  ids.forEach(function(id){let m=id.match(/^(\d{2})(\d{2})-(\d{2})(\d{2})(\d{4})$/);if(m){if(+m[5]>o.L.seq){o.L.seq=+m[5];o.L.id=id}return}
+    m=id.match(/^(\d{2})(\d{4})$/);if(m){if(!r3[m[1]]||+m[2]>r3[m[1]])r3[m[1]]=+m[2];return}
+    m=id.match(/^0([12])-(\d{2})(\d{4})$/);if(m){const k='R'+m[1];if(+m[3]>o[k].seq){o[k].seq=+m[3];o[k].id=id}}});
+  const yy=Object.keys(r3).sort().pop();if(yy){o.R3={yy:yy,seq:r3[yy],id:yy+String(r3[yy]).padStart(4,'0')}}
+  return o}
+// 다음 번호 n 개 — 이미 있는 번호는 건너뜀
+function rtNext(last,type,grade,issued,region,have,n){const yy=String(issued||'').slice(2,4),mm=String(issued||'').slice(5,7),g2=String(grade).padStart(2,'0'),out=[];
+  let seq=type==='지도자'?last.L.seq:(String(grade)==='3'?last.R3.seq:last['R'+grade].seq);
+  while(out.length<n){seq++;let no;
+    if(type==='지도자')no=g2+(REGION_CODE[region]||'??')+'-'+yy+mm+String(seq).padStart(4,'0');
+    else if(String(grade)==='3')no=yy+String(seq).padStart(4,'0');
+    else no=g2+'-'+yy+String(seq).padStart(4,'0');
+    if(!have[no])out.push(no)}
+  return out}
+function rtNoOk(no,type,grade){if(type==='지도자')return /^\d{4}-\d{8}$/.test(no);return /^\d{6}$/.test(no)||/^0[123]-\d{6}$/.test(no)}
+async function rtLoadAll(){const q=await DB.collection('licenses').get();RT_ALL={};q.docs.forEach(d=>{const v=d.data();RT_ALL[d.id]={name:v.name||'',type:v.type||'',grade:v.grade||'',region:v.region||'',issuedAt:v.issuedAt||'',status:v.status||''}});return RT_ALL}
+function rtExpAuto(){const i=document.getElementById('rtIssued').value;if(i)document.getElementById('rtExpire').value=plus4y(i)}
+async function rtOpen(){
+  const st=document.getElementById('rtStat');if(!document.getElementById('rtIssued').value){document.getElementById('rtIssued').value=new Date().toISOString().slice(0,10);rtExpAuto()}
+  try{await rtLoadAll()}catch(e){st.innerHTML='<b style="color:#C41E2F">대장을 불러오지 못했습니다: '+esc(e.message)+'</b> — 다음 번호를 자동으로 붙이려면 대장 전체를 읽을 수 있어야 합니다(중앙·시도연맹).';return}
+  const ids=Object.keys(RT_ALL),L=rtLast(ids),yy=new Date().toISOString().slice(2,4),inf=id=>{const v=RT_ALL[id]||{};return id?(' <span style="color:var(--gray)">'+esc([v.region,v.issuedAt].filter(Boolean).join(' · '))+'</span>'):''};
+  st.innerHTML='<b>대장 번호 현황</b> <span style="color:var(--gray)">(전체 '+ids.length.toLocaleString()+'건 기준 · 자동으로 이어 붙입니다)</span>'
+    +'<br>· 지도자 (전국 누적 순번): 마지막 <b>'+esc(L.L.id||'-')+'</b>'+inf(L.L.id)+' → 다음 순번 <b>'+String(L.L.seq+1).padStart(4,'0')+'</b> <span style="color:var(--gray)">(급수·지역코드·발급연월이 앞에 붙음)</span>'
+    +'<br>· 심판 3급 (6자리): 마지막 <b>'+esc(L.R3.id||'-')+'</b>'+inf(L.R3.id)+' → 다음 <b>'+yy+String(L.R3.seq+1).padStart(4,'0')+'</b>'
+    +'<br>· 심판 2급: 마지막 <b>'+esc(L.R2.id||'-')+'</b>'+inf(L.R2.id)+' → 다음 <b>02-'+yy+String(L.R2.seq+1).padStart(4,'0')+'</b>'
+    +' &nbsp; · 심판 1급: 마지막 <b>'+esc(L.R1.id||'-')+'</b>'+inf(L.R1.id)+' → 다음 <b>01-'+yy+String(L.R1.seq+1).padStart(4,'0')+'</b>'
+    +'<br><span style="color:var(--gray)">지역 코드: '+RT_REGIONS.map(k=>k+' '+REGION_CODE[k]).join(' · ')+'</span>';
+}
+async function rtCheck(){
+  const msg=document.getElementById('rtMsg');msg.textContent='확인 중…';msg.style.color='#153A77';document.getElementById('rtGo').disabled=true;
+  if(!RT_ALL){try{await rtLoadAll()}catch(e){msg.textContent='대장을 불러오지 못했습니다: '+e.message;msg.style.color='#C41E2F';return}}
+  const lines=document.getElementById('rtData').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  if(!lines.length){msg.textContent='명단을 붙여 넣어 주세요';msg.style.color='#C41E2F';return}
+  const type=document.getElementById('rtType').value;RT_ROWS=[];
+  for(const line of lines){const c=line.split(/\t|,/).map(x=>x.trim());if(/^성명$/.test(c[0]))continue;
+    const r={name:(c[0]||'').replace(/\s+/g,''),birth:rtBirth(c[1]),birthRaw:c[1]||'',region:rtRegion(c[2]),regionRaw:c[2]||'',givenNo:rtNo(c[3]),uid:'',member:'',notes:[]};
+    if(!r.name){continue}
+    if(c[1]&&!r.birth)r.notes.push('생년월일 형식 확인');
+    if(r.birth){try{const mk=await DB.collection('memberKeys').doc(r.name+'|'+r.birth).get();if(mk.exists&&mk.data().uid){r.uid=mk.data().uid;r.member='회원 연결';
+      if(!r.region){try{const u=await DB.collection('users').doc(r.uid).get();const v=u.exists?(u.data()||{}):{};r.region=rtRegion(v.sidoKey||'')||rtRegion(v.baseCity||'');if(r.region)r.notes.push('지역은 회원 정보에서')}catch(e){}}}}catch(e){}}
+    const same=Object.keys(RT_ALL).filter(id=>RT_ALL[id].name===r.name&&RT_ALL[id].type===type);
+    if(same.length)r.dup=same.map(id=>id+' '+RT_ALL[id].grade+' '+(RT_ALL[id].region||'')+' '+(RT_ALL[id].status||'')).join(' / ');
+    RT_ROWS.push(r)}
+  rtRenum();
+}
+function rtRenum(){
+  if(!RT_ROWS.length||!RT_ALL)return;
+  const type=document.getElementById('rtType').value,grade=document.getElementById('rtGrade').value,issued=document.getElementById('rtIssued').value,mode=document.getElementById('rtMode').value;
+  const last=rtLast(Object.keys(RT_ALL)),have=Object.assign({},RT_ALL);
+  RT_ROWS.forEach(function(r){r.err='';
+    if(mode==='given'||r.manual){r.no=r.manual?r.no:r.givenNo;r.auto=false;if(!r.no)r.err='자격번호 없음';else if(!rtNoOk(r.no,type,grade))r.err='번호 형식 확인';else if(RT_ALL[r.no])r.err='이미 대장에 있는 번호 ('+RT_ALL[r.no].name+')';have[r.no]=1;
+      if(type==='지도자'&&r.no&&!r.region){const cd=r.no.slice(2,4);r.region=cd==='05'||cd==='13'?'전남광주':(RT_REGIONS.find(k=>REGION_CODE[k]===cd)||'')}}
+    else{r.auto=true;if(type==='지도자'&&!r.region){r.no='';r.err='소속지역을 골라 주세요';return}r.no=rtNext(last,type,grade,issued,r.region,have,1)[0];have[r.no]=1;
+      if(type==='지도자')last.L.seq=+r.no.slice(-4);else if(grade==='3')last.R3.seq=+r.no.slice(-4);else last['R'+grade].seq=+r.no.slice(-4)}
+    if(!issued)r.err='발급일을 넣어 주세요'});
+  rtDraw();
+}
+function rtSetRegion(i,v){RT_ROWS[i].region=v;rtRenum()}
+function rtSetNo(i,v){const r=RT_ROWS[i];r.no=rtNo(v);r.manual=true;rtRenum()}
+function rtDraw(){
+  const type=document.getElementById('rtType').value,out=document.getElementById('rtTable'),bad=RT_ROWS.filter(r=>r.err).length;
+  out.innerHTML='<table class="rtbl" style="width:100%;font-size:12.5px;min-width:760px"><thead><tr><th>#</th><th>성명</th><th>생년월일</th><th>소속지역</th><th>자격번호</th><th>회원</th><th>확인</th></tr></thead><tbody>'
+    +RT_ROWS.map(function(r,i){return '<tr'+(r.err?' style="background:#fff5f5"':'')+'><td>'+(i+1)+'</td><td class="nm">'+esc(r.name)+'</td><td>'+esc(r.birth||r.birthRaw||'-')+'</td>'
+      +'<td><select onchange="rtSetRegion('+i+',this.value)" style="padding:4px 6px"><option value="">선택</option>'+RT_REGIONS.map(k=>'<option'+(r.region===k?' selected':'')+'>'+k+'</option>').join('')+'</select>'+(r.regionRaw&&!rtRegion(r.regionRaw)?'<div style="color:#C41E2F;font-size:11px">「'+esc(r.regionRaw)+'」 판정 불가</div>':'')+'</td>'
+      +'<td><input value="'+esc(r.no||'')+'" onchange="rtSetNo('+i+',this.value)" style="width:140px;padding:4px 6px;font-family:monospace">'+(r.auto?'<div style="color:var(--gray);font-size:11px">자동</div>':'')+'</td>'
+      +'<td>'+(r.uid?'<b style="color:#0f766e">연결</b>':'<span style="color:var(--gray)">없음</span>')+'</td>'
+      +'<td>'+(r.err?'<b style="color:#C41E2F">'+esc(r.err)+'</b>':'<b style="color:#0f766e">등록 가능</b>')+(r.dup?'<div style="color:#b8860b;font-size:11.5px">대장에 같은 이름의 '+esc(type)+' 자격: '+esc(r.dup)+'</div>':'')+(r.notes.length?'<div style="color:var(--gray);font-size:11.5px">'+esc(r.notes.join(' · '))+'</div>':'')+'</td></tr>'}).join('')+'</tbody></table>';
+  const msg=document.getElementById('rtMsg');msg.textContent=RT_ROWS.length+'명 · 등록 가능 '+(RT_ROWS.length-bad)+'명'+(bad?' · 확인 필요 '+bad+'명':'');msg.style.color=bad?'#b8860b':'#0f766e';
+  const go=document.getElementById('rtGo');go.disabled=!(RT_ROWS.length-bad);go.textContent=CENTRAL?'등록 ('+(RT_ROWS.length-bad)+'명)':'중앙에 등록 요청 ('+(RT_ROWS.length-bad)+'명)';
+}
+function rtRowsOut(){const type=document.getElementById('rtType').value,grade=document.getElementById('rtGrade').value,issued=document.getElementById('rtIssued').value,expire=document.getElementById('rtExpire').value||plus4y(issued);
+  return RT_ROWS.filter(r=>!r.err).map(r=>({no:r.no,auto:!!r.auto,name:r.name,type:type,grade:grade,issuedAt:issued,expireAt:expire,region:r.region||'',birth:r.birth||'',uid:r.uid||'',email:'',renewedAt:''}))}
+// 실제 등록 — 번호가 이미 있으면 자동 번호는 다음 번호로 넘기고, 직접 넣은 번호는 실패로 둡니다(덮어쓰지 않음)
+async function rtExec(rows,progress){let ok=0;const fail=[],done=[];const last=rtLast(Object.keys(RT_ALL||{}));
+  for(let i=0;i<rows.length;i++){const r=rows[i];if(progress&&i%10===0)progress(i,rows.length);
+    try{let no=r.no;
+      for(let t=0;t<30;t++){const ex=await DB.collection('licenses').doc(no).get();if(!ex.exists)break;if(!r.auto)throw new Error('이미 있는 번호');
+        const have={};have[no]=1;Object.keys(RT_ALL||{}).forEach(k=>have[k]=1);no=rtNext(last,r.type,r.grade,r.issuedAt,r.region,have,1)[0];if(t===29)throw new Error('빈 번호를 찾지 못함')}
+      await DB.collection('licenses').doc(no).set({name:r.name,maskName:maskName(r.name),type:r.type,grade:r.grade+'급',issuedAt:r.issuedAt,expireAt:r.expireAt,status:'유효',region:r.region||'',
+        issuer:'중앙연맹(소급 등록)',issuedBy:((LME&&LME.uid)||''),issuedByName:((LMY&&LMY.name)||''),uid:r.uid||'',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+      if(RT_ALL)RT_ALL[no]={name:r.name,type:r.type,grade:r.grade+'급',region:r.region,issuedAt:r.issuedAt,status:'유효'};
+      if(r.type==='지도자')last.L.seq=Math.max(last.L.seq,+no.slice(-4));else if(String(r.grade)==='3')last.R3.seq=Math.max(last.R3.seq,+no.slice(-4));else last['R'+r.grade].seq=Math.max(last['R'+r.grade].seq,+no.slice(-4));
+      if(r.birth&&CENTRAL){try{await lcBirthSet(no,r.name,r.birth,'기존 자격 등록')}catch(e){}}
+      if(r.uid)await addHist(r.uid,'[자격] '+r.type+' '+r.grade+'급 등록 ('+no+' · 소급 등록)');
+      ok++;done.push(no+' '+r.name)}catch(e){fail.push((r.no||'')+' '+r.name+' ('+e.message+')')}}
+  return {ok:ok,fail:fail,done:done}}
+// 시도연맹 요청을 중앙이 승인할 때 — 자동 번호 행은 지금 대장 기준으로 다시 매깁니다
+async function rtExecReq(rows,progress){await rtLoadAll();const last=rtLast(Object.keys(RT_ALL)),have=Object.assign({},RT_ALL);
+  rows.forEach(r=>{if(r.auto){r.no=rtNext(last,r.type,r.grade,r.issuedAt,r.region,have,1)[0];have[r.no]=1;const q=+r.no.slice(-4);if(r.type==='지도자')last.L.seq=q;else if(String(r.grade)==='3')last.R3.seq=q;else last['R'+r.grade].seq=q}});
+  return rtExec(rows,progress)}
+async function rtSave(){
+  const rows=rtRowsOut();if(!rows.length)return;const msg=document.getElementById('rtMsg');
+  const t=rows[0].type+' '+rows[0].grade+'급 · 발급일 '+rows[0].issuedAt+' · 유효기간 '+rows[0].expireAt;
+  if(!CENTRAL){
+    const out=rows.filter(r=>MSIDOS.indexOf(r.region)<0&&!(r.region==='전남광주'&&MSIDOS.some(x=>/광주|전남/.test(x))));
+    if(!confirm(rows.length+'명의 기존 자격 등록을 중앙연맹에 요청할까요?\n'+t+(out.length?'\n\n⚠ 관할 밖 지역 '+out.length+'명: '+out.map(r=>r.name+'('+r.region+')').join(', '):'')+'\n\n번호는 중앙이 승인할 때 대장의 다음 번호로 다시 매깁니다.'))return;
+    try{await DB.collection('licenseBulkReqs').add({rows:rows,count:rows.length,status:'대기',helper:true,by:((LME&&LME.uid)||''),byName:((LMY&&LMY.name)||''),bySido:MFEDS.join('·'),at:new Date().toISOString()});
+      msg.textContent='✓ 승인 요청 완료 — '+rows.length+'명, 중앙연맹 검토 후 등록됩니다';msg.style.color='#0f766e';RT_ROWS=[];document.getElementById('rtTable').innerHTML='';document.getElementById('rtData').value='';document.getElementById('rtGo').disabled=true}
+    catch(e){msg.textContent='요청 실패: '+e.message;msg.style.color='#C41E2F'}
+    return}
+  if(!confirm(rows.length+'명을 자격 대장에 등록할까요?\n'+t+'\n\n'+rows.slice(0,12).map(r=>r.no+'  '+r.name+(r.region?' ('+r.region+')':'')).join('\n')+(rows.length>12?'\n… 외 '+(rows.length-12)+'명':'')))return;
+  document.getElementById('rtGo').disabled=true;msg.textContent='등록 중…';msg.style.color='#153A77';
+  const r=await rtExec(rows,function(i,n){msg.textContent='등록 중… '+i+'/'+n});
+  msg.textContent='✓ 등록 '+r.ok+'명'+(r.fail.length?' · 실패 '+r.fail.length+'명':'');msg.style.color=r.fail.length?'#C41E2F':'#0f766e';
+  document.getElementById('rtTable').innerHTML='<div style="font-size:12.5px;line-height:1.8"><b>등록된 번호</b><br>'+r.done.map(esc).join('<br>')+(r.fail.length?'<br><b style="color:#C41E2F">실패</b><br>'+r.fail.map(esc).join('<br>'):'')+'</div>';
+  RT_ROWS=[];if(r.ok)document.getElementById('rtData').value='';rtOpen();
+}
 // 일괄 등록 요청 목록 — 중앙은 검토·실행, 시도연맹은 자기 요청 진행 상황
 async function loadBulkReqs(){
   const el=document.getElementById('bkReqList');if(!el)return;
@@ -1497,7 +1636,7 @@ async function loadBulkReqs(){
     if(!docs.length){el.innerHTML=CENTRAL?'<div class="bempty">승인 대기 중인 일괄 등록 요청이 없습니다.</div>':'';return}
     el.innerHTML='<b style="font-size:13.5px">일괄 등록 요청 '+(CENTRAL?'승인 대기':'진행 상황')+'</b>'
       +docs.map(function(d){const r=d.data();
-        const head=(r.rows||[]).slice(0,5).map(function(x){return esc(x.no+' '+x.name+' '+x.type+' '+x.grade+'급'+(x.region?' ('+x.region+')':''))}).join('<br>');
+        const head=(r.rows||[]).slice(0,5).map(function(x){return esc((x.auto?'(번호 자동) ':x.no+' ')+x.name+' '+x.type+' '+x.grade+'급'+(x.region?' ('+x.region+')':''))}).join('<br>')+(r.helper?'<br><b style="color:#153A77">번호 자동 요청 — 승인할 때 대장의 다음 번호로 매깁니다</b>':'');
         const stc={'대기':'#b8860b','처리완료':'#0f766e','반려':'#C41E2F'}[r.status]||'#8a919d';
         return '<div class="lccard" style="padding:11px 15px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div>'
           +'<b>'+esc(r.bySido||'')+'</b> · '+esc(r.byName||'')+' · '+esc(String(r.at||'').slice(0,10))+' · <b>'+(r.count||0)+'건</b>'
@@ -1516,7 +1655,8 @@ async function approveBulkReq(id){
   if(r.status!=='대기'){alert('이미 처리된 요청입니다.');loadBulkReqs();return}
   if(!confirm((r.bySido||'')+' 연맹의 일괄 등록 '+(r.count||0)+'건을 실행할까요?\n위 미리보기 명단을 확인한 뒤 진행해주세요.'))return;
   const m=document.getElementById('bkMsg');
-  const res=await bkExecRows(r.rows||[],function(i,n){if(m){m.textContent='등록 중… '+i+'/'+n;m.style.color='#153A77'}});
+  const res=r.helper?await rtExecReq(r.rows||[],function(i,n){if(m){m.textContent='등록 중… '+i+'/'+n;m.style.color='#153A77'}})
+    :await bkExecRows(r.rows||[],function(i,n){if(m){m.textContent='등록 중… '+i+'/'+n;m.style.color='#153A77'}});
   await DB.collection('licenseBulkReqs').doc(id).update({
     status:'처리완료',okCount:res.ok,failCount:res.fail.length,failList:res.fail.slice(0,20),
     processedAt:new Date().toISOString(),processedBy:((LME&&LME.uid)||'')});
