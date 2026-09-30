@@ -1,4 +1,4 @@
-// intranet.js v20260929b · 연맹 인트라넷(그룹웨어) — 중앙 · 시도연맹 · 구군연맹 임원용 전자결재 · 문서함 · 직인 · 조직도
+// intranet.js v20260930a · 연맹 인트라넷(그룹웨어) — 중앙 · 시도연맹 · 구군연맹 임원용 전자결재 · 문서함 · 직인 · 조직도
 //   · 홈페이지와 별도 창에서 열리며, 들어올 때마다 아이디·비밀번호를 다시 입력해 인증합니다(창마다 · 30분 동안 쓰지 않으면 잠김).
 //   · 기관(orgKey): central | sido_{시도} | gugun_{시도}_{구군} — 회원 등급(admin·owner / sidoOfficer+sido / gugunOfficer+sido+gugun)에서 정해집니다.
 //   · 저장(보안 규칙 v46): intraDocs · intraMembers · intraOrgs · intraSeals(직인 관리자만) · intraCounters / 첨부: storage intranet/{문서ID}/ (스토리지 규칙 v9)
@@ -6,7 +6,7 @@
 (function(){
 'use strict';
 var DB,AUTH;
-var ME=null,MY=null,ORGS=[],ORG=null,MEMBERS=[],ORGDIR={},DOCS={},UNSUB=[],CP=null,STAMP=null,OPEN_ID='',LAST=Date.now(),TICK=null;
+var ME=null,MY=null,ORGS=[],ORG=null,MEMBERS=[],ORGDIR={},DOCS={},UNSUB=[],CP=null,STAMP=null,OPEN_ID='',LAST=Date.now(),TICK=null,HIDE=[];
 var V={mod:'appr',folder:'a_wait',q:'',from:'',to:'',kind:'',page:1,size:15,sel:{}};
 var IDLE_MS=30*60*1000;
 var KIND={draft:'기안',coop:'협조',seal:'직인',notice:'공람'};
@@ -36,8 +36,8 @@ function loc(s){s=String(s||'');if(!s)return '';var d=new Date(s);if(isNaN(d))re
 function locd(s){return loc(s).slice(0,10)}
 function roleSet(md){return [md.role].concat(md.roles||[]).filter(Boolean)}
 // ── 순수 함수(시험 대상) ──
-function myOrgsOf(md){var r=roleSet(md||{}),o=[];md=md||{};
-  if(md.owner===true||r.indexOf('admin')>=0)o.push({key:'central',name:'대한민국플라잉디스크연맹',level:0,sido:'',gugun:''});
+function myOrgsOf(md,noCentral){var r=roleSet(md||{}),o=[];md=md||{};
+  if(!noCentral&&(md.owner===true||r.indexOf('admin')>=0))o.push({key:'central',name:'대한민국플라잉디스크연맹',level:0,sido:'',gugun:''});
   if(r.indexOf('sidoOfficer')>=0&&md.sido)o.push({key:'sido_'+md.sido,name:md.sido+'플라잉디스크연맹',level:1,sido:md.sido,gugun:''});
   if(r.indexOf('gugunOfficer')>=0&&md.sido&&md.gugun)o.push({key:'gugun_'+md.sido+'_'+md.gugun,name:md.sido+' '+md.gugun+'플라잉디스크연맹',level:2,sido:md.sido,gugun:md.gugun});
   return o}
@@ -70,8 +70,10 @@ function stateOf(d,c){
   if(d.status==='완료'&&(d.toOrgs||[]).indexOf(c.orgKey)>=0){var r=(d.recv||{})[c.orgKey];return r?r.status:'완료'}
   if(d.status==='완료'&&d.kind==='coop'&&(d.toOrgs||[]).length){var rv=d.recv||{},n=Object.keys(rv).filter(function(k){return rv[k].status==='완료'}).length;return '회신 '+n+'/'+d.toOrgs.length}
   return d.status==='완료'?'시행완료':d.status}
+// 중앙 조직도 제외 목록에 있는지 — 있으면 인트라넷에서는 중앙 소속이 아님
+function hiddenIn(list,uid){return (list||[]).some(function(x){return x&&x.uid===uid})}
 function gateOk(g,uid,t){return !!(g&&g.uid===uid&&(t-g.at)<12*3600*1000&&(t-(g.act||g.at))<IDLE_MS)}
-window.KFDF_INTRA_CORE={myOrgsOf:myOrgsOf,curStep:curStep,isMyTurn:isMyTurn,foldersOf:foldersOf,todoOf:todoOf,needRecv:needRecv,sealPending:sealPending,isKeeper:isKeeper,defPrefix:defPrefix,docNoOf:docNoOf,readersOf:readersOf,readOrgsOf:readOrgsOf,stateOf:stateOf,gateOk:gateOk};
+window.KFDF_INTRA_CORE={hiddenIn:hiddenIn,myOrgsOf:myOrgsOf,curStep:curStep,isMyTurn:isMyTurn,foldersOf:foldersOf,todoOf:todoOf,needRecv:needRecv,sealPending:sealPending,isKeeper:isKeeper,defPrefix:defPrefix,docNoOf:docNoOf,readersOf:readersOf,readOrgsOf:readOrgsOf,stateOf:stateOf,gateOk:gateOk};
 if(typeof document==='undefined'||!window.firebase)return;
 
 function ctx(){return {uid:ME.uid,orgKey:ORG.key,dir:ORGDIR}}
@@ -114,8 +116,11 @@ function touch(){LAST=Date.now()}
 // ── 들어가기 ──
 async function enter(u){
   ME=u;var d;try{d=await DB.collection('users').doc(u.uid).get();MY=d.exists?(d.data()||{}):{}}catch(e){showLogin('회원 정보를 확인하지 못했습니다.');return}
-  ORGS=myOrgsOf(MY);
+  HIDE=[];try{var hc=await DB.collection('intraOrgs').doc('central').get();HIDE=(hc.exists&&hc.data().hideCentral)||[]}catch(e){HIDE=[]}
+  var noC=hiddenIn(HIDE,u.uid);ORGS=myOrgsOf(MY,noC);
+  if(!ORGS.length&&noC){gateClear();showLogin('인트라넷에서 중앙 소속으로 표시하지 않도록 지정된 계정인데, 시도·구군 임원 지정이 없어 들어갈 소속이 없습니다. 사무국에 문의하세요.');return}
   if(!ORGS.length||MY.status!=='approved'){gateClear();showLogin('인트라넷은 중앙 사무국 · 시도연맹 임원 · 구군연맹 임원만 이용할 수 있습니다.');return}
+  if(noC){try{var st=await DB.collection('intraMembers').doc(u.uid+'__central').get();if(st.exists)await st.ref.delete()}catch(e){}}   // 예전에 등록된 중앙 명부 정리
   var saved='';try{saved=localStorage.getItem('kfdfIntraOrg')||''}catch(e){}
   ORG=ORGS.find(function(o){return o.key===saved})||ORGS[0];
   try{await register();await loadDir()}catch(e){showLogin('인트라넷을 열지 못했습니다 ('+(e.code||e.message||e)+'). 보안 규칙 v46 게시 여부를 확인하세요.');return}
@@ -134,7 +139,8 @@ async function register(){
 }
 async function loadDir(){
   var a=await Promise.all([DB.collection('intraMembers').get(),DB.collection('intraOrgs').get()]);
-  MEMBERS=a[0].docs.map(function(d){return Object.assign({_id:d.id},d.data())});ORGDIR={};a[1].docs.forEach(function(d){ORGDIR[d.id]=d.data()});
+  ORGDIR={};a[1].docs.forEach(function(d){ORGDIR[d.id]=d.data()});HIDE=((ORGDIR.central||{}).hideCentral)||HIDE||[];
+  MEMBERS=a[0].docs.map(function(d){return Object.assign({_id:d.id},d.data())}).filter(function(m){return !(m.orgKey==='central'&&hiddenIn(HIDE,m.uid))});
   ORGS.forEach(function(o){if(ORGDIR[o.key]&&ORGDIR[o.key].name)o.name=ORGDIR[o.key].name});
 }
 function listen(){
@@ -427,11 +433,24 @@ async function settings(){
     +'<tr><th>문서번호 머리글</th><td><div class="gw-row"><input id="setPrefix" maxlength="12" value="'+esc(o.docPrefix||defPrefix(ORG))+'" style="width:160px"><button class="gw-b" onclick="INTRA.saveOrg()">기관 정보 저장</button></div><small>문서번호 예: '+esc(docNoOf(o.docPrefix||defPrefix(ORG),new Date().getFullYear(),12))+'</small></td></tr>'
     +'<tr><th>직인 관리자</th><td><div class="gw-chips">'+mine.map(function(m){return '<label class="ck"><input type="checkbox" class="setKeep" value="'+esc(m.uid)+'"'+((o.sealKeepers||[]).indexOf(m.uid)>=0?' checked':'')+'> '+esc(m.name)+' '+esc(m.title||'')+'</label>'}).join(' &nbsp; ')+'</div><button class="gw-b" onclick="INTRA.saveKeepers()">직인 관리자 저장</button><br><small>직인 관리자는 직인 이미지를 관리하고 직인 날인을 승인합니다.</small></td></tr>'
     +'<tr><th>직인 이미지</th><td>'+(keeper?has+'<div class="gw-row" style="margin-top:6px"><label class="gw-b" style="cursor:pointer">직인 이미지 등록 · 변경<input type="file" accept="image/png,image/jpeg" style="display:none" onchange="INTRA.saveSeal(this)"></label></div><small>직인 이미지는 직인 관리자만 볼 수 있고, 날인을 승인한 문서에만 들어갑니다.</small>':'직인 관리자만 보고 바꿀 수 있습니다.')+'</td></tr>'
+    +(ORG.key==='central'?'<tr><th>중앙 조직도<br>제외</th><td><div class="gw-chips">'+mine.filter(function(m){return m.uid!==ME.uid}).map(function(m){return '<label class="ck"><input type="checkbox" class="setHide" value="'+esc(m.uid)+'" data-name="'+esc(m.name)+'"> '+esc(m.name)+' '+esc(m.title||'')+'</label>'}).join(' &nbsp; ')+'</div>'
+      +(HIDE.length?'<div style="margin-top:4px">제외 중: '+HIDE.map(function(h){return '<label class="ck"><input type="checkbox" class="setUnhide" value="'+esc(h.uid)+'"> '+esc(h.name||'')+'</label>'}).join(' &nbsp; ')+' <small>(체크하면 다시 중앙에 표시)</small></div>':'')
+      +'<button class="gw-b" onclick="INTRA.saveHide()">저장</button><br><small>홈페이지 관리 권한은 그대로 두고, 인트라넷에서만 중앙 소속으로 보이지 않게 합니다. 제외된 사람은 시도·구군 소속으로만 인트라넷을 씁니다.</small></td></tr>':'')
     +'<tr><th>보안</th><td>이 창에서 30분 동안 사용하지 않으면 자동으로 잠깁니다. <button class="gw-b" onclick="INTRA.lock()">지금 잠금</button></td></tr></table>';
 }
 async function saveTitle(){try{await DB.collection('intraMembers').doc(ME.uid+'__'+ORG.key).update({title:$('setTitle').value.trim().slice(0,20),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),uid:ME.uid,orgKey:ORG.key});await loadDir();renderAll();say('직위를 저장했습니다')}catch(e){say('저장 실패: '+(e.code||e.message),true)}}
 async function saveOrg(){var n=$('setName').value.trim(),p=$('setPrefix').value.trim();if(n.length<2||!p){say('기관 이름과 머리글을 입력하세요',true);return}
   try{await DB.collection('intraOrgs').doc(ORG.key).update({name:n,docPrefix:p,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:ME.uid});await loadDir();renderAll();say('저장했습니다')}catch(e){say('저장 실패: '+(e.code||e.message),true)}}
+async function saveHide(){
+  var add=[].slice.call(document.querySelectorAll('.setHide:checked')).map(function(x){return {uid:x.value,name:x.getAttribute('data-name')||''}});
+  var del=[].slice.call(document.querySelectorAll('.setUnhide:checked')).map(function(x){return x.value});
+  if(!add.length&&!del.length){say('바꿀 내용이 없습니다',true);return}
+  var next=HIDE.filter(function(h){return del.indexOf(h.uid)<0}).concat(add.filter(function(a){return !hiddenIn(HIDE,a.uid)}));
+  if(!confirm((add.length?'중앙 조직도에서 제외: '+add.map(function(a){return a.name}).join(', ')+'\n':'')+(del.length?'다시 중앙에 표시: '+del.length+'명\n':'')+'\n저장할까요? (홈페이지 관리 권한은 바뀌지 않습니다)'))return;
+  try{await DB.collection('intraOrgs').doc('central').update({hideCentral:next,hideBy:ME.uid,hideByName:MY.name||'',hideAt:now()});
+    for(var i=0;i<add.length;i++){try{await DB.collection('intraMembers').doc(add[i].uid+'__central').delete()}catch(e){}
+      (ORGDIR.central.sealKeepers||[]).indexOf(add[i].uid)>=0&&await DB.collection('intraOrgs').doc('central').update({sealKeepers:firebase.firestore.FieldValue.arrayRemove(add[i].uid)})}
+    HIDE=next;await loadDir();renderAll();say('저장했습니다')}catch(e){say('저장 실패: '+(e.code||e.message),true)}}
 async function saveKeepers(){var k=[].slice.call(document.querySelectorAll('.setKeep:checked')).map(function(x){return x.value});
   if(!confirm('직인 관리자를 '+k.length+'명으로 저장할까요?'))return;
   try{await DB.collection('intraOrgs').doc(ORG.key).update({sealKeepers:k,keepersBy:ME.uid,keepersByName:MY.name||'',keepersAt:now()});await loadDir();renderAll()}catch(e){say('저장 실패: '+(e.code||e.message),true)}}
@@ -461,7 +480,7 @@ function print(id){var d=DOCS[id];if(!d)return;var w=window.open('','_blank');if
 
 window.INTRA={login:login,lock:lock,logout:logout,setOrg:setOrg,setMod:setMod,setFolder:setFolder,setV:setV,search:search,resetSearch:resetSearch,refresh:refresh,go:go,sel:sel,selAll:selAll,openSel:openSel,recvSel:recvSel,newMenu:newMenu,
   openDoc:openDoc,closeW:closeW,openFile:openFile,openStamped:openStamped,compose:compose,cpAddLine:cpAddLine,cpDelLine:cpDelLine,cpAddTo:cpAddTo,cpAddToAll:cpAddToAll,cpDelTo:cpDelTo,cpDelKeep:cpDelKeep,cpDelFile:cpDelFile,cpFiles:cpFiles,submit:submit,approve:approve,withdraw:withdraw,del:del,recv:recv,reply:reply,
-  sealOpen:sealOpen,sealReject:sealReject,stLoad:stLoad,stLocal:stLocal,stPage:stPage,stSize:stSize,stMake:stMake,settings:settings,saveTitle:saveTitle,saveOrg:saveOrg,saveKeepers:saveKeepers,saveSeal:saveSeal,print:print,
+  sealOpen:sealOpen,sealReject:sealReject,stLoad:stLoad,stLocal:stLocal,stPage:stPage,stSize:stSize,stMake:stMake,settings:settings,saveTitle:saveTitle,saveOrg:saveOrg,saveHide:saveHide,saveKeepers:saveKeepers,saveSeal:saveSeal,print:print,
   _sim:function(o){ME=o.me;MY=o.my;ORGS=myOrgsOf(MY);ORG=ORGS[0];MEMBERS=o.members||[];ORGDIR=o.orgs||{};DOCS=o.docs||{};$('gwLogin').style.display='none';$('gwApp').style.display='flex';renderAll()}};
 KFDF.initApp();DB=firebase.firestore();AUTH=firebase.auth();
 ['mousemove','keydown','click','touchstart'].forEach(function(e){document.addEventListener(e,touch,{passive:true})});
