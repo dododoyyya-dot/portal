@@ -1151,7 +1151,7 @@ async function transferApp(id){
 }
 // ── 연맹 자격번호 규칙 (지역조견표 기준) ──
 // 지도자: {급수2}{지역2}-{년2}{월2}{순번4}  예) 0301-09080001 — 순번은 달마다 새로 시작하지 않고 전국 누적으로 이어집니다(licLeaderNext)
-// 심판  : {급수2}-{년2}{순번4}              예) 01-230001
+// 심판  : {급수2}-{년2}{순번4}              예) 01-230001 — 순번은 급수별 누적(licSeqNext). 예전 수기 3급 6자리(260304 등)는 그대로 둠
 const REGION_CODE={'서울':'01','부산':'02','대구':'03','인천':'04','광주':'05','대전':'06','울산':'07','경기':'08','강원':'09','충북':'10','충남':'11','전북':'12','전남':'13','경북':'14','경남':'15','제주':'16','세종':'17','해외':'20','전남광주':'05','광주전남':'05','중앙':'01'};
 const REGION_MENU='1=서울 2=부산 3=대구 4=인천 5=전남광주(광주·전남 통합) 6=대전 7=울산 8=경기 9=강원 10=충북 11=충남 12=전북 14=경북 15=경남 16=제주 17=세종 20=해외';
 async function nextSeq(key){
@@ -1166,22 +1166,26 @@ async function nextSeq(key){
 }
 // [자격번호 2026-09-30] 지도자 순번 — 대장 전체의 마지막 순번 다음 번호. counters/licLeaderSeq 를 1씩 올려 동시에 발급해도 겹치지 않게 합니다.
 //   중앙: 카운터가 대장 최대값보다 작으면 대장 최대값에 맞춘 뒤 +1 · 시도·권역: 1씩만 올릴 수 있어(보안 규칙) 이미 쓴 순번이면 다음으로 넘어갑니다.
-let LIC_CTR=0;
-function licSeqUsed(n){if(!RT_ALL)return false;return Object.keys(RT_ALL).some(function(id){const m=id.match(/^d{4}-d{4}(d{4})$/);return m&&+m[1]===n})}
-async function licLeaderNext(){
-  let ledger=0;try{if(!RT_ALL)await rtLoadAll();ledger=rtLast(Object.keys(RT_ALL)).L.seq}catch(e){}
-  const ref=DB.collection('counters').doc('licLeaderSeq');
+const LIC_CTR={L:0,R1:0,R2:0,R3:0};
+const LIC_CTR_DOC={L:'licLeaderSeq',R1:'licRefSeq1',R2:'licRefSeq2',R3:'licRefSeq3'};
+// 이 계열(L: 지도자, R1~R3: 심판 급수)의 순번 n 이 대장에 이미 있는지
+function licSeqUsed(kind,n){if(!RT_ALL)return false;const re=kind==='L'?/^\d{4}-\d{4}(\d{4})$/:new RegExp('^0'+kind.slice(1)+'-\\d{2}(\\d{4})$');
+  return Object.keys(RT_ALL).some(function(id){const m=id.match(re);return m&&+m[1]===n})}
+async function licSeqNext(kind){
+  let ledger=0;try{if(!RT_ALL)await rtLoadAll();ledger=rtLast(Object.keys(RT_ALL))[kind].seq}catch(e){}
+  const ref=DB.collection('counters').doc(LIC_CTR_DOC[kind]);const nm=kind==='L'?'지도자':'심판 '+kind.slice(1)+'급';
   for(let k=0;k<80;k++){
     let n=0;
     await DB.runTransaction(async tx=>{const c=await tx.get(ref);const cur=c.exists?(c.data().count||0):0;
       if(CENTRAL){n=Math.max(cur,ledger)+1;tx.set(ref,{count:n})}
-      else if(!c.exists){throw new Error('지도자 자격번호 순번이 아직 설정되지 않았습니다. 중앙 사무국에 문의하세요.')}
+      else if(!c.exists){throw new Error(nm+' 자격번호 순번이 아직 설정되지 않았습니다. 중앙 사무국에 문의하세요.')}
       else{n=cur+1;tx.update(ref,{count:n})}});
-    LIC_CTR=n;
-    if(n>ledger&&!licSeqUsed(n))return n;
+    LIC_CTR[kind]=n;
+    if(n>ledger&&!licSeqUsed(kind,n))return n;
   }
-  throw new Error('다음 지도자 자격번호를 찾지 못했습니다. 중앙 사무국에 문의하세요.');
+  throw new Error('다음 '+nm+' 자격번호를 찾지 못했습니다. 중앙 사무국에 문의하세요.');
 }
+async function licLeaderNext(){return licSeqNext('L')}
 function plus4y(dateStr){
   // 유효기간: 발급일 + 4년 - 1일 (기존 대장 관행: 2023-06-15 → 2027-06-14)
   const d=dateStr?new Date(dateStr):new Date();
@@ -1231,7 +1235,7 @@ async function issueOneLicense(a,type,sido){
     const seq=await licLeaderNext();   // [자격번호] 전국 누적 순번 (예전: 달마다 1번부터 — 오류)
     no=g2+REGION_CODE[sido]+'-'+yy+mm+String(seq).padStart(4,'0');
   }else{
-    const seq=await nextSeq('licR'+g2+yy);
+    const seq=await licSeqNext('R'+String(a.grade));   // [자격번호] 심판: 급수별 누적 순번 (예전: 연도별 1부터)
     no=g2+'-'+yy+String(seq).padStart(4,'0');
   }
   const today=now.toISOString().slice(0,10);
@@ -1535,33 +1539,33 @@ function rtBirth(t){t=String(t||'').trim().replace(/\.$/,'');if(!t)return '';let
   else return '';
   mo=String(mo).padStart(2,'0');d=String(d).padStart(2,'0');if(+mo<1||+mo>12||+d<1||+d>31)return '';return y+'-'+mo+'-'+d}
 function rtNo(t){return String(t||'').toUpperCase().replace(/\s+/g,'')}
-// 대장 번호에서 계열별 마지막 번호 — 지도자: 전국 누적 순번 · 심판 3급: 6자리 중 가장 최근 연도의 누적 순번 · 심판 1·2급: 급수별 누적 순번
-function rtLast(ids){const o={L:{seq:0,id:''},R3:{seq:0,yy:'',id:''},R2:{seq:0,id:''},R1:{seq:0,id:''}},r3={};
+// 대장 번호에서 계열별 마지막 번호 — 지도자: 전국 누적 순번 · 심판: 급수별 누적 순번({급수2}-{연2}{순번4}). R6 은 예전 수기 3급 6자리(참고용)
+function rtLast(ids){const o={L:{seq:0,id:''},R1:{seq:0,id:''},R2:{seq:0,id:''},R3:{seq:0,id:''},R6:{seq:0,id:''}},r6={};
   ids.forEach(function(id){let m=id.match(/^(\d{2})(\d{2})-(\d{2})(\d{2})(\d{4})$/);if(m){if(+m[5]>o.L.seq){o.L.seq=+m[5];o.L.id=id}return}
-    m=id.match(/^(\d{2})(\d{4})$/);if(m){if(!r3[m[1]]||+m[2]>r3[m[1]])r3[m[1]]=+m[2];return}
-    m=id.match(/^0([12])-(\d{2})(\d{4})$/);if(m){const k='R'+m[1];if(+m[3]>o[k].seq){o[k].seq=+m[3];o[k].id=id}}});
-  const yy=Object.keys(r3).sort().pop();if(yy){o.R3={yy:yy,seq:r3[yy],id:yy+String(r3[yy]).padStart(4,'0')}}
+    m=id.match(/^0([123])-(\d{2})(\d{4})$/);if(m){const k='R'+m[1];if(+m[3]>o[k].seq){o[k].seq=+m[3];o[k].id=id}return}
+    m=id.match(/^(\d{2})(\d{4})$/);if(m){if(!r6[m[1]]||+m[2]>r6[m[1]])r6[m[1]]=+m[2]}});
+  const yy=Object.keys(r6).sort().pop();if(yy)o.R6={seq:r6[yy],id:yy+String(r6[yy]).padStart(4,'0')};
   return o}
 // 다음 번호 n 개 — 이미 있는 번호는 건너뜀
 function rtNext(last,type,grade,issued,region,have,n){const yy=String(issued||'').slice(2,4),mm=String(issued||'').slice(5,7),g2=String(grade).padStart(2,'0'),out=[];
-  let seq=type==='지도자'?last.L.seq:(String(grade)==='3'?last.R3.seq:last['R'+grade].seq);
+  let seq=type==='지도자'?last.L.seq:last['R'+grade].seq;
   while(out.length<n){seq++;let no;
     if(type==='지도자')no=g2+(REGION_CODE[region]||'??')+'-'+yy+mm+String(seq).padStart(4,'0');
-    else if(String(grade)==='3')no=yy+String(seq).padStart(4,'0');
     else no=g2+'-'+yy+String(seq).padStart(4,'0');
     if(!have[no])out.push(no)}
   return out}
 function rtNoOk(no,type,grade){if(type==='지도자')return /^\d{4}-\d{8}$/.test(no);return /^\d{6}$/.test(no)||/^0[123]-\d{6}$/.test(no)}
 async function rtLoadAll(){const q=await DB.collection('licenses').get();RT_ALL={};q.docs.forEach(d=>{const v=d.data();RT_ALL[d.id]={name:v.name||'',type:v.type||'',grade:v.grade||'',region:v.region||'',issuedAt:v.issuedAt||'',status:v.status||''}});return RT_ALL}
 function rtExpAuto(){const i=document.getElementById('rtIssued').value;if(i)document.getElementById('rtExpire').value=plus4y(i)}
-async function rtCtr(){try{const c=await DB.collection('counters').doc('licLeaderSeq').get();LIC_CTR=c.exists?(c.data().count||0):0}catch(e){}return LIC_CTR}
+async function rtCtr(){for(const k of Object.keys(LIC_CTR_DOC)){try{const c=await DB.collection('counters').doc(LIC_CTR_DOC[k]).get();LIC_CTR[k]=c.exists?(c.data().count||0):0}catch(e){}}return LIC_CTR}
+function rtCtrApply(L){['L','R1','R2','R3'].forEach(function(k){if(LIC_CTR[k]>L[k].seq){L[k].seq=LIC_CTR[k];L[k].id='(발급 순번 '+LIC_CTR[k]+')'}});return L}
 async function rtOpen(){
   const st=document.getElementById('rtStat');if(!document.getElementById('rtIssued').value){document.getElementById('rtIssued').value=new Date().toISOString().slice(0,10);rtExpAuto()}
   try{await rtLoadAll()}catch(e){st.innerHTML='<b style="color:#C41E2F">대장을 불러오지 못했습니다: '+esc(e.message)+'</b> — 다음 번호를 자동으로 붙이려면 대장 전체를 읽을 수 있어야 합니다(중앙·시도연맹).';return}
-  await rtCtr();const ids=Object.keys(RT_ALL),L=rtLast(ids);if(LIC_CTR>L.L.seq){L.L.seq=LIC_CTR;L.L.id='(발급 순번 '+LIC_CTR+')'}const yy=new Date().toISOString().slice(2,4),inf=id=>{const v=RT_ALL[id]||{};return id?(' <span style="color:var(--gray)">'+esc([v.region,v.issuedAt].filter(Boolean).join(' · '))+'</span>'):''};
+  await rtCtr();const ids=Object.keys(RT_ALL),L=rtCtrApply(rtLast(ids));const yy=new Date().toISOString().slice(2,4),inf=id=>{const v=RT_ALL[id]||{};return id?(' <span style="color:var(--gray)">'+esc([v.region,v.issuedAt].filter(Boolean).join(' · '))+'</span>'):''};
   st.innerHTML='<b>대장 번호 현황</b> <span style="color:var(--gray)">(전체 '+ids.length.toLocaleString()+'건 기준 · 자동으로 이어 붙입니다)</span>'
     +'<br>· 지도자 (전국 누적 순번): 마지막 <b>'+esc(L.L.id||'-')+'</b>'+inf(L.L.id)+' → 다음 순번 <b>'+String(L.L.seq+1).padStart(4,'0')+'</b> <span style="color:var(--gray)">(급수·지역코드·발급연월이 앞에 붙음)</span>'
-    +'<br>· 심판 3급 (6자리): 마지막 <b>'+esc(L.R3.id||'-')+'</b>'+inf(L.R3.id)+' → 다음 <b>'+yy+String(L.R3.seq+1).padStart(4,'0')+'</b>'
+    +'<br>· 심판 3급: 마지막 <b>'+esc(L.R3.id||'-')+'</b>'+inf(L.R3.id)+' → 다음 <b>03-'+yy+String(L.R3.seq+1).padStart(4,'0')+'</b> <span style="color:var(--gray)">(예전 수기 6자리 마지막 '+esc(L.R6.id||'-')+' — 그대로 둠)</span>'
     +'<br>· 심판 2급: 마지막 <b>'+esc(L.R2.id||'-')+'</b>'+inf(L.R2.id)+' → 다음 <b>02-'+yy+String(L.R2.seq+1).padStart(4,'0')+'</b>'
     +' &nbsp; · 심판 1급: 마지막 <b>'+esc(L.R1.id||'-')+'</b>'+inf(L.R1.id)+' → 다음 <b>01-'+yy+String(L.R1.seq+1).padStart(4,'0')+'</b>'
     +'<br><span style="color:var(--gray)">지역 코드: '+RT_REGIONS.map(k=>k+' '+REGION_CODE[k]).join(' · ')+'</span>';
@@ -1586,12 +1590,12 @@ async function rtCheck(){
 function rtRenum(){
   if(!RT_ROWS.length||!RT_ALL)return;
   const type=document.getElementById('rtType').value,grade=document.getElementById('rtGrade').value,issued=document.getElementById('rtIssued').value,mode=document.getElementById('rtMode').value;
-  const last=rtLast(Object.keys(RT_ALL)),have=Object.assign({},RT_ALL);if(LIC_CTR>last.L.seq)last.L.seq=LIC_CTR;
+  const last=rtCtrApply(rtLast(Object.keys(RT_ALL))),have=Object.assign({},RT_ALL);
   RT_ROWS.forEach(function(r){r.err='';
     if(mode==='given'||r.manual){r.no=r.manual?r.no:r.givenNo;r.auto=false;if(!r.no)r.err='자격번호 없음';else if(!rtNoOk(r.no,type,grade))r.err='번호 형식 확인';else if(RT_ALL[r.no])r.err='이미 대장에 있는 번호 ('+RT_ALL[r.no].name+')';have[r.no]=1;
       if(type==='지도자'&&r.no&&!r.region){const cd=r.no.slice(2,4);r.region=cd==='05'||cd==='13'?'전남광주':(RT_REGIONS.find(k=>REGION_CODE[k]===cd)||'')}}
     else{r.auto=true;if(type==='지도자'&&!r.region){r.no='';r.err='소속지역을 골라 주세요';return}r.no=rtNext(last,type,grade,issued,r.region,have,1)[0];have[r.no]=1;
-      if(type==='지도자')last.L.seq=+r.no.slice(-4);else if(grade==='3')last.R3.seq=+r.no.slice(-4);else last['R'+grade].seq=+r.no.slice(-4)}
+      if(type==='지도자')last.L.seq=+r.no.slice(-4);else last['R'+grade].seq=+r.no.slice(-4)}
     if(!issued)r.err='발급일을 넣어 주세요'});
   rtDraw();
 }
@@ -1614,20 +1618,22 @@ function rtRowsOut(){const type=document.getElementById('rtType').value,grade=do
 async function rtExec(rows,progress){let ok=0;const fail=[],done=[];const last=rtLast(Object.keys(RT_ALL||{}));
   for(let i=0;i<rows.length;i++){const r=rows[i];if(progress&&i%10===0)progress(i,rows.length);
     try{let no=r.no;
-      if(r.auto&&r.type==='지도자'){const q=await licLeaderNext();no=String(r.grade).padStart(2,'0')+REGION_CODE[r.region]+'-'+String(r.issuedAt).slice(2,4)+String(r.issuedAt).slice(5,7)+String(q).padStart(4,'0')}   // 지도자는 발급 카운터로(홈페이지 발급과 겹치지 않게)
+      if(r.auto){const g2=String(r.grade).padStart(2,'0'),yy=String(r.issuedAt).slice(2,4);
+        if(r.type==='지도자'){const q=await licLeaderNext();no=g2+REGION_CODE[r.region]+'-'+yy+String(r.issuedAt).slice(5,7)+String(q).padStart(4,'0')}
+        else{const q=await licSeqNext('R'+String(r.grade));no=g2+'-'+yy+String(q).padStart(4,'0')}}   // 지도자는 발급 카운터로(홈페이지 발급과 겹치지 않게)
       for(let t=0;t<30;t++){const ex=await DB.collection('licenses').doc(no).get();if(!ex.exists)break;if(!r.auto)throw new Error('이미 있는 번호');
         const have={};have[no]=1;Object.keys(RT_ALL||{}).forEach(k=>have[k]=1);no=rtNext(last,r.type,r.grade,r.issuedAt,r.region,have,1)[0];if(t===29)throw new Error('빈 번호를 찾지 못함')}
       await DB.collection('licenses').doc(no).set({name:r.name,maskName:maskName(r.name),type:r.type,grade:r.grade+'급',issuedAt:r.issuedAt,expireAt:r.expireAt,status:'유효',region:r.region||'',
         issuer:'중앙연맹(소급 등록)',issuedBy:((LME&&LME.uid)||''),issuedByName:((LMY&&LMY.name)||''),uid:r.uid||'',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
       if(RT_ALL)RT_ALL[no]={name:r.name,type:r.type,grade:r.grade+'급',region:r.region,issuedAt:r.issuedAt,status:'유효'};
-      if(r.type==='지도자')last.L.seq=Math.max(last.L.seq,+no.slice(-4));else if(String(r.grade)==='3')last.R3.seq=Math.max(last.R3.seq,+no.slice(-4));else last['R'+r.grade].seq=Math.max(last['R'+r.grade].seq,+no.slice(-4));
+      if(r.type==='지도자')last.L.seq=Math.max(last.L.seq,+no.slice(-4));else last['R'+r.grade].seq=Math.max(last['R'+r.grade].seq,+no.slice(-4));
       if(r.birth&&CENTRAL){try{await lcBirthSet(no,r.name,r.birth,'기존 자격 등록')}catch(e){}}
       if(r.uid)await addHist(r.uid,'[자격] '+r.type+' '+r.grade+'급 등록 ('+no+' · 소급 등록)');
       ok++;done.push(no+' '+r.name)}catch(e){fail.push((r.no||'')+' '+r.name+' ('+e.message+')')}}
   return {ok:ok,fail:fail,done:done}}
 // 시도연맹 요청을 중앙이 승인할 때 — 자동 번호 행은 지금 대장 기준으로 다시 매깁니다
 async function rtExecReq(rows,progress){await rtLoadAll();const last=rtLast(Object.keys(RT_ALL)),have=Object.assign({},RT_ALL);
-  rows.forEach(r=>{if(r.auto){r.no=rtNext(last,r.type,r.grade,r.issuedAt,r.region,have,1)[0];have[r.no]=1;const q=+r.no.slice(-4);if(r.type==='지도자')last.L.seq=q;else if(String(r.grade)==='3')last.R3.seq=q;else last['R'+r.grade].seq=q}});
+  rows.forEach(r=>{if(r.auto){r.no=rtNext(last,r.type,r.grade,r.issuedAt,r.region,have,1)[0];have[r.no]=1;const q=+r.no.slice(-4);if(r.type==='지도자')last.L.seq=q;else last['R'+r.grade].seq=q}});
   return rtExec(rows,progress)}
 async function rtSave(){
   const rows=rtRowsOut();if(!rows.length)return;const msg=document.getElementById('rtMsg');
