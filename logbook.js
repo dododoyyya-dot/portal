@@ -1,4 +1,4 @@
-// logbook.js v20260929a · 학교강습 운영일지 보고서(인쇄 → PDF로 저장) + 일지 삭제·복원(기록 보존)
+// logbook.js v20261001a · 학교강습 운영일지 보고서(인쇄 → PDF로 저장) + 일지 삭제·복원(기록 보존)
 //   관리자 강습신청관리 › 📒 일지 패널, 강사 마이페이지 › 운영일지 에서 학교 단위로 엽니다.
 //   홈페이지에 입력된 일지(sessionLogs) 항목만 씁니다: 회차·수업일·인원(남/여)·수업 내용·특이사항·안전 지도 점검 4항목·
 //   활동 사진(최대 3장)·담당교사 확인(성명·시각·전자서명)·정정 이력 + 강습 신청(schoolApplications) 기본 정보.
@@ -245,7 +245,7 @@
         +'<div class="meta"><div class="pp"><i>참여 인원</i><b>'+esc(l.count||'-')+'</b>명'+(m!=null||f!=null?'<small>남 '+(m==null?'-':m)+' · 여 '+(f==null?'-':f)+'</small>':'')+'</div>'
         +'<div class="ct"><i>수업 내용</i><p>'+esc(l.content||'')+'</p>'+(l.note?'<p class="note">특이사항 · '+esc(l.note)+'</p>':'')+'</div></div>'
         +'<div class="ph ph'+(ph.length||0)+'">'+photos+'</div>'
-        +'<footer><div class="chk">'+SAFE.map(function(k){var y=l.check&&l.check[k];return '<span class="'+(y?'y':'n')+'">'+(y?'✓':'–')+' '+SAFE_LB[k]+'</span>'}).join('')+'</div>'
+        +'<footer><div class="chk">'+SAFE.map(function(k){var y=l.check&&l.check[k];return '<span class="'+(y?'y':'n')+'">'+(y?'✓':'–')+' '+SAFE_LB[k]+'</span>'}).join('')+(l.checkAddedAt?'<span class="n" style="color:#777">(점검 사후 입력 '+esc(String(l.checkAddedAt).slice(0,10))+')</span>':'')+'</div>'
         +'<div class="tc">'+(tc?'<div><i>담당교사 확인</i><b>'+esc(tc.name)+'</b><small>'+ts(tc.at)+'</small></div>'+(src(tc.sign)?'<img src="'+src(tc.sign)+'" alt="서명">':''):'<div><i>담당교사 확인</i><b class="mu">확인 전</b></div>')+'</div></footer>'
         +(eh.length?'<div class="eh">✏️ 정정 '+eh.length+'회 · 마지막 '+esc(le.role||'')+' '+esc(le.by||'')+' '+ts(le.at)+' — 정정 전 값은 시스템에 보존됩니다</div>':'')
         +'</article>';
