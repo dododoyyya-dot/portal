@@ -1,4 +1,4 @@
-// intranet.js v20260930a · 연맹 인트라넷(그룹웨어) — 중앙 · 시도연맹 · 구군연맹 임원용 전자결재 · 문서함 · 직인 · 조직도
+// intranet.js v20261002a · 연맹 인트라넷(그룹웨어) — 중앙 · 시도연맹 · 구군연맹 임원용 전자결재 · 문서함 · 직인 · 조직도
 //   · 홈페이지와 별도 창에서 열리며, 들어올 때마다 아이디·비밀번호를 다시 입력해 인증합니다(창마다 · 30분 동안 쓰지 않으면 잠김).
 //   · 기관(orgKey): central | sido_{시도} | gugun_{시도}_{구군} — 회원 등급(admin·owner / sidoOfficer+sido / gugunOfficer+sido+gugun)에서 정해집니다.
 //   · 저장(보안 규칙 v46): intraDocs · intraMembers · intraOrgs · intraSeals(직인 관리자만) · intraCounters / 첨부: storage intranet/{문서ID}/ (스토리지 규칙 v9)
@@ -7,7 +7,7 @@
 'use strict';
 var DB,AUTH;
 var ME=null,MY=null,ORGS=[],ORG=null,MEMBERS=[],ORGDIR={},DOCS={},UNSUB=[],CP=null,STAMP=null,OPEN_ID='',LAST=Date.now(),TICK=null,HIDE=[];
-var V={mod:'appr',folder:'a_wait',q:'',from:'',to:'',kind:'',page:1,size:15,sel:{}};
+var V={mod:'home',folder:'a_wait',q:'',from:'',to:'',kind:'',page:1,size:15,sel:{}};
 var IDLE_MS=30*60*1000;
 var KIND={draft:'기안',coop:'협조',seal:'직인',notice:'공람'};
 var MODS=[['appr','결재'],['docs','문서함'],['seal','직인'],['org','조직도'],['set','환경설정']];
@@ -72,8 +72,11 @@ function stateOf(d,c){
   return d.status==='완료'?'시행완료':d.status}
 // 중앙 조직도 제외 목록에 있는지 — 있으면 인트라넷에서는 중앙 소속이 아님
 function hiddenIn(list,uid){return (list||[]).some(function(x){return x&&x.uid===uid})}
+// [결재 방식 2026-10-02] 기안자를 포함해 서명해야 하는 사람 수 — 1 = 기안자 전결(1인), 2 = 결재자 1명 이상, 3 = 결재자 2명 이상
+//   중앙 사무국이 환경설정에서 정합니다(intraOrgs/central.apprPolicy {def, by:{기관 키:n}}). 지정이 없으면 1인 전결.
+function apprMinOf(orgKey,dir){var p=((dir||{}).central||{}).apprPolicy||{};var n=+((p.by||{})[orgKey])||+p.def||1;return n>=1&&n<=3?n:1}
 function gateOk(g,uid,t){return !!(g&&g.uid===uid&&(t-g.at)<12*3600*1000&&(t-(g.act||g.at))<IDLE_MS)}
-window.KFDF_INTRA_CORE={hiddenIn:hiddenIn,myOrgsOf:myOrgsOf,curStep:curStep,isMyTurn:isMyTurn,foldersOf:foldersOf,todoOf:todoOf,needRecv:needRecv,sealPending:sealPending,isKeeper:isKeeper,defPrefix:defPrefix,docNoOf:docNoOf,readersOf:readersOf,readOrgsOf:readOrgsOf,stateOf:stateOf,gateOk:gateOk};
+window.KFDF_INTRA_CORE={apprMinOf:apprMinOf,hiddenIn:hiddenIn,myOrgsOf:myOrgsOf,curStep:curStep,isMyTurn:isMyTurn,foldersOf:foldersOf,todoOf:todoOf,needRecv:needRecv,sealPending:sealPending,isKeeper:isKeeper,defPrefix:defPrefix,docNoOf:docNoOf,readersOf:readersOf,readOrgsOf:readOrgsOf,stateOf:stateOf,gateOk:gateOk};
 if(typeof document==='undefined'||!window.firebase)return;
 
 function ctx(){return {uid:ME.uid,orgKey:ORG.key,dir:ORGDIR}}
@@ -92,7 +95,15 @@ var IDL={norm:function(id){return String(id||'').trim().toLowerCase()},
 function gateGet(){try{return JSON.parse(sessionStorage.getItem('kfdfIntraGate')||'null')}catch(e){return null}}
 function gateSet(uid){try{sessionStorage.setItem('kfdfIntraGate',JSON.stringify({uid:uid,at:(gateGet()&&gateGet().uid===uid?gateGet().at:Date.now()),act:Date.now()}))}catch(e){}}
 function gateClear(){try{sessionStorage.removeItem('kfdfIntraGate')}catch(e){}}
+// [로그인 배경 2026-10-02] 홈페이지 앨범의 가장 최근 사진(공개 자료)을 흐리게 깔아 줍니다. 못 불러오면 기본 배경 그대로.
+var BG_DONE=false;
+function loginBg(){if(BG_DONE)return;BG_DONE=true;
+  DB.collection('gallery').where('status','==','published').limit(40).get().then(function(s){
+    var a=s.docs.map(function(d){return d.data()}).filter(function(x){return x.cover&&/^(https:\/\/|data:image\/)/.test(x.cover)}).sort(function(x,y){return String(y.date||'').localeCompare(String(x.date||''))});
+    if(!a.length)return;var im=new Image();im.onload=function(){var b=$('gwLgBg');if(b){b.style.backgroundImage='url("'+a[0].cover.replace(/"/g,'%22')+'")';b.className='gw-lgbg on'}};im.src=a[0].cover}).catch(function(){BG_DONE=false})}
+function home(){V.mod='home';V.page=1;V.sel={};renderAll();var m=$('gwMain');if(m)m.scrollTop=0}
 function showLogin(msg){
+  loginBg();
   UNSUB.forEach(function(f){try{f()}catch(e){}});UNSUB=[];if(TICK){clearInterval(TICK);TICK=null}
   [].slice.call(document.querySelectorAll('.gw-win')).forEach(function(x){x.remove()});
   $('gwApp').style.display='none';var g=$('gwLogin');g.style.display='flex';
@@ -163,7 +174,13 @@ function renderTop(){
     +'<button title="잠금" onclick="INTRA.lock()">'+ic('lock',15)+'</button><button class="tx" onclick="INTRA.logout()">로그아웃</button>';
 }
 function renderLeft(){
-  if(!ORG)return;var q=[['a_wait','결재대기'],['r_wait','접수대기'],['n_wait','공람대기'],['k_wait','직인대기']];
+  if(!ORG)return;
+  if(V.mod==='home'){
+    var G=[['결재',[['a_wait','결재대기'],['a_prog','결재진행'],['a_rej','반려·회수']]],['수신',[['r_wait','접수대기'],['n_wait','공람대기']]],['직인',[['k_wait','직인대기']]],['문서함',[['s_out','발신함'],['r_all','수신함']]]];
+    $('gwLeft').innerHTML='<div class="gw-alarm"><h3>업무알림</h3>'+G.map(function(g){return '<div class="ag"><b>'+g[0]+'</b><div>'+g[1].map(function(f){var n=count(f[0]);return '<a onclick="INTRA.setFolder(\''+f[0]+'\')"><span>'+f[1]+'</span><em>'+(n||'')+'</em></a>'}).join('')+'</div></div>'}).join('')+'</div>'
+      +'<div class="gw-new" style="margin-top:14px"><button class="main" onclick="INTRA.compose(\'draft\')">'+ic('pen',14)+' 기안하기</button></div>';
+    return}
+  var q=[['a_wait','결재대기'],['r_wait','접수대기'],['n_wait','공람대기'],['k_wait','직인대기']];
   var h='<div class="gw-new"><button class="main" onclick="INTRA.compose(\'draft\')">'+ic('pen',14)+' 기안하기</button><button class="dd" onclick="INTRA.newMenu(event)" title="문서 종류 선택">▾</button>'
     +'<div class="menu" id="gwNewMenu"><a onclick="INTRA.compose(\'draft\')">기안 · 결재</a><a onclick="INTRA.compose(\'coop\')">협조 요청</a><a onclick="INTRA.compose(\'seal\')">직인 날인 요청</a><a onclick="INTRA.compose(\'notice\')">공람 · 공지</a></div></div>'
     +'<div class="gw-quick">'+q.map(function(x){var n=count(x[0]);return '<button onclick="INTRA.setFolder(\''+x[0]+'\')"><span class="c'+(n?' on':'')+'">'+ic('file',18)+(n?'<em>'+(n>99?'99+':n)+'</em>':'')+'</span><i>'+x[1]+'</i></button>'}).join('')+'</div>'
@@ -178,6 +195,7 @@ function filtered(){var q=V.q.trim().toLowerCase(),c=ctx();
     .sort(function(a,b){return String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||''))})}
 function renderMain(){
   if(!ORG)return;var m=$('gwMain');
+  if(V.mod==='home'){m.innerHTML=homeHtml();return}
   if(V.mod==='org'){m.innerHTML=orgHtml();return}
   if(V.mod==='set'){settings();return}
   var L=filtered(),pages=Math.max(1,Math.ceil(L.length/V.size));if(V.page>pages)V.page=pages;var P=L.slice((V.page-1)*V.size,V.page*V.size),c=ctx();
@@ -220,6 +238,20 @@ function renderRight(){
   $('gwRight').innerHTML='<div class="box"><h3>바로가기</h3>'+links.map(function(l){return '<a href="'+l[1]+'" target="_blank" rel="noopener">'+esc(l[0])+'<span>▸</span></a>'}).join('')+'</div>'
     +'<div class="box"><h3>조직도</h3><div class="org">'+ic('fold',13)+' '+esc(ORG.name)+'</div>'+(mine.map(function(m){return '<div class="mem"><span class="av">'+ic('user',20)+'</span><span>성명 : '+esc(m.name)+'<br>직위 : '+esc(m.title||'-')+'</span></div>'}).join('')||'<div class="mem">등록된 임원이 없습니다.</div>')+'</div>';
 }
+// ══ 첫 화면 ══
+function homeList(f,n,who){var c=ctx(),L=inFolder(f).sort(function(a,b){return String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||''))}).slice(0,n);
+  return L.length?L.map(function(d){return '<a class="hr" onclick="INTRA.openDoc(\''+d._id+'\')"><span class="t">'+(todoOf(d,c)?'<i class="nw">N</i>':'')+esc(d.title||'(제목 없음)')+'</span><span class="w">'+esc(who==='org'?(d.orgName||''):(d.authorName||''))+'</span><span class="d">'+esc(loc(d.updatedAt||d.createdAt))+'</span></a>'}).join(''):'<div class="he">조회 결과가 없습니다.</div>'}
+function homeCard(cls,title,f,n,who){return '<section class="gw-card '+cls+'"><h3>'+ic('pen',14)+' '+title+'<button title="전체 보기" onclick="INTRA.setFolder(\''+f+'\')">＋</button></h3><div class="hl">'+homeList(f,n,who)+'</div></section>'}
+function homeHtml(){
+  var n=apprMinOf(ORG.key,ORGDIR);
+  var tiles=[['기안 · 결재','draft','pen'],['협조 요청','coop','org'],['직인 요청','seal','seal'],['공람 · 공지','notice','file']];
+  var links=[['결재완료 문서','a_done'],['기안함','a_mine'],['문서 대장','reg'],['직인 대장','k_reg'],['접수완료','r_done']];
+  return '<div class="gw-home"><div class="gw-banner"><b>'+esc(ORG.name)+'</b><span>'+esc(MY.name||'')+(myTitle()?' '+esc(myTitle()):'')+' 님 · 결재 방식 '+(n<=1?'1인 전결':n+'인 이상 결재')+'</span>'
+      +(ORGS.length>1?'<select onchange="INTRA.setOrg(this.value)" title="소속 전환">'+ORGS.map(function(o){return '<option value="'+esc(o.key)+'"'+(o.key===ORG.key?' selected':'')+'>'+esc(o.name)+'</option>'}).join('')+'</select>':'')+'<span id="gwMsg" class="gw-say"></span></div>'
+    +'<div class="gw-grid">'+homeCard('c1','결재대기','a_wait',6)
+    +'<section class="gw-card c2"><h3>'+ic('file',14)+' 바로가기 메뉴</h3><div class="gw-tiles"><div class="tl">'+tiles.map(function(t,i){return '<button class="'+(i?'':'y')+'" onclick="INTRA.compose(\''+t[1]+'\')">'+ic(t[2],26)+'<span>'+t[0]+'</span></button>'}).join('')+'</div>'
+      +'<div class="lk">'+links.map(function(l){return '<a onclick="INTRA.setFolder(\''+l[1]+'\')">'+ic('fold',13)+' '+l[0]+'<em>'+(count(l[1])||'')+'</em></a>'}).join('')+'</div></div></section>'
+    +homeCard('c3','결재진행','a_prog',6)+homeCard('c4','최근 수신 문서','r_all',8,'org')+'</div></div>'}
 function orgHtml(){var ks=Object.keys(ORGDIR).sort(function(a,b){return (ORGDIR[a].level-ORGDIR[b].level)||String(ORGDIR[a].name).localeCompare(String(ORGDIR[b].name),'ko')});
   return '<div class="gw-bar"><h2>조직도 <span>('+MEMBERS.length+'명 · '+ks.length+'개 기관)</span></h2></div><div class="gw-note">임원이 인트라넷에 처음 로그인하면 명부에 올라옵니다. 직위는 환경설정에서 본인이 입력합니다.</div>'
     +'<div class="gw-tblw"><table class="gw-tbl"><colgroup><col style="width:70px"><col style="width:240px"><col style="width:110px"><col style="width:140px"><col></colgroup><thead><tr><th>구분</th><th>기관</th><th>성명</th><th>직위</th><th>비고</th></tr></thead><tbody>'
@@ -228,8 +260,8 @@ function orgHtml(){var ks=Object.keys(ORGDIR).sort(function(a,b){return (ORGDIR[
 // ══ 창(문서 보기 · 작성) ══
 function win(id,title,body,w){var o=$(id);if(o)o.remove();o=document.createElement('div');o.id=id;o.className='gw-win';o.innerHTML='<div class="gw-wbox" style="max-width:'+(w||900)+'px"><div class="gw-wtit"><b>'+esc(title)+'</b><button onclick="INTRA.closeW(\''+id+'\')">✕</button></div><div class="gw-wbody">'+body+'</div></div>';document.body.appendChild(o);return o}
 function closeW(id){var o=$(id);if(o)o.remove();if(id==='gwDoc')OPEN_ID=''}
-function apprBox(d){var l=d.line||[];var cols=[{t:'기안',n:d.authorName,p:d.authorTitle,s:'',d:locd(d.createdAt),cur:false,rej:false}].concat(l.map(function(x,i){return {t:x.type||'결재',n:x.name,p:x.title,s:x.status==='승인'?x.sign:'',d:x.status==='승인'?locd(x.at):(x.status==='반려'?'반려':''),cur:d.status==='진행'&&curStep(d)===i,rej:x.status==='반려',ok:x.status==='승인'}}));
-  return '<table class="gw-appr"><tr>'+cols.map(function(c){return '<th>'+esc(c.t)+'</th>'}).join('')+'</tr><tr>'+cols.map(function(c){return '<td class="sg'+(c.cur?' cur':'')+(c.rej?' rej':'')+'">'+(c.s?'<img src="'+esc(c.s)+'" alt="">':(c.ok?'<em>승인</em>':c.rej?'<em>반려</em>':c.cur?'<em>대기</em>':''))+'</td>'}).join('')+'</tr><tr>'+cols.map(function(c){return '<td>'+esc(c.n||'')+(c.p?'<br><small>'+esc(c.p)+'</small>':'')+'</td>'}).join('')+'</tr><tr>'+cols.map(function(c){return '<td class="dt">'+esc(c.d||'')+'</td>'}).join('')+'</tr></table>'}
+function apprBox(d){var l=d.line||[];var cols=[{t:l.length?'기안':'기안 · 전결',n:d.authorName,p:d.authorTitle,s:'',d:locd(d.createdAt),cur:false,rej:false,fin:!l.length&&d.status==='완료'}].concat(l.map(function(x,i){return {t:x.type||'결재',n:x.name,p:x.title,s:x.status==='승인'?x.sign:'',d:x.status==='승인'?locd(x.at):(x.status==='반려'?'반려':''),cur:d.status==='진행'&&curStep(d)===i,rej:x.status==='반려',ok:x.status==='승인'}}));
+  return '<table class="gw-appr"><tr>'+cols.map(function(c){return '<th>'+esc(c.t)+'</th>'}).join('')+'</tr><tr>'+cols.map(function(c){return '<td class="sg'+(c.cur?' cur':'')+(c.rej?' rej':'')+'">'+(c.s?'<img src="'+esc(c.s)+'" alt="">':(c.fin?'<em>전결</em>':c.ok?'<em>승인</em>':c.rej?'<em>반려</em>':c.cur?'<em>대기</em>':''))+'</td>'}).join('')+'</tr><tr>'+cols.map(function(c){return '<td>'+esc(c.n||'')+(c.p?'<br><small>'+esc(c.p)+'</small>':'')+'</td>'}).join('')+'</tr><tr>'+cols.map(function(c){return '<td class="dt">'+esc(c.d||'')+'</td>'}).join('')+'</tr></table>'}
 function openDoc(id,keep){
   var d=DOCS[id];if(!d)return;OPEN_ID=id;var c=ctx(),mine=d.authorUid===ME.uid,turn=isMyTurn(d,ME.uid);
   var acted=(d.line||[]).some(function(x){return x.status==='승인'||x.status==='반려'}),a=[];
@@ -272,7 +304,7 @@ function compose(kind,fromId){
   var h='<div class="gw-wtool"><button class="gw-b pri" id="cpGo" onclick="INTRA.submit()">결재상신</button><button class="gw-b" onclick="INTRA.closeW(\'gwCp\')">취소</button><span id="cpMsg" class="gw-say"></span></div>'
     +'<table class="gw-form"><tr><th>문서 구분</th><td>'+esc({draft:'기안 · 결재',coop:'협조 요청',seal:'직인 날인 요청',notice:'공람 · 공지'}[kind])+'</td><th>기안일</th><td>'+esc(locd(now()))+'</td></tr>'
     +'<tr><th>기안부서</th><td>'+esc(ORG.name)+'</td><th>기안자</th><td>'+esc(MY.name||'')+' '+esc(myTitle())+'</td></tr>'
-    +'<tr><th>결재선</th><td colspan="3"><div id="cpLine" class="gw-chips"></div><div class="gw-row"><select id="cpLineType" style="width:80px"><option>검토</option><option>협조</option><option selected>결재</option></select><select id="cpLineWho" style="flex:1"></select><button class="gw-b" onclick="INTRA.cpAddLine()">추가</button></div><small>위에서부터 차례로 결재합니다. 비워 두면 결재 없이 바로 시행됩니다.</small></td></tr>'
+    +'<tr><th>결재선</th><td colspan="3"><div id="cpLine" class="gw-chips"></div><div class="gw-row"><select id="cpLineType" style="width:80px"><option>검토</option><option>협조</option><option selected>결재</option></select><select id="cpLineWho" style="flex:1"></select><button class="gw-b" onclick="INTRA.cpAddLine()">추가</button></div><small>위에서부터 차례로 결재합니다. '+(apprMinOf(ORG.key,ORGDIR)<=1?'비워 두면 기안자 전결(1인 결재)로 바로 시행됩니다.':'<b style="color:#c0392b">이 기관은 '+apprMinOf(ORG.key,ORGDIR)+'인 이상 결재입니다 — 결재자를 '+(apprMinOf(ORG.key,ORGDIR)-1)+'명 이상 지정하세요.</b>')+'</small></td></tr>'
     +(kind==='seal'?'':'<tr><th>수신'+(kind==='coop'||kind==='notice'?' <em>*</em>':'')+'</th><td colspan="3"><div id="cpTo" class="gw-chips"></div><div class="gw-row"><select id="cpToWho" style="flex:1"></select><button class="gw-b" onclick="INTRA.cpAddTo()">추가</button><button class="gw-b" onclick="INTRA.cpAddToAll(1)">시도연맹 전체</button><button class="gw-b" onclick="INTRA.cpAddToAll(2)">구군연맹 전체</button></div><small>내부 결재만 할 때는 비워 둡니다.</small></td></tr>')
     +'<tr><th>제목 <em>*</em></th><td colspan="3"><input id="cpTitle" maxlength="120" value="'+esc(src?src.title:'')+'"></td></tr>'
     +'<tr><th>내용 <em>*</em></th><td colspan="3"><textarea id="cpBody" rows="12" maxlength="6000" placeholder="1. 관련: &#10;2. 위 호와 관련하여 아래와 같이 …&#10;&#10;  가. &#10;  나. ">'+esc(src?src.body:'')+'</textarea></td></tr>'
@@ -306,6 +338,8 @@ async function submit(){
   var title=$('cpTitle').value.trim(),body=$('cpBody').value.trim();
   if(title.length<2)return bad('제목을 입력하세요');if(body.length<2)return bad('내용을 입력하세요');
   if((kind==='coop'||kind==='notice')&&!CP.to.length)return bad('수신 기관을 선택하세요');
+  var need=apprMinOf(ORG.key,ORGDIR)-1;
+  if(CP.line.length<need)return bad('이 기관은 '+(need+1)+'인 이상 결재입니다 — 결재선에 결재자를 '+need+'명 이상 지정하세요'+(MEMBERS.some(function(x){return x.uid!==ME.uid})?'':' (인트라넷에 등록된 다른 임원이 없습니다. 결재자가 먼저 인트라넷에 로그인해야 합니다)'));
   var wantSeal=$('cpSeal').checked,seal=null;
   if(wantSeal){var so=$('cpSealOrg').value,mode=$('cpSealMode').value;if(!so)return bad('직인을 선택하세요');
     if(mode==='file'&&!(CP.files.concat(CP.keep)).some(function(f){return /\.(pdf|png|jpe?g)$/i.test(f.name)}))return bad('붙임 문서에 날인하려면 PDF 또는 이미지 파일을 붙이세요');
@@ -321,7 +355,7 @@ async function submit(){
     var done=!CP.line.length,t=now();
     var d={kind:kind,title:title,body:body,org:ORG.key,orgName:ORG.name,authorUid:ME.uid,authorName:MY.name||'',authorTitle:myTitle(),
       line:CP.line.map(function(x){return {uid:x.uid,name:x.name,orgName:x.orgName,title:x.title||'',type:x.type,status:'대기',at:'',comment:'',sign:''}}),
-      toOrgs:CP.to.slice(),toNames:CP.to.map(orgName),status:done?'완료':'진행',docNo:'',files:files,recv:{},replies:[],seal:seal,log:[logOf(done?'기안 · 결재선 없이 시행':'기안')],createdAt:t,updatedAt:t,doneAt:done?t:''};
+      toOrgs:CP.to.slice(),toNames:CP.to.map(orgName),status:done?'완료':'진행',docNo:'',files:files,recv:{},replies:[],seal:seal,log:[logOf(done?'기안 · 전결 시행(1인 결재)':'기안')],createdAt:t,updatedAt:t,doneAt:done?t:''};
     d.readers=readersOf(ME.uid,d.line);d.readOrgs=readOrgsOf(d,done);
     await DB.runTransaction(async function(tx){if(done)d.docNo=await nextNo(tx,ORG.key);tx.set(ref,d)});
     if(CP.from){try{await DB.collection('intraDocs').doc(CP.from).update({log:firebase.firestore.FieldValue.arrayUnion(logOf('재기안 → 새 문서')),updatedAt:now()})}catch(e){}}
@@ -436,11 +470,23 @@ async function settings(){
     +(ORG.key==='central'?'<tr><th>중앙 조직도<br>제외</th><td><div class="gw-chips">'+mine.filter(function(m){return m.uid!==ME.uid}).map(function(m){return '<label class="ck"><input type="checkbox" class="setHide" value="'+esc(m.uid)+'" data-name="'+esc(m.name)+'"> '+esc(m.name)+' '+esc(m.title||'')+'</label>'}).join(' &nbsp; ')+'</div>'
       +(HIDE.length?'<div style="margin-top:4px">제외 중: '+HIDE.map(function(h){return '<label class="ck"><input type="checkbox" class="setUnhide" value="'+esc(h.uid)+'"> '+esc(h.name||'')+'</label>'}).join(' &nbsp; ')+' <small>(체크하면 다시 중앙에 표시)</small></div>':'')
       +'<button class="gw-b" onclick="INTRA.saveHide()">저장</button><br><small>홈페이지 관리 권한은 그대로 두고, 인트라넷에서만 중앙 소속으로 보이지 않게 합니다. 제외된 사람은 시도·구군 소속으로만 인트라넷을 씁니다.</small></td></tr>':'')
+    +'<tr><th>결재 방식</th><td>'+(ORG.key==='central'?(function(){var p=o.apprPolicy||{},by=p.by||{};var op=function(v,base){return [['','기본 따름'],['1','1인 전결'],['2','2인 이상'],['3','3인 이상']].filter(function(x){return base||x[0]}).map(function(x){return '<option value="'+x[0]+'"'+(String(v||'')===x[0]?' selected':'')+'>'+x[1]+'</option>'}).join('')};
+        var ks=Object.keys(ORGDIR).sort(function(a,b){return (ORGDIR[a].level-ORGDIR[b].level)||String(ORGDIR[a].name).localeCompare(String(ORGDIR[b].name),'ko')});
+        return '<div class="gw-row"><label>전체 기본</label><select id="setApprDef" style="width:120px">'+op(p.def||1,false)+'</select></div>'
+          +'<div class="gw-row" style="align-items:flex-start;flex-direction:column;gap:3px;margin-top:4px">'+ks.map(function(k){return '<span><select class="setApprBy" data-k="'+esc(k)+'" style="width:110px">'+op(by[k],true)+'</select> '+esc(ORGDIR[k].name)+' <small>(임원 '+MEMBERS.filter(function(m){return m.orgKey===k}).length+'명 등록)</small></span>'}).join('')+'</div>'
+          +'<button class="gw-b" onclick="INTRA.saveAppr()" style="margin-top:4px">결재 방식 저장</button><br><small>1인 전결: 기안자가 결재선 없이 바로 시행(결재자를 넣어도 됩니다). 2인 이상: 기안자 외 결재자 1명 이상이 승인해야 시행. 3인 이상: 결재자 2명 이상. 중앙 사무국만 바꿀 수 있고, 저장한 뒤 새로 기안하는 문서부터 적용됩니다.</small>'})()
+        :(function(){var n=apprMinOf(ORG.key,ORGDIR);return (n<=1?'1인 전결 — 결재선 없이 바로 시행할 수 있습니다.':n+'인 이상 결재 — 결재자를 '+(n-1)+'명 이상 지정해야 합니다.')+' <small>(중앙 사무국 설정)</small>'})())+'</td></tr>'
     +'<tr><th>보안</th><td>이 창에서 30분 동안 사용하지 않으면 자동으로 잠깁니다. <button class="gw-b" onclick="INTRA.lock()">지금 잠금</button></td></tr></table>';
 }
 async function saveTitle(){try{await DB.collection('intraMembers').doc(ME.uid+'__'+ORG.key).update({title:$('setTitle').value.trim().slice(0,20),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),uid:ME.uid,orgKey:ORG.key});await loadDir();renderAll();say('직위를 저장했습니다')}catch(e){say('저장 실패: '+(e.code||e.message),true)}}
 async function saveOrg(){var n=$('setName').value.trim(),p=$('setPrefix').value.trim();if(n.length<2||!p){say('기관 이름과 머리글을 입력하세요',true);return}
   try{await DB.collection('intraOrgs').doc(ORG.key).update({name:n,docPrefix:p,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:ME.uid});await loadDir();renderAll();say('저장했습니다')}catch(e){say('저장 실패: '+(e.code||e.message),true)}}
+async function saveAppr(){
+  if(ORG.key!=='central')return;var def=+$('setApprDef').value||1,by={};
+  [].slice.call(document.querySelectorAll('.setApprBy')).forEach(function(x){if(x.value)by[x.getAttribute('data-k')]=+x.value});
+  var lone=Object.keys(ORGDIR).filter(function(k){return apprMinOf(k,{central:{apprPolicy:{def:def,by:by}}})>1&&MEMBERS.filter(function(m){return m.orgKey===k}).length<2});
+  if(!confirm('결재 방식을 저장할까요?\n· 전체 기본: '+(def<=1?'1인 전결':def+'인 이상')+(Object.keys(by).length?'\n· 기관별 지정 '+Object.keys(by).length+'곳':'')+(lone.length?'\n\n⚠ 임원이 1명뿐이라 2인 이상 결재를 할 수 없는 기관: '+lone.map(orgName).join(', ')+'\n(결재자가 인트라넷에 로그인해 명부에 올라와야 기안할 수 있습니다)':'')))return;
+  try{await DB.collection('intraOrgs').doc('central').update({apprPolicy:{def:def,by:by},apprBy:ME.uid,apprByName:MY.name||'',apprAt:now()});await loadDir();renderAll();say('결재 방식을 저장했습니다')}catch(e){say('저장 실패: '+(e.code||e.message),true)}}
 async function saveHide(){
   var add=[].slice.call(document.querySelectorAll('.setHide:checked')).map(function(x){return {uid:x.value,name:x.getAttribute('data-name')||''}});
   var del=[].slice.call(document.querySelectorAll('.setUnhide:checked')).map(function(x){return x.value});
@@ -480,7 +526,7 @@ function print(id){var d=DOCS[id];if(!d)return;var w=window.open('','_blank');if
 
 window.INTRA={login:login,lock:lock,logout:logout,setOrg:setOrg,setMod:setMod,setFolder:setFolder,setV:setV,search:search,resetSearch:resetSearch,refresh:refresh,go:go,sel:sel,selAll:selAll,openSel:openSel,recvSel:recvSel,newMenu:newMenu,
   openDoc:openDoc,closeW:closeW,openFile:openFile,openStamped:openStamped,compose:compose,cpAddLine:cpAddLine,cpDelLine:cpDelLine,cpAddTo:cpAddTo,cpAddToAll:cpAddToAll,cpDelTo:cpDelTo,cpDelKeep:cpDelKeep,cpDelFile:cpDelFile,cpFiles:cpFiles,submit:submit,approve:approve,withdraw:withdraw,del:del,recv:recv,reply:reply,
-  sealOpen:sealOpen,sealReject:sealReject,stLoad:stLoad,stLocal:stLocal,stPage:stPage,stSize:stSize,stMake:stMake,settings:settings,saveTitle:saveTitle,saveOrg:saveOrg,saveHide:saveHide,saveKeepers:saveKeepers,saveSeal:saveSeal,print:print,
+  sealOpen:sealOpen,sealReject:sealReject,stLoad:stLoad,stLocal:stLocal,stPage:stPage,stSize:stSize,stMake:stMake,settings:settings,home:home,saveAppr:saveAppr,saveTitle:saveTitle,saveOrg:saveOrg,saveHide:saveHide,saveKeepers:saveKeepers,saveSeal:saveSeal,print:print,
   _sim:function(o){ME=o.me;MY=o.my;ORGS=myOrgsOf(MY);ORG=ORGS[0];MEMBERS=o.members||[];ORGDIR=o.orgs||{};DOCS=o.docs||{};$('gwLogin').style.display='none';$('gwApp').style.display='flex';renderAll()}};
 KFDF.initApp();DB=firebase.firestore();AUTH=firebase.auth();
 ['mousemove','keydown','click','touchstart'].forEach(function(e){document.addEventListener(e,touch,{passive:true})});
