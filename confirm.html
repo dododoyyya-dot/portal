@@ -66,6 +66,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
 <script>
 KFDF.initApp();
@@ -167,7 +168,20 @@ function exportSign(){
 // ── 용품(물품) 배송지 입력 + 수령 확인 (2단계) ──
 // [배송지 기능] STEP1: 배송지 입력(주소검색·수령인·연락처) → STEP2: 용품 도착 후 수령 확인(성명·사진 1장 필수·서명)
 let GOODS=null,GOODS_PHOTO='';
+// [용품 안내 링크 2026-10-02] 사무국이 보낸 링크(링크코드)는 회원이 아니어도 배송지 입력·수령 확인 — 서버 함수 goodsLink 가 링크코드를 확인하고 기록합니다
+const GOODS_FN_URL='https://goodslink-1081847355343.asia-northeast3.run.app';
+function goodsFn(payload){return firebase.app().functions('asia-northeast3').httpsCallableFromURL(GOODS_FN_URL)(payload).then(function(r){return r.data})}
+function goodsErr(e){return (e&&e.message)?String(e.message):'잠시 후 다시 시도해 주세요'}
 async function bootGoods(id){
+  if(/^G[A-Za-z0-9]{20,40}$/.test(id)){
+    document.getElementById('stage').innerHTML='<h1>📦 강습용품 배송지 · 수령 확인</h1><p class="lead">불러오는 중…</p>';
+    try{const g=await goodsFn({token:id,action:'get'});GOODS=Object.assign({_t:id},g);renderGoodsFlow()}
+    catch(e){document.getElementById('stage').innerHTML='<h1>📦 강습용품 배송지 · 수령 확인</h1><p class="lead" style="color:#C41E2F">'+esc(goodsErr(e))+'</p><div style="font-size:12.5px;color:#8a919d;margin-top:12px;line-height:1.6">사무국(031-984-3248)으로 연락해 주세요.</div>'}
+    return;
+  }
+  return bootGoodsOld(id);
+}
+async function bootGoodsOld(id){
   // [2026-09-15] 용품 배송지·수령 확인은 마이페이지 [활동·계약]에서 (배정 강사·담당교사 로그인) — 예전 링크는 안내만 합니다
   document.getElementById('stage').innerHTML='<h1>📦 강습용품 배송지 · 수령 확인</h1>'
     +'<p class="lead">강습용품 배송지 입력과 수령 확인은 이제 <b>홈페이지 로그인 후 마이페이지 [활동·계약] › 📦 강습용품</b>에서 합니다.<br>선정 학교의 <b>배정 강사</b> 또는 <b>담당교사</b>(강습 신청서의 휴대전화·이메일로 가입한 회원)가 처리할 수 있습니다.<br><br>🚚 <b>강습용품은 10월 중순에 일괄 발송됩니다.</b></p>'
@@ -249,11 +263,11 @@ async function submitDelivery(){
   const btn=document.getElementById('okbtn');btn.disabled=true;msg.textContent='저장 중…';msg.className='msg';
   const dv={zip:v('dZip'),addr:v('dAddr'),addr2:v('dAddr2'),receiver:v('dName'),phone:v('dPhone'),note:v('dNote'),at:new Date().toISOString()};
   try{
-    await DB.collection('goodsConfirms').doc(GOODS._id).update({delivery:dv});
-    GOODS.delivery=dv;
+    if(GOODS._t){const g=await goodsFn({token:GOODS._t,action:'delivery',delivery:dv});GOODS.delivery=g.delivery||dv}
+    else{await DB.collection('goodsConfirms').doc(GOODS._id).update({delivery:dv});GOODS.delivery=dv}
     renderGoodsFlow();
     setTimeout(()=>{try{document.getElementById('msg2').textContent='✓ 배송지가 저장되었습니다. 용품이 도착하면 아래에서 수령 확인을 해주세요!';document.getElementById('msg2').className='msg ok'}catch(e){}},50);
-  }catch(e){btn.disabled=false;msg.textContent='저장 실패: '+e.message;msg.className='msg err'}
+  }catch(e){btn.disabled=false;msg.textContent='저장 실패: '+goodsErr(e);msg.className='msg err'}
 }
 // ── STEP 2: 수령 확인 (성명·사진 필수·서명) ──
 function renderGoodsForm(){
@@ -327,9 +341,10 @@ async function submitGoods(){
   const btn=document.getElementById('okbtn');btn.disabled=true;msg.textContent='제출 중…';msg.className='msg';
   const tc={name:name,at:new Date().toISOString(),sign:exportSign(),photo:GOODS_PHOTO};
   try{
-    await DB.collection('goodsConfirms').doc(GOODS._id).update({teacherConfirm:tc});
+    if(GOODS._t){await goodsFn({token:GOODS._t,action:'confirm',confirm:{name:tc.name,photo:tc.photo,sign:tc.sign}})}
+    else await DB.collection('goodsConfirms').doc(GOODS._id).update({teacherConfirm:tc});
     GOODS.teacherConfirm=tc;renderGoodsDone();
-  }catch(e){btn.disabled=false;msg.textContent='제출 실패 — 이미 확인되었거나 링크가 만료되었을 수 있습니다.';msg.className='msg err'}
+  }catch(e){btn.disabled=false;msg.textContent='제출 실패 — '+(GOODS._t?goodsErr(e):'이미 확인되었거나 링크가 만료되었을 수 있습니다.');msg.className='msg err'}
 }
 
 async function submitConfirm(){
