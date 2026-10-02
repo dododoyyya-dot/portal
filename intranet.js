@@ -1,4 +1,4 @@
-// intranet.js v20261002b · 연맹 인트라넷(그룹웨어) — 중앙 · 시도연맹 · 구군연맹 임원용 전자결재 · 문서함 · 직인 · 조직도
+// intranet.js v20261002c · 연맹 인트라넷(그룹웨어) — 중앙 · 시도연맹 · 구군연맹 임원용 전자결재 · 문서함 · 직인 · 조직도
 //   · 홈페이지와 별도 창에서 열리며, 들어올 때마다 아이디·비밀번호를 다시 입력해 인증합니다(창마다 · 30분 동안 쓰지 않으면 잠김).
 //   · 기관(orgKey): central | sido_{시도} | gugun_{시도}_{구군} — 회원 등급(admin·owner / sidoOfficer+sido / gugunOfficer+sido+gugun)에서 정해집니다.
 //   · 저장(보안 규칙 v46): intraDocs · intraMembers · intraOrgs · intraSeals(직인 관리자만) · intraCounters / 첨부: storage intranet/{문서ID}/ (스토리지 규칙 v9)
@@ -83,6 +83,8 @@ function foldersOf(d,c){var f=['all'],uid=c.uid,ok=c.orgKey,mine=d.authorUid===u
   if(d.seal&&(d.seal.orgKey===ok||d.org===ok))f.push('k_reg');
   if(d.org===ok&&d.docNo&&!ext)f.push('reg');
   if((ext&&d.org===ok)||(sent&&toMe&&got&&r.status!=='반송'&&d.kind!=='notice'))f.push('x_reg');
+  // [중앙 전체 열람] 중앙이 결재선·수신처가 아닌데도 볼 수 있는 다른 기관 문서(읽기 전용)
+  if(ok==='central'&&d.org!=='central'&&!mine&&!inLine&&!toMe)f.push('z_org');
   var cb=(d.cab||{})[ok];if(cb)f.push('c_'+cb);
   return f}
 function todoOf(d,c){return isMyTurn(d,c.uid)||needRecv(d,c.orgKey)||myRecvJob(d,c)||(sendPending(d)&&d.authorUid===c.uid)||(sealPending(d)&&isKeeper(d.seal.orgKey,c.uid,c.dir))}
@@ -193,11 +195,13 @@ function listen(){
   var on=function(q){UNSUB.push(q.onSnapshot(function(s){s.docChanges().forEach(function(c){if(c.type==='removed')delete DOCS[c.doc.id];else DOCS[c.doc.id]=Object.assign({_id:c.doc.id},c.doc.data())});renderLeft();renderMain();if(OPEN_ID&&DOCS[OPEN_ID]&&$('gwDoc'))openDoc(OPEN_ID,true)},function(e){say('문서를 불러오지 못했습니다: '+(e.code||e.message),true)}))};
   on(DB.collection('intraDocs').where('readers','array-contains',ME.uid).limit(500));
   on(DB.collection('intraDocs').where('readOrgs','array-contains',ORG.key).limit(500));
+  // [중앙 전체 열람 · 규칙 v49] 중앙 소속으로 들어오면 모든 기관 문서를 함께 불러옵니다(게시 전에는 조용히 건너뜀)
+  if(ORG.key==='central')UNSUB.push(DB.collection('intraDocs').limit(2000).onSnapshot(function(s){s.docChanges().forEach(function(c){if(c.type==='removed')delete DOCS[c.doc.id];else DOCS[c.doc.id]=Object.assign({_id:c.doc.id},c.doc.data())});renderLeft();renderMain()},function(){}));
   TEMPS={};UNSUB.push(DB.collection('intraTemp').where('uid','==',ME.uid).limit(100).onSnapshot(function(s){TEMPS={};s.forEach(function(d){TEMPS[d.id]=Object.assign({_id:d.id},d.data())});renderLeft();if(V.folder==='p_temp')renderMain()},function(){}));
   Object.keys(EXT).forEach(function(k){try{if(EXT[k].start)EXT[k].start()}catch(e){}});
 }
-function treeOf(m){if(m!=='docs')return TREE[m];var cs=((ORGDIR[(ORG||{}).key]||{}).cabinets)||[];return cs.length?TREE.docs.concat([['기록물철',cs.map(function(c){return ['c_'+c.id,c.name]})]]):TREE.docs}
-function fname(f){if(FNAME[f])return FNAME[f];var cs=((ORGDIR[(ORG||{}).key]||{}).cabinets)||[];var c=cs.find(function(x){return 'c_'+x.id===f});return c?c.name:''}
+function treeOf(m){if(m!=='docs')return TREE[m];var cs=((ORGDIR[(ORG||{}).key]||{}).cabinets)||[];var t=TREE.docs;if(ORG&&ORG.key==='central')t=t.concat([['중앙 열람',[['z_org','다른 기관 문서']]]]);return cs.length?t.concat([['기록물철',cs.map(function(c){return ['c_'+c.id,c.name]})]]):t}
+function fname(f){if(FNAME[f])return FNAME[f];if(f==='z_org')return '다른 기관 문서 (중앙 열람)';var cs=((ORGDIR[(ORG||{}).key]||{}).cabinets)||[];var c=cs.find(function(x){return 'c_'+x.id===f});return c?c.name:''}
 function setOrg(k){ORG=ORGS.find(function(o){return o.key===k})||ORG;try{localStorage.setItem('kfdfIntraOrg',ORG.key)}catch(e){}V.page=1;V.sel={};listen();renderAll()}
 function setMod(m){V.mod=m;if(m==='appr')V.folder='a_wait';else if(TREE[m])V.folder=TREE[m][0][1][0][0];V.page=1;V.sel={};V.q='';renderAll()}
 function setFolder(f){V.folder=f;var m=Object.keys(TREE).find(function(k){return treeOf(k).some(function(g){return g[1].some(function(x){return x[0]===f})})});if(m)V.mod=m;V.page=1;V.sel={};renderAll()}
@@ -374,6 +378,7 @@ function openDoc(id,keep){
     +(cm?'<h4>결재 의견</h4><table class="gw-form">'+cm+'</table>':'')+recv+rep
     +'<details class="gw-log"><summary>처리 기록 '+((d.log||[]).length)+'건</summary>'+((d.log||[]).map(function(x){return '<div>'+esc(loc(x.at))+' · '+esc(x.name)+' ('+esc(x.org||'')+') · '+esc(x.act)+'</div>'}).join(''))+'</details>';
   var kv=keep&&$('gwRep')?$('gwRep').value:'';win('gwDoc','문서정보',h,960);if(kv)$('gwRep').value=kv;
+  if(foldersOf(d,c).indexOf('z_org')>=0){var rp=document.querySelector('#gwDoc .gw-rep');if(rp)rp.outerHTML='<div class="gw-note" style="padding:6px 0">중앙 사무국 열람용으로 보이는 문서입니다(결재선·수신처가 아니라 읽기만 가능).</div>'}
 }
 async function openFile(id,i){var f=((DOCS[id]||{}).files||[])[i];if(!f)return;var w=window.open('','_blank');try{var u=await firebase.storage().ref(f.path).getDownloadURL();if(w)w.location.href=u;else location.href=u}catch(e){if(w)w.close();alert('파일을 열 수 없습니다: '+(e.code||e.message)+'\n(스토리지 규칙 v9 게시 여부 확인)')}}
 async function openStamped(id){var s=((DOCS[id]||{}).seal||{}).stamped;if(!s)return;var w=window.open('','_blank');try{var u=await firebase.storage().ref(s.path).getDownloadURL();if(w)w.location.href=u;else location.href=u}catch(e){if(w)w.close();alert('파일을 열 수 없습니다: '+(e.code||e.message))}}
