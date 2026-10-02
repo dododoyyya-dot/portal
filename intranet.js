@@ -1,4 +1,4 @@
-// intranet.js v20261002f · 연맹 인트라넷(그룹웨어) — 중앙 · 시도연맹 · 구군연맹 임원용 전자결재 · 문서함 · 직인 · 조직도
+// intranet.js v20261002g · 연맹 인트라넷(그룹웨어) — 중앙 · 시도연맹 · 구군연맹 임원용 전자결재 · 문서함 · 직인 · 조직도
 //   · 홈페이지와 별도 창에서 열리며, 들어올 때마다 아이디·비밀번호를 다시 입력해 인증합니다(창마다 · 30분 동안 쓰지 않으면 잠김).
 //   · 기관(orgKey): central | sido_{시도} | gugun_{시도}_{구군} — 회원 등급(admin·owner / sidoOfficer+sido / gugunOfficer+sido+gugun)에서 정해집니다.
 //   · 저장(보안 규칙 v46): intraDocs · intraMembers · intraOrgs · intraSeals(직인 관리자만) · intraCounters / 첨부: storage intranet/{문서ID}/ (스토리지 규칙 v9)
@@ -403,16 +403,20 @@ function compose(kind,fromId,opt){
     sender:(src&&src.sender&&src.org===ORG.key)?src.sender:ORG.name+'회장',toLabel:src?(src.toLabel||''):'',
     seal:{on:kind==='seal'||!!(src&&src.seal&&src.seal.orgKey),org:ss.orgKey||ss.org||ORG.key,mode:ss.mode||(kind==='seal'?'file':'doc'),purpose:ss.purpose||''}};
   if(kind==='draft')CP.to=[];
+  // 먼저 결재정보(제목 · 수신자 · 결재선)를 정하고, [확인]하면 본문 작성 창(cpEditor)이 열립니다
+  CP.title=src?(src.title||''):'';CP.body=src?(src.body||''):'';CP.first=true;closeW('gwCp');ciOpen('doc');
+}
+function cpEditor(){
   var h='<div class="gw-wtool"><button class="gw-b" onclick="INTRA.closeW(\'gwCp\')">닫기</button><button class="gw-b" onclick="INTRA.ciOpen(\'doc\')">'+ic('file',13)+' 결재정보</button><button class="gw-b pri" id="cpGo" onclick="INTRA.submit()">'+ic('pen',13)+' 기안 (결재상신)</button>'
       +'<button class="gw-b" onclick="INTRA.saveTemp()">임시저장</button><button class="gw-b" onclick="INTRA.cpSaveForm()">서식으로 저장</button><label class="gw-b" style="cursor:pointer">'+ic('clip',13)+' 붙임문서<input type="file" id="cpFiles" multiple style="display:none" onchange="INTRA.cpFiles(this)"></label><span id="cpMsg" class="gw-say"></span></div>'
     +'<div id="cpSum" class="gw-cpsum"></div>'
     +'<div class="gw-cpwrap"><div class="gw-paper"><div class="pm">'+MOTTO+'</div><div class="ph"><img src="kfdf_logo.png" alt=""><b>'+esc(ORG.name)+'</b><span></span></div>'
       +'<table class="pk"><tr><th>수 신</th><td><a id="cpToTxt" title="수신자 지정" onclick="INTRA.ciOpen(\'to\')"></a></td></tr><tr><th>(경유)</th><td></td></tr>'
-      +'<tr><th>제 목</th><td><input id="cpTitle" maxlength="120" value="'+esc(src?(src.title||''):'')+'" placeholder="제목을 입력하세요"></td></tr></table>'
-      +'<textarea id="cpBody" maxlength="6000" placeholder="1. 귀 기관의 무궁한 발전을 기원합니다.&#10;&#10;2. 관련: &#10;&#10;3. 위 호와 관련하여 아래와 같이 …&#10;&#10;  가. &#10;  나. &#10;&#10;붙임  1부.  끝.">'+esc(src?(src.body||''):'')+'</textarea>'
+      +'<tr><th>제 목</th><td><input id="cpTitle" maxlength="120" value="'+esc(CP.title||'')+'" placeholder="제목을 입력하세요"></td></tr></table>'
+      +'<textarea id="cpBody" maxlength="6000" placeholder="1. 귀 기관의 무궁한 발전을 기원합니다.&#10;&#10;2. 관련: &#10;&#10;3. 위 호와 관련하여 아래와 같이 …&#10;&#10;  가. &#10;  나. &#10;&#10;붙임  1부.  끝.">'+esc(CP.body||'')+'</textarea>'
       +'<div class="pf" id="cpSender"></div></div>'
     +'<aside class="gw-cpatt"><b>붙임목록</b><div id="cpFileList" class="gw-chips"></div><small>PDF · 이미지 · 한글 · 워드 · 엑셀<br>파일당 20MB, 10개까지</small></aside></div>';
-  win('gwCp','기안하기',h,1120);cpDraw();
+  win('gwCp','기안하기',h,1120);cpDraw();setTimeout(function(){try{$('cpBody').focus()}catch(e){}},60);
 }
 // 외부에서 받은 문서의 접수 등록(결재 없음)
 function composeExt(){closeW('gwDoc');var nm=$('gwNewMenu');if(nm)nm.style.display='none';
@@ -440,21 +444,21 @@ function cpDraw(){
 // ══ 결재정보 창 — 문서정보 · 결재선 · 수신자 · 발송정보 ══
 var CI=null;
 function ciOpen(tab){if(!CP||CP.kind==='ext')return;
-  CI={tab:tab||'doc',kind:CP.kind,fixed:CP.kind==='seal'||CP.kind==='notice',title:$('cpTitle').value,urgent:!!CP.urgent,cab:CP.cab||'',line:clone(CP.line),to:CP.to.slice(),
+  CI={tab:tab||'doc',first:!!CP.first,kind:CP.kind,fixed:CP.kind==='seal'||CP.kind==='notice',title:$('cpTitle')?$('cpTitle').value:(CP.title||''),urgent:!!CP.urgent,cab:CP.cab||'',line:clone(CP.line),to:CP.to.slice(),
     ext:String(CP.extTo||'').split(',').map(function(x){return x.trim()}).filter(Boolean),auto:CP.auto!==false,seal:clone(CP.seal),sender:CP.sender,toLabel:CP.toLabel||'',toLabelOn:!!CP.toLabel,selM:'',selL:-1,selO:'',selT:-1,sub:'org',type:'결재'};
-  win('gwCi','결재정보','<div id="ciBody"></div>',860);ciDraw()}
+  win('gwCi',CI.first?'기안하기 — 결재정보':'결재정보','<div id="ciBody"></div>',860);ciDraw();if(CI.first)setTimeout(function(){try{$('ciTitle').focus()}catch(e){}},60)}
 function ciSet(k,v){if(!CI)return;if(k.indexOf('seal.')===0)CI.seal[k.slice(5)]=v;else CI[k]=v}
 function ciTab(t){CI.tab=t;ciDraw()}
 function ciKind(k){CI.kind=k;ciDraw()}
 function ciPick(w,v){if(w==='m')CI.selM=v;else if(w==='o')CI.selO=v;else if(w==='l')CI.selL=+v;else if(w==='t')CI.selT=+v;else if(w==='sub'){CI.sub=v;CI.selO=''}ciDraw()}
 function ciDraw(){var b=$('ciBody');if(!b||!CI)return;var day=now().slice(0,10),keys=orgKeysSorted();
-  var tabs=[['doc','문서정보'],['line','결재선'],['to','수신자'],['send','발송정보']];
+  var tabs=[['doc','① 문서정보 · 제목'],['to','② 수신자'],['line','③ 결재선'],['send','④ 발송정보']];
   var h='<div class="gw-tabs">'+tabs.map(function(t){return '<a class="'+(CI.tab===t[0]?'on':'')+'" onclick="INTRA.ciTab(\''+t[0]+'\')">'+t[1]+'</a>'}).join('')+'</div><div class="gw-tabp">';
   if(CI.tab==='doc'){var cabs=((ORGDIR[ORG.key]||{}).cabinets)||[];
     h+='<table class="gw-form"><tr><th>발송종류</th><td>'+(CI.fixed?esc(KINDL[CI.kind]):[['official','일반기안'],['coop','협조문'],['draft','내부결재']].map(function(k){return '<label class="ck" style="margin-right:22px"><input type="radio" name="ciKind"'+(CI.kind===k[0]?' checked':'')+' onchange="INTRA.ciKind(\''+k[0]+'\')"> '+k[1]+'</label>'}).join(''))
         +' <label class="ck" style="margin-left:14px"><input type="checkbox"'+(CI.urgent?' checked':'')+' onchange="INTRA.ciSet(\'urgent\',this.checked)"> 긴급결재</label>'
         +'<br><small>'+(CI.kind==='official'?'일반기안: 외부 기관(수기 입력)이나 다른 연맹으로 나가는 일반공문 — 결재 후 시행문을 인쇄해 보내고 [발송]으로 기록합니다.':CI.kind==='coop'?'협조문: 중앙 · 시도 · 구군 연맹끼리 주고받는 문서 — 수신 기관이 인트라넷에서 접수합니다.':CI.kind==='draft'?'내부결재: 수신자 없이 기관 안에서 결재하고 보관합니다.':'')+'</small></td></tr>'
-      +'<tr><th>제 목</th><td><input maxlength="120" value="'+esc(CI.title)+'" oninput="INTRA.ciSet(\'title\',this.value)" style="width:100%"></td></tr>'
+      +'<tr><th>제 목</th><td><input id="ciTitle" maxlength="120" value="'+esc(CI.title)+'" placeholder="제목을 먼저 입력하세요" oninput="INTRA.ciSet(\'title\',this.value)" style="width:100%"></td></tr>'
       +'<tr><th>문서번호</th><td>'+esc(((ORGDIR[ORG.key]||{}).docPrefix)||defPrefix(ORG))+' '+new Date().getFullYear()+'-@N <small>(결재가 끝나면 자동으로 붙습니다)</small></td></tr>'
       +'<tr><th>기록물철</th><td><select onchange="INTRA.ciSet(\'cab\',this.value)" style="width:320px"><option value="">(분류 안 함)</option>'+cabs.map(function(c){return '<option value="'+esc(c.id)+'"'+(CI.cab===c.id?' selected':'')+'>'+esc(c.name)+'</option>'}).join('')+'</select> <small>환경설정에서 기록물철을 만듭니다</small></td></tr>'
       +'<tr><th>열람범위</th><td>기안자 · 결재선 · 발신/수신 기관 임원 <small>(중앙 사무국은 전체 열람)</small></td></tr></table>'}
@@ -486,7 +490,8 @@ function ciDraw(){var b=$('ciBody');if(!b||!CI)return;var day=now().slice(0,10),
           +'<div class="gw-row"><label>용도</label><input maxlength="120" value="'+esc(CI.seal.purpose||'')+'" placeholder="제출처 · 부수" oninput="INTRA.ciSet(\'seal.purpose\',this.value)" style="flex:1"></div>':'')
         +'<br><small>결재가 끝난 뒤 직인 관리자가 승인해야 날인되며, 직인 대장에 기록됩니다.</small></td></tr>'
       +'<tr><th>발신명의</th><td>'+esc(CI.sender||'')+' <small>([수신자] 탭에서 바꿉니다)</small></td></tr></table>'}
-  b.innerHTML=h+'</div><div class="gw-cifoot"><button class="gw-b pri" onclick="INTRA.ciOk()">확인</button><button class="gw-b" onclick="INTRA.closeW(\'gwCi\')">취소</button></div>';
+  var order=['doc','to','line','send'],ti=order.indexOf(CI.tab);
+  b.innerHTML=h+'</div><div class="gw-cifoot">'+(CI.first?(ti>0?'<button class="gw-b" onclick="INTRA.ciTab(\''+order[ti-1]+'\')">◀ 이전</button>':'')+(ti<3?'<button class="gw-b" onclick="INTRA.ciNext()">다음 ▶</button>':'')+'<button class="gw-b pri" onclick="INTRA.ciOk()">확인 · 본문 작성</button>':'<button class="gw-b pri" onclick="INTRA.ciOk()">확인</button>')+'<button class="gw-b" onclick="INTRA.closeW(\'gwCi\')">취소</button><span id="ciMsg" class="gw-say bad"></span></div>';
 }
 // 결재자가 부재 중이면 대결자로 바꿔 지정할지 묻습니다
 function ciAddLine(){var m=MEMBERS.find(function(x){return x._id===CI.selM});if(!m){alert('조직도에서 결재자를 고르세요.');return}
@@ -509,11 +514,21 @@ function ciAddTo(){if(CI.kind==='draft'){alert('내부결재는 수신자를 지
   else{if(!CI.selO){alert('조직도에서 수신 기관을 고르세요.');return}add(CI.selO)}
   ciDraw()}
 function ciDelTo(){var i=CI.selT;if(i<0){alert('오른쪽 목록에서 뺄 수신자를 고르세요.');return}if(i<CI.to.length)CI.to.splice(i,1);else CI.ext.splice(i-CI.to.length,1);CI.selT=-1;ciDraw()}
+function ciNext(){var order=['doc','to','line','send'],i=order.indexOf(CI.tab);if(CI.tab==='doc'&&String(CI.title||'').trim().length<2){var m=$('ciMsg');if(m)m.textContent='제목을 입력하세요';return}
+  var n=order[i+1];if(n==='to'&&CI.kind==='draft')n='line';ciTab(n)}
 function ciOk(){
+  if(CI.first){var er='',need=apprMinOf(ORG.key,ORGDIR)-1,kd=CI.fixed?CP.kind:CI.kind;
+    if(String(CI.title||'').trim().length<2){er='제목을 입력하세요';CI.tab='doc'}
+    else if((kd==='coop'||kd==='notice')&&!CI.to.length){er='수신 기관을 지정하세요';CI.tab='to'}
+    else if(kd==='official'&&!CI.to.length&&!CI.ext.length){er='수신자를 지정하세요 (조직도 또는 수기입력)';CI.tab='to'}
+    else if(CI.line.length<need){er='이 기관은 '+(need+1)+'인 이상 결재입니다 — 결재자를 '+need+'명 이상 지정하세요';CI.tab='line'}
+    if(er){ciDraw();var m=$('ciMsg');if(m)m.textContent=er;return}}
+  var first=CI.first;
   if(!CI.fixed)CP.kind=CI.kind;CP.urgent=!!CI.urgent;CP.cab=CI.cab||'';CP.line=clone(CI.line);
   CP.to=CP.kind==='draft'?[]:CI.to.slice();CP.extTo=CP.kind==='official'?CI.ext.join(', '):'';CP.auto=CI.auto!==false;CP.seal=clone(CI.seal);if(CP.kind==='seal')CP.seal.on=true;
   CP.sender=CI.sender||ORG.name+'회장';CP.toLabel=CI.toLabelOn?String(CI.toLabel||'').trim().slice(0,80):'';
-  if($('cpTitle'))$('cpTitle').value=CI.title||'';closeW('gwCi');cpDraw()}
+  CP.title=String(CI.title||'').trim();if($('cpTitle'))$('cpTitle').value=CP.title;closeW('gwCi');
+  if(first){CP.first=false;cpEditor()}else cpDraw()}
 function cpAddLine(){ciOpen('line')}
 function cpDelLine(i){CP.line.splice(i,1);cpDraw()}
 function cpLoadLine(){ciOpen('line')}
@@ -778,7 +793,7 @@ function print(id){var d=DOCS[id];if(!d)return;var w=window.open('','_blank');if
 
 window.INTRA={login:login,lock:lock,logout:logout,setOrg:setOrg,setMod:setMod,setFolder:setFolder,setV:setV,search:search,resetSearch:resetSearch,refresh:refresh,go:go,sel:sel,selAll:selAll,openSel:openSel,recvSel:recvSel,newMenu:newMenu,
   openDoc:openDoc,closeW:closeW,openFile:openFile,openStamped:openStamped,compose:compose,cpAddLine:cpAddLine,cpDelLine:cpDelLine,cpAddTo:cpAddTo,cpAddToAll:cpAddToAll,cpDelTo:cpDelTo,cpDelKeep:cpDelKeep,cpDelFile:cpDelFile,cpFiles:cpFiles,submit:submit,approve:approve,withdraw:withdraw,del:del,recv:recv,reply:reply,
-  sealOpen:sealOpen,sealReject:sealReject,stLoad:stLoad,stLocal:stLocal,stPage:stPage,stSize:stSize,stMake:stMake,settings:settings,home:home,saveAppr:saveAppr,sendSel:sendSel,sendDoc:sendDoc,recvOpen:recvOpen,recvGo:recvGo,recvBack:recvBack,setCab:setCab,saveTemp:saveTemp,tempOpen:tempOpen,tempDel:tempDel,formUse:formUse,formDel:formDel,cpLoadLine:cpLoadLine,cpSaveLine:cpSaveLine,cpSaveForm:cpSaveForm,ciOpen:ciOpen,ciSet:ciSet,ciTab:ciTab,ciKind:ciKind,ciPick:ciPick,ciAddLine:ciAddLine,ciDelLine:ciDelLine,ciMove:ciMove,ciLoadLine:ciLoadLine,ciSaveLine:ciSaveLine,ciAddTo:ciAddTo,ciDelTo:ciDelTo,ciOk:ciOk,saveAbsent:saveAbsent,addCab:addCab,delCab:delCab,saveTitle:saveTitle,saveOrg:saveOrg,saveHide:saveHide,saveKeepers:saveKeepers,saveSeal:saveSeal,print:print,
+  sealOpen:sealOpen,sealReject:sealReject,stLoad:stLoad,stLocal:stLocal,stPage:stPage,stSize:stSize,stMake:stMake,settings:settings,home:home,saveAppr:saveAppr,sendSel:sendSel,sendDoc:sendDoc,recvOpen:recvOpen,recvGo:recvGo,recvBack:recvBack,setCab:setCab,saveTemp:saveTemp,tempOpen:tempOpen,tempDel:tempDel,formUse:formUse,formDel:formDel,cpLoadLine:cpLoadLine,cpSaveLine:cpSaveLine,cpSaveForm:cpSaveForm,ciOpen:ciOpen,ciSet:ciSet,ciTab:ciTab,ciKind:ciKind,ciPick:ciPick,ciAddLine:ciAddLine,ciDelLine:ciDelLine,ciMove:ciMove,ciLoadLine:ciLoadLine,ciSaveLine:ciSaveLine,ciAddTo:ciAddTo,ciDelTo:ciDelTo,ciOk:ciOk,ciNext:ciNext,saveAbsent:saveAbsent,addCab:addCab,delCab:delCab,saveTitle:saveTitle,saveOrg:saveOrg,saveHide:saveHide,saveKeepers:saveKeepers,saveSeal:saveSeal,print:print,
   _sim:function(o){ME=o.me;MY=o.my;ORGS=myOrgsOf(MY);ORG=ORGS[0];MEMBERS=o.members||[];ORGDIR=o.orgs||{};DOCS=o.docs||{};TEMPS=o.temps||{};PREFS=o.prefs||{lines:[],forms:[]};$('gwLogin').style.display='none';$('gwApp').style.display='flex';renderAll()}};
 // 확장 모듈(intranet2.js)이 쓰는 연결점 — reg(이름, {left, main, count, alarm, home, start})
 window.INTRA_X={reg:function(k,o){EXT[k]=o},db:function(){return DB},me:function(){return ME},my:function(){return MY},org:function(){return ORG},orgs:function(){return ORGS},members:function(){return MEMBERS},dir:function(){return ORGDIR},V:V,
