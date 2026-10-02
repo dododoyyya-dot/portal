@@ -1,4 +1,4 @@
-// intranet.js v20261002e · 연맹 인트라넷(그룹웨어) — 중앙 · 시도연맹 · 구군연맹 임원용 전자결재 · 문서함 · 직인 · 조직도
+// intranet.js v20261002f · 연맹 인트라넷(그룹웨어) — 중앙 · 시도연맹 · 구군연맹 임원용 전자결재 · 문서함 · 직인 · 조직도
 //   · 홈페이지와 별도 창에서 열리며, 들어올 때마다 아이디·비밀번호를 다시 입력해 인증합니다(창마다 · 30분 동안 쓰지 않으면 잠김).
 //   · 기관(orgKey): central | sido_{시도} | gugun_{시도}_{구군} — 회원 등급(admin·owner / sidoOfficer+sido / gugunOfficer+sido+gugun)에서 정해집니다.
 //   · 저장(보안 규칙 v46): intraDocs · intraMembers · intraOrgs · intraSeals(직인 관리자만) · intraCounters / 첨부: storage intranet/{문서ID}/ (스토리지 규칙 v9)
@@ -336,7 +336,7 @@ function orgHtml(){var day=now().slice(0,10);
 function win(id,title,body,w){var o=$(id);if(o)o.remove();o=document.createElement('div');o.id=id;o.className='gw-win';o.innerHTML='<div class="gw-wbox" style="max-width:'+(w||900)+'px"><div class="gw-wtit"><b>'+esc(title)+'</b><button onclick="INTRA.closeW(\''+id+'\')">✕</button></div><div class="gw-wbody">'+body+'</div></div>';document.body.appendChild(o);return o}
 function closeW(id){var o=$(id);if(o)o.remove();if(id==='gwDoc')OPEN_ID=''}
 // 수신 표기: 수신자표기를 따로 적었으면 그것, 아니면 수신 기관 + 수기 입력 수신처
-var MOTTO='「함께 날리는 원반, 함께 자라는 내일」';   // 공문 머리 문구
+var MOTTO='「원반 하나로 잇는 건강한 대한민국」';   // 공문 머리 문구
 function recvText(d){if(d.toLabel)return d.toLabel;var a=(d.toNames||[]).slice();if(d.extTo)a.push(d.extTo);return a.length?a.join(', '):'내부결재'}
 function senderOf(d){return d.sender||((d.orgName||'')+'회장')}
 // 공문 용지(보기) — 머리(로고 · 기관명) / 수신 · (경유) · 제목 / 본문 / 발신명의
