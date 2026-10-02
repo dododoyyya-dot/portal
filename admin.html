@@ -7626,10 +7626,10 @@ async function moonDocSet(uid,st){
 }
 // ══ [교원 2026-10-02] 교원(교사)은 겸직 허가서 제출 불필요 — 회원 유형이 교사가 아니어도 실제 교사면 사무국이 「교사로 분류」(users.teacherMark) ══
 function isTeacherV(v){return !!(v&&(v.accountType==='teacher'||v.workSchool||v.teacherMark))}
-function tmTag(uid,small){
+function tmTag(uid,small,noLabel){
   if(!VIEWER_IS_ADMIN||!uid)return '';const d=(USERS||[]).find(function(x){return x.id===uid});if(!d)return '';const v=d.data()||{};
   const st=small?'padding:2px 8px;font-size:11px;min-height:0;':'';
-  if(isTeacherV(v))return ' <span style="font-size:11px;font-weight:800;color:#0f766e" title="교원 — 겸직 허가서 제출 불필요">🧑‍🏫 교원'+(v.teacherMark?'(사무국 분류)':'')+'</span>'
+  if(isTeacherV(v))return (noLabel?'':' <span style="font-size:11px;font-weight:800;color:#0f766e" title="교원 — 겸직 허가서 제출 불필요">🧑‍🏫 교원'+(v.teacherMark?'(사무국 분류)':'')+'</span>')
     +(v.teacherMark?' <button class="btn-sub" style="'+st+'background:#fff;color:#8a919d;border:1.5px solid #8a919d" onclick="tmSet(\''+uid+'\',false)" title="사무국이 교사로 분류한 것을 해제">분류 해제</button>':'');
   return ' <button class="btn-sub" style="'+st+'background:#fff;color:#0f766e;border:1.5px solid #0f766e" onclick="tmSet(\''+uid+'\',true)" title="회원 유형이 교사가 아니지만 실제 교원인 경우 — 교사로 분류하면 겸직 서류 제출 대상에서 빠집니다">🧑‍🏫 교사로 분류</button>';
 }
@@ -7783,7 +7783,7 @@ function renderCrimBoard(){
       return '<tr><td>'+esc(r.region)+'</td><td>'+esc(r.sido)+'</td><td><b>'+esc(r.school)+'</b></td><td>'+esc(r.type)+'</td><td>'+esc(r.name)+'</td>'
         +'<td style="white-space:nowrap">'+(r.logs?'<b>'+r.logs+'</b>회':'<span style="color:#8a919d">0</span>')+'</td>'
         +'<td>'+(c?(c.status==='반려'?'<b style="color:#C41E2F">반려</b>':c.adminMarked?'<b style="color:#7c3aed" title="'+esc(c.note||'')+'">제출 처리(사무국)</b>':'<b style="color:#1F4E9C">제출</b>')+' '+esc(String(c.at||'').slice(5,10))+(c.path?' <button class="btn-sub" style="padding:2px 8px;font-size:11px;min-height:0;background:#fff;color:#153A77;border:1.5px solid #153A77" onclick="crimBoardPhoto(\''+r.appId+'\')">보기</button>':''):'<span style="color:#C41E2F;font-weight:700">미제출</span>')
-          +'<div style="font-size:11.5px;margin-top:2px">'+(r.teacher?'🧑‍🏫 교원 · 겸직 '+(r.moon?(r.moon.status==='확인'?'<b style="color:#0f766e">확인'+(r.moon.adminMarked?'(사무국)':'')+'</b>':r.moon.status==='반려'?'<b style="color:#8a919d">반려</b>':'<b style="color:#1F4E9C">대기</b>'):'<span style="color:#8a919d">제출 불필요</span>'):'')+tmTag(r.uid,true)+'</div>'
+          +'<div style="font-size:11.5px;margin-top:2px">'+(r.teacher?'🧑‍🏫 교원 · 겸직 '+(r.moon?(r.moon.status==='확인'?'<b style="color:#0f766e">확인'+(r.moon.adminMarked?'(사무국)':'')+'</b>':r.moon.status==='반려'?'<b style="color:#8a919d">반려</b>':'<b style="color:#1F4E9C">대기</b>'):'<span style="color:#8a919d">제출 불필요</span>'):'')+tmTag(r.uid,true,true)+'</div>'
           +(crimNeedMark(r)?'<div style="margin-top:3px"><button class="btn-sub" style="padding:2px 8px;font-size:11px;min-height:0;background:#7c3aed" onclick="crimMarkDone(\''+r.appId+'\')" title="강습이 이미 시작된 건 — 동의 사진을 자료 업로드한 것으로 처리">📎 자료 제출 처리</button></div>':'')+'</td>'
         +'<td style="white-space:nowrap"><select id="cbr_'+r.appId+'" style="padding:3px 6px;font-size:12px"><option value="">—</option><option'+(r.res&&r.res.result==='적격'?' selected':'')+'>적격</option><option'+(r.res&&r.res.result==='부적격'?' selected':'')+'>부적격</option></select>'
           +' <input type="date" id="cbd_'+r.appId+'" value="'+esc((r.res&&r.res.repliedAt)||today)+'" style="padding:2px 5px;font-size:12px">'
