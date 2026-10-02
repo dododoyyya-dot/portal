@@ -2131,7 +2131,7 @@ AUTH.onAuthStateChanged(async u=>{
   renderGoods().catch(function(){});   // [용품 배송·수령] 배정 강사·담당교사
   try{
     const cs=await DB.collection('compSlots').where('confirmed','array-contains',u.uid).get();
-    MYCOMP=cs.docs;
+    MYCOMP=cs.docs.filter(x=>(x.data().role||'')!=='참가');   // [2026-10-02] 대회 위촉계약은 심판·운영요원만 — 대회 참가(선수)로 확정된 공고는 제외
     if(MYCOMP.length){
       document.getElementById('compContractBox').style.display='block';
       renderCompContracts();
@@ -2646,12 +2646,13 @@ function tlPdf(si){
 function hdBadge(t,c){return '<span style="font-size:11.5px;font-weight:900;color:#fff;background:'+c+';border-radius:999px;padding:3px 9px">'+t+'</span>'}
 function renderHireDocs(d){
   const row=document.getElementById('hireDocsRow');if(!row)return;
-  const isTeacher=d.accountType==='teacher'||!!d.workSchool;
+  const isTeacher=d.accountType==='teacher'||!!d.workSchool||!!d.teacherMark;
   const m=(d.submitDocs||{}).moonlight||null;
   const consented=!!(d.consents&&d.consents.agreedAt);
   let h='<b style="margin-right:4px">📂 위촉 서류</b>';
   // ① 겸직 허가서 (교원) — 학교장 결재 문서 사진·PDF
-  if(isTeacher){const mSt=!m?hdBadge('미제출','#C41E2F'):(m.status==='확인'?hdBadge('확인 완료','#0f766e'):(m.status==='반려'?hdBadge('반려','#C41E2F'):hdBadge('확인 대기','#b8860b')));
+  // [2026-10-02] 교원은 겸직 허가서 제출 불필요 — 이미 올린 경우만 상태를 보여 줍니다
+  if(isTeacher&&m){const mSt=!m?hdBadge('미제출','#C41E2F'):(m.status==='확인'?hdBadge('확인 완료','#0f766e'):(m.status==='반려'?hdBadge('반려','#C41E2F'):hdBadge('확인 대기','#b8860b')));
   h+='<span style="display:inline-flex;align-items:center;gap:6px;border:1.5px solid #e2e7f0;background:#fff;border-radius:10px;padding:6px 10px">'
     +'<span style="font-weight:800">🧑‍🏫 겸직 허가서'+(isTeacher?'':' <span style="font-weight:600;color:#8a919d;font-size:11px">(교원만)</span>')+'</span>'+mSt
     +(m&&m.url?'<a href="'+m.url+'" target="_blank" style="font-size:12px;font-weight:800;color:#153A77">보기</a>':'')

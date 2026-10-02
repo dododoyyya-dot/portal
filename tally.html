@@ -49,12 +49,13 @@ h2{font-size:17px;font-weight:900;margin:6px 0 10px;color:var(--navy)}
       <span id="updated"></span>
     </div>
     <div class="bignums" id="bigNums"></div>
-    <h2>권역별 선정 현황 (선정 + 배정완료)</h2>
+    <h2>권역별 선정 현황 (선정 + 배정완료) <span style="font-size:12px;color:#0f766e;font-weight:800">● 실시간</span></h2>
     <table id="regTable"></table>
     <h2>지원방식별 (선정교 기준)</h2>
     <table id="supTable"></table>
     <div class="note">
-      · 선정교 = 상태가 [선정] 또는 [배정완료]인 신청 건 (학교 단위가 아닌 신청 건 단위 — 한 학교가 학교체육·방과후 모두 선정되면 2건으로 집계)<br>
+      · 선정 학교 수 = 같은 학교(학교명·시도)를 한 번만 센 수 · 선정 건 = 상태가 [선정] 또는 [배정완료]인 신청 건 (한 학교가 학교체육·방과후 모두 선정되면 2건)<br>
+      · 신청서가 바뀌면 이 화면이 바로 다시 집계됩니다 (홈 화면 「사업 현황」은 30분마다 자동 갱신)<br>
       · 접수·대기는 아직 미선정, 취소·미선정은 집계 제외 · 권역/유형은 표준화 보정 적용
     </div>
   </div>
@@ -104,14 +105,21 @@ AUTH.onAuthStateChanged(async u=>{
   load();
 });
 
-async function load(){
+// [2026-10-02] 실시간 — 신청서가 바뀌면 바로 다시 집계(onSnapshot). [↻ 새로고침]은 연결을 새로 엽니다.
+let UNSUB=null;
+function load(){
   // 권역장은 규칙상 관할 권역 건만 읽을 수 있으므로 where 조건 필수 (admin은 전체)
-  const snap=SCOPE_R
-    ?await DB.collection('schoolApplications').where('region','==',SCOPE_R).get()
-    :await DB.collection('schoolApplications').get();
+  if(UNSUB){try{UNSUB()}catch(e){}UNSUB=null}
+  const q=SCOPE_R?DB.collection('schoolApplications').where('region','==',SCOPE_R):DB.collection('schoolApplications');
+  document.getElementById('updated').textContent='불러오는 중…';
+  UNSUB=q.onSnapshot(render,function(e){document.getElementById('updated').textContent='⚠ 실시간 연결 실패: '+(e.code||e.message)+' — [↻ 새로고침]을 눌러 주세요'});
+}
+const SIDO_LONG={'서울특별시':'서울','부산광역시':'부산','대구광역시':'대구','인천광역시':'인천','광주광역시':'광주','대전광역시':'대전','울산광역시':'울산','세종특별자치시':'세종','경기도':'경기','강원도':'강원','강원특별자치도':'강원','충청북도':'충북','충청남도':'충남','전라북도':'전북','전북특별자치도':'전북','전라남도':'전남','경상북도':'경북','경상남도':'경남','제주특별자치도':'제주','제주도':'제주'};
+function sidoOf(c){const t=String(c||'').trim().split(/\s+/)[0]||'';return SIDO_LONG[t]||t.slice(0,2)}
+function render(snap){
   const R={};KFDF_REGIONS.forEach(r=>R[r]={school:0,after:0,goods:0,self:0,dispatch:0,applied:0,wait:0});
   R['미상']={school:0,after:0,goods:0,self:0,dispatch:0,applied:0,wait:0};
-  let selSchool=0,selAfter=0,goods=0,selfN=0,dispatch=0,totalApps=0,waitN=0;
+  let selSchool=0,selAfter=0,goods=0,selfN=0,dispatch=0,totalApps=0,waitN=0;const UQ={},UQR={},BOTH={};
   snap.forEach(doc=>{
     const s=doc.data();
     if(s.deleted)return;
@@ -123,29 +131,33 @@ async function load(){
     if(st==='대기'){waitN++;R[reg].wait++;}
     if(st!=='선정'&&st!=='배정완료')return;
     if(ty==='after'){selAfter++;R[reg].after++;}else{selSchool++;R[reg].school++;}
+    {const k=String(s.school||'').replace(/\s/g,'')+'|'+sidoOf(s.city);if(UQ[k]&&UQ[k]!==ty)BOTH[k]=1;UQ[k]=UQ[k]||ty;(UQR[reg]=UQR[reg]||{})[k]=1;}
     const sup=s.support||'강사파견+용품';
     if(sup==='용품만'){goods++;R[reg].goods++;}
     else if(sup==='본인지도+용품'||s.selfTeach){selfN++;R[reg].self++;}
     else{dispatch++;R[reg].dispatch++;}
   });
-  const total=selSchool+selAfter;
+  const total=selSchool+selAfter;const uqN=Object.keys(UQ).length,bothN=Object.keys(BOTH).length;
   document.getElementById('bigNums').innerHTML=
-    '<div class="bn total"><b>'+total+'</b><span>총 선정교 (건)</span></div>'
+    '<div class="bn total"><b>'+uqN+'</b><span>선정 학교 수 (중복 제외)</span></div>'
+    +'<div class="bn"><b style="color:#153A77">'+total+'</b><span>선정 건 (학교 × 유형)'+(bothN?' · 두 유형 모두 '+bothN+'교':'')+'</span></div>'
     +'<div class="bn"><b style="color:#8c1622">'+selSchool+'</b><span>🏫 학교체육 강습</span></div>'
     +'<div class="bn"><b style="color:#0f766e">'+selAfter+'</b><span>🌱 방과후·늘봄</span></div>'
     +'<div class="bn"><b style="color:#6b7280">'+waitN+'</b><span>⏳ 대기 (미선정)</span></div>'
     +'<div class="bn"><b style="color:#1F4E9C">'+totalApps+'</b><span>유효 신청 전체</span></div>';
-  let rt='<tr><th>권역</th><th>🏫 학교체육</th><th>🌱 방과후·늘봄</th><th>선정 계</th><th>유효 신청</th><th>대기</th></tr>';
+  let rt='<tr><th>권역</th><th>선정 학교 수</th><th>🏫 학교체육</th><th>🌱 방과후·늘봄</th><th>선정 건 계</th><th>유효 신청</th><th>대기</th></tr>';let tu=0;
   let ts=0,ta=0,tapp=0,tw=0;
   KFDF_REGIONS.forEach(r=>{
     if(SCOPE_R&&r!==SCOPE_R)return; // 권역장: 관할 권역 행만 표시
     const c=R[r];const sum=c.school+c.after;
     ts+=c.school;ta+=c.after;tapp+=c.applied;tw+=c.wait;
-    rt+='<tr><td>'+r+'</td><td>'+c.school+'</td><td>'+c.after+'</td><td class="big">'+sum+'</td><td>'+c.applied+'</td><td>'+c.wait+'</td></tr>';
+    const un=Object.keys(UQR[r]||{}).length;tu+=un;
+    rt+='<tr><td>'+r+'</td><td class="big">'+un+'</td><td>'+c.school+'</td><td>'+c.after+'</td><td class="big">'+sum+'</td><td>'+c.applied+'</td><td>'+c.wait+'</td></tr>';
   });
   if(R['미상'].applied){const c=R['미상'];ts+=c.school;ta+=c.after;tapp+=c.applied;tw+=c.wait;
-    rt+='<tr><td>미상(확인 필요)</td><td>'+c.school+'</td><td>'+c.after+'</td><td class="big">'+(c.school+c.after)+'</td><td>'+c.applied+'</td><td>'+c.wait+'</td></tr>';}
-  rt+='<tr class="sum"><td>합계</td><td>'+ts+'</td><td>'+ta+'</td><td class="big">'+(ts+ta)+'</td><td>'+tapp+'</td><td>'+tw+'</td></tr>';
+    const un=Object.keys(UQR['미상']||{}).length;tu+=un;
+    rt+='<tr><td>미상(확인 필요)</td><td class="big">'+un+'</td><td>'+c.school+'</td><td>'+c.after+'</td><td class="big">'+(c.school+c.after)+'</td><td>'+c.applied+'</td><td>'+c.wait+'</td></tr>';}
+  rt+='<tr class="sum"><td>합계</td><td class="big">'+uqN+'</td><td>'+ts+'</td><td>'+ta+'</td><td class="big">'+(ts+ta)+'</td><td>'+tapp+'</td><td>'+tw+'</td></tr>';
   document.getElementById('regTable').innerHTML=rt;
   let st2='<tr><th>권역</th><th>강사파견+용품</th><th>본인지도+용품</th><th>🎁 용품만</th></tr>';
   let td2=0,tf2=0,tg2=0;
@@ -156,7 +168,7 @@ async function load(){
   });
   st2+='<tr class="sum"><td>합계</td><td>'+td2+'</td><td>'+tf2+'</td><td>'+tg2+'</td></tr>';
   document.getElementById('supTable').innerHTML=st2;
-  document.getElementById('updated').textContent='집계 시각: '+new Date().toLocaleString('ko-KR')+(SCOPE_R?' · 관할 권역('+SCOPE_R+') 집계만 표시됩니다':'');
+  document.getElementById('updated').textContent='● 실시간 반영 중 · 마지막 갱신 '+new Date().toLocaleString('ko-KR')+(SCOPE_R?' · 관할 권역('+SCOPE_R+') 집계만 표시됩니다':'');
 }
 </script>
 </body>

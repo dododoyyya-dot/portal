@@ -71,7 +71,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
 function ymd(x){try{if(!x)return '';if(typeof x==='string')return x.slice(0,10);const d=x.toDate?x.toDate():new Date(x);return isNaN(d)?'':d.toISOString().slice(0,10)}catch(e){return ''}}
 function yearOf(x){return (ymd(x)||'').slice(0,4)}
 function chip(t,c){return '<span class="chip" style="background:'+c+'">'+esc(t)+'</span>'}
-function isTeacher(v){return v.accountType==='teacher'||!!v.workSchool}
+function isTeacher(v){return v.accountType==='teacher'||!!v.workSchool||!!v.teacherMark}
 function typeOf(s){const t=String((s.type||'')+' '+(s.typeKey||'')).toLowerCase();return (t.indexOf('after')>=0||t.indexOf('방과후')>=0||t.indexOf('늘봄')>=0||t.indexOf('돌봄')>=0)?'방과후·늘봄':'학교체육 강습'}
 function appYear(a){const s=a.s;const l=LOGS.find(x=>x.appId===a.id);return yearOf(s.createdAt)||yearOf(s.approvedAt)||(l&&String(l.date||'').slice(0,4))||'2026'}
 function hasAdmin(v){return !!(v&&(v.role==='admin'||(Array.isArray(v.roles)&&v.roles.indexOf('admin')>=0)))}
@@ -141,7 +141,7 @@ function render(){
     ['안전교육',v.safetyEdu?'✓':'미이수',!!v.safetyEdu],
     ['2026 연수',v.edu2026?'✓ 이수':'미이수',!!v.edu2026]
   ].map(r=>'<span style="border-color:'+(r[2]?'#bfe3d4':'#f1c7cc')+'">'+esc(r[0])+' <b style="color:'+(r[2]?'var(--green)':'var(--red)')+'">'+esc(r[1])+'</b></span>').join('');
-  const moon=(isTeacher(v)||m)?('<div class="sec"><b>🧑‍🏫 겸직 허가서</b> '
+  const moon=m?('<div class="sec"><b>🧑‍🏫 겸직 허가서</b> '   // [2026-10-02] 교원 겸직 허가서 제출 불필요 — 올린 경우만 표시
     +(!m?chip('미제출','#C41E2F'):chip(m.status==='확인'?'확인 완료':(m.status==='반려'?'반려':'확인 대기'),m.status==='확인'?'#0f766e':(m.status==='반려'?'#C41E2F':'#b8860b')))
     +(m?' <span class="sub">'+esc(ymd(m.at))+(m.note?' · 사유: '+esc(m.note):'')+'</span> <a href="'+esc(m.url)+'" target="_blank" rel="noopener" style="font-weight:800">📎 보기</a> '
       +'<button class="btn" onclick="moonSet(\'확인\')">'+(m.status==='확인'?'확인 취소':'확인')+'</button> <button class="btn r" onclick="moonSet(\'반려\')">반려</button>':'')
