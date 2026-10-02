@@ -1,4 +1,4 @@
-// intranet.js v20261002d · 연맹 인트라넷(그룹웨어) — 중앙 · 시도연맹 · 구군연맹 임원용 전자결재 · 문서함 · 직인 · 조직도
+// intranet.js v20261002e · 연맹 인트라넷(그룹웨어) — 중앙 · 시도연맹 · 구군연맹 임원용 전자결재 · 문서함 · 직인 · 조직도
 //   · 홈페이지와 별도 창에서 열리며, 들어올 때마다 아이디·비밀번호를 다시 입력해 인증합니다(창마다 · 30분 동안 쓰지 않으면 잠김).
 //   · 기관(orgKey): central | sido_{시도} | gugun_{시도}_{구군} — 회원 등급(admin·owner / sidoOfficer+sido / gugunOfficer+sido+gugun)에서 정해집니다.
 //   · 저장(보안 규칙 v46): intraDocs · intraMembers · intraOrgs · intraSeals(직인 관리자만) · intraCounters / 첨부: storage intranet/{문서ID}/ (스토리지 규칙 v9)
@@ -336,11 +336,12 @@ function orgHtml(){var day=now().slice(0,10);
 function win(id,title,body,w){var o=$(id);if(o)o.remove();o=document.createElement('div');o.id=id;o.className='gw-win';o.innerHTML='<div class="gw-wbox" style="max-width:'+(w||900)+'px"><div class="gw-wtit"><b>'+esc(title)+'</b><button onclick="INTRA.closeW(\''+id+'\')">✕</button></div><div class="gw-wbody">'+body+'</div></div>';document.body.appendChild(o);return o}
 function closeW(id){var o=$(id);if(o)o.remove();if(id==='gwDoc')OPEN_ID=''}
 // 수신 표기: 수신자표기를 따로 적었으면 그것, 아니면 수신 기관 + 수기 입력 수신처
+var MOTTO='「함께 날리는 원반, 함께 자라는 내일」';   // 공문 머리 문구
 function recvText(d){if(d.toLabel)return d.toLabel;var a=(d.toNames||[]).slice();if(d.extTo)a.push(d.extTo);return a.length?a.join(', '):'내부결재'}
 function senderOf(d){return d.sender||((d.orgName||'')+'회장')}
 // 공문 용지(보기) — 머리(로고 · 기관명) / 수신 · (경유) · 제목 / 본문 / 발신명의
 function paperHtml(d){var fl=(d.files||[]).map(function(x){return x.name});
-  return '<div class="gw-paper view"><div class="ph"><img src="kfdf_logo.png" alt=""><b>'+esc(d.orgName||'')+'</b><span></span></div>'
+  return '<div class="gw-paper view"><div class="pm">'+MOTTO+'</div><div class="ph"><img src="kfdf_logo.png" alt=""><b>'+esc(d.orgName||'')+'</b><span></span></div>'
     +'<table class="pk"><tr><th>수 신</th><td>'+esc(d.kind==='ext'?(d.orgName||''):recvText(d))+'</td></tr><tr><th>(경유)</th><td></td></tr><tr><th>제 목</th><td><b>'+esc(d.title||'')+'</b></td></tr></table>'
     +'<div class="pb">'+nl(d.body||'')+'</div>'
     +(d.kind==='ext'?'':'<div class="pf">'+esc(senderOf(d))+'</div>')+'</div>'}
@@ -405,7 +406,7 @@ function compose(kind,fromId,opt){
   var h='<div class="gw-wtool"><button class="gw-b" onclick="INTRA.closeW(\'gwCp\')">닫기</button><button class="gw-b" onclick="INTRA.ciOpen(\'doc\')">'+ic('file',13)+' 결재정보</button><button class="gw-b pri" id="cpGo" onclick="INTRA.submit()">'+ic('pen',13)+' 기안 (결재상신)</button>'
       +'<button class="gw-b" onclick="INTRA.saveTemp()">임시저장</button><button class="gw-b" onclick="INTRA.cpSaveForm()">서식으로 저장</button><label class="gw-b" style="cursor:pointer">'+ic('clip',13)+' 붙임문서<input type="file" id="cpFiles" multiple style="display:none" onchange="INTRA.cpFiles(this)"></label><span id="cpMsg" class="gw-say"></span></div>'
     +'<div id="cpSum" class="gw-cpsum"></div>'
-    +'<div class="gw-cpwrap"><div class="gw-paper"><div class="ph"><img src="kfdf_logo.png" alt=""><b>'+esc(ORG.name)+'</b><span></span></div>'
+    +'<div class="gw-cpwrap"><div class="gw-paper"><div class="pm">'+MOTTO+'</div><div class="ph"><img src="kfdf_logo.png" alt=""><b>'+esc(ORG.name)+'</b><span></span></div>'
       +'<table class="pk"><tr><th>수 신</th><td><a id="cpToTxt" title="수신자 지정" onclick="INTRA.ciOpen(\'to\')"></a></td></tr><tr><th>(경유)</th><td></td></tr>'
       +'<tr><th>제 목</th><td><input id="cpTitle" maxlength="120" value="'+esc(src?(src.title||''):'')+'" placeholder="제목을 입력하세요"></td></tr></table>'
       +'<textarea id="cpBody" maxlength="6000" placeholder="1. 귀 기관의 무궁한 발전을 기원합니다.&#10;&#10;2. 관련: &#10;&#10;3. 위 호와 관련하여 아래와 같이 …&#10;&#10;  가. &#10;  나. &#10;&#10;붙임  1부.  끝.">'+esc(src?(src.body||''):'')+'</textarea>'
@@ -762,12 +763,12 @@ function print(id){var d=DOCS[id];if(!d)return;var w=window.open('','_blank');if
   var seal=(d.seal&&d.seal.status==='승인'&&d.seal.img)?'<img class="seal" src="'+esc(d.seal.img)+'">':'';var l=d.line||[];
   w.document.write('<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>'+esc(d.docNo||'')+' '+esc(d.title)+'</title><style>'
     +'@page{size:A4;margin:20mm 18mm}*{box-sizing:border-box}body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;font-size:11.5pt;line-height:1.8;color:#111;word-break:keep-all;margin:0}'
-    +'.hd{text-align:center;font-size:21pt;font-weight:800;letter-spacing:2px;padding-bottom:6mm;border-bottom:2.2px solid #111}.kv{margin:7mm 0 0}.kv div{display:flex;gap:4mm}.kv b{flex:none;width:18mm}'
+    +'.mt{text-align:center;font-size:10.5pt;letter-spacing:1px;margin-bottom:3mm}.hd{text-align:center;font-size:21pt;font-weight:800;letter-spacing:2px;padding-bottom:6mm;border-bottom:2.2px solid #111}.kv{margin:7mm 0 0}.kv div{display:flex;gap:4mm}.kv b{flex:none;width:18mm}'
     +'h1{font-size:12.5pt;margin:3mm 0 0;display:flex;gap:4mm}h1 b{flex:none;width:18mm}.rule{border-top:1px solid #111;margin:4mm 0 6mm}.body{min-height:95mm;white-space:pre-wrap}'
     +'.att{margin-top:6mm}.from{text-align:center;font-size:19pt;font-weight:800;letter-spacing:3px;margin:16mm 0 10mm}.from span{position:relative;display:inline-block}.seal{position:absolute;right:-22mm;top:50%;transform:translateY(-50%);width:30mm;height:30mm;object-fit:contain;mix-blend-mode:multiply;opacity:.93}'
     +'.ft{border-top:2.2px solid #111;padding-top:3mm;font-size:9.5pt;line-height:1.7}.ft .ln{display:flex;flex-wrap:wrap;gap:1mm 7mm}.np{text-align:center;margin:0 0 10px}@media print{.np{display:none}}'
     +'</style></head><body><div class="np"><button onclick="window.print()" style="padding:6px 18px;font-size:13px">인쇄 · PDF로 저장</button></div>'
-    +'<div class="hd">'+esc(d.orgName)+'</div><div class="kv"><div><b>수신</b><span>'+esc(d.toLabel||((d.toNames||[]).length+(d.extTo?1:0)>4?'수신처 참조':recvText(d)))+'</span></div><div><b>(경유)</b><span></span></div></div>'
+    +'<div class="mt">'+MOTTO+'</div><div class="hd">'+esc(d.orgName)+'</div><div class="kv"><div><b>수신</b><span>'+esc(d.toLabel||((d.toNames||[]).length+(d.extTo?1:0)>4?'수신처 참조':recvText(d)))+'</span></div><div><b>(경유)</b><span></span></div></div>'
     +'<h1><b>제목</b><span>'+esc(d.title)+'</span></h1><div class="rule"></div><div class="body">'+esc(d.body)+'</div>'
     +((d.files||[]).length?'<div class="att"><b>붙임</b>&nbsp; '+d.files.map(function(f,i){return (i+1)+'. '+esc(f.name)+' 1부'}).join(' &nbsp;')+'. &nbsp;끝.</div>':'<div class="att">끝.</div>')
     +'<div class="from"><span>'+esc(senderOf(d))+seal+'</span></div>'+(((d.toNames||[]).length+(d.extTo?1:0)>4||d.toLabel)&&((d.toNames||[]).length||d.extTo)?'<div style="font-size:10pt;margin-bottom:6mm"><b>수신처</b>&nbsp; '+esc((d.toNames||[]).concat(d.extTo?[d.extTo]:[]).join(', '))+'</div>':'')
