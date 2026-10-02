@@ -208,6 +208,9 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
       <label class="lclab" style="margin-top:10px">포스터 이미지 <span style="font-weight:600;color:var(--gray)">— 신청자에게 공고 카드에 표시됩니다 (자동 압축)</span></label>
       <input type="file" id="nPoster" accept="image/*" class="lcin" style="padding:8px">
       <div id="nPosterNow" style="font-size:12px;margin-top:4px"></div>
+      <label class="lclab" style="margin-top:10px">첨부파일 <span style="font-weight:600;color:var(--gray)">— 공고문·신청서 양식 등 (PDF·HWP·DOCX·이미지, 파일당 10MB, 여러 개 가능) · 수정 때 추가·삭제할 수 있습니다</span></label>
+      <input type="file" id="nFiles" multiple accept=".pdf,.hwp,.hwpx,.docx,image/*" class="lcin" style="padding:8px" onchange="nFilePick(this)">
+      <div id="nFileList" style="font-size:12.5px;margin-top:4px"></div>
       <label style="display:flex;gap:8px;align-items:center;margin-top:12px;padding:10px 12px;background:#fff8ed;border:1.5px solid #ecd9b0;border-radius:9px;font-size:13px;font-weight:800;color:#8a5a00"><input type="checkbox" id="nShowBanner" style="width:auto"> 📢 홈페이지 메인 배너에 노출 <span style="font-weight:600;color:var(--gray);font-size:11.5px">— 체크한 공고만 접수중일 때 메인 화면 상단 배너에 표시됩니다</span></label>
       <div style="margin-top:12px"><button class="lcbtn p" id="nBtn" onclick="addNotice()">공고 게시</button>
       <a href="javascript:cancelEdit()" id="nCancel" style="display:none;font-size:12.5px;font-weight:800;color:#C41E2F;margin-left:8px">수정 취소 ✕</a>
@@ -444,6 +447,7 @@ async function loadNotices(){
         +(n.desc?'<br>'+esc(n.desc):'')
         +(n.schedule?'<div style="margin-top:8px;padding:10px 12px;background:#f4f7fb;border-radius:9px;font-size:12.5px;line-height:1.9"><b style="color:#153A77">📅 세부 일정</b><br>'+esc(n.schedule).replace(/\n/g,'<br>')+'</div>':'')
         +(n.posterUrl?'<a href="'+n.posterUrl+'" target="_blank" rel="noopener"><img src="'+n.posterUrl+'" alt="공고 포스터" style="display:block;max-width:230px;width:100%;border-radius:10px;margin-top:10px;border:1px solid #dfe5ee" loading="lazy"></a><span style="font-size:11.5px;color:var(--gray)">포스터를 누르면 크게 보입니다</span>':'')
+        +((n.attachments||[]).length?'<div style="margin-top:8px">'+(n.attachments||[]).map(function(x){return '<a href="'+esc(x.url)+'" target="_blank" rel="noopener" style="display:inline-block;margin:2px 6px 2px 0;padding:4px 10px;border:1.5px solid #dbe4f3;border-radius:8px;background:#f5f8fd;font-size:12.5px;font-weight:800;color:#153A77;text-decoration:none">📎 '+esc(x.name||'첨부파일')+'</a>'}).join('')+'</div>':'')
         +((mine||CENTRAL)&&n.report?'<br><span style="color:#153A77;font-weight:700">📝 결과보고: '+esc(n.report.date||'')+' · 참석 '+esc(n.report.attend||0)+' · 합격 '+esc(n.report.pass||0)+' · 불합격 '+esc(n.report.fail||0)+' · 수납 '+esc(n.report.fee||'')+(n.report.note?' · '+esc(n.report.note):'')+'</span>':'')
         +((mine||CENTRAL)&&n.approval==='반려'&&n.remandReason?'<br><span style="color:#C41E2F;font-weight:700">⛔ 공고 반려 사유: '+esc(n.remandReason)+'</span>':'')
         +((mine||CENTRAL)&&n.reportStatus==='보완요청'&&n.reportRemand?'<br><span style="color:#C41E2F;font-weight:700">✏️ 보고 보완요청: '+esc(n.reportRemand)+'</span>':'')
@@ -489,9 +493,49 @@ async function uploadPoster(){
   const m=document.getElementById('nMsg');
   m.textContent='포스터 업로드 중…';m.style.color='#153A77';
   const blob=await compressPoster(f);
-  const ref=firebase.storage().ref('notices/'+Date.now()+'.jpg');
+  // [2026-10-02] notices/ 는 중앙·권역장만 쓸 수 있어 시도연맹 임원의 포스터 업로드가 거부됐음 → 로그인 회원 누구나 쓰는 compdocs/본인 폴더(열람 공개)
+  const ref=firebase.storage().ref('compdocs/'+AUTH.currentUser.uid+'/licposter_'+Date.now()+'.jpg');
   await ref.put(blob,{contentType:'image/jpeg'});
   return await ref.getDownloadURL();
+}
+// ── [첨부파일 2026-10-02] 공고 첨부(PDF·HWP·DOCX·이미지) — N_ATT: 이미 올라간 것 {name,url} + 새로 고른 것 {name,file} ──
+let N_ATT=[],N_POSTER_DEL=false;
+function nMime(f){const e=(f.name.split('.').pop()||'').toLowerCase();
+  if(e==='pdf')return 'application/pdf';if(e==='hwp')return 'application/x-hwp';if(e==='hwpx')return 'application/vnd.hancom.hwpx';
+  if(e==='docx')return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  if(/^image\//.test(f.type||''))return f.type;if(/^(jpg|jpeg)$/.test(e))return 'image/jpeg';if(e==='png')return 'image/png';return ''}
+function nFilePick(inp){
+  [].slice.call(inp.files||[]).forEach(function(f){
+    if(!nMime(f)){alert(f.name+' — PDF·HWP·DOCX·이미지 파일만 첨부할 수 있습니다.');return}
+    if(f.size>=10*1024*1024){alert(f.name+' — 10MB 이하만 첨부할 수 있습니다.');return}
+    if(N_ATT.length>=8){alert('첨부파일은 8개까지입니다.');return}
+    N_ATT.push({name:f.name,file:f})});
+  inp.value='';nFileDraw();
+}
+function nFileDel(i){N_ATT.splice(i,1);nFileDraw()}
+function nFileDraw(){
+  const el=document.getElementById('nFileList');if(!el)return;
+  el.innerHTML=N_ATT.length?N_ATT.map(function(x,i){return '<div style="display:flex;gap:8px;align-items:center;padding:4px 0">📎 '
+    +(x.url?'<a href="'+esc(x.url)+'" target="_blank" rel="noopener" style="font-weight:800;color:#153A77">'+esc(x.name)+'</a>':'<b>'+esc(x.name)+'</b> <span style="color:#b8860b;font-weight:700">(저장 시 업로드)</span>')
+    +' <a href="javascript:nFileDel('+i+')" style="color:#C41E2F;font-weight:800;text-decoration:none">✕ 삭제</a></div>'}).join(''):(EDIT_ID?'<span style="color:var(--gray)">첨부파일 없음</span>':'');
+}
+async function nFilesUpload(m){
+  const out=[];
+  for(let i=0;i<N_ATT.length;i++){const x=N_ATT[i];
+    if(x.url){out.push({name:x.name,url:x.url});continue}
+    m.textContent='첨부파일 업로드 중… ('+x.name+')';m.style.color='#153A77';
+    const ext=(x.name.split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,'');
+    const ref=firebase.storage().ref('compdocs/'+AUTH.currentUser.uid+'/licattach_'+Date.now()+'_'+i+'.'+ext);
+    await ref.put(x.file,{contentType:nMime(x.file)});
+    const url=await ref.getDownloadURL();x.url=url;delete x.file;out.push({name:x.name,url:url});
+  }
+  return out;
+}
+function nPosterDel(){N_POSTER_DEL=true;document.getElementById('nPoster').value='';document.getElementById('nPosterNow').innerHTML='<b style="color:#C41E2F">포스터 삭제 예정</b> — [✏️ 수정 저장]을 누르면 반영됩니다 (새 파일을 고르면 그 파일로 교체)';}
+function nFormReset(){
+  ['nTitle','nDate','nPlace','nFee','nAcct','nUntil','nDesc','nSched','nFLn','nFLg','nFLb','nFRn','nFRg','nFRb'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('nPoster').value='';document.getElementById('nPosterNow').textContent='';document.getElementById('nShowBanner').checked=false;
+  N_ATT=[];N_POSTER_DEL=false;nFileDraw();
 }
 function feesVal(){
   const f={},m={nFLn:'지도자|신규',nFLg:'지도자|갱신',nFLb:'지도자|보수(역량강화)',nFRn:'심판|신규',nFRg:'심판|갱신',nFRb:'심판|보수(역량강화)'};
@@ -510,6 +554,13 @@ async function addNotice(){
   if(!v('nTitle')||!v('nDate')){m.textContent='제목·일시는 필수입니다';m.style.color='#C41E2F';return}
   const sido=document.getElementById('nSido').value;
   const isCentral=lcHasRole(LMY,'admin');
+  const nb=document.getElementById('nBtn');nb.disabled=true;
+  try{await addNoticeGo(m,v,sido,isCentral)}
+  catch(e){console.warn('notice save',e);const t=String((e&&(e.code||e.message))||e);
+    m.textContent='저장 실패: '+(/unauthorized|permission/i.test(t)?'권한이 없거나 파일 형식·용량이 맞지 않습니다 (첨부 10MB 이하 · PDF·HWP·DOCX·이미지)':t)+' — 입력한 내용은 그대로 있으니 다시 눌러 주세요';m.style.color='#C41E2F'}
+  nb.disabled=false;
+}
+async function addNoticeGo(m,v,sido,isCentral){
   if(EDIT_ID){
     // ── 공고 수정 (승인·보고 상태는 유지, 내용만 갱신) ──
     const upd={
@@ -518,13 +569,15 @@ async function addNotice(){
       sido:(sido==='전국(중앙)'?'전국':sido),
       showOnBanner:document.getElementById('nShowBanner').checked,
       editedAt:firebase.firestore.FieldValue.serverTimestamp()};
-    const pu=await uploadPoster();if(pu)upd.posterUrl=pu;
+    const pu=await uploadPoster();if(pu)upd.posterUrl=pu;else if(N_POSTER_DEL)upd.posterUrl='';
+    upd.attachments=await nFilesUpload(m);
+    upd.editedBy=(LMY&&LMY.name)||'';
     await DB.collection('licenseNotices').doc(EDIT_ID).update(upd);
-    m.textContent='✓ 공고가 수정되었습니다';m.style.color='#0f766e';
-    cancelEdit();loadNotices();return;
+    cancelEdit();m.textContent='✓ 공고가 수정되었습니다';m.style.color='#0f766e';loadNotices();return;
   }
   const posterUrl=await uploadPoster();
-  await DB.collection('licenseNotices').add({
+  const atts=await nFilesUpload(m);
+  await DB.collection('licenseNotices').add({attachments:atts,
     type:ntypeVal(),target:v('nTarget'),title:v('nTitle'),date:v('nDate'),place:v('nPlace'),fee:v('nFee'),acct:v('nAcct'),until:v('nUntil'),desc:v('nDesc'),
     schedule:v('nSched'),posterUrl:(posterUrl||''),fees:feesVal(),
     sido:(sido==='전국(중앙)'?'전국':sido),
@@ -535,7 +588,7 @@ async function addNotice(){
     reportStatus:'',
     createdAt:firebase.firestore.FieldValue.serverTimestamp()});
   m.textContent=isCentral?'✓ 게시되었습니다':'✓ 등록되었습니다 — 중앙연맹 승인 후 회원에게 공개됩니다';m.style.color='#0f766e';
-  ['nTitle','nDate','nPlace','nFee','nAcct','nUntil','nDesc','nSched','nFLn','nFLg','nFLb','nFRn','nFRg','nFRb'].forEach(i=>document.getElementById(i).value='');document.getElementById('nPoster').value='';document.getElementById('nPosterNow').textContent='';document.getElementById('nShowBanner').checked=false;
+  nFormReset();
   loadNotices();
 }
 function editNotice(id){
@@ -560,7 +613,8 @@ function editNotice(id){
   const fm={nFLn:'지도자|신규',nFLg:'지도자|갱신',nFLb:'지도자|보수(역량강화)',nFRn:'심판|신규',nFRg:'심판|갱신',nFRb:'심판|보수(역량강화)'};
   for(const id in fm)document.getElementById(id).value=(n.fees&&n.fees[fm[id]])||'';
   document.getElementById('nPoster').value='';
-  document.getElementById('nPosterNow').innerHTML=n.posterUrl?('현재 포스터 등록됨 — <a href="'+n.posterUrl+'" target="_blank" style="font-weight:800;color:#153A77">보기</a> (새 파일 선택 시 교체)'):'등록된 포스터 없음';
+  document.getElementById('nPosterNow').innerHTML=n.posterUrl?('현재 포스터 등록됨 — <a href="'+n.posterUrl+'" target="_blank" style="font-weight:800;color:#153A77">보기</a> (새 파일 선택 시 교체) · <a href="javascript:nPosterDel()" style="font-weight:800;color:#C41E2F">✕ 포스터 삭제</a>'):'등록된 포스터 없음';
+  N_POSTER_DEL=false;N_ATT=(n.attachments||[]).map(function(x){return {name:x.name||'첨부파일',url:x.url}});nFileDraw();
   document.getElementById('nShowBanner').checked=!!n.showOnBanner;
   document.getElementById('nBtn').textContent='✏️ 수정 저장';
   document.getElementById('nCancel').style.display='inline';
@@ -570,8 +624,7 @@ function editNotice(id){
 }
 function cancelEdit(){
   EDIT_ID=null;
-  ['nTitle','nDate','nPlace','nFee','nAcct','nUntil','nDesc'].forEach(i=>document.getElementById(i).value='');
-  document.getElementById('nShowBanner').checked=false;
+  nFormReset();
   document.getElementById('nBtn').textContent='공고 게시';
   document.getElementById('nCancel').style.display='none';
   document.getElementById('nMsg').textContent='';
