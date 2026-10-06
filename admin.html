@@ -3983,7 +3983,17 @@ function rptNorm(x){return String(x||'').replace(/\s+/g,'').replace(/초등학�
 //   ④ 회차: 같은 회차 중복 일지는 1건으로, 수업일 순서대로 1회차 칸부터 빈칸 없이 · 월별 횟수 합 = 회차 칸 수
 //   ⑤ 시도는 짧은 이름(경기·부산…), 시군구만 · 유형 순서(1→5)로 다시 배열 · 지도자는 일지를 쓴 강사 수(체육지도자 자격 승인 여부로 구분)
 //   ⑥ 기입 전 점검표: 학년-반·남·여를 확인·수정한 뒤 내려받기
-const RPT_GOAL={3:{B:70,D:25,E:25,F:1680,G:600,H:33600},5:{B:30,D:25,E:25,F:720,G:600,H:14400}};   // 「사업 성과」 목표(8월 제출본 값) — 양식·기준 파일의 목표 칸이 비어 있을 때만 기입
+// [목표 고정 2026-10-06] 2번 시트 「사업 성과」 목표 — 보고서를 내려받을 때마다 아래 값으로 고정 기입(양식·기준 파일에 적힌 값은 덮어씀).
+//   유형 3·4·5 는 2026-10-06 실데이터로 사업 최종 결과를 예측한 값: 선정 62·30교(정원 70·30, 접수·대기 105건 중 일부 추가 선정 가정 → 65·30교),
+//   학교당 약 19~20회(예산 24회 중 2학기 실제 진행 가능분), 회차당 참여 19·16명(일지 평균), 지도자 = 배정 강사 수(46·31명 → 전 학교 시작 시 60·32명),
+//   자격증 종합 = 체육지도자 자격 승인 예상(현재 신고 6·6명), 은퇴선수 0. 유형 4 는 예산서(권역별 대회 5개 권역·850명) 기준. 유형 1·2 는 체육회 제출본(7~9월) 값 그대로.
+//   칸: 유형 1·3·4·5 = B 학교(참여 학교) 수 · C 은퇴선수 · D 자격증 종합 · E 지도자 수 · F 누적 횟차 · G 누적 지도자 · H 누적 참여인원 / 유형 2 = B 은퇴선수 · C 자격증 · D 지도자 수 · E 횟차 · F 지도자 · G 참여인원
+const RPT_GOAL={
+  1:{B:4,C:0,D:4,E:4,F:12,G:12,H:285},
+  2:{B:0,C:100,D:30,E:1,F:100,G:70},
+  3:{B:65,C:0,D:6,E:60,F:1200,G:1200,H:22800},
+  4:{B:40,C:0,D:5,E:50,F:5,G:75,H:850},
+  5:{B:30,C:0,D:6,E:32,F:600,G:600,H:9600}};
 const RPT_S2={1:{goal:8,act:9,rate:10,first:'C',cnt:'B'},2:{goal:15,act:16,rate:17,first:'B',cnt:''},3:{goal:22,act:23,rate:24,first:'C',cnt:'B'},4:{goal:29,act:30,rate:31,first:'C',cnt:'B'},5:{goal:36,act:37,rate:38,first:'C',cnt:'B'}};
 const RPT_MCOLS=['R','S','T','U','V','W','X','Y','Z','AA','AB'];
 const RPT_SRC={admin:['관리자 입력','#0f766e'],log:['강사 일지','#153A77'],base:['기준 파일','#0e7490'],'import':['이전 보고서','#b8860b'],est:['추정(반반)','#C41E2F'],none:['없음','#C41E2F']};
@@ -4151,7 +4161,7 @@ function rptApply(o){
     if(oldName&&oldName!==sheetName)s2=s2.split("'"+oldName+"'!").join("'"+sheetName+"'!");
     const cell=function(ref){const n=+ref.replace(/\D/g,'');const row=rptRowXml(s2,n);return row?rptCellText(row,ref,sst):''};
     Object.keys(RPT_S2).forEach(function(t){const d=RPT_S2[t];const nCols=(+t===2)?6:6;const first=rptColNum(d.first);
-      if(RPT_GOAL[t]){const empty=['B','C','D','E','F','G','H'].every(function(c){return cell(c+d.goal)===''});if(empty)Object.keys(RPT_GOAL[t]).forEach(function(c){s2=rptSetCell(s2,c+d.goal,RPT_GOAL[t][c])})}
+      if(RPT_GOAL[t])Object.keys(RPT_GOAL[t]).forEach(function(c){s2=rptSetCell(s2,c+d.goal,RPT_GOAL[t][c])});   // [목표 고정] 늘 같은 값으로 기입
       const act={};
       if(d.cnt){const c=Object.keys(cnt[t]||{}).length;const keep=rptNum(cell(d.cnt+d.act));const v=(+t===3||+t===5)?c:Math.max(c,0)||keep||0;s2=rptSetCell(s2,d.cnt+d.act,v);act[d.cnt]=v}
       const src=['F','G','H','I','J','K'];
@@ -4198,6 +4208,9 @@ function rptReview(ctx){
   ov=document.createElement('div');ov.id='rptRv';ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(15,16,19,.55);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px 10px';
   const rows=ctx.rows.slice().sort(function(a,b){return (rptWarn(b).length?1:0)-(rptWarn(a).length?1:0)||a.type-b.type||String(a.vals.E).localeCompare(String(b.vals.E),'ko')});
   ctx.rv=rows;const nWarn=rows.filter(function(r){return rptWarn(r).length}).length;
+  const goalNote='<details style="margin:8px 0 4px;font-size:12px"><summary style="cursor:pointer;font-weight:800;color:#153A77">2번 시트 「사업 성과」 목표 (고정값 · 사업 최종 예측치, 2026-10-06 기준)</summary><table class="rtbl" style="margin-top:6px;font-size:12px"><tr><th>유형</th><th>학교 수</th><th>은퇴선수</th><th>자격증 종합</th><th>지도자 수</th><th>누적 횟차</th><th>누적 지도자</th><th>누적 참여인원</th></tr>'
+    +[1,3,4,5].map(function(t){const g=RPT_GOAL[t];return '<tr><td>유형'+t+'</td>'+['B','C','D','E','F','G','H'].map(function(c){return '<td>'+(g[c]==null?'':g[c].toLocaleString('ko-KR'))+'</td>'}).join('')+'</tr>'}).join('')
+    +'<tr><td>유형2</td><td>-</td>'+['B','C','D','E','F','G'].map(function(c){return '<td>'+RPT_GOAL[2][c].toLocaleString('ko-KR')+'</td>'}).join('')+'</tr></table><div style="color:#8a919d;margin-top:4px">값을 바꾸려면 admin.html 의 RPT_GOAL 을 고칩니다.</div></details>';
   const inp='padding:5px 7px;border:1.5px solid #d5dce8;border-radius:7px;font-size:13px;font-family:inherit';
   ov.innerHTML='<div style="background:#fff;border-radius:16px;max-width:1180px;width:100%;padding:18px 20px">'
     +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:17px">📋 '+esc(ctx.ym)+' 현황보고서 — 기입 전 점검</b><span style="font-size:12.5px;color:#6b7280">강습을 시작한(일지가 있는) 학교 '+rows.length+'곳'+(ctx.base?' · 기준 파일에 덧씀':' · 빈 양식')+'</span><span style="flex:1"></span><button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'rptRv\').remove()">닫기</button></div>'
@@ -4206,7 +4219,7 @@ function rptReview(ctx){
     +'· <b>남/여</b>는 관리자 입력 → 강사 일지(남·여 각각 가장 많았던 인원) → 기준 파일·이전 보고서 → 추정 순으로 채웠습니다. 정원(남+여)은 회차 최대 참여 인원 이상이어야 합니다.<br>'
     +'· <b style="color:#C41E2F">추정(반반)</b>으로 표시된 학교는 실제 남·여 인원을 확인해 고쳐 주세요 — 체육회 확인 항목입니다.<br>'
     +'· 값을 고치고 <b>[저장하고 내려받기]</b>를 누르면 학교별 수혜자 정보로 저장되어 다음 달에도 그대로 쓰입니다.'
-    +(nWarn?'<br><b style="color:#C41E2F">⚠ 확인이 필요한 학교 '+nWarn+'곳이 위쪽에 모여 있습니다.</b>':'')+'</div>'
+    +(nWarn?'<br><b style="color:#C41E2F">⚠ 확인이 필요한 학교 '+nWarn+'곳이 위쪽에 모여 있습니다.</b>':'')+'</div>'+goalNote
     +'<div style="overflow:auto;max-height:60vh;border:1.5px solid #e2e7f0;border-radius:10px"><table class="rtbl" style="width:100%;font-size:12.5px;min-width:980px"><thead><tr><th>#</th><th>유형</th><th>시도</th><th>시군구</th><th>기관명</th><th>학년-반</th><th>남</th><th>여</th><th>정원</th><th>회차 최대</th><th>회차</th><th>지도자<br>자격O/X</th><th>남/여 출처 · 확인</th></tr></thead><tbody>'
     +rows.map(function(r,i){const w=rptWarn(r);const s=RPT_SRC[r.src]||RPT_SRC.none;
       return '<tr id="rvr_'+i+'"'+(w.length?' style="background:#fff7f7"':'')+'><td>'+(i+1)+'</td><td>'+r.type+'</td><td>'+esc(r.vals.C)+'</td><td>'+esc(r.vals.D)+'</td><td class="nm"><b>'+esc(r.vals.E)+'</b></td>'
