@@ -57,7 +57,7 @@ select,input[type=date],input[type=text]{border:1.5px solid var(--line);border-r
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="logbook.js?v=20261001a"></script>
+<script src="logbook.js?v=20261007a"></script>
 <script src="crimcheck.js?v=20260918a"></script>
 <script>
 // [사업 참가자 기록 2026-09-17] 회원 명단은 명단대로 두고, 사업에 참가한 사람마다 이 페이지에서
@@ -197,8 +197,8 @@ function appCard(a){
         +(res&&res.result?' <button class="btn r" onclick="crimClear(\''+id+'\')">회신 취소</button> <span class="sub">'+esc(res.byName||'')+' '+esc(ymd(res.at))+'</span>':'')
       +'</div></div>'
     +'<div class="sec"><div class="row" style="justify-content:space-between"><b>📒 운영일지</b><span class="row"><span class="sub">'+logs.length+'/24회차 · 교사확인 '+cfm+'/'+logs.length+(arch.length?' · 삭제 '+arch.length+'건':'')+'</span> <button class="btn k" onclick="pdf(\''+id+'\')">🖨 운영일지 PDF</button></span></div>'
-      +(logs.length?'<div class="tw"><table><tr><th>회차</th><th>수업일</th><th>인원(남/여)</th><th>수업 내용 · 특이사항</th><th>교사확인</th><th>사진</th></tr>'
-        +logs.map(l=>'<tr><td><b>'+esc(l.session)+'</b></td><td>'+esc(l.date||'')+'</td><td>'+esc(l.count||'-')+(l.male!=null||l.female!=null?' <span class="mut">('+esc(l.male==null?'-':l.male)+'/'+esc(l.female==null?'-':l.female)+')</span>':'')+'</td>'
+      +(logs.length?'<div class="tw"><table><tr><th>회차</th><th>수업일·시간</th><th>인원(남/여)</th><th>수업 내용 · 특이사항</th><th>교사확인</th><th>사진</th></tr>'
+        +logs.map(l=>'<tr><td><b>'+esc(l.session)+'</b></td><td>'+esc(l.date||'')+(l.classTime?' <span class="mut">'+esc(l.classTime)+'</span>':'')+'</td><td>'+esc(l.count||'-')+(l.male!=null||l.female!=null?' <span class="mut">('+esc(l.male==null?'-':l.male)+'/'+esc(l.female==null?'-':l.female)+')</span>':'')+'</td>'
           +'<td>'+esc(l.content||'')+(l.note?' <span style="color:var(--red)">· '+esc(l.note)+'</span>':'')+(((l.editHistory||[]).length||l.adminEdit)?' <span class="mut">✏️정정 '+(((l.editHistory||[]).length)+(l.adminEdit?1:0))+'</span>':'')+(l.restoredFrom?' <span class="mut">↩복원</span>':'')+'</td>'
           +'<td>'+(l.teacherConfirm?'<b style="color:var(--green)">✓ '+esc(l.teacherConfirm.name||'')+'</b>':'<span style="color:var(--red)">미확인</span>')+'</td>'
           +'<td class="ph">'+((l.photos||[]).filter(p=>/^https:\/\//.test(p)).map(p=>'<a href="'+esc(p)+'" target="_blank" rel="noopener"><img src="'+esc(p)+'" alt="" loading="lazy"></a>').join('')||'<span class="mut">-</span>')+'</td></tr>').join('')

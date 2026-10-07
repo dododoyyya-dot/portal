@@ -555,6 +555,7 @@ function eduWho(v){return (v.name||'')+' ('+(v.birth||'생년월일 없음')+' �
         <button class="btn-sub" style="background:#153A77" onclick="reviewHist()">📋 이력 승인·포인트 전환</button>
         <button class="btn-sub" style="background:#b8860b" onclick="payrollCSV()">💰 월 지급 계산 CSV</button>
         <button class="btn-sub" style="background:#0f766e" onclick="rptDownload()" title="유소년 월별 현황보고서 양식에 누적 실적을 자동 기입해 내려받습니다. 내려받기 전에 학교별 학년-반·남/여 점검표가 열립니다. 합계·요약 칸 계산값까지 함께 기입 · 강습을 시작한(일지가 있는) 학교만">📊 월별 현황보고서 (빈 양식에 기입)</button>
+        <button class="btn-sub" style="background:#1F4E9C" onclick="adFillClassTime()" title="수업 시간 칸이 생기기 전(2026-10-07 이전)에 쓴 일지 — 강습 신청서의 희망 요일·시간에서 그 수업일 요일의 시간을 찾아 채웁니다. 이미 시간이 있는 일지는 건드리지 않고, 교사 확인도 그대로입니다. 강사는 마이페이지 [수정]에서 고칠 수 있습니다.">🕒 일지 수업 시간 채우기</button>
         <button id="crimBoardBtn" class="btn-sub" style="background:#8c1622;display:none" onclick="showCrimBoard()" title="배정완료 건별 강사 동의 사진 · 학교 회신(적격/부적격) — 중앙 사무국 전용">🛡 범죄경력 조회 현황</button>
         <a id="logsPageBtn" class="btn-sub" href="schoollogs.html" target="_blank" style="background:#153A77;display:none;text-decoration:none" title="선정학교별 운영일지 모아보기(권역·시도·유형·진행별) — 중앙 사무국 전용 (새 창)">📒 학교별 운영일지</a>
         <a class="btn-sub" href="selected.html" target="_blank" style="background:#0e7490;text-decoration:none" title="선정학교 현황 — 권역·시도·유형별 보기 (새 창)">🏫 선정학교 현황</a>
@@ -4360,6 +4361,9 @@ function adEditLog(id){
     +'<div style="font-size:12.5px;color:#666;margin:4px 0 10px">'+esc(l.school||'')+' · 강사 '+esc(l.name||'')+'</div>'
     +(l.teacherConfirm?'<div style="background:#fff7e6;border:1.5px solid #f0d48a;border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:10px;line-height:1.55">⚠ 이 회차는 <b>교사확인 완료</b>('+esc((l.teacherConfirm||{}).name||'')+')입니다. 사무국 정정은 <b>교사확인을 그대로 남기고</b> 정정 이력만 기록합니다. 실적 증빙이니 <b>담당교사와 확인한 내용만</b> 고쳐주세요.</div>':'')
     +'<label style="font-size:12.5px;font-weight:800">수업일</label><input id="alDate" type="date" value="'+esc(l.date||'')+'" '+inp+'>'
+    +(function(){var m=String(l.classTime||'').match(/(\d{1,2}:\d{2})\s*~\s*(\d{1,2}:\d{2})?/)||[];
+      return '<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">수업 시간'+(l.classTimeSrc?' <span style="font-weight:600;color:#8a919d">('+esc(l.classTimeSrc)+')</span>':'')+'</label>'
+        +'<div style="display:flex;gap:6px;align-items:center"><input id="alT1" type="time" step="300" value="'+esc(m[1]?m[1].padStart(5,'0'):'')+'" '+inp+'><b>~</b><input id="alT2" type="time" step="300" value="'+esc(m[2]?m[2].padStart(5,'0'):'')+'" '+inp+'></div>'})()
     +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">참여 인원(합계)</label><input id="alCount" type="number" min="1" value="'+(l.count||'')+'" '+inp+'>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">남학생</label><input id="alMale" type="number" min="0" value="'+(l.male!=null?l.male:'')+'" oninput="adLogSumMF()" '+inp+'></div><div><label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">여학생</label><input id="alFemale" type="number" min="0" value="'+(l.female!=null?l.female:'')+'" oninput="adLogSumMF()" '+inp+'></div></div>'
     +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">수업 내용</label><textarea id="alContent" rows="2" '+inp+'>'+esc(l.content||'')+'</textarea>'
@@ -4370,6 +4374,29 @@ function adEditLog(id){
     +'<button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'alModal\').remove()">닫기</button>'
     +'<button class="btn-sub" style="background:#0f766e" onclick="adSaveLog(\''+id+'\')">💾 저장</button></div></div>';
   document.body.appendChild(div);
+}
+// ══ [수업 시간 2026-10-07] 옛 일지에 수업 시간 채우기 — 신청서 d1·d2 의 그 요일 시간(logbook.js appTime). 이미 시간이 있으면 건드리지 않음 ══
+async function adFillClassTime(){
+  if(!VIEWER_IS_ADMIN){alert('중앙 사무국만 실행할 수 있습니다.');return}
+  if(!window.KFDF_LOGBOOK||!KFDF_LOGBOOK.appTime){alert('운영일지 모듈(logbook.js)을 아직 불러오는 중입니다. 잠시 후 다시 눌러 주세요.');return}
+  try{
+    const ls=await DB.collection('sessionLogs').get();
+    const todo=ls.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(l=>!l.classTime);
+    if(!todo.length){alert('수업 시간이 비어 있는 일지가 없습니다.');return}
+    const ids=[...new Set(todo.map(l=>l.appId).filter(Boolean))];const apps={};
+    for(let k=0;k<ids.length;k+=10){const part=ids.slice(k,k+10);const q=await DB.collection('schoolApplications').where(firebase.firestore.FieldPath.documentId(),'in',part).get();q.docs.forEach(d=>apps[d.id]=d.data())}
+    const plan=[],miss={},diff={};
+    todo.forEach(l=>{const r=KFDF_LOGBOOK.appTime(apps[l.appId],l.date);if(!r){(miss[l.school||l.appId]=miss[l.school||l.appId]||[]).push(l.session);return}
+      if(r.src!=='신청서')(diff[l.school]=diff[l.school]||[]).push(l.session+'회 '+r.time);plan.push({id:l._id,time:r.time,src:r.src})});
+    const ms=Object.keys(miss),ds=Object.keys(diff);
+    if(!confirm('수업 시간이 비어 있는 일지 '+todo.length+'건\n\n'
+      +'· 신청서 시간으로 채움: '+plan.length+'건'+(ds.length?' (그중 같은 요일이 없어 1지망 시간: '+ds.map(k=>k+' '+diff[k].join(', ')).join(' / ')+')':'')+'\n'
+      +'· 신청서에 시간이 없어 비워 둠: '+(todo.length-plan.length)+'건'+(ms.length?' — '+ms.map(k=>k+'('+miss[k].length+'회차)').join(', '):'')+'\n\n'
+      +'교사 확인·정정 이력은 건드리지 않습니다. 강사는 마이페이지 [수정]에서 실제 시간으로 고칠 수 있습니다(교사 확인 유지).\n계속할까요?'))return;
+    const at=new Date().toISOString();let n=0;
+    for(let k=0;k<plan.length;k+=400){const b=DB.batch();plan.slice(k,k+400).forEach(p=>b.update(DB.collection('sessionLogs').doc(p.id),{classTime:p.time,classTimeSrc:p.src,classTimeAt:at}));await b.commit();n+=Math.min(400,plan.length-k)}
+    alert('✓ '+n+'건에 수업 시간을 채웠습니다.'+(ms.length?'\n\n비워 둔 학교(신청서에 시각 없음): '+ms.join(', ')+'\n→ 해당 강사에게 마이페이지 [수정]에서 수업 시간을 넣도록 안내해 주세요.':''));
+  }catch(e){alert('채우기 실패: '+e.message)}
 }
 async function adSaveLog(id){
   var m=document.getElementById('alMsg');
@@ -4382,9 +4409,13 @@ async function adSaveLog(id){
   var content=document.getElementById('alContent').value.trim();
   var note=document.getElementById('alNote').value.trim();
   if(!date||!cnt||cnt<1||!content){m.textContent='수업일·참여 인원·수업 내용을 확인해주세요';m.style.color='#C41E2F';return}
-  var before={date:l.date||'',count:(l.count!=null?l.count:null),male:(l.male!=null?l.male:null),female:(l.female!=null?l.female:null),content:l.content||'',note:l.note||''};
+  var t1=(document.getElementById('alT1')||{}).value||'',t2=(document.getElementById('alT2')||{}).value||'';
+  if((t1||t2)&&(!t1||!t2||t2<=t1)){m.textContent='수업 시간은 시작·끝을 모두 넣고, 끝이 시작보다 늦어야 합니다';m.style.color='#C41E2F';return}
+  var ctime=t1?t1+'~'+t2:(l.classTime||'');
+  var before={date:l.date||'',classTime:l.classTime||'',count:(l.count!=null?l.count:null),male:(l.male!=null?l.male:null),female:(l.female!=null?l.female:null),content:l.content||'',note:l.note||''};
   if(!confirm('['+(l.school||'')+'] '+(l.session||'')+'회차 일지를 정정합니다.\n\n'
     +'수업일 '+(before.date||'-')+' → '+date+'\n'
+    +'수업 시간 '+(before.classTime||'-')+' → '+(ctime||'-')+'\n'
     +'인원 '+(before.count==null?'-':before.count)+'명 → '+cnt+'명'+((male!=null||female!=null)?' (남 '+(male==null?'-':male)+' · 여 '+(female==null?'-':female)+')':'')+'\n'
     +'내용 '+(before.content||'-')+'\n  → '+content+'\n\n'
     +'정정 전 값은 기록으로 남아 되돌릴 수 있습니다. 계속할까요?'))return;
@@ -4392,6 +4423,7 @@ async function adSaveLog(id){
     m.textContent='저장 중…';m.style.color='#8a919d';
     await DB.collection('sessionLogs').doc(id).update({
       date:date,count:cnt,male:male,female:female,content:content,note:note,
+      classTime:ctime,classTimeSrc:(ctime!==(l.classTime||'')?'사무국':(l.classTimeSrc||'')),
       editHistory:firebase.firestore.FieldValue.arrayUnion({
         at:new Date().toISOString(),by:(CMY&&CMY.name)||'',uid:(AUTH.currentUser||{}).uid||'',role:'사무국',before:before}),
       editedAt:firebase.firestore.FieldValue.serverTimestamp()});
@@ -4479,7 +4511,7 @@ async function toggleLogs(id){
     const cfmN=logs.filter(l=>l.teacherConfirm).length;
     el.innerHTML='<b style="font-size:13.5px">운영일지 '+logs.length+'건 (강사: '+esc(logs[0].name)+')</b> <span style="font-size:12px;font-weight:800;color:'+(cfmN===logs.length?'#0f766e':'#C41E2F')+'">· 교사확인 '+cfmN+'/'+logs.length+'</span>'+' <button class="btn-sub" style="padding:3px 12px;font-size:12px;background:#16181d;margin-left:6px" title="표지·요약 통계·회차별 사진 기록·확인란이 담긴 운영일지를 PDF로 저장합니다" onclick="adLogbook(\''+id+'\')">🖨 운영일지 PDF</button>'
       +logs.map(l=>'<div style="border-top:1px dashed #d5d9e0;padding:8px 0;font-size:13px">'
-        +'<b>'+l.session+'회차</b> · '+esc(l.date)+(l.count?' · 👥 '+l.count+'명':'')+' — '+esc(l.content)
+        +'<b>'+l.session+'회차</b> · '+esc(l.date)+(l.classTime?' '+esc(l.classTime)+(String(l.classTimeSrc||'').indexOf('신청서')===0?'<span style="font-size:11px;color:#b8860b">(신청서)</span>':''):' <span style="font-size:11.5px;color:#C41E2F">시간 미입력</span>')+(l.count?' · 👥 '+l.count+'명':'')+' — '+esc(l.content)
         +(l.note?' · <span style="color:#C41E2F">'+esc(l.note)+'</span>':'')
         +(VIEWER_IS_ADMIN?' <button class="btn-sub" style="padding:2px 9px;font-size:11.5px;background:#b8860b" title="사무국 정정 — 수업일·인원·내용·비고. 교사확인은 그대로 남으며 정정 이력이 기록됩니다" onclick="adEditLog(\''+l._id+'\')">✏️ 수정</button>'
           +' <button class="btn-sub" style="padding:2px 9px;font-size:11.5px;background:#C41E2F" title="사무국 삭제 — 원본과 사유는 기록으로 남습니다" onclick="adDeleteLog(\''+l._id+'\')">🗑 삭제</button>':'')
@@ -9257,7 +9289,7 @@ async function dlGoodsCerts(){
 <script src="schoolclub_core.js?v=20260922a"></script>
 <script src="post_alert.js?v=20260914a"></script>
 <script src="schoolclub_admin.js?v=20260914f"></script>
-<script src="logbook.js?v=20261001a"></script>
+<script src="logbook.js?v=20261007a"></script>
 <script src="crimcheck.js?v=20260918a"></script>
 <script src="consentdocs.js?v=20260929a"></script>
 <script src="auth_ui.js?v=20260929b"></script>

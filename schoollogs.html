@@ -166,7 +166,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="logbook.js?v=20261001a"></script>
+<script src="logbook.js?v=20261007a"></script>
 <script>
 KFDF.initApp();
 const DB=firebase.firestore(),AUTH=firebase.auth();
@@ -248,7 +248,7 @@ function lg(l){let dow='';try{const d=new Date(String(l.date||'')+'T00:00:00');i
   const voided=(l.editHistory||[]).some(x=>x&&x.voidedConfirm);
   const chip=l.fixReq?'<span class="chip" style="background:#C41E2F;color:#fff" title="'+esc((l.fixReq.by||'')+' 선생님: '+(l.fixReq.reason||''))+'">✏️ 교사 정정 요청</span>':(l.teacherConfirm?'<span class="chip" style="background:#e6f5f0;color:#0f766e">✓ 담당교사 확인 · '+esc(l.teacherConfirm.name||'')+'</span>':'<span class="chip" style="background:#fdf3f4;color:#C41E2F">'+(voided?'정정 후 재확인 필요':'교사 미확인')+'</span>');
   const mf=(l.male!=null||l.female!=null)?'남 '+(l.male||0)+' · 여 '+(l.female||0):'<span style="color:#b8860b">남·여 미기입</span>';const ph=(l.photos||[]).slice(0,3);
-  return '<div class="lgcard"><div class="hd"><div class="no">'+esc(String(l.session==null?'':l.session).padStart(2,'0'))+'<small>회차</small></div><div class="dt">'+esc(String(l.date||'').replace(/-/g,'. '))+esc(dow)+'<small>'+esc(l.name||'')+'</small></div>'+chip+'</div>'
+  return '<div class="lgcard"><div class="hd"><div class="no">'+esc(String(l.session==null?'':l.session).padStart(2,'0'))+'<small>회차</small></div><div class="dt">'+esc(String(l.date||'').replace(/-/g,'. '))+esc(dow)+(l.classTime?' <span style="color:#1F4E9C">'+esc(l.classTime)+'</span>':'')+'<small>'+esc(l.name||'')+'</small></div>'+chip+'</div>'
     +'<div class="bd"><div class="cnt"><i>참여 인원</i><b>'+esc(l.count!=null?l.count:'-')+'<small>명</small></b><span>'+mf+'</span></div><div class="tx"><i>수업 내용</i>'+esc(l.content||'-')+(l.note?'<div style="color:#6b7280;margin-top:3px">특이사항: '+esc(l.note)+'</div>':'')+(l.fixReq?'<div style="color:#C41E2F;font-weight:700;margin-top:3px">정정 요청: '+esc(l.fixReq.reason||'')+'</div>':'')+'</div></div>'
     +'<div class="ph">'+(ph.length?ph.map(u=>'<a href="'+esc(u)+'" target="_blank" rel="noopener" style="flex:1 1 0;min-width:0;display:flex"><img src="'+esc(u)+'" alt="'+esc(l.session)+'회차 활동 사진" loading="lazy"></a>').join(''):'<div class="none">📷 활동 사진 없음</div>')+'</div>'
     +'<div class="ft"><b style="color:'+(ckN>=4?'#0f766e':'#b8860b')+'">✔ 안전 지도 점검 '+ckN+'/4</b>'+((l.editHistory||[]).length?'<span style="color:#b8860b;font-weight:700">✏️ 정정 '+(l.editHistory||[]).length+'회</span>':'')+'</div></div>'}

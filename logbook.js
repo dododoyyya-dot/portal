@@ -1,6 +1,6 @@
-// logbook.js v20261001a · 학교강습 운영일지 보고서(인쇄 → PDF로 저장) + 일지 삭제·복원(기록 보존)
+// logbook.js v20261007a · 학교강습 운영일지 보고서(인쇄 → PDF로 저장) + 일지 삭제·복원(기록 보존)
 //   관리자 강습신청관리 › 📒 일지 패널, 강사 마이페이지 › 운영일지 에서 학교 단위로 엽니다.
-//   홈페이지에 입력된 일지(sessionLogs) 항목만 씁니다: 회차·수업일·인원(남/여)·수업 내용·특이사항·안전 지도 점검 4항목·
+//   홈페이지에 입력된 일지(sessionLogs) 항목만 씁니다: 회차·수업일·수업 시간(classTime)·인원(남/여)·수업 내용·특이사항·안전 지도 점검 4항목·
 //   활동 사진(최대 3장)·담당교사 확인(성명·시각·전자서명)·정정 이력 + 강습 신청(schoolApplications) 기본 정보.
 //   구성: 표지(요약 지표·회차별 참여 그래프·24회차 진행) → 회차별 운영 현황표 → 회차별 활동 기록(한 쪽 2회차, 사진 포함) → 운영 결과 요약·확인.
 //   사용: var w=KFDF_LOGBOOK.prep();  (클릭 직후 동기 호출 — 팝업 차단 방지)  → 자료를 모은 뒤 KFDF_LOGBOOK.render(w,{app,appId,logs,instructor,printedBy,printedRole})
@@ -216,7 +216,7 @@
       var rows=logs.slice(t,t+24).map(function(l){
         var m=num(l.male),f=num(l.female),tc=l.teacherConfirm,ok=l.check&&SAFE.every(function(k){return l.check[k]});
         var sc=l.check?SAFE.filter(function(k){return l.check[k]}).length:0;
-        return '<tr><td class="c sn">'+esc(l.session)+'</td><td class="c">'+fds(l.date)+'</td>'
+        return '<tr><td class="c sn">'+esc(l.session)+'</td><td class="c">'+fds(l.date)+(classTime(l)?'<span class="mf">'+esc(classTime(l))+'</span>':'')+'</td>'
           +'<td class="c"><b>'+esc(l.count||'-')+'</b>'+(m!=null||f!=null?'<span class="mf">남 '+(m==null?'-':m)+' · 여 '+(f==null?'-':f)+'</span>':'')+'</td>'
           +'<td><span class="ct">'+esc(l.content||'')+(l.note?' <b style="color:#C41E2F">· '+esc(l.note)+'</b>':'')+'</span></td>'
           +'<td class="c">'+(ok?'<span class="ok-t">✓ 4/4</span>':(l.check?'<span class="no-t">'+sc+'/4</span>':'<span class="mu">-</span>'))+'</td>'
@@ -227,7 +227,7 @@
         +'<div style="height:2.4mm"></div>'
         +(t===0?mchips:'')
         +'<table class="tb"><colgroup><col style="width:11mm"><col style="width:21mm"><col style="width:19mm"><col><col style="width:14mm"><col style="width:11mm"><col style="width:33mm"></colgroup>'
-        +'<tr><th>회차</th><th>수업일</th><th>참여</th><th>수업 내용 · 특이사항</th><th>안전점검</th><th>사진</th><th>담당교사 확인</th></tr>'
+        +'<tr><th>회차</th><th>수업일·시간</th><th>참여</th><th>수업 내용 · 특이사항</th><th>안전점검</th><th>사진</th><th>담당교사 확인</th></tr>'
         +(rows||'<tr><td colspan="7" class="c mu" style="height:30mm">아직 제출된 회차 보고가 없습니다</td></tr>')+'</table>'});
     }
 
@@ -237,11 +237,11 @@
       var m=num(l.male),f=num(l.female),eh=edits(l),le=eh[eh.length-1]||{};
       var st=tc?'<span class="pill ok">✓ 담당교사 확인'+(tc.self?' · 본인 지도':'')+'</span>':(reconfirm(l)?'<span class="pill warn">정정 후 재확인 필요</span>':'<span class="pill no">담당교사 확인 전</span>');
       var photos=ph.length?ph.map(function(p){return '<figure><img src="'+src(p)+'" alt=""></figure>'}).join('')
-        +(ph.length===1?'<div class="aside"><b style="color:#16181d;font-size:9pt">'+esc(l.session)+'회차 활동 사진</b>'+fd(l.date,true)+'<br>'+esc(school)+'</div>':'')
+        +(ph.length===1?'<div class="aside"><b style="color:#16181d;font-size:9pt">'+esc(l.session)+'회차 활동 사진</b>'+fd(l.date,true)+(classTime(l)?' '+esc(classTime(l)):'')+'<br>'+esc(school)+'</div>':'')
         :'<div class="noph">등록된 활동 사진이 없습니다</div>';
       return '<article class="sc">'
         +'<header><div class="no"><b>'+p2(l.session||0)+'</b><i>회차</i></div>'
-        +'<div class="dt"><b>'+fd(l.date,true)+'</b><span>'+esc(school)+' · 강사 '+esc(l.name||insName)+'</span></div>'+st+'</header>'
+        +'<div class="dt"><b>'+fd(l.date,true)+(classTime(l)?' '+esc(classTime(l)):'')+'</b><span>'+esc(school)+' · 강사 '+esc(l.name||insName)+'</span></div>'+st+'</header>'
         +'<div class="meta"><div class="pp"><i>참여 인원</i><b>'+esc(l.count||'-')+'</b>명'+(m!=null||f!=null?'<small>남 '+(m==null?'-':m)+' · 여 '+(f==null?'-':f)+'</small>':'')+'</div>'
         +'<div class="ct"><i>수업 내용</i><p>'+esc(l.content||'')+'</p>'+(l.note?'<p class="note">특이사항 · '+esc(l.note)+'</p>':'')+'</div></div>'
         +'<div class="ph ph'+(ph.length||0)+'">'+photos+'</div>'
@@ -316,6 +316,55 @@
   }
   // [일지 삭제 2026-09-16] 삭제는 반드시 기록(sessionLogArchive/{같은 ID})과 한 묶음으로 — 규칙 v35.
   //   원본 전체(내용·사진 주소·교사확인 서명·정정 이력)·사유·삭제자를 남기고 일지를 지웁니다. 둘 중 하나만 되는 일은 없습니다.
+  // ══ [수업 시간 2026-10-07] 일지 수업 시간(classTime 「HH:MM~HH:MM」) ══
+  //   일지 작성란에 시간이 없어(현장 지적) 새로 둠. 옛 일지는 강습 신청서의 희망 요일·시간(d1·d2)에서 그 수업일 요일의 시간을 찾아 채웁니다.
+  //   appTime(신청서, 'YYYY-MM-DD') → {time, src} | null · src: '신청서'(요일 일치·요일 무관·시간 하나) / '신청서(요일 다름)'(같은 요일이 없어 1지망 시간)
+  //   신청서 표기: 「월수금 13:00-14:30」「화요일 15시~17시」「목요일 오전 8시 50분~12시」「수 1-4시」(1~6시는 오후)「화요일 13:10」(시작만)
+  //   「방학 중 …」 문구가 든 희망은 7·8·1·2월 수업일에만 씁니다.
+  function hm(h,m){return p2(h)+':'+p2(m||0)}
+  function hr(h,ap){h=+h;if(ap==='오후'&&h<12)h+=12;else if(ap!=='오전'&&h>=1&&h<=6)h+=12;return h}
+  function dayRuns(t){var out=[],re=/[월화수목금토일]+/g,m;
+    while((m=re.exec(t))){var pv=m.index?t.charAt(m.index-1):'',nx=t.slice(m.index+m[0].length);
+      if(/[가-힣0-9]/.test(pv))continue;
+      if(!/^요일/.test(nx)&&/^[가-힣]/.test(nx))continue;
+      out.push({i:m.index,d:m[0].split('')})}
+    return out}
+  function timeEntries(text){
+    var t=String(text||'').replace(/\s+/g,' '),list=[],m,DW='월화수목금토일';
+    // 요일 범위 「월~금」「월요일부터 금요일까지」 → 월화수목금
+    t=t.replace(/([월화수목금토일])(?:요일)?\s*(?:[~∼\-–]|부터)\s*([월화수목금토일])(?:요일)?(?:\s*까지)?/g,function(x,a,b){var i=DW.indexOf(a),j=DW.indexOf(b);return j>i?DW.slice(i,j+1):x});
+    // 「0900~1330」 꼴 → 09:00~13:30, 「~:13:30」 → ~13:30
+    t=t.replace(/([01]\d|2[0-2])([0-5]\d)(?=\s*[~∼\-–])/g,'$1:$2').replace(/([~∼\-–]\s*):?\s*([01]\d|2[0-2])([0-5]\d)(?!\d)/g,'$1$2:$3').replace(/([~∼\-–])\s*:/g,'$1');
+    var re=/(오전|오후)?\s*(\d{1,2})\s*(?:(:|시)\s*(\d{1,2})?\s*분?)?\s*[~∼\-–]\s*(오전|오후)?\s*(\d{1,2})\s*(?:(:|시)\s*(\d{1,2})?\s*분?)?/g;
+    while((m=re.exec(t))){
+      if(!m[3]&&!m[7]){   // 「14-16」처럼 시·분 표시가 없으면 7~22시 범위이고 학년·반·명 등이 뒤따르지 않을 때만
+        var nx=t.slice(m.index+m[0].length);if(!(+m[2]>=7&&+m[2]<=22&&+m[6]>=7&&+m[6]<=22)||/^\s*(학|반|명|회|차|교|개|%|월|일)/.test(nx))continue}
+      var a=hr(m[2],m[1]),b=+m[6],bm=+(m[8]||0),am=+(m[4]||0);
+      if(m[5]==='오후'&&b<12)b+=12;else if(m[5]!=='오전'&&(b<a||(b===a&&bm<=am))&&b+12<=24)b+=12;
+      if(a<6||a>22||b>24||am>59||bm>59||b*60+bm<=a*60+am||(b*60+bm)-(a*60+am)>480)continue;
+      list.push({i:m.index,e:m.index+m[0].length,time:hm(a,am)+'~'+hm(b,bm)})}
+    // 시작 시각만 「13:10」「9시~」「아침 8시」 (「2시간」은 제외)
+    var re2=/(오전|오후)?\s*(\d{1,2})(?::(\d{2})|\s*시(?!간)\s*(?:(\d{1,2})\s*분)?)/g;
+    while((m=re2.exec(t))){var at=m.index;if(list.some(function(x){return at>=x.i&&at<x.e}))continue;
+      var h=hr(m[2],m[1]),mi=+(m[3]||m[4]||0);if(h<6||h>22||mi>59)continue;list.push({i:at,e:at+m[0].length,time:hm(h,mi)+'~'})}
+    list.sort(function(x,y){return x.i-y.i});
+    var runs=dayRuns(t);
+    list.forEach(function(x,k){var from=k?list[k-1].e:0;var ds=[];runs.forEach(function(r){if(r.i>=from&&r.i<x.i)ds=ds.concat(r.d)});x.days=ds});
+    list.forEach(function(x,k){if(x.days.length)return;var to=k+1<list.length?list[k+1].i:t.length;var ds=[];runs.forEach(function(r){if(r.i>=x.e&&r.i<to)ds=ds.concat(r.d)});x.days=ds});
+    var vac=/방학/.test(t)&&!/학기\s*중/.test(t);
+    return list.map(function(x){return {time:x.time,days:x.days,vac:vac}})}
+  function appTime(app,date){
+    app=app||{};var d=pd(date);if(!d)return null;
+    var w=WD.charAt(d.getDay()),mo=d.getMonth()+1,vacMonth=(mo===7||mo===8||mo===1||mo===2);
+    var all=timeEntries(app.d1).concat(timeEntries(app.d2));
+    var c=all.filter(function(x){return vacMonth||!x.vac});if(!c.length)c=all;if(!c.length)return null;
+    var hit=c.filter(function(x){return x.days.indexOf(w)>=0});if(hit.length)return {time:hit[0].time,src:'신청서'};
+    var any=c.filter(function(x){return !x.days.length});if(any.length)return {time:any[0].time,src:'신청서'};
+    if(c.every(function(x){return x.time===c[0].time}))return {time:c[0].time,src:'신청서'};
+    return {time:c[0].time,src:'신청서(요일 다름)'};
+  }
+  // 표시: 「13:00~14:30」 · 시작만 아는 경우 「13:10~」
+  function classTime(l){return String((l&&l.classTime)||'').trim()}
   function removeLog(db,fb,id,log,who){
     var src={};Object.keys(log||{}).forEach(function(k){if(k.charAt(0)!=='_')src[k]=log[k]});
     who=who||{};
@@ -339,5 +388,5 @@
     b.update(db.collection('sessionLogArchive').doc(aid),{restoredAt:fb.firestore.FieldValue.serverTimestamp(),restoredBy:who.uid||'',restoredByName:who.name||'',restoredTo:ref.id});
     return b.commit().then(function(){return ref.id});
   }
-  window.KFDF_LOGBOOK={prep:prep,render:render,fail:fail,removeLog:removeLog,restoreLog:restoreLog};
+  window.KFDF_LOGBOOK={prep:prep,render:render,fail:fail,removeLog:removeLog,restoreLog:restoreLog,appTime:appTime,timeEntries:timeEntries,classTime:classTime};
 })();

@@ -623,12 +623,15 @@ function orgChip(o,region,title,fed){
       📋 <b>회차 보고 안내</b> — 수업일·회차·참여 인원과 아래 <b>안전 지도 점검</b>을 확인해 제출해 주세요. 강사수당 지급·실적보고의 기초자료가 됩니다. (미제출 회차는 수당 산정 제외 · 사진은 활동 장면 1~3장 권장)
     </div>
     <div class="authbox" style="max-width:none">
-      <label>학교 선택</label><select id="lgApp"></select>
+      <label>학교 선택</label><select id="lgApp" onchange="lgTimeFill(true)"></select>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
         <div><label>회차 *</label><input id="lgSession" type="number" min="1" max="24"></div>
-        <div><label>수업일 *</label><input id="lgDate" type="date"></div>
+        <div><label>수업일 *</label><input id="lgDate" type="date" onchange="lgTimeFill(true)"></div>
         <div><label>참여 인원 *</label><input id="lgCount" type="number" min="1" placeholder="예: 24"></div>
       </div>
+      <label style="margin-top:8px">수업 시간 * <span style="font-weight:600;color:#8a919d;font-size:12px">· 시작 ~ 끝</span></label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input id="lgT1" type="time" step="300" style="flex:1;min-width:120px" oninput="this.dataset.man=1"><span style="font-weight:800">~</span><input id="lgT2" type="time" step="300" style="flex:1;min-width:120px" oninput="this.dataset.man=1"></div>
+      <div id="lgTimeHint" style="font-size:12px;color:#8a919d;margin-top:4px"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
         <div><label>남학생 <span style="font-weight:600;color:#8a919d">(실적보고용)</span></label><input id="lgMale" type="number" min="0" placeholder="예: 12" oninput="lgSumMF()"></div>
         <div><label>여학생 <span style="font-weight:600;color:#8a919d">(실적보고용)</span></label><input id="lgFemale" type="number" min="0" placeholder="예: 12" oninput="lgSumMF()"></div>
@@ -2124,6 +2127,7 @@ AUTH.onAuthStateChanged(async u=>{
       document.getElementById('logBox').style.display='block';
       document.getElementById('lgApp').innerHTML=MYASG.map(x=>'<option value="'+x.id+'">'+esc(x.data().school)+' ('+esc(x.data().type)+')</option>').join('');
       document.getElementById('lgDate').value=new Date().toISOString().slice(0,10);
+      lgTimeFill(true);
       loadMyLogs();
       renderHireDocs(d);
     }
@@ -2299,6 +2303,11 @@ function editLog(id){
     +'<div style="font-size:12.5px;color:#666;margin:4px 0 12px">'+esc(l.school||'')+' · '+esc(l.date||'')+'</div>'
     +(l.teacherConfirm?'<div style="background:#fff7e6;border:1.5px solid #f0d48a;border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:12px;line-height:1.6">⚠ 이 회차는 <b>담당교사 확인(서명)이 끝난 회차</b>입니다 — '+esc((l.teacherConfirm||{}).name||'')+'.<br>저장하면 교사확인이 <b>「미확인」으로 되돌아가고</b>, 기존 서명은 <b>정정 이력에 보존</b>됩니다.<br>저장 후 <b>[📱 교사 확인 요청]</b>을 다시 눌러 담당교사에게 재확인을 받아주세요.</div>':'')
     +'<label style="font-size:12.5px;font-weight:800">수업일</label><input id="elDate" type="date" value="'+esc(l.date||'')+'" '+inp+'>'
+    +(function(){const p=lgSplitTime(l.classTime);const sug=!l.classTime?lgAppTime(l.appId,l.date):null;const q=sug?lgSplitTime(sug.time):p;
+      return '<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">수업 시간 <span style="font-weight:600;color:#8a919d">· 시작 ~ 끝</span></label>'
+        +'<div style="display:flex;gap:6px;align-items:center"><input id="elT1" type="time" step="300" value="'+esc(q[0])+'" '+inp+'><b>~</b><input id="elT2" type="time" step="300" value="'+esc(q[1])+'" '+inp+'></div>'
+        +'<div style="font-size:11.5px;color:#8a919d;margin-top:3px">'+(l.classTime?(String(l.classTimeSrc||'').indexOf('신청서')===0?'강습 신청서의 희망 시간으로 채워 둔 값입니다. 실제 수업 시간으로 고쳐 주세요.':''):(sug?'신청서의 희망 시간을 미리 넣었습니다. 실제 수업 시간으로 고쳐 주세요.':'수업 시작·끝 시각을 넣어 주세요.'))
+        +' <b>수업 시간만 고치면 담당교사 확인은 그대로 유지됩니다.</b></div>'})()
     +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">참여 인원</label><input id="elCount" type="number" min="1" value="'+(l.count||'')+'" '+inp+'>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">남학생</label><input id="elMale" type="number" min="0" value="'+(l.male!=null?l.male:'')+'" oninput="elSumMF()" '+inp+'></div><div><label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">여학생</label><input id="elFemale" type="number" min="0" value="'+(l.female!=null?l.female:'')+'" oninput="elSumMF()" '+inp+'></div></div>'
     +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">수업 내용</label><textarea id="elContent" rows="2" '+inp+'>'+esc(l.content||'')+'</textarea>'
@@ -2336,6 +2345,21 @@ async function saveLogEdit(id){
   let cnt=parseInt(document.getElementById('elCount').value);if(male!=null&&female!=null&&male+female>0)cnt=male+female;
   const content=document.getElementById('elContent').value.trim();
   if(!date||!cnt||cnt<1||!content){m.textContent='수업일·참여 인원·수업 내용을 확인해주세요';m.style.color='#C41E2F';return}
+  const tv=lgTimeVal(document.getElementById('elT1').value,document.getElementById('elT2').value);if(tv.err){m.textContent=tv.err;m.style.color='#C41E2F';return}
+  const note=document.getElementById('elNote').value.trim();
+  const newFiles=(document.getElementById('elPhotos').files||[]).length;
+  const same=(a,b)=>(a==null?'':String(a))===(b==null?'':String(b));
+  const otherSame=same(date,l.date)&&same(cnt,l.count)&&same(male,l.male)&&same(female,l.female)&&same(content,l.content)&&same(note,l.note)&&!newFiles&&JSON.stringify(EL_PHOTOS)===JSON.stringify(l.photos||[]);
+  const timeChanged=tv.v!==(l.classTime||'');
+  if(otherSame&&!timeChanged){document.getElementById('elModal').remove();return}
+  if(otherSame&&timeChanged){   // [수업 시간만 정정] 교사 확인·정정 요청 그대로
+    try{m.textContent='저장 중…';m.style.color='#8a919d';
+      await DB.collection('sessionLogs').doc(id).update({classTime:tv.v,classTimeSrc:'작성자',
+        editHistory:firebase.firestore.FieldValue.arrayUnion({at:new Date().toISOString(),by:(MYD&&MYD.name)||'',uid:(AUTH.currentUser||{}).uid||'',role:'강사',timeOnly:true,before:{classTime:l.classTime||''}}),
+        editedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      document.getElementById('elModal').remove();alert('✓ '+l.session+'회차 수업 시간을 '+tv.v+' 로 저장했습니다.'+(l.teacherConfirm?'\n담당교사 확인은 그대로 유지됩니다.':''));loadMyLogs();
+    }catch(e){m.textContent='저장 실패: '+e.message+(/permission/i.test(e.message)?' — 사무국에 「보안 규칙 v50 게시」를 요청해 주세요':'');m.style.color='#C41E2F'}
+    return}
   if(WASCFM&&!SELF&&!confirm('['+(l.school||'')+'] '+l.session+'회차는 담당교사 확인(서명)이 끝난 회차입니다 — '+(WASCFM.name||'')+'.\n\n'
     +'저장하면 교사확인이 「미확인」으로 되돌아가고, 기존 서명은 정정 이력에 보존됩니다.\n'
     +'저장 후 [📱 교사 확인 요청] 을 다시 눌러 담당교사에게 재확인을 받아주세요.\n\n계속할까요?'))return;
@@ -2352,14 +2376,14 @@ async function saveLogEdit(id){
     }
     m.textContent='저장 중…';
     await DB.collection('sessionLogs').doc(id).update({
-      date:date,count:cnt,male:male,female:female,content:content,
-      note:document.getElementById('elNote').value.trim(),
+      date:date,classTime:tv.v,classTimeSrc:'작성자',count:cnt,male:male,female:female,content:content,
+      note:note,
       photos:photos,
       fixReq:firebase.firestore.FieldValue.delete(),   // [담당교사 정정 요청] 정정하면 요청 표시 해제 (요청이 없으면 아무 변화 없음)
       teacherConfirm:null,   // [서명 후 정정] 없었으면 그대로 null, 있었으면 해제해 재확인 대상으로
       editHistory:firebase.firestore.FieldValue.arrayUnion({
         at:new Date().toISOString(),by:(MYD&&MYD.name)||'',uid:(AUTH.currentUser||{}).uid||'',role:'강사',
-        before:{date:l.date||'',count:(l.count!=null?l.count:null),male:(l.male!=null?l.male:null),female:(l.female!=null?l.female:null),content:l.content||'',note:l.note||'',photos:((l.photos||[]).length)},
+        before:{date:l.date||'',classTime:l.classTime||'',count:(l.count!=null?l.count:null),male:(l.male!=null?l.male:null),female:(l.female!=null?l.female:null),content:l.content||'',note:l.note||'',photos:((l.photos||[]).length)},
         voidedConfirm:WASCFM}),
       editedAt:firebase.firestore.FieldValue.serverTimestamp()});
     let selfOk=false;
@@ -2393,6 +2417,22 @@ async function selfConfirmFill(logs){
   for(const l of todo){try{const tc=selfConfirmRec(l.appId);await DB.collection('sessionLogs').doc(l._id).update({teacherConfirm:tc});l.teacherConfirm=tc;n++}catch(e){}}
   return n;
 }
+// ══ [수업 시간 2026-10-07] 일지에 수업 시간(classTime 「HH:MM~HH:MM」) — 신청서의 희망 요일·시간에서 그 수업일 요일 시간을 미리 채움 ══
+function lgSplitTime(t){const m=String(t||'').match(/(\d{1,2}:\d{2})\s*~\s*(\d{1,2}:\d{2})?/);return m?[m[1].padStart(5,'0'),(m[2]||'').padStart(m[2]?5:0,'0')]:['','']}
+function lgAppTime(appId,date){try{const x=(MYASG||[]).find(d=>d.id===appId);if(!x||!window.KFDF_LOGBOOK||!KFDF_LOGBOOK.appTime)return null;return KFDF_LOGBOOK.appTime(x.data(),date)}catch(e){return null}}
+function lgTimeFill(force){
+  const t1=document.getElementById('lgT1'),t2=document.getElementById('lgT2'),h=document.getElementById('lgTimeHint');if(!t1||!t2)return;
+  const appId=(document.getElementById('lgApp')||{}).value,date=(document.getElementById('lgDate')||{}).value;
+  // 같은 학교에서 내가 마지막으로 쓴 시간 → 없으면 신청서 시간
+  const mine=(MYLOGS||[]).filter(l=>l.appId===appId&&l.classTime&&l.classTimeSrc==='작성자').sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  let r=null;const wd=date?new Date(date+'T00:00:00').getDay():-1;
+  const sameWd=mine.find(l=>new Date(String(l.date)+'T00:00:00').getDay()===wd);
+  if(sameWd)r={time:sameWd.classTime,src:'지난 회차'};else r=lgAppTime(appId,date);
+  if(force||(!t1.dataset.man&&!t2.dataset.man)){
+    const p=lgSplitTime(r&&r.time);t1.value=p[0];t2.value=p[1];delete t1.dataset.man;delete t2.dataset.man}
+  if(h)h.textContent=r?(r.src==='지난 회차'?'같은 요일 지난 회차 시간으로 채웠습니다 — 실제와 다르면 고쳐 주세요.':'강습 신청서의 희망 시간으로 채웠습니다 — 실제 수업 시간과 다르면 고쳐 주세요.'+(r.src!=='신청서'?' (신청서에 이 요일 시간이 없어 1지망 시간)':'')+(/~$/.test(r.time)?' (끝 시각을 넣어 주세요)':'')):'수업 시작·끝 시각을 넣어 주세요.';
+}
+function lgTimeVal(a,b){a=String(a||'').trim();b=String(b||'').trim();if(!a||!b)return {err:'수업 시작·끝 시각을 넣어 주세요'};if(b<=a)return {err:'수업 끝 시각이 시작보다 늦어야 합니다'};return {v:a+'~'+b}}
 let LGBUSY=false;
 async function submitLog(){
   const m=document.getElementById('lgMsg');
@@ -2406,6 +2446,7 @@ async function submitLog(){
   let cnt=parseInt(document.getElementById('lgCount').value);
   if(male!=null&&female!=null&&male+female>0)cnt=male+female;   // [실적보고] 남+여가 있으면 합계 우선
   if(!appId||!sess||sess<1||sess>24||!date||!content||!cnt||cnt<1){m.textContent='회차·수업일·참여 인원·수업 내용을 입력해주세요';m.className='msg err';return}
+  const tv=lgTimeVal(document.getElementById('lgT1').value,document.getElementById('lgT2').value);if(tv.err){m.textContent=tv.err;m.className='msg err';return}
   const chk={level:document.getElementById('lgChk1').checked,fit:document.getElementById('lgChk2').checked,time:document.getElementById('lgChk3').checked,notice:document.getElementById('lgChk4').checked};
   if(!chk.level||!chk.fit||!chk.time||!chk.notice){m.textContent='안전 지도 점검 4개 항목을 모두 확인해주세요';m.className='msg err';return}
   LGBUSY=true;
@@ -2426,7 +2467,7 @@ async function submitLog(){
     const selfTc=selfTeachOf(appId)?selfConfirmRec(appId):null;   // [본인 지도] 담당교사 확인란에 본인 성명·서명을 같이 기입
     await DB.collection('sessionLogs').add({
       appId:appId,school:a.school,type:a.type,uid:AUTH.currentUser.uid,name:MYD.name,
-      session:sess,date:date,count:cnt,male:male,female:female,content:content,note:document.getElementById('lgNote').value.trim(),
+      session:sess,date:date,classTime:tv.v,classTimeSrc:'작성자',count:cnt,male:male,female:female,content:content,note:document.getElementById('lgNote').value.trim(),
       check:chk,photos:photos,teacherConfirm:selfTc,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
     m.textContent='✓ '+sess+'회차 보고가 제출되었습니다.'+(photos.length?' (사진 '+photos.length+'장 포함)':'')+' 사무국 확인 후 포인트가 반영됩니다.'
       +(selfTc?(selfTc.sign?' · 본인 지도 — 담당교사 확인란에 같은 서명이 기입되었습니다.':' · 본인 지도 — 등록된 서명이 없어 담당교사 확인란에 성명만 기입했습니다(프로필에서 서명을 등록해 주세요).'):'');m.className='msg ok';
@@ -2586,7 +2627,7 @@ function tlDraw(){
     h+=L.map(function(l,li){const tc=l.teacherConfirm;const mf=(l.male!=null||l.female!=null)?' (남 '+(l.male||0)+' · 여 '+(l.female||0)+')':'';
       return '<details style="border-top:1px solid #eef1f5;padding:8px 0"><summary style="cursor:pointer;display:flex;gap:8px;align-items:center;flex-wrap:wrap;list-style:none">'
         +(tc?'<span style="width:18px"></span>':'<input type="checkbox" class="tlck'+si+'" value="'+li+'" onclick="event.stopPropagation()" style="width:auto;margin:0">')
-        +'<b style="white-space:nowrap">'+esc(l.session)+'회차</b><span style="color:#6b7280;white-space:nowrap">'+esc(l.date||'')+'</span><span style="white-space:nowrap">👥 '+esc(l.count!=null?l.count:'-')+mf+'</span>'
+        +'<b style="white-space:nowrap">'+esc(l.session)+'회차</b><span style="color:#6b7280;white-space:nowrap">'+esc(l.date||'')+(l.classTime?' '+esc(l.classTime):'')+'</span><span style="white-space:nowrap">👥 '+esc(l.count!=null?l.count:'-')+mf+'</span>'
         +(l.photos&&l.photos.length?'<span style="color:#0f766e;font-weight:800;white-space:nowrap">📷'+l.photos.length+'</span>':'')
         +'<span style="flex:1"></span>'
         +(l.fixReq?'<b style="color:#C41E2F;font-size:12px;white-space:nowrap">✏️ 정정 요청 중</b>':'')
@@ -3317,7 +3358,7 @@ function deleteLog(id){
   const R=['겸직 허가 이전에 운영한 회차 — 다시 작성','회차 번호·학교를 잘못 골라 제출','같은 회차를 중복 제출'];
   div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:460px;width:100%;max-height:92vh;overflow:auto;padding:22px">'
     +'<b style="font-size:16px">🗑 '+esc(l.session)+'회차 보고 삭제</b>'
-    +'<div style="font-size:12.5px;color:#666;margin:4px 0 12px">'+esc(l.school||'')+' · '+esc(l.date||'')+(l.count?' · '+esc(l.count)+'명':'')+'</div>'
+    +'<div style="font-size:12.5px;color:#666;margin:4px 0 12px">'+esc(l.school||'')+' · '+esc(l.date||'')+(l.classTime?' '+esc(l.classTime):'')+(l.count?' · '+esc(l.count)+'명':'')+'</div>'
     +'<div style="background:#f1f4f9;border:1.5px solid #d4dbe6;border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.65;margin-bottom:12px">'
     +'· 삭제해도 <b>원래 내용·사진·교사확인 서명과 삭제 사유는 기록으로 보존</b>되어 사무국이 확인할 수 있습니다.<br>'
     +'· 삭제한 회차는 수당·실적 집계에서 빠집니다. 같은 회차는 <b>새로 다시 작성</b>하면 됩니다.'
@@ -3391,7 +3432,7 @@ function lgCardHtml(l){
   const mf=(l.male!=null||l.female!=null)?'남 '+(l.male||0)+' · 여 '+(l.female||0):'<span style="color:#b8860b">남·여 미기입</span>';
   const ph=(l.photos||[]).slice(0,3);
   return '<div class="lgcard"><div class="hd"><div class="no">'+esc(String(l.session==null?'':l.session).padStart(2,'0'))+'<small>회차</small></div>'
-    +'<div class="dt">'+esc(String(l.date||'').replace(/-/g,'. '))+esc(dow)+'<small>'+esc(l.school||'')+'</small></div>'+chip+'</div>'
+    +'<div class="dt">'+esc(String(l.date||'').replace(/-/g,'. '))+esc(dow)+(l.classTime?' <span style="font-weight:800;color:#1F4E9C">'+esc(l.classTime)+'</span>'+(String(l.classTimeSrc||'').indexOf('신청서')===0?'<span title="강습 신청서의 희망 시간으로 채운 값 — 실제와 다르면 [수정]에서 고쳐 주세요(교사 확인 유지)" style="font-size:10.5px;color:#b8860b;font-weight:700;margin-left:3px">신청서 기준</span>':''):' <a href="javascript:void 0" onclick="editLog(\''+l._id+'\')" style="font-size:11.5px;color:#C41E2F;font-weight:800">🕒 수업 시간 입력</a>')+'<small>'+esc(l.school||'')+'</small></div>'+chip+'</div>'
     +'<div class="bd"><div class="cnt"><i>참여 인원</i><b>'+esc(l.count!=null?l.count:'-')+'<small>명</small></b><span>'+mf+'</span></div>'
     +'<div class="tx"><i>수업 내용</i>'+esc(l.content||'-')+(l.note?'<div style="color:#6b7280;margin-top:3px">특이사항: '+esc(l.note)+'</div>':'')
     +(l.fixReq?'<div style="color:#C41E2F;font-weight:700;margin-top:3px">정정 요청: '+esc(l.fixReq.reason||'')+'</div>':'')+'</div></div>'
@@ -4066,7 +4107,7 @@ document.getElementById('cfmModal').addEventListener('click',function(e){if(e.ta
 document.getElementById('sigModal').addEventListener('click',function(e){if(e.target===this)closeSigModal()});
 </script>
 <script src="schoolclub_core.js?v=20260922a"></script>
-<script src="logbook.js?v=20261001a"></script>
+<script src="logbook.js?v=20261007a"></script>
 <script src="crimcheck.js?v=20260918a"></script>
 <script src="auth_ui.js?v=20260929b"></script>
 </body>
