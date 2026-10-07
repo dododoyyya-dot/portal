@@ -1,6 +1,6 @@
-// logbook.js v20261007a · 학교강습 운영일지 보고서(인쇄 → PDF로 저장) + 일지 삭제·복원(기록 보존)
+// logbook.js v20261008a · 학교강습 운영일지 보고서(인쇄 → PDF로 저장) + 일지 삭제·복원(기록 보존)
 //   관리자 강습신청관리 › 📒 일지 패널, 강사 마이페이지 › 운영일지 에서 학교 단위로 엽니다.
-//   홈페이지에 입력된 일지(sessionLogs) 항목만 씁니다: 회차·수업일·수업 시간(classTime)·인원(남/여)·수업 내용·특이사항·안전 지도 점검 4항목·
+//   홈페이지에 입력된 일지(sessionLogs) 항목만 씁니다: 회차·수업일·수업 교시(classTime 「N교시」「N~M교시」, 0~8교시)·인원(남/여)·수업 내용·특이사항·안전 지도 점검 4항목·
 //   활동 사진(최대 3장)·담당교사 확인(성명·시각·전자서명)·정정 이력 + 강습 신청(schoolApplications) 기본 정보.
 //   구성: 표지(요약 지표·회차별 참여 그래프·24회차 진행) → 회차별 운영 현황표 → 회차별 활동 기록(한 쪽 2회차, 사진 포함) → 운영 결과 요약·확인.
 //   사용: var w=KFDF_LOGBOOK.prep();  (클릭 직후 동기 호출 — 팝업 차단 방지)  → 자료를 모은 뒤 KFDF_LOGBOOK.render(w,{app,appId,logs,instructor,printedBy,printedRole})
@@ -227,7 +227,7 @@
         +'<div style="height:2.4mm"></div>'
         +(t===0?mchips:'')
         +'<table class="tb"><colgroup><col style="width:11mm"><col style="width:21mm"><col style="width:19mm"><col><col style="width:14mm"><col style="width:11mm"><col style="width:33mm"></colgroup>'
-        +'<tr><th>회차</th><th>수업일·시간</th><th>참여</th><th>수업 내용 · 특이사항</th><th>안전점검</th><th>사진</th><th>담당교사 확인</th></tr>'
+        +'<tr><th>회차</th><th>수업일·교시</th><th>참여</th><th>수업 내용 · 특이사항</th><th>안전점검</th><th>사진</th><th>담당교사 확인</th></tr>'
         +(rows||'<tr><td colspan="7" class="c mu" style="height:30mm">아직 제출된 회차 보고가 없습니다</td></tr>')+'</table>'});
     }
 
@@ -316,7 +316,18 @@
   }
   // [일지 삭제 2026-09-16] 삭제는 반드시 기록(sessionLogArchive/{같은 ID})과 한 묶음으로 — 규칙 v35.
   //   원본 전체(내용·사진 주소·교사확인 서명·정정 이력)·사유·삭제자를 남기고 일지를 지웁니다. 둘 중 하나만 되는 일은 없습니다.
-  // ══ [수업 시간 2026-10-07] 일지 수업 시간(classTime 「HH:MM~HH:MM」) ══
+  // ══ [수업 교시 2026-10-08] 일지의 수업 시간은 「교시」로 적습니다: classTime 「3교시」「1~4교시」(0교시=아침 활동, 7·8교시=방과후). ══
+  //   옛 값(2026-10-07 「HH:MM~HH:MM」 신청서 시간)은 표준 초등 시간표로 교시 환산(clockToPeriod) — 1교시 09:00, 40분 수업·10분 쉼, 5교시 13:00, 0교시 08:00~, 7교시 14:40, 8교시 15:30~.
+  var PERIOD_START=[8*60,9*60,9*60+50,10*60+40,11*60+30,13*60,13*60+50,14*60+40,15*60+30];
+  function periodOf(str){var m=String(str||'').trim().match(/^(\d)(?:\s*[~∼\-–]\s*(\d))?\s*교시$/);if(!m)return null;var a=+m[1],b=m[2]!=null?+m[2]:a;if(a>8||b>8||b<a)return null;return {from:a,to:b}}
+  function periodStr(a,b){return a===b?a+'교시':a+'~'+b+'교시'}
+  function isClock(str){return /^\d{1,2}:\d{2}\s*~/.test(String(str||''))}
+  function clockToPeriod(t){var m=String(t||'').match(/(\d{1,2}):(\d{2})\s*~\s*(?:(\d{1,2}):(\d{2}))?/);if(!m)return null;
+    var st=+m[1]*60+ +m[2],en=m[3]?+m[3]*60+ +m[4]:st+40;if(en<=st)en=st+40;
+    var a=0;for(var p=8;p>=0;p--){if(st>=PERIOD_START[p]){a=(st>=PERIOD_START[p]+40&&p<8)?p+1:p;break}}
+    var b=0;for(var q=8;q>=0;q--){if(en-1>=PERIOD_START[q]){b=(en-PERIOD_START[q]<=20&&q>0)?q-1:q;break}}
+    if(b<a)b=a;return periodStr(a,b)}
+  // ══ [수업 시간 2026-10-07] 신청서 희망 시간 해석(교시 환산의 바탕) ══
   //   일지 작성란에 시간이 없어(현장 지적) 새로 둠. 옛 일지는 강습 신청서의 희망 요일·시간(d1·d2)에서 그 수업일 요일의 시간을 찾아 채웁니다.
   //   appTime(신청서, 'YYYY-MM-DD') → {time, src} | null · src: '신청서'(요일 일치·요일 무관·시간 하나) / '신청서(요일 다름)'(같은 요일이 없어 1지망 시간)
   //   신청서 표기: 「월수금 13:00-14:30」「화요일 15시~17시」「목요일 오전 8시 50분~12시」「수 1-4시」(1~6시는 오후)「화요일 13:10」(시작만)
@@ -335,6 +346,11 @@
     t=t.replace(/([월화수목금토일])(?:요일)?\s*(?:[~∼\-–]|부터)\s*([월화수목금토일])(?:요일)?(?:\s*까지)?/g,function(x,a,b){var i=DW.indexOf(a),j=DW.indexOf(b);return j>i?DW.slice(i,j+1):x});
     // 「0900~1330」 꼴 → 09:00~13:30, 「~:13:30」 → ~13:30
     t=t.replace(/([01]\d|2[0-2])([0-5]\d)(?=\s*[~∼\-–])/g,'$1:$2').replace(/([~∼\-–]\s*):?\s*([01]\d|2[0-2])([0-5]\d)(?!\d)/g,'$1$2:$3').replace(/([~∼\-–])\s*:/g,'$1');
+    // 교시 표기 「1교시-4교시」「1~4교시」「1, 2,3,4교시」「3교시」 → 「N~M교시」 (그 자리는 비워 시각 해석에서 제외)
+    var pr=/(\d)\s*교시\s*[~∼\-–]\s*(\d)\s*교시|(\d)\s*[~∼\-–]\s*(\d)\s*교시|((?:\d\s*,\s*)+\d)\s*교시|(\d)\s*교시/g;
+    while((m=pr.exec(t))){var pa,pb;if(m[1]){pa=+m[1];pb=+m[2]}else if(m[3]){pa=+m[3];pb=+m[4]}else if(m[5]){var ns=m[5].split(',').map(function(x){return +x});pa=Math.min.apply(null,ns);pb=Math.max.apply(null,ns)}else{pa=pb=+m[6]}
+      if(pa>8||pb>8||pb<pa)continue;list.push({i:m.index,e:m.index+m[0].length,time:periodStr(pa,pb)})}
+    if(list.length){t=t.replace(pr,function(x){return Array(x.length+1).join(' ')})}
     var re=/(오전|오후)?\s*(\d{1,2})\s*(?:(:|시)\s*(\d{1,2})?\s*분?)?\s*[~∼\-–]\s*(오전|오후)?\s*(\d{1,2})\s*(?:(:|시)\s*(\d{1,2})?\s*분?)?/g;
     while((m=re.exec(t))){
       if(!m[3]&&!m[7]){   // 「14-16」처럼 시·분 표시가 없으면 7~22시 범위이고 학년·반·명 등이 뒤따르지 않을 때만
@@ -363,7 +379,9 @@
     if(c.every(function(x){return x.time===c[0].time}))return {time:c[0].time,src:'신청서'};
     return {time:c[0].time,src:'신청서(요일 다름)'};
   }
-  // 표시: 「13:00~14:30」 · 시작만 아는 경우 「13:10~」
+  // 신청서 → 그 수업일의 교시: 교시 표기가 있으면 그대로, 시각이면 표준 시간표로 환산(src 에 「·시간 환산」)
+  function appPeriod(app,date){var r=appTime(app,date);if(!r)return null;if(periodOf(r.time))return r;var p=clockToPeriod(r.time);return p?{time:p,src:r.src+'·시간 환산',clock:r.time}:null}
+  // 표시: 「3교시」「1~4교시」 (옛 시각 값은 그대로)
   function classTime(l){return String((l&&l.classTime)||'').trim()}
   function removeLog(db,fb,id,log,who){
     var src={};Object.keys(log||{}).forEach(function(k){if(k.charAt(0)!=='_')src[k]=log[k]});
@@ -388,5 +406,5 @@
     b.update(db.collection('sessionLogArchive').doc(aid),{restoredAt:fb.firestore.FieldValue.serverTimestamp(),restoredBy:who.uid||'',restoredByName:who.name||'',restoredTo:ref.id});
     return b.commit().then(function(){return ref.id});
   }
-  window.KFDF_LOGBOOK={prep:prep,render:render,fail:fail,removeLog:removeLog,restoreLog:restoreLog,appTime:appTime,timeEntries:timeEntries,classTime:classTime};
+  window.KFDF_LOGBOOK={prep:prep,render:render,fail:fail,removeLog:removeLog,restoreLog:restoreLog,appTime:appTime,appPeriod:appPeriod,periodOf:periodOf,periodStr:periodStr,clockToPeriod:clockToPeriod,isClock:isClock,timeEntries:timeEntries,classTime:classTime};
 })();

@@ -629,8 +629,8 @@ function orgChip(o,region,title,fed){
         <div><label>수업일 *</label><input id="lgDate" type="date" onchange="lgTimeFill(true)"></div>
         <div><label>참여 인원 *</label><input id="lgCount" type="number" min="1" placeholder="예: 24"></div>
       </div>
-      <label style="margin-top:8px">수업 시간 * <span style="font-weight:600;color:#8a919d;font-size:12px">· 시작 ~ 끝</span></label>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input id="lgT1" type="time" step="300" style="flex:1;min-width:120px" oninput="this.dataset.man=1"><span style="font-weight:800">~</span><input id="lgT2" type="time" step="300" style="flex:1;min-width:120px" oninput="this.dataset.man=1"></div>
+      <label style="margin-top:8px">수업 교시 * <span style="font-weight:600;color:#8a919d;font-size:12px">· 시작 교시 ~ 끝 교시 (0교시 = 아침 활동, 7·8교시 = 방과후)</span></label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="lgT1" style="flex:1;min-width:120px" onchange="this.dataset.man=1;lgPeriodPair('lgT1','lgT2')"></select><span style="font-weight:800">~</span><select id="lgT2" style="flex:1;min-width:120px" onchange="this.dataset.man=1"></select></div>
       <div id="lgTimeHint" style="font-size:12px;color:#8a919d;margin-top:4px"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
         <div><label>남학생 <span style="font-weight:600;color:#8a919d">(실적보고용)</span></label><input id="lgMale" type="number" min="0" placeholder="예: 12" oninput="lgSumMF()"></div>
@@ -2304,10 +2304,12 @@ function editLog(id){
     +(l.teacherConfirm?'<div style="background:#fff7e6;border:1.5px solid #f0d48a;border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:12px;line-height:1.6">⚠ 이 회차는 <b>담당교사 확인(서명)이 끝난 회차</b>입니다 — '+esc((l.teacherConfirm||{}).name||'')+'.<br>저장하면 교사확인이 <b>「미확인」으로 되돌아가고</b>, 기존 서명은 <b>정정 이력에 보존</b>됩니다.<br>저장 후 <b>[📱 교사 확인 요청]</b>을 다시 눌러 담당교사에게 재확인을 받아주세요.</div>':'')
     +'<label style="font-size:12.5px;font-weight:800">수업일</label><input id="elDate" type="date" value="'+esc(l.date||'')+'" '+inp+'>'
     +(function(){const p=lgSplitTime(l.classTime);const sug=!l.classTime?lgAppTime(l.appId,l.date):null;const q=sug?lgSplitTime(sug.time):p;
-      return '<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">수업 시간 <span style="font-weight:600;color:#8a919d">· 시작 ~ 끝</span></label>'
-        +'<div style="display:flex;gap:6px;align-items:center"><input id="elT1" type="time" step="300" value="'+esc(q[0])+'" '+inp+'><b>~</b><input id="elT2" type="time" step="300" value="'+esc(q[1])+'" '+inp+'></div>'
-        +'<div style="font-size:11.5px;color:#8a919d;margin-top:3px">'+(l.classTime?(String(l.classTimeSrc||'').indexOf('신청서')===0?'강습 신청서의 희망 시간으로 채워 둔 값입니다. 실제 수업 시간으로 고쳐 주세요.':''):(sug?'신청서의 희망 시간을 미리 넣었습니다. 실제 수업 시간으로 고쳐 주세요.':'수업 시작·끝 시각을 넣어 주세요.'))
-        +' <b>수업 시간만 고치면 담당교사 확인은 그대로 유지됩니다.</b></div>'})()
+      const opt=v=>'<option value="">선택</option>'+LG_PERIODS.map((n,i)=>'<option value="'+i+'"'+(String(v)===String(i)?' selected':'')+'>'+n+'</option>').join('');
+      const old=KFDF_LOGBOOK.isClock(l.classTime);
+      return '<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">수업 교시 <span style="font-weight:600;color:#8a919d">· 시작 ~ 끝 (0교시 아침 · 7·8교시 방과후)</span></label>'
+        +'<div style="display:flex;gap:6px;align-items:center"><select id="elT1" '+inp+' onchange="lgPeriodPair(\'elT1\',\'elT2\')">'+opt(q[0])+'</select><b>~</b><select id="elT2" '+inp+'>'+opt(q[1])+'</select></div>'
+        +'<div style="font-size:11.5px;color:#8a919d;margin-top:3px">'+(l.classTime?(old?'이전에 시각(「'+esc(l.classTime)+'」)으로 적힌 회차입니다. 표준 시간표로 환산한 교시를 넣어 두었으니 실제 교시로 고쳐 주세요.':(String(l.classTimeSrc||'').indexOf('신청서')===0?'강습 신청서의 희망 시간을 환산해 채워 둔 값입니다. 실제 수업 교시로 고쳐 주세요.':'')):(sug?'신청서의 희망 시간을 환산해 미리 넣었습니다. 실제 수업 교시로 고쳐 주세요.':'수업 시작·끝 교시를 골라 주세요.'))
+        +' <b>교시만 고치면 담당교사 확인은 그대로 유지됩니다.</b></div>'})()
     +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">참여 인원</label><input id="elCount" type="number" min="1" value="'+(l.count||'')+'" '+inp+'>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">남학생</label><input id="elMale" type="number" min="0" value="'+(l.male!=null?l.male:'')+'" oninput="elSumMF()" '+inp+'></div><div><label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">여학생</label><input id="elFemale" type="number" min="0" value="'+(l.female!=null?l.female:'')+'" oninput="elSumMF()" '+inp+'></div></div>'
     +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">수업 내용</label><textarea id="elContent" rows="2" '+inp+'>'+esc(l.content||'')+'</textarea>'
@@ -2357,8 +2359,8 @@ async function saveLogEdit(id){
       await DB.collection('sessionLogs').doc(id).update({classTime:tv.v,classTimeSrc:'작성자',
         editHistory:firebase.firestore.FieldValue.arrayUnion({at:new Date().toISOString(),by:(MYD&&MYD.name)||'',uid:(AUTH.currentUser||{}).uid||'',role:'강사',timeOnly:true,before:{classTime:l.classTime||''}}),
         editedAt:firebase.firestore.FieldValue.serverTimestamp()});
-      document.getElementById('elModal').remove();alert('✓ '+l.session+'회차 수업 시간을 '+tv.v+' 로 저장했습니다.'+(l.teacherConfirm?'\n담당교사 확인은 그대로 유지됩니다.':''));loadMyLogs();
-    }catch(e){m.textContent='저장 실패: '+e.message+(/permission/i.test(e.message)?' — 사무국에 「보안 규칙 v50 게시」를 요청해 주세요':'');m.style.color='#C41E2F'}
+      document.getElementById('elModal').remove();alert('✓ '+l.session+'회차 수업 교시를 '+tv.v+' 로 저장했습니다.'+(l.teacherConfirm?'\n담당교사 확인은 그대로 유지됩니다.':''));loadMyLogs();
+    }catch(e){m.textContent='저장 실패: '+e.message+(/permission/i.test(e.message)?' — 사무국에 「보안 규칙 v51 게시」를 요청해 주세요':'');m.style.color='#C41E2F'}
     return}
   if(WASCFM&&!SELF&&!confirm('['+(l.school||'')+'] '+l.session+'회차는 담당교사 확인(서명)이 끝난 회차입니다 — '+(WASCFM.name||'')+'.\n\n'
     +'저장하면 교사확인이 「미확인」으로 되돌아가고, 기존 서명은 정정 이력에 보존됩니다.\n'
@@ -2418,21 +2420,25 @@ async function selfConfirmFill(logs){
   return n;
 }
 // ══ [수업 시간 2026-10-07] 일지에 수업 시간(classTime 「HH:MM~HH:MM」) — 신청서의 희망 요일·시간에서 그 수업일 요일 시간을 미리 채움 ══
-function lgSplitTime(t){const m=String(t||'').match(/(\d{1,2}:\d{2})\s*~\s*(\d{1,2}:\d{2})?/);return m?[m[1].padStart(5,'0'),(m[2]||'').padStart(m[2]?5:0,'0')]:['','']}
-function lgAppTime(appId,date){try{const x=(MYASG||[]).find(d=>d.id===appId);if(!x||!window.KFDF_LOGBOOK||!KFDF_LOGBOOK.appTime)return null;return KFDF_LOGBOOK.appTime(x.data(),date)}catch(e){return null}}
+// [교시 2026-10-08] 「3교시」「1~4교시」 ↔ [시작, 끝] · 옛 시각 값(「13:00~15:00」)은 표준 시간표로 환산해 보여 줌
+const LG_PERIODS=['0교시(아침)','1교시','2교시','3교시','4교시','5교시','6교시','7교시(방과후)','8교시(방과후)'];
+function lgPeriodOpts(sel,v){const el=document.getElementById(sel);if(!el)return;el.innerHTML='<option value="">선택</option>'+LG_PERIODS.map((n,i)=>'<option value="'+i+'"'+(String(v)===String(i)?' selected':'')+'>'+n+'</option>').join('')}
+function lgPeriodPair(a,b){const x=document.getElementById(a),y=document.getElementById(b);if(x&&y&&x.value!==''&&(y.value===''||+y.value<+x.value))y.value=x.value}
+function lgSplitTime(t){const LB=window.KFDF_LOGBOOK||{};let p=LB.periodOf?LB.periodOf(t):null;if(!p&&LB.isClock&&LB.isClock(t)&&LB.clockToPeriod)p=LB.periodOf(LB.clockToPeriod(t));return p?[String(p.from),String(p.to)]:['','']}
+function lgAppTime(appId,date){try{const x=(MYASG||[]).find(d=>d.id===appId);if(!x||!window.KFDF_LOGBOOK||!KFDF_LOGBOOK.appPeriod)return null;return KFDF_LOGBOOK.appPeriod(x.data(),date)}catch(e){return null}}
 function lgTimeFill(force){
   const t1=document.getElementById('lgT1'),t2=document.getElementById('lgT2'),h=document.getElementById('lgTimeHint');if(!t1||!t2)return;
   const appId=(document.getElementById('lgApp')||{}).value,date=(document.getElementById('lgDate')||{}).value;
   // 같은 학교에서 내가 마지막으로 쓴 시간 → 없으면 신청서 시간
-  const mine=(MYLOGS||[]).filter(l=>l.appId===appId&&l.classTime&&l.classTimeSrc==='작성자').sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const mine=(MYLOGS||[]).filter(l=>l.appId===appId&&l.classTime&&l.classTimeSrc==='작성자'&&window.KFDF_LOGBOOK&&KFDF_LOGBOOK.periodOf(l.classTime)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   let r=null;const wd=date?new Date(date+'T00:00:00').getDay():-1;
   const sameWd=mine.find(l=>new Date(String(l.date)+'T00:00:00').getDay()===wd);
   if(sameWd)r={time:sameWd.classTime,src:'지난 회차'};else r=lgAppTime(appId,date);
   if(force||(!t1.dataset.man&&!t2.dataset.man)){
-    const p=lgSplitTime(r&&r.time);t1.value=p[0];t2.value=p[1];delete t1.dataset.man;delete t2.dataset.man}
-  if(h)h.textContent=r?(r.src==='지난 회차'?'같은 요일 지난 회차 시간으로 채웠습니다 — 실제와 다르면 고쳐 주세요.':'강습 신청서의 희망 시간으로 채웠습니다 — 실제 수업 시간과 다르면 고쳐 주세요.'+(r.src!=='신청서'?' (신청서에 이 요일 시간이 없어 1지망 시간)':'')+(/~$/.test(r.time)?' (끝 시각을 넣어 주세요)':'')):'수업 시작·끝 시각을 넣어 주세요.';
+    const p=lgSplitTime(r&&r.time);lgPeriodOpts('lgT1',p[0]);lgPeriodOpts('lgT2',p[1]);delete t1.dataset.man;delete t2.dataset.man}
+  if(h)h.textContent=r?(r.src==='지난 회차'?'같은 요일 지난 회차의 교시로 채웠습니다 — 실제와 다르면 고쳐 주세요.':'강습 신청서의 희망 시간을 교시로 환산해 채웠습니다 — 실제 수업 교시와 다르면 고쳐 주세요.'+(String(r.src).indexOf('요일 다름')>=0?' (신청서에 이 요일 시간이 없어 1지망 시간)':'')):'수업 시작·끝 교시를 골라 주세요.';
 }
-function lgTimeVal(a,b){a=String(a||'').trim();b=String(b||'').trim();if(!a||!b)return {err:'수업 시작·끝 시각을 넣어 주세요'};if(b<=a)return {err:'수업 끝 시각이 시작보다 늦어야 합니다'};return {v:a+'~'+b}}
+function lgTimeVal(a,b){a=String(a||'').trim();b=String(b||'').trim();if(a===''||b==='')return {err:'수업 시작·끝 교시를 골라 주세요'};if(+b<+a)return {err:'끝 교시가 시작 교시보다 앞설 수 없습니다'};return {v:KFDF_LOGBOOK.periodStr(+a,+b)}}
 let LGBUSY=false;
 async function submitLog(){
   const m=document.getElementById('lgMsg');
@@ -3432,7 +3438,7 @@ function lgCardHtml(l){
   const mf=(l.male!=null||l.female!=null)?'남 '+(l.male||0)+' · 여 '+(l.female||0):'<span style="color:#b8860b">남·여 미기입</span>';
   const ph=(l.photos||[]).slice(0,3);
   return '<div class="lgcard"><div class="hd"><div class="no">'+esc(String(l.session==null?'':l.session).padStart(2,'0'))+'<small>회차</small></div>'
-    +'<div class="dt">'+esc(String(l.date||'').replace(/-/g,'. '))+esc(dow)+(l.classTime?' <span style="font-weight:800;color:#1F4E9C">'+esc(l.classTime)+'</span>'+(String(l.classTimeSrc||'').indexOf('신청서')===0?'<span title="강습 신청서의 희망 시간으로 채운 값 — 실제와 다르면 [수정]에서 고쳐 주세요(교사 확인 유지)" style="font-size:10.5px;color:#b8860b;font-weight:700;margin-left:3px">신청서 기준</span>':''):' <a href="javascript:void 0" onclick="editLog(\''+l._id+'\')" style="font-size:11.5px;color:#C41E2F;font-weight:800">🕒 수업 시간 입력</a>')+'<small>'+esc(l.school||'')+'</small></div>'+chip+'</div>'
+    +'<div class="dt">'+esc(String(l.date||'').replace(/-/g,'. '))+esc(dow)+(l.classTime?' <span style="font-weight:800;color:#1F4E9C">'+esc(l.classTime)+'</span>'+(String(l.classTimeSrc||'').indexOf('신청서')===0?'<span title="강습 신청서의 희망 시간을 교시로 환산해 채운 값 — 실제와 다르면 [수정]에서 고쳐 주세요(교사 확인 유지)" style="font-size:10.5px;color:#b8860b;font-weight:700;margin-left:3px">신청서 기준</span>':''):' <a href="javascript:void 0" onclick="editLog(\''+l._id+'\')" style="font-size:11.5px;color:#C41E2F;font-weight:800">🕒 수업 교시 입력</a>')+'<small>'+esc(l.school||'')+'</small></div>'+chip+'</div>'
     +'<div class="bd"><div class="cnt"><i>참여 인원</i><b>'+esc(l.count!=null?l.count:'-')+'<small>명</small></b><span>'+mf+'</span></div>'
     +'<div class="tx"><i>수업 내용</i>'+esc(l.content||'-')+(l.note?'<div style="color:#6b7280;margin-top:3px">특이사항: '+esc(l.note)+'</div>':'')
     +(l.fixReq?'<div style="color:#C41E2F;font-weight:700;margin-top:3px">정정 요청: '+esc(l.fixReq.reason||'')+'</div>':'')+'</div></div>'
@@ -4107,7 +4113,7 @@ document.getElementById('cfmModal').addEventListener('click',function(e){if(e.ta
 document.getElementById('sigModal').addEventListener('click',function(e){if(e.target===this)closeSigModal()});
 </script>
 <script src="schoolclub_core.js?v=20260922a"></script>
-<script src="logbook.js?v=20261007a"></script>
+<script src="logbook.js?v=20261008a"></script>
 <script src="crimcheck.js?v=20260918a"></script>
 <script src="auth_ui.js?v=20260929b"></script>
 </body>
