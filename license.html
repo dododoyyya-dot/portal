@@ -775,6 +775,16 @@ function pickDialog(title,options){
     document.body.appendChild(ov);
   });
 }
+// [검사식 수정 2026-10-12] 내 자격 찾기 — ① 계정 연결(uid) ② 성명이 같은 대장 기록 중 생년월일까지 같은 것(licenseBirth 는 규칙상 본인 성명·생년월일과 같은 문서만 읽힘)
+//   급수는 「2」「2급」 모두 인정. 종류(지도자·심판)는 신청 코스의 종류와 같아야 함
+async function findMyLicense(need,targets){
+  const gOk=l=>String(l.grade||'').replace(/급$/,'')===String(need),tOk=l=>targets.indexOf(String(l.type||''))>=0;
+  try{const q=await DB.collection('licenses').where('uid','==',LME.uid).get();const d=q.docs.find(x=>gOk(x.data())&&tOk(x.data()));if(d)return {no:d.id,via:'계정 연결'}}catch(e){}
+  try{const q=await DB.collection('licenses').where('name','==',String(LMY.name||'').trim()).limit(10).get();
+    for(const d of q.docs){const l=d.data();if(l.uid&&l.uid!==LME.uid)continue;if(!gOk(l)||!tOk(l))continue;
+      try{const b=await DB.collection('licenseBirth').doc(d.id).get();if(b.exists)return {no:d.id,via:'성명·생년월일 일치(미연결)'}}catch(e){}}}catch(e){}
+  return null;
+}
 async function applyNotice(id){
   if(!LME){if(confirm('로그인이 필요합니다. 로그인 페이지로 이동할까요?'))location.href='login.html';return}
   if(!LMY||LMY.status!=='approved'){alert('사무국 승인 후 신청할 수 있습니다.');return}
@@ -805,7 +815,15 @@ async function applyNotice(id){
   function ageOf(b){if(!b)return 0;const t=new Date(b);if(isNaN(t.getTime()))return 0;const now=new Date();let a=now.getFullYear()-t.getFullYear();if(now.getMonth()<t.getMonth()||(now.getMonth()===t.getMonth()&&now.getDate()<t.getDate()))a--;return a;}
   if(ageOf(LMY.birth)<18){alert('만 18세 미만은 연맹 자격을 신청·취득할 수 없습니다.');return}
   // ── 상위 등급 신청 시 하위 등급 보유 검증 ──
-  if(g!=='3'){const need=g==='1'?'2':'3';const low=await DB.collection('licenses').where('uid','==',LME.uid).where('grade','==',need).where('type','in',targets).get();if(low.empty){alert('상위 등급 신청은 '+need+'급 '+targets.join('·')+' 자격 보유가 필요합니다.\n하위 등급 발급 후 신청해주세요.');return}}
+  // ── [검사식 수정 2026-10-12] 상위 등급(1·2급) 보유 검증은 「신규」 코스에만 — 갱신·보수(역량강화)는 그 등급을 이미 가진 사람의 교육이라 하위 등급을 묻지 않음(만료된 2급의 보수·갱신 포함)
+  //   종전 검사는 대장 급수가 「2급」으로 적혀 있는데 「2」를 찾아 아무도 통과하지 못했음. 계정에 연결된 자격(uid) → 성명+생년월일이 같은 대장 자격(licenseBirth 규칙으로 본인 확인) 순으로 찾음
+  const gradeCheck={mode:sel.some(o=>o.tp==='신규')?'신규':'갱신·보수',need:'',found:'',via:''};
+  if(g!=='3'&&gradeCheck.mode==='신규'){
+    const need=g==='1'?'2':'3';gradeCheck.need=need+'급';
+    const hit=await findMyLicense(need,targets);
+    if(!hit){alert('상위 등급('+g+'급) 신규 신청은 '+need+'급 '+targets.join('·')+' 자격 보유가 필요합니다.\n\n'+need+'급 자격이 있는데도 이 안내가 뜨면 자격 대장의 기록이 회원 계정과 연결되지 않은 경우입니다.\n마이페이지 › 연맹 자격 › 「기존 자격 연결」에서 내 자격을 연결한 뒤 다시 신청해 주세요.\n\n※ 갱신·보수(역량강화) 교육은 이 검사 없이 신청할 수 있습니다.');return}
+    gradeCheck.found=hit.no;gradeCheck.via=hit.via;
+  }
   let sido=await pickDialog('소속(담당) 연맹을 선택하세요 — 교육 장소·주관과 달라도 됩니다 (교차 지원 가능)',FED_LIST);
   if(sido===null)return;
   if(sido==='기타(중앙 처리)')sido='중앙';
@@ -824,6 +842,7 @@ async function applyNotice(id){
     courses:courses,totalFee:totalFee,physicalCert:physical,physicalFee:physicalFee,
     uid:LME.uid,name:LMY.name,email:LME.email||'',phone:phone,grade:g,sido:sido,
     birth:LMY.birth||'',address:LMY.address||'',fedName:LMY.fedName||'',
+    gradeCheck:gradeCheck,   // [검사식 수정] 하위 등급 검사 내용(신규: 찾은 자격 번호·확인 경로 / 갱신·보수: 검사 생략) — 담당 연맹 검토용
     status:'접수',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
   const courseTxt=courses.map(c=>'· '+c.target+' '+c.type+' '+g+'급'+(c.fee?' — '+c.fee.toLocaleString('ko-KR')+'원':'')).join('\n');
   if(window.kfdfMail&&LME.email)kfdfMail(LME.email,'[플라잉디스크연맹] 자격 검정·갱신 신청 접수 — '+n.title,
