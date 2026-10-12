@@ -2774,6 +2774,43 @@ let CCOMPS=[];
 const CC2_SIDOS=['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
 let CC2_ENTRY=null,CC2_DATES=[],CC2_Y=0,CC2_M=0,CC2_ATTACH=[],CC2_CIMGS=[],CC2_EDIT=null,CC2_LIST=[];
 function _cc2Admin(){return cHasRole(CMY,'admin')}
+// ══ [공고 복구 2026-10-12] 대회(competitions)는 남았는데 연결된 참가 공고(compSlots)·캘린더 일정(events)이 지워진 경우 ══
+//   (예: 2026 해운대 비치 — 관리자 「대회 삭제」가 공고·일정만 지우고 대회 문서 삭제에서 실패하면 이렇게 남음)
+//   대회 문서에 저장된 요강 그대로 참가 공고를 같은 ID 로 다시 만들어 기존 링크(알림·캘린더)가 그대로 살아나게 합니다. 신청 기록(claimed)은 되살릴 수 없습니다.
+function compCanManage(c){return !!(CME&&CMY&&(_cc2Admin()||c.byUid===CME.uid||(cHasRole(CMY,'sidoOfficer')&&KFDF.sidoMatch(CMY.sido,c.sido))))}
+async function compRebuildSlot(compId,slotId){
+  const cd=await DB.collection('competitions').doc(compId).get();if(!cd.exists)throw new Error('대회 문서가 없습니다');const c=cd.data();
+  if(!compCanManage(c))throw new Error('이 대회를 관리할 권한이 없습니다');
+  const entry=Object.assign({indiv:[],team:[],teamUnits:[],teamGenders:[]},c.entry||{});
+  const roles=[],teamDivs=[],divDates={};
+  entry.indiv.concat(entry.team).forEach(sp=>{Object.keys(sp.divDates||{}).forEach(d2=>{if((sp.divs||[]).indexOf(d2)>=0&&(sp.divDates[d2]||[]).length)divDates[sp.name+' '+d2]=sp.divDates[d2]})});
+  entry.indiv.forEach(sp=>{if((sp.divs||[]).length)sp.divs.forEach(d2=>roles.push(sp.name+' '+d2));else roles.push(sp.name)});
+  entry.team.forEach(sp=>{if((sp.divs||[]).length)sp.divs.forEach(d2=>{roles.push(sp.name+' '+d2);teamDivs.push(sp.name+' '+d2)});else teamDivs.push(sp.name)});
+  teamDivs.forEach(td=>{if(roles.indexOf(td)<0)roles.push(td)});
+  const byUid=_cc2Admin()?(c.byUid||CME.uid):CME.uid;   // 시도임원은 규칙상 본인 명의로만 만들 수 있음
+  const slot={title:c.title||'',role:'참가',roles:roles,quota:999,date:c.dateStart||'',region:c.sido||'',place:c.place||'',deadline:c.deadline||'',fee:c.fee||'',note:c.desc||'',eligRegion:'',
+    teamDivs:teamDivs,teamTypes:entry.teamUnits||[],teamGenders:entry.teamGenders||[],entry:entry,divDates:divDates,
+    host:c.host||'',organizer:c.organizer||'',sponsor:c.sponsor||'',partner:c.partner||'',opening:c.opening||{},time:c.time||'',daySchedule:c.daySchedule||{},attachments:c.attachments||[],extras:c.extras||{},committee:c.committee||'',
+    consentText:c.consentText||'',consentImgs:c.consentImgs||[],consentOverlays:c.consentOverlays||null,consentForm:c.consentForm||'basic',consentFormUrl:c.consentFormUrl||'',consentFormName:c.consentFormName||'',
+    compId:compId,bySido:c.sido||'',byUid:byUid,claimed:[],cancels:[],confirmed:[],createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+    restoredAt:new Date().toISOString(),restoredBy:CME.uid,restoredByName:(CMY&&CMY.name)||''};
+  const sref=slotId?DB.collection('compSlots').doc(slotId):DB.collection('compSlots').doc();
+  if(slotId&&(await sref.get()).exists)throw new Error('이미 공고가 있습니다');
+  await sref.set(slot);
+  if((c.slotIds||[]).indexOf(sref.id)<0)await DB.collection('competitions').doc(compId).update({slotIds:firebase.firestore.FieldValue.arrayUnion(sref.id)});
+  // 캘린더 일정도 지워졌으면 같은 ID 로 다시
+  let evMsg='';
+  try{const eref=c.eventId?DB.collection('events').doc(c.eventId):DB.collection('events').doc();
+    if(!c.eventId||!(await eref.get()).exists){await eref.set({title:'🏆 '+(c.title||''),type:'대회',start:c.dateStart||'',end:c.dateEnd||c.dateStart||'',sido:c.sido||'',place:c.place||'',desc:c.desc||'대회 페이지에서 신청',link:'competition.html?slot='+sref.id,slotId:sref.id,byUid:CME.uid,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+      if(!c.eventId)await DB.collection('competitions').doc(compId).update({eventId:eref.id});evMsg=' · 캘린더 일정도 다시 등록'}}catch(e){evMsg=' · 캘린더 일정은 다시 등록하지 못함('+e.message+')'}
+  return {id:sref.id,evMsg:evMsg};
+}
+async function compRestoreClick(compId,slotId,btn){
+  if(!confirm('이 대회의 참가 공고를 대회 등록 내용(요강·부문·동의서)으로 다시 만듭니다.\n지워진 공고에 있던 참가 신청 기록은 되살릴 수 없습니다.\n계속할까요?'))return;
+  if(btn){btn.disabled=true;btn.textContent='복구 중…'}
+  try{const r=await compRebuildSlot(compId,slotId);alert('✓ 참가 공고를 복구했습니다'+r.evMsg+'.');location.href='competition.html?slot='+r.id}
+  catch(e){alert('복구 실패: '+e.message);if(btn){btn.disabled=false;btn.textContent='🛠 참가 공고 복구'}}
+}
 async function cc2LoadMine(){
   const el=document.getElementById('cc2MyList');if(!el)return;
   try{
@@ -3600,7 +3637,7 @@ function compRow(r,today){
   const past=!!(r.end&&r.end<today);
   const badge='<div class="cdate"><b>'+(dm?(+dm[1])+'.'+dm[2]:'-')+'</b><span>'+(dm?cc2DowOf(r.date):'')+'</span></div>';
   const isOpen=!past&&!r.closed&&!(r.deadline&&r.deadline<today);
-  const chips=(r.kind==='staff'?'<span class="chip ks">심판 모집</span>':'<span class="chip kc">참가 모집</span>')+(past?'<span class="chip closed">종료</span>':compDday(r,today))+(r.applied?'<span class="chip mine">신청함</span>':'')+(r.team?'<span class="chip team">단체전</span>':'');
+  const chips=(r.kind==='staff'?'<span class="chip ks">심판 모집</span>':'<span class="chip kc">참가 모집</span>')+(past?'<span class="chip closed">종료</span>':compDday(r,today))+(r.applied?'<span class="chip mine">신청함</span>':'')+(r.team?'<span class="chip team">단체전</span>':'')+(r.broken?'<span class="chip closed" title="참가 공고 문서가 삭제됨 — 상세에서 복구">공고 복구 필요</span>':'');
   const meta=[r.place,r.host].filter(Boolean).join(' · ');
   const tag=r.href?'a':'div';
   return '<'+tag+' class="crow'+(past?' past':'')+(r.href?'':' static')+'"'+(r.href?' href="'+r.href+'"':'')+(r.key?' data-newkey="'+cesc(r.key)+'"':'')+' data-kind="'+(r.kind==='staff'?'staff':'comp')+'" data-open="'+(isOpen?'1':'0')+'" data-reg="'+compRegOf(r.region,r)+'" data-sido="'+cesc((window.KFDF_MAP?(KFDF_MAP.sidoOf(r.region+' '+(r.place||''))||KFDF_MAP.sidoOf(r.host||'')||KFDF_MAP.sidoOf(r.title||'')):'')||'')+'">'+badge
@@ -3630,8 +3667,8 @@ async function loadLiveComps(){
     const rows=[],seen=new Set();
     if(cs)cs.docs.forEach(cd=>{const c=cd.data();const sid=(c.slotIds||[])[0];const sd=sid?slotMap[sid]:null;if(sid)seen.add(sid);
       if(sd){rows.push({html:compRowOfSlot(sd,today,c),date:c.dateStart||'',end:c.dateEnd||c.dateStart||''});return}
-      // 공고 문서를 못 읽는 경우(로그인 전)에도 공개 대회 정보로 행을 만들고 상세로 연결
-      rows.push({html:compRow({key:sid||'',href:sid?'competition.html?slot='+sid:'',date:c.dateStart||'',end:c.dateEnd||c.dateStart||'',title:c.title||'',place:c.place||'',host:c.host||'',region:c.sido||'',deadline:c.deadline||'',closed:!!(c.deadline&&c.deadline<today),team:!!((c.teamTypes||[]).length)},today),date:c.dateStart||'',end:c.dateEnd||c.dateStart||''});});
+      // 공고 문서를 못 읽는 경우(로그인 전)에도 공개 대회 정보로 행을 만들고 상세로 연결 · [공고 복구] 읽었는데 없으면(지워짐) 표시
+      rows.push({html:compRow({key:sid||'',href:sid?'competition.html?slot='+sid:'',broken:!!(sl&&sid),date:c.dateStart||'',end:c.dateEnd||c.dateStart||'',title:c.title||'',place:c.place||'',host:c.host||'',region:c.sido||'',deadline:c.deadline||'',closed:!!(c.deadline&&c.deadline<today),team:!!((c.teamTypes||[]).length)},today),date:c.dateStart||'',end:c.dateEnd||c.dateStart||''});});
     if(sl)sl.docs.forEach(d=>{const s=d.data();if(seen.has(d.id)||s.compId||s.role!=='참가')return;rows.push({html:compRowOfSlot(d,today),date:s.date||'',end:s.date||''})});
     // [공고 허브] 심판·운영 모집 공고를 같은 목록에 (승인된 공고만 · 로그인 시)
     HUB_STAFF=sp?sp.docs.map(x=>Object.assign({id:x.id},x.data())).filter(p=>p.approved):(u?[]:null);
@@ -3740,7 +3777,16 @@ async function loadSlots(){
         if(_d.data().role==='참가'){el.innerHTML=_card;if(refEl)refEl.innerHTML='<div class="bempty">전체 공고 목록에서 확인하세요. <a href="competition.html" style="font-weight:800;color:var(--blue)">← 목록으로</a></div>';}
         else{el.innerHTML='<div class="bempty">전체 공고 목록에서 확인하세요. <a href="competition.html" style="font-weight:800;color:var(--blue)">← 목록으로</a></div>';if(refEl)refEl.innerHTML=_card;}
       }else{
-        const _msg=_back+'<div class="bempty">공고를 찾을 수 없습니다 — 마감 후 정리되었거나 삭제되었을 수 있습니다.</div>';
+        // [공고 복구] 대회 문서가 이 공고 ID 를 가리키면 대회 정보를 보여 주고, 관리 권한자에게는 복구 버튼
+        let _cdoc=null;try{const _cq=await DB.collection('competitions').where('slotIds','array-contains',_qs).limit(1).get();if(!_cq.empty)_cdoc=Object.assign({id:_cq.docs[0].id},_cq.docs[0].data())}catch(e){}
+        let _msg;
+        if(_cdoc){
+          const _c=_cdoc;const _can=compCanManage(_c);
+          _msg=_back+'<div class="bempty" style="text-align:left;line-height:1.7"><b style="font-size:15px;color:#16181d">🏆 '+cesc(_c.title||'')+'</b><br>'
+            +'📅 '+cesc(_c.dateStart||'')+(_c.dateEnd&&_c.dateEnd!==_c.dateStart?' ~ '+cesc(_c.dateEnd):'')+(_c.place?' · 📍 '+cesc(_c.place):'')+(_c.host?' · '+cesc(_c.host):'')+(_c.deadline?' · 접수 마감 '+cesc(_c.deadline):'')+'<br>'
+            +'<span style="color:#C41E2F;font-weight:800">이 대회의 참가 공고(신청 화면)가 삭제되어 상세·신청을 표시할 수 없습니다.</span> '
+            +(_can?'대회 등록 내용으로 공고를 다시 만들 수 있습니다.<br><button class="cbtn" style="margin-top:8px" onclick="compRestoreClick(\''+_c.id+'\',\''+cesc(_qs)+'\',this)">🛠 참가 공고 복구</button>':'주최 시도연맹 또는 사무국(031-984-3248)에 문의해 주세요.')+'</div>';
+        }else _msg=_back+'<div class="bempty">공고를 찾을 수 없습니다 — 마감 후 정리되었거나 삭제되었을 수 있습니다.</div>';
         el.innerHTML=_msg;if(refEl)refEl.innerHTML='';
       }
       // [1공고 1상세] 상세가 첫 화면에 오도록 맨 위로

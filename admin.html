@@ -6653,11 +6653,14 @@ async function delCompMaster(id){
   if(IS_SIDO && c.byUid!==CMY.uid && !sameSidoComp(c)){alert('본인이 등록하거나 관할 시도의 대회만 삭제할 수 있습니다.');return;}
   if(!confirm('['+c.title+'] 대회를 삭제할까요?\n연결된 공고·캘린더 일정도 함께 삭제됩니다. (신청 기록 포함 — 복구 불가)'))return;
   try{
-    for(const sid of (c.slotIds||[]))await DB.collection('compSlots').doc(sid).delete().catch(()=>{});
-    if(c.eventId)await DB.collection('events').doc(c.eventId).delete().catch(()=>{});
-    await DB.collection('competitions').doc(id).delete();
+    // [2026-10-12] 공고·일정·대회를 한 묶음(batch)으로 지웁니다 — 예전에는 공고·일정을 먼저 지우고 대회 삭제가 실패하면 대회만 남아 목록에는 보이는데 상세가 안 뜨는 상태가 됐습니다(해운대 비치 대회)
+    const b=DB.batch();
+    for(const sid of (c.slotIds||[])){try{if((await DB.collection('compSlots').doc(sid).get()).exists)b.delete(DB.collection('compSlots').doc(sid))}catch(e){}}
+    if(c.eventId){try{if((await DB.collection('events').doc(c.eventId).get()).exists)b.delete(DB.collection('events').doc(c.eventId))}catch(e){}}
+    b.delete(DB.collection('competitions').doc(id));
+    await b.commit();
     loadCompsAdmin();
-  }catch(e){alert('삭제 실패: '+e.message)}
+  }catch(e){alert('삭제 실패(아무것도 지워지지 않음): '+e.message)}
 }
 // 기존 공고를 대회로 연결
 async function linkSlotsModal(compId){
@@ -7365,8 +7368,11 @@ async function compConsentDocs(id){
 async function delComp(id){
   const s=(await DB.collection('compSlots').doc(id).get()).data();
   if(IS_SIDO && !sameSidoComp(s)){alert('관할 시도가 아닌 공고입니다.');return;}
+  if(s.compId&&s.role==='참가'&&!confirm('이 공고는 대회 「'+(s.title||'')+'」에 연결된 참가 공고입니다. 공고만 지우면 대회는 남고 신청 화면이 사라집니다.\n대회 자체를 없애려면 「대회 등록·관리」의 대회 삭제를 쓰세요.\n\n그래도 공고만 삭제할까요?'))return;
   if(!confirm('이 대회 모집을 삭제할까요? (지명 기록도 함께 삭제)'))return;
-  await DB.collection('compSlots').doc(id).delete();loadCompsAdmin();
+  await DB.collection('compSlots').doc(id).delete();
+  if(s.compId)await DB.collection('competitions').doc(s.compId).update({slotIds:firebase.firestore.FieldValue.arrayRemove(id)}).catch(()=>{});   // [2026-10-12] 대회의 연결 목록에서도 제거
+  loadCompsAdmin();
 }
 // ── 수당지급내역서 (확정자 대상 — 금액 입력 → 원천징수 자동 → 저장·CSV·인쇄) ──
 let PAY_CTX=null;
