@@ -1,4 +1,4 @@
-// matchrec.js v20261013a · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
+// matchrec.js v20261014a · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
 //   화면: match.html(기록 콘솔·경기 관리) · competition.html(오더지 작성) · results.html(공개 결과) · live.html(중계 콘솔 호환)
 //   원칙 ① 경기 문서(liveMatches) 하나가 원본 ② 점수는 득점 기록(events)에서 계산해 a.score/b.score 에 같이 저장(중계 화면 호환)
 //        ③ 입력권(ctrl)은 한 번에 한 화면 ④ 기록 추가는 고유 id + 트랜잭션(중복 전송 무시) ⑤ 취소는 삭제 대신 void 표시
@@ -151,7 +151,7 @@
     return byDiv}
 
   // ── 결과 페이지용 표시 ──
-  function evLine(e){if(!e)return '';var mm=e.min!=null&&e.min!==''?e.min+"'":(e.clock||'');var who=e.type==='goal'?((e.scorer?('#'+e.scorer.no+' '+e.scorer.name):'득점자 미지정')+(e.assist?' · 어시 #'+e.assist.no+' '+e.assist.name:'')):e.type==='card'?(CARDS[e.card]||e.card)+' '+((e.target||{}).kind==='coach'?'지도자 ':'')+((e.target||{}).no?'#'+e.target.no+' ':'')+((e.target||{}).name||''):e.type==='timeout'?'타임아웃':e.type==='injury'?'부상 중단':(e.note||e.type||'');return {min:mm,who:who}}
+  function evLine(e){if(!e)return '';var mm=e.min!=null&&e.min!==''?e.min+"'":(e.clock||'');var who=e.type==='goal'?((e.scorer?('#'+e.scorer.no+' '+e.scorer.name):'득점자 미지정')+(e.assist?' · 어시 #'+e.assist.no+' '+e.assist.name:'')):e.type==='card'?(CARDS[e.card]||e.card)+' '+((e.target||{}).kind==='coach'?'지도자'+(((e.target||{}).name&&e.target.name!=='지도자')?' '+e.target.name:''):(((e.target||{}).no?'#'+e.target.no+' ':'')+((e.target||{}).name||''))):e.type==='timeout'?'타임아웃':e.type==='injury'?'부상 중단':(e.note||e.type||'');return {min:mm,who:who}}
 
   // ══ 인쇄(PDF) — 양식 그대로 ══
   var PCSS='@page{size:A4;margin:12mm}body{margin:0;font-family:Pretendard,"Malgun Gothic",sans-serif;color:#111;font-size:11pt}*{box-sizing:border-box}'

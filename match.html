@@ -261,7 +261,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="matchrec.js?v=20261013a"></script>
+<script src="matchrec.js?v=20261014a"></script>
 <script>
 // ══════════ 경기 기록 (match.html) ══════════
 //   ?slot=참가공고ID            대회의 경기·오더지·디스크골프·순위 (운영진은 경기 생성·심판 배정)
@@ -603,7 +603,7 @@ function qkTeam(m,side){
     else h+=qkPad(side,'assist');
     h+='<div class="qa"><button class="ok" onclick="qkAssist(\''+side+'\',\'\')">어시스트 없음 · 저장</button><button class="no" onclick="qkCancel()">취소</button></div>';
   }else if(P&&P.stage==='card'){
-    h+='<div class="qp c">🟨 <b>'+(P.target.kind==='coach'?'지도자 '+esc(P.target.name||''):'#'+esc(P.target.no)+' '+esc(P.target.name||''))+'</b> — 제재 종류'+qkMinRow(P)+'</div>'
+    h+='<div class="qp c">🟨 <b>'+(P.target.kind==='coach'?'지도자'+(P.target.name&&P.target.name!=='지도자'?' '+esc(P.target.name):''):'#'+esc(P.target.no)+' '+esc(P.target.name||''))+'</b> — 제재 종류'+qkMinRow(P)+'</div>'
       +'<div class="qk">'+Object.keys(MR.CARDS).map(k=>'<button class="'+k+'" onclick="qkCard(\''+k+'\')">'+k+' · '+MR.CARDS[k]+'</button>').join('')+'</div><div class="qa" style="grid-template-columns:1fr"><button class="no" onclick="qkCancel()">취소</button></div>';
   }else{
     const act=QK.mode==='card'?'qkCardPick':'qkScorer';
@@ -629,10 +629,10 @@ async function qkAssistObj(side,ap){const P=QK.pend;if(!P||P.side!==side)return;
   qkToast((m[side]||{}).name+' 득점 '+(ev.scorer?'#'+ev.scorer.no+' '+(ev.scorer.name||''):'')+(ev.assist?' · 어시 #'+ev.assist.no:'')+' · '+ev.min+'′',ev.id);
   await sendEvent({kind:'add',id:RC_ID,ev:ev,opts:{requireCtrl:true}})}
 function qkCardPick(side,no){QK.pend=qkNew(side,'card');QK.pend.target=Object.assign({kind:'player'},pickFromOrder(side,no)||{no:no,name:''});rcRender()}
-function qkCoach(side){const m=MATCHES.find(x=>x.id===RC_ID);const o=orderOf((m[side]||{}).pid)||{};QK.pend=qkNew(side,'card');QK.pend.target={kind:'coach',no:'',name:((o.coach||{}).name)||'지도자'};rcRender()}
+function qkCoach(side){const m=MATCHES.find(x=>x.id===RC_ID);const o=orderOf((m[side]||{}).pid)||{};QK.pend=qkNew(side,'card');QK.pend.target={kind:'coach',no:'',name:((o.coach||{}).name)||''};rcRender()}
 async function qkCard(code){const P=QK.pend;if(!P||P.stage!=='card')return;const m=MATCHES.find(x=>x.id===RC_ID);const ev={id:MR.uid8(),type:'card',side:P.side,min:+P.min,period:P.period,card:code,target:P.target,clock:MR.clockTxt(m)};QK.pend=null;
   qkToast((m[P.side]||{}).name+' '+MR.CARDS[code]+' '+(P.target.kind==='coach'?'지도자':'#'+P.target.no)+' · '+ev.min+'′',ev.id);await sendEvent({kind:'add',id:RC_ID,ev:ev,opts:{requireCtrl:true}})}
-function qkToast(text,evId){try{if(navigator.vibrate)navigator.vibrate(35)}catch(e){}QK.toast={text:'✓ '+text,evId:evId};clearTimeout(QK.toastT);QK.toastT=setTimeout(()=>{QK.toast=null;rcRender()},6000);rcRender()}
+function qkToast(text,evId){try{if(navigator.vibrate)navigator.vibrate(35)}catch(e){}QK.toast={text:'✓ '+text,evId:evId};clearTimeout(QK.toastT);QK.toastT=setTimeout(()=>{QK.toast=null;rcRender()},9000);rcRender()}
 async function qkUndo(){const t=QK.toast;if(!t||!t.evId)return;QK.toast=null;clearTimeout(QK.toastT);rcRender();await sendEvent({kind:'void',id:RC_ID,evId:t.evId})}
 function qkClk(d){const m=MATCHES.find(x=>x.id===RC_ID);if(!m)return;rcUpdate({clock:MR.clockSet(m,Math.max(0,MR.minuteOf(m)+d))})}
 async function rcUpdate(upd,msg){try{await DB.collection('liveMatches').doc(RC_ID).update(Object.assign({updatedAt:FV.serverTimestamp(),by:whoAmI().name},upd))}catch(e){say((msg||'저장 실패')+': '+(e.message||e))}}
