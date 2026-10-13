@@ -2303,7 +2303,7 @@ async function lcPdfSave(which){
   if(docs.length>30&&!confirm('자격증 '+docs.length+'장을 한 PDF 파일로 만듭니다. 시간이 걸릴 수 있습니다. 계속할까요?'))return;
   const cards=[],noBirth=[];
   for(const d of docs){const x=d.data();const m=await lcMemberOf(x.uid);const birth=(CENTRAL?await lcBirthOf(d.id):'')||x.birth||m.birth||'';if(!birth)noBirth.push(d.id+' '+(x.name||x.maskName||''));
-    cards.push({no:d.id,type:x.type,grade:x.grade,name:x.name||m.name||x.maskName||'',birth:birth,expireAt:x.expireAt,issuedAt:x.issuedAt,region:x.region})}
+    cards.push({no:d.id,type:x.type,grade:x.grade,name:x.name||m.name||x.maskName||'',birth:birth,expireAt:x.expireAt,issuedAt:x.issuedAt||x.renewedAt||'',region:x.region})}   // [발급일 2026-10-14] 소급 등록분(발급일 없음)은 갱신일을 발급일로
   try{const r=await KFDF_LICCERT.savePdf(cards,cards.length===1?null:'자격증_'+cards.length+'장_'+new Date().toISOString().slice(0,10)+'.pdf','연맹 자격증');
     if(r==='download')alert('📄 자격증 PDF '+cards.length+'장을 파일로 저장했습니다.'+(noBirth.length?'\n\n생년월일을 확인하지 못한 '+noBirth.length+'건은 생년월일 칸이 비어 있습니다:\n'+noBirth.slice(0,10).join('\n')+(noBirth.length>10?'\n…':'')+'\n(회원 미연결 또는 회원 정보에 생년월일 없음 — [정보 수정]에서 생년월일 입력 또는 [🔗 회원 연동] 후 다시 저장)':''))}
   catch(e){alert('PDF 저장 실패: '+(e&&e.message||e)+'\n\n[자격증 출력](인쇄 대화상자)을 이용해 주세요.')}
