@@ -221,7 +221,7 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
 
     <div id="mg_apps" class="lccard" style="display:none">
       <h3 style="margin:0 0 8px;font-size:16px">신청 처리 · 발급</h3>
-      <div class="lcbar"><select id="apNotice" class="lcin" style="width:auto;min-width:240px" onchange="loadApps()"><option value="">공고 선택</option></select>
+      <div class="lcbar"><select id="apNotice" class="lcin" style="width:auto;min-width:240px" onchange="Promise.resolve(loadApps()).then(apStatsRender)"><option value="">공고 선택</option></select>
       <button class="lcbtn s" id="apBulkBtn" onclick="bulkIssue()">🎖 합격자 일괄 발급</button>
       <span id="apCount" style="font-size:13px;font-weight:800;color:#153A77"></span></div>
       <div class="board" id="apList"><div class="bempty">공고를 선택하세요.</div></div>
@@ -1096,7 +1096,32 @@ async function reopenClaim(id){
 }
 // [화면 전환 2026-10-14] 공고 카드의 수정·신청현황 버튼은 「자격 관리」 화면(?view=admin) 안의 패널을 여는데, 「공고」 화면에서는 그 패널이 숨겨져 있어 눌러도 아무것도 안 보였음
 function lcAdminView(){try{if(document.body.getAttribute('data-view')!=='admin'){const u=new URL(location.href);u.searchParams.set('view','admin');u.hash='';history.replaceState(null,'',u.toString());if(typeof _kfdfBind==='function')_kfdfBind()}}catch(e){}}
+// [신청현황 팝업 2026-10-14] 대회 「👥 신청 현황」처럼 공고 화면 위에 바로 — #mg_apps 를 팝업으로 옮겨 기존 처리 기능을 그대로 씀
+let AP_HOME=null;
+function apModalClose(){const mo=document.getElementById('apModal');const box=document.getElementById('mg_apps');if(box&&AP_HOME){AP_HOME.parent.insertBefore(box,AP_HOME.next);box.style.display=AP_HOME.disp;const st=document.getElementById('apStats');if(st)st.remove()}AP_HOME=null;if(mo)mo.remove();document.body.style.overflow=''}
+function apStatsRender(){const box=document.getElementById('mg_apps');if(!box)return;let st=document.getElementById('apStats');if(!st){st=document.createElement('div');st.id='apStats';box.insertBefore(st,document.getElementById('apList'))}
+  const L=(LAPPS||[]).map(d=>d.data());if(!L.length){st.innerHTML='';return}
+  const by={},stc={};let fee=0;L.forEach(a=>{(a.courses&&a.courses.length?a.courses:[{target:a.target,type:a.appType}]).forEach(c=>{const k=(c.target||'')+' '+(c.type||'')+' '+(a.grade?a.grade+'급':'');by[k]=(by[k]||0)+1});stc[a.status||'접수']=(stc[a.status||'접수']||0)+1;fee+=Number(a.totalFee)||0});
+  const chip=(t,c)=>'<span class="lctag" style="background:'+(c||'#153A77')+';font-size:12px;margin:2px">'+t+'</span>';
+  st.innerHTML='<div style="background:#f6f8fb;border-radius:12px;padding:10px 12px;margin:8px 0;font-size:12.5px;line-height:1.9">'
+    +'<b style="color:#153A77">코스·급수별</b> '+Object.keys(by).sort().map(k=>chip(esc(k)+' '+by[k]+'명')).join('')
+    +'<br><b style="color:#153A77">상태</b> '+Object.keys(stc).map(k=>chip(esc(k)+' '+stc[k],'#0f766e')).join('')+(fee?' · <b>납부 예정 합계 '+fee.toLocaleString('ko-KR')+'원</b>':'')
+    +'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><input class="lcin" id="apFind" placeholder="이름 · 연락처 검색" style="flex:1;min-width:160px;padding:7px 10px" oninput="apFilter(this.value)"><button class="lcbtn b" onclick="apCsv()">📥 엑셀(CSV)</button></div></div>'}
+function apFilter(q){q=String(q||'').trim();document.querySelectorAll('#apList > .lccard').forEach(c=>{c.style.display=(!q||c.innerText.indexOf(q)>=0)?'':'none'})}
+function apCsv(){const L=(LAPPS||[]).map(d=>d.data());const sel=document.getElementById('apNotice');const nt=sel&&sel.options[sel.selectedIndex]?sel.options[sel.selectedIndex].text:'';
+  const rows=[['성명','생년월일','연락처','주소','등급','코스','납부액','실물자격증','담당연맹','상태','신청일']].concat(L.map(a=>[a.name||'',a.birth||'',a.phone||'',a.address||'',(a.grade||'')+'급',(a.courses||[]).map(c=>c.target+' '+c.type).join(' / ')||((a.target||'')+' '+(a.appType||'')),a.totalFee||0,a.physicalCert?'실물':'디지털',a.sido||'',a.status||'',a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().toISOString().slice(0,10):'']));
+  const csv='\ufeff'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='자격신청현황_'+nt.replace(/[\\/:*?"<>|]/g,'').slice(0,40)+'.csv';a.click()}
 function gotoApps(nid){
+  const box=document.getElementById('mg_apps');if(!box)return;
+  if(!AP_HOME)AP_HOME={parent:box.parentNode,next:box.nextSibling,disp:box.style.display};
+  let mo=document.getElementById('apModal');if(!mo){mo=document.createElement('div');mo.id='apModal';mo.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:flex-start;justify-content:center;padding:24px 14px;overflow:auto';
+    mo.innerHTML='<div style="background:#fff;border-radius:18px;max-width:980px;width:100%;padding:16px 18px;box-shadow:0 24px 60px rgba(0,0,0,.25)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><b style="font-size:17px">📋 신청 현황</b><span style="flex:1"></span><button class="lcbtn ghost" onclick="apModalClose()">✕ 닫기</button></div><div id="apModalBody"></div></div>';
+    mo.addEventListener('click',e=>{if(e.target===mo)apModalClose()});document.body.appendChild(mo);document.body.style.overflow='hidden'}
+  document.getElementById('apModalBody').appendChild(box);box.style.display='block';
+  const sel=document.getElementById('apNotice');
+  if(sel){sel.value=nid;Promise.resolve(loadApps()).then(apStatsRender).catch(e=>{document.getElementById('apList').innerHTML='<div class="bempty">불러오기 실패: '+esc(e.message||e)+'</div>'})}
+}
+function gotoAppsPanel(nid){
   lcAdminView();
   const chip=document.querySelector('.lcchip[data-t="apps"]');
   if(chip)mgTab('apps',chip);
