@@ -130,6 +130,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
 <script src="career.js?v=20260907a"></script>
+<script src="matchrec.js?v=20261013a"></script>
 <script>
 // ══════════ 대회 결과 (공개) — eventReports(연맹 대회 종료 보고) + schoolClubEvents(학교스포츠클럽 결과 요약, admin 업로드 도구가 생성) ══════════
 //  이름 공개 범위 = siteContent/results.nameMode : 'masked'(기본, 홍*동) | 'full' | 'hidden'(팀·학교와 인원수만). 생년월일·학년은 어디에도 싣지 않습니다.
@@ -152,8 +153,11 @@ async function rsLoad(){
       DB.collection('schoolClubEvents').limit(300).get().catch(()=>null)
     ]);
     ITEMS=[];
-    if(a)a.docs.forEach(d=>{const x=d.data();if(!(x.awards&&x.awards.length)&&!(x.stats&&x.stats.teams))return;ITEMS.push({id:'r_'+d.id,src:'fed',title:x.title||'',date:x.date||'',endDate:x.endDate||'',organizer:'대한민국플라잉디스크연맹',place:x.place||'',sport:x.sport||'',awards:x.awards||[],stats:x.stats||{},summary:x.summary||''})});
-    if(b)b.docs.forEach(d=>{const x=d.data();if(x.source==='kfdf')return;ITEMS.push({id:'s_'+d.id,src:'school',title:x.competitionName||'',date:x.date||'',organizer:x.organizer||'',place:'',sport:x.sport||'',divisions:x.divisions||{},sido:x.sido||''})});
+    if(a)a.docs.forEach(d=>{const x=d.data();if(!(x.awards&&x.awards.length)&&!(x.stats&&x.stats.teams))return;ITEMS.push({id:'r_'+d.id,src:'fed',title:x.title||'',date:x.date||'',endDate:x.endDate||'',organizer:'대한민국플라잉디스크연맹',place:x.place||'',sport:x.sport||'',awards:x.awards||[],stats:x.stats||{},summary:x.summary||'',slotId:x.refId||''})});
+    if(b)b.docs.forEach(d=>{const x=d.data();if(x.source==='kfdf')return;ITEMS.push({id:'s_'+d.id,src:'school',title:x.competitionName||'',date:x.date||'',organizer:x.organizer||'',place:'',sport:x.sport||'',divisions:x.divisions||{},sido:x.sido||'',slotId:x.slotId||''})});
+    // [경기 기록 2026-10-13] 종료 처리 전이라도 경기 기록(compStats)이 있는 대회는 「경기 기록」 항목으로 목록에 — 진행 중인 대회의 대진·결과·순위를 누구나 봅니다
+    try{const c=await DB.collection('compStats').limit(200).get();c.docs.forEach(d=>{const x=d.data();if(!x.slotId)return;if(ITEMS.some(it=>it.slotId===x.slotId))return;
+      ITEMS.push({id:'slot_'+x.slotId,src:'live',title:x.title||'',date:x.date||'',organizer:'대한민국플라잉디스크연맹',place:'',sport:'',awards:[],stats:{},summary:'',slotId:x.slotId,live:x.stats||{},golfN:Object.keys(x.golf||{}).length})})}catch(e){}
     ITEMS.sort((a2,b2)=>String(b2.date||'').localeCompare(String(a2.date||'')));
     rsRender();
     const id=new URLSearchParams(location.search).get('id');if(id)rsOpen(id);
@@ -161,6 +165,7 @@ async function rsLoad(){
 }
 function rsFilter(f,el){FILTER=f;[].forEach.call(document.querySelectorAll('.rs-top .rs-chip'),c=>c.classList.toggle('on',c===el));rsRender()}
 function rsStats(x){
+  if(x.src==='live'){const L=x.live||{};const t=Object.keys(L.byDiv||{}).reduce((n,dv)=>n+Object.keys((L.byDiv[dv]||{}).teams||{}).length,0);return {divs:Object.keys(L.byDiv||{}).length,teams:t,people:0,awards:0,matches:(L.played||0)+'/'+(L.total||0)}}
   if(x.src==='fed'){const st=x.stats||{};return {divs:new Set((x.awards||[]).map(a=>a.division||'')).size,teams:st.teams||0,people:(st.members||0)+(st.individuals||0),awards:(x.awards||[]).length}}
   let teams=0,people=0,awards=0;const divs=Object.keys(x.divisions||{});
   divs.forEach(dv=>{const T=(x.divisions[dv]||{}).teams||{};Object.keys(T).forEach(k=>{teams++;people+=(T[k].members||[]).length;if(rankOf(T[k].result)<9)awards++})});
@@ -177,20 +182,24 @@ function rsRender(){
   if(q)list=list.filter(x=>rsSearchText(x).indexOf(q)>=0);
   if(!list.length){el.innerHTML='<div class="bempty" style="grid-column:1/-1">'+(ITEMS.length?'조건에 맞는 대회가 없습니다.':'아직 등록된 대회 결과가 없습니다. 대회가 끝나면 이곳에 올라옵니다.')+'</div>';return}
   el.innerHTML=list.map(x=>{const st=rsStats(x);return '<div class="rs-card" data-newkey="'+x.id+'" onclick="rsOpen(\''+x.id+'\')">'
-    +'<span class="rs-kind" style="background:'+(x.src==='school'?'#0e7490':'#153A77')+'">'+ico(x.src==='school'?'stadium':'flag',{size:12,color:'#fff'})+(x.src==='school'?'학교스포츠클럽':'연맹 대회')+'</span>'
+    +'<span class="rs-kind" style="background:'+(x.src==='school'?'#0e7490':x.src==='live'?'#C41E2F':'#153A77')+'">'+ico(x.src==='school'?'stadium':'flag',{size:12,color:'#fff'})+(x.src==='school'?'학교스포츠클럽':x.src==='live'?'경기 기록 · 진행 중':'연맹 대회')+'</span>'
     +'<div class="rs-title">'+esc(x.title||'(제목 없음)')+'</div>'
     +'<div class="rs-meta">'+ico('calendar',{size:12,color:'#6b7280'})+' '+esc(fmtD(x.date))+(x.endDate&&x.endDate!==x.date?' ~ '+esc(fmtD(x.endDate).slice(5)):'')+(x.organizer?'<br>'+ico('shield',{size:12,color:'#6b7280'})+' '+esc(x.organizer):'')+(x.sport?' · '+ico('disc',{size:12,color:'#6b7280'})+' '+esc(x.sport):'')+'</div>'
-    +'<div class="rs-stat"><span>부문 <b>'+st.divs+'</b></span><span>팀·개인 <b>'+st.teams+'</b></span>'+(st.people?'<span>선수 <b>'+st.people+'</b>명</span>':'')+'<span>입상 <b>'+st.awards+'</b></span></div>'
+    +'<div class="rs-stat"><span>부문 <b>'+st.divs+'</b></span><span>팀·개인 <b>'+st.teams+'</b></span>'+(st.matches?'<span>경기 <b>'+st.matches+'</b></span>':'')+(st.people?'<span>선수 <b>'+st.people+'</b>명</span>':'')+'<span>입상 <b>'+st.awards+'</b></span></div>'
     +'</div>'}).join('');
 }
-function rsOpen(id){
-  CUR=ITEMS.find(x=>x.id===id);if(!CUR)return;
+async function rsOpen(id){
+  CUR=ITEMS.find(x=>x.id===id);
+  if(!CUR&&/^slot_/.test(id)){const sid=id.slice(5);CUR=ITEMS.find(x=>x.slotId===sid);if(!CUR){try{const c=await DB.collection('compStats').doc(sid).get();if(c.exists){const x=c.data();CUR={id:id,src:'live',title:x.title||'',date:x.date||'',organizer:'대한민국플라잉디스크연맹',place:'',awards:[],stats:{},summary:'',slotId:sid,live:x.stats||{}};ITEMS.push(CUR)}}catch(e){}}
+    if(!CUR){try{const s=await DB.collection('compSlots').doc(sid).get();if(s.exists){CUR={id:id,src:'live',title:s.data().title||'',date:s.data().date||'',organizer:'대한민국플라잉디스크연맹',place:s.data().place||'',awards:[],stats:{},summary:'',slotId:sid,live:{}};ITEMS.push(CUR)}}catch(e){}}}
+  if(!CUR)return;
   const d=document.getElementById('rsDetail');d.style.display='block';
   try{history.replaceState(null,'','results.html?id='+id)}catch(e){}
   // [개별 페이지] 상세를 열면 목록·필터는 감추고(닫으면 복귀)
   const l=document.getElementById('rsList');if(l)l.style.display='none';const t=document.querySelector('.rs-top');if(t)t.style.display='none';
   let body='';
-  if(CUR.src==='school'){
+  if(CUR.src==='live'){body='<div class="rs-stat" style="margin-top:8px"><span>경기 기록이 올라오는 대로 자동 갱신됩니다. 종료 처리 뒤에는 입상 기록과 함께 표시됩니다.</span></div>'}
+  else if(CUR.src==='school'){
     const divs=Object.keys(CUR.divisions||{}).sort();
     body=divs.map(dv=>{const T=(CUR.divisions[dv]||{}).teams||{};
       const teams=Object.keys(T).map(k=>T[k]).sort((a,b)=>rankOf(a.result)-rankOf(b.result)||String(a.school||'').localeCompare(String(b.school||'')));
@@ -213,9 +222,33 @@ function rsOpen(id){
     +'<h3 style="font-size:22px;font-weight:900;margin:10px 0 4px;word-break:keep-all">'+esc(CUR.title||'')+'</h3>'
     +'<div style="font-size:13px;color:#6b7280">'+ico('calendar',{size:13,color:'#6b7280'})+' '+esc(fmtD(CUR.date))+(CUR.organizer?' · '+ico('shield',{size:13,color:'#6b7280'})+' 주최 '+esc(CUR.organizer):'')+(CUR.place?' · '+ico('pin',{size:13,color:'#6b7280'})+' '+esc(CUR.place):'')+(CUR.sport?' · '+ico('disc',{size:13,color:'#6b7280'})+' '+esc(CUR.sport):'')+'</div>'
     +(CUR.src==='school'?'<div style="font-size:12px;color:#8a5a00;background:#fff8e6;border:1.5px solid #f1dfa6;border-radius:10px;padding:8px 12px;margin-top:10px;line-height:1.6">이 결과는 주최기관('+esc(CUR.organizer||'교육청 등')+')이 제공한 명단을 대한민국플라잉디스크연맹이 기록·관리한 것입니다. 본인의 기록은 회원가입 후 마이페이지 [나의 선수 경력 → 내 기록 찾기]로 가져올 수 있습니다.</div>':'')
-    +body+'</div>';
+    +body+(CUR.slotId?'<div id="rsRec" style="margin-top:18px"><div class="bempty">경기 기록 불러오는 중…</div></div>':'')+'</div>';
+  if(CUR.slotId)rsRecLoad(CUR.slotId);
   d.scrollIntoView({behavior:'smooth',block:'start'});
 }
+// ══ [경기 기록 2026-10-13] 대진·결과 · 타임라인 · 순위표 · 득점/어시스트 · 디스크골프 리더보드 (liveMatches·golfRounds 공개 읽기, 집계는 matchrec.js) ══
+let REC={matches:[],rounds:[],tab:'matches',open:null};
+function recName(n){return NAME_MODE==='hidden'?'비공개':String(n||'')}   // 선수 이름은 전체 공개(회장 결정) — 「비공개」 설정만 따름
+async function rsRecLoad(slotId){const el=document.getElementById('rsRec');if(!el)return;
+  try{const [m,g]=await Promise.all([DB.collection('liveMatches').where('slotId','==',slotId).get(),DB.collection('golfRounds').where('slotId','==',slotId).get().catch(()=>null)]);
+    REC.matches=m.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>String(a.day||'').localeCompare(String(b.day||''))||(+a.order||0)-(+b.order||0));REC.rounds=g?g.docs.map(d=>Object.assign({id:d.id},d.data())):[];
+    if(!REC.matches.length&&!REC.rounds.length){el.innerHTML='';return}
+    REC.tab='matches';rsRecRender()}catch(e){el.innerHTML='<div class="bempty">경기 기록을 불러오지 못했습니다: '+esc(e.message)+'</div>'}}
+function rsRecRender(){const el=document.getElementById('rsRec');if(!el)return;const MR=window.KFDF_MR;const st=MR.computeStats(REC.matches,{});
+  const tabs=[['matches','🏁 대진 · 결과'],['table','📋 순위표'],['players','⚡ 득점 · 어시스트']].concat(REC.rounds.length?[['golf','⛳ 디스크골프']]:[]);
+  let h='<div class="rs-top" style="margin-top:0">'+tabs.map(t=>'<span class="rs-chip'+(REC.tab===t[0]?' on':'')+'" onclick="REC.tab=\''+t[0]+'\';REC.open=null;rsRecRender()">'+t[1]+'</span>').join('')+'<span style="font-size:12px;color:#6b7280;font-weight:700;margin-left:auto">경기 '+st.played+'/'+st.total+' 종료'+(REC.rounds.length?' · 골프 '+REC.rounds.length+'라운드':'')+'</span></div>';
+  if(REC.tab==='matches'){const by={};REC.matches.forEach(m=>{(by[m.div||'전체']=by[m.div||'전체']||[]).push(m)});
+    h+=Object.keys(by).sort().map(dv=>'<div class="rs-div"><div class="rs-divh">'+ico('layers',{size:16,color:'#153A77'})+esc(dv)+' <span style="font-size:12px;color:#6b7280;font-weight:700">'+by[dv].length+'경기</span></div>'+by[dv].map(m=>{const sc=MR.score(m.events||[]);const a=m.a||{},b=m.b||{};const open=REC.open===m.id;const col=m.status==='진행'?'#C41E2F':m.status==='종료'?'#153A77':'#8a919d';
+      const evs=(m.events||[]).filter(e=>e&&!e.void&&(e.type==='goal'||e.type==='card'));
+      return '<div class="rs-team'+(open?' open':'')+'" onclick="REC.open=REC.open===\''+m.id+'\'?null:\''+m.id+'\';rsRecRender()"><span class="rs-rank" style="color:#fff;background:'+col+'">'+esc(m.status||'예정')+'</span><b style="flex:1;font-size:14px">'+esc(a.name||'A')+' <span style="color:#C41E2F;font-variant-numeric:tabular-nums">'+sc.a+' : '+sc.b+'</span> '+esc(b.name||'B')+'</b><span style="font-size:12px;color:#6b7280;font-weight:700">'+esc([m.stage,m.round,m.court,fmtD(m.day),m.time].filter(Boolean).join(' · '))+(m.locked?' · 확정':'')+'</span></div>'
+        +'<div class="rs-members" style="padding-left:12px">'+(evs.length?evs.map(e=>{const L=MR.evLine(e);const t=(m[e.side]||{}).name||'';const who=e.type==='goal'?((e.scorer?'#'+esc(e.scorer.no)+' '+esc(recName(e.scorer.name)):'득점자 미지정')+(e.assist?' <span style="color:#6b7280">어시스트 #'+esc(e.assist.no)+' '+esc(recName(e.assist.name))+'</span>':'')):'<span style="color:#C41E2F">'+esc(MR.CARDS[e.card]||'')+' '+esc(((e.target||{}).kind==='coach'?'지도자 ':'')+((e.target||{}).no?'#'+e.target.no+' ':'')+recName((e.target||{}).name))+'</span>';
+          return '<div style="display:flex;gap:10px;align-items:center;padding:3px 0;border-bottom:1px dashed #eef1f5"><span style="min-width:44px;font-weight:900;color:#b8860b;font-variant-numeric:tabular-nums">'+esc(L.min||'')+'</span><span style="min-width:90px;font-weight:800">'+esc(t)+'</span><span style="flex:1">'+who+'</span>'+(e.score?'<b style="font-variant-numeric:tabular-nums">'+esc(e.score)+'</b>':'')+'</div>'}).join(''):'<span style="color:#6b7280">득점·제재 기록이 없습니다</span>')
+        +(m.fairplay||m.mvp?'<div style="margin-top:6px;font-size:12.5px;color:#374151">'+(m.fairplay?'페어플레이 '+esc(a.name)+' '+(m.fairplay.a||0)+'점 · '+esc(b.name)+' '+(m.fairplay.b||0)+'점':'')+(m.mvp?' · 최우수선수 #'+esc(m.mvp.no||'')+' '+esc(recName(m.mvp.name))+(m.mvp.team?' ('+esc(m.mvp.team)+')':''):'')+'</div>':'')+'</div>'}).join('')+'</div>').join('')||'<div class="bempty">경기가 없습니다.</div>'}
+  else if(REC.tab==='table'){const dvs=Object.keys(st.byDiv).sort();h+=dvs.length?dvs.map(dv=>'<div class="rs-div"><div class="rs-divh">'+ico('layers',{size:16,color:'#153A77'})+esc(dv)+'</div><div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:6px"><tr style="background:#f6f8fb;font-size:12px"><th style="padding:7px">순위</th><th style="text-align:left;padding:7px">팀</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득</th><th>실</th><th>득실</th><th>승점</th><th>페어</th></tr>'+(st.byDiv[dv].table||[]).map(t=>'<tr style="border-bottom:1px solid #eef1f5"><td style="text-align:center;padding:7px"><b>'+t.rank+'</b></td><td style="padding:7px"><b>'+esc(t.name)+'</b>'+(t.school&&t.school!==t.name?' <small style="color:#6b7280">'+esc(t.school)+'</small>':'')+'</td><td style="text-align:center">'+t.p+'</td><td style="text-align:center">'+t.w+'</td><td style="text-align:center">'+t.d+'</td><td style="text-align:center">'+t.l+'</td><td style="text-align:center">'+t.gf+'</td><td style="text-align:center">'+t.ga+'</td><td style="text-align:center">'+(t.gf-t.ga)+'</td><td style="text-align:center"><b>'+t.pts+'</b></td><td style="text-align:center">'+t.fair+'</td></tr>').join('')+'</table></div></div>').join(''):'<div class="bempty">종료된 경기가 없어 순위표가 아직 없습니다.</div>'}
+  else if(REC.tab==='players'){h+=st.scorers.length?'<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:10px"><tr style="background:#f6f8fb;font-size:12px"><th style="padding:7px">#</th><th style="text-align:left;padding:7px">선수</th><th style="text-align:left">팀</th><th>부문</th><th>득점</th><th>어시스트</th></tr>'+st.scorers.slice(0,100).map((p,i)=>'<tr style="border-bottom:1px solid #eef1f5"><td style="text-align:center;padding:7px">'+(i+1)+'</td><td style="padding:7px"><b>#'+esc(p.no)+' '+esc(recName(p.name))+'</b></td><td>'+esc(p.team)+'</td><td style="text-align:center">'+esc(p.div)+'</td><td style="text-align:center"><b>'+p.g+'</b></td><td style="text-align:center">'+p.a+'</td></tr>').join('')+'</table></div>':'<div class="bempty">득점 기록이 없습니다.</div>'}
+  else if(REC.tab==='golf'){h+=REC.rounds.map(r=>{const R=MR.golfRank(r);const holes=r.holes||18;return Object.keys(R).map(dv=>'<div class="rs-div"><div class="rs-divh">'+ico('layers',{size:16,color:'#153A77'})+esc(r.title||'디스크골프')+' · '+esc(dv)+' <span style="font-size:12px;color:#6b7280;font-weight:700">'+holes+'홀 · '+esc(r.status||'')+((r.playoff||[]).length?' · 연장 '+(r.playoff||[]).length+'홀':'')+'</span></div><div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px"><tr style="background:#f6f8fb;font-size:12px"><th style="padding:6px">순위</th><th style="text-align:left;padding:6px">선수</th><th>소속</th>'+Array.from({length:holes},(_,i)=>'<th style="padding:6px 3px">'+(i+1)+'</th>').join('')+'<th>합계</th><th>±</th></tr><tr style="background:#f0f4fa;color:#374151"><td colspan="3" style="padding:5px 6px;font-weight:800">PAR</td>'+(r.par||[]).slice(0,holes).map(p=>'<td style="text-align:center">'+p+'</td>').join('')+'<td colspan="2"></td></tr>'
+    +R[dv].map(p=>'<tr style="border-bottom:1px solid #eef1f5"><td style="text-align:center;padding:6px"><b>'+(p.tied?'T':'')+p.rank+'</b></td><td style="padding:6px"><b>'+esc(recName(p.name))+'</b></td><td style="text-align:center">'+esc(p.school||'')+'</td>'+Array.from({length:holes},(_,i)=>{const v=(((r.scores||{})[p.pid]||{}).h||[])[i];return '<td style="text-align:center;font-variant-numeric:tabular-nums">'+(v==null||v===''?'':v)+'</td>'}).join('')+'<td style="text-align:center"><b>'+(p.holesIn?p.total:'')+'</b></td><td style="text-align:center">'+(p.holesIn?((p.toPar>0?'+':'')+p.toPar):'')+'</td></tr>').join('')+'</table></div></div>').join('')}).join('')}
+  el.innerHTML=h}
 function rsClose(){document.getElementById('rsDetail').style.display='none';try{history.replaceState(null,'','results.html')}catch(e){}CUR=null;const l=document.getElementById('rsList');if(l)l.style.display='';const t=document.querySelector('.rs-top');if(t)t.style.display='';try{window.scrollTo(0,0)}catch(e){}}
 </script>
 <footer><div class="wrap">
