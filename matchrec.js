@@ -1,4 +1,4 @@
-// matchrec.js v20261015b · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
+// matchrec.js v20261015d · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
 //   화면: match.html(기록 콘솔·경기 관리) · competition.html(오더지 작성) · results.html(공개 결과) · live.html(중계 콘솔 호환)
 //   원칙 ① 경기 문서(liveMatches) 하나가 원본 ② 점수는 득점 기록(events)에서 계산해 a.score/b.score 에 같이 저장(중계 화면 호환)
 //        ③ 입력권(ctrl)은 한 번에 한 화면 ④ 기록 추가는 고유 id + 트랜잭션(중복 전송 무시) ⑤ 취소는 삭제 대신 void 표시
@@ -55,7 +55,10 @@
   // 작전타임 사용 내역: 구간별 팀당 1회
   function timeouts(m){var o={a:{},b:{}};(m&&m.events||[]).forEach(function(e){if(!e||e.void||e.type!=='timeout'||!o[e.side])return;var p=e.period||'';(o[e.side][p]=o[e.side][p]||[]).push(e)});return o}
   // 퇴장 선수(레드·퇴장) — key 또는 배번
-  function sentOff(m,side){var o={};(m&&m.events||[]).forEach(function(e){if(!e||e.void||e.type!=='card'||e.side!==side||!isOff(e.card)||!e.target||e.target.kind==='coach')return;if(e.target.key)o['k:'+e.target.key]=1;if(e.target.no)o['n:'+e.target.no]=1});return o}
+  // [퇴장] 레드(R)·퇴장(W) 1장, 또는 옐로(Y) 2장 누적 — 선수 키·배번 두 가지로 표시
+  function sentOff(m,side){var o={},yc={};(m&&m.events||[]).forEach(function(e){if(!e||e.void||e.type!=='card'||e.side!==side||!e.target||e.target.kind==='coach')return;var ks=[];if(e.target.key)ks.push('k:'+e.target.key);if(e.target.no)ks.push('n:'+e.target.no);
+    if(isOff(e.card))ks.forEach(function(k){o[k]=1});else if(e.card==='Y'){var hit=ks.some(function(k){return (yc[k]||0)>=1});ks.forEach(function(k){yc[k]=(yc[k]||0)+1});if(hit)ks.forEach(function(k){o[k]=1})}});return o}
+  function yellowCount(m,side,target){var n=0;(m&&m.events||[]).forEach(function(e){if(!e||e.void||e.type!=='card'||e.side!==side||e.card!=='Y'||!e.target||e.target.kind==='coach')return;if((target.key&&e.target.key===target.key)||(target.no&&e.target.no===target.no))n++});return n}
   function clockSet(m,minutes){var c=Object.assign({running:false,base:0,startedAt:0},(m&&m.clock)||{});var ms=Math.max(0,Math.round(+minutes||0)*60000);if(c.running){c.startedAt=now();c.base=ms}else{c.base=ms;c.startedAt=0}return c}
   function clockAct(m,act){var c=Object.assign({running:false,base:0,startedAt:0},(m&&m.clock)||{});
     if(act==='start'){if(!c.running){c.running=true;c.startedAt=now()}}
@@ -280,7 +283,7 @@
         +'<table><tr><th>단계</th><th>경기</th><th>일시·코트</th><th>A팀</th><th>점수</th><th>B팀</th><th>상태</th></tr>'+M.map(function(m){var sc=score(m.events||[]);return '<tr><td>'+esc(m.stage||'')+'</td><td>'+esc(m.round||'')+'</td><td class="s">'+esc([m.day,m.time,m.court].filter(Boolean).join(' '))+'</td><td class="l">'+esc(teamLabel(m.a))+'</td><td><b>'+sc.a+' : '+sc.b+'</b></td><td class="l">'+esc(teamLabel(m.b))+'</td><td>'+esc(m.status||'')+(m.locked?'·확정':'')+'</td></tr>'}).join('')+'</table></div>')});
     var S=(st.scorers||[]).slice(0,40);if(S.length)w.document.write('<div class="pg"><div class="h1" style="font-size:16pt">득점 · 어시스트</div><div class="h2">'+esc(title||'')+'</div><table><tr><th>순위</th><th>부문</th><th>팀</th><th>배번</th><th>선수</th><th>득점</th><th>어시스트</th></tr>'+S.map(function(p,i){return '<tr><td>'+(i+1)+'</td><td>'+esc(p.div)+'</td><td class="l">'+esc(p.team)+'</td><td>'+esc(p.no)+'</td><td>'+esc(p.name)+'</td><td><b>'+p.g+'</b></td><td>'+p.a+'</td></tr>'}).join('')+'</table></div>');
     pend(w)}
-  window.KFDF_MR={roundLabel:roundLabel,CARD_PICK:CARD_PICK,isOff:isOff,KIT_COLORS:KIT_COLORS,kitTextColor:kitTextColor,kitsOf:kitsOf,noFor:noFor,secOf:secOf,fmtSec:fmtSec,evSec:evSec,evTime:evTime,clockSetMs:clockSetMs,clockAdd:clockAdd,clockFloorMin:clockFloorMin,brkLeft:brkLeft,timeouts:timeouts,sentOff:sentOff,rankTable:rankTable,loadXlsx:loadXlsx,saveXlsxMatch:saveXlsxMatch,saveXlsxComp:saveXlsxComp,printComp:printComp,teamLabel:teamLabel,
+  window.KFDF_MR={roundLabel:roundLabel,CARD_PICK:CARD_PICK,isOff:isOff,KIT_COLORS:KIT_COLORS,kitTextColor:kitTextColor,kitsOf:kitsOf,noFor:noFor,secOf:secOf,fmtSec:fmtSec,evSec:evSec,evTime:evTime,clockSetMs:clockSetMs,clockAdd:clockAdd,clockFloorMin:clockFloorMin,brkLeft:brkLeft,timeouts:timeouts,sentOff:sentOff,yellowCount:yellowCount,rankTable:rankTable,loadXlsx:loadXlsx,saveXlsxMatch:saveXlsxMatch,saveXlsxComp:saveXlsxComp,printComp:printComp,teamLabel:teamLabel,
     PERIODS:PERIODS,CARDS:CARDS,esc:esc,uid8:uid8,tsMs:tsMs,score:score,goals:goals,clockMs:clockMs,clockTxt:clockTxt,minuteOf:minuteOf,clockSet:clockSet,clockAct:clockAct,
     ctrlState:ctrlState,ctrlLabel:ctrlLabel,CTRL_BEAT:CTRL_BEAT,addEvent:addEvent,voidEvent:voidEvent,editEvent:editEvent,qPush:qPush,qCount:qCount,flush:flush,
     canRecord:canRecord,isStaffUser:isStaffUser,orderId:orderId,orderFromEntry:orderFromEntry,orderCheck:orderCheck,lineup:lineup,playerStats:playerStats,computeStats:computeStats,
