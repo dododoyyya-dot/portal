@@ -139,7 +139,10 @@
 .rc .sbt .tou{color:var(--y);font-weight:800}
 .rc .cc{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
 .rc .clk{font-size:clamp(66px,13vw,128px);font-weight:900;font-variant-numeric:tabular-nums;background:#0a1122;color:#fff;border:1px solid #2b3f6b;border-radius:18px;padding:14px 20px;cursor:pointer;line-height:1;text-align:center;width:100%;letter-spacing:-1px;box-shadow:inset 0 2px 12px rgba(0,0,0,.6)}
-.rc .clk small{display:block;font-size:13px;color:var(--y);letter-spacing:1.5px;margin-top:10px;font-weight:800;text-transform:uppercase}
+.rc .clk small{display:block;font-size:13px;color:var(--y);letter-spacing:1px;margin-top:10px;font-weight:800}
+.rc .clk.ot{color:#ff9aa8;animation:rcOt 1.2s infinite}@keyframes rcOt{50%{color:#fff}}
+.rc .plog{display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:12.5px;color:#c9d3e8;font-weight:700;margin-bottom:2px}.rc .plog b{color:var(--y);font-variant-numeric:tabular-nums}.rc .plog i{font-style:normal;opacity:.5}
+.rc .seg2.plen label{display:flex;align-items:center;justify-content:center;gap:6px;min-height:52px;border:1px solid var(--ln2);border-radius:12px;font-weight:800;font-size:15px;background:#fff;padding:0 10px}.rc .seg2.plen input{width:68px;text-align:center;font-size:20px;font-weight:900;padding:6px;border:1px solid var(--ln2);border-radius:10px;font-family:inherit}
 .rc .pp{min-height:54px;width:100%;border:none;border-radius:14px;font-weight:900;font-size:18px;cursor:pointer;color:#fff;background:linear-gradient(135deg,#1b8a5e,#156b4a);box-shadow:0 6px 14px rgba(21,107,74,.35)}
 .rc .pp.st{background:linear-gradient(135deg,#e2c67a,#b8923a);color:#1f2937;box-shadow:0 6px 14px rgba(184,146,58,.35)}.rc .pp:disabled{background:#8a94a6;box-shadow:none;cursor:not-allowed}
 .rc .tadj{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:10px auto 0;max-width:760px}
@@ -797,14 +800,16 @@ function isOffP(m,side,p){const o=MR.sentOff(m,side);return !!(o['k:'+p.key]||o[
 function pickFromOrder(side,no){const T=teamPl(RCM(),side);const p=T?T.all.find(x=>x.no===String(no)):null;return p?{no:p.no,name:p.name,key:p.key}:null}
 function pickByKey(side,key){const T=teamPl(RCM(),side);const p=T?T.all.find(x=>x.key===key):null;return p?{no:p.no,name:p.name,key:p.key}:null}
 function curPeriodRec(m){return m.period==='하프타임'?(((m.brk||{}).from)==='후반'?'연장':'후반'):(m.period||'전반')}
-function rcTick(){const m=RCM();if(!m)return;const el=document.getElementById('rcClk');if(el&&el.firstChild)el.firstChild.nodeValue=MR.clockTxt(m);
+function rcLim(m){const pl=(m&&m.plen)||{};return (m&&m.period==='연장')?(pl.ot||5):(pl.reg||20)}
+function rcOver(m){const per=m&&m.period;if(!per||per==='하프타임')return false;return MR.secOf(m)>=rcLim(m)*60}
+function rcTick(){const m=RCM();if(!m)return;const el=document.getElementById('rcClk');if(el&&el.firstChild){el.firstChild.nodeValue=MR.clockTxt(m);const ov2=rcOver(m);if(el.classList.contains('ot')!==ov2){el.classList.toggle('ot',ov2);if(ov2){try{navigator.vibrate&&navigator.vibrate([150,80,150])}catch(e){}rcRender();return}}}
   const ov=document.getElementById('rcOv');if(!ov)return;
   if(m.brk&&m.brk.start){const left=MR.brkLeft(m);const t=document.getElementById('rcBrkT');if(t)t.textContent=MR.fmtSec(left);ov.classList.toggle('flash',left<=0);const bx=document.getElementById('rcBrk');if(bx)bx.classList.toggle('over',left<=0);
     if(left<=0&&!QK.beeped){QK.beeped=true;try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}}}
   else{ov.classList.remove('flash');QK.beeped=false}}
 function rcRender(){
   const ov=document.getElementById('rcOv');const m=RCM();if(!ov)return;if(!m){ov.innerHTML='<div class="top"><b>경기를 찾을 수 없습니다</b><button class="x" onclick="rcClose()">✕ 닫기</button></div>';return}
-  const keep=(ov.querySelector('.body')||{}).scrollTop||0;
+  const bd0=ov.querySelector('.body');const keep=(bd0||{}).scrollTop||0;let anc=null;if(bd0){const top0=bd0.getBoundingClientRect().top;bd0.querySelectorAll('[data-anc]').forEach(e=>{const t=e.getBoundingClientRect().top-top0;if(anc===null||(t<=8&&t>anc.t)||(anc.t>8&&t<anc.t))anc={id:e.dataset.anc,t:t}})}
   const sc=MR.score(m.events||[]);const H=sc.half||{a:{},b:{}};const st=ME?MR.ctrlState(m,ME.uid):'other';const can=canRec(m)&&!m.locked;const mine=can&&st==='mine';
   const c=m.clock||{};const q=MR.qCount(RC_ID);
   const ctrl=!can?'<div class="ctrl">보기 전용'+(m.locked?' · 확정된 경기':'')+'</div>'
@@ -822,8 +827,8 @@ function rcRender(){
         :(curP&&used.length?'<small class="tou">'+curP+' 작전타임 '+esc(MR.evTime(used[0]))+'</small>':''))+'</div>'};
   // ② 점수판 · 시계
   h+='<div class="body">'+(mine?rcTipHtml():'')
-    +'<div class="sb">'+sideBox(L)
-    +'<div class="cc"><div class="clk" id="rcClk" '+(mine?'onclick="clockSheet()" title="눌러서 분·초를 직접 맞춥니다"':'')+'>'+MR.clockTxt(m)+'<small>'+esc(per||'시작 전')+' · '+(c.running?'진행 중':'멈춤')+'</small></div>'
+    +'<div class="sb" data-anc="sb">'+sideBox(L)
+    +'<div class="cc">'+(function(){const lg=m.clockLog||{};const k=['전반','후반','연장'].filter(x=>lg[x]);return k.length?'<div class="plog">'+k.map(x=>esc(x)+' 종료 <b>'+esc(lg[x])+'</b>').join('<i>·</i>')+'</div>':''})()+'<div class="clk'+(rcOver(m)?' ot':'')+'" id="rcClk" '+(mine?'onclick="clockSheet()" title="눌러서 분·초를 직접 맞춥니다"':'')+'>'+MR.clockTxt(m)+'<small>'+esc(per||'시작 전')+(per&&per!=='하프타임'?' · '+rcLim(m)+'분':'')+' · '+(c.running?'진행 중':'멈춤')+(rcOver(m)?' · 시간 초과':'')+'</small></div>'
       +(mine?'<button class="pp '+(c.running?'st':'')+'" '+(m.brk?'disabled':'')+' onclick="rcClock(\''+(c.running?'pause':'start')+'\')">'+(c.running?'∥ 시계 멈춤':'▶ 시계 시작')+'</button>':'')+'</div>'
     +sideBox(R)+'</div>';
   if(mine)h+='<div class="tadj"><button onclick="rcClockAdd(-60)">−1분</button><button onclick="rcClockAdd(-10)">−10초</button><button onclick="rcClockAdd(-1)">−1초</button><button class="rs" onclick="rcClock(\'reset\')">리셋</button><button onclick="rcClockAdd(1)">+1초</button><button onclick="rcClockAdd(10)">+10초</button><button onclick="rcClockAdd(60)">+1분</button></div>';
@@ -834,13 +839,13 @@ function rcRender(){
   h+=brkHtml(m,mine);
   // ④ 입력 방식 · 팀 패널
   if(mine){
-    h+='<div class="mode"><button class="g'+(QK.mode==='goal'?' on':'')+'" onclick="qkMode(\'goal\')">득점 기록</button><button class="c'+(QK.mode==='card'?' on':'')+'" onclick="qkMode(\'card\')">제재 기록</button><button class="u" '+(lastEv(m)?'':'disabled')+' onclick="qkUndoLast()" title="마지막 기록(득점·제재·작전타임)을 취소 표시합니다">↩ 되돌리기</button></div>';
-    if(QK.swap)h+='<div class="swapbar">⇅ 바꿀 두 선수를 차례로 누르세요 (주전 ↔ 후보). 카드를 끌어 놓아도 됩니다.<button onclick="swapMode()">완료</button></div>';
+    h+='<div class="mode" data-anc="mode"><button class="g'+(QK.mode==='goal'?' on':'')+'" onclick="qkMode(\'goal\')">득점 기록</button><button class="c'+(QK.mode==='card'?' on':'')+'" onclick="qkMode(\'card\')">제재 기록</button><button class="u" '+(lastEv(m)?'':'disabled')+' onclick="qkUndoLast()" title="마지막 기록(득점·제재·작전타임)을 취소 표시합니다">↩ 되돌리기</button></div>';
+    if(QK.swap)h+='<div class="swapbar">'+(QK.swapSel?'⇅ 선택한 선수와 바꿀 선수를 누르세요':'⇅ 바꿀 두 선수를 차례로 누르세요 (주전 ↔ 후보)')+'<button onclick="swapMode()">취소</button></div>';
     h+='<div class="qteams">'+qkTeam(m,L)+qkTeam(m,R)+'</div>';
   }
   // ⑤ 기록
   const evs=(m.events||[]).slice().reverse();
-  h+='<div class="log"><div class="h">경기 기록 <span style="color:#0b6b3a">'+(m.events||[]).filter(e=>e&&!e.void&&e.type==='goal').length+'득점</span><span>· 제재 '+(m.events||[]).filter(e=>e&&!e.void&&e.type==='card').length+'</span>'+(m.fairplay?'<span>· 페어 '+esc((m.a||{}).name||'A')+' '+(m.fairplay.a||0)+' · '+esc((m.b||{}).name||'B')+' '+(m.fairplay.b||0)+'</span>':'')+(m.mvp?'<span>· MVP #'+esc(m.mvp.no||'')+' '+esc(m.mvp.name||'')+'</span>':'')+'</div>'
+  h+='<div class="log" data-anc="log"><div class="h">경기 기록 <span style="color:#0b6b3a">'+(m.events||[]).filter(e=>e&&!e.void&&e.type==='goal').length+'득점</span><span>· 제재 '+(m.events||[]).filter(e=>e&&!e.void&&e.type==='card').length+'</span>'+(m.fairplay?'<span>· 페어 '+esc((m.a||{}).name||'A')+' '+(m.fairplay.a||0)+' · '+esc((m.b||{}).name||'B')+' '+(m.fairplay.b||0)+'</span>':'')+(m.mvp?'<span>· MVP #'+esc(m.mvp.no||'')+' '+esc(m.mvp.name||'')+'</span>':'')+'</div>'
     +(evs.length?evs.map(e=>{const Lx=MR.evLine(e);const legacy=e.type==null;const kd=e.type==='goal'?'<span class="kd">득점</span>':e.type==='card'?'<span class="kd c">'+esc(MR.CARDS[e.card]||'제재')+'</span>':e.type==='timeout'?'<span class="kd t">작전타임</span>':'';
       return '<div class="ev'+(e.void?' void':'')+'"><div class="m">'+(legacy?esc(e.clock||''):esc(Lx.min||'-'))+'<small>'+esc(e.period||'')+'</small></div><div class="w">'+kd+'<b>'+esc(legacy?(e.team||''):(m[e.side]||{}).name||'')+'</b> '+(legacy?'<span>'+(e.d>0?'득점':'취소')+'</span>':esc(e.type==='timeout'?'':Lx.who))+(e.void?' <span>· 취소 '+esc(e.void.by||'')+'</span>':'')+(e.edits&&e.edits.length?' <span>· 수정 '+e.edits.length+'</span>':'')+'</div><div style="display:flex;gap:4px;align-items:center"><span class="sc">'+esc(e.score||'')+'</span>'+(mine&&!e.void&&!legacy?'<button onclick="evEdit(\''+esc(e.id)+'\')">수정</button><button onclick="evVoid(\''+esc(e.id)+'\')">취소</button>':'')+'</div></div>'}).join('')
       :'<div class="ev" style="grid-template-columns:1fr">아직 기록이 없습니다.'+(mine?' 득점: 득점한 선수 카드 → 어시스트 선수(또는 「어시스트 없음」) 두 번 누르면 저장됩니다.':'')+'</div>')+'</div>'
@@ -850,7 +855,7 @@ function rcRender(){
   if(m.locked&&STAFF)fb.push('<button class="act" onclick="rcUnlock()">정정</button>');
   if(fb.length)h+='<div class="foot">'+fb.join('')+'</div>';
   if(QK.toast)h+='<div class="toast">'+esc(QK.toast.text)+(QK.toast.evId?'<button onclick="qkUndo()">되돌리기</button>':'')+'</div>';
-  ov.innerHTML=h;const bd=ov.querySelector('.body');if(bd&&keep)bd.scrollTop=keep;rcBind();rcTick();
+  ov.innerHTML=h;const bd=ov.querySelector('.body');if(bd){bd.scrollTop=keep;if(anc){const e=bd.querySelector('[data-anc="'+anc.id+'"]');if(e){const t=e.getBoundingClientRect().top-bd.getBoundingClientRect().top;if(Math.abs(t-anc.t)>1)bd.scrollTop+=(t-anc.t)}}}rcBind();rcTick();
 }
 function rcTipHtml(){let seen=false;try{seen=localStorage.getItem('kfdf_rc_tip2')==='1'}catch(e){}if(seen)return '';return '<div class="tip">💡 처음이신가요? 득점·제재·주전 교체·작전타임 방법을 30초 만에 볼 수 있습니다.<button onclick="rcHelp()">사용법 보기</button><button class="nx" onclick="try{localStorage.setItem(\'kfdf_rc_tip2\',\'1\')}catch(e){};rcRender()">다시 보지 않기</button></div>'}
 function rcHelp(){sheet('<div class="hd"><b>❓ 기록 콘솔 사용법</b><button class="x" onclick="sheetClose()">✕</button></div><ol class="help">'
@@ -858,22 +863,24 @@ function rcHelp(){sheet('<div class="hd"><b>❓ 기록 콘솔 사용법</b><butt
   +'<li><b>경기 시작</b> — 아래 「▶ 경기 시작」을 누르면 전반이 시작되고 시계가 갑니다.</li>'
   +'<li><b>득점</b> — 「득점 기록」 상태에서 득점한 선수 카드를 누르고, 이어서 어시스트 선수(또는 「어시스트 없음」)를 누르면 저장됩니다.</li>'
   +'<li><b>제재</b> — 「🟨 제재 기록」을 누르고 선수(또는 지도자)를 고른 뒤 주의·옐로·레드를 고르고 사유를 적어 저장합니다. 레드를 받은 선수 카드는 잠깁니다.</li>'
-  +'<li><b>주전·후보</b> — 선수 카드를 <b>길게 누른 채 끌어서</b>(PC는 마우스로 끌어서) 주전 ↔ 후보 칸으로 옮깁니다. 다른 선수 카드 위에 놓으면 둘이 자리를 바꿉니다. 끌기가 어려우면 「⇅ 선수 교체」를 켜고 두 선수를 차례로 누르세요.</li>'
+  +'<li><b>주전·후보 교체</b> — 휴대폰·태블릿: 선수 카드를 <b>길게 누르면</b> 그 선수가 선택되고, 이어서 <b>바꿀 선수를 누르면</b> 자리가 바뀝니다. PC: 마우스로 끌어 다른 선수 위에 놓거나 주전·후보 칸으로 옮깁니다. 「⇅ 교체」 버튼을 켜고 두 선수를 차례로 눌러도 됩니다.</li>'
   +'<li><b>작전타임</b> — 점수 아래 버튼. 경기 시계가 멈추고 1분 타이머가 따로 돕니다. 구간(전반·후반·연장)마다 팀당 1번입니다.</li>'
-  +'<li><b>하프타임</b> — 가운데 「☕ 하프타임」. 시계의 초는 버리고 10분 타이머가 돕니다. 시간이 끝나면 화면 테두리가 깜박이며 알려 주고, <b>「재개」를 눌러야</b> 후반과 시계가 함께 시작됩니다.</li>'
+  +'<li><b>구간 시계</b> — 전반·후반·연장은 저마다 0:00 부터 셉니다. 구간이 끝나면 종료 시간이 시계 위에 작게 남고, 정한 구간 시간(기본 20분·연장 5분)이 지나면 시계가 붉게 깜박입니다(자동으로 멈추지 않음).</li>'
+  +'<li><b>하프타임</b> — 가운데 「하프타임」. 전반 종료 시간을 남기고 10분 타이머가 돕니다. 시간이 끝나면 화면 테두리가 깜박이며 알려 주고, <b>「재개」를 눌러야</b> 후반과 시계가 함께 시작됩니다.</li>'
   +'<li><b>시간 고치기</b> — 시계 아래 −1′ −10″ −1″ +1″ +10″ +1′ (초는 그대로 유지). 시계를 누르면 분:초를 직접 맞춥니다. 각 기록의 시간도 「수정」에서 초 단위로 고칩니다.</li>'
   +'<li><b>배번·오더지</b> — 팀 칸의 「# 배번」「📝 오더지」로 기록 화면을 닫지 않고 바로 고칩니다(권한이 있을 때).</li>'
   +'<li><b>잘못 눌렀을 때</b> — 저장 직후 아래 「되돌리기」, 또는 기록 목록의 「취소」·「수정」.</li>'
   +'<li><b>경기 종료</b> — 「🏁 경기 종료」에서 페어플레이·MVP를 고르면 서명이 자동으로 들어갑니다. 결과지 PDF·엑셀은 「대회 결과」 페이지에서 내려받습니다.</li></ol>'
   +'<button class="go b" onclick="try{localStorage.setItem(\'kfdf_rc_tip2\',\'1\')}catch(e){};sheetClose();rcRender()">알겠습니다</button>')}
 // ── 시작 전 설정: 경기복 2벌 중 선택 · 전반 풀 ──
-function setupHtml(m,inSheet){const S=QK.setup||(QK.setup={a:kitIdx(m,'a'),b:kitIdx(m,'b'),pull:(m.pulls||{})['전반']||''});
+function setupHtml(m,inSheet){const S=QK.setup||(QK.setup={a:kitIdx(m,'a'),b:kitIdx(m,'b'),pull:(m.pulls||{})['전반']||'',reg:(m.plen||{}).reg||20,ot:(m.plen||{}).ot||5});
   const team=side=>{const t=m[side]||{};const o=orderOf(t.pid);const K=MR.kitsOf(o||{});
     return '<div class="su-team"><div class="su-h">'+esc(tname(m,side))+(o?'':' <span class="warn">· 오더지 없음 (기본 색으로 표시, 배번은 숫자판으로 입력)</span>')+'</div><div class="su-kits">'+[0,1].map(i=>{const k=K[i];const nos=o?(o.players||[]).map(p=>MR.noFor(p,i)).filter(Boolean):[];
       return '<button class="su-kit'+(S[side]===i?' on':'')+'" onclick="suPick(\''+side+'\','+i+')"><span class="sw" style="background:'+esc(k.color)+';color:'+MR.kitTextColor(k.color)+'">'+(i+1)+'</span><b>'+esc(k.name)+'</b><small>'+(nos.length?'배번 '+esc(nos.slice(0,10).join(' · '))+(nos.length>10?' …':''):'배번 미입력')+'</small>'+(S[side]===i?'<i>✓ 선택</i>':'')+'</button>'}).join('')+'</div></div>'};
   return '<div class="su"><div class="su-step">① 오늘 입은 경기복을 팀마다 고르세요<small>오더지에 등록한 두 벌 중 하나 — 색상과 배번이 기록 화면에 그대로 적용됩니다</small></div>'+team('a')+team('b')
     +'<div class="su-step">② 전반 풀(첫 스로우)을 하는 팀<small>모르면 건너뛰어도 됩니다 · 후반 풀은 하프타임 때 고릅니다</small></div><div class="seg2">'+['a','b'].map(sd=>'<button class="'+(S.pull===sd?'on':'')+'" onclick="suPull(\''+sd+'\')">'+esc(tname(m,sd))+'</button>').join('')+'</div>'
-    +(inSheet?'':'<div class="su-step">③ 다음 화면에서 주전·후보를 확인하세요<small>선수 카드를 길게 누른 채 끌어 옮기거나 「⇅ 선수 교체」로 바꿉니다</small></div>')
+    +'<div class="su-step">③ 구간 시간(분)<small>구간마다 0:00 부터 세고, 정한 시간이 지나면 시계가 붉게 바뀌어 알립니다(자동으로 멈추지는 않습니다)</small></div><div class="seg2 plen"><label>전반 · 후반 <input type="number" min="1" max="90" inputmode="numeric" value="'+esc(S.reg)+'" oninput="QK.setup.reg=this.value">분</label><label>연장 <input type="number" min="1" max="60" inputmode="numeric" value="'+esc(S.ot)+'" oninput="QK.setup.ot=this.value">분</label></div>'
+    +(inSheet?'':'<div class="su-step">④ 다음 화면에서 주전·후보를 확인하세요<small>선수 카드를 길게 누른 채 끌어 옮기거나 「⇅ 선수 교체」로 바꿉니다</small></div>')
     +'<button class="su-go" onclick="setupSave()">'+(inSheet?'✔ 저장':'✔ 이 설정으로 기록 화면 열기')+'</button></div>'}
 function suPick(side,i){QK.setup[side]=i;suRefresh()}
 function suPull(sd){QK.setup.pull=QK.setup.pull===sd?'':sd;suRefresh()}
@@ -881,24 +888,34 @@ function suRefresh(){if(document.getElementById('kitSh'))kitSheetRender();else r
 async function setupSave(){const S=QK.setup||{};const m=RCM();const pulls=Object.assign({},m.pulls||{});if(S.pull)pulls['전반']=S.pull;else delete pulls['전반'];
   const changed=m.kit&&((kitIdx(m,'a')!==(S.a?1:0))||(kitIdx(m,'b')!==(S.b?1:0)));
   if(changed&&m.status!=='예정'&&!confirm('경기 중에 경기복을 바꾸면 선수 배번이 그 옷의 배번으로 바뀝니다. 이미 저장된 기록의 배번은 그대로 남습니다. 바꿀까요?'))return;
-  QK.setup=null;if(document.getElementById('kitSh'))sheetClose();await rcUpdate({kit:{a:S.a?1:0,b:S.b?1:0},pulls:pulls})}
-function kitSheet(){const m=RCM();QK.setup={a:kitIdx(m,'a'),b:kitIdx(m,'b'),pull:(m.pulls||{})['전반']||''};kitSheetRender()}
+  QK.setup=null;if(document.getElementById('kitSh'))sheetClose();await rcUpdate({kit:{a:S.a?1:0,b:S.b?1:0},pulls:pulls,plen:{reg:Math.max(1,parseInt(S.reg,10)||20),ot:Math.max(1,parseInt(S.ot,10)||5)}})}
+function kitSheet(){const m=RCM();QK.setup={a:kitIdx(m,'a'),b:kitIdx(m,'b'),pull:(m.pulls||{})['전반']||'',reg:(m.plen||{}).reg||20,ot:(m.plen||{}).ot||5};kitSheetRender()}
 function kitSheetRender(){const m=RCM();sheet('<div class="hd"><b>👕 경기복 · 전반 풀</b><button class="x" onclick="QK.setup=null;sheetClose()">✕</button></div><div id="kitSh" class="rc" style="position:static;inset:auto;background:transparent;display:block;overflow:visible;z-index:auto">'+setupHtml(m,true)+'</div>')}
 // ── 하프타임·작전타임 ──
 function brkHtml(m,mine){const b=m.brk;if(!b||!b.start)return '';const left=MR.brkLeft(m);const half=b.kind==='half';const nextP=half?(b.from==='후반'?'연장':'후반'):'';
   return '<div id="rcBrk" class="brk'+(left<=0?' over':'')+'"><div class="bt">'+(half?'하프타임':'⏱ '+esc((m[b.side]||{}).name||'')+' 작전타임')+'</div><div class="bv" id="rcBrkT">'+MR.fmtSec(left)+'</div><div class="bm"><span class="t1">남은 시간 · 경기 시계는 멈춰 있습니다</span><span class="t2">⏰ 시간이 끝났습니다 — 준비되면 「재개」를 눌러 주세요</span></div>'
     +(half&&mine?'<div class="bp">'+esc(nextP)+' 풀(첫 스로우): '+['a','b'].map(sd=>'<button class="'+((m.pulls||{})[nextP]===sd?'on':'')+'" onclick="pullSet(\''+nextP+'\',\''+sd+'\')">'+esc((m[sd]||{}).name||sd)+'</button>').join('')+'</div>':'')
     +(mine?'<div class="ba"><button class="go" onclick="brkResume()">▶ 재개'+(half?' · '+esc(nextP)+' 시작':' · 경기 계속')+'</button><button onclick="brkAdj(60)">＋1분</button><button onclick="brkAdj(-60)">−1분</button><button class="no" onclick="brkCancel()">'+(half?'하프타임 취소 (잘못 누름)':'작전타임 취소 (잘못 누름)')+'</button></div>':'')+'</div>'}
-async function rcPeriod(p){const m=RCM();if(!m)return;
-  if(p==='하프타임'){if(m.brk)return;if(m.period==='하프타임')return;await rcUpdate({period:'하프타임',clock:MR.clockFloorMin(m),brk:{kind:'half',side:'',start:Date.now(),dur:600,from:(m.period&&m.period!=='하프타임')?m.period:'전반'}});return}
-  const upd={period:p};if(m.brk&&m.brk.kind==='half')upd.brk=null;await rcUpdate(upd)}
+// [구간 시계 2026-10-15] 전반·후반·연장은 저마다 0:00 부터 셉니다. 구간이 끝나면 그 구간의 종료 시간을 clockLog 에 남겨 시계 위에 작게 보여 주고,
+//   잘못 눌러 앞 구간으로 되돌아가면 그 구간의 종료 시간이 복원됩니다. 기록(득점·제재)의 시간은 「구간 + 그 구간 안의 분:초」입니다.
+const ZERO_CLK={running:false,base:0,startedAt:0};
+function clkFromTxt(t){const a=String(t||'0:00').split(':');return {running:false,base:((+a[0]||0)*60+(+a[1]||0))*1000,startedAt:0}}
+async function rcPeriod(p){const m=RCM();if(!m)return;const cur=m.period||'';if(p===cur)return;const sec=MR.secOf(m);const log=Object.assign({},m.clockLog||{});const upd={};
+  if(p==='하프타임'){if(m.brk)return;const from=(cur&&cur!=='하프타임')?cur:'전반';if(sec>0)log[from]=MR.fmtSec(sec);
+    Object.assign(upd,{period:'하프타임',clockLog:log,clock:ZERO_CLK,brk:{kind:'half',side:'',start:Date.now(),dur:600,from:from}});await rcUpdate(upd);qkToast(from+' 종료 '+MR.fmtSec(sec)+' · 하프타임 10분');return}
+  if(cur&&cur!=='하프타임'&&sec>0&&!log[cur])log[cur]=MR.fmtSec(sec);
+  if(cur==='하프타임'&&m.brk&&m.brk.kind==='half')upd.brk=null;
+  const back=!!log[p];let msg;
+  if(back){upd.clock=clkFromTxt(log[p]);msg=p+'(으)로 되돌아감 · 종료 시간 '+log[p]+' 복원';delete log[p]}
+  else{upd.clock=ZERO_CLK;msg=(cur&&cur!=='하프타임'&&sec>0?cur+' 종료 '+MR.fmtSec(sec)+' · ':'')+p+' — ▶ 시계 시작을 누르면 0:00 부터'}
+  upd.period=p;upd.clockLog=log;await rcUpdate(upd);qkToast(msg)}
 async function toStart(side){const m=RCM();if(!m||m.brk)return;const p=curPeriodRec(m);if((MR.timeouts(m)[side][p]||[]).length){say(p+' 작전타임은 팀당 1번입니다');return}
   const sec=MR.secOf(m);const ev={id:MR.uid8(),type:'timeout',side:side,sec:sec,min:Math.floor(sec/60),period:p,clock:MR.fmtSec(sec)};
   const extra={brk:{kind:'to',side:side,start:Date.now(),dur:60,evId:ev.id,from:p}};if((m.clock||{}).running)extra.clock=MR.clockAct(m,'pause');
   qkToast((m[side]||{}).name+' 작전타임 · 1분',ev.id);await sendEvent({kind:'add',id:RC_ID,ev:ev,opts:{requireCtrl:true,extra:extra}})}
 async function brkResume(){const m=RCM();const b=m.brk||{};const upd={brk:null};if(b.kind==='half')upd.period=b.from==='후반'?'연장':'후반';upd.clock=MR.clockAct(m,'start');QK.beeped=false;await rcUpdate(upd)}
 async function brkAdj(d){const m=RCM();if(!m.brk)return;const b=Object.assign({},m.brk);b.dur=Math.max(0,(+b.dur||0)+d);await rcUpdate({brk:b})}
-async function brkCancel(){const m=RCM();const b=m.brk||{};if(b.kind==='half'){await rcUpdate({brk:null,period:b.from||'전반'});return}
+async function brkCancel(){const m=RCM();const b=m.brk||{};if(b.kind==='half'){const log=Object.assign({},m.clockLog||{});const from=b.from||'전반';const upd={brk:null,period:from};if(log[from]){upd.clock=clkFromTxt(log[from]);delete log[from];upd.clockLog=log}await rcUpdate(upd);return}
   if(b.evId&&(m.events||[]).some(e=>e.id===b.evId&&!e.void))await sendEvent({kind:'void',id:RC_ID,evId:b.evId});await rcUpdate({brk:null})}
 async function pullSet(p,side){const m=RCM();const pl=Object.assign({},m.pulls||{});if(pl[p]===side)delete pl[p];else pl[p]=side;await rcUpdate({pulls:pl})}
 function pullSheet(){const m=RCM();const pl=m.pulls||{};sheet('<div class="hd"><b>🥏 풀(첫 스로우) 기록</b><span class="st">구간마다 풀을 한 팀(팀명만)</span><button class="x" onclick="sheetClose()">✕</button></div>'
@@ -909,7 +926,7 @@ function rcSwap(){const m=RCM();rcUpdate({swap:!m.swap})}
 function qkCounts(m,side){const o={};(m.events||[]).forEach(e=>{if(!e||e.void||e.side!==side)return;const add=(p,f,v)=>{if(!p||!p.no)return;const k=p.no;o[k]=o[k]||{g:0,a:0,c:''};if(f==='c')o[k].c+=v;else o[k][f]++};if(e.type==='goal'){add(e.scorer,'g');add(e.assist,'a')}if(e.type==='card'&&e.target&&e.target.kind!=='coach')add(e.target,'c',e.card)});return o}
 function qkTeam(m,side){
   const t=m[side]||{};const T=teamPl(m,side);const P=QK.pend&&QK.pend.side===side?QK.pend:null;const cnt=qkCounts(m,side);const K=kitOfSide(m,side);
-  let h='<div class="qt'+(P?(P.stage==='card'?' hotc':' hot'):'')+'"><div class="qh"><span class="sw" style="background:'+esc(K.color)+'"></span><b>'+esc((t.name||t.school||side.toUpperCase()))+'</b><span class="ki">'+esc(K.name)+(T?' · '+T.all.length+'명':' · 오더지 없음')+'</span>'
+  let h='<div class="qt'+(P?(P.stage==='card'?' hotc':' hot'):'')+'" data-anc="qt-'+side+'"><div class="qh"><span class="sw" style="background:'+esc(K.color)+'"></span><b>'+esc((t.name||t.school||side.toUpperCase()))+'</b><span class="ki">'+esc(K.name)+(T?' · '+T.all.length+'명':' · 오더지 없음')+'</span>'
     +(P?'':'<div class="qb"><button class="'+(QK.swap?'on':'')+'" onclick="swapMode()" title="주전·후보 바꾸기">⇅ 교체</button><button onclick="kitSheet()" title="오늘 입은 경기복(색·배번) 바꾸기">경기복</button><button onclick="numSheet(\''+side+'\')" title="배번 변경"># 배번</button><button onclick="rcOrder(\''+side+'\')" title="오더지 열기">오더지</button></div>')+'</div>';
   const chip=(p,zone,act)=>{const off=isOffP(m,side,p);const k=cnt[p.no]||{};const sel=QK.swapSel&&QK.swapSel.side===side&&QK.swapSel.key===p.key;
     return '<button class="pc'+(p.role==='주장'?' cap':'')+(off?' off':'')+(sel?' sel':'')+(QK.pend&&!P?' dim':'')+'" data-side="'+side+'" data-key="'+esc(p.key)+'" data-zone="'+zone+'"'+(act?' data-act="'+act+'"':'')+(off?' disabled':'')+'>'+(p.role==='주장'?'<em>C</em>':'')+((k.g||k.a)?'<i>'+(k.g?k.g+'득':'')+(k.a?' '+k.a+'도':'')+'</i>':'')+'<b>'+esc(p.no)+'</b><span>'+esc(p.name||'')+'</span>'+(k.c?'<u>'+esc(k.c.split('').map(x=>({C:'주',Y:'옐',R:'레',W:'퇴'})[x]||x).join(''))+'</u>':'')+(off?'<s>퇴장</s>':'')+'</button>'};
@@ -938,11 +955,11 @@ let PD=null;
 function rcBind(){const ov=document.getElementById('rcOv');if(!ov)return;ov.querySelectorAll('.pc').forEach(el=>{el.addEventListener('pointerdown',pcDown);el.addEventListener('contextmenu',e=>e.preventDefault())})}
 function pcDown(e){if(e.button>0||PD)return;const el=e.currentTarget;if(el.disabled)return;
   PD={el:el,side:el.dataset.side,key:el.dataset.key,zone:el.dataset.zone,act:el.dataset.act||'',x:e.clientX,y:e.clientY,drag:false,touch:e.pointerType!=='mouse',lp:null,moved:false};
-  if(PD.touch&&PD.zone)PD.lp=setTimeout(()=>{if(PD&&!PD.moved)pcDragStart(PD.x,PD.y)},300);
+  if(PD.touch&&PD.zone)PD.lp=setTimeout(()=>{if(PD&&!PD.moved){const sd=PD.side,k=PD.key;pcEnd();lpSelect(sd,k)}},350);
   document.addEventListener('pointermove',pcMove);document.addEventListener('pointerup',pcUp);document.addEventListener('pointercancel',pcCancel);document.addEventListener('touchmove',pcTouchMove,{passive:false})}
 function pcTouchMove(e){if(PD&&PD.drag)e.preventDefault()}
 function pcMove(e){if(!PD)return;const d=Math.hypot(e.clientX-PD.x,e.clientY-PD.y);
-  if(!PD.drag){if(d>10){PD.moved=true;if(PD.touch||!PD.zone){pcEnd();return}pcDragStart(e.clientX,e.clientY)}else return}
+  if(!PD.drag){if(d>12){PD.moved=true;if(PD.touch||!PD.zone){pcEnd();return}pcDragStart(e.clientX,e.clientY)}else return}
   PD.ghost.style.left=e.clientX+'px';PD.ghost.style.top=e.clientY+'px';document.querySelectorAll('#rcOv .over').forEach(x=>x.classList.remove('over'));const t=pcTarget(e.clientX,e.clientY);if(t)(t.chip||t.zone).classList.add('over')}
 function pcDragStart(x,y){if(!PD)return;PD.drag=true;try{navigator.vibrate&&navigator.vibrate(25)}catch(e){}const g=PD.el.cloneNode(true);g.className='pc-ghost';g.style.width=PD.el.offsetWidth+'px';g.style.left=x+'px';g.style.top=y+'px';document.body.appendChild(g);PD.ghost=g;PD.el.classList.add('dragging');const ov=document.getElementById('rcOv');if(ov)ov.classList.add('dragmode')}
 function pcTarget(x,y){const el=document.elementFromPoint(x,y);if(!el)return null;const zone=el.closest('.zone');if(!zone||zone.dataset.side!==PD.side)return null;const chip=el.closest('.pc');return {zone:zone,chip:(chip&&chip!==PD.el&&chip.dataset.side===PD.side&&chip.dataset.zone)?chip:null}}
@@ -966,9 +983,11 @@ async function lineupMove(side,key,zone,tkey){const m=RCM();const T=teamPl(m,sid
     else if(tkey&&on.indexOf(tkey)>=0){on[on.indexOf(tkey)]=key;msg=nm(key)+' 들어감 ↔ '+nm(tkey)+' 나감'}
     else{on.push(key);msg=nm(key)+' 주전으로'}}
   else{if(!inOn)return;if(tkey&&on.indexOf(tkey)<0){on[on.indexOf(key)]=tkey;msg=nm(tkey)+' 들어감 ↔ '+nm(key)+' 나감'}else{on=on.filter(k=>k!==key);msg=nm(key)+' 후보로'}}
-  const Lu=Object.assign({},m.lineup||{});Lu[side]=Object.assign({},Lu[side]||{},{on:on});const i=MATCHES.findIndex(x=>x.id===RC_ID);if(i>=0)MATCHES[i]=Object.assign({},m,{lineup:Lu});QK.swapSel=null;qkToast(msg);
+  const Lu=Object.assign({},m.lineup||{});Lu[side]=Object.assign({},Lu[side]||{},{on:on});const i=MATCHES.findIndex(x=>x.id===RC_ID);if(i>=0)MATCHES[i]=Object.assign({},m,{lineup:Lu});QK.swapSel=null;if(QK.swapOnce){QK.swap=false;QK.swapOnce=false}qkToast(msg);
   await rcUpdate({lineup:Lu},'주전·후보 저장 실패')}
-function swapMode(){QK.swap=!QK.swap;QK.swapSel=null;QK.pend=null;rcRender()}
+function swapMode(){QK.swap=!QK.swap;QK.swapSel=null;QK.swapOnce=false;QK.pend=null;rcRender()}
+// 길게 누름 → 그 선수를 교체 대상으로 고르고 교체 모드로(한 번 바꾸면 자동 해제). 퇴장 선수는 안 됨
+function lpSelect(side,key){const m=RCM();const p=pickByKey(side,key);if(!p)return;const T=teamPl(m,side);const pl=T&&T.all.find(x=>x.key===key);if(pl&&isOffP(m,side,pl)){say('퇴장한 선수는 교체할 수 없습니다.');return}try{navigator.vibrate&&navigator.vibrate(30)}catch(e){}QK.pend=null;QK.swap=true;QK.swapOnce=true;QK.swapSel={side:side,key:key};qkToast('#'+p.no+' '+(p.name||'')+' 선택 — 바꿀 선수를 누르세요');rcRender()}
 function swapTap(side,key){const S=QK.swapSel;if(!S||S.side!==side){QK.swapSel={side:side,key:key};rcRender();return}if(S.key===key){QK.swapSel=null;rcRender();return}
   const m=RCM();const T=teamPl(m,side);const aOn=T.onKeys.indexOf(S.key)>=0,bOn=T.onKeys.indexOf(key)>=0;lineupMove(side,S.key,bOn?'on':'bench',key)}
 // ── 기록 화면에서 오더지 바로 열기 (대표자·운영진) — 저장하면 기록 화면에 바로 반영 ──
@@ -1079,7 +1098,8 @@ async function endSave(confirmNow){const S=SHEET;const m=MATCHES.find(x=>x.id===
   const signs={};if(oa.coach&&oa.coach.name)signs.coachA={name:oa.coach.name,img:oa.coach.sign||'',at:new Date().toISOString()};if(ob.coach&&ob.coach.name)signs.coachB={name:ob.coach.name,img:ob.coach.sign||'',at:new Date().toISOString()};
   const role=myRole(m);if(role&&MY.signatureImg&&!(SIGNS[role]&&SIGNS[role].img))signs[role]={name:MY.name||'',img:MY.signatureImg,uid:ME.uid,at:new Date().toISOString()};
   const lock=!three||confirmNow;
-  const upd={status:'종료',endAt:m.endAt||FV.serverTimestamp(),fairplay:{a:S.fa,b:S.fb},mvp:S.mvp?Object.assign({},S.mvp,{team:(m[S.mvp.side]||{}).name||''}):null,bestCoach:S.coach?{side:S.coach,name:((S.coach==='a'?oa:ob).coach||{}).name||'',team:(m[S.coach]||{}).name||''}:null,locked:lock};
+  const _cur=m.period||'';const _log=Object.assign({},m.clockLog||{});if(_cur&&_cur!=='하프타임'&&!_log[_cur]&&MR.secOf(m)>0)_log[_cur]=MR.fmtSec(MR.secOf(m));
+  const upd={status:'종료',clockLog:_log,endAt:m.endAt||FV.serverTimestamp(),fairplay:{a:S.fa,b:S.fb},mvp:S.mvp?Object.assign({},S.mvp,{team:(m[S.mvp.side]||{}).name||''}):null,bestCoach:S.coach?{side:S.coach,name:((S.coach==='a'?oa:ob).coach||{}).name||'',team:(m[S.coach]||{}).name||''}:null,locked:lock};
   if((m.clock||{}).running)upd.clock=MR.clockAct(m,'pause');if(lock)upd.confirmedBy={uid:ME.uid,name:MY.name||'',at:new Date().toISOString(),role:role||(STAFF?'운영진':'')};
   sheetClose();
   try{if(Object.keys(signs).length)await DB.collection('compSigns').doc(RC_ID).set(signs,{merge:true}).catch(()=>{});await rcUpdate(upd,'종료 저장 실패');
