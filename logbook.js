@@ -383,15 +383,54 @@
   function appPeriod(app,date){var r=appTime(app,date);if(!r)return null;if(periodOf(r.time))return r;var p=clockToPeriod(r.time);return p?{time:p,src:r.src+'·시간 환산',clock:r.time}:null}
   // 표시: 「3교시」「1~4교시」 (옛 시각 값은 그대로)
   function classTime(l){return String((l&&l.classTime)||'').trim()}
-  function removeLog(db,fb,id,log,who){
+  // ══ [회차 번호 변경 2026-10-14] 회차 정리(빈 회차 당기기 · 수업일 순 재부여) · 삭제 시 뒤 회차 당기기 — 보안 규칙 v53 ══
+  //   회차 번호만 바꾸므로 담당교사 확인은 그대로 두고, 정정 이력(editHistory)에 원 번호를 남깁니다.
+  function sessKey(l){return String(l.date||'')+'|'+String((l.createdAt&&l.createdAt.seconds)||'')+'|'+String(l._id||'')}
+  // 같은 학교 일지의 번호 겹침·빈 번호 — {dups:{번호:[일지…]}, gaps:[번호…], max}
+  function sessionIssues(logs){
+    var by={},max=0;(logs||[]).forEach(function(l){var n=+l.session||0;if(!n)return;(by[n]=by[n]||[]).push(l);if(n>max)max=n});
+    var dups={},gaps=[];Object.keys(by).forEach(function(k){if(by[k].length>1)dups[k]=by[k]});
+    for(var i=1;i<=max;i++)if(!by[i])gaps.push(i);
+    return {dups:dups,gaps:gaps,max:max,used:Object.keys(by).map(Number).sort(function(a,b){return a-b})};
+  }
+  // 새 번호 계산 — mode 'compact': 지금 번호 순서를 지키며 1부터 빈틈 없이 / 'bydate': 수업일 순으로 1부터. 바뀌는 건만 [{id,from,to,log}]
+  function renumberOps(logs,mode){
+    var arr=(logs||[]).filter(function(l){return l&&l._id}).slice();
+    if(mode==='bydate')arr.sort(function(a,b){return String(a.date||'').localeCompare(String(b.date||''))||((+a.session||0)-(+b.session||0))||sessKey(a).localeCompare(sessKey(b))});
+    else arr.sort(function(a,b){return ((+a.session||0)-(+b.session||0))||String(a.date||'').localeCompare(String(b.date||''))||sessKey(a).localeCompare(sessKey(b))});
+    var ops=[];arr.forEach(function(l,i){var to=i+1;if((+l.session||0)!==to)ops.push({id:l._id,from:(+l.session||0),to:to,log:l})});
+    return ops;
+  }
+  // 삭제할 회차보다 뒤 번호를 1씩 당기는 작업 목록(겹침이 있으면 비움 — 먼저 회차 정리)
+  function shiftOps(logs,deleted){
+    var n=+deleted.session||0;if(!n)return [];
+    var later=(logs||[]).filter(function(l){return l._id!==deleted._id&&(+l.session||0)>n}).sort(function(a,b){return (+a.session)-(+b.session)});
+    var seen={};for(var i=0;i<later.length;i++){if(seen[later[i].session])return [];seen[later[i].session]=1}
+    return later.map(function(l){return {id:l._id,from:+l.session,to:(+l.session)-1,log:l}});
+  }
+  // 번호 변경을 batch 에 담기 (commit 은 호출한 쪽에서) — 한 건당 session + editHistory(원 번호)
+  function addRenumber(db,fb,batch,ops,who,why){
+    who=who||{};(ops||[]).forEach(function(o){
+      batch.update(db.collection('sessionLogs').doc(o.id),{session:o.to,
+        editHistory:fb.firestore.FieldValue.arrayUnion({at:new Date().toISOString(),by:who.name||'',uid:who.uid||'',role:who.role||'',sessionOnly:true,why:why||'',before:{session:o.from}}),
+        editedAt:fb.firestore.FieldValue.serverTimestamp()});
+    });
+  }
+  function renumber(db,fb,ops,who,why){if(!(ops||[]).length)return Promise.resolve(0);var b=db.batch();addRenumber(db,fb,b,ops,who,why);return b.commit().then(function(){return ops.length})}
+  // 번호 변경 뒤 바뀌었음을 회차 카드에 알리는 짧은 글 — 「원 4회차」
+  function sessNote(l){var h=(l&&l.editHistory||[]).filter(function(x){return x&&x.sessionOnly&&x.before&&x.before.session!=null});if(!h.length)return '';return '원 '+h[0].before.session+'회차'}
+  // shift(선택): 삭제와 같은 묶음에서 뒤 회차를 당기는 작업 목록(shiftOps) — 기록에도 남김
+  function removeLog(db,fb,id,log,who,shift){
     var src={};Object.keys(log||{}).forEach(function(k){if(k.charAt(0)!=='_')src[k]=log[k]});
     who=who||{};
     var b=db.batch();
+    if((shift||[]).length)addRenumber(db,fb,b,shift,who,'삭제 뒤 당김');
     b.set(db.collection('sessionLogArchive').doc(id),{
       log:src,uid:src.uid||'',appId:src.appId||'',school:src.school||'',session:(src.session==null?null:src.session),
       date:src.date||'',name:src.name||'',hadConfirm:!!src.teacherConfirm,
       deletedAt:fb.firestore.FieldValue.serverTimestamp(),deletedAtIso:new Date().toISOString(),
-      deletedBy:who.uid||'',deletedByName:who.name||'',deletedRole:who.role||'',reason:String(who.reason||'').slice(0,500)});
+      deletedBy:who.uid||'',deletedByName:who.name||'',deletedRole:who.role||'',reason:String(who.reason||'').slice(0,500),
+      shifted:(shift||[]).map(function(o){return {id:o.id,from:o.from,to:o.to}})});   // [회차 번호 변경] 삭제 뒤 당긴 회차
     b.delete(db.collection('sessionLogs').doc(id));
     return b.commit();
   }
@@ -406,5 +445,5 @@
     b.update(db.collection('sessionLogArchive').doc(aid),{restoredAt:fb.firestore.FieldValue.serverTimestamp(),restoredBy:who.uid||'',restoredByName:who.name||'',restoredTo:ref.id});
     return b.commit().then(function(){return ref.id});
   }
-  window.KFDF_LOGBOOK={prep:prep,render:render,fail:fail,removeLog:removeLog,restoreLog:restoreLog,appTime:appTime,appPeriod:appPeriod,periodOf:periodOf,periodStr:periodStr,clockToPeriod:clockToPeriod,isClock:isClock,timeEntries:timeEntries,classTime:classTime};
+  window.KFDF_LOGBOOK={prep:prep,render:render,fail:fail,removeLog:removeLog,restoreLog:restoreLog,sessionIssues:sessionIssues,renumberOps:renumberOps,shiftOps:shiftOps,addRenumber:addRenumber,renumber:renumber,sessNote:sessNote,appTime:appTime,appPeriod:appPeriod,periodOf:periodOf,periodStr:periodStr,clockToPeriod:clockToPeriod,isClock:isClock,timeEntries:timeEntries,classTime:classTime};
 })();

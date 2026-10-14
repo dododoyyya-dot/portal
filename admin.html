@@ -4507,11 +4507,15 @@ async function toggleLogs(id){
     const logs=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).sort((a,b)=>(a.session||0)-(b.session||0));
     Object.keys(ALOGS).forEach(function(k){if(ALOGS[k]&&ALOGS[k]._appId===id)delete ALOGS[k]});   // [일지 삭제] 지운 회차가 남지 않게 이 학교분을 새로 채움
     logs.forEach(function(l){ALOGS[l._id]=Object.assign({},l,{_appId:id})});   // [일지 정정] 수정창에서 참조
+    var _si=KFDF_LOGBOOK.sessionIssues(logs),_siMsg='';   // [회차 번호 변경 2026-10-14] 번호 겹침·빈 회차 안내(강사가 마이페이지 「회차 정리」로 바로잡음)
+    Object.keys(_si.dups).forEach(function(k){_siMsg+='<b style="color:#C41E2F">⚠ '+k+'회차 번호 겹침 '+_si.dups[k].length+'건</b> ';});
+    if(_si.gaps.length)_siMsg+='<span style="color:#6b7280">빈 회차: '+_si.gaps.join(', ')+'</span>';
+    if(_siMsg)_siMsg='<div style="font-size:12.5px;margin-bottom:6px">'+_siMsg+' — 강사가 마이페이지 [🔢 회차 정리]로 바로잡을 수 있습니다</div>';
     AARCH[id]=[];if(VIEWER_IS_ADMIN){try{const as=await DB.collection('sessionLogArchive').where('appId','==',id).get();AARCH[id]=as.docs.map(d=>Object.assign({_id:d.id},d.data()))}catch(e){}}   // [일지 삭제] 규칙 v35 전이면 빈 목록
     if(!logs.length&&AARCH[id].length){el.innerHTML='<span style="font-size:13px;color:var(--gray)">현재 제출된 일지가 없습니다 (삭제된 회차만 있음).</span>'+adArchBlock(id);return}
     if(!logs.length){el.innerHTML='<span style="font-size:13px;color:var(--gray)">아직 제출된 일지가 없습니다. 배정된 강사(마이페이지 › 운영일지)가 직접 회차 보고를 등록해야 이곳에 표시됩니다 — 강사에게 제출을 안내해주세요.</span>';return}
     const cfmN=logs.filter(l=>l.teacherConfirm).length;
-    el.innerHTML='<b style="font-size:13.5px">운영일지 '+logs.length+'건 (강사: '+esc(logs[0].name)+')</b> <span style="font-size:12px;font-weight:800;color:'+(cfmN===logs.length?'#0f766e':'#C41E2F')+'">· 교사확인 '+cfmN+'/'+logs.length+'</span>'+' <button class="btn-sub" style="padding:3px 12px;font-size:12px;background:#16181d;margin-left:6px" title="표지·요약 통계·회차별 사진 기록·확인란이 담긴 운영일지를 PDF로 저장합니다" onclick="adLogbook(\''+id+'\')">🖨 운영일지 PDF</button>'
+    el.innerHTML=_siMsg+'<b style="font-size:13.5px">운영일지 '+logs.length+'건 (강사: '+esc(logs[0].name)+')</b> <span style="font-size:12px;font-weight:800;color:'+(cfmN===logs.length?'#0f766e':'#C41E2F')+'">· 교사확인 '+cfmN+'/'+logs.length+'</span>'+' <button class="btn-sub" style="padding:3px 12px;font-size:12px;background:#16181d;margin-left:6px" title="표지·요약 통계·회차별 사진 기록·확인란이 담긴 운영일지를 PDF로 저장합니다" onclick="adLogbook(\''+id+'\')">🖨 운영일지 PDF</button>'
       +logs.map(l=>'<div style="border-top:1px dashed #d5d9e0;padding:8px 0;font-size:13px">'
         +'<b>'+l.session+'회차</b> · '+esc(l.date)+(l.classTime?' '+esc(l.classTime)+(String(l.classTimeSrc||'').indexOf('신청서')===0?'<span style="font-size:11px;color:#b8860b">(신청서)</span>':''):' <span style="font-size:11.5px;color:#C41E2F">교시 미입력</span>')+(l.count?' · 👥 '+l.count+'명':'')+' — '+esc(l.content)
         +(l.note?' · <span style="color:#C41E2F">'+esc(l.note)+'</span>':'')
@@ -9297,7 +9301,7 @@ async function dlGoodsCerts(){
 <script src="schoolclub_core.js?v=20260922a"></script>
 <script src="post_alert.js?v=20260914a"></script>
 <script src="schoolclub_admin.js?v=20260914f"></script>
-<script src="logbook.js?v=20261008a"></script>
+<script src="logbook.js?v=20261014a"></script>
 <script src="crimcheck.js?v=20260918a"></script>
 <script src="consentdocs.js?v=20260929a"></script>
 <script src="auth_ui.js?v=20260929b"></script>

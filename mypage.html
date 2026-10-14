@@ -2289,6 +2289,56 @@ function compressImg(file){
 }
 // ── ✏️ 제출한 회차보고 수정 (사진 누락·오기재 정정 — 교사확인 전까지 가능) ──
 let MYLOGS=[];
+// ══ [회차 번호 변경 2026-10-14] 회차 정리 — 빈 회차 당기기 · 수업일 순 재부여 (보안 규칙 v53 · 교사확인 유지) ══
+function lgWho(){return {uid:(AUTH.currentUser||{}).uid||'',name:(MYD&&MYD.name)||'',role:'강사'}}
+async function lgFreshLogs(appId){   // 저장 직전 최신 목록(겹침 확인용) — 실패하면 화면 목록
+  try{const s=await DB.collection('sessionLogs').where('uid','==',AUTH.currentUser.uid).where('appId','==',appId).get();return s.docs.map(d=>Object.assign({_id:d.id},d.data()))}catch(e){return MYLOGS.filter(l=>l.appId===appId)}
+}
+function lgIssueHtml(appId,logs){
+  const I=KFDF_LOGBOOK.sessionIssues(logs);const parts=[];
+  Object.keys(I.dups).forEach(k=>parts.push('<b style="color:#C41E2F">⚠ '+k+'회차 번호 겹침 '+I.dups[k].length+'건</b> ('+I.dups[k].map(l=>esc(l.date||'')).join(', ')+')'));
+  if(I.gaps.length)parts.push('빈 회차: '+I.gaps.join(', '));
+  if(!parts.length)return '';
+  return '<div style="font-size:12.5px;color:#6b7280;margin:0 0 8px;line-height:1.6">'+parts.join(' · ')+' — <a href="javascript:void 0" onclick="openRenumber(\''+appId+'\')" style="font-weight:800;color:#153A77">🔢 회차 정리</a>로 바로잡을 수 있습니다</div>';
+}
+function openRenumber(appId){
+  const logs=MYLOGS.filter(l=>l.appId===appId);if(!logs.length)return alert('이 학교에 제출한 일지가 없습니다.');
+  const old=document.getElementById('rnModal');if(old)old.remove();
+  const div=document.createElement('div');div.id='rnModal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';
+  const school=(logs[0]||{}).school||'';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:92vh;overflow:auto;padding:22px">'
+    +'<b style="font-size:16px">🔢 회차 정리 — '+esc(school)+'</b>'
+    +'<div style="font-size:12.5px;color:#666;margin:4px 0 12px;line-height:1.6">회차 번호만 바뀌고 내용·사진·<b>담당교사 확인은 그대로</b>입니다. 바뀐 번호는 정정 이력에 「원 n회차」로 남습니다.</div>'
+    +'<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;font-weight:700;margin-top:6px"><input type="radio" name="rnMode" value="compact" checked onchange="rnPreview(\''+appId+'\')" style="width:auto;margin-top:3px"><span>빈 회차 당기기<br><span style="font-weight:600;color:#8a919d;font-size:12px">지금 순서를 지키며 1부터 빈틈 없이 다시 매김 (예: 1·2·4·5 → 1·2·3·4)</span></span></label>'
+    +'<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;font-weight:700;margin-top:8px"><input type="radio" name="rnMode" value="bydate" onchange="rnPreview(\''+appId+'\')" style="width:auto;margin-top:3px"><span>수업일 순으로 다시 매기기<br><span style="font-weight:600;color:#8a919d;font-size:12px">날짜가 빠른 회차부터 1·2·3… (번호가 뒤섞였거나 겹칠 때)</span></span></label>'
+    +'<div id="rnPrev" style="margin-top:12px"></div>'
+    +'<div id="rnMsg" style="font-size:12.5px;font-weight:700;margin-top:8px"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
+    +'<button class="btn-sub" style="background:#8a919d" onclick="document.getElementById(\'rnModal\').remove()">닫기</button>'
+    +'<button id="rnGo" class="btn-sub" style="background:#0f766e" onclick="rnApply(\''+appId+'\')">🔢 적용</button></div></div>';
+  document.body.appendChild(div);rnPreview(appId);
+}
+function rnPreview(appId){
+  const mode=(document.querySelector('input[name="rnMode"]:checked')||{}).value||'compact';
+  const logs=MYLOGS.filter(l=>l.appId===appId);const ops=KFDF_LOGBOOK.renumberOps(logs,mode);
+  const box=document.getElementById('rnPrev'),go=document.getElementById('rnGo');if(!box)return;
+  if(!ops.length){box.innerHTML='<div style="font-size:13px;color:#0f766e;font-weight:700">바꿀 회차가 없습니다 — 이미 정리되어 있습니다.</div>';if(go)go.disabled=true;return}
+  if(go)go.disabled=false;
+  box.innerHTML='<div style="font-size:12.5px;font-weight:800;margin-bottom:4px">바뀌는 회차 '+ops.length+'건</div><div style="max-height:40vh;overflow:auto;border:1px solid var(--line);border-radius:9px">'
+    +ops.map(o=>'<div style="display:flex;gap:8px;align-items:center;padding:6px 10px;border-top:1px solid #f0f2f5;font-size:13px"><b>'+o.from+'회차</b><span style="color:#8a919d">→</span><b style="color:#153A77">'+o.to+'회차</b><span style="color:#6b7280;font-size:12px">'+esc(o.log.date||'')+(o.log.classTime?' '+esc(o.log.classTime):'')+(o.log.teacherConfirm?' · 교사확인 유지':'')+'</span></div>').join('')+'</div>';
+}
+async function rnApply(appId){
+  const m=document.getElementById('rnMsg');const mode=(document.querySelector('input[name="rnMode"]:checked')||{}).value||'compact';
+  m.textContent='최신 목록 확인 중…';m.style.color='#8a919d';
+  const logs=await lgFreshLogs(appId);const ops=KFDF_LOGBOOK.renumberOps(logs,mode);
+  if(!ops.length){m.textContent='바꿀 회차가 없습니다.';return}
+  if(!confirm(ops.length+'건의 회차 번호를 바꿉니다.\n'+ops.slice(0,8).map(o=>'· '+o.from+'회차('+(o.log.date||'')+') → '+o.to+'회차').join('\n')+(ops.length>8?'\n· 외 '+(ops.length-8)+'건':'')+'\n\n담당교사 확인은 그대로 유지됩니다. 적용할까요?'))return;
+  try{m.textContent='저장 중…';
+    await KFDF_LOGBOOK.renumber(DB,firebase,ops,lgWho(),mode==='bydate'?'수업일 순 재부여':'빈 회차 당기기');
+    document.getElementById('rnModal').remove();alert('✓ 회차 '+ops.length+'건의 번호를 바꿨습니다.');loadMyLogs();
+  }catch(e){m.textContent='적용 실패: '+e.message+(/permission/i.test(e.message)?' — 사무국에 「보안 규칙 v53 게시」를 요청해 주세요':'');m.style.color='#C41E2F'}
+}
 function editLog(id){
   const l=MYLOGS.find(x=>x._id===id);if(!l)return;
   // [서명 후 정정 2026-09-12] 교사확인이 끝난 회차도 고칠 수 있습니다.
@@ -2302,7 +2352,8 @@ function editLog(id){
     +'<b style="font-size:16px">✏️ '+esc(l.session)+'회차 보고 수정</b>'
     +'<div style="font-size:12.5px;color:#666;margin:4px 0 12px">'+esc(l.school||'')+' · '+esc(l.date||'')+'</div>'
     +(l.teacherConfirm?'<div style="background:#fff7e6;border:1.5px solid #f0d48a;border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:12px;line-height:1.6">⚠ 이 회차는 <b>담당교사 확인(서명)이 끝난 회차</b>입니다 — '+esc((l.teacherConfirm||{}).name||'')+'.<br>저장하면 교사확인이 <b>「미확인」으로 되돌아가고</b>, 기존 서명은 <b>정정 이력에 보존</b>됩니다.<br>저장 후 <b>[📱 교사 확인 요청]</b>을 다시 눌러 담당교사에게 재확인을 받아주세요.</div>':'')
-    +'<label style="font-size:12.5px;font-weight:800">수업일</label><input id="elDate" type="date" value="'+esc(l.date||'')+'" '+inp+'>'
+    +'<label style="font-size:12.5px;font-weight:800">회차 <span style="font-weight:600;color:#8a919d">· 1~24 — 번호만 고치면 담당교사 확인은 그대로 유지됩니다</span></label><input id="elSession" type="number" min="1" max="24" value="'+esc(l.session||'')+'" '+inp+'>'
+    +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">수업일</label><input id="elDate" type="date" value="'+esc(l.date||'')+'" '+inp+'>'
     +(function(){const p=lgSplitTime(l.classTime);const sug=!l.classTime?lgAppTime(l.appId,l.date):null;const q=sug?lgSplitTime(sug.time):p;
       const opt=v=>'<option value="">선택</option>'+LG_PERIODS.map((n,i)=>'<option value="'+i+'"'+(String(v)===String(i)?' selected':'')+'>'+n+'</option>').join('');
       const old=KFDF_LOGBOOK.isClock(l.classTime);
@@ -2349,12 +2400,25 @@ async function saveLogEdit(id){
   if(!date||!cnt||cnt<1||!content){m.textContent='수업일·참여 인원·수업 내용을 확인해주세요';m.style.color='#C41E2F';return}
   const tv=lgTimeVal(document.getElementById('elT1').value,document.getElementById('elT2').value);if(tv.err){m.textContent=tv.err;m.style.color='#C41E2F';return}
   const note=document.getElementById('elNote').value.trim();
+  // [회차 번호 변경] 1~24 · 같은 학교의 다른 일지와 겹치면 저장 안 함(저장 직전 최신 목록으로 확인)
+  const newSess=parseInt(document.getElementById('elSession').value);
+  if(!newSess||newSess<1||newSess>24){m.textContent='회차는 1~24 사이 숫자로 적어 주세요';m.style.color='#C41E2F';return}
+  const sessChanged=newSess!==(+l.session||0);
+  if(sessChanged){m.textContent='회차 겹침 확인 중…';m.style.color='#8a919d';
+    const fresh=await lgFreshLogs(l.appId);const hit=fresh.find(x=>x._id!==id&&(+x.session||0)===newSess);
+    if(hit){m.textContent=newSess+'회차는 이미 있습니다('+(hit.date||'')+'). 다른 번호를 쓰거나 [🔢 회차 정리]를 이용해 주세요';m.style.color='#C41E2F';return}}
   const newFiles=(document.getElementById('elPhotos').files||[]).length;
   const same=(a,b)=>(a==null?'':String(a))===(b==null?'':String(b));
   const otherSame=same(date,l.date)&&same(cnt,l.count)&&same(male,l.male)&&same(female,l.female)&&same(content,l.content)&&same(note,l.note)&&!newFiles&&JSON.stringify(EL_PHOTOS)===JSON.stringify(l.photos||[]);
   const timeChanged=tv.v!==(l.classTime||'');
-  if(otherSame&&!timeChanged){document.getElementById('elModal').remove();return}
-  if(otherSame&&timeChanged){   // [수업 시간만 정정] 교사 확인·정정 요청 그대로
+  if(otherSame&&!timeChanged&&!sessChanged){document.getElementById('elModal').remove();return}
+  if(otherSame&&!timeChanged&&sessChanged){   // [회차 번호만 변경] 교사 확인·정정 요청 그대로 (규칙 v53)
+    try{m.textContent='저장 중…';m.style.color='#8a919d';
+      await KFDF_LOGBOOK.renumber(DB,firebase,[{id:id,from:+l.session||0,to:newSess,log:l}],lgWho(),'수정 창에서 변경');
+      document.getElementById('elModal').remove();alert('✓ '+l.session+'회차 → '+newSess+'회차로 번호를 바꿨습니다.'+(l.teacherConfirm?'\n담당교사 확인은 그대로 유지됩니다.':''));loadMyLogs();
+    }catch(e){m.textContent='저장 실패: '+e.message+(/permission/i.test(e.message)?' — 사무국에 「보안 규칙 v53 게시」를 요청해 주세요':'');m.style.color='#C41E2F'}
+    return}
+  if(otherSame&&timeChanged&&!sessChanged){   // [수업 시간만 정정] 교사 확인·정정 요청 그대로
     try{m.textContent='저장 중…';m.style.color='#8a919d';
       await DB.collection('sessionLogs').doc(id).update({classTime:tv.v,classTimeSrc:'작성자',
         editHistory:firebase.firestore.FieldValue.arrayUnion({at:new Date().toISOString(),by:(MYD&&MYD.name)||'',uid:(AUTH.currentUser||{}).uid||'',role:'강사',timeOnly:true,before:{classTime:l.classTime||''}}),
@@ -2378,6 +2442,7 @@ async function saveLogEdit(id){
     }
     m.textContent='저장 중…';
     await DB.collection('sessionLogs').doc(id).update({
+      session:newSess,   // [회차 번호 변경] 내용과 함께 바꾸면 종전대로 교사확인 해제
       date:date,classTime:tv.v,classTimeSrc:'작성자',count:cnt,male:male,female:female,content:content,
       note:note,
       photos:photos,
@@ -2385,13 +2450,13 @@ async function saveLogEdit(id){
       teacherConfirm:null,   // [서명 후 정정] 없었으면 그대로 null, 있었으면 해제해 재확인 대상으로
       editHistory:firebase.firestore.FieldValue.arrayUnion({
         at:new Date().toISOString(),by:(MYD&&MYD.name)||'',uid:(AUTH.currentUser||{}).uid||'',role:'강사',
-        before:{date:l.date||'',classTime:l.classTime||'',count:(l.count!=null?l.count:null),male:(l.male!=null?l.male:null),female:(l.female!=null?l.female:null),content:l.content||'',note:l.note||'',photos:((l.photos||[]).length)},
+        before:{session:(+l.session||0),date:l.date||'',classTime:l.classTime||'',count:(l.count!=null?l.count:null),male:(l.male!=null?l.male:null),female:(l.female!=null?l.female:null),content:l.content||'',note:l.note||'',photos:((l.photos||[]).length)},
         voidedConfirm:WASCFM}),
       editedAt:firebase.firestore.FieldValue.serverTimestamp()});
     let selfOk=false;
     if(SELF){try{await DB.collection('sessionLogs').doc(id).update({teacherConfirm:selfConfirmRec(l.appId)});selfOk=true}catch(e){}}   // [본인 지도] 확인란 다시 기입(정정 저장과는 따로 — 보안 규칙상 한 번에 못 씀)
     document.getElementById('elModal').remove();
-    alert('✓ '+l.session+'회차 보고가 수정되었습니다.'+(photos.length?'\n사진 '+photos.length+'장이 등록되었습니다.':'')
+    alert('✓ '+newSess+'회차 보고가 수정되었습니다.'+(sessChanged?'\n(회차 번호 '+l.session+' → '+newSess+')':'')+(photos.length?'\n사진 '+photos.length+'장이 등록되었습니다.':'')
       +(selfOk?'\n\n본인 지도 — 담당교사 확인란에 본인 서명을 다시 기입했습니다.'
         :(WASCFM?'\n\n⚠ 교사확인이 「미확인」으로 되돌아갔습니다.\n[📱 교사 확인 요청] 을 눌러 담당교사에게 다시 확인을 받아주세요.':'')));
     loadMyLogs();
@@ -2452,6 +2517,8 @@ async function submitLog(){
   let cnt=parseInt(document.getElementById('lgCount').value);
   if(male!=null&&female!=null&&male+female>0)cnt=male+female;   // [실적보고] 남+여가 있으면 합계 우선
   if(!appId||!sess||sess<1||sess>24||!date||!content||!cnt||cnt<1){m.textContent='회차·수업일·참여 인원·수업 내용을 입력해주세요';m.className='msg err';return}
+  {const dup=MYLOGS.find(x=>x.appId===appId&&(+x.session||0)===sess);   // [회차 번호 변경] 같은 번호 겹침 방지
+   if(dup){m.textContent=sess+'회차는 이미 제출했습니다('+(dup.date||'')+'). 다른 번호를 쓰거나 그 회차를 [수정]해 주세요';m.className='msg err';return}}
   const tv=lgTimeVal(document.getElementById('lgT1').value,document.getElementById('lgT2').value);if(tv.err){m.textContent=tv.err;m.className='msg err';return}
   const chk={level:document.getElementById('lgChk1').checked,fit:document.getElementById('lgChk2').checked,time:document.getElementById('lgChk3').checked,notice:document.getElementById('lgChk4').checked};
   if(!chk.level||!chk.fit||!chk.time||!chk.notice){m.textContent='안전 지도 점검 4개 항목을 모두 확인해주세요';m.className='msg err';return}
@@ -3369,6 +3436,10 @@ function deleteLog(id){
     +'· 삭제해도 <b>원래 내용·사진·교사확인 서명과 삭제 사유는 기록으로 보존</b>되어 사무국이 확인할 수 있습니다.<br>'
     +'· 삭제한 회차는 수당·실적 집계에서 빠집니다. 같은 회차는 <b>새로 다시 작성</b>하면 됩니다.'
     +(l.teacherConfirm?'<br>· <b style="color:#b8860b">담당교사 확인이 끝난 회차</b>입니다 — 다시 작성하면 교사확인도 다시 받아야 합니다.':'')+'</div>'
+    +(function(){const sh=KFDF_LOGBOOK.shiftOps(MYLOGS.filter(x=>x.appId===l.appId),l);if(!sh.length)return '';
+      return '<b style="font-size:12.5px">삭제 뒤 회차 번호</b>'
+        +'<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-top:6px;font-weight:600"><input type="radio" name="dlShift" value="" checked style="width:auto;margin-top:3px"><span>'+esc(l.session)+'회차 자리는 비워 둠 <span style="color:#8a919d">(같은 번호로 다시 작성할 때)</span></span></label>'
+        +'<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-top:6px;font-weight:600"><input type="radio" name="dlShift" value="1" style="width:auto;margin-top:3px"><span>뒤 회차를 당김 — '+sh.slice(0,4).map(o=>o.from+'→'+o.to).join(', ')+(sh.length>4?' …':'')+' <span style="color:#8a919d">(교사확인 유지)</span></span></label><div style="height:8px"></div>'})()
     +'<b style="font-size:12.5px">삭제 사유 *</b>'
     +R.map((t,i)=>'<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px;font-weight:600"><input type="radio" name="dlWhy" value="'+esc(t)+'" style="width:auto"'+(i===0?' checked':'')+'>'+esc(t)+'</label>').join('')
     +'<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px;font-weight:600"><input type="radio" name="dlWhy" value="" style="width:auto">기타 (아래에 직접 입력)</label>'
@@ -3385,12 +3456,15 @@ async function confirmDeleteLog(id){
   const note=(document.getElementById('dlNote').value||'').trim();
   const reason=(base&&note)?base+' — '+note:(base||note);
   if(reason.length<2){m.textContent='삭제 사유를 고르거나 입력해 주세요';m.style.color='#C41E2F';return}
-  if(!confirm('['+(l.school||'')+'] '+l.session+'회차 보고를 삭제합니다.\n사유: '+reason+'\n\n원래 내용과 삭제 기록은 보존됩니다. 계속할까요?'))return;
+  const doShift=!!(document.querySelector('input[name="dlShift"]:checked')||{}).value;   // [회차 번호 변경] 뒤 회차 당기기
+  const shift=doShift?KFDF_LOGBOOK.shiftOps(MYLOGS.filter(x=>x.appId===l.appId),l):[];
+  if(!confirm('['+(l.school||'')+'] '+l.session+'회차 보고를 삭제합니다.\n사유: '+reason+(shift.length?'\n뒤 회차 당김: '+shift.map(o=>o.from+'→'+o.to).join(', '):'')+'\n\n원래 내용과 삭제 기록은 보존됩니다. 계속할까요?'))return;
   try{
     m.textContent='삭제 중…';m.style.color='#8a919d';
-    await KFDF_LOGBOOK.removeLog(DB,firebase,id,l,{uid:AUTH.currentUser.uid,name:(MYD&&MYD.name)||'',role:'강사',reason:reason});
+    await KFDF_LOGBOOK.removeLog(DB,firebase,id,l,{uid:AUTH.currentUser.uid,name:(MYD&&MYD.name)||'',role:'강사',reason:reason},shift);
     const mod=document.getElementById('dlModal');if(mod)mod.remove();
-    const again=confirm('✓ '+l.session+'회차 보고를 삭제했습니다(기록 보존).\n\n지금 같은 회차를 다시 작성할까요?\n[확인]을 누르면 아래 제출 양식에 학교와 회차 번호를 채워 드립니다.');
+    const again=shift.length?(alert('✓ '+l.session+'회차 보고를 삭제하고 뒤 '+shift.length+'회차를 당겼습니다(기록 보존).'),false)
+      :confirm('✓ '+l.session+'회차 보고를 삭제했습니다(기록 보존).\n\n지금 같은 회차를 다시 작성할까요?\n[확인]을 누르면 아래 제출 양식에 학교와 회차 번호를 채워 드립니다.');
     await loadMyLogs();
     if(again){
       const sa=document.getElementById('lgApp');if(sa&&[].some.call(sa.options,o=>o.value===l.appId))sa.value=l.appId;
@@ -3407,6 +3481,7 @@ function myArchBlock(appId){
     +del.map(a=>'<div style="padding:5px 0;border-top:1px dotted var(--line);color:#555;line-height:1.55"><b>'+esc(a.session)+'회차</b> · 원 수업일 '+esc(a.date||'-')
       +(a.hadConfirm?' · <span style="color:#b8860b">교사확인 있던 회차</span>':'')
       +'<br><span style="color:#8a919d">삭제 '+esc(String(a.deletedAtIso||'').slice(0,10))+' · '+esc(a.deletedRole||'')+' '+esc(a.deletedByName||'')+' · 사유: '+esc(a.reason||'')+'</span>'
+      +((a.shifted||[]).length?' <span style="color:#153A77">· 삭제 뒤 뒤 회차 당김('+a.shifted.map(o=>o.from+'→'+o.to).join(', ')+')</span>':'')
       +(a.restoredAt?' <b style="color:#0f766e">· 사무국이 복원함</b>':'')+'</div>').join('')
     +'</details>';
 }
@@ -3446,6 +3521,7 @@ function lgCardHtml(l){
     +'<div class="ft">'+((ck&&typeof ck==='object')?'<b style="color:'+(ckN>=4?'#0f766e':'#b8860b')+'">✔ 안전 지도 점검 '+ckN+'/4</b>'+(l.checkAddedAt?'<span style="color:#8a919d;font-size:11px">(사후 입력)</span>':'')
       :'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#0f766e" title="8월 10일 이전에 작성해 안전 지도 점검 기록이 없는 회차 — 담당교사 확인은 그대로 유지됩니다" onclick="lgSafeOpen(\''+l._id+'\')">✔ 안전 지도 점검 입력</button>')
     +((l.editHistory||[]).length?'<span style="color:#b8860b;font-weight:700">✏️ 정정 '+(l.editHistory||[]).length+'회</span>':'')
+    +(KFDF_LOGBOOK.sessNote(l)?'<span style="color:#153A77;font-weight:700">🔢 '+esc(KFDF_LOGBOOK.sessNote(l))+'</span>':'')
     +'<span style="flex:1"></span>'
     +'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:'+(l.teacherConfirm?'#8a919d':'#b8860b')+'" title="'+(l.teacherConfirm?'교사확인 후 정정 — 저장하면 확인이 해제되어 재확인이 필요합니다':'회차 보고 수정')+'" onclick="editLog(\''+l._id+'\')">✏️ 수정</button>'
     +'<button class="btn-sub" style="padding:3px 10px;font-size:11.5px;background:#C41E2F" title="겸직 시기 정정 등으로 이 회차를 지우고 다시 작성 — 원본과 사유는 기록으로 남습니다" onclick="deleteLog(\''+l._id+'\')">🗑 삭제</button></div></div>';
@@ -3504,8 +3580,11 @@ async function loadMyLogs(){
         +'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">'
         +'<b style="font-size:15px">'+esc(g.school)+' <span style="font-size:12.5px;color:var(--gray);font-weight:600">· '+g.logs.length+'회차 제출</span></b>'
         +'<span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+(pend.length?'<button class="btn-sub" style="background:#153A77" onclick="reqConfirmBatch(\''+appId+'\')">📱 교사 확인 요청 (미확인 '+pend.length+'회차)</button>'
-                     :(g.logs.length?'<span style="font-size:12.5px;font-weight:800;color:#0f766e">✓ 전 회차 교사확인 완료</span>':''))+'<button class="btn-sub" style="background:#16181d" title="표지·요약 통계·회차별 사진 기록·확인란이 담긴 운영일지를 PDF로 저장합니다" onclick="myLogbook(\''+appId+'\')">🖨 운영일지 PDF</button></span>'
+                     :(g.logs.length?'<span style="font-size:12.5px;font-weight:800;color:#0f766e">✓ 전 회차 교사확인 완료</span>':''))
+        +(g.logs.length>1?'<button class="btn-sub" style="background:#fff;color:#153A77;border:1.5px solid #b9cdec" title="빈 회차 당기기 · 수업일 순으로 다시 매기기 — 담당교사 확인은 유지됩니다" onclick="openRenumber(\''+appId+'\')">🔢 회차 정리</button>':'')
+        +'<button class="btn-sub" style="background:#16181d" title="표지·요약 통계·회차별 사진 기록·확인란이 담긴 운영일지를 PDF로 저장합니다" onclick="myLogbook(\''+appId+'\')">🖨 운영일지 PDF</button></span>'
         +'</div>'
+        +lgIssueHtml(appId,g.logs)
         +'<div class="lgcards">'+g.logs.map(lgCardHtml).join('')+'</div>'
         +myArchBlock(appId)
         +'</div>';
@@ -4113,7 +4192,7 @@ document.getElementById('cfmModal').addEventListener('click',function(e){if(e.ta
 document.getElementById('sigModal').addEventListener('click',function(e){if(e.target===this)closeSigModal()});
 </script>
 <script src="schoolclub_core.js?v=20260922a"></script>
-<script src="logbook.js?v=20261008a"></script>
+<script src="logbook.js?v=20261014a"></script>
 <script src="crimcheck.js?v=20260918a"></script>
 <script src="auth_ui.js?v=20260929b"></script>
 </body>
