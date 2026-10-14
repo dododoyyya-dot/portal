@@ -3822,7 +3822,7 @@ async function autoFindLics(){
       var snap=await DB.collection('licenses').where('name','==',names[i]).limit(10).get();
       var cand=[];
       snap.forEach(function(d){var l=d.data()||{};
-        if(seen[d.id]||l.uid||l.status==='이관')return;
+        if(seen[d.id]||l.uid||l.status==='이관'||l.status==='승급')return;
         seen[d.id]=1;cand.push({id:d.id,l:l});});
       for(var j=0;j<cand.length;j++){   // 읽히면 본인 자격, 거부되면 동명이인
         try{var pb=await DB.collection('licenseBirth').doc(cand[j].id).get();if(pb.exists)LF_FOUND.push(cand[j])}catch(e){}
@@ -3909,7 +3909,7 @@ function syncQualFromDB(){
     const valid={},expired={};
     (MYLICS||[]).forEach(d=>{
       const l=d.data()||{};
-      if(l.status==='이관')return;                                  // 이관된 구번호 제외
+      if(l.status==='이관'||l.status==='승급')return;               // 이관·승급된 구번호 제외
       const label=String(l.type||'')+' '+String(l.grade||'');
       const isExp=(l.status==='만료')||(l.expireAt?l.expireAt<today:false);
       (isExp?expired:valid)[l.type]=label;
@@ -4009,13 +4009,14 @@ async function loadMyLics(uid){
     document.getElementById('licCards').innerHTML=MYLICS.map(d=>{
       const l=d.data();
       const expired=(l.status==='만료')||(l.expireAt?l.expireAt<today:true);
-      if(l.status==='이관')return ''; // 이관 구번호 카드는 숨김 (새 번호 카드만 표시)
+      if(l.status==='이관'||l.status==='승급')return ''; // 이관·승급 구번호 카드는 숨김 (새 번호 카드에 보관 번호 표시)
       const dday=l.expireAt?Math.floor((new Date(l.expireAt)-new Date())/86400000):null;
       const warn=!expired&&dday!==null&&dday<=180;
       return '<div style="background:'+(expired?'#fdf3f4':'#fffdf5')+';border:2px solid '+(expired?'#C41E2F':'#e6b422')+';border-radius:16px;padding:22px 26px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">'
         +'<div><div style="font-weight:900;font-size:17px">🎖 '+esc(l.type)+' '+esc(l.grade)
         +(expired?' <span style="font-size:12px;font-weight:900;color:#fff;background:#C41E2F;padding:2px 10px;border-radius:999px">만료</span>':' <span style="font-size:12px;font-weight:900;color:#fff;background:#0f766e;padding:2px 10px;border-radius:999px">유효</span>')+'</div>'
         +'<div style="font-size:13.5px;color:var(--gray);margin-top:6px">자격번호 <b>'+esc(d.id)+'</b>'+(l.issuedAt?' · 발급 '+esc(l.issuedAt):'')+(l.expireAt?' · 유효기간 ~'+esc(l.expireAt):'')
+        +((l.upgradedFrom&&l.upgradedFrom.length)?'<br><span style="font-size:12.5px">⬆ 승급 전 자격번호(보관): '+l.upgradedFrom.map(esc).join(', ')+'</span>':'')
         +(warn?'<br><b style="color:#b8860b">⏳ 만료까지 '+dday+'일 — 갱신·보수(역량강화) 교육 공고를 확인하세요 (자격증 페이지)</b>':'')
         +(expired?'<br><b style="color:#C41E2F">만료된 자격입니다. 갱신 절차(갱신·보수 교육 이수 및 갱신료)를 통해 재활성화할 수 있습니다.</b>':'')+'</div></div>'
         +'<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sub" style="background:#153A77;font-size:14px;padding:11px 20px" onclick="licPdfSave(\''+d.id+'\')" title="자격증을 PDF 파일로 바로 저장합니다 — 휴대폰에서는 카카오톡·메일 등으로 공유">📄 PDF 파일 저장·공유</button>'

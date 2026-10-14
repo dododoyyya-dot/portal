@@ -1536,7 +1536,7 @@ async function stCsv(postId){
 // ③ [신청하기] 버튼 — 심판 전용 공고(모든 날짜의 정원이 심판·관리위원뿐)는 유효한 심판 자격이 없으면 잠그고 사유를 보여 줍니다.
 //   운영·봉사 정원이 함께 있는 공고는 신청은 열어 두고(운영요원 임무는 자격 불필요) 심판 임무 제한만 안내합니다. 제출 시 검증(submitApply)은 그대로 유지.
 function stRefOnly(p){const ds=(p&&p.dates)||[];if(!ds.length)return false;return ds.every(dd=>{const q=dd.quota||{};return ((+q.referee||0)+(+q.manager||0))>0&&((+q.staff||0)+(+q.volunteer||0))===0})}
-function stRefLicMsg(){const refs=(MYLIC_DOCS||[]).filter(l=>String(l.type||'').indexOf('심판')>=0&&l.status!=='이관');if(!refs.length)return '등록된 심판 자격이 없어 신청할 수 없습니다. 자격 취득·연결 후 신청해 주세요.';const exp=refs.map(l=>String(l.expireAt||'').slice(0,10)).sort().pop()||'';return '자격이 만료되었습니다'+(exp?' ('+exp+')':'')+'. 갱신 후 신청해 주세요.'}
+function stRefLicMsg(){const refs=(MYLIC_DOCS||[]).filter(l=>String(l.type||'').indexOf('심판')>=0&&l.status!=='이관'&&l.status!=='승급');if(!refs.length)return '등록된 심판 자격이 없어 신청할 수 없습니다. 자격 취득·연결 후 신청해 주세요.';const exp=refs.map(l=>String(l.expireAt||'').slice(0,10)).sort().pop()||'';return '자격이 만료되었습니다'+(exp?' ('+exp+')':'')+'. 갱신 후 신청해 주세요.'}
 function stApplyBtn(p,pad,label){
   const mine=!!(SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid));
   if(SME&&!mine&&!hasValidRefLic()&&stRefOnly(p)){const m=stRefLicMsg();

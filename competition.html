@@ -497,7 +497,7 @@ AUTH.onAuthStateChanged(async u=>{
 const RS={view:'all',prof:{},career:{}};   // view: 'all' | 'group' | 지역명
 function rsRegionOf(u){u=u||{};const raw=u.sidoKey||u.sido||u.baseCity||((u.activityRegions||[])[0])||'';const n=(window.SCC&&SCC.sidoNorm)?SCC.sidoNorm(raw):'';return n||String(raw).split(/[\s·]/)[0]||'미상'}
 function rsAge(birth){const a=ageOf(birth);return (a==null||isNaN(a))?'':a}
-function rsLicBest(ls){const today=new Date().toISOString().slice(0,10);const refs=(ls||[]).filter(l=>String(l.type||'').indexOf('심판')>=0&&l.status!=='이관');
+function rsLicBest(ls){const today=new Date().toISOString().slice(0,10);const refs=(ls||[]).filter(l=>String(l.type||'').indexOf('심판')>=0&&l.status!=='이관'&&l.status!=='승급');
   if(!refs.length)return null;const g=l=>parseInt(String(l.grade||'').replace(/\D/g,''),10)||9;
   refs.sort((a,b)=>{const va=(a.status!=='만료'&&(!a.expireAt||String(a.expireAt).slice(0,10)>=today))?0:1,vb=(b.status!=='만료'&&(!b.expireAt||String(b.expireAt).slice(0,10)>=today))?0:1;return (va-vb)||(g(a)-g(b))});
   const l=refs[0];const valid=l.status!=='만료'&&(!l.expireAt||String(l.expireAt).slice(0,10)>=today);return {grade:l.grade||'',exp:String(l.expireAt||'').slice(0,10),valid:valid,no:l.no||''}}
@@ -4090,7 +4090,7 @@ async function refLicState(){
   try{
     const snap=await DB.collection('licenses').where('uid','==',CME.uid).get();
     const today=new Date().toISOString().slice(0,10);
-    const refs=snap.docs.map(d=>d.data()).filter(l=>String(l.type||'').indexOf('심판')>=0&&l.status!=='이관');
+    const refs=snap.docs.map(d=>d.data()).filter(l=>String(l.type||'').indexOf('심판')>=0&&l.status!=='이관'&&l.status!=='승급');
     const ok=refs.some(l=>l.status!=='만료'&&(!l.expireAt||String(l.expireAt).slice(0,10)>=today));
     const exp=refs.map(l=>String(l.expireAt||'').slice(0,10)).sort().pop()||'';
     __refLicState={st:ok?'ok':(refs.length?'expired':'none'),exp:exp};

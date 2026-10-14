@@ -251,6 +251,10 @@ async function verifyLic(){
       el.innerHTML='<div style="background:#f1f4f9;border:2px solid #8a919d;border-radius:12px;padding:20px 22px"><b style="color:#555;font-size:17px">↪ 소속 이관으로 자격번호가 변경된 자격입니다</b><div style="font-size:14px;margin-top:8px">새 자격번호: <b>'+esc(l.movedTo)+'</b> — 새 번호로 다시 조회해주세요.</div></div>';
       return;
     }
+    if(l.status==='승급'&&l.upgradedTo){
+      el.innerHTML='<div style="background:#f1f4f9;border:2px solid #153A77;border-radius:12px;padding:20px 22px"><b style="color:#153A77;font-size:17px">⬆ 상위 등급으로 승급한 자격입니다 (이전 번호 보관)</b><div style="font-size:14px;margin-top:8px">'+esc(l.type||'')+' '+esc(l.grade||'')+' → 현재 자격번호: <b>'+esc(l.upgradedTo)+'</b>'+(l.upgradedAt?' (승급 '+esc(l.upgradedAt)+')':'')+' — 새 번호로 다시 조회해주세요.</div></div>';
+      return;
+    }
     const today=new Date().toISOString().slice(0,10);
     const expired=(l.status==='만료')||(l.expireAt?l.expireAt<today:true);
     const dday=l.expireAt?Math.floor((new Date(l.expireAt)-new Date())/86400000):null;
@@ -319,7 +323,7 @@ async function verifyLicByName(){
   el.innerHTML='<span style="font-size:14px;color:var(--gray)">조회 중…</span>';
   try{
     const snap=await DB.collection('licenses').where('name','==',name).limit(10).get();
-    const docs=snap.docs.filter(d=>d.data().status!=='이관');
+    const docs=snap.docs.filter(d=>d.data().status!=='이관'&&d.data().status!=='승급');
     if(!docs.length){el.innerHTML='<div style="background:#fdf3f4;border:2px solid var(--red);border-radius:12px;padding:16px 18px"><b style="color:var(--red);font-size:15px">❌ 일치하는 자격 정보가 없습니다</b><div style="font-size:12.5px;color:var(--gray);margin-top:6px">성명을 정확히 입력했는지 확인해주세요. 본 연맹이 발급하지 않은 자격은 조회되지 않습니다.</div></div>';return}
     const today=new Date().toISOString().slice(0,10);
     el.innerHTML='<div style="background:#fff;border:1.5px solid var(--line);border-radius:12px;overflow:hidden">'

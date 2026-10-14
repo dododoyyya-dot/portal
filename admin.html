@@ -2821,7 +2821,7 @@ async function qualFixScan(){
       const ls=await DB.collection('licenses').get();
       ls.docs.forEach(d=>{
         const l=d.data()||{};
-        if(l.uid||l.status==='이관')return;
+        if(l.uid||l.status==='이관'||l.status==='승급')return;
         const k=String(l.name||'').replace(/\s/g,'');
         if(k)(unlinked[k]=unlinked[k]||[]).push({id:d.id,type:l.type||'',grade:l.grade||''});
       });
@@ -5227,7 +5227,7 @@ function __lstart(){
     DB.collection('licenses').where('uid','>','').onSnapshot(function(snap){
       if(first&&snap.metadata&&snap.metadata.fromCache)return;   // [캐시 응답 무시] 서버 응답으로 시작
       const m={};
-      snap.docs.forEach(function(d){const l=d.data()||{};if(!l.uid||l.status==='이관')return;(m[l.uid]=m[l.uid]||[]).push({id:d.id,type:l.type||'',grade:l.grade||'',status:l.status||'',expireAt:l.expireAt||''})});
+      snap.docs.forEach(function(d){const l=d.data()||{};if(!l.uid||l.status==='이관'||l.status==='승급')return;(m[l.uid]=m[l.uid]||[]).push({id:d.id,type:l.type||'',grade:l.grade||'',status:l.status||'',expireAt:l.expireAt||''})});
       LICMAP=m;
       if(first){first=false;res();return}
       __uRender();
@@ -5242,7 +5242,7 @@ async function loadLicenses(){
     const m={};
     snap.docs.forEach(d=>{
       const l=d.data()||{};
-      if(!l.uid||l.status==='이관')return;          // 미연결·이관(구번호) 제외
+      if(!l.uid||l.status==='이관'||l.status==='승급')return;          // 미연결·이관(구번호) 제외
       (m[l.uid]=m[l.uid]||[]).push({id:d.id,type:l.type||'',grade:l.grade||'',status:l.status||'',expireAt:l.expireAt||''});
     });
     LICMAP=m;
@@ -7276,7 +7276,7 @@ async function compLicenseDocs(id){
     let lics=[];
     try{
       const ls=await DB.collection('licenses').where('uid','==',c.uid).get();
-      lics=ls.docs.map(x=>Object.assign({_no:x.id},x.data())).filter(x=>x.status!=='이관');
+      lics=ls.docs.map(x=>Object.assign({_no:x.id},x.data())).filter(x=>x.status!=='이관'&&x.status!=='승급');
     }catch(e){}
     if(!lics.length){noLic.push(c.name);continue}
     // 대회 역할에 맞는 자격 우선 (심판 공고면 심판 자격 우선)

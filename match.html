@@ -490,7 +490,7 @@ async function rfPool(scope){const pool={};const add=(uid,name,src)=>{if(!uid)re
   if(scope==='all'||!Object.keys(pool).length)car.forEach(c=>add(c.uid,c.name,'경력'));
   car.forEach(c=>{const P=pool[c.uid];if(!P)return;const r=String(c.role||c.duty||'');if(RF_LEAD.test(r))P.lead++;else if(RF_REF.test(r))P.other++});
   const ids=Object.keys(pool);const today=new Date().toISOString().slice(0,10);
-  for(let i=0;i<ids.length;i+=10){try{const q=await DB.collection('licenses').where('uid','in',ids.slice(i,i+10)).get();q.docs.forEach(d=>{const l=d.data();if(l.type!=='심판')return;if(l.status==='이관'||(l.expireAt&&l.expireAt<today))return;const g=String(l.grade||'').replace(/급$/,'');const pt=g==='1'?6:g==='2'?4:g==='3'?2:0;const P=pool[l.uid];if(P&&pt>P.licPt){P.licPt=pt;P.lic=g+'급'}})}catch(e){}}
+  for(let i=0;i<ids.length;i+=10){try{const q=await DB.collection('licenses').where('uid','in',ids.slice(i,i+10)).get();q.docs.forEach(d=>{const l=d.data();if(l.type!=='심판')return;if(l.status==='이관'||l.status==='승급'||(l.expireAt&&l.expireAt<today))return;const g=String(l.grade||'').replace(/급$/,'');const pt=g==='1'?6:g==='2'?4:g==='3'?2:0;const P=pool[l.uid];if(P&&pt>P.licPt){P.licPt=pt;P.lic=g+'급'}})}catch(e){}}
   ids.forEach(u=>{const P=pool[u];P.score=P.lead*3+P.other+P.licPt});
   return Object.values(pool).sort((a,b)=>b.score-a.score||String(a.name).localeCompare(String(b.name),'ko'))}
 async function rfOpen(){RF={scope:'apply',mode:'single',over:false,div:BD_DIV||'',day:'',pool:[],plan:null};modal('rfModal','<div class="bempty">심판 후보와 경력을 불러오는 중…</div>');RF.pool=await rfPool(RF.scope);rfRender()}
