@@ -110,6 +110,7 @@
 /* ── 기록 콘솔 2차 (흰 화면) ── */
 .rc{position:fixed;inset:0;z-index:9999;background:#f3f5f9;color:#16181d;display:flex;flex-direction:column;overflow:hidden;font-family:inherit;transition:box-shadow .2s}
 .rc *{box-sizing:border-box;touch-action:manipulation}
+.rc{-webkit-user-select:none;user-select:none}.rc input,.rc textarea{-webkit-user-select:text;user-select:text}
 .rc.flash{animation:rcFlash 1s infinite}
 @keyframes rcFlash{0%,100%{box-shadow:inset 0 0 0 0 rgba(196,30,47,0)}50%{box-shadow:inset 0 0 0 10px rgba(196,30,47,.9)}}
 .rc .top{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#fff;border-bottom:1px solid #e2e7f0;font-size:12.5px;flex-wrap:wrap}
@@ -759,7 +760,7 @@ function rcRender(){
     :st==='mine'?'<div class="ctrl mine">✅ 이 화면이 입력 중 · '+esc(MY.name||'')+(q?' · <b>미전송 '+q+'건</b>':'')+'</div>'
     :st==='other'?'<div class="ctrl other">⛔ '+esc(MR.ctrlLabel(m))+' 입력 중 — 보기 전용<button onclick="rcTake()">넘겨받기</button></div>'
     :'<div class="ctrl">입력권이 비어 있습니다<button onclick="rcClaim(true)">입력 시작</button></div>';
-  let h='<div class="top"><span class="mr-pill" style="background:'+(STC[m.status]||'#8a919d')+'">'+esc(m.status||'예정')+'</span><b>'+esc([m.div,m.stage,m.round?m.round+'경기':''].filter(Boolean).join(' · ')||'경기')+'</b><span class="meta">'+esc([m.court,dateK(m.day),m.time].filter(Boolean).join(' · '))+'</span>'+(m.locked?'<span class="mr-pill" style="background:#0f766e">확정</span>':'')+'<button class="hb" style="margin-left:auto" onclick="rcHelp()">❓ 사용법</button><button class="x" style="margin-left:0" onclick="rcClose()">✕ 닫기</button></div>'+ctrl;
+  let h='<div class="top"><span class="mr-pill" style="background:'+(STC[m.status]||'#8a919d')+'">'+esc(m.status||'예정')+'</span><b>'+esc([m.div,m.stage,MR.roundLabel(m)].filter(Boolean).join(' · ')||'경기')+'</b><span class="meta">'+esc([m.court,dateK(m.day),m.time].filter(Boolean).join(' · '))+'</span>'+(m.locked?'<span class="mr-pill" style="background:#0f766e">확정</span>':'')+'<button class="hb" style="margin-left:auto" onclick="rcHelp()">❓ 사용법</button><button class="x" style="margin-left:0" onclick="rcClose()">✕ 닫기</button></div>'+ctrl;
   // ① 시작 전: 경기복·풀 고르기
   if(mine&&m.status==='예정'&&!m.kit){ov.innerHTML=h+'<div class="body">'+rcTipHtml()+setupHtml(m,false)+'</div>';return}
   const [L,R]=sidesLR(m);const per=m.period||'';const curP=per==='하프타임'?'':per;const TO=MR.timeouts(m);
@@ -936,7 +937,7 @@ async function qkAssistObj(side,ap){const P=QK.pend;if(!P||P.side!==side)return;
   qkToast((m[side]||{}).name+' 득점 '+(ev.scorer?'#'+ev.scorer.no+' '+(ev.scorer.name||''):'')+(ev.assist?' · 어시 #'+ev.assist.no:'')+' · '+ev.clock,ev.id);
   await sendEvent({kind:'add',id:RC_ID,ev:ev,opts:{requireCtrl:true}})}
 function qkCoach(side){const m=RCM();const o=orderOf((m[side]||{}).pid)||{};QK.pend=qkNew(side,'card');QK.pend.target={kind:'coach',no:'',name:((o.coach||{}).name)||''};rcRender()}
-async function qkCardSave(){const P=QK.pend;if(!P||P.stage!=='card'||!P.card)return;const m=RCM();const r=document.getElementById('qkRsn');const note=String((r?r.value:P.note)||'').trim();
+async function qkCardSave(){const P=QK.pend;if(!P||P.stage!=='card'||!P.card)return;const m=RCM();const r=document.getElementById('qkRsn');const note=String((r&&r.value)||P.note||'').trim();
   const ev={id:MR.uid8(),type:'card',side:P.side,sec:+P.sec,min:Math.floor((+P.sec)/60),period:P.period,card:P.card,note:note,target:P.target,clock:MR.fmtSec(P.sec)};QK.pend=null;
   qkToast((m[P.side]||{}).name+' '+MR.CARDS[P.card]+' '+(P.target.kind==='coach'?'지도자':'#'+P.target.no)+(MR.isOff(P.card)?' · 퇴장 처리':'')+' · '+ev.clock,ev.id);await sendEvent({kind:'add',id:RC_ID,ev:ev,opts:{requireCtrl:true}})}
 function qkToast(text,evId){try{if(navigator.vibrate)navigator.vibrate(35)}catch(e){}QK.toast={text:'✓ '+text,evId:evId};clearTimeout(QK.toastT);QK.toastT=setTimeout(()=>{QK.toast=null;rcRender()},9000);rcRender()}

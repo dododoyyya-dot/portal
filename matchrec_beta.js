@@ -154,7 +154,7 @@
     var byDiv={},scorers={},played=0;
     (matches||[]).forEach(function(m){if(!m||m.golf)return;var dv=m.div||'전체';var D=byDiv[dv]=byDiv[dv]||{teams:{},matches:0};
       var sc=score(m.events||[]);var fin=m.status==='종료';
-      ['a','b'].forEach(function(side){var t=m[side]||{};var key=t.pid||t.name||'';if(!key)return;var T=D.teams[key]=D.teams[key]||{pid:t.pid||'',name:t.name||'',school:t.school||'',p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0,fair:0};
+      ['a','b'].forEach(function(side){var t=m[side]||{};var key=t.pid||t.name||'';if(!key)return;if(!t.pid&&/^(.*)$/.test(String(t.name||'').trim()))return;   // 「(준결승 1경기 승자)」 같은 자리 표시는 순위표에서 제외var T=D.teams[key]=D.teams[key]||{pid:t.pid||'',name:t.name||'',school:t.school||'',p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0,fair:0};
         if(fin){var me=side==='a'?sc.a:sc.b,op=side==='a'?sc.b:sc.a;T.p++;T.gf+=me;T.ga+=op;if(me>op)T.w++;else if(me<op)T.l++;else T.d++;T.pts=T.w*3+T.d;T.fair+=((m.fairplay||{})[side]||0);T.sanc=(T.sanc||0)+(m.events||[]).filter(function(e){return e&&!e.void&&e.type==='card'&&e.side===side}).length}});
       if(fin)(D.fin=D.fin||[]).push(m);
       if(fin){D.matches++;played++}
@@ -246,16 +246,17 @@
         grp.sort(function(x,y){return y.h2h-x.h2h||y.h2hgd-x.h2hgd||(x.sanc||0)-(y.sanc||0)||((lot[x.key]||999)-(lot[y.key]||999))||String(x.name).localeCompare(String(y.name),'ko')});
         grp.forEach(function(t,k){var nb=grp[k-1]||grp[k+1];var nbs=[grp[k-1],grp[k+1]].filter(Boolean);
           t.tb=nbs.every(function(o){return o.h2h!==t.h2h||o.h2hgd!==t.h2hgd})?'승자승':nbs.every(function(o){return o.h2h!==t.h2h||o.h2hgd!==t.h2hgd||(o.sanc||0)!==(t.sanc||0)})?'제재 수':(lot[t.key]?'추첨':'');
-          t.needLot=nbs.some(function(o){return o.h2h===t.h2h&&o.h2hgd===t.h2hgd&&(o.sanc||0)===(t.sanc||0)&&!(lot[o.key]&&lot[t.key])})})}
+          t.needLot=t.p>0&&nbs.some(function(o){return o.p>0&&o.h2h===t.h2h&&o.h2hgd===t.h2hgd&&(o.sanc||0)===(t.sanc||0)&&!(lot[o.key]&&lot[t.key])})})}
       out=out.concat(grp);i=j+1}
     return out.map(function(t,k){return Object.assign({rank:k+1},t)})}
 
   // ── 엑셀(xlsx) — SheetJS 를 필요할 때 불러옴 ──
   function loadXlsx(){if(window.XLSX)return Promise.resolve(window.XLSX);return new Promise(function(ok,no){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=function(){ok(window.XLSX)};s.onerror=function(){no(new Error('엑셀 모듈을 불러오지 못했습니다(네트워크 확인)'))};document.head.appendChild(s)})}
   function teamLabel(t){t=t||{};return (t.school&&t.name&&t.school!==t.name)?t.school+' ('+t.name+')':(t.school||t.name||'')}
-  function matchRows(m){var rows=[];(m.events||[]).filter(function(e){return e&&!e.void}).forEach(function(e){var L=evLine(e);rows.push([e.period||'',evTime(e),teamLabel(m[e.side]||{})||'',e.type==='goal'?'득점':e.type==='card'?'제재':e.type==='timeout'?'작전타임':(e.type||''),L.who,e.type==='goal'?(e.score||''):'',e.note||''])});return rows}
+  function roundLabel(m){var r=String((m&&m.round)||'');return /^d+$/.test(r)?r+'경기':r}
+  function matchRows(m){var rows=[];var PO={'전반':0,'후반':1,'연장':2};(m.events||[]).filter(function(e){return e&&!e.void}).slice().sort(function(a,b){return ((PO[a.period]!=null?PO[a.period]:9)-(PO[b.period]!=null?PO[b.period]:9))||((evSec(a)||0)-(evSec(b)||0))}).forEach(function(e){var L=evLine(e);rows.push([e.period||'',evTime(e),teamLabel(m[e.side]||{})||'',e.type==='goal'?'득점':e.type==='card'?'제재':e.type==='timeout'?'작전타임':(e.type||''),L.who,e.type==='goal'?(e.score||''):'',e.note||''])});return rows}
   function xlsxMatchSheet(X,m,oa,ob){var sc=score(m.events||[]);var H=sc.half||{a:{},b:{}};
-    var aoa=[[(m.div||'')+' '+(m.stage||'')+' '+(m.round||'')+'경기 결과'],['일시',(m.day||'')+' '+(m.time||''),'장소',(m.place||'')+' '+(m.court||'')],[],['팀','전반','후반','연장','합계','결과','풀(전반/후반)','작전타임']];
+    var aoa=[[[m.div,m.stage,roundLabel(m)].filter(Boolean).join(' ')+' 결과'],['일시',(m.day||'')+' '+(m.time||''),'장소',(m.place||'')+' '+(m.court||'')],[],['팀','전반','후반','연장','합계','결과','풀(전반/후반)','작전타임']];
     var to=timeouts(m);['a','b'].forEach(function(sd){var me=sd==='a'?sc.a:sc.b,op=sd==='a'?sc.b:sc.a;var h=H[sd]||{};aoa.push([teamLabel(m[sd]),h['전반']||0,h['후반']||0,h['연장']||0,me,m.status==='종료'?(me>op?'승':me<op?'패':'무'):'',((m.pulls||{})['전반']===sd?'전반 ':'')+((m.pulls||{})['후반']===sd?'후반':''),Object.keys(to[sd]).map(function(p){return p+' '+to[sd][p].map(evTime).join(',')}).join(' / ')])});
     aoa.push([],['구간','시간','팀','구분','내용','점수','사유·메모']);matchRows(m).forEach(function(r){aoa.push(r)});
     var ps=playerStats(m);aoa.push([],['팀','배번','선수','득점','어시스트','제재']);['a','b'].forEach(function(sd){Object.keys(ps[sd]).forEach(function(k){var p=ps[sd][k];aoa.push([teamLabel(m[sd]),p.no,p.name,p.g,p.a,(p.c||[]).map(function(c){return CARDS[c]||c}).join(',')])})});
@@ -279,7 +280,7 @@
         +'<table><tr><th>단계</th><th>경기</th><th>일시·코트</th><th>A팀</th><th>점수</th><th>B팀</th><th>상태</th></tr>'+M.map(function(m){var sc=score(m.events||[]);return '<tr><td>'+esc(m.stage||'')+'</td><td>'+esc(m.round||'')+'</td><td class="s">'+esc([m.day,m.time,m.court].filter(Boolean).join(' '))+'</td><td class="l">'+esc(teamLabel(m.a))+'</td><td><b>'+sc.a+' : '+sc.b+'</b></td><td class="l">'+esc(teamLabel(m.b))+'</td><td>'+esc(m.status||'')+(m.locked?'·확정':'')+'</td></tr>'}).join('')+'</table></div>')});
     var S=(st.scorers||[]).slice(0,40);if(S.length)w.document.write('<div class="pg"><div class="h1" style="font-size:16pt">득점 · 어시스트</div><div class="h2">'+esc(title||'')+'</div><table><tr><th>순위</th><th>부문</th><th>팀</th><th>배번</th><th>선수</th><th>득점</th><th>어시스트</th></tr>'+S.map(function(p,i){return '<tr><td>'+(i+1)+'</td><td>'+esc(p.div)+'</td><td class="l">'+esc(p.team)+'</td><td>'+esc(p.no)+'</td><td>'+esc(p.name)+'</td><td><b>'+p.g+'</b></td><td>'+p.a+'</td></tr>'}).join('')+'</table></div>');
     pend(w)}
-  window.KFDF_MR={CARD_PICK:CARD_PICK,isOff:isOff,KIT_COLORS:KIT_COLORS,kitTextColor:kitTextColor,kitsOf:kitsOf,noFor:noFor,secOf:secOf,fmtSec:fmtSec,evSec:evSec,evTime:evTime,clockSetMs:clockSetMs,clockAdd:clockAdd,clockFloorMin:clockFloorMin,brkLeft:brkLeft,timeouts:timeouts,sentOff:sentOff,rankTable:rankTable,loadXlsx:loadXlsx,saveXlsxMatch:saveXlsxMatch,saveXlsxComp:saveXlsxComp,printComp:printComp,teamLabel:teamLabel,
+  window.KFDF_MR={roundLabel:roundLabel,CARD_PICK:CARD_PICK,isOff:isOff,KIT_COLORS:KIT_COLORS,kitTextColor:kitTextColor,kitsOf:kitsOf,noFor:noFor,secOf:secOf,fmtSec:fmtSec,evSec:evSec,evTime:evTime,clockSetMs:clockSetMs,clockAdd:clockAdd,clockFloorMin:clockFloorMin,brkLeft:brkLeft,timeouts:timeouts,sentOff:sentOff,rankTable:rankTable,loadXlsx:loadXlsx,saveXlsxMatch:saveXlsxMatch,saveXlsxComp:saveXlsxComp,printComp:printComp,teamLabel:teamLabel,
     PERIODS:PERIODS,CARDS:CARDS,esc:esc,uid8:uid8,tsMs:tsMs,score:score,goals:goals,clockMs:clockMs,clockTxt:clockTxt,minuteOf:minuteOf,clockSet:clockSet,clockAct:clockAct,
     ctrlState:ctrlState,ctrlLabel:ctrlLabel,CTRL_BEAT:CTRL_BEAT,addEvent:addEvent,voidEvent:voidEvent,editEvent:editEvent,qPush:qPush,qCount:qCount,flush:flush,
     canRecord:canRecord,isStaffUser:isStaffUser,orderId:orderId,orderFromEntry:orderFromEntry,orderCheck:orderCheck,lineup:lineup,playerStats:playerStats,computeStats:computeStats,
