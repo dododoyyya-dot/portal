@@ -3497,6 +3497,8 @@ function pmRoleUI(){
   document.getElementById('pmGugunRow').style.display=(p.indexOf('gugunOfficer')>=0)?'block':'none';
   document.getElementById('pmRegionRows').style.display=(p.indexOf('regionAdmin')>=0)?'block':'none';
 }
+// 시도명 → 그 연맹의 관할 시도 목록(PM_EXP) · 연맹이 없는 시도(대전·충청·제주 등)는 null
+function pmSidoFed(sd){if(!sd)return null;const fed=Object.keys(PM_EXP).find(k=>PM_EXP[k].indexOf(sd)>=0);return fed?PM_EXP[fed].slice():null}
 async function savePerm(uid){
   const doc=USERS.find(d=>d.id===uid);if(!doc)return;
   const v=doc.data();
@@ -3521,11 +3523,12 @@ async function savePerm(uid){
       if(!duties.length){alert('강습 배정·자격증 업무 중 최소 하나는 위임해야 합니다.');return}
       upd.managedRegion=document.getElementById('pmRegion').value;upd.duties=duties;
       const feds=[...document.querySelectorAll('.pmFed:checked')].map(x=>x.value);
-      upd.managedSido=(duties.indexOf('license')>=0&&feds.length)?[...new Set(feds.flatMap(f=>PM_EXP[f]))]:del();
+      upd.managedSido=(duties.indexOf('license')>=0&&feds.length)?[...new Set(feds.flatMap(f=>PM_EXP[f]))]:(pmSidoFed(isSido&&upd.sido)||del());
       const ex=document.getElementById('pmExpire').value;
       upd.regionAdminExpiresAt=ex?firebase.firestore.Timestamp.fromDate(new Date(ex+'T23:59:59+09:00')):del();
     }else{
-      upd.managedRegion=del();upd.duties=del();upd.managedSido=del();upd.regionAdminExpiresAt=del();
+      // [2026-10-15] 시도임원은 관할 시도(연맹 단위)를 managedSido 로 함께 저장 — 예전엔 이 창으로 저장하면 지워져 자격 공고 등록·발급이 권한 오류로 막혔음
+      upd.managedRegion=del();upd.duties=del();upd.managedSido=pmSidoFed(isSido&&upd.sido)||del();upd.regionAdminExpiresAt=del();
     }
     // 최우선 등급 (admin > regionAdmin > sidoOfficer > gugunOfficer > member)
     const PRI=['admin','regionAdmin','sidoOfficer','gugunOfficer'];
