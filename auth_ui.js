@@ -45,7 +45,7 @@
       ['선정학교 현황','selected.html','','admin'],['학교별 운영일지','schoollogs.html','','admin'],['연맹 인트라넷','intranet.html','','admin']]},
     {t:'대회',h:'competition.html?view=list',d:[
       ['대회 일정 · 안내','competition.html?view=list'],['참가 신청','competition.html?view=entry'],
-      ['심판 · 운영요원 모집','competition.html?view=list&kind=staff'],['라이브 중계','live.html'],['대회 결과','results.html'],['사진첩','gallery.html'],
+      ['심판 · 운영요원 모집','competition.html?view=list&kind=staff'],['라이브 중계','live.html'],['경기 기록 · 운영','match.html'],['대회 결과','results.html'],['사진첩','gallery.html'],
       ['공고 등록 · 관리','competition.html?view=manage','','admin']]},
     {t:'클럽',h:'club.html?view=find',d:[
       ['클럽 찾기 · 가입','club.html?view=find'],['학교스포츠클럽','schoolclub.html'],['학교클럽 전적 · 순위','schoolclub.html?view=rank'],['클럽 만들기','club.html?view=create'],['내 클럽 · 가입 승인','club.html?view=mine'],['클럽 교류전','club.html?view=meet']]},
