@@ -982,7 +982,9 @@ async function numSave(side){const m=RCM();const t=m[side]||{};const o=orderOf(t
 function qkPad(side,what){const v=QK.nums[side]||'';return '<div class="qn"><div class="disp">'+(v?'#'+esc(v):'<span style="color:#9aa1ad;font-size:15px">배번 입력</span>')+'</div>'+[1,2,3,4,5,6,7,8,9].map(n=>'<button onclick="qkNum(\''+side+'\','+n+')">'+n+'</button>').join('')+'<button class="bk" onclick="qkNum(\''+side+'\',-1)">⌫</button><button onclick="qkNum(\''+side+'\',0)">0</button><button class="wide" onclick="qkNumGo(\''+side+'\',\''+what+'\')">확인</button></div>'}
 function qkNum(side,n){let v=QK.nums[side]||'';v=n<0?v.slice(0,-1):(v.length<3?v+String(n):v);QK.nums[side]=v;rcRender()}
 function qkNumGo(side,what){const v=QK.nums[side]||'';if(!v){say('배번을 입력해 주세요');return}QK.nums[side]='';const p={no:v,name:'',key:''};if(what==='assist')return qkAssistObj(side,p);if(what==='card'){QK.pend=qkNew(side,'card');QK.pend.target=Object.assign({kind:'player'},p);return rcRender()}qkScorerObj(side,p)}
-function qkTimeRow(P){return '<div class="qm"><span class="ql">시간</span><button onclick="qkT(-60)">−1′</button><button onclick="qkT(-10)">−10″</button><button onclick="qkT(-1)">−1″</button><span class="mv">'+MR.fmtSec(P.sec)+'</span><button onclick="qkT(1)">+1″</button><button onclick="qkT(10)">+10″</button><button onclick="qkT(60)">+1′</button></div><div class="qm"><span class="ql">구간</span>'+MR.PERIODS.map(p=>'<button class="pc2'+(P.period===p?' on':'')+'" onclick="QK.pend.period=\''+p+'\';rcRender()">'+p+'</button>').join('')+'</div>'}
+// [2026-10-15] 득점·제재 입력 때 시간·구간 칸은 없음 — 저장 순간의 경기 시계·구간을 그대로 씀(틀리면 기록 목록의 「수정」에서 고침)
+function qkTimeRow(P){return ''}
+function qkTimeRow_old(P){return '<div class="qm"><span class="ql">시간</span><button onclick="qkT(-60)">−1′</button><button onclick="qkT(-10)">−10″</button><button onclick="qkT(-1)">−1″</button><span class="mv">'+MR.fmtSec(P.sec)+'</span><button onclick="qkT(1)">+1″</button><button onclick="qkT(10)">+10″</button><button onclick="qkT(60)">+1′</button></div><div class="qm"><span class="ql">구간</span>'+MR.PERIODS.map(p=>'<button class="pc2'+(P.period===p?' on':'')+'" onclick="QK.pend.period=\''+p+'\';rcRender()">'+p+'</button>').join('')+'</div>'}
 function qkT(d){if(!QK.pend)return;QK.pend.sec=Math.max(0,(+QK.pend.sec||0)+d);rcRender()}
 function qkNew(side,stage){const m=RCM();return {side:side,stage:stage,sec:MR.secOf(m),period:curPeriodRec(m)}}
 function qkMode(md){QK.mode=md;QK.pend=null;QK.swap=false;QK.swapSel=null;rcRender()}
@@ -990,11 +992,13 @@ function qkCancel(){QK.pend=null;rcRender()}
 function qkScorerObj(side,p){QK.pend=qkNew(side,'assist');QK.pend.scorer=p;rcRender()}
 async function qkAssistObj(side,ap){const P=QK.pend;if(!P||P.side!==side)return;const m=RCM();
   if(ap&&P.scorer&&ap.no===P.scorer.no){say('득점자와 어시스트가 같은 선수입니다');return}
+  P.sec=MR.secOf(m);P.period=curPeriodRec(m);
   const ev={id:MR.uid8(),type:'goal',side:side,sec:+P.sec,min:Math.floor((+P.sec)/60),period:P.period,scorer:P.scorer||null,assist:ap||null,clock:MR.fmtSec(P.sec)};QK.pend=null;
   qkToast((m[side]||{}).name+' 득점 '+(ev.scorer?'#'+ev.scorer.no+' '+(ev.scorer.name||''):'')+(ev.assist?' · 어시 #'+ev.assist.no:'')+' · '+ev.clock,ev.id);
   await sendEvent({kind:'add',id:RC_ID,ev:ev,opts:{requireCtrl:true}})}
 function qkCoach(side){const m=RCM();const o=orderOf((m[side]||{}).pid)||{};QK.pend=qkNew(side,'card');QK.pend.target={kind:'coach',no:'',name:((o.coach||{}).name)||''};rcRender()}
 async function qkCardSave(){const P=QK.pend;if(!P||P.stage!=='card'||!P.card)return;const m=RCM();const r=document.getElementById('qkRsn');const note=String((r&&r.value)||P.note||'').trim();
+  P.sec=MR.secOf(m);P.period=curPeriodRec(m);
   const ev={id:MR.uid8(),type:'card',side:P.side,sec:+P.sec,min:Math.floor((+P.sec)/60),period:P.period,card:P.card,note:note,target:P.target,clock:MR.fmtSec(P.sec)};QK.pend=null;
   qkToast((m[P.side]||{}).name+' '+MR.CARDS[P.card]+' '+(P.target.kind==='coach'?'지도자':'#'+P.target.no)+(MR.isOff(P.card)?' · 퇴장 처리':'')+' · '+ev.clock,ev.id);await sendEvent({kind:'add',id:RC_ID,ev:ev,opts:{requireCtrl:true}})}
 function qkToast(text,evId){try{if(navigator.vibrate)navigator.vibrate(35)}catch(e){}QK.toast={text:'✓ '+text,evId:evId};clearTimeout(QK.toastT);QK.toastT=setTimeout(()=>{QK.toast=null;rcRender()},9000);rcRender()}
