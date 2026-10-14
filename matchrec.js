@@ -154,7 +154,7 @@
     var byDiv={},scorers={},played=0;
     (matches||[]).forEach(function(m){if(!m||m.golf)return;var dv=m.div||'전체';var D=byDiv[dv]=byDiv[dv]||{teams:{},matches:0};
       var sc=score(m.events||[]);var fin=m.status==='종료';
-      ['a','b'].forEach(function(side){var t=m[side]||{};var key=t.pid||t.name||'';if(!key)return;if(!t.pid&&/^(.*)$/.test(String(t.name||'').trim()))return;   // 「(준결승 1경기 승자)」 같은 자리 표시는 순위표에서 제외var T=D.teams[key]=D.teams[key]||{pid:t.pid||'',name:t.name||'',school:t.school||'',p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0,fair:0};
+      ['a','b'].forEach(function(side){var t=m[side]||{};var key=t.pid||t.name||'';if(!key)return;if(!t.pid&&/^\(.*\)$/.test(String(t.name||'').trim()))return;/* 「(준결승 1경기 승자)」 같은 자리 표시는 순위표에서 제외 */var T=D.teams[key]=D.teams[key]||{pid:t.pid||'',name:t.name||'',school:t.school||'',p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0,fair:0};
         if(fin){var me=side==='a'?sc.a:sc.b,op=side==='a'?sc.b:sc.a;T.p++;T.gf+=me;T.ga+=op;if(me>op)T.w++;else if(me<op)T.l++;else T.d++;T.pts=T.w*3+T.d;T.fair+=((m.fairplay||{})[side]||0);T.sanc=(T.sanc||0)+(m.events||[]).filter(function(e){return e&&!e.void&&e.type==='card'&&e.side===side}).length}});
       if(fin)(D.fin=D.fin||[]).push(m);
       if(fin){D.matches++;played++}
