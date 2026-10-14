@@ -374,7 +374,7 @@ AUTH.onAuthStateChanged(async u=>{
       document.getElementById('mgrBadge').textContent='— '+(CENTRAL?'중앙연맹 (전체 관할)':(MFEDS.join('·')+'연맹 (관할: '+MSIDOS.join('·')+')'));
       if(!CENTRAL){
         const ns=document.getElementById('nSido');
-        ns.innerHTML=MFEDS.map(s=>'<option>'+s+'</option>').join(''); // 관할 연맹만 선택 가능
+        ns.innerHTML=MFEDS.length?MFEDS.map(s=>'<option>'+s+'</option>').join(''):'<option value="">관할 미지정</option>'; // 관할 연맹만 선택 가능 · [2026-10-15] 관할(managedSido) 없는 계정은 빈 값 → 저장 때 안내
         // (아래는 시도연맹 화면 조정 — 중앙 전용 도구 버튼은 이 블록 밖에서 켭니다)
         // [중앙 최종 승인] 갱신과 기존 자격 일괄 등록은 시도연맹이 '요청' 하고 중앙이 최종 승인합니다.
         //   버튼 문구를 바꿔 두어, 누르기 전에 요청 절차임을 알 수 있게 합니다.
@@ -566,6 +566,7 @@ async function addNotice(){
   {const F=feesVal();const big=Object.keys(F).filter(k=>F[k]>1500000);if(big.length&&!confirm('금액이 150만원을 넘는 칸이 있습니다:\n'+big.map(k=>k+' '+F[k].toLocaleString('ko-KR')+'원').join('\n')+'\n\n칸 하나에 금액 하나만 적어야 합니다(예: 3급 칸에 150000). 그대로 저장할까요?'))return}
   const sido=document.getElementById('nSido').value;
   const isCentral=lcHasRole(LMY,'admin');
+  if(!sido&&!isCentral){m.textContent='이 계정은 관할 연맹이 지정되지 않아 공고를 올릴 수 없습니다. 중앙 사무국(031-984-3248)에 관할 연맹 지정을 요청해 주세요.';m.style.color='#C41E2F';return}   // [2026-10-15] 예전엔 권한 오류가 「파일 형식」 안내로 보였음
   const nb=document.getElementById('nBtn');nb.disabled=true;
   try{await addNoticeGo(m,v,sido,isCentral)}
   catch(e){console.warn('notice save',e);const t=String((e&&(e.code||e.message))||e);
