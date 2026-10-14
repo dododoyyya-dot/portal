@@ -143,7 +143,10 @@
 .rc .tadj button{min-height:52px;border:1.5px solid #dfe5ee;background:#fff;color:#16181d;border-radius:13px;font-weight:900;font-size:16px;cursor:pointer;font-family:inherit;font-variant-numeric:tabular-nums}
 .rc .tadj button.rs{background:#f6f8fb;color:#9E1624;border-color:#f1c7cc;font-size:13.5px}
 .rc .tadj button:active{background:#eef3fb}
-@media(max-width:560px){.rc .tadj{grid-template-columns:repeat(3,1fr)}.rc .tadj .rs{grid-column:1/-1}}
+@media(max-width:560px){.rc .tadj{grid-template-columns:repeat(6,1fr);gap:5px}.rc .tadj button{min-height:48px;font-size:14px;padding:0}.rc .tadj .rs{grid-column:1/-1;order:9;min-height:40px}
+  .rc .sb{grid-template-columns:1fr 1fr;padding:10px;gap:8px}.rc .sb .cc{grid-column:1/-1;order:-1;flex-direction:row;justify-content:center}.rc .clk{min-width:0;font-size:38px}.rc .pp{min-width:0;flex:1;max-width:170px}
+  .rc .top{flex-wrap:nowrap}.rc .top b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rc .top .meta{display:none}.rc .top .hb,.rc .top .x{padding:7px 10px;white-space:nowrap}
+  .rc .pbar button{min-width:0;flex:1}.rc .pg{grid-template-columns:repeat(auto-fill,minmax(78px,1fr))}.rc .pc{min-height:80px}.rc .pc b{font-size:27px}}
 /* 구간 */
 .rc .pbar{display:flex;justify-content:center;gap:8px;margin-top:10px;flex-wrap:wrap}
 .rc .pbar button{min-height:50px;min-width:92px;border:2px solid #dfe5ee;background:#fff;color:#374151;border-radius:14px;font-weight:900;font-size:15px;cursor:pointer;font-family:inherit}
@@ -766,7 +769,7 @@ function rcRender(){
   const [L,R]=sidesLR(m);const per=m.period||'';const curP=per==='하프타임'?'':per;const TO=MR.timeouts(m);
   const sideBox=(side,right)=>{const K=kitOfSide(m,side);const used=(TO[side][curP]||[]);const v=side==='a'?sc.a:sc.b;
     const hs=['전반','후반','연장'].filter(p=>H[side][p]!=null).map(p=>p.charAt(0)+' '+H[side][p]).join(' · ');
-    return '<div class="sbt"><div class="kit" style="background:'+esc(K.color)+';color:'+MR.kitTextColor(K.color)+'">'+esc(tname(m,side))+'</div><div class="v">'+v+'</div><small>'+esc(hs)+'&nbsp;</small>'
+    const tm=m[side]||{};return '<div class="sbt"><div class="kit" style="background:'+esc(K.color)+';color:'+MR.kitTextColor(K.color)+'" title="'+esc(tname(m,side))+'">'+esc(tm.name||tm.school||side.toUpperCase())+(tm.school&&tm.school!==tm.name?'<small style="display:block;font-size:11px;font-weight:700;opacity:.85;color:inherit">'+esc(tm.school)+'</small>':'')+'</div><div class="v">'+v+'</div><small>'+esc(hs)+'&nbsp;</small>'
       +(mine&&m.status==='진행'?'<button class="to" '+((used.length||!curP||m.brk)?'disabled':'')+' onclick="toStart(\''+side+'\')">⏱ 작전타임<small>'+(curP?(used.length?curP+' 사용함 · '+esc(MR.evTime(used[0])):curP+' 0/1 남음'):'구간 시작 후 사용')+'</small></button>'
         :(curP&&used.length?'<small class="tou">'+curP+' 작전타임 사용 '+esc(MR.evTime(used[0]))+'</small>':''))+'</div>'};
   h+='<div class="body">'+(mine?rcTipHtml():'')
