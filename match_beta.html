@@ -455,7 +455,7 @@ async function matchForm(id){
     +'<div class="mr-row" style="justify-content:flex-end;margin-top:14px">'+(m?'<button class="mr-btn r" onclick="matchDel(\''+m.id+'\')">🗑 삭제</button><span style="flex:1"></span>':'')+'<button class="mr-btn s" onclick="document.getElementById(\'mfModal\').remove()">닫기</button><button class="mr-btn g" onclick="matchSave(\''+(m?m.id:'')+'\')">💾 저장</button></div>');
 }
 function mfFree(side){const s=document.getElementById('mf_'+side),n=document.getElementById('mf_'+side+'n');n.style.display=s.value==='__free__'?'block':'none'}
-function modal(id,html){const old=document.getElementById(id);if(old)old.remove();const d=document.createElement('div');d.id=id;d.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:9990;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';d.innerHTML='<div style="background:#fff;border-radius:18px;max-width:560px;width:100%;max-height:92vh;overflow:auto;padding:22px">'+html+'</div>';document.body.appendChild(d)}
+function modal(id,html){const old=document.getElementById(id);if(old)old.remove();const d=document.createElement('div');d.id=id;d.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:10005;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';d.innerHTML='<div style="background:#fff;border-radius:18px;max-width:560px;width:100%;max-height:92vh;overflow:auto;padding:22px">'+html+'</div>';document.body.appendChild(d)}
 function teamRef(key,nameInput){if(key==='__free__')return {pid:'',name:nameInput,school:'',scid:'',score:0};const c=teamEntries().find(x=>entryKey(x)===key);if(!c)return null;return {pid:entryKey(c),name:c.name||'',school:c.teamOrg||'',scid:c.teamSchoolClubId||'',score:0}}
 async function matchSave(id){
   const m=id?MATCHES.find(x=>x.id===id):null;
@@ -656,7 +656,7 @@ async function bdAdvance(m){const sc=MR.score(m.events||[]);if(sc.a===sc.b)retur
 // ══ 오더지 ══
 function orderTab(){
   const teams=teamEntries();if(!teams.length)return '<div class="bempty">단체전 참가 신청이 없습니다.</div>';
-  const by={};teams.forEach(c=>{(by[(c.prefs||[])[0]||'부문 미지정']=by[(c.prefs||[])[0]||'부문 미지정']||[]).push(c)});
+  const by={};teams.forEach(c=>{const o=orderOf(entryKey(c));const dv=(o&&o.div)||(c.prefs||[])[0]||'부문 미지정';(by[dv]=by[dv]||[]).push(c)});
   const sw=k=>'<span title="'+esc(k.name)+'" style="display:inline-block;width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(17,17,20,.25);vertical-align:middle;background:'+esc(k.color)+'"></span>';
   return '<div class="mr-note" style="margin:6px 0 2px">참가 신청 명단이 오더지에 그대로 들어가고, 대표자가 <b>경기복 2벌(색상)</b>과 옷별 배번, 주장·주전·교체만 적어 제출합니다. 제출된 오더지의 선수가 기록 콘솔의 선수 카드가 됩니다. 한 대표자가 여러 팀을 신청했다면 팀마다 따로 작성합니다.</div>'
     +Object.keys(by).sort().map(dv=>'<div style="margin:18px 0 4px;display:flex;align-items:center;gap:8px"><span style="font-size:17px;font-weight:900;color:#153A77;border-left:5px solid #153A77;padding-left:10px">'+esc(dv)+'</span><span class="mr-note">'+by[dv].length+'팀</span></div><table class="mr-tbl"><tr><th class="l">팀 · 소속</th><th>경기복</th><th>명단</th><th>배번</th><th>상태</th><th>감독교사</th><th></th></tr>'
@@ -668,7 +668,7 @@ let OD=null,OD_PID='';
 function orderOpen(pid){
   const c=teamEntries().find(x=>entryKey(x)===pid);if(!c){say('참가 항목을 찾지 못했습니다');return}
   const mine=ME&&c.uid===ME.uid;if(!mine&&!STAFF){say('이 팀의 대표자(신청자) 또는 운영진만 열 수 있습니다');return}
-  const prev=orderOf(pid);OD=MR.orderFromEntry(SLOT_ID,SLOT,c,prev);OD.kits=MR.kitsOf(prev||{}).map(k=>({name:k.name,color:k.color}));OD_PID=pid;
+  const prev=orderOf(pid);OD=MR.orderFromEntry(SLOT_ID,SLOT,c,prev);if(prev&&prev.div)OD.div=prev.div;OD.entryDiv=(c.prefs||[])[0]||'';OD.kits=MR.kitsOf(prev||{}).map(k=>({name:k.name,color:k.color}));OD_PID=pid;
   const rk={'주장':0,'주전':0,'':1,'교체':2};OD.players.sort((a,b)=>((rk[a.role||'']!=null?rk[a.role||'']:1)-(rk[b.role||'']!=null?rk[b.role||'']:1))||((+a.no||999)-(+b.no||999))||(a.i-b.i));
   odRender();
 }
@@ -682,7 +682,7 @@ function odRender(){
     return head+'<tr><td>'+(i+1)+'</td><td class="in"><input type="number" min="0" max="999" inputmode="numeric" value="'+esc(p.no)+'" '+dis+' oninput="OD.players['+i+'].no=this.value" style="width:64px;text-align:center" class="mr-in"></td><td class="l"><b>'+esc(p.name)+'</b><br><small style="color:#6b7280">'+esc(p.birth||'')+'</small></td><td style="font-size:12px">'+esc(p.school||'-')+'</td><td class="in"><input type="number" min="0" max="999" inputmode="numeric" value="'+esc(p.subNo)+'" '+dis+' oninput="OD.players['+i+'].subNo=this.value" style="width:64px;text-align:center" class="mr-in" placeholder="같음"></td><td><select class="mr-in" '+dis+' onchange="OD.players['+i+'].role=this.value"><option value="">—</option>'+['주장','주전','교체'].map(r=>'<option'+(p.role===r?' selected':'')+'>'+r+'</option>').join('')+'</select></td></tr>'}).join('');
   const sign=OD.coach.sign||(mine&&MY&&MY.signatureImg)||'';
   modal('odModal','<b style="font-size:16px">📝 출전 선수 오더지</b><div class="mr-note">'+esc(SLOT.title||'')+'</div>'
-    +'<div class="od-div">출전 부문 : '+esc(OD.div||'미지정')+'</div>'
+    +'<div class="od-div">출전 부문 : '+esc(OD.div||'미지정')+(STAFF?' <select class="mr-in" style="width:auto;display:inline-block;margin-left:8px;font-size:14px;padding:5px 8px" onchange="odDiv(this.value)"><option value="">부문 변경…</option>'+divsOf().filter(x=>x!==OD.div).map(x=>'<option>'+esc(x)+'</option>').join('')+'<option value="__new">＋ 직접 입력</option></select>':'')+'</div>'+(OD.entryDiv&&OD.entryDiv!==OD.div?'<div class="mr-note" style="color:#b8860b;text-align:center">참가 신청 부문(\''+esc(OD.entryDiv)+'\')과 다릅니다 — 저장할 때 신청 부문도 함께 바꿀 수 있습니다</div>':'')+''
     +'<div class="mr-card" style="margin-top:10px"><div class="mr-row"><span class="mr-note" style="font-weight:800">소속</span><b style="font-size:16px">'+esc(OD.school||OD.team)+'</b>'+(OD.team&&OD.team!==OD.school?'<span style="color:#6b7280">팀명 '+esc(OD.team)+'</span>':'')+'<span style="flex:1"></span><span class="mr-pill" style="background:'+(OD.status==='제출'?'#0f766e':OD.status==='잠금'?'#153A77':'#b8860b')+'">'+esc(OD.status)+'</span></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="mr-lab">감독교사 성명</label><input class="mr-in" id="od_cn" value="'+esc(OD.coach.name)+'" '+dis+' oninput="OD.coach.name=this.value"></div><div><label class="mr-lab">직책</label><input class="mr-in" id="od_cr" value="'+esc(OD.coach.role)+'" placeholder="감독교사 · 지도자" '+dis+' oninput="OD.coach.role=this.value"></div></div>'
     +'<label class="mr-lab">서명 (자동 기입)</label><div class="mr-row">'+(sign?'<img src="'+esc(sign)+'" style="height:40px;background:#fff;border:1px solid #dfe5ee;border-radius:6px"> <span class="mr-note">'+(OD.coach.sign?'제출 때 기입된 서명':'회원 등록 서명이 제출 시 기입됩니다')+'</span>':'<span class="mr-note" style="color:#C41E2F">등록된 서명이 없습니다 — 마이페이지 › 프로필에서 서명을 등록하면 자동으로 들어갑니다(없어도 제출은 됩니다)</span>')+'</div></div>'
@@ -691,6 +691,7 @@ function odRender(){
     +'<div style="overflow:auto"><table class="mr-tbl"><tr><th>순번</th><th>'+sw(K[0])+' 1번 옷<br>배번</th><th class="l">선수 이름</th><th>소속</th><th>'+sw(K[1])+' 2번 옷<br>배번</th><th>비고</th></tr>'+rows+'</table></div>'
     +'<div class="mr-row" style="justify-content:flex-end;margin-top:14px">'+(orderOf(pid)?'<button class="mr-btn ghost" onclick="orderPdf(\''+esc(pid)+'\')">📄 PDF</button>':'')+'<span style="flex:1"></span><button class="mr-btn s" onclick="document.getElementById(\'odModal\').remove()">닫기</button>'+(locked?'':'<button class="mr-btn y" onclick="orderSave(\''+esc(pid)+'\',\'작성중\')">임시 저장</button><button class="mr-btn g" onclick="orderSave(\''+esc(pid)+'\',\'제출\')">✅ 제출</button>')+'</div>');
 }
+function odDiv(v){if(!v)return;if(v==='__new'){v=prompt('새 부문 이름을 적어 주세요 (예: 얼티미트 초등 혼성)');if(!v)return odRender();v=v.trim()}OD.div=v;odRender()}
 function odKit(i,color,name){const k=OD.kits[i];const auto=!k.name||/^\d번 경기복/.test(k.name)||MR.KIT_COLORS.some(c=>k.name===c[0]+' 유니폼'||k.name===c[0]+' 조끼');k.color=color;if(name&&auto)k.name=name+(i?' 조끼':' 유니폼');const box=document.querySelector('#odModal');const sc=box?box.scrollTop:0;odRender();const nb=document.querySelector('#odModal');if(nb)nb.scrollTop=sc}
 async function orderSave(pid,status){
   OD.coach.name=v('od_cn');OD.coach.role=v('od_cr');
@@ -704,9 +705,16 @@ async function orderSave(pid,status){
     kits:OD.kits.map((k,i)=>({name:String(k.name||'').trim()||((i+1)+'번 경기복'),color:k.color||'#ffffff'})),
     players:OD.players.slice().sort((a,b)=>a.i-b.i).map(p=>({i:p.i,key:p.key,name:p.name,birth:p.birth,school:p.school,gender:p.gender,no:String(p.no||'').trim(),subNo:String(p.subNo||'').trim(),role:p.role||'',uid:p.uid||'',guardianUid:p.guardianUid||''})),
     updatedAt:FV.serverTimestamp(),updatedBy:whoAmI().name,history:FV.arrayUnion({at:new Date().toISOString(),by:whoAmI().name,status:status})};
-  try{await DB.collection('compOrders').doc(MR.orderId(SLOT_ID,pid)).set(doc,{merge:true});document.getElementById('odModal').remove();if(status==='제출')say('✓ 오더지를 제출했습니다. PDF는 오더지 탭에서 내려받을 수 있습니다.')}
+  try{await DB.collection('compOrders').doc(MR.orderId(SLOT_ID,pid)).set(doc,{merge:true});document.getElementById('odModal').remove();
+    if(STAFF&&OD.div&&OD.entryDiv!==OD.div&&confirm('참가 신청의 부문도 「'+OD.div+'」(으)로 바꿀까요?\n(대진 만들기·빠른 경기 추가·순위표에 쓰이는 부문입니다. 이미 만든 경기의 부문은 「✏️ 경기 정보」에서 고칩니다)'))await entryDivSave(pid,OD.div);if(status==='제출')say('✓ 오더지를 제출했습니다. PDF는 오더지 탭에서 내려받을 수 있습니다.')}
   catch(e){say('저장 실패: '+(/permission/i.test(String(e))?'권한이 없습니다 (보안 규칙 v52 게시 필요)':(e.message||e)))}
 }
+// 참가 신청(compSlots.claimed)의 이 팀 마지막 줄 부문만 바꿈 — 운영진(관리자·관할 시도임원)
+async function entryDivSave(pid,dv){const ref=DB.collection('compSlots').doc(SLOT_ID);
+  try{await DB.runTransaction(async tx=>{const d=await tx.get(ref);const x=d.data()||{};const cl=(x.claimed||[]).slice();let k=-1;cl.forEach((c,i)=>{if(c&&(c.pid||c.uid)===pid)k=i});if(k<0)throw new Error('신청 줄을 찾지 못했습니다');
+      const old=cl[k];const prefs=(old.prefs||[]).slice();prefs[0]=dv;cl[k]=Object.assign({},old,{prefs:prefs,divEdit:{from:(old.prefs||[])[0]||'',to:dv,by:whoAmI().name,at:new Date().toISOString()}});tx.update(ref,{claimed:cl})});
+    const s2=await ref.get();SLOT=s2.data();render();say('✓ 참가 신청 부문을 「'+dv+'」(으)로 바꿨습니다.')}
+  catch(e){say('신청 부문 변경 실패: '+(/permission/i.test(String(e))?'권한이 없습니다(관리자·관할 시도연맹 임원만)':(e.message||e))+'\n오더지의 출전 부문은 저장되었습니다.')}}
 function orderPdf(pid){const o=orderOf(pid);if(!o){say('아직 저장된 오더지가 없습니다');return}MR.printOrder(o)}
 // ══ 기록 콘솔 ══
 function rcOpen(id){
@@ -786,6 +794,7 @@ function rcRender(){
   if(mine){
     h+='<div class="mode"><button class="g'+(QK.mode==='goal'?' on':'')+'" onclick="qkMode(\'goal\')">⚡ 득점 기록</button><button class="c'+(QK.mode==='card'?' on':'')+'" onclick="qkMode(\'card\')">🟨 제재 기록</button></div>'
       +'<div class="tools"><button class="'+(QK.swap?'on':'')+'" onclick="swapMode()">⇅ 선수 교체 '+(QK.swap?'켜짐':'')+'</button><button onclick="numSheet(\''+L+'\')"># 배번 변경 · '+esc((m[L]||{}).name||'')+'</button><button onclick="numSheet(\''+R+'\')"># 배번 변경 · '+esc((m[R]||{}).name||'')+'</button></div>';
+    h+='<div class="tools"><button onclick="rcOrder(\''+L+'\')">📝 오더지 · '+esc((m[L]||{}).name||'')+'</button><button onclick="rcOrder(\''+R+'\')">📝 오더지 · '+esc((m[R]||{}).name||'')+'</button>'+(STAFF?'<button onclick="matchForm(\''+m.id+'\')">✏️ 경기 정보 (부문·단계·팀·심판)</button>':'')+'</div>';
     if(QK.swap)h+='<div class="swapbar">⇅ 바꿀 두 선수를 차례로 누르세요 (주전 ↔ 후보). 카드를 끌어 놓아도 됩니다.<button onclick="swapMode()">완료</button></div>';
     h+='<div class="qteams">'+qkTeam(m,L)+qkTeam(m,R)+'</div>';
   }
@@ -913,6 +922,11 @@ async function lineupMove(side,key,zone,tkey){const m=RCM();const T=teamPl(m,sid
 function swapMode(){QK.swap=!QK.swap;QK.swapSel=null;QK.pend=null;rcRender()}
 function swapTap(side,key){const S=QK.swapSel;if(!S||S.side!==side){QK.swapSel={side:side,key:key};rcRender();return}if(S.key===key){QK.swapSel=null;rcRender();return}
   const m=RCM();const T=teamPl(m,side);const aOn=T.onKeys.indexOf(S.key)>=0,bOn=T.onKeys.indexOf(key)>=0;lineupMove(side,S.key,bOn?'on':'bench',key)}
+// ── 기록 화면에서 오더지 바로 열기 (대표자·운영진) — 저장하면 기록 화면에 바로 반영 ──
+function rcOrder(side){const m=RCM();const t=(m||{})[side]||{};if(!t.pid){say('이 팀은 참가 신청과 연결되지 않아 오더지가 없습니다. 「✏️ 경기 정보」에서 팀을 참가 신청 팀으로 골라 주세요.');return}
+  const c=teamEntries().find(x=>entryKey(x)===t.pid);if(!c){say('참가 신청에서 이 팀을 찾지 못했습니다(취소·반려되었을 수 있습니다).');return}
+  if(!STAFF&&!(ME&&c.uid===ME.uid)){say('오더지는 그 팀 대표자와 운영진만 고칠 수 있습니다. 경기 중 배번만 바뀐 경우는 「# 배번 변경」을 이용해 주세요.');return}
+  orderOpen(t.pid)}
 // ── 배번 변경 (오더지와 같이) ──
 function numSheet(side){const m=RCM();const t=m[side]||{};const o=orderOf(t.pid);if(!o){say('이 팀은 오더지가 없어 배번 목록이 없습니다. 기록은 숫자판으로 배번을 직접 넣으면 됩니다.');return}const kit=kitIdx(m,side);const K=kitOfSide(m,side);const ov=((m.nums||{})[side])||{};
   sheet('<div class="hd"><b># 배번 변경</b><span class="st">'+esc(tname(m,side))+' · '+esc(K.name)+' 배번</span><button class="x" onclick="sheetClose()">✕</button></div><div class="mr-note">바꾼 배번은 이 경기 기록에 바로 쓰이고, 권한(대표자·운영진)이 있으면 오더지의 「'+esc(K.name)+'」 배번에도 함께 저장됩니다. 이미 저장된 기록의 배번은 그대로 남습니다.</div>'
