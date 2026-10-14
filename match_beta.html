@@ -713,7 +713,7 @@ function rcOpen(id){
   RC_ID=id;const m=MATCHES.find(x=>x.id===id);
   let ov=document.getElementById('rcOv');if(!ov){ov=document.createElement('div');ov.id='rcOv';ov.className='rc';document.body.appendChild(ov);document.body.style.overflow='hidden'}
   try{history.replaceState(null,'',PAGE+'?m='+id)}catch(e){}
-  if(RC_UNSUB)RC_UNSUB();RC_UNSUB=DB.collection('liveMatches').doc(id).onSnapshot(d=>{if(!d.exists){rcClose();return}const x=Object.assign({id:d.id},d.data());const i=MATCHES.findIndex(y=>y.id===id);if(i>=0)MATCHES[i]=x;else MATCHES.push(x);rcRender()},e=>console.warn('rc',e));
+  if(RC_UNSUB)RC_UNSUB();let first=true;RC_UNSUB=DB.collection('liveMatches').doc(id).onSnapshot(d=>{if(!d.exists){rcClose();return}const x=Object.assign({id:d.id},d.data());const i=MATCHES.findIndex(y=>y.id===id);if(i>=0)MATCHES[i]=x;else MATCHES.push(x);if(first){first=false;if(!m&&canRec(x)&&!x.locked&&MR.ctrlState(x,ME&&ME.uid)!=='other')rcClaim(false)}rcRender()},e=>console.warn('rc',e));
   DB.collection('compSigns').doc(id).get().then(d=>{SIGNS=d.exists?d.data():{}}).catch(()=>{SIGNS={}});
   if(RC_TICK)clearInterval(RC_TICK);RC_TICK=setInterval(rcTick,1000);
   if(m&&canRec(m))rcClaim(false);
