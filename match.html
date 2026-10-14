@@ -1015,8 +1015,8 @@ async function qkCardSave(){const P=QK.pend;if(!P||P.stage!=='card'||!P.card)ret
   if(willOff){const m2=Object.assign({},m,{events:(m.events||[]).concat([ev])});const T=teamPl(m2,P.side);if(T){const cap=T.on.filter(p=>!isOffP(m2,P.side,p)).length;const Lu=Object.assign({},m.lineup||{});Lu[P.side]=Object.assign({},Lu[P.side]||{},{on:T.onKeys,cap:cap});await rcUpdate({lineup:Lu})}}}
 function qkToast(text,evId){try{if(navigator.vibrate)navigator.vibrate(35)}catch(e){}QK.toast={text:'✓ '+text,evId:evId};clearTimeout(QK.toastT);QK.toastT=setTimeout(()=>{QK.toast=null;rcRender()},9000);rcRender()}
 function lastEv(m){const L=(m.events||[]).filter(e=>e&&!e.void&&e.type&&['goal','card','timeout'].indexOf(e.type)>=0);return L[L.length-1]||null}
-async function qkUndoLast(){const m=RCM();const e=lastEv(m);if(!e)return;const L=MR.evLine(e);if(!confirm('마지막 기록을 되돌릴까요?\n'+((m[e.side]||{}).name||'')+' · '+(e.type==='timeout'?'작전타임':L.who)+(L.min?' · '+L.min:'')+'\n(기록은 지워지지 않고 취소 표시만 남습니다)'))return;QK.toast=null;await sendEvent({kind:'void',id:RC_ID,evId:e.id});if(m.brk&&m.brk.evId===e.id)await rcUpdate({brk:null})}
-async function qkUndo(){const t=QK.toast;if(!t||!t.evId)return;QK.toast=null;clearTimeout(QK.toastT);const m=RCM();rcRender();await sendEvent({kind:'void',id:RC_ID,evId:t.evId});if(m&&m.brk&&m.brk.evId===t.evId)await rcUpdate({brk:null})}
+async function qkUndoLast(){const m=RCM();const e=lastEv(m);if(!e)return;const L=MR.evLine(e);if(!confirm('마지막 기록을 되돌릴까요?\n'+((m[e.side]||{}).name||'')+' · '+(e.type==='timeout'?'작전타임':L.who)+(L.min?' · '+L.min:'')+'\n(기록은 지워지지 않고 취소 표시만 남습니다)'))return;QK.toast=null;await sendEvent({kind:'void',id:RC_ID,evId:e.id});if(m.brk&&m.brk.evId===e.id)await rcUpdate({brk:null});if(e.type==='card')await capClear(e.side,e.id)}
+async function qkUndo(){const t=QK.toast;if(!t||!t.evId)return;QK.toast=null;clearTimeout(QK.toastT);const m=RCM();rcRender();await sendEvent({kind:'void',id:RC_ID,evId:t.evId});if(m&&m.brk&&m.brk.evId===t.evId)await rcUpdate({brk:null});const ev=m&&(m.events||[]).find(x=>x.id===t.evId);if(ev&&ev.type==='card')await capClear(ev.side,ev.id)}
 // ── 시계 ──
 function rcClockAdd(sec){const m=RCM();if(!m)return;rcUpdate({clock:MR.clockAdd(m,sec*1000)})}
 async function rcUpdate(upd,msg){try{await DB.collection('liveMatches').doc(RC_ID).update(Object.assign({updatedAt:FV.serverTimestamp(),by:whoAmI().name},upd))}catch(e){say((msg||'저장 실패')+': '+(e.message||e))}}
@@ -1043,7 +1043,9 @@ async function sendEvent(op){
 }
 window.addEventListener('online',()=>{if(RC_ID)MR.flush(DB,firebase,Object.assign(whoAmI(),{screen:'match'}),()=>rcRender())});
 async function evVoid(id){const m=RCM();const e=(m.events||[]).find(x=>x.id===id);if(!e)return;const wasOff=e.type==='card'&&e.target&&e.target.kind!=='coach'&&!!MR.sentOff(m,e.side)['k:'+(e.target.key||'')];const L=MR.evLine(e);if(!confirm('이 기록을 취소할까요?\n'+(m[e.side]||{}).name+' · '+(e.type==='timeout'?'작전타임':L.who)+(L.min?' · '+L.min:'')+'\n(기록은 지워지지 않고 취소 표시만 남습니다)'))return;await sendEvent({kind:'void',id:RC_ID,evId:id});if(m.brk&&m.brk.evId===id)await rcUpdate({brk:null});
-  if(wasOff){const m2=RCM();const T=teamPl(m2,e.side);if(T&&!T.on.some(p=>isOffP(m2,e.side,p))){const Lu=Object.assign({},m2.lineup||{});Lu[e.side]={on:T.onKeys};await rcUpdate({lineup:Lu})}}}
+  if(wasOff)await capClear(e.side,id)}
+// 퇴장 기록이 취소되어 그 팀에 퇴장 선수가 없어지면 주전 인원 상한(cap)도 풀어 줌 — 화면 자료가 늦게 와도 맞게 취소된 상태로 계산
+async function capClear(side,voidId){const m=RCM();if(!m)return;const m2=Object.assign({},m,{events:(m.events||[]).map(x=>x.id===voidId?Object.assign({},x,{void:{by:'',at:''}}):x)});const T=teamPl(m2,side);if(!T)return;if(T.on.some(p=>isOffP(m2,side,p)))return;const cur=((m.lineup||{})[side])||{};if(cur.cap==null)return;const Lu=Object.assign({},m.lineup||{});Lu[side]={on:T.onKeys};await rcUpdate({lineup:Lu})}
 // ── 기록 수정: 시간(분:초)·구간·득점자/어시스트·제재 종류/사유 ──
 function evEdit(id){const m=RCM();const e=(m.events||[]).find(x=>x.id===id);if(!e)return;SHEET={kind:'edit',id:id,sec:MR.evSec(e)||0,period:e.period||'전반',side:e.side,scorer:e.scorer||null,assist:e.assist||null,type:e.type,card:e.card||'',note:e.note||'',target:e.target||null};editRender()}
 function editRender(){const S=SHEET;const m=RCM();const tg=S.target||{};
