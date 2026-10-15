@@ -801,6 +801,7 @@ function tname(m,side){return MR.teamLabel((m||{})[side]||{})||side.toUpperCase(
 function teamPl(m,side){const t=(m||{})[side]||{};const o=orderOf(t.pid);if(!o)return null;const L=MR.lineup(o,{kit:kitIdx(m,side),nums:((m.nums||{})[side])||{}});
   const saved=(((m.lineup||{})[side])||{}).on;let onKeys;
   if(Array.isArray(saved))onKeys=saved.filter(k=>L.some(p=>p.key===k));else{const st=L.filter(p=>p.role==='주장'||p.role==='주전');onKeys=(st.length?st:L).map(p=>p.key)}
+  onKeys=onKeys.slice(0,maxOn(m));   // [주전 상한] 오더지에 주전을 더 많이 적었거나 예전에 저장한 명단이 많아도 설정 인원(기본 7)까지만
   const on=onKeys.map(k=>L.find(p=>p.key===k)).filter(Boolean);return {all:L,on:on,bench:L.filter(p=>onKeys.indexOf(p.key)<0),onKeys:onKeys}}
 function maxOn(m){return Math.max(1,parseInt(((m&&m.plen)||{}).on,10)||7)}
 function isOffP(m,side,p){const o=MR.sentOff(m,side);return !!(o['k:'+p.key]||o['n:'+p.no])}
