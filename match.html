@@ -891,7 +891,7 @@ function rcHelp(){sheet('<div class="hd"><b>❓ 기록 콘솔 사용법</b><butt
   +'<li><b>경기 시작</b> — 아래 「▶ 경기 시작」을 누르면 전반이 시작되고 시계가 갑니다. 구간은 시계 위 「전반전」 옆 ◀ ▶ 로 넘깁니다(전반 → 하프타임 → 후반 → 연장).</li>'
   +'<li><b>풀</b> — 팀 칸 아래 「전반 풀」을 누르면 상대 팀에 「후반 풀」이 자동으로 표시됩니다.</li>'
   +'<li><b>득점</b> — 팀 칸 머리의 「득점」 상태에서 득점한 선수 카드를 누르고, 이어서 어시스트 선수(또는 「어시스트 없음」)를 누르면 저장됩니다.</li>'
-  +'<li><b>제재</b> — 팀 칸 머리의 「제재」를 누르고 선수(또는 지도자)를 고른 뒤 주의·옐로·레드를 고르고 사유를 적어 저장합니다. 레드를 받은 선수 카드는 잠깁니다.</li>'
+  +'<li><b>제재</b> — 팀 칸 머리의 「제재」를 누르고 선수(또는 지도자)를 고른 뒤 주의·옐로·레드를 고르고 사유를 적어 저장합니다. 레드(또는 옐로 2장)를 받은 선수는 후보 칸으로 내려가 잠기고, 빈 자리에 다른 선수를 넣어 인원 그대로 진행합니다.</li>'
   +'<li><b>주전·후보 교체</b> — 휴대폰·태블릿: 선수 카드를 <b>길게 누르면</b> 그 선수가 선택되고, 이어서 <b>바꿀 선수를 누르면</b> 자리가 바뀝니다. PC: 마우스로 끌어 다른 선수 위에 놓거나 주전·후보 칸으로 옮깁니다. 「⇅ 교체」 버튼을 켜고 두 선수를 차례로 눌러도 됩니다.</li>'
   +'<li><b>작전타임</b> — 점수 아래 버튼. 경기 시계가 멈추고 1분 타이머가 따로 돕니다. 구간(전반·후반·연장)마다 팀당 1번입니다.</li>'
   +'<li><b>구간 시계</b> — 전반·후반·연장은 저마다 0:00 부터 셉니다. 구간이 끝나면 종료 시간이 시계 위에 작게 남고, 정한 구간 시간(기본 20분·연장 5분)이 지나면 시계가 붉게 깜박입니다(자동으로 멈추지 않음).</li>'
@@ -982,7 +982,7 @@ function qkTeam(m,side){
       +'<input class="rsn" id="qkRsn" placeholder="사유를 적어 주세요 (예: 고의 접촉, 경기 지연, 항의)" value="'+esc(P.note||'')+'" oninput="QK.pend.note=this.value">'
       +'<div class="qa"><button class="ok c" '+(P.card?'':'disabled')+' onclick="qkCardSave()">✓ '+(P.card?esc(MR.CARDS[P.card])+' ':'')+'제재 저장</button><button class="no" onclick="qkCancel()">취소</button></div>';
   }else if(T&&T.all.length){
-    h+='<div class="zone" data-side="'+side+'" data-zone="on"><div class="zl">주전 <small>'+(T.on.length-T.on.filter(p=>isOffP(m,side,p)).length)+' / '+maxOn(m)+'명</small>'+(T.on.some(p=>isOffP(m,side,p))?'<span class="off">퇴장 '+T.on.filter(p=>isOffP(m,side,p)).length+' · 한 명 적게 진행</span>':'')+'<span class="kbar" style="background:'+esc(K.color)+'"></span></div><div class="pg">'+T.on.map(p=>chip(p,'on')).join('')+Array.from({length:Math.max(0,maxOn(m)-T.on.length)}).map(()=>'<div class="pc empty"><b>＋</b><span>빈 자리</span></div>').join('')+'</div></div>'
+    h+='<div class="zone" data-side="'+side+'" data-zone="on"><div class="zl">주전 <small>'+(T.on.length-T.on.filter(p=>isOffP(m,side,p)).length)+' / '+maxOn(m)+'명</small>'+(T.on.some(p=>isOffP(m,side,p))?'<span class="off">퇴장 '+T.on.filter(p=>isOffP(m,side,p)).length+' — 다른 선수를 넣어 주세요</span>':'')+'<span class="kbar" style="background:'+esc(K.color)+'"></span></div><div class="pg">'+T.on.map(p=>chip(p,'on')).join('')+Array.from({length:Math.max(0,maxOn(m)-T.on.length)}).map(()=>'<div class="pc empty"><b>＋</b><span>빈 자리</span></div>').join('')+'</div></div>'
       +'<div class="zone bench" data-side="'+side+'" data-zone="bench"><div class="zl">후보 <small>'+T.bench.length+'명</small></div><div class="pg">'+(T.bench.map(p=>chip(p,'bench')).join('')||'<div class="ze">후보 없음 — 주전 카드를 여기로 끌면 후보가 됩니다</div>')+'</div></div>';
     h+='<div class="qx">'+(QK.mode==='card'?'<button onclick="qkCoach(\''+side+'\')">👔 지도자 제재</button>':'<button onclick="qkScorerObj(\''+side+'\',null)">득점자 모름 — 점수만 올리기</button>')+'</div>';
   }else{
@@ -1016,9 +1016,8 @@ function pcTap(side,key,act){if(act==='assist'){qkAssistObj(side,pickByKey(side,
 async function lineupMove(side,key,zone,tkey){const m=RCM();const T=teamPl(m,side);if(!T||!key)return;let on=T.onKeys.slice();const inOn=on.indexOf(key)>=0;const nm=k=>{const p=T.all.find(x=>x.key===k);return p?'#'+p.no+' '+p.name:''};let msg='';
   // [퇴장 2026-10-15] 레드·옐로 2장으로 퇴장한 선수는 그 자리에 다른 선수를 넣을 수 없고(한 명 적게 진행), 퇴장 뒤 주전 인원 상한(cap)을 넘겨 추가도 못 함
   const isO=k=>{const p=T.all.find(x=>x.key===k);return !!(p&&isOffP(m,side,p))};
-  if(isO(key)||(tkey&&isO(tkey))){say('퇴장한 선수는 교체할 수 없습니다. 그 자리는 비워 두고 한 명 적게 진행합니다.');QK.swapSel=null;rcRender();return}
-  const cap=(((m.lineup||{})[side])||{}).cap;const activeNow=on.filter(k=>!isO(k)).length;
-  if(zone==='on'&&!inOn&&!(tkey&&on.indexOf(tkey)>=0)&&cap!=null&&activeNow>=cap){say('퇴장으로 이 팀은 '+cap+'명까지만 뛸 수 있습니다. 다른 선수와 바꾸는 것만 됩니다.');QK.swapSel=null;rcRender();return}
+  // [퇴장 2026-10-15 수정] 퇴장 선수는 다시 뛸 수 없을 뿐, 팀은 그 자리에 다른 선수를 넣어 인원 그대로 진행(회장님 확인). 퇴장 선수를 주전으로 넣거나 주전 자리에서 바꿔 들어가게 하는 것만 막음
+  if(zone==='on'&&(isO(key)||(tkey&&!inOn&&isO(tkey)&&false))){say('퇴장한 선수는 다시 뛸 수 없습니다.');QK.swapSel=null;rcRender();return}
   if(zone==='on'&&!inOn&&!(tkey&&on.indexOf(tkey)>=0)&&on.length>=maxOn(m)){say('주전은 '+maxOn(m)+'명까지입니다. 주전 선수와 바꿔 넣어 주세요.');QK.swapSel=null;rcRender();return}
   if(zone==='on'){
     if(inOn){if(!tkey||on.indexOf(tkey)<0)return;on.splice(on.indexOf(key),1);on.splice(on.indexOf(tkey),0,key);msg='주전 순서 변경'}
@@ -1073,7 +1072,8 @@ async function qkCardSave(){const P=QK.pend;if(!P||P.stage!=='card'||!P.card)ret
   const willOff=P.target.kind!=='coach'&&(MR.isOff(P.card)||(P.card==='Y'&&MR.yellowCount(m,P.side,P.target)>=1));
   qkToast((m[P.side]||{}).name+' '+MR.CARDS[P.card]+' '+(P.target.kind==='coach'?'지도자':'#'+P.target.no)+(willOff?(P.card==='Y'?' · 옐로 2장 → 퇴장':' · 퇴장')+' — 한 명 적게 진행':'')+' · '+ev.clock,ev.id);
   await sendEvent({kind:'add',id:RC_ID,ev:ev,opts:{requireCtrl:true}});
-  if(willOff){const m2=Object.assign({},m,{events:(m.events||[]).concat([ev])});const T=teamPl(m2,P.side);if(T){const cap=T.on.filter(p=>!isOffP(m2,P.side,p)).length;const Lu=Object.assign({},m.lineup||{});Lu[P.side]=Object.assign({},Lu[P.side]||{},{on:T.onKeys,cap:cap});await rcUpdate({lineup:Lu})}}}
+  // 퇴장 선수는 주전에서 빼 후보 칸으로(잠김) — 빈 자리에 다른 선수를 넣어 인원 그대로 진행
+  if(willOff&&P.target.key){const T=teamPl(m,P.side);if(T&&T.onKeys.indexOf(P.target.key)>=0){const Lu=Object.assign({},m.lineup||{});Lu[P.side]={on:T.onKeys.filter(k=>k!==P.target.key)};await rcUpdate({lineup:Lu})}}}
 function qkToast(text,evId){try{if(navigator.vibrate)navigator.vibrate(35)}catch(e){}QK.toast={text:'✓ '+text,evId:evId};clearTimeout(QK.toastT);QK.toastT=setTimeout(()=>{QK.toast=null;rcRender()},9000);rcRender()}
 function lastEv(m){const L=(m.events||[]).filter(e=>e&&!e.void&&e.type&&['goal','card','timeout'].indexOf(e.type)>=0);return L[L.length-1]||null}
 async function qkUndoLast(){const m=RCM();const e=lastEv(m);if(!e)return;const L=MR.evLine(e);if(!confirm('마지막 기록을 되돌릴까요?\n'+((m[e.side]||{}).name||'')+' · '+(e.type==='timeout'?'작전타임':L.who)+(L.min?' · '+L.min:'')+'\n(기록은 지워지지 않고 취소 표시만 남습니다)'))return;QK.toast=null;await sendEvent({kind:'void',id:RC_ID,evId:e.id});if(m.brk&&m.brk.evId===e.id)await rcUpdate({brk:null});if(e.type==='card')await capClear(e.side,e.id)}
