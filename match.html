@@ -254,6 +254,8 @@
 .rc .qh .co{font-size:12.5px;font-weight:700;color:var(--mut);align-self:center;margin-right:4px;white-space:nowrap}.rc .qh .co b{color:var(--ink)}
 .rc .zl{display:flex;align-items:center;gap:8px}.rc .zl .kbar{flex:1;height:12px;border-radius:6px;border:1px solid rgba(0,0,0,.25);box-shadow:inset 0 0 0 2px rgba(255,255,255,.5);min-width:40px}
 .rc .pc.empty{border:2px dashed var(--ln2);background:transparent;box-shadow:none;cursor:default;color:var(--mut)}.rc .pc.empty b{color:var(--ln2);font-size:30px}.rc .pc.empty span{color:var(--mut);font-size:12px}
+.rc .sbt .kit .wb{display:inline-block;margin-left:8px;background:#fff;color:#9f1239;border-radius:7px;padding:1px 8px;font-size:13px;vertical-align:middle;border:1px solid #9f1239}
+.sh .fprow{display:flex;align-items:center;gap:8px;margin:4px 0;flex-wrap:wrap}.sh .fprow>b{min-width:130px;font-size:13.5px;line-height:1.2}.sh .fprow small{display:block;color:#5b6474;font-weight:700;font-size:11.5px}.sh .fp{display:flex;gap:4px;flex:1;flex-wrap:nowrap;min-width:0}.sh .fp button{flex:1;min-width:30px;min-height:40px;border:1px solid #b9c2d3;background:#fff;border-radius:9px;font-weight:900;cursor:pointer;font-family:inherit;padding:0;font-size:13px}.sh .fp button.on{background:#1c2e55;color:#fff;border-color:#1c2e55}.sh .fp button.neg{color:#9f1239}.sh .fp button.neg.on{background:#9f1239;border-color:#9f1239;color:#fff}
 /* 휴대폰 · 태블릿 */
 @media(max-width:560px){
   .rc .body{padding:10px 8px 100px}
@@ -378,7 +380,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="matchrec.js?v=20261015e"></script>
+<script src="matchrec.js?v=20261015f"></script>
 <script>
 // ══════════ 경기 기록 (match.html) ══════════
 //   ?slot=참가공고ID            대회의 경기·오더지·디스크골프·순위 (운영진은 경기 생성·심판 배정)
@@ -408,7 +410,7 @@ function divsOf(){const s=new Set();teamEntries().forEach(c=>{if((c.prefs||[])[0
 function orderOf(pid){return ORDERS[MR.orderId(SLOT_ID,pid)]||null}
 function teamOf(side,m){return (m&&m[side])||{}}
 function canRec(m){return MR.canRecord(m,ME&&ME.uid,MY||{})}
-function myRole(m){const o=(m&&m.officials)||{};for(const k of ['recorder','ref1','ref2','ref3','scorer','supervisor']){if(o[k]&&o[k].uid===(ME&&ME.uid))return k}return STAFF?'recorder':''}
+function myRole(m){const me=MR.offOf(m,ME&&ME.uid);if(me)return me.key;return STAFF?'recorder':''}
 // ── 로그인·시작 ──
 AUTH.onAuthStateChanged(async u=>{ME=u;MY=null;STAFF=false;
   if(u){try{const d=await DB.collection('users').doc(u.uid).get();MY=d.exists?(d.data()||{}):{};STAFF=MR.isStaffUser(MY)}catch(e){MY={}}}
@@ -832,7 +834,7 @@ function rcRender(){
   const [L,R]=sidesLR(m);const per=m.period||'';const curP=per==='하프타임'?'':per;const TO=MR.timeouts(m);
   const sideBox=(side)=>{const K=kitOfSide(m,side);const used=(TO[side][curP]||[]);const v=side==='a'?sc.a:sc.b;
     const hs=['전반','후반','연장'].filter(p=>H[side][p]!=null).map(p=>p.charAt(0)+' '+H[side][p]).join(' · ');
-    const tm=m[side]||{};return '<div class="sbt"><div class="kit" style="background:'+esc(K.color)+';color:'+MR.kitTextColor(K.color)+'" title="'+esc(tname(m,side))+'">'+esc(tm.name||tm.school||side.toUpperCase())+(tm.school&&tm.school!==tm.name?'<small style="display:block;font-size:11.5px;font-weight:800;color:inherit;opacity:.9">'+esc(tm.school)+'</small>':'')+'</div><div class="v">'+v+'</div><small>'+esc(hs)+'&nbsp;</small>'
+    const tm=m[side]||{};const won=m.status==='종료'&&MR.winnerOf(m)===side;return '<div class="sbt"><div class="kit" style="background:'+esc(K.color)+';color:'+MR.kitTextColor(K.color)+'" title="'+esc(tname(m,side))+'">'+esc(tm.name||tm.school||side.toUpperCase())+(won?'<span class="wb">승</span>':'')+(tm.school&&tm.school!==tm.name?'<small style="display:block;font-size:11.5px;font-weight:800;color:inherit;opacity:.9">'+esc(tm.school)+'</small>':'')+'</div><div class="v">'+v+'</div><small>'+esc(hs)+'&nbsp;</small>'
       +(mine&&m.status==='진행'?'<button class="to" '+((used.length||!curP||m.brk)?'disabled':'')+' onclick="toStart(\''+side+'\')">작전타임<small>'+(curP?(used.length?curP+' 사용 '+esc(MR.evTime(used[0])):curP+' 1회 남음'):'구간 시작 후')+'</small></button>'
         :(curP&&used.length?'<small class="tou">'+curP+' 작전타임 '+esc(MR.evTime(used[0]))+'</small>':''))+'</div>'};
   // ② 점수판 · 시계
@@ -859,9 +861,10 @@ function rcRender(){
     +(evs.length?evs.map(e=>{const Lx=MR.evLine(e);const legacy=e.type==null;const kd=e.type==='goal'?'<span class="kd">득점</span>':e.type==='card'?'<span class="kd c">'+esc(MR.CARDS[e.card]||'제재')+'</span>':e.type==='timeout'?'<span class="kd t">작전타임</span>':'';
       return '<div class="ev'+(e.void?' void':'')+'"><div class="m">'+(legacy?esc(e.clock||''):esc(Lx.min||'-'))+'<small>'+esc(e.period||'')+'</small></div><div class="w">'+kd+'<b>'+esc(legacy?(e.team||''):(m[e.side]||{}).name||'')+'</b> '+(legacy?'<span>'+(e.d>0?'득점':'취소')+'</span>':esc(e.type==='timeout'?'':Lx.who))+(e.void?' <span>· 취소 '+esc(e.void.by||'')+'</span>':'')+(e.edits&&e.edits.length?' <span>· 수정 '+e.edits.length+'</span>':'')+'</div><div style="display:flex;gap:4px;align-items:center"><span class="sc">'+esc(e.score||'')+'</span>'+(mine&&!e.void&&!legacy?'<button onclick="evEdit(\''+esc(e.id)+'\')">수정</button><button onclick="evVoid(\''+esc(e.id)+'\')">취소</button>':'')+'</div></div>'}).join('')
       :'<div class="ev" style="grid-template-columns:1fr">아직 기록이 없습니다.'+(mine?' 득점: 득점한 선수 카드 → 어시스트 선수(또는 「어시스트 없음」) 두 번 누르면 저장됩니다.':'')+'</div>')+'</div>'
-    +(m.status!=='예정'?'<div class="mr-note" style="margin:10px 2px 0;font-weight:700;color:#0b0d12">결과지 PDF·엑셀은 <a href="results.html?id=slot_'+esc(SLOT_ID)+'" style="color:#0b2a5e;font-weight:900">대회 결과 페이지</a>에서 내려받습니다.</div>':'')+'</div>';
+    +(m.status==='종료'?'<div class="mr-note" style="margin:10px 2px 0;font-weight:700">기록지는 아래 「기록지 인쇄」, 엑셀과 대회 전체 결과는 <a href="results.html?id=slot_'+esc(SLOT_ID)+'" style="color:#1c2e55;font-weight:900">대회 결과 페이지</a>에서 내려받습니다.</div>':'')+'</div>';
   // ⑥ 아래 고정 줄: 시작·종료·확정만
-  const fb=[];if(mine){if(m.status==='예정')fb.push('<button class="act g" onclick="rcStatus(\'진행\')">▶ 경기 시작 (전반 · 시계 시작)</button>');if(m.status==='진행')fb.push('<button class="act r" onclick="endSheet()">경기 종료</button>');if(m.status==='종료'&&!m.locked)fb.push('<button class="act y" onclick="endSheet()">결과 확정 · 서명</button>','<button class="act" onclick="rcStatus(\'진행\')">다시 진행</button>')}
+  const fb=[];if(mine){if(m.status==='예정')fb.push('<button class="act g" onclick="rcStatus(\'진행\')">▶ 경기 시작 (전반 · 시계 시작)</button>');if(m.status==='진행'){const R=endRoleInfo(m);fb.push('<button class="act r" '+(R.can?'':'disabled title="경기 종료·확정은 감독관이 합니다"')+' onclick="endSheet()">경기 종료'+(R.can?'':' (감독관)')+'</button>')}if(m.status==='종료'&&!m.locked)fb.push('<button class="act y" onclick="endSheet()">결과 확정 · 서명</button>','<button class="act" onclick="rcStatus(\'진행\')">다시 진행</button>')}
+  if(m.status==='종료')fb.push('<button class="act b" onclick="sheetPdf(\''+m.id+'\')">기록지 인쇄</button>');
   if(m.locked&&STAFF)fb.push('<button class="act" onclick="rcUnlock()">정정</button>');
   if(fb.length)h+='<div class="foot">'+fb.join('')+'</div>';
   if(QK.toast)h+='<div class="toast">'+esc(QK.toast.text)+(QK.toast.evId?'<button onclick="qkUndo()">되돌리기</button>':'')+'</div>';
@@ -1091,32 +1094,40 @@ async function editSave(){const S=SHEET;const n=document.getElementById('edNote'
 function clockSheet(){const m=RCM();SHEET={kind:'clock',sec:MR.secOf(m)};sheet('<div class="hd"><b>🕐 경기 시계 맞추기</b><span class="st">현장 시계와 같게 분:초를 맞춥니다</span><button class="x" onclick="sheetClose()">✕</button></div>'+secUI()+'<button class="go b" onclick="clockSave()">✓ 이 시간으로 맞춤</button><button class="go gray" onclick="sheetClose();rcClock(\'reset\')">↺ 00:00 으로 리셋</button>')}
 async function clockSave(){const m=RCM();const sec=+SHEET.sec;const c=MR.clockSetMs(m,sec*1000);sheetClose();await rcUpdate({clock:c,clockAdj:FV.arrayUnion({at:new Date().toISOString(),by:whoAmI().name,sec:sec})})}
 
-// ── 종료·확정 시트: 페어플레이 → MVP → 우수지도자 → 서명 자동 기입 ──
-function endSheet(){const m=MATCHES.find(x=>x.id===RC_ID);SHEET={kind:'end',fa:(m.fairplay||{}).a!=null?m.fairplay.a:2,fb:(m.fairplay||{}).b!=null?m.fairplay.b:2,mvp:m.mvp||null,coach:(m.bestCoach||{}).side||'',side:'a'};endRender()}
-function endRender(){const S=SHEET;const m=MATCHES.find(x=>x.id===RC_ID);const sc=MR.score(m.events||[]);const oa=orderOf((m.a||{}).pid)||{},ob=orderOf((m.b||{}).pid)||{};
-  const three=m.refMode==='three';const role=myRole(m);const canConfirm=STAFF||!three||role==='ref1';
-  const sg=(r,lab,fallback)=>{const s=SIGNS[r]||fallback||null;return '<div class="sig"><span style="min-width:62px;font-weight:800">'+lab+'</span>'+(s&&s.name?'<span>'+esc(s.name)+'</span>'+(s.img?'<img src="'+esc(s.img)+'"> <span class="ok">자동 기입</span>':'<span class="no">등록 서명 없음</span>'):'<span style="color:#6b7280">미배정</span>')+'</div>'};
-  const ofs=m.officials||{};const fb=r=>ofs[r]&&ofs[r].name?{name:ofs[r].name}:null;
-  sheet('<div class="hd"><b>🏁 경기 종료 · 결과 확정</b><span class="st">'+sc.a+' : '+sc.b+'</span><button class="x" onclick="sheetClose()">✕</button></div>'
-    +'<span class="lab">페어플레이 가점 (우수 2 · 보통 1 · 없음 0)</span><div class="mr-row"><span style="min-width:90px;font-weight:800">'+esc((m.a||{}).name||'A')+'</span><div class="seg" style="flex:1;margin:0">'+[2,1,0].map(n=>'<button class="'+(S.fa===n?'on':'')+'" onclick="SHEET.fa='+n+';endRender()">'+n+'</button>').join('')+'</div></div><div class="mr-row" style="margin-top:6px"><span style="min-width:90px;font-weight:800">'+esc((m.b||{}).name||'B')+'</span><div class="seg" style="flex:1;margin:0">'+[2,1,0].map(n=>'<button class="'+(S.fb===n?'on':'')+'" onclick="SHEET.fb='+n+';endRender()">'+n+'</button>').join('')+'</div></div>'
-    +'<span class="lab">최우수선수 추천</span><div class="mr-row"><span class="chip on">'+(S.mvp?'#'+esc(S.mvp.no)+' '+esc(S.mvp.name)+' ('+esc((m[S.mvp.side]||{}).name||'')+')':'미선정')+'</span><button class="chip" onclick="SHEET.kind=\'mvp\';SHEET.side=\'a\';mvpPick()">'+esc((m.a||{}).name||'A')+'에서</button><button class="chip" onclick="SHEET.kind=\'mvp\';SHEET.side=\'b\';mvpPick()">'+esc((m.b||{}).name||'B')+'에서</button></div>'
-    +'<span class="lab">우수지도자 추천</span><div class="seg"><button class="'+(S.coach==='a'?'on':'')+'" onclick="SHEET.coach=SHEET.coach===\'a\'?\'\':\'a\';endRender()">'+esc((oa.coach||{}).name||'A 지도자')+'</button><button class="'+(S.coach==='b'?'on':'')+'" onclick="SHEET.coach=SHEET.coach===\'b\'?\'\':\'b\';endRender()">'+esc((ob.coach||{}).name||'B 지도자')+'</button></div>'
-    +'<span class="lab">서명 (등록 서명 자동 기입)</span>'+sg('coachA','감독교사 A',oa.coach&&oa.coach.name?{name:oa.coach.name,img:oa.coach.sign}:null)+sg('coachB','감독교사 B',ob.coach&&ob.coach.name?{name:ob.coach.name,img:ob.coach.sign}:null)+sg('supervisor','감독관',fb('supervisor'))+sg('scorer','점수심',fb('scorer'))+sg('recorder','기록원',fb('recorder')||(role==='recorder'?{name:MY.name,img:MY.signatureImg}:null))+sg('ref1','심판1',fb('ref1'))+sg('ref2','심판2',fb('ref2'))+sg('ref3','심판3',fb('ref3'))
-    +'<div class="mr-note" style="margin-top:8px">'+(three?'3심제: 기록심이 종료하면 「확정 전」으로 두고, 주심(또는 운영진)이 확정합니다.':'기록심 단독: 종료와 함께 확정됩니다.')+' 확정 뒤에는 사무국 정정으로만 바뀝니다.</div>'
-    +'<button class="go r" onclick="endSave(false)">🏁 경기 종료'+(three?' (확정 전)':' · 확정')+'</button>'+(three&&canConfirm?'<button class="go" style="margin-top:8px" onclick="endSave(true)">✅ 주심 확정 · 잠금</button>':''))}
-function mvpPick(){const S=SHEET;const m=MATCHES.find(x=>x.id===RC_ID);sheet('<div class="hd"><b>최우수선수 — '+esc((m[S.side]||{}).name||'')+'</b><button class="x" onclick="SHEET.kind=\'end\';endRender()">✕</button></div>'+playerGrid(S.side,S.mvp&&S.mvp.side===S.side?S.mvp:null,true,'선정 안 함'))}
-async function endSave(confirmNow){const S=SHEET;const m=MATCHES.find(x=>x.id===RC_ID);const oa=orderOf((m.a||{}).pid)||{},ob=orderOf((m.b||{}).pid)||{};const three=m.refMode==='three';
-  const signs={};if(oa.coach&&oa.coach.name)signs.coachA={name:oa.coach.name,img:oa.coach.sign||'',at:new Date().toISOString()};if(ob.coach&&ob.coach.name)signs.coachB={name:ob.coach.name,img:ob.coach.sign||'',at:new Date().toISOString()};
-  const role=myRole(m);if(role&&MY.signatureImg&&!(SIGNS[role]&&SIGNS[role].img))signs[role]={name:MY.name||'',img:MY.signatureImg,uid:ME.uid,at:new Date().toISOString()};
-  const lock=!three||confirmNow;
+// ── 종료·확정 시트: 페어플레이·지도자 가점(5~−3) → 최우수선수(팀마다 1명) → 서명 자동 기입 → 감독관이 종료·확정 ──
+const FP_SCALE=[5,4,3,2,1,0,-1,-2,-3];
+function endRoleInfo(m){const me=MR.offOf(m,ME&&ME.uid);const hasSup=MR.offList(m).some(x=>x.role==='감독관');const isSup=!!(me&&me.role==='감독관');return {me,hasSup,isSup,can:STAFF||isSup||(!hasSup&&!!me)}}
+function endSheet(){const m=MATCHES.find(x=>x.id===RC_ID);const R=endRoleInfo(m);if(!R.can){say('경기 종료·결과 확정은 감독관이 합니다. 기록원은 경기 중 기록까지만 담당합니다.');return}
+  const v=(o,k,d)=>(o&&o[k]!=null)?o[k]:d;const mv=side=>(m.mvps||[]).find(p=>p.side===side)||(m.mvp&&m.mvp.side===side?m.mvp:null);
+  SHEET={kind:'end',fa:v(m.fairplay,'a',3),fb:v(m.fairplay,'b',3),ca:v(m.coachScore,'a',3),cb:v(m.coachScore,'b',3),mvpA:mv('a'),mvpB:mv('b'),side:'a'};endRender()}
+function endRender(){const S=SHEET;const m=MATCHES.find(x=>x.id===RC_ID);const sc=MR.score(m.events||[]);const oa=orderOf((m.a||{}).pid)||{},ob=orderOf((m.b||{}).pid)||{};const R=endRoleInfo(m);
+  const nmA=tname(m,'a'),nmB=tname(m,'b');
+  const scale=(key)=>'<div class="fp">'+FP_SCALE.map(n=>'<button class="'+(S[key]===n?'on':'')+(n<0?' neg':n===0?' zero':'')+'" onclick="SHEET.'+key+'='+n+';endRender()">'+(n>0?'+'+n:n)+'</button>').join('')+'</div>';
+  const sg=(s,lab)=>'<div class="sig"><span style="min-width:72px;font-weight:800">'+esc(lab)+'</span>'+(s&&s.name?'<span>'+esc(s.name)+'</span>'+(s.img?'<img src="'+esc(s.img)+'"> <span class="ok">자동 기입</span>':'<span class="no">등록 서명 없음</span>'):'<span style="color:#6b7280">미배정</span>')+'</div>';
+  const cA=MR.coachesOf(m,'a',oa),cB=MR.coachesOf(m,'b',ob);
+  const offs=MR.offList(m);const offSig=offs.map(x=>{const s=SIGNS[x.key]&&SIGNS[x.key].name?SIGNS[x.key]:(x.uid===(ME&&ME.uid)&&MY.signatureImg?{name:MY.name,img:MY.signatureImg}:{name:x.name});return sg(s,x.role||'심판')}).join('');
+  sheet('<div class="hd"><b>경기 종료 · 결과 확정</b><span class="st">'+esc(nmA)+' '+sc.a+' : '+sc.b+' '+esc(nmB)+(sc.a!==sc.b?' · <b style="color:#156b4a">'+esc(sc.a>sc.b?nmA:nmB)+' 승</b>':' · 동점')+'</span><button class="x" onclick="sheetClose()">✕</button></div>'
+    +'<span class="lab">페어플레이 가점 (5 ~ −3)</span><div class="fprow"><b>'+esc(nmA)+'</b>'+scale('fa')+'</div><div class="fprow"><b>'+esc(nmB)+'</b>'+scale('fb')+'</div>'
+    +'<span class="lab">지도자 가점 (5 ~ −3) — 향후 우수지도자 선발·제외 근거</span><div class="fprow"><b>'+esc(nmA)+' <small>'+esc(cA.map(c=>c.name).join('·')||'감독 미입력')+'</small></b>'+scale('ca')+'</div><div class="fprow"><b>'+esc(nmB)+' <small>'+esc(cB.map(c=>c.name).join('·')||'감독 미입력')+'</small></b>'+scale('cb')+'</div>'
+    +'<span class="lab">최우수선수 추천 (팀마다 1명 · 선정 안 해도 됨)</span><div class="mr-row"><span class="chip on">'+esc(nmA)+' · '+(S.mvpA?'#'+esc(S.mvpA.no)+' '+esc(S.mvpA.name):'미선정')+'</span><button class="chip" onclick="SHEET.kind=\'mvp\';SHEET.side=\'a\';mvpPick()">고르기</button></div><div class="mr-row" style="margin-top:6px"><span class="chip on">'+esc(nmB)+' · '+(S.mvpB?'#'+esc(S.mvpB.no)+' '+esc(S.mvpB.name):'미선정')+'</span><button class="chip" onclick="SHEET.kind=\'mvp\';SHEET.side=\'b\';mvpPick()">고르기</button></div>'
+    +'<span class="lab">서명 (등록 서명 자동 기입)</span>'+sg(cA[0]?{name:cA[0].name,img:cA[0].sign}:null,'감독교사 · '+nmA)+sg(cB[0]?{name:cB[0].name,img:cB[0].sign}:null,'감독교사 · '+nmB)+offSig
+    +'<div class="mr-note" style="margin-top:8px">'+(R.isSup?'감독관으로 종료·확정합니다.':STAFF?'운영진 권한으로 종료·확정합니다.':'감독관이 배정되지 않아 심판진이 종료·확정합니다.')+' 확정 뒤 정정은 감독관·사무국만 할 수 있습니다. 종료 후 이 화면에서 바로 기록지를 인쇄할 수 있습니다.</div>'
+    +'<button class="go r" onclick="endSave(true)">경기 종료 · 확정</button>')}
+function mvpPick(){const S=SHEET;const m=MATCHES.find(x=>x.id===RC_ID);const cur=S.side==='a'?S.mvpA:S.mvpB;sheet('<div class="hd"><b>최우수선수 — '+esc(tname(m,S.side))+'</b><button class="x" onclick="SHEET.kind=\'end\';endRender()">✕</button></div>'+playerGrid(S.side,cur,true,'선정 안 함'))}
+async function endSave(confirmNow){const S=SHEET;const m=MATCHES.find(x=>x.id===RC_ID);const oa=orderOf((m.a||{}).pid)||{},ob=orderOf((m.b||{}).pid)||{};
+  const cA=MR.coachesOf(m,'a',oa),cB=MR.coachesOf(m,'b',ob);
+  const signs={};if(cA[0])signs.coachA={name:cA[0].name,img:cA[0].sign||'',at:new Date().toISOString()};if(cB[0])signs.coachB={name:cB[0].name,img:cB[0].sign||'',at:new Date().toISOString()};
+  const me=MR.offOf(m,ME&&ME.uid);if(me&&MY.signatureImg&&!(SIGNS[me.key]&&SIGNS[me.key].img))signs[me.key]={name:MY.name||'',img:MY.signatureImg,uid:ME.uid,at:new Date().toISOString()};
+  const lock=true;const sc=MR.score(m.events||[]);
   const _cur=m.period||'';const _log=Object.assign({},m.clockLog||{});if(_cur&&_cur!=='하프타임'&&!_log[_cur]&&MR.secOf(m)>0)_log[_cur]=MR.fmtSec(MR.secOf(m));
-  const upd={status:'종료',clockLog:_log,endAt:m.endAt||FV.serverTimestamp(),fairplay:{a:S.fa,b:S.fb},mvp:S.mvp?Object.assign({},S.mvp,{team:(m[S.mvp.side]||{}).name||''}):null,bestCoach:S.coach?{side:S.coach,name:((S.coach==='a'?oa:ob).coach||{}).name||'',team:(m[S.coach]||{}).name||''}:null,locked:lock};
-  if((m.clock||{}).running)upd.clock=MR.clockAct(m,'pause');if(lock)upd.confirmedBy={uid:ME.uid,name:MY.name||'',at:new Date().toISOString(),role:role||(STAFF?'운영진':'')};
+  const mvps=[S.mvpA?Object.assign({},S.mvpA,{side:'a',team:tname(m,'a')}):null,S.mvpB?Object.assign({},S.mvpB,{side:'b',team:tname(m,'b')}):null].filter(Boolean);
+  const upd={status:'종료',clockLog:_log,endAt:m.endAt||FV.serverTimestamp(),fairplay:{a:S.fa,b:S.fb},coachScore:{a:S.ca,b:S.cb},mvps:mvps,mvp:mvps[0]||null,bestCoach:(S.ca!==S.cb)?{side:S.ca>S.cb?'a':'b',name:((S.ca>S.cb?cA:cB)[0]||{}).name||'',team:tname(m,S.ca>S.cb?'a':'b')}:null,winner:sc.a>sc.b?'a':sc.b>sc.a?'b':'',locked:lock,brk:null};
+  if((m.clock||{}).running)upd.clock=MR.clockAct(m,'pause');upd.confirmedBy={uid:ME.uid,name:MY.name||'',at:new Date().toISOString(),role:(me&&me.role)||(STAFF?'운영진':'')};
   sheetClose();
   try{if(Object.keys(signs).length)await DB.collection('compSigns').doc(RC_ID).set(signs,{merge:true}).catch(()=>{});await rcUpdate(upd,'종료 저장 실패');
-    if(lock)await DB.collection('liveMatches').doc(RC_ID).update({ctrl:FV.delete()}).catch(()=>{});
-    statsSave(true);scSync(Object.assign({},m,upd));if(lock)bdAdvance(Object.assign({},m,upd));
-    say('✓ 경기가 '+(lock?'종료·확정':'종료(확정 전)')+'되었습니다. 결과지 PDF·엑셀은 「대회 결과」 페이지에서 내려받을 수 있습니다.')}catch(e){}
+    await DB.collection('liveMatches').doc(RC_ID).update({ctrl:FV.delete()}).catch(()=>{});
+    statsSave(true);scSync(Object.assign({},m,upd));bdAdvance(Object.assign({},m,upd));
+    qkToast('경기 종료·확정 — '+(upd.winner?tname(m,upd.winner)+' 승 '+sc.a+':'+sc.b:'동점 '+sc.a+':'+sc.b)+' · 아래 「기록지 인쇄」')}catch(e){}
 }
 async function sheetPdf(id){const m=MATCHES.find(x=>x.id===id);if(!m)return;let signs={};try{const d=await DB.collection('compSigns').doc(id).get();signs=d.exists?d.data():{}}catch(e){}
   const oa=orderOf((m.a||{}).pid)||{},ob=orderOf((m.b||{}).pid)||{};if(!signs.coachA&&oa.coach&&oa.coach.name)signs.coachA={name:oa.coach.name,img:oa.coach.sign};if(!signs.coachB&&ob.coach&&ob.coach.name)signs.coachB={name:ob.coach.name,img:ob.coach.sign};
