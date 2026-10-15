@@ -1,4 +1,4 @@
-// matchrec.js v20261015d · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
+// matchrec.js v20261015e · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
 //   화면: match.html(기록 콘솔·경기 관리) · competition.html(오더지 작성) · results.html(공개 결과) · live.html(중계 콘솔 호환)
 //   원칙 ① 경기 문서(liveMatches) 하나가 원본 ② 점수는 득점 기록(events)에서 계산해 a.score/b.score 에 같이 저장(중계 화면 호환)
 //        ③ 입력권(ctrl)은 한 번에 한 화면 ④ 기록 추가는 고유 id + 트랜잭션(중복 전송 무시) ⑤ 취소는 삭제 대신 void 표시
@@ -227,7 +227,7 @@
       +'<div class="s" style="margin-top:2mm">※제재(지도자 포함): 주의(C), 경고·옐로(Y), 퇴장·레드(R) · 예전 기록: 퇴장(W), 경기지연(D), 비교육적 언행(N)</div>'+((m.events||[]).some(function(e){return e&&!e.void&&e.type==='card'&&e.note})?'<div class="s">※제재 사유: '+(m.events||[]).filter(function(e){return e&&!e.void&&e.type==='card'&&e.note}).map(function(e){return esc(((m[e.side]||{}).name||'')+' '+((e.target||{}).kind==='coach'?'지도자':'#'+((e.target||{}).no||''))+' '+(CARDS[e.card]||e.card)+'('+evTime(e)+') '+e.note)}).join(' / ')+'</div>':'')
       +'<div class="s">※페어플레이 가점(주심,부심,기록,감독관합의): 우수(2점), 보통(1) &nbsp; 최우수선수 추천: <b>'+esc(m.mvp?('#'+(m.mvp.no||'')+' '+(m.mvp.name||'')+(m.mvp.team?' ('+m.mvp.team+')':'')):'')+'</b> &nbsp; 우수지도자 추천: <b>'+esc(m.bestCoach&&m.bestCoach.name||'')+'</b></div>'
       +'<div class="sl"><div><b>감독교사:</b>'+sg('coachA')+'</div><div><b>감독교사:</b>'+sg('coachB')+'</div></div>'
-      +'<div class="sl"><div><b>감독관:</b>'+sg('supervisor')+'</div><div><b>기록원:</b>'+sg('recorder')+'</div></div>'
+      +'<div class="sl"><div><b>감독관:</b>'+sg('supervisor')+'</div><div><b>점수심:</b>'+sg('scorer')+'</div><div><b>기록원:</b>'+sg('recorder')+'</div></div>'
       +'<div class="sl"><div><b>심판1:</b>'+sg('ref1')+'</div><div><b>심판2:</b>'+sg('ref2')+'</div><div><b>심판3:</b>'+sg('ref3')+'</div></div>'
       +'<div class="s" style="color:#666;margin-top:3mm">연맹 홈페이지 경기 기록 콘솔 기록 · '+(m.locked?'확정':'미확정')+(m.confirmedBy?' · 확정 '+esc(m.confirmedBy.name||'')+' '+esc(String(m.confirmedBy.at||'').slice(0,16).replace('T',' ')):'')+' · 시간은 경기 시간 기준 분:초</div></div>');pend(w)}
   function printGolf(round,title){var w=pwin('디스크골프 스코어_'+(title||''));if(!w)return;var R=golfRank(round);var holes=round.holes||18;var hs='';for(var i=1;i<=holes;i++)hs+='<th style="width:6.5mm">'+i+'</th>';
