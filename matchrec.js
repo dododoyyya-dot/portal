@@ -1,4 +1,4 @@
-// matchrec.js v20261017a · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
+// matchrec.js v20261017b · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
 //   화면: match.html(기록 콘솔·경기 관리) · competition.html(오더지 작성) · results.html(공개 결과) · live.html(중계 콘솔 호환)
 //   원칙 ① 경기 문서(liveMatches) 하나가 원본 ② 점수는 득점 기록(events)에서 계산해 a.score/b.score 에 같이 저장(중계 화면 호환)
 //        ③ 입력권(ctrl)은 한 번에 한 화면 ④ 기록 추가는 고유 id + 트랜잭션(중복 전송 무시) ⑤ 취소는 삭제 대신 void 표시
@@ -129,7 +129,7 @@
   function orderFromEntry(slotId,s,c,prev){
     var p=prev||{};var pm={};(p.players||[]).forEach(function(x){pm[x.key]=x});
     var players=(c.roster||[]).map(function(r,i){var key=String(r.name||'').replace(/\s+/g,'')+'|'+(r.birth||'');var o=pm[key]||{};
-      return {i:i+1,key:key,name:r.name||'',birth:r.birth||'',school:r.school||'',gender:r.gender||'',no:o.no!=null?o.no:'',subNo:o.subNo||'',role:o.role||'',uid:r.memberUid||r.uid||'',guardianUid:r.guardianUid||''}});
+      return {i:i+1,key:key,name:r.name||'',birth:r.birth||'',school:r.school||'',gender:r.gender||'',no:(o.no!=null&&String(o.no).trim()!=='')?o.no:String(r.no||'').trim(),subNo:o.subNo||'',role:o.role||'',uid:r.memberUid||r.uid||'',guardianUid:r.guardianUid||''}});   // [배번] 오더지에 아직 배번이 없으면 참가 신청 명단(엑셀·화면)의 배번을 그대로
     return {slotId:slotId,pid:c.pid||'',uid:c.uid||'',team:c.name||'',school:c.teamOrg||'',teamType:c.teamType||'',div:(c.prefs||[])[0]||'',gender:c.teamGender||'',
       compTitle:s.title||'',coach:{name:p.coach&&p.coach.name||c.leader||'',role:p.coach&&p.coach.role||c.leaderRole||'',sign:p.coach&&p.coach.sign||'',at:p.coach&&p.coach.at||''},
       players:players,status:p.status||'작성중',updatedAt:p.updatedAt||null}}

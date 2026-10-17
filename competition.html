@@ -1826,7 +1826,7 @@ async function openTeamApply(id,fresh){
     +'<div style="padding:9px 12px;background:#f7f9fc;border-bottom:1px solid #e2e7f0"><div style="font-size:12.5px;font-weight:900;color:#153A77">팀원 담기 ① — 한 명씩 담기</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px"><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#e0f2f1;color:#068081" onclick="taAddSelf()">인솔자 본인도 선수로 참가</button><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#eef7f4;color:#0f766e" onclick="taFindTeams(true)">👥 내 클럽 명단에서 선택</button><button type="button" class="cbtn cbtn-soft" id="taLoadClub" style="padding:6px 14px;font-size:12.5px;display:none" onclick="taLoadClubRoster()">📋 클럽 명단 불러오기</button><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px" onclick="taAddRow()">+ 비회원 팀원 직접 입력</button></div></div>'
     +'<div style="padding:9px 12px;background:#fffdf5"><div style="font-size:12.5px;font-weight:900;color:#8a5a00">팀원 담기 ② — 엑셀 파일로 한 번에 담기 <span style="font-weight:600;color:#8a919d;font-size:11.5px">(팀원이 많을 때 편합니다)</span></div>'
-    +'<div style="font-size:12px;color:#5b6472;line-height:1.75;margin-top:4px">빈 명단 양식(엑셀 파일)을 내려받아 <b>성명·생년월일·성별·학교</b>를 적어 저장한 뒤, 그 파일을 올리면 위 명단 칸에 <b>자동으로 채워집니다</b>. 이미 가지고 있는 엑셀 명단도 첫 줄에 「성명」「생년월일」 제목만 있으면 바로 올릴 수 있습니다. 올린 뒤 한 명씩 고쳐도 됩니다.</div>'
+    +'<div style="font-size:12px;color:#5b6472;line-height:1.75;margin-top:4px">빈 명단 양식(엑셀 파일)을 내려받아 <b>성명·배번(선택)·생년월일·성별·학교</b>를 적어 저장한 뒤, 그 파일을 올리면 위 명단 칸에 <b>자동으로 채워집니다</b>. 이미 가지고 있는 엑셀 명단도 첫 줄에 「성명」「생년월일」 제목만 있으면 바로 올릴 수 있습니다. 올린 뒤 한 명씩 고쳐도 됩니다.</div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:7px"><button type="button" class="cbtn cbtn-soft" style="padding:7px 14px;font-size:12.5px;background:#fff6e0;color:#8a5a00;border:1.5px solid #ecd9b0" onclick="taXlsxTemplate()">① ⬇ 빈 명단 양식 내려받기 (엑셀)</button><span style="color:#8a919d;font-weight:900">→ 적어서 저장 →</span><label class="cbtn cbtn-soft" style="padding:7px 14px;font-size:12.5px;background:#fff6e0;color:#8a5a00;border:1.5px solid #ecd9b0;cursor:pointer;margin:0">② ⬆ 작성한 엑셀 파일 올리기 → 명단 자동 입력<input type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" style="display:none" onchange="taImportXlsx(this)"></label></div>'
     +'</div></div>'
     +'<div style="font-size:13px;font-weight:800;margin:14px 0 4px">③ 보호자 동의 (미성년 팀원)</div>'
@@ -2092,6 +2092,7 @@ function taAddRow(v){
   row.style.cssText='display:flex;gap:6px;margin-top:'+(i?'6px':'0')+';flex-wrap:wrap;align-items:center';
   row.innerHTML='<span style="font-size:11.5px;color:#8a919d;width:18px">'+(i+1)+'</span><span class="taR-self" style="display:'+(v.self?'':'none')+';font-size:10.5px;background:#e0f2f1;color:#068081;border-radius:6px;padding:2px 6px;font-weight:800">본인</span>'
     +'<input class="taR-name" placeholder="이름" value="'+cesc(v.name||'')+'" style="width:90px;padding:7px 9px;border:1px solid #d5dce8;border-radius:8px;font-size:13px">'
+    +'<input class="taR-no" placeholder="배번" inputmode="numeric" title="경기복 배번(선택) — 적어 두면 오더지와 경기 기록에 그대로 쓰입니다" value="'+cesc(v.no||'')+'" style="width:56px;padding:7px 8px;border:1px solid #d5dce8;border-radius:8px;font-size:13px;text-align:center">'
     +'<input class="taR-birth" type="date" value="'+cesc(v.birth||'')+'" style="width:140px;padding:7px 9px;border:1px solid #d5dce8;border-radius:8px;font-size:13px">'
     +'<select class="taR-g" style="padding:7px 8px;border:1px solid #d5dce8;border-radius:8px;font-size:13px"><option value="">성별</option><option'+(v.gender==='남'?' selected':'')+'>남</option><option'+(v.gender==='여'?' selected':'')+'>여</option></select>'
     +'<input class="taR-school" placeholder="학교·소속" value="'+cesc(v.school||'')+'" style="flex:1;min-width:110px;padding:7px 9px;border:1px solid #d5dce8;border-radius:8px;font-size:13px">'
@@ -2130,7 +2131,7 @@ function taParseSheet(ws){
   if(!hdrRow)return {rows:[],errors:['머리글 행을 찾지 못했습니다. 첫 줄에 「성명」(또는 이름·학생명) 칸이 있어야 합니다. 「① 빈 명단 양식 내려받기」로 양식을 받아 그 양식에 적어 주세요.']};
   const H=hdr.map(h=>String(h||'').replace(/\s+/g,''));
   const col=re=>{for(let i=0;i<H.length;i++)if(re.test(H[i]))return i;return -1};
-  const C={name:col(NAME_RE),birth:col(/생년월일|생일|출생|생년|birth/i),gender:col(/성별|gender|남녀/i),school:col(/학교|소속|팀명|클럽/),phone:col(/연락처|전화|휴대|핸드폰|phone/i),addr:col(/주소/),note:col(/비고|메모|특이/)};
+  const C={name:col(NAME_RE),no:col(/^배번|등번호|등번|^번호$|^no\.?$|^number$/i),birth:col(/생년월일|생일|출생|생년|birth/i),gender:col(/성별|gender|남녀/i),school:col(/학교|소속|팀명|클럽/),phone:col(/연락처|전화|휴대|핸드폰|phone/i),addr:col(/주소/),note:col(/비고|메모|특이/)};
   if(C.name<0)return {rows:[],errors:['성명 열이 없습니다.']};
   const rows=[],errors=[];
   ws.eachRow((row,n)=>{if(n<=hdrRow)return;const v=row.values||[];const g=i=>i>=0?taCell(v[i]):'';
@@ -2138,7 +2139,7 @@ function taParseSheet(ws){
     const birthRaw=C.birth>=0?v[C.birth]:'';const birth=taDate(birthRaw instanceof Date?birthRaw:(typeof birthRaw==='object'&&birthRaw?taCell(birthRaw):birthRaw));
     if(C.birth>=0&&taCell(birthRaw)&&!birth)errors.push(n+'행 '+name+': 생년월일 형식을 읽지 못했습니다 (YYYY-MM-DD 로 적어 주세요)');
     let gender=g(C.gender);gender=/여|f|female|w/i.test(gender)?'여':(/남|m|male/i.test(gender)?'남':'');
-    rows.push({name:name,birth:birth,gender:gender,school:g(C.school),phone:g(C.phone),address:g(C.addr),note:g(C.note)});
+    rows.push({name:name,no:String(g(C.no)||'').replace(/[^0-9]/g,'').slice(0,3),birth:birth,gender:gender,school:g(C.school),phone:g(C.phone),address:g(C.addr),note:g(C.note)});
   });
   return {rows:rows,errors:errors};
 }
@@ -2231,12 +2232,12 @@ async function taImportXlsx(input){
 async function taXlsxTemplate(){
   if(typeof ExcelJS==='undefined'){alert('엑셀 라이브러리를 아직 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');return}
   const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet('팀원 명단');
-  ws.columns=[{header:'성명',width:12},{header:'생년월일',width:14},{header:'성별',width:8},{header:'학교·소속',width:20},{header:'연락처',width:16},{header:'주소',width:34},{header:'비고',width:16}];
-  ws.addRow(['홍길동','2013-05-05','남','대한초등학교','010-1234-5678','부산광역시 ○○구 ○○로 12, 101동 1203호','']);
-  ws.addRow(['김영희','2014-03-01','여','대한초등학교','','','']);
+  ws.columns=[{header:'성명',width:12},{header:'배번',width:8},{header:'생년월일',width:14},{header:'성별',width:8},{header:'학교·소속',width:20},{header:'연락처',width:16},{header:'주소',width:34},{header:'비고',width:16}];
+  ws.addRow(['홍길동','7','2013-05-05','남','대한초등학교','010-1234-5678','부산광역시 ○○구 ○○로 12, 101동 1203호','']);
+  ws.addRow(['김영희','11','2014-03-01','여','대한초등학교','','','']);
   ws.getRow(1).font={bold:true};
   const g=wb.addWorksheet('작성 안내');
-  ['· 1행(머리글)은 그대로 두고 2행부터 한 사람씩 적습니다. 예시 두 줄은 지우고 쓰세요.','· 생년월일은 2013-05-05 처럼 적습니다 (2013.05.05, 20130505, 130505 도 읽힙니다). 보호자 동의·연령 확인에 꼭 필요합니다.','· 성별은 남/여. 학교·소속은 학교 정식 명칭.','· 연락처·주소는 주최기관 참가자 명단에 필요할 때만 적습니다.','· 연맹 회원(또는 보호자 계정에 등록된 자녀)은 성명+생년월일이 같으면 회원 정보와 자동 연동됩니다.'].forEach(t=>g.addRow([t]));
+  ['· 1행(머리글)은 그대로 두고 2행부터 한 사람씩 적습니다. 예시 두 줄은 지우고 쓰세요.','· 배번(경기복 등번호)은 선택입니다. 적어 두면 출전 오더지의 「신청 배번」에 자동으로 들어가 경기 기록(득점·제재)까지 그대로 쓰입니다. 나중에 오더지에서 바꿀 수도 있습니다.','· 생년월일은 2013-05-05 처럼 적습니다 (2013.05.05, 20130505, 130505 도 읽힙니다). 보호자 동의·연령 확인에 꼭 필요합니다.','· 성별은 남/여. 학교·소속은 학교 정식 명칭.','· 연락처·주소는 주최기관 참가자 명단에 필요할 때만 적습니다.','· 연맹 회원(또는 보호자 계정에 등록된 자녀)은 성명+생년월일이 같으면 회원 정보와 자동 연동됩니다.'].forEach(t=>g.addRow([t]));
   g.getColumn(1).width=100;
   const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.download='단체전_팀원명단_양식(적어서_올리기).xlsx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
 }
@@ -2611,6 +2612,7 @@ async function submitTeam(){
   try{await taResolveMembers()}catch(e){}   // [회원 색인] 직접 입력한 팀원도 회원이면 회원으로 저장
   const roster=[...document.querySelectorAll('#taRosterBox > div')].map(r=>Object.assign({},r.dataset.self==='1'?{self:true,uid:CME.uid}:{},(r.dataset.uid&&r.dataset.self!=='1')?{memberUid:r.dataset.uid}:{},r.dataset.guardianUid?{guardianUid:r.dataset.guardianUid}:{},{   // [회원 연동] 확인된 회원·자녀는 uid 를 함께 저장 (종료 처리 시 경력 연동)   // [클럽장 본인 참가] 본인 행만 self·uid 기록 (종료 처리 시 '선수' 경력용)
     name:r.querySelector('.taR-name').value.trim(),
+    no:String((r.querySelector('.taR-no')||{}).value||'').replace(/[^0-9]/g,'').slice(0,3),   // [배번 2026-10-17] 선택 — 오더지 「신청 배번」으로 자동 연결
     birth:r.querySelector('.taR-birth').value,
     gender:r.querySelector('.taR-g').value,
     school:r.querySelector('.taR-school').value.trim(),
