@@ -132,6 +132,7 @@
 .rc .sb{display:grid;grid-template-columns:1fr minmax(250px,1.35fr) 1fr;gap:12px;align-items:stretch;background:linear-gradient(145deg,#111c35 0%,#1c2e55 60%,#223a6a 100%);color:#fff;border:1px solid #2b3f6b;border-radius:22px;padding:16px 16px 14px;box-shadow:0 18px 40px rgba(15,23,42,.22)}
 .rc .sbt{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:4px}
 .rc .sbt .kit{width:100%;border-radius:12px;padding:6px 10px;font-weight:900;font-size:clamp(13px,2.5vw,16px);text-align:center;line-height:1.2;word-break:keep-all;border:1px solid rgba(255,255,255,.35);box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);min-height:calc(2.4em + 12px);display:flex;flex-direction:column;align-items:center;justify-content:center}.rc .sbt .kit small{display:-webkit-box!important;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.rc .sbt .v.tap{cursor:pointer;border-radius:18px;transition:background .15s}.rc .sbt .v.tap:active{background:rgba(255,255,255,.12)}.rc .sbt small .tapHint{display:block;font-style:normal;font-size:10.5px;font-weight:800;color:rgba(255,255,255,.55);margin-top:2px;letter-spacing:0}
 .rc .sbt .v{flex:1;display:flex;align-items:center;font-size:clamp(84px,15vw,160px);font-weight:900;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-3px;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.25)}.rc .sbt>small{margin-top:-2px}
 .rc .sbt small{font-size:12.5px;color:#c9d3e8;font-weight:700;letter-spacing:.3px}
 .rc .sbt .to{width:100%;min-height:46px;border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.08);color:#fff;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;line-height:1.2}
@@ -865,7 +866,7 @@ function rcRender(){
   const [L,R]=sidesLR(m);const per=m.period||'';const curP=per==='하프타임'?'':per;const TO=MR.timeouts(m);
   const sideBox=(side)=>{const K=kitOfSide(m,side);const used=(TO[side][curP]||[]);const v=side==='a'?sc.a:sc.b;
     const hs=['전반','후반','연장'].filter(p=>H[side][p]!=null).map(p=>p.charAt(0)+' '+H[side][p]).join(' · ');
-    const tm=m[side]||{};const won=m.status==='종료'&&MR.winnerOf(m)===side;return '<div class="sbt"><div class="kit" style="background:'+esc(K.color)+';color:'+MR.kitTextColor(K.color)+'" title="'+esc(tname(m,side))+'">'+esc(tm.name||tm.school||side.toUpperCase())+(won?'<span class="wb">승</span>':'')+(tm.school&&tm.school!==tm.name?'<small style="display:block;font-size:11.5px;font-weight:800;color:inherit;opacity:.9">'+esc(tm.school)+'</small>':'')+'</div><div class="v">'+v+'</div><small>'+esc(hs)+'&nbsp;</small>'
+    const tm=m[side]||{};const won=m.status==='종료'&&MR.winnerOf(m)===side;return '<div class="sbt"><div class="kit" style="background:'+esc(K.color)+';color:'+MR.kitTextColor(K.color)+'" title="'+esc(tname(m,side))+'">'+esc(tm.name||tm.school||side.toUpperCase())+(won?'<span class="wb">승</span>':'')+(tm.school&&tm.school!==tm.name?'<small style="display:block;font-size:11.5px;font-weight:800;color:inherit;opacity:.9">'+esc(tm.school)+'</small>':'')+'</div><div class="v'+(mine&&m.status==='진행'?' tap':'')+'"'+(mine&&m.status==='진행'?' role="button" title="누르면 이 팀 선수 명단으로 바로 내려가 득점을 입력합니다" onclick="qkJump(\''+side+'\')"':'')+'>'+v+'</div><small>'+esc(hs)+(mine&&m.status==='진행'?'<em class="tapHint">숫자를 누르면 득점 입력</em>':'')+'&nbsp;</small>'
       +'<div class="sbb">'+pullBtn(m,side,mine,curP)+(mine&&m.status==='진행'?'<button class="to" '+((used.length||!curP||m.brk)?'disabled':'')+' onclick="toStart(\''+side+'\')">작전타임<small>'+(curP?(used.length?'사용 '+esc(MR.evTime(used[0])):'1회 남음'):'구간 시작 후')+'</small></button>'
         :(curP&&used.length?'<small class="tou">작전타임 '+esc(MR.evTime(used[0]))+'</small>':''))+'</div></div>'};
   // ② 점수판 · 시계
@@ -1070,7 +1071,11 @@ function qkTimeRow_old(P){return '<div class="qm"><span class="ql">시간</span>
 function qkT(d){if(!QK.pend)return;QK.pend.sec=Math.max(0,(+QK.pend.sec||0)+d);rcRender()}
 function qkNew(side,stage){const m=RCM();return {side:side,stage:stage,sec:MR.secOf(m),period:curPeriodRec(m)}}
 function qkMode(md){QK.mode=md;QK.pend=null;QK.swap=false;QK.swapSel=null;rcRender()}
-function qkCancel(){QK.pend=null;rcRender()}
+function qkCancel(){QK.pend=null;rcRender();qkJumpBack()}
+// [13차] 스코어 숫자 → 그 팀 선수 명단(득점 모드)으로 바로 이동, 저장·취소 뒤 스코어로 복귀 — 휴대폰에서 스크롤을 줄이기 위함
+function rcScrollTo(id,block){const bd=document.querySelector('#rcOv .body');const e=bd&&bd.querySelector('[data-anc="'+id+'"]');if(!e)return;try{e.scrollIntoView({block:block||'start',behavior:'smooth'})}catch(x){e.scrollIntoView()}}
+function qkJump(side){QK.mode='goal';QK.pend=null;QK.swap=false;QK.swapSel=null;QK.jump=side;rcRender();setTimeout(()=>rcScrollTo('qt-'+side,'start'),30)}
+function qkJumpBack(){if(!QK.jump)return;QK.jump=null;setTimeout(()=>rcScrollTo('sb','start'),80)}
 function qkScorerObj(side,p){QK.pend=qkNew(side,'assist');QK.pend.scorer=p;rcRender()}
 async function qkAssistObj(side,ap){const P=QK.pend;if(!P||P.side!==side)return;const m=RCM();
   if(ap&&P.scorer&&ap.no===P.scorer.no){say('득점자와 어시스트가 같은 선수입니다');return}
@@ -1087,7 +1092,7 @@ async function qkCardSave(){const P=QK.pend;if(!P||P.stage!=='card'||!P.card)ret
   await sendEvent({kind:'add',id:RC_ID,ev:ev,opts:{requireCtrl:true}});
   // 퇴장 선수는 주전에서 빼 후보 칸으로(잠김) — 빈 자리에 다른 선수를 넣어 인원 그대로 진행
   if(willOff&&P.target.key){const T=teamPl(m,P.side);if(T&&T.onKeys.indexOf(P.target.key)>=0){const Lu=Object.assign({},m.lineup||{});Lu[P.side]={on:T.onKeys.filter(k=>k!==P.target.key)};await rcUpdate({lineup:Lu})}}}
-function qkToast(text,evId){try{if(navigator.vibrate)navigator.vibrate(35)}catch(e){}QK.toast={text:'✓ '+text,evId:evId};clearTimeout(QK.toastT);QK.toastT=setTimeout(()=>{QK.toast=null;rcRender()},9000);rcRender()}
+function qkToast(text,evId){try{if(navigator.vibrate)navigator.vibrate(35)}catch(e){}QK.toast={text:'✓ '+text,evId:evId};clearTimeout(QK.toastT);QK.toastT=setTimeout(()=>{QK.toast=null;rcRender()},9000);rcRender();qkJumpBack()}
 function lastEv(m){const L=(m.events||[]).filter(e=>e&&!e.void&&e.type&&['goal','card','timeout'].indexOf(e.type)>=0);return L[L.length-1]||null}
 async function qkUndoLast(){const m=RCM();const e=lastEv(m);if(!e)return;const L=MR.evLine(e);if(!confirm('마지막 기록을 되돌릴까요?\n'+((m[e.side]||{}).name||'')+' · '+(e.type==='timeout'?'작전타임':L.who)+(L.min?' · '+L.min:'')+'\n(기록은 지워지지 않고 취소 표시만 남습니다)'))return;QK.toast=null;await sendEvent({kind:'void',id:RC_ID,evId:e.id});if(m.brk&&m.brk.evId===e.id)await rcUpdate({brk:null});if(e.type==='card')await capClear(e.side,e.id)}
 async function qkUndo(){const t=QK.toast;if(!t||!t.evId)return;QK.toast=null;clearTimeout(QK.toastT);const m=RCM();rcRender();await sendEvent({kind:'void',id:RC_ID,evId:t.evId});if(m&&m.brk&&m.brk.evId===t.evId)await rcUpdate({brk:null});const ev=m&&(m.events||[]).find(x=>x.id===t.evId);if(ev&&ev.type==='card')await capClear(ev.side,ev.id)}

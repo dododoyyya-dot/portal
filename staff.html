@@ -209,7 +209,7 @@ const DEFAULT_CHECKED=['필기구','텀블러 (물병 지참)','운동화'];
 // [2026-10-17] 자격 없이 신청할 수 있는 임무는 운영요원 계열(○○요원)·봉사요원·기록원뿐 — 감독관·관리위원(심판총괄·위원장 등)·주심·부심·점수원과 그 밖의 직접 입력 임무는 모두 유효한 심판 자격이 있어야 신청 가능
 //   (전에는 주심·부심·기록원·점수원과 「심판」이 든 이름만 잠가서 감독관이 자격 없이 신청되던 문제)
 const FREE_DUTIES=['기록원','운영요원','봉사요원'].concat(ROLE_TREE['운영요원']||[]);
-function isRefDuty(r){r=String(r||'').trim();if(!r)return false;if(FREE_DUTIES.indexOf(r)>=0)return false;if(r.indexOf('심판')<0&&(/요원$/.test(r)||r.indexOf('봉사')>=0))return false;return true}
+function isRefDuty(r){r=String(r||'').trim();if(!r)return false;if(FREE_DUTIES.indexOf(r)>=0)return false;if(r.indexOf('심판')<0&&(r.indexOf('요원')>=0||r.indexOf('봉사')>=0))return false;return true}
 function hasValidRefLic(){return Array.isArray(MYLIC_DOCS._valid)&&MYLIC_DOCS._valid.some(l=>String(l.type||'').indexOf('심판')>=0);}
 
 let APPS_CANCELLED={};   // [신청 취소] 취소된 신청(기록 보존용) — 공고ID → []
