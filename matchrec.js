@@ -1,4 +1,4 @@
-// matchrec.js v20261015f · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
+// matchrec.js v20261017a · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
 //   화면: match.html(기록 콘솔·경기 관리) · competition.html(오더지 작성) · results.html(공개 결과) · live.html(중계 콘솔 호환)
 //   원칙 ① 경기 문서(liveMatches) 하나가 원본 ② 점수는 득점 기록(events)에서 계산해 a.score/b.score 에 같이 저장(중계 화면 호환)
 //        ③ 입력권(ctrl)은 한 번에 한 화면 ④ 기록 추가는 고유 id + 트랜잭션(중복 전송 무시) ⑤ 취소는 삭제 대신 void 표시
@@ -192,7 +192,7 @@
     +'th{background:#e8f3ee;font-weight:800}.h1{text-align:center;font-size:22pt;font-weight:900;margin:2mm 0 1mm}.h2{text-align:center;font-size:12.5pt;font-weight:700;margin:0 0 4mm;color:#333}'
     +'.lab{background:#e8f3ee;font-weight:800}.sig{height:11mm;object-fit:contain;max-width:34mm;vertical-align:middle}.l{text-align:left}.s{font-size:9.5pt}.y{background:#fff59a}.b{background:#dcdcf0}.g{background:#bfe8d2}'
     +'.sl{display:flex;justify-content:space-between;margin-top:4mm;font-size:10.5pt;align-items:flex-end;gap:3mm;flex-wrap:wrap}.sl div{flex:1;min-width:40%}.sl b{margin-right:3mm}.sl u{display:inline-block;min-width:34mm;border-bottom:1px solid #333;text-align:center;text-decoration:none}'
-    +'.tt td.tm{font-variant-numeric:tabular-nums;font-size:9.5pt;white-space:nowrap}.tt td.l b{font-size:11pt}.win{color:#b00020;font-weight:900}.winline{text-align:center;font-size:13pt;font-weight:900;margin:2mm 0 0;border:1.5px solid #333;padding:1.5mm;background:#f6f6f6}';
+    +'.tt td.tm{font-variant-numeric:tabular-nums;font-size:9.5pt;white-space:nowrap}.tt td.l b{font-size:11pt}.tl td{padding:1.8mm 1.5mm;font-size:10pt}.tl td.l b{font-size:10.5pt}.tl td.tm{font-variant-numeric:tabular-nums;font-size:9.5pt;white-space:nowrap}.tl td.sc{font-variant-numeric:tabular-nums;font-size:11.5pt;font-weight:900;background:#fffbe6;white-space:nowrap}.tl td.sc .hi{color:#b00020}.tl th.tn{font-size:11pt}.tl th.mid{background:#fff3c4}.tl tr.pd td{background:#e8f3ee;font-weight:800;font-size:9pt;padding:0.8mm}.win{color:#b00020;font-weight:900}.winline{text-align:center;font-size:13pt;font-weight:900;margin:2mm 0 0;border:1.5px solid #333;padding:1.5mm;background:#f6f6f6}';
   function pwin(title){var w=window.open('','_blank');if(!w){alert('팝업이 차단되어 인쇄 창을 열 수 없습니다. 주소창의 팝업 차단 표시에서 허용해 주세요.');return null}
     w.document.write('<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>'+esc(title)+'</title><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"><style>'+PCSS+'</style></head><body><div class="bar"><button onclick="window.print()">🖨 인쇄 · PDF로 저장</button><span>인쇄 창에서 대상을 「PDF로 저장」, 용지 A4, 「배경 그래픽」 켜기</span></div>');return w}
   function pend(w){w.document.write('<script>setTimeout(function(){window.print()},500)<\/script></body></html>');w.document.close()}
@@ -212,19 +212,32 @@
   // 팀 지도자 목록 — 경기 정보에서 고친 것(m.coaches[side]) 우선, 없으면 오더지 감독교사
   function coachesOf(m,side,o){var c=m&&m.coaches&&m.coaches[side];if(Array.isArray(c)&&c.length)return c.filter(function(x){return x&&x.name});var oc=(o&&o.coach)||{};return oc.name?[{name:oc.name,role:oc.role||'',sign:oc.sign||''}]:[]}
   function winnerOf(m){var sc=score(m&&m.events||[]);if(m.status!=='종료')return '';return sc.a>sc.b?'a':sc.b>sc.a?'b':''}
-  // 결과지(연맹 기록지) — 시간 순서로 한 줄에 하나: TIME · 득점(배번 이름) · 도움(배번 이름) · 제재(종류 배번 이름) — 부산 기록지 양식(2026-10-15 샘플) 기준
-  function printSheet(m,oa,ob,signs,opt){opt=opt||{};signs=signs||{};var w=pwin('경기 기록지_'+teamLabel(m.a)+'_'+teamLabel(m.b));if(!w)return;
+  // 결과지(연맹 기록지) — 시간 순서로 한 사건에 한 줄: 왼쪽 팀(득점·도움·제재) | TIME | 점수(가운데) | 오른쪽 팀(득점·도움·제재). 부산 기록지 양식(2026-10-15 샘플) 기준, 10차에서 두 팀 나란히 적던 것을 한 줄 한 사건으로 고침
+  function sheetBody(m,oa,ob,signs,opt){opt=opt||{};signs=signs||{};
     var sc=score(m.events||[]);var H=sc.half||{a:{},b:{}};var PO={'전반':0,'후반':1,'연장':2};var win=winnerOf(m);
-    function rowsOf(side){var L=(m.events||[]).filter(function(e){return e&&!e.void&&e.side===side&&(e.type==='goal'||e.type==='card'||e.type==='timeout')}).sort(function(a,b){return ((PO[a.period]!=null?PO[a.period]:9)-(PO[b.period]!=null?PO[b.period]:9))||((evSec(a)||0)-(evSec(b)||0))});
-      return L.map(function(e){var t=(e.period||'').charAt(0)+' '+evTime(e);var pn=function(p){return p?('<b>'+esc(p.no||'')+'</b>'+(p.name?' <span class="s">'+esc(p.name)+'</span>':'')):''};
-        if(e.type==='goal')return '<tr><td class="tm">'+esc(t)+'</td><td class="l">'+(e.scorer?pn(e.scorer):'<span class="s">미지정</span>')+'</td><td class="l">'+pn(e.assist)+'</td><td></td></tr>';
-        if(e.type==='card'){var tg=e.target||{};return '<tr><td class="tm">'+esc(t)+'</td><td></td><td></td><td class="l"><b>'+esc(CARDS[e.card]||e.card)+'</b> '+(tg.kind==='coach'?'지도자 '+esc(tg.name||''):'<b>'+esc(tg.no||'')+'</b>'+(tg.name?' <span class="s">'+esc(tg.name)+'</span>':''))+(e.note?' <span class="s">('+esc(e.note)+')</span>':'')+'</td></tr>'}
-        return '<tr><td class="tm">'+esc(t)+'</td><td colspan="3" class="l s">작전타임</td></tr>'})}
-    var ra=rowsOf('a'),rb=rowsOf('b');var N=Math.max(16,ra.length,rb.length);var blank='<tr><td class="tm">&nbsp;</td><td></td><td></td><td></td></tr>';while(ra.length<N)ra.push(blank);while(rb.length<N)rb.push(blank);
-    function team(side,o,rows){var t=m[side]||{};var kit=((m.kit||{})[side]===1)?1:0;var K=kitsOf(o||{})[kit];var fp=(m.fairplay||{})[side];var cs=(m.coachScore||{})[side];
-      return '<table class="tt"><tr><td class="lab" style="width:16mm">학교명</td><td colspan="3" class="l" style="padding-left:3mm;font-weight:800;font-size:11.5pt">'+esc(teamLabel(t))+(win===side?' <span class="win">승</span>':'')+' <span class="s" style="display:inline-block;border:1px solid #333;background:'+esc(K.color)+';color:'+kitTextColor(K.color)+';padding:0 2mm;border-radius:1mm;font-weight:600">'+esc(K.name)+'</span></td></tr>'
-        +'<tr><th style="width:16mm">TIME</th><th>득점</th><th>도움</th><th style="width:30mm">제재</th></tr>'+rows.join('')
-        +'<tr><td class="g lab">가점</td><td colspan="3" class="l" style="padding-left:3mm">페어플레이 <b>'+(fp!=null?fp:'')+'</b>'+(cs!=null?' &nbsp;·&nbsp; 지도자 <b>'+cs+'</b>':'')+'</td></tr></table>'}
+    var EV=(m.events||[]).map(function(e,i){return {e:e,i:i}}).filter(function(x){var e=x.e;return e&&!e.void&&(e.side==='a'||e.side==='b')&&(e.type==='goal'||e.type==='card'||e.type==='timeout'||(e.type==null&&typeof e.d==='number'))})
+      .sort(function(x,y){var a=x.e,b=y.e;return ((PO[a.period]!=null?PO[a.period]:9)-(PO[b.period]!=null?PO[b.period]:9))||((evSec(a)||0)-(evSec(b)||0))||(x.i-y.i)});
+    var pn=function(p){return p?('<b>'+esc(p.no||'')+'</b>'+(p.name?' <span class="s">'+esc(p.name)+'</span>':'')):''};
+    var E3='<td></td><td></td><td></td>';
+    var cellsOf=function(e){
+      if(e.type==='goal')return '<td class="l">'+(e.scorer?pn(e.scorer):'<span class="s">미지정</span>')+'</td><td class="l">'+pn(e.assist)+'</td><td></td>';
+      if(e.type==='card'){var tg=e.target||{};return '<td></td><td></td><td class="l"><b>'+esc(CARDS[e.card]||e.card)+'</b> '+(tg.kind==='coach'?'지도자 '+esc(tg.name||''):'<b>'+esc(tg.no||'')+'</b>'+(tg.name?' <span class="s">'+esc(tg.name)+'</span>':''))+(e.note?' <span class="s">('+esc(e.note)+')</span>':'')+'</td>'}
+      if(e.type==='timeout')return '<td colspan="3" class="s">작전타임</td>';
+      return '<td class="l" colspan="3">'+(e.d>0?'득점':'득점 취소')+'</td>'};
+    var run={a:0,b:0};var rows=[];var curP=null;
+    EV.forEach(function(x){var e=x.e;var p=e.period||'';if(p!==curP){curP=p;rows.push('<tr class="pd"><td colspan="3"></td><td colspan="2">'+esc(p||'구간 미정')+'</td><td colspan="3"></td></tr>')}
+      var d=e.type==='goal'?1:(e.type==null?(+e.d||0):0);if(d)run[e.side]=Math.max(0,run[e.side]+d);
+      var C=cellsOf(e);var left=e.side==='a'?C:E3,right=e.side==='b'?C:E3;
+      var scv=d?('<b'+(e.side==='a'?' class="hi"':'')+'>'+run.a+'</b> : <b'+(e.side==='b'?' class="hi"':'')+'>'+run.b+'</b>'):'';
+      rows.push('<tr>'+left+'<td class="tm">'+esc(evTime(e))+'</td><td class="sc">'+scv+'</td>'+right+'</tr>')});
+    var N=16;while(rows.length<N)rows.push('<tr>'+E3+'<td class="tm">&nbsp;</td><td class="sc"></td>'+E3+'</tr>');
+    function th_(side,o){var t=m[side]||{};var kit=((m.kit||{})[side]===1)?1:0;var K=kitsOf(o||{})[kit];
+      return '<th colspan="3" class="tn">'+esc(teamLabel(t))+(win===side?' <span class="win">승</span>':'')+' <span class="s" style="display:inline-block;border:1px solid #333;background:'+esc(K.color)+';color:'+kitTextColor(K.color)+';padding:0 2mm;border-radius:1mm;font-weight:600">'+esc(K.name)+'</span></th>'}
+    function gp(side){var fp=(m.fairplay||{})[side];var cs=(m.coachScore||{})[side];return '<td class="g l" colspan="3" style="padding-left:3mm"><b>가점</b> &nbsp;페어플레이 <b>'+(fp!=null?fp:'')+'</b>'+(cs!=null?' &nbsp;·&nbsp; 지도자 <b>'+cs+'</b>':'')+'</td>'}
+    var timeline='<table class="tl"><colgroup><col style="width:28mm"><col style="width:26mm"><col style="width:22mm"><col style="width:14mm"><col style="width:20mm"><col style="width:28mm"><col style="width:26mm"><col style="width:22mm"></colgroup>'
+      +'<tr>'+th_('a',oa)+'<th rowspan="2" class="mid">TIME</th><th rowspan="2" class="mid">점수<br><span class="s" style="font-weight:600">왼쪽 : 오른쪽</span></th>'+th_('b',ob)+'</tr>'
+      +'<tr><th>득점</th><th>도움</th><th>제재</th><th>득점</th><th>도움</th><th>제재</th></tr>'+rows.join('')
+      +'<tr>'+gp('a')+'<td colspan="2" class="g"></td>'+gp('b')+'</tr></table>';
     var ta=m.a||{},tb=m.b||{};var day=m.day||'';var dd=day?new Date(day+'T00:00:00'):null;
     var sg=function(s){return s&&s.name?('<b>'+esc(s.name)+'</b> '+(s.img?'<img class="sig" src="'+esc(s.img)+'">':'<u>&nbsp;</u>')):'<u>&nbsp;</u>'};
     var coachBox=function(side,o){var cs=coachesOf(m,side,o);var key=side==='a'?'coachA':'coachB';var first=signs[key]&&signs[key].name?signs[key]:(cs[0]?{name:cs[0].name,img:cs[0].sign}:null);
@@ -233,18 +246,21 @@
     var offs=offList(m);var byRole={};offs.forEach(function(x){(byRole[x.role||'심판']=byRole[x.role||'심판']||[]).push(x)});
     var offLine=function(role,labelFn){var L=byRole[role]||[];if(!L.length)return '<div><b>'+esc(role)+':</b><u>&nbsp;</u></div>';return L.map(function(x,i){return '<div><b>'+esc(labelFn?labelFn(i):role)+':</b>'+sg(signs[x.key]&&signs[x.key].name?signs[x.key]:{name:x.name})+'</div>'}).join('')};
     var mvps=(m.mvps&&m.mvps.length?m.mvps:(m.mvp?[m.mvp]:[])).map(function(p){return '#'+(p.no||'')+' '+(p.name||'')+(p.team?' ('+p.team+')':'')}).join(', ');
-    w.document.write('<div class="pg"><div class="h1" style="font-size:16pt">( '+esc(m.div||'')+' )부 ( '+esc(m.round||'')+' )경기 기록(결과)지 ( '+esc(m.stage||'예선')+' )</div>'
+    return '<div class="pg"><div class="h1" style="font-size:16pt">( '+esc(m.div||'')+' )부 ( '+esc(m.round||'')+' )경기 기록(결과)지 ( '+esc(m.stage||'예선')+' )</div>'
       +'<table><tr><td class="lab" style="width:20mm">경기<br>일시</td><td style="width:46mm">'+(dd?dd.getFullYear()+'년 '+(dd.getMonth()+1)+'월 '+dd.getDate()+'일':esc(day))+(m.time?' '+esc(m.time):(m.startAt?' '+esc(new Date(tsMs(m.startAt)).toTimeString().slice(0,5)):''))+'</td><td class="lab" style="width:20mm">경기장소</td><td class="l" style="padding-left:3mm">'+esc(m.place||'')+(m.court?' ( '+esc(m.court)+' )':'')+'</td></tr></table>'
       +'<table style="border-top:none"><tr><td class="lab" rowspan="3" style="width:20mm">경기 결과</td><th style="width:46mm">학교명</th><th class="y" style="width:20mm">전반</th><th class="b" style="width:20mm">후반</th><th style="width:20mm">총점</th><th>결과</th></tr>'
       +['a','b'].map(function(side){var t=m[side]||{};var me=side==='a'?sc.a:sc.b,op=side==='a'?sc.b:sc.a;var res=m.status==='종료'?(me>op?'승':me<op?'패':'무'):'';return '<tr><td class="l" style="padding-left:3mm;font-weight:800">'+esc(teamLabel(t))+'</td><td class="y">'+((H[side]||{})['전반']||0)+'</td><td class="b">'+(((H[side]||{})['후반']||0)+((H[side]||{})['연장']||0))+'</td><td style="font-weight:900">'+me+'</td><td style="font-weight:900;font-size:12pt">'+res+'</td></tr>'}).join('')+'</table>'
       +(win?'<div class="winline">'+esc(t_('a'))+' <b>'+sc.a+'</b> : <b>'+sc.b+'</b> '+esc(t_('b'))+' &nbsp;—&nbsp; <span class="win">'+esc(t_(win))+' 승</span></div>':'')
-      +'<div style="display:flex;gap:2mm;margin-top:2mm"><div style="flex:1">'+team('a',oa,ra)+'</div><div style="flex:1">'+team('b',ob,rb)+'</div></div>'
-      +'<div class="s" style="margin-top:2mm">※제재(지도자 포함): 주의 · 옐로(경고) · 레드(퇴장) — 옐로 2장은 퇴장 &nbsp; ※페어플레이·지도자 가점: 5 ~ −3 (주심·부심·기록·감독관 합의)</div>'
+      +'<div style="margin-top:2mm">'+timeline+'</div>'
+      +'<div class="s" style="margin-top:2mm">※ 한 줄에 사건 하나 — 왼쪽 팀 사건은 왼쪽 칸, 오른쪽 팀 사건은 오른쪽 칸에 적고 가운데 「점수」는 그 득점 직후의 점수(왼쪽 : 오른쪽) &nbsp; ※제재(지도자 포함): 주의 · 옐로(경고) · 레드(퇴장) — 옐로 2장은 퇴장 &nbsp; ※페어플레이·지도자 가점: 5 ~ −3</div>'
       +'<div class="s">최우수선수 추천: <b>'+esc(mvps)+'</b></div>'
       +'<div class="sl">'+coachBox('a',oa)+coachBox('b',ob)+'</div>'
       +'<div class="sl">'+offLine('감독관')+offLine('기록원')+offLine('점수심')+'</div>'
       +'<div class="sl">'+offLine('주심',function(i){return '주심'+((byRole['주심']||[]).length>1?(i+1):'')})+offLine('부심',function(i){return '부심'+(i+1)})+'</div>'
-      +'<div class="s" style="color:#666;margin-top:3mm">연맹 홈페이지 경기 기록 콘솔 기록 · '+(m.locked?'확정':'미확정')+(m.confirmedBy?' · 확정 '+esc(m.confirmedBy.name||'')+(m.confirmedBy.role?'('+esc(m.confirmedBy.role)+')':'')+' '+esc(String(m.confirmedBy.at||'').slice(0,16).replace('T',' ')):'')+' · 시간은 구간 안의 경기 시간(분:초)</div></div>');pend(w)}
+      +'<div class="s" style="color:#666;margin-top:3mm">연맹 홈페이지 경기 기록 콘솔 기록 · '+(m.locked?'확정':'미확정')+(m.confirmedBy?' · 확정 '+esc(m.confirmedBy.name||'')+(m.confirmedBy.role?'('+esc(m.confirmedBy.role)+')':'')+' '+esc(String(m.confirmedBy.at||'').slice(0,16).replace('T',' ')):'')+' · 시간은 구간 안의 경기 시간(분:초)</div></div>'}
+  function printSheet(m,oa,ob,signs,opt){var w=pwin('경기 기록지_'+teamLabel(m.a)+'_'+teamLabel(m.b));if(!w)return;w.document.write(sheetBody(m,oa,ob,signs,opt));pend(w)}
+  // 같은 화면 안(iframe)에서 보여 줄 완성 문서 — 좁은 화면에서는 A4 폭을 화면에 맞춰 축소(인쇄 때는 원래 크기)
+  function sheetHtml(m,oa,ob,signs,opt){return '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc('경기 기록지_'+teamLabel(m.a)+'_'+teamLabel(m.b))+'</title><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"><style>'+PCSS+'body{background:#fff}@media print{.zw{zoom:1!important}}</style></head><body><div class="zw">'+sheetBody(m,oa,ob,signs,opt)+'</div><script>(function(){var z=document.querySelector(".zw");function fit(){var w=document.documentElement.clientWidth;var k=Math.min(1,(w-12)/740);z.style.zoom=k<1?k:""}fit();window.addEventListener("resize",fit);window.addEventListener("beforeprint",function(){z.style.zoom=""});window.addEventListener("afterprint",fit)})()<\/script></body></html>'}
   function printGolf(round,title){var w=pwin('디스크골프 스코어_'+(title||''));if(!w)return;var R=golfRank(round);var holes=round.holes||18;var hs='';for(var i=1;i<=holes;i++)hs+='<th style="width:6.5mm">'+i+'</th>';
     var ps='';(round.par||[]).slice(0,holes).forEach(function(p){ps+='<td>'+esc(p)+'</td>'});
     Object.keys(R).forEach(function(dv){w.document.write('<div class="pg"><div class="h1" style="font-size:16pt">디스크골프 스코어카드 · '+esc(dv)+'</div><div class="h2">'+esc(title||'')+' · '+holes+'홀'+(round.playoff&&round.playoff.length?' · 연장 '+round.playoff.length+'홀':'')+'</div>'
@@ -302,5 +318,5 @@
     PERIODS:PERIODS,CARDS:CARDS,esc:esc,uid8:uid8,tsMs:tsMs,score:score,goals:goals,clockMs:clockMs,clockTxt:clockTxt,minuteOf:minuteOf,clockSet:clockSet,clockAct:clockAct,
     ctrlState:ctrlState,ctrlLabel:ctrlLabel,CTRL_BEAT:CTRL_BEAT,addEvent:addEvent,voidEvent:voidEvent,editEvent:editEvent,qPush:qPush,qCount:qCount,flush:flush,
     canRecord:canRecord,isStaffUser:isStaffUser,orderId:orderId,orderFromEntry:orderFromEntry,orderCheck:orderCheck,lineup:lineup,playerStats:playerStats,computeStats:computeStats,
-    golfTotals:golfTotals,golfRank:golfRank,evLine:evLine,printOrder:printOrder,printSheet:printSheet,printGolf:printGolf};
+    golfTotals:golfTotals,golfRank:golfRank,evLine:evLine,printOrder:printOrder,printSheet:printSheet,sheetHtml:sheetHtml,sheetBody:sheetBody,printGolf:printGolf};
 })();

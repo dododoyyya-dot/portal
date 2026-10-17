@@ -105,6 +105,7 @@
 .mr-vs .n{font-weight:900;font-size:15px;min-width:0;word-break:keep-all}
 .mr-vs .s{font-size:30px;font-weight:900;font-variant-numeric:tabular-nums;text-align:center;letter-spacing:1px}
 .mr-note{font-size:12px;color:#6b7280;line-height:1.6}
+.shv{position:fixed;inset:0;z-index:10007;display:flex;flex-direction:column;background:#3b4252}.shv-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;background:#16181d;color:#fff;font-size:12.5px}.shv-bar b{font-size:15px}.shv-bar span{color:#c7cdd8}.shv iframe{flex:1;width:100%;border:0;background:#fff}
 .mr-tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}.mr-tbl th,.mr-tbl td{border-bottom:1px solid #eef1f5;padding:7px 8px;text-align:center}.mr-tbl th{background:#f6f8fb;font-size:12px}.mr-tbl td.l,.mr-tbl th.l{text-align:left}
 .bempty{padding:26px 16px;text-align:center;color:#8a919d;font-size:13.5px;background:#f6f8fb;border-radius:12px}
 /* ── 기록 콘솔 5차 (프리미엄: 네이비 점수판 · 골드 포인트 · 흰 카드 · 은은한 그림자) ── */
@@ -386,7 +387,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="matchrec.js?v=20261015f"></script>
+<script src="matchrec.js?v=20261017a"></script>
 <script>
 // ══════════ 경기 기록 (match.html) ══════════
 //   ?slot=참가공고ID            대회의 경기·오더지·디스크골프·순위 (운영진은 경기 생성·심판 배정)
@@ -887,10 +888,10 @@ function rcRender(){
     +(evs.length?evs.map(e=>{const Lx=MR.evLine(e);const legacy=e.type==null;const kd=e.type==='goal'?'<span class="kd">득점</span>':e.type==='card'?'<span class="kd c">'+esc(MR.CARDS[e.card]||'제재')+'</span>':e.type==='timeout'?'<span class="kd t">작전타임</span>':'';
       return '<div class="ev'+(e.void?' void':'')+'"><div class="m">'+(legacy?esc(e.clock||''):esc(Lx.min||'-'))+'<small>'+esc(e.period||'')+'</small></div><div class="w">'+kd+'<b>'+esc(legacy?(e.team||''):(m[e.side]||{}).name||'')+'</b> '+(legacy?'<span>'+(e.d>0?'득점':'취소')+'</span>':esc(e.type==='timeout'?'':Lx.who))+(e.void?' <span>· 취소 '+esc(e.void.by||'')+'</span>':'')+(e.edits&&e.edits.length?' <span>· 수정 '+e.edits.length+'</span>':'')+'</div><div style="display:flex;gap:4px;align-items:center"><span class="sc">'+esc(e.score||'')+'</span>'+(mine&&!e.void&&!legacy?'<button onclick="evEdit(\''+esc(e.id)+'\')">수정</button><button onclick="evVoid(\''+esc(e.id)+'\')">취소</button>':'')+'</div></div>'}).join('')
       :'<div class="ev" style="grid-template-columns:1fr">아직 기록이 없습니다.'+(mine?' 득점: 득점한 선수 카드 → 어시스트 선수(또는 「어시스트 없음」) 두 번 누르면 저장됩니다.':'')+'</div>')+'</div>'
-    +(m.status==='종료'?'<div class="mr-note" style="margin:10px 2px 0;font-weight:700">기록지는 아래 「기록지 인쇄」, 엑셀과 대회 전체 결과는 <a href="results.html?id=slot_'+esc(SLOT_ID)+'" style="color:#1c2e55;font-weight:900">대회 결과 페이지</a>에서 내려받습니다.</div>':'')+'</div>';
+    +(m.status==='종료'?'<div class="mr-note" style="margin:10px 2px 0;font-weight:700">기록지는 아래 「기록지 보기 · 인쇄」로 이 화면에서 바로 봅니다. 엑셀과 대회 전체 결과는 <a href="results.html?id=slot_'+esc(SLOT_ID)+'" style="color:#1c2e55;font-weight:900">대회 결과 페이지</a>에서 내려받습니다.</div>':'')+'</div>';
   // ⑥ 아래 고정 줄: 시작·종료·확정만
   const fb=[];if(mine){if(m.status==='예정')fb.push('<button class="act g" onclick="rcStatus(\'진행\')">▶ 경기 시작 (전반 · 시계 시작)</button>');if(m.status==='진행'){const R=endRoleInfo(m);fb.push('<button class="act r" '+(R.can?'':'disabled title="경기 종료·확정은 감독관이 합니다"')+' onclick="endSheet()">경기 종료'+(R.can?'':' (감독관)')+'</button>')}if(m.status==='종료'&&!m.locked)fb.push('<button class="act y" onclick="endSheet()">결과 확정 · 서명</button>','<button class="act" onclick="rcStatus(\'진행\')">다시 진행</button>')}
-  if(m.status==='종료')fb.push('<button class="act b" onclick="sheetPdf(\''+m.id+'\')">기록지 인쇄</button>');
+  if(m.status==='종료')fb.push('<button class="act b" onclick="sheetPdf(\''+m.id+'\')">📄 기록지 보기 · 인쇄</button>');
   if(m.locked&&STAFF)fb.push('<button class="act" onclick="rcUnlock()">정정</button>');
   if(fb.length)h+='<div class="foot">'+fb.join('')+'</div>';
   if(QK.toast)h+='<div class="toast">'+esc(QK.toast.text)+(QK.toast.evId?'<button onclick="qkUndo()">되돌리기</button>':'')+'</div>';
@@ -1167,11 +1168,18 @@ async function endSave(confirmNow){const S=SHEET;const m=MATCHES.find(x=>x.id===
   try{if(Object.keys(signs).length)await DB.collection('compSigns').doc(RC_ID).set(signs,{merge:true}).catch(()=>{});await rcUpdate(upd,'종료 저장 실패');
     await DB.collection('liveMatches').doc(RC_ID).update({ctrl:FV.delete()}).catch(()=>{});
     statsSave(true);scSync(Object.assign({},m,upd));bdAdvance(Object.assign({},m,upd));
-    qkToast('경기 종료·확정 — '+(upd.winner?tname(m,upd.winner)+' 승 '+sc.a+':'+sc.b:'동점 '+sc.a+':'+sc.b)+' · 아래 「기록지 인쇄」')}catch(e){}
+    qkToast('경기 종료·확정 — '+(upd.winner?tname(m,upd.winner)+' 승 '+sc.a+':'+sc.b:'동점 '+sc.a+':'+sc.b)+' · 기록지를 바로 엽니다');setTimeout(function(){sheetPdf(RC_ID,Object.assign({},m,upd))},350)}catch(e){}
 }
-async function sheetPdf(id){const m=MATCHES.find(x=>x.id===id);if(!m)return;let signs={};try{const d=await DB.collection('compSigns').doc(id).get();signs=d.exists?d.data():{}}catch(e){}
+// 결과지 — 페이지를 옮기지 않고 같은 화면 위 창(iframe)에서 보고, 「인쇄 · PDF 저장」으로 바로 출력 (10차)
+async function sheetPdf(id,mo){const m=mo||MATCHES.find(x=>x.id===id);if(!m)return;let signs={};try{const d=await DB.collection('compSigns').doc(id).get();signs=d.exists?d.data():{}}catch(e){}
   const oa=orderOf((m.a||{}).pid)||{},ob=orderOf((m.b||{}).pid)||{};if(!signs.coachA&&oa.coach&&oa.coach.name)signs.coachA={name:oa.coach.name,img:oa.coach.sign};if(!signs.coachB&&ob.coach&&ob.coach.name)signs.coachB={name:ob.coach.name,img:ob.coach.sign};
-  MR.printSheet(m,oa,ob,signs)}
+  SHV={m:m,oa:oa,ob:ob,signs:signs};sheetView(MR.sheetHtml(m,oa,ob,signs))}
+let SHV=null;
+function sheetView(html){sheetViewClose();const d=document.createElement('div');d.id='rcSheetView';d.className='shv';
+  d.innerHTML='<div class="shv-bar"><b>📄 경기 기록(결과)지</b><span>이 화면에서 바로 확인 · 인쇄하거나 PDF로 저장</span><span style="flex:1"></span><button class="mr-btn" onclick="sheetViewPrint()">🖨 인쇄 · PDF 저장</button><button class="mr-btn s" onclick="sheetViewClose()">닫기</button></div><iframe id="rcSheetFrame" title="경기 기록지"></iframe>';
+  document.body.appendChild(d);document.getElementById('rcSheetFrame').srcdoc=html;document.body.style.overflow='hidden'}
+function sheetViewClose(){const d=document.getElementById('rcSheetView');if(d)d.remove();document.body.style.overflow=''}
+function sheetViewPrint(){const f=document.getElementById('rcSheetFrame');try{f.contentWindow.focus();f.contentWindow.print()}catch(e){if(SHV)MR.printSheet(SHV.m,SHV.oa,SHV.ob,SHV.signs)}}
 // ── 학교클럽 전적 반영 (live.html 과 같은 문서 ID 규칙) ──
 async function scSync(m){const a=m.a||{},b=m.b||{};if(!a.scid||!b.scid)return;const sc=MR.score(m.events||[]);const day=m.day||'';const mo=+String(day).slice(5,7)||1;
   const doc={eventName:SLOT.title||'',date:day,year:mo>=3?+day.slice(0,4):+day.slice(0,4)-1,sport:'얼티미트',division:[m.div,m.stage,m.round].filter(Boolean).join(' · '),divCode:'',round:m.round||'',court:m.court||'',

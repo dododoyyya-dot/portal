@@ -1821,9 +1821,14 @@ async function openTeamApply(id,fresh){
     +'<div style="margin-top:6px"><button type="button" class="cbtn cbtn-soft" style="padding:5px 12px;font-size:12.5px;background:#eef3fb;color:#153A77" onclick="taAddStaff()">+ 인솔자 추가 (감독·코치·지도자)</button></div>'
     +'<div style="font-size:13px;font-weight:800;margin:14px 0 4px">② 팀원 명단 <span style="font-weight:600;color:#8a919d;font-size:11.5px">— 인솔자 본인 · 클럽 명단 · 비회원 직접 입력 모두 가능</span></div>'
     +'<div id="taRosterBox" style="border:1px solid #e2e7f0;border-radius:10px;padding:8px"></div>'
-    +'<div style="display:flex;gap:8px;margin-top:7px;flex-wrap:wrap;align-items:center"><span style="font-size:12px;font-weight:800;color:#5b6472">팀원 담기</span><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#e0f2f1;color:#068081" onclick="taAddSelf()">인솔자 본인도 선수로 참가</button><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#fff6e0;color:#8a5a00" onclick="taXlsxTemplate()">엑셀 양식</button><label class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#fff6e0;color:#8a5a00;cursor:pointer;margin:0">엑셀로 명단 불러오기<input type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" style="display:none" onchange="taImportXlsx(this)"></label><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px" onclick="taAddRow()">+ 비회원 팀원 추가</button>'
-    +'<button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#eef7f4;color:#0f766e" onclick="taFindTeams(true)">👥 내 클럽 명단에서 선택</button>'
-    +'<button type="button" class="cbtn cbtn-soft" id="taLoadClub" style="padding:6px 14px;font-size:12.5px;display:none" onclick="taLoadClubRoster()">📋 클럽 명단 불러오기</button></div>'
+    // [팀원 담기 안내 2026-10-17] 한 명씩 담기 / 엑셀로 한 번에 담기 — 보기만 해도 뭘 누르는지 알 수 있게 단계와 설명을 붙임
+    +'<div style="margin-top:8px;border:1.5px solid #e2e7f0;border-radius:12px;overflow:hidden">'
+    +'<div style="padding:9px 12px;background:#f7f9fc;border-bottom:1px solid #e2e7f0"><div style="font-size:12.5px;font-weight:900;color:#153A77">팀원 담기 ① — 한 명씩 담기</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px"><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#e0f2f1;color:#068081" onclick="taAddSelf()">인솔자 본인도 선수로 참가</button><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px;background:#eef7f4;color:#0f766e" onclick="taFindTeams(true)">👥 내 클럽 명단에서 선택</button><button type="button" class="cbtn cbtn-soft" id="taLoadClub" style="padding:6px 14px;font-size:12.5px;display:none" onclick="taLoadClubRoster()">📋 클럽 명단 불러오기</button><button type="button" class="cbtn cbtn-soft" style="padding:6px 14px;font-size:12.5px" onclick="taAddRow()">+ 비회원 팀원 직접 입력</button></div></div>'
+    +'<div style="padding:9px 12px;background:#fffdf5"><div style="font-size:12.5px;font-weight:900;color:#8a5a00">팀원 담기 ② — 엑셀 파일로 한 번에 담기 <span style="font-weight:600;color:#8a919d;font-size:11.5px">(팀원이 많을 때 편합니다)</span></div>'
+    +'<div style="font-size:12px;color:#5b6472;line-height:1.75;margin-top:4px">빈 명단 양식(엑셀 파일)을 내려받아 <b>성명·생년월일·성별·학교</b>를 적어 저장한 뒤, 그 파일을 올리면 위 명단 칸에 <b>자동으로 채워집니다</b>. 이미 가지고 있는 엑셀 명단도 첫 줄에 「성명」「생년월일」 제목만 있으면 바로 올릴 수 있습니다. 올린 뒤 한 명씩 고쳐도 됩니다.</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:7px"><button type="button" class="cbtn cbtn-soft" style="padding:7px 14px;font-size:12.5px;background:#fff6e0;color:#8a5a00;border:1.5px solid #ecd9b0" onclick="taXlsxTemplate()">① ⬇ 빈 명단 양식 내려받기 (엑셀)</button><span style="color:#8a919d;font-weight:900">→ 적어서 저장 →</span><label class="cbtn cbtn-soft" style="padding:7px 14px;font-size:12.5px;background:#fff6e0;color:#8a5a00;border:1.5px solid #ecd9b0;cursor:pointer;margin:0">② ⬆ 작성한 엑셀 파일 올리기 → 명단 자동 입력<input type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" style="display:none" onchange="taImportXlsx(this)"></label></div>'
+    +'</div></div>'
     +'<div style="font-size:13px;font-weight:800;margin:14px 0 4px">③ 보호자 동의 (미성년 팀원)</div>'
     +'<div style="background:#fff8ed;border:1.5px solid #ecd9b0;border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.8">'
     // [서면 양식 보관함] 공고가 파일 양식(consentForm:'file')이면 그 파일(PDF·HWP·이미지)을 열고, 아니면 화면 양식(consent_guardian.html)을 엽니다
@@ -2122,7 +2127,7 @@ function taParseSheet(ws){
   // [명단 인식 보강 2026-09-10] 머리글은 '성명·이름·학생명·선수명·참가자·이름(한글)' 등 어디에 있어도 찾고, 공백·괄호는 무시합니다
   const NAME_RE=/(성\s*명|이름|학생명|선수명|참가자|참가자명|선수이름|학생이름|성함)/;
   ws.eachRow((row,n)=>{if(hdrRow)return;const vals=(row.values||[]).map(taCell);if(vals.some(v=>NAME_RE.test(String(v).replace(/\s+/g,''))))({hdrRow,hdr}={hdrRow:n,hdr:vals})});
-  if(!hdrRow)return {rows:[],errors:['머리글 행을 찾지 못했습니다. 첫 줄에 「성명」(또는 이름·학생명) 칸이 있어야 합니다. [엑셀 양식]을 내려받아 그 양식에 적어 주세요.']};
+  if(!hdrRow)return {rows:[],errors:['머리글 행을 찾지 못했습니다. 첫 줄에 「성명」(또는 이름·학생명) 칸이 있어야 합니다. 「① 빈 명단 양식 내려받기」로 양식을 받아 그 양식에 적어 주세요.']};
   const H=hdr.map(h=>String(h||'').replace(/\s+/g,''));
   const col=re=>{for(let i=0;i<H.length;i++)if(re.test(H[i]))return i;return -1};
   const C={name:col(NAME_RE),birth:col(/생년월일|생일|출생|생년|birth/i),gender:col(/성별|gender|남녀/i),school:col(/학교|소속|팀명|클럽/),phone:col(/연락처|전화|휴대|핸드폰|phone/i),addr:col(/주소/),note:col(/비고|메모|특이/)};
@@ -2221,7 +2226,7 @@ async function taImportXlsx(input){
     // 번호 다시 매기기
     [...box.querySelectorAll('#taRosterBox > div')].forEach((x,i)=>{const s=x.querySelector('span');if(s&&/^\d+$/.test(s.textContent.trim()))s.textContent=String(i+1);x.style.marginTop=i?'6px':'0'});
     alert('엑셀에서 '+added+'명을 담았습니다.'+((member+linked)?' (회원으로 확인 '+(member+linked)+'명)':'')+(dup?' · 이미 있는 '+dup+'명은 건너뜀':'')+(errors.length?'\n\n확인 필요:\n'+errors.slice(0,8).join('\n')+(errors.length>8?'\n… 외 '+(errors.length-8)+'건':''):'')+'\n\n비회원으로 표시된 팀원도 나중에 같은 성명·생년월일로 회원 가입하면 이 대회의 참가·입상 기록이 자동으로 경력에 연동됩니다.');
-  }catch(e){alert('엑셀 읽기 실패: '+(e.message||e)+'\n\n· 파일이 .xlsx 인지 확인해 주세요 (.xls·한셀 파일은 엑셀에서 .xlsx 로 다시 저장)\n· 첫 줄에 성명·생년월일 등 제목이 있어야 합니다\n· 계속 안 되면 [엑셀 양식]을 내려받아 옮겨 적어 주세요')}
+  }catch(e){alert('엑셀 읽기 실패: '+(e.message||e)+'\n\n· 파일이 .xlsx 인지 확인해 주세요 (.xls·한셀 파일은 엑셀에서 .xlsx 로 다시 저장)\n· 첫 줄에 성명·생년월일 등 제목이 있어야 합니다\n· 계속 안 되면 「① 빈 명단 양식 내려받기」로 양식을 받아 옮겨 적어 주세요')}
 }
 async function taXlsxTemplate(){
   if(typeof ExcelJS==='undefined'){alert('엑셀 라이브러리를 아직 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');return}
@@ -2233,7 +2238,7 @@ async function taXlsxTemplate(){
   const g=wb.addWorksheet('작성 안내');
   ['· 1행(머리글)은 그대로 두고 2행부터 한 사람씩 적습니다. 예시 두 줄은 지우고 쓰세요.','· 생년월일은 2013-05-05 처럼 적습니다 (2013.05.05, 20130505, 130505 도 읽힙니다). 보호자 동의·연령 확인에 꼭 필요합니다.','· 성별은 남/여. 학교·소속은 학교 정식 명칭.','· 연락처·주소는 주최기관 참가자 명단에 필요할 때만 적습니다.','· 연맹 회원(또는 보호자 계정에 등록된 자녀)은 성명+생년월일이 같으면 회원 정보와 자동 연동됩니다.'].forEach(t=>g.addRow([t]));
   g.getColumn(1).width=100;
-  const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.download='단체전_팀원명단_양식.xlsx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+  const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.download='단체전_팀원명단_양식(적어서_올리기).xlsx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
 }
 // ══ [개인전 엑셀 일괄 신청 2026-09-14] 사무국이 권한을 준 회원(학교·클럽 담당자 등)이 개인전 참가자를 엑셀 한 장으로 신청 ══
 //   · 회원 연동: 성명+생년월일로 회원 색인(memberKeys)을 찾습니다 — 회원 본인 계정이면 memberUid, 보호자 계정의 자녀면 guardianUid.
