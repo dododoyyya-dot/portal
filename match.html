@@ -319,6 +319,17 @@
 
 /* 대진·시간표 */
 .bd-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.fm-card{border-color:#c3d4ed;background:linear-gradient(180deg,#f8fbff,#fff)}
+.fm-wrap{display:flex;gap:8px;align-items:stretch;overflow-x:auto;padding:8px 2px 4px}
+.fm-st{flex:0 0 262px;border:1.5px solid #dfe5ee;border-radius:14px;padding:12px 13px;background:#fff;box-shadow:0 4px 14px rgba(15,23,42,.05)}.fm-st.made{border-color:#9fc3a8;background:#f7fcf8}
+.fm-h{display:flex;gap:7px;align-items:center}.fm-h b{font-size:15px}.fm-n{font-size:11px;font-weight:900;color:#fff;background:#153A77;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.fm-x{border:1px solid #dfe5ee;background:#fff;border-radius:8px;padding:3px 8px;font-size:11.5px;font-weight:800;cursor:pointer;font-family:inherit;color:#153A77}
+.fm-t{font-weight:900;color:#153A77;margin-top:7px;font-size:13.5px}.fm-r{font-size:12.5px;color:#4b5563;margin-top:4px;line-height:1.5}.fm-b{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px}.fm-b .mr-btn{padding:7px 11px;font-size:12.5px}
+.fm-arrow{align-self:center;font-size:24px;color:#9aa1ad;flex:none}
+.fm-add{flex:0 0 150px;border:2px dashed #c3d4ed;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-weight:900;color:#153A77;cursor:pointer;background:#fbfdff}.fm-add small{font-size:11px;color:#6b7280;font-weight:700}
+.fm-empty{align-self:center;font-size:13px;color:#6b7280;padding:10px}
+.fm-ty{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.fm-ty label{border:1.5px solid #dfe5ee;border-radius:12px;padding:10px;cursor:pointer;display:block}.fm-ty label.on{border-color:#153A77;background:#eef3fb}.fm-ty label b{display:block;font-size:14px}.fm-ty label small{display:block;font-size:11.5px;color:#6b7280;margin-top:3px;line-height:1.4}
+@media(max-width:560px){.fm-ty{grid-template-columns:1fr}.fm-st{flex-basis:240px}}
 .bd-steps{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.bd-steps span{font-size:12px;font-weight:800;color:#153A77;background:#eef3fb;border:1px solid #c3d4ed;border-radius:999px;padding:5px 11px}
 .bd-plan{font-size:13px;line-height:1.6;color:#26262b;background:#fffbea;border:1.5px solid #f3e2a3;border-radius:12px;padding:9px 13px;margin:2px 0 8px}.bd-plan b{color:#8a5a00}
 .bd-dayrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:1px solid #e2e7f0;border-radius:12px;padding:8px 10px;margin-top:6px}.bd-dayrow .n{font-weight:900;font-size:13px;color:#153A77;min-width:44px}.bd-dayrow .bd_d{width:160px;margin:0}
@@ -442,7 +453,7 @@ async function boot(){
   document.getElementById('mrHp').textContent=[dateK(SLOT.date),SLOT.place,SLOT.host].filter(Boolean).join(' · ');
   UNSUB.push(DB.collection('liveMatches').where('slotId','==',SLOT_ID).onSnapshot(s=>{MATCHES=s.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>String(a.day||'').localeCompare(String(b.day||''))||(+a.order||0)-(+b.order||0));render();if(RC_ID)rcRender()},e=>console.warn('matches',e)));
   UNSUB.push(DB.collection('compOrders').where('slotId','==',SLOT_ID).onSnapshot(s=>{ORDERS={};s.docs.forEach(d=>ORDERS[d.id]=Object.assign({id:d.id},d.data()));render();if(RC_ID)rcRender()},e=>console.warn('orders',e)));
-  UNSUB.push(DB.collection('compStats').doc(SLOT_ID).onSnapshot(d=>{BOARD=(d.exists&&d.data().board)||null;DRAWS=(d.exists&&d.data().draws)||{};LOTS=(d.exists&&d.data().lots)||{};SLOT_REFS=(d.exists&&d.data().refUids)||[];if(RC_ID)rcRender();if((TAB==='board'&&!BD_DRAG)||TAB==='stats')render()},e=>console.warn('board',e)));
+  UNSUB.push(DB.collection('compStats').doc(SLOT_ID).onSnapshot(d=>{BOARD=(d.exists&&d.data().board)||null;FORMAT=(d.exists&&d.data().format)||{};DRAWS=(d.exists&&d.data().draws)||{};LOTS=(d.exists&&d.data().lots)||{};SLOT_REFS=(d.exists&&d.data().refUids)||[];if(RC_ID)rcRender();if((TAB==='board'&&!BD_DRAG)||TAB==='stats')render()},e=>console.warn('board',e)));
   UNSUB.push(DB.collection('golfRounds').where('slotId','==',SLOT_ID).onSnapshot(s=>{ROUNDS=s.docs.map(d=>Object.assign({id:d.id},d.data()));render();if(GOLF_ID)golfRender()},e=>console.warn('golf',e)));
   render();
   // [확정 심판 권한 2026-10-15] 운영진이 열면 이 대회 심판 공고에서 확정된 신청자 uid 를 compStats.refUids 로 맞춰 둠 → 경기별 배정 없이도 기록 가능(보안 규칙 v55)
@@ -547,18 +558,18 @@ async function matchSave(id){
 async function matchDel(id){const m=MATCHES.find(x=>x.id===id);if(!m)return;if((m.events||[]).some(e=>!e.void)&&!confirm('득점·제재 기록이 있는 경기입니다. 정말 삭제할까요?'))return;if(!confirm('이 경기를 삭제할까요?'))return;
   try{await DB.collection('liveMatches').doc(id).delete();document.getElementById('mfModal').remove()}catch(e){say('삭제 실패: '+(e.message||e))}}
 // ══ [대진·시간표 2026-10-14] ══
-let BOARD=null,DRAWS={},BD_DAY='',BD_DIV='',BD_DRAG=null,BD_SEL=null,DR=null;
+let BOARD=null,DRAWS={},BD_DAY='',BD_DIV='',BD_DRAG=null,BD_SEL=null,DR=null;let FORMAT={},FM_DIV='',FM_ED=null;   // [대회 구성] compStats.format{부문:{stages:[]}}
 function bdDays(){const ds=(COMP&&COMP.dates&&COMP.dates.length)?COMP.dates.slice():[];if(!ds.length&&SLOT.date)ds.push(String(SLOT.date).slice(0,10));((BOARD||{}).days||[]).forEach(d=>{if(d&&ds.indexOf(d)<0)ds.push(d)});MATCHES.forEach(m=>{if(m.day&&ds.indexOf(m.day)<0)ds.push(m.day)});return ds.sort()}
 function bdCfg(){const b=BOARD||{};return {courts:(b.courts&&b.courts.length)?b.courts:['1구장','2구장'],start:b.start||'09:00',step:+b.step||40,n:+b.n||12,plan:b.dayPlan||{}}}
 // [여러 날 2026-10-17] 날짜별 계획 — 그 날 치를 단계(예선·본선 …). 탭 이름·자동 배치·안내문에 씀
 function bdStages(){const S=[...new Set(MATCHES.map(m=>m.stage).filter(Boolean))];['예선','본선'].forEach(s=>{if(S.indexOf(s)<0)S.push(s)});return S}
-function bdPlanOf(d){const p=(bdCfg().plan||{})[d]||{};return {stages:Array.isArray(p.stages)?p.stages:[],label:p.label||''}}
+function bdPlanOf(d){const p=(bdCfg().plan||{})[d]||{};const S=Array.isArray(p.stages)?p.stages.slice():[];Object.keys(FORMAT||{}).forEach(dv=>((FORMAT[dv]||{}).stages||[]).forEach(st=>{if(st.day===d&&st.name&&S.indexOf(st.name)<0)S.push(st.name)}));return {stages:S,label:p.label||''}}
 function bdDayName(d,i){const p=bdPlanOf(d);return (i+1)+'일차 '+dateK(d)+(p.stages.length?' · '+p.stages.join('·'):'')}
 function bdStageOf(m){return m.stage||'(단계 없음)'}
 function bdTimes(c){const out=[];const p=c.start.split(':');let t=(+p[0])*60+(+p[1]||0);for(let i=0;i<c.n;i++){out.push(String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0'));t+=c.step}return out}
 function bdPlaced(m,c,times){return m.day&&m.time&&m.court&&c.courts.indexOf(m.court)>=0&&times.indexOf(m.time)>=0}
 function bdCard(m){const sc=MR.score(m.events||[]);const a=m.a||{},b=m.b||{};const cls=m.status==='진행'?' live':m.status==='종료'?' done':'';
-  return '<div class="bd-card'+cls+(BD_SEL===m.id?' sel':'')+'" data-mid="'+esc(m.id)+'"><span class="st"></span><div class="dv">'+esc([m.stage,m.div,m.group||m.round].filter(Boolean).join(' · '))+'</div><div class="vs">'+esc(a.name||'?')+(m.status!=='예정'?' <span class="sc">'+sc.a+':'+sc.b+'</span> ':' vs ')+esc(b.name||'?')+'</div>'+((m.officials||{}).ref1?'<div class="dv" style="color:#7c3aed">주심 '+esc(m.officials.ref1.name)+((m.officials||{}).recorder?' · 기록 '+esc(m.officials.recorder.name):'')+'</div>':'')+'</div>'}
+  return '<div class="bd-card'+cls+(BD_SEL===m.id?' sel':'')+'" data-mid="'+esc(m.id)+'"><span class="st"></span><div class="dv">'+esc([m.stage,m.div,m.group||m.round].filter(Boolean).join(' · '))+(m.day&&!m.time?' <span style="color:#b8860b">📅 '+esc(dateK(m.day).slice(5))+'</span>':'')+'</div><div class="vs">'+esc(a.name||'?')+(m.status!=='예정'?' <span class="sc">'+sc.a+':'+sc.b+'</span> ':' vs ')+esc(b.name||'?')+'</div>'+((m.officials||{}).ref1?'<div class="dv" style="color:#7c3aed">주심 '+esc(m.officials.ref1.name)+((m.officials||{}).recorder?' · 기록 '+esc(m.officials.recorder.name):'')+'</div>':'')+'</div>'}
 function boardTab(){
   const days=bdDays();if(!BD_DAY||days.indexOf(BD_DAY)<0)BD_DAY=days[0]||'';const c=bdCfg();const times=bdTimes(c);
   const divs=[...new Set(MATCHES.map(m=>m.div).filter(Boolean))].sort();
@@ -569,9 +580,9 @@ function boardTab(){
   const planNote=STAFF?(days.length>1||planNow.stages.length
       ?'<div class="bd-plan">'+(planNow.stages.length?'<b>'+esc(bdDayName(BD_DAY,dayIdx))+'</b> — 이 날은 <b>'+esc(planNow.stages.join(' · '))+'</b> 경기를 치릅니다. 「⚡ 자동 배치」는 '+esc(planNow.stages.join('·'))+' 미배치 경기('+planNow.stages.reduce((s,st)=>s+(byStage[st]||0),0)+')만 이 날 빈 칸에 넣습니다.':'<b>'+esc(bdDayName(BD_DAY,dayIdx))+'</b> — 이 날 치를 단계가 정해지지 않았습니다. 「⚙ 시간표 설정」에서 날짜마다 예선·본선을 고르면 탭과 자동 배치가 그 단계로 맞춰집니다.')+'</div>'
       :'<div class="bd-plan">하루 대회입니다. 첫날 예선 · 둘째날 토너먼트처럼 나누려면 「⚙ 시간표 설정」에서 날짜를 추가하고 날짜마다 치를 단계(예선·본선)를 고르세요.</div>'):'';
-  let h='<div class="mr-card"><div class="mr-row"><b>🗓 대진 · 시간표</b><span class="mr-note">빈 칸을 누르면 그 시간·코트에 경기를 바로 추가합니다(팀 두 개 누르기). 카드를 칸에 끌어다 놓으면 옮겨지고, 카드를 누르면 기록 콘솔이 열립니다.'+(STAFF?' 휴대폰은 카드를 한 번 눌러 고른 뒤 칸을 눌러도 됩니다(선택 중 다시 누르면 콘솔).':'')+'</span></div>'
-    +(STAFF?'<div class="mr-row" style="margin-top:10px"><button class="mr-btn r" onclick="drOpen()">🎲 대진 편성 (랜덤 · 조별 · 토너먼트)</button><button class="mr-btn s" onclick="bdSetup()">⚙ 시간표 설정 · 코트 '+c.courts.length+'면 · '+c.start+'부터 '+c.step+'분 간격</button><button class="mr-btn ghost" onclick="bdAuto()" title="미배치 경기를 빈 칸에 순서대로 채웁니다(같은 팀 연속 경기는 피함)">⚡ 빈 칸 자동 배치</button><button class="mr-btn s" onclick="qaOpen(\'\',\'\')">＋ 경기 빠르게 추가</button><button class="mr-btn ghost" onclick="rfOpen()">🧑‍⚖️ 심판 배정</button></div>':'')+'</div>'
-    +(STAFF?'<div class="bd-steps"><span>① 🎲 대진 편성(예선 조·토너먼트 만들기)</span><span>② ⚙ 시간표 설정(날짜·코트·날짜별 단계)</span><span>③ 날짜 탭 고르고 ⚡ 자동 배치(또는 끌어다 놓기)</span><span>④ 🧑‍⚖️ 심판 배정</span></div>':'')
+  let h=fmPanel()+'<div class="mr-card"><div class="mr-row"><b>🗓 날짜 · 시간표</b><span class="mr-note">빈 칸을 누르면 그 시간·코트에 경기를 바로 추가합니다(팀 두 개 누르기). 카드를 칸에 끌어다 놓으면 옮겨지고, 카드를 누르면 기록 콘솔이 열립니다.'+(STAFF?' 휴대폰은 카드를 한 번 눌러 고른 뒤 칸을 눌러도 됩니다(선택 중 다시 누르면 콘솔).':'')+'</span></div>'
+    +(STAFF?'<div class="mr-row" style="margin-top:10px"><button class="mr-btn s" onclick="bdSetup()">⚙ 시간표 설정 · 코트 '+c.courts.length+'면 · '+c.start+'부터 '+c.step+'분 간격</button><button class="mr-btn ghost" onclick="bdAuto()" title="미배치 경기를 빈 칸에 순서대로 채웁니다(같은 팀 연속 경기는 피함)">⚡ 빈 칸 자동 배치</button><button class="mr-btn s" onclick="qaOpen(\'\',\'\')">＋ 경기 빠르게 추가</button><button class="mr-btn ghost" onclick="rfOpen()">🧑‍⚖️ 심판 배정</button></div>':'')+'</div>'
+    +(STAFF?'<div class="bd-steps"><span>① 🏗 대회 구성에서 단계를 쌓고 「경기 만들기」</span><span>② ⚙ 시간표 설정(날짜·코트)</span><span>③ 날짜 탭 고르고 ⚡ 자동 배치(또는 끌어다 놓기)</span><span>④ 🧑‍⚖️ 심판 배정</span><span>⑤ 예선 끝나면 「⬇ 진출팀 채우기」</span></div>':'')
     +'<div class="bd-bar">'+days.map((d,i)=>'<button class="bd-day'+(d===BD_DAY?' on':'')+'" onclick="BD_DAY=\''+d+'\';render()">'+esc(bdDayName(d,i))+' <small>('+MATCHES.filter(m=>m.day===d&&m.time&&m.court).length+')</small></button>').join('')
     +'<span style="flex:1"></span>'+['',...divs].map(dv=>'<button class="bd-day'+(BD_DIV===dv?' on':'')+'" onclick="BD_DIV=\''+esc(dv)+'\';render()">'+(dv?esc(dv):'전체 부문')+'</button>').join('')+'</div>'
     +planNote+'<div class="mr-note" style="font-weight:800;margin:4px 0">미배치 경기 '+unplaced.length+(unplaced.length?' <span style="font-weight:600">— '+Object.keys(byStage).map(s=>esc(s)+' '+byStage[s]).join(' · ')+'</span>':'')+'</div><div class="bd-tray" data-drop="tray">'+(unplaced.length?unplaced.map(bdCard).join(''):'<span class="mr-note" style="align-self:center">모든 경기가 배치되었습니다. 카드를 이곳에 놓으면 배치가 해제됩니다.</span>')+'</div>'
@@ -618,7 +629,7 @@ async function bdSetupSave(){const courts=v('bd_courts').split(',').map(x=>x.tri
   days.sort();
   const board={courts:courts,start:v('bd_start')||'09:00',step:Math.max(10,+v('bd_step')||40),n:Math.max(1,Math.min(40,+v('bd_n')||12)),days:days,dayPlan:dayPlan};
   try{await DB.collection('compStats').doc(SLOT_ID).set({slotId:SLOT_ID,title:SLOT.title||'',date:SLOT.date||'',board:board,updatedAt:FV.serverTimestamp()},{merge:true});document.getElementById('bdModal').remove()}catch(e){say('저장 실패: '+(e.message||e))}}
-async function bdAuto(stage){const c=bdCfg();const times=bdTimes(c);let pool=MATCHES.filter(m=>(!BD_DIV||m.div===BD_DIV)&&!bdPlaced(m,c,times)&&m.status!=='종료').sort((a,b)=>(+a.order||0)-(+b.order||0));if(!pool.length){say('배치할 경기가 없습니다');return}
+async function bdAuto(stage){const c=bdCfg();const times=bdTimes(c);let pool=MATCHES.filter(m=>(!BD_DIV||m.div===BD_DIV)&&!bdPlaced(m,c,times)&&m.status!=='종료'&&(!m.day||m.day===BD_DAY)).sort((a,b)=>(+a.order||0)-(+b.order||0));if(!pool.length){say('배치할 경기가 없습니다');return}
   // [여러 날] 미배치 경기에 단계(예선·본선 …)가 섞여 있으면 이 날짜에 넣을 단계를 고름 — 24일 예선, 25일 토너먼트처럼
   const planSt=bdPlanOf(BD_DAY).stages;
   if(stage===undefined&&planSt.length){const inPlan=pool.filter(m=>planSt.indexOf(bdStageOf(m))>=0);if(!inPlan.length){say(bdDayName(BD_DAY,bdDays().indexOf(BD_DAY))+' — 이 날 계획 단계('+planSt.join('·')+')의 미배치 경기가 없습니다. 다른 날짜 탭을 고르거나 시간표 설정에서 이 날 단계를 바꿔 주세요.');return}pool=inPlan;stage=''}
@@ -636,6 +647,77 @@ async function bdAuto(stage){const c=bdCfg();const times=bdTimes(c);let pool=MAT
   if(!confirm(bdDayName(BD_DAY,bdDays().indexOf(BD_DAY))+' 시간표 빈 칸에 '+(planSt.length?planSt.join('·')+' ':'')+'경기 '+plan.length+'개를 배치합니다'+(left.length?'(남는 '+left.length+'개는 미배치)':'')+'. 같은 팀은 같은 시간·연속 시간대를 피합니다. 계속할까요?'))return;
   const b=DB.batch();plan.forEach(p=>b.update(DB.collection('liveMatches').doc(p.id),{day:BD_DAY,time:p.time,court:p.court,updatedAt:FV.serverTimestamp()}));try{await b.commit()}catch(e){say('배치 실패: '+(e.message||e))}}
 function bdAutoPick(st){const mo=document.getElementById('bdStageModal');if(mo)mo.remove();if(st===null)return;bdAuto(st)}
+// ══ [대회 구성 2026-10-17] 부문별 단계 카드 — 예선(조별 리그) → 본선(토너먼트) 처럼 리그·토너먼트를 자유롭게 쌓음. compStats.format{부문:{stages:[{id,name,type,ng,third,src:{kind,perGroup,top},day}]}} ══
+const FM_TYPE={group:{n:'조별 리그',d:'조로 나눠 조 안에서 서로 한 번씩 — 예선에 알맞음'},league:{n:'풀리그',d:'모든 팀이 서로 한 번씩 — 팀이 적을 때'},knockout:{n:'토너먼트',d:'지면 탈락, 이기면 다음 라운드 — 본선·결선'}};
+function fmStages(div){return (((FORMAT||{})[div]||{}).stages||[])}
+function fmMatches(st){return MATCHES.filter(m=>m.stageId===st.id)}
+function fmIsPh(t){return !!(t&&t.seed&&/^\(.*\)$/.test(String(t.name||'').trim()))}
+function fmSrcTxt(st,i,div){const src=st.src||{};if(i===0||src.kind!=='prev')return '참가 팀 전체';const p=fmStages(div)[i-1];if(!p)return '이전 단계';return p.name+' '+(p.type==='group'?'각 조 상위 '+(+src.perGroup||1)+'팀':'상위 '+(+src.top||4)+'팀')+' 진출'}
+function fmPanel(){const dvs=divsOf();if(!FM_DIV||dvs.indexOf(FM_DIV)<0)FM_DIV=BD_DIV||dvs[0]||'';const S=fmStages(FM_DIV);const nT=drTeams(FM_DIV).length;const days=bdDays();
+  const cards=S.map((st,i)=>{const ms=fmMatches(st);const fin=ms.filter(m=>m.status==='종료').length;const ph=ms.filter(m=>fmIsPh(m.a)||fmIsPh(m.b)).length;const dayI=days.indexOf(st.day);const T=FM_TYPE[st.type]||FM_TYPE.group;
+    const opt=st.type==='group'?(st.ng||2)+'개 조':st.type==='knockout'?(st.third?'3·4위전 포함':'3·4위전 없음'):'';
+    return '<div class="fm-st'+(ms.length?' made':'')+'"><div class="fm-h"><span class="fm-n">'+(i+1)+'단계</span><b>'+esc(st.name||T.n)+'</b><span style="flex:1"></span>'+(STAFF?'<button class="fm-x" title="단계 설정 바꾸기" onclick="fmEdit('+i+')">✎ 설정</button>':'')+'</div>'
+      +'<div class="fm-t">'+esc(T.n)+(opt?' · '+esc(opt):'')+'</div><div class="fm-r">👥 '+esc(fmSrcTxt(st,i,FM_DIV))+'</div><div class="fm-r">'+(st.day?'📅 '+esc(bdDayName(st.day,dayI<0?0:dayI)):'📅 날짜 미정 — ✎ 설정에서 고르면 그 날 시간표로')+'</div>'
+      +'<div class="fm-r">'+(ms.length?'🏁 경기 '+ms.length+'개'+(fin?' · 종료 '+fin:'')+(ph?' · <b style="color:#b8860b">진출팀 미정 '+ph+'</b>':''):'<b style="color:#C41E2F">경기 아직 안 만듦</b>')+'</div>'
+      +(STAFF?'<div class="fm-b">'+(ms.length?(ph?'<button class="mr-btn y" onclick="fmFill('+i+')" title="이전 단계 결과(순위)로 진출팀을 넣습니다">⬇ 진출팀 채우기</button>':'')+'<button class="mr-btn s" onclick="BD_DIV=FM_DIV;setTab(\'match\')">경기 보기</button><button class="mr-btn s" onclick="fmDelMatches('+i+')">경기 지우기</button>':'<button class="mr-btn g" onclick="fmCreate('+i+')">⚡ 경기 만들기</button>')+(i===S.length-1?'<button class="mr-btn s" onclick="fmRemove('+i+')" title="이 단계를 구성에서 뺍니다">단계 삭제</button>':'')+'</div>':'')+'</div>'}).join('<div class="fm-arrow">→</div>');
+  return '<div class="mr-card fm-card"><div class="mr-row"><b>🏗 대회 구성</b><span class="mr-note">부문마다 단계를 쌓습니다. 예: 1단계 예선(조별 리그) → 2단계 본선(토너먼트). 단계마다 「경기 만들기」로 경기를 만들고, 앞 단계가 끝나면 「진출팀 채우기」로 다음 단계 팀을 넣습니다.</span></div>'
+    +'<div class="mr-row" style="margin-top:8px"><span class="mr-note" style="font-weight:800">부문</span>'+dvs.map(dv=>'<button class="bd-day'+(FM_DIV===dv?' on':'')+'" onclick="FM_DIV=\''+esc(dv)+'\';render()">'+esc(dv)+' <small>'+drTeams(dv).length+'팀</small></button>').join('')+(dvs.length?'':'<span class="mr-note">참가 신청 팀이 아직 없습니다. 팀이 신청되면 부문이 나타납니다.</span>')+'</div>'
+    +(FM_DIV?'<div class="fm-wrap">'+(cards||'<div class="fm-empty">아직 단계가 없습니다. 아래에서 자주 쓰는 구성을 고르거나 「＋ 단계 추가」로 직접 쌓으세요.</div>')+(STAFF?'<div class="fm-add" onclick="fmEdit(-1)">＋ 단계 추가<small>조별 리그 · 풀리그 · 토너먼트</small></div>':'')+'</div>'
+      +(STAFF&&!S.length?'<div class="mr-row" style="margin-top:8px"><span class="mr-note" style="font-weight:800">자주 쓰는 구성</span><button class="qa-chip" onclick="fmPreset(\'gk\')">예선 조별 리그 → 본선 토너먼트</button><button class="qa-chip" onclick="fmPreset(\'league\')">풀리그만</button><button class="qa-chip" onclick="fmPreset(\'knockout\')">토너먼트만</button><button class="qa-chip" onclick="fmPreset(\'gl\')">조별 리그 → 순위별 풀리그</button><span style="flex:1"></span><button class="mr-btn ghost" onclick="drOpen()" title="단계 없이 바로 편성(옛 방식)">🎲 단계 없이 바로 편성</button></div>':'')
+      +'<div class="mr-note" style="margin-top:6px">'+FM_DIV+' 참가 '+nT+'팀'+(S.length?' · 조별 리그·풀리그는 「경기 만들기」에서 무작위 추첨 뒤 손으로 조를 바꿀 수 있고, 토너먼트는 앞 단계 순위 자리(예: A조 1위)로 먼저 만들어 두고 결과가 나오면 채웁니다.':'')+'</div>':'')+'</div>'}
+function fmNewId(){return 's'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)}
+async function fmSave(){FORMAT[FM_DIV]=FORMAT[FM_DIV]||{stages:[]};try{await DB.collection('compStats').doc(SLOT_ID).set({slotId:SLOT_ID,title:SLOT.title||'',date:SLOT.date||'',format:FORMAT,updatedAt:FV.serverTimestamp()},{merge:true})}catch(e){say('저장 실패: '+(e.message||e))}}
+function fmPreset(k){const days=bdDays();const d1=days[0]||'',d2=days[1]||'';let S=[];
+  if(k==='gk')S=[{name:'예선',type:'group',ng:2,src:{kind:'all'},day:d1},{name:'본선',type:'knockout',third:true,src:{kind:'prev',perGroup:2},day:d2}];
+  else if(k==='league')S=[{name:'풀리그',type:'league',src:{kind:'all'},day:d1}];
+  else if(k==='knockout')S=[{name:'토너먼트',type:'knockout',third:true,src:{kind:'all'},day:d1}];
+  else if(k==='gl')S=[{name:'예선',type:'group',ng:2,src:{kind:'all'},day:d1},{name:'결선 리그',type:'league',src:{kind:'prev',perGroup:1},day:d2}];
+  S.forEach(s=>s.id=fmNewId());FORMAT[FM_DIV]={stages:S};fmSave()}
+function fmEdit(i){const S=fmStages(FM_DIV);const st=i>=0?S[i]:{id:fmNewId(),name:S.length?'본선':'예선',type:S.length?'knockout':'group',ng:2,third:true,src:{kind:S.length?'prev':'all',perGroup:2,top:4},day:bdDays()[Math.min(S.length,bdDays().length-1)]||''};
+  FM_ED={i:i,st:JSON.parse(JSON.stringify(st))};if(!FM_ED.st.src)FM_ED.st.src={kind:i>0?'prev':'all',perGroup:2,top:4};fmEdRender()}
+function fmEdRender(){const E=FM_ED;if(!E)return;const st=E.st;const i=E.i<0?fmStages(FM_DIV).length:E.i;const prev=i>0?fmStages(FM_DIV)[i-1]:null;const days=bdDays();const has=E.i>=0&&fmMatches(st).length;
+  const ty=Object.keys(FM_TYPE).map(k=>'<label class="'+(st.type===k?'on':'')+'" onclick="FM_ED.st.type=\''+k+'\';fmEdRender()"><b>'+FM_TYPE[k].n+'</b><small>'+FM_TYPE[k].d+'</small></label>').join('');
+  modal('fmModal','<b style="font-size:17px">'+(E.i<0?'＋ ':'✎ ')+(i+1)+'단계 설정 — '+esc(FM_DIV)+'</b>'+(has?'<div class="mr-note" style="color:#C41E2F;margin-top:4px">이미 만든 경기가 '+has+'개 있습니다. 방식·조 수를 바꾸면 경기를 지우고 다시 만들어야 합니다.</div>':'')
+    +'<label class="mr-lab">단계 이름</label><input class="mr-in" value="'+esc(st.name||'')+'" placeholder="예선 · 본선 · 결선" oninput="FM_ED.st.name=this.value">'
+    +'<label class="mr-lab">방식</label><div class="fm-ty">'+ty+'</div>'
+    +(st.type==='group'?'<label class="mr-lab">조 수</label><div class="mr-row">'+[2,3,4,5,6,8].map(n=>'<button class="mr-btn '+(+st.ng===n?'':'s')+'" style="padding:7px 13px" onclick="FM_ED.st.ng='+n+';fmEdRender()">'+n+'개 조</button>').join('')+'<label style="display:flex;gap:5px;align-items:center;font-size:12.5px;font-weight:800">직접 <input class="mr-in" type="number" min="1" max="16" style="width:66px;padding:6px 8px" value="'+(+st.ng||2)+'" onchange="FM_ED.st.ng=Math.max(1,Math.min(16,parseInt(this.value,10)||2))">개</label></div>':'')
+    +(st.type==='knockout'?'<label class="mr-lab" style="display:flex;gap:6px;align-items:center"><input type="checkbox" '+(st.third!==false?'checked':'')+' onchange="FM_ED.st.third=this.checked"> 3·4위전 포함</label>':'')
+    +(prev?'<label class="mr-lab">이 단계에 올라오는 팀</label><div class="mr-row"><button class="mr-btn '+(st.src.kind==='prev'?'':'s')+'" style="padding:7px 13px" onclick="FM_ED.st.src.kind=\'prev\';fmEdRender()">'+esc(prev.name)+' 결과로 진출</button><button class="mr-btn '+(st.src.kind!=='prev'?'':'s')+'" style="padding:7px 13px" onclick="FM_ED.st.src.kind=\'all\';fmEdRender()">참가 팀 전체</button></div>'
+      +(st.src.kind==='prev'?(prev.type==='group'?'<div class="mr-row" style="margin-top:6px"><span class="mr-note" style="font-weight:800">각 조 상위</span>'+[1,2,3,4].map(n=>'<button class="mr-btn '+(+st.src.perGroup===n?'':'s')+'" style="padding:7px 13px" onclick="FM_ED.st.src.perGroup='+n+';fmEdRender()">'+n+'팀</button>').join('')+'<span class="mr-note">→ '+((+prev.ng||2)*(+st.src.perGroup||1))+'팀 진출'+(st.type==='knockout'?' · 1위끼리는 서로 피해 맞붙게 배치':'')+'</span></div>'
+        :'<div class="mr-row" style="margin-top:6px"><span class="mr-note" style="font-weight:800">상위</span>'+[2,4,8,16].map(n=>'<button class="mr-btn '+(+st.src.top===n?'':'s')+'" style="padding:7px 13px" onclick="FM_ED.st.src.top='+n+';fmEdRender()">'+n+'팀</button>').join('')+'</div>'):''):'')
+    +'<label class="mr-lab">경기 날짜 <small style="font-weight:600;color:#6b7280">— 이 단계 경기는 그 날 시간표 탭의 미배치에 들어갑니다</small></label><div class="mr-row">'+days.map((d,k)=>'<button class="mr-btn '+(st.day===d?'':'s')+'" style="padding:7px 13px" onclick="FM_ED.st.day=\''+d+'\';fmEdRender()">'+esc(bdDayName(d,k).split(' · ')[0])+'</button>').join('')+'<button class="mr-btn '+(!st.day?'':'s')+'" style="padding:7px 13px" onclick="FM_ED.st.day=\'\';fmEdRender()">미정</button><button class="mr-btn ghost" style="padding:7px 13px" onclick="document.getElementById(\'fmModal\').remove();bdSetup()">날짜 추가(시간표 설정)</button></div>'
+    +'<div class="mr-row" style="justify-content:flex-end;margin-top:14px"><button class="mr-btn s" onclick="FM_ED=null;document.getElementById(\'fmModal\').remove()">닫기</button><button class="mr-btn g" onclick="fmEdSave()">💾 저장</button></div>')}
+async function fmEdSave(){const E=FM_ED;if(!E)return;const st=E.st;st.name=(st.name||'').trim()||FM_TYPE[st.type].n;if(st.type!=='group')delete st.ng;if(st.type!=='knockout')delete st.third;
+  FORMAT[FM_DIV]=FORMAT[FM_DIV]||{stages:[]};const S=FORMAT[FM_DIV].stages;if(E.i<0)S.push(st);else S[E.i]=st;
+  // 이미 만든 경기의 날짜·단계 이름도 맞춤(시간 미배치 경기만 날짜 변경)
+  const ms=fmMatches(st);if(ms.length){const b=DB.batch();ms.forEach(m=>{const u={stage:st.name,updatedAt:FV.serverTimestamp()};if(!m.time)u.day=st.day||'';b.update(DB.collection('liveMatches').doc(m.id),u)});try{await b.commit()}catch(e){}}
+  FM_ED=null;const mo=document.getElementById('fmModal');if(mo)mo.remove();await fmSave()}
+async function fmRemove(i){const S=fmStages(FM_DIV);const st=S[i];if(!st)return;const n=fmMatches(st).length;if(n){say('이 단계에 경기 '+n+'개가 있습니다. 먼저 「경기 지우기」를 눌러 주세요');return}if(!confirm((i+1)+'단계 「'+st.name+'」를 구성에서 뺄까요?'))return;S.splice(i,1);await fmSave()}
+async function fmDelMatches(i){const st=fmStages(FM_DIV)[i];if(!st)return;const ms=fmMatches(st);const busy=ms.filter(m=>m.status!=='예정');if(busy.length){say('진행·종료된 경기 '+busy.length+'개가 있어 지울 수 없습니다. 경기 탭에서 하나씩 확인해 주세요');return}
+  if(!confirm('「'+st.name+'」 경기 '+ms.length+'개를 모두 지웁니다(시간표 배치·심판 배정도 함께). 계속할까요?'))return;
+  try{for(let k=0;k<ms.length;k+=400){const b=DB.batch();ms.slice(k,k+400).forEach(m=>b.delete(DB.collection('liveMatches').doc(m.id)));await b.commit()}}catch(e){say('삭제 실패: '+(e.message||e))}}
+// 경기 만들기 — 1단계/참가 팀 전체: 편성 창(무작위 추첨·손으로 조정) · 앞 단계 결과로: 순위 자리 표시로 바로 생성
+function fmCreate(i){const S=fmStages(FM_DIV);const st=S[i];if(!st)return;if(fmMatches(st).length){say('이미 경기가 있습니다');return}const prev=i>0?S[i-1]:null;const src=st.src||{};
+  if(prev&&src.kind==='prev'){const pms=fmMatches(prev);if(!pms.length){say('먼저 '+(i)+'단계 「'+prev.name+'」 경기를 만들어 주세요');return}
+    let seeds=[];
+    if(prev.type==='group'){const gs=[...new Set(pms.map(m=>m.group).filter(Boolean))].sort();const per=Math.max(1,+src.perGroup||1);for(let r=1;r<=per;r++)gs.forEach(g=>seeds.push({pid:'',name:'('+g+' '+r+'위)',school:'',scid:'',seed:{stageId:prev.id,group:g,rank:r}}))}
+    else{const top=Math.max(2,+src.top||4);for(let r=1;r<=top;r++)seeds.push({pid:'',name:'('+prev.name+' '+r+'위)',school:'',scid:'',seed:{stageId:prev.id,group:'',rank:r}})}
+    if(st.type==='knockout'){DR={div:FM_DIV,fmt:'knockout',ng:1,teams:seeds,groups:[{name:'토너먼트',teams:seeds}],extra:'',sel:null,thirdPlace:st.third!==false,stageId:st.id,stageName:st.name,day:st.day||''};drCreate();return}
+    // 풀리그·조별 리그를 순위 자리로 만들기
+    DR={div:FM_DIV,fmt:st.type,ng:+st.ng||2,teams:seeds,groups:[],extra:'',sel:null,thirdPlace:false,stageId:st.id,stageName:st.name,day:st.day||''};if(st.type==='group'){const n=Math.max(1,Math.min(16,+st.ng||2));DR.groups=Array.from({length:n},(_,k)=>({name:String.fromCharCode(65+k)+'조',teams:[]}));seeds.forEach((t,k)=>DR.groups[k%n].teams.push(t))}else DR.groups=[{name:'풀리그',teams:seeds}];drRender();return}
+  DR={div:FM_DIV,fmt:st.type,ng:+st.ng||2,teams:drTeams(FM_DIV),groups:[],extra:'',sel:null,thirdPlace:st.third!==false,stageId:st.id,stageName:st.name,day:st.day||''};drDeal();drRender()}
+// 진출팀 채우기 — 앞 단계 경기의 순위(조별)로 자리 표시(A조 1위 …)를 실제 팀으로
+async function fmFill(i){const S=fmStages(FM_DIV);const st=S[i];const prev=i>0?S[i-1]:null;if(!st||!prev){say('앞 단계가 없습니다');return}
+  const pms=fmMatches(prev);const open=pms.filter(m=>m.status!=='종료');if(open.length&&!confirm('「'+prev.name+'」에 아직 끝나지 않은 경기가 '+open.length+'개 있습니다. 지금 순위대로 채울까요? (나중에 다시 「진출팀 채우기」를 누르면 바뀐 순위로 고쳐집니다)'))return;
+  const tbl={};const need=[];
+  const tableOf=ms=>{const stt=MR.computeStats(ms,ORDERS,LOTS);return ((stt.byDiv[FM_DIV]||{}).table||[])};
+  if(prev.type==='group'){[...new Set(pms.map(m=>m.group).filter(Boolean))].forEach(g=>{tbl[g]=tableOf(pms.filter(m=>m.group===g))})}else tbl['']=tableOf(pms);
+  const teamsAll=drTeams(FM_DIV);const pick=(g,r)=>{const T=tbl[g]||[];const row=T.find(t=>+t.rank===+r);if(!row)return null;if(row.needLot)need.push((g?g+' ':'')+r+'위');const full=teamsAll.find(t=>t.pid&&t.pid===row.pid)||{};return {pid:row.pid||'',name:row.name||'',school:row.school||full.school||'',scid:full.scid||'',score:0}};
+  const ms=fmMatches(st);const b=DB.batch();let n=0;
+  ms.forEach(m=>{const u={};['a','b'].forEach(s=>{const t=m[s]||{};if(!t.seed)return;const p=pick(t.seed.group||'',t.seed.rank);if(p){u[s]=Object.assign(p,{seed:t.seed});n++}});if(Object.keys(u).length){u.updatedAt=FV.serverTimestamp();b.update(DB.collection('liveMatches').doc(m.id),u)}});
+  if(need.length){say('순위가 같은 팀이 있어 추첨이 필요합니다: '+[...new Set(need)].join(', ')+' — 「순위 · 기록」 탭에서 추첨한 뒤 다시 눌러 주세요');return}
+  if(!n){say('채울 자리가 없습니다(앞 단계 순위가 아직 없거나 이미 채워짐)');return}
+  try{await b.commit();say('진출팀 '+n+'자리를 채웠습니다. 경기 탭·시간표에서 확인하세요')}catch(e){say('저장 실패: '+(e.message||e))}}
 // ══ [빠른 경기 추가 2026-10-14] 빈 칸(또는 버튼) → 부문 → 팀 두 개 누르면 바로 생성 ══
 let QA=null;
 function qaOpen(time,court){const dvs=divsOf();QA={time:time||'',court:court||'',div:BD_DIV||dvs[0]||'',a:null,free:''};qaRender()}
@@ -707,14 +789,14 @@ async function rfApply(){if(!RF.plan)return;try{for(let i=0;i<RF.plan.length;i+=
 // ── 대진 편성 ──
 function drTeams(div){return teamEntries().filter(c=>!div||((c.prefs||[])[0]===div)).map(c=>({pid:entryKey(c),name:c.name||'',school:c.teamOrg||'',scid:c.teamSchoolClubId||''}))}
 function drShuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
-function drOpen(){const dvs=divsOf();DR={div:BD_DIV||dvs[0]||'',fmt:'group',ng:2,teams:[],groups:[],extra:'',sel:null,thirdPlace:true};DR.teams=drTeams(DR.div);drDeal();drRender()}
+function drOpen(){const dvs=divsOf();DR={div:BD_DIV||dvs[0]||'',fmt:'group',ng:2,teams:[],groups:[],extra:'',sel:null,thirdPlace:true,stageId:'',stageName:'',day:''};DR.teams=drTeams(DR.div);drDeal();drRender()}
 function drDeal(){const T=drShuffle(DR.teams.concat(DR.extra.split('\n').map(x=>x.trim()).filter(Boolean).map(n=>({pid:'',name:n,school:'',scid:''}))));
   if(DR.fmt==='group'){const n=Math.max(1,Math.min(16,+DR.ng||2));DR.groups=Array.from({length:n},(_,i)=>({name:String.fromCharCode(65+i)+'조',teams:[]}));T.forEach((t,i)=>{const r=Math.floor(i/n),k=r%2===0?i%n:n-1-(i%n);DR.groups[k].teams.push(t)})}   // 지그재그로 고르게
   else DR.groups=[{name:DR.fmt==='league'?'풀리그':'토너먼트',teams:T}]}
 function drRR(teams){const T=teams.slice();if(T.length%2)T.push(null);const n=T.length,rounds=[];for(let r=0;r<n-1;r++){const ps=[];for(let i=0;i<n/2;i++){const a=T[i],b=T[n-1-i];if(a&&b)ps.push(r%2?[b,a]:[a,b])}rounds.push(ps);T.splice(1,0,T.pop())}return rounds}
 function drPlanCount(){if(DR.fmt==='knockout'){const n=DR.groups[0].teams.length;return n<2?0:(n-1)+(DR.thirdPlace&&n>=4?1:0)}return DR.groups.reduce((s,g)=>s+g.teams.length*(g.teams.length-1)/2,0)}
 function drRender(){const dvs=divsOf();
-  modal('drModal','<b style="font-size:17px">🎲 대진 편성</b><div class="mr-note">참가 신청 팀을 무작위로 나눕니다. 팀을 한 번 누르고 다른 조 제목을 누르면 옮겨집니다.</div>'
+  modal('drModal','<b style="font-size:17px">🎲 대진 편성'+(DR.stageName?' — '+esc(DR.stageName)+(DR.day?' · '+esc(dateK(DR.day)):''):'')+'</b><div class="mr-note">참가 신청 팀을 무작위로 나눕니다. 팀을 한 번 누르고 다른 조 제목을 누르면 옮겨집니다.</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="mr-lab">부문</label><select class="mr-in" onchange="DR.div=this.value;DR.teams=drTeams(DR.div);drDeal();drRender()">'+dvs.map(d=>'<option'+(d===DR.div?' selected':'')+'>'+esc(d)+'</option>').join('')+'</select></div>'
     +'<div><label class="mr-lab">방식</label><select class="mr-in" onchange="DR.fmt=this.value;drDeal();drRender()">'+[['group','조별 리그'],['league','풀리그(전체 한 조)'],['knockout','토너먼트']].map(x=>'<option value="'+x[0]+'"'+(DR.fmt===x[0]?' selected':'')+'>'+x[1]+'</option>').join('')+'</select></div></div>'
     +(DR.fmt==='group'?'<label class="mr-lab">조 수 <small style="font-weight:600;color:#6b7280">— 몇 개 조든 됩니다(1~16). 조마다 팀 수가 달라도 되고, 팀을 누른 뒤 다른 조 제목을 누르면 옮겨집니다</small></label><div class="mr-row" style="align-items:center">'+[2,3,4,5,6,7,8].map(n=>'<button class="mr-btn '+(+DR.ng===n?'':'s')+'" style="padding:7px 13px" onclick="DR.ng='+n+';drDeal();drRender()">'+n+'개 조</button>').join('')+'<label style="display:flex;gap:5px;align-items:center;font-size:12.5px;font-weight:800;white-space:nowrap">직접 <input class="mr-in" type="number" min="1" max="16" inputmode="numeric" style="width:66px;padding:6px 8px" value="'+(+DR.ng||2)+'" onchange="DR.ng=Math.max(1,Math.min(16,parseInt(this.value,10)||2));drDeal();drRender()">개 조</label></div>':'')
@@ -727,25 +809,26 @@ function drPick(g,t){DR.sel=(DR.sel&&DR.sel.g===g&&DR.sel.t===t)?null:{g:g,t:t};
 function drMoveTo(g){if(!DR.sel)return;const t=DR.groups[DR.sel.g].teams.splice(DR.sel.t,1)[0];DR.groups[g].teams.push(t);DR.sel=null;drRender()}
 async function drCreate(){const n=drPlanCount();if(!n){say('팀이 부족합니다');return}
   const exist=MATCHES.filter(m=>m.div===DR.div&&m.drawn).length;if(exist&&!confirm(DR.div+' 부문에 편성으로 만든 경기가 이미 '+exist+'개 있습니다. 그대로 두고 새로 '+n+'개를 더 만들까요?'))return;
-  const base={slotId:SLOT_ID,compId:SLOT.compId||'',sport:'얼티미트',rec:true,div:DR.div,place:SLOT.place||'',refMode:'single',officials:{},officialUids:[],status:'예정',period:'',note:'',startAt:null,endAt:null,events:[],clock:{running:false,base:0,startedAt:0},locked:false,day:'',time:'',court:'',drawn:true,createdAt:FV.serverTimestamp(),updatedAt:FV.serverTimestamp(),by:whoAmI().name};
-  const tm=t=>({pid:t.pid||'',name:t.name,school:t.school||'',scid:t.scid||'',score:0});let order=MATCHES.length;const docs=[];
+  const base={slotId:SLOT_ID,compId:SLOT.compId||'',sport:'얼티미트',rec:true,div:DR.div,place:SLOT.place||'',refMode:'single',officials:{},officialUids:[],status:'예정',period:'',note:'',startAt:null,endAt:null,events:[],clock:{running:false,base:0,startedAt:0},locked:false,day:DR.day||'',time:'',court:'',drawn:true,stageId:DR.stageId||'',createdAt:FV.serverTimestamp(),updatedAt:FV.serverTimestamp(),by:whoAmI().name};
+  const STG_K=DR.stageName||'본선',STG_G=DR.stageName||'예선';
+  const tm=t=>Object.assign({pid:t.pid||'',name:t.name,school:t.school||'',scid:t.scid||'',score:0},t.seed?{seed:t.seed}:{});let order=MATCHES.length;const docs=[];
   if(DR.fmt==='knockout'){const T=DR.groups[0].teams;let size=1;while(size<T.length)size*=2;const slots=T.concat(Array(size-T.length).fill(null));
     // 부전승은 고르게 — 상위 시드 자리에 배치
     const seedOrder=(function o(n){if(n===1)return [0];const p=o(n/2);return p.flatMap(x=>[x,n-1-x])})(size);const seeded=Array(size);seedOrder.forEach((pos,i)=>{seeded[pos]=slots[i]});
     const rName=k=>{if(k===0&&T.length!==size)return T.length+'강';const m=size/Math.pow(2,k);return m===2?'결승':m===4?'준결승':m===8?'8강':m===16?'16강':m+'강'};let mn0=0;
     let prev=[];for(let i=0;i<size;i+=2){const A=seeded[i],B=seeded[i+1];const ref=DB.collection('liveMatches').doc();
-      if(A&&B){mn0++;docs.push([ref,Object.assign({},base,{stage:'본선',round:rName(0)+' '+mn0+'경기',title:[DR.div,'본선',rName(0)].join(' · '),order:++order,a:tm(A),b:tm(B)})]);prev.push({ref:ref,bye:null,no:mn0})}
+      if(A&&B){mn0++;docs.push([ref,Object.assign({},base,{stage:STG_K,round:rName(0)+' '+mn0+'경기',title:[DR.div,'본선',rName(0)].join(' · '),order:++order,a:tm(A),b:tm(B)})]);prev.push({ref:ref,bye:null,no:mn0})}
       else prev.push({ref:null,bye:A||B})}
     for(let k=1;size/Math.pow(2,k)>=2;k++){const nx=[];for(let i=0;i<prev.length;i+=2){const x=prev[i],y=prev[i+1];const ref=DB.collection('liveMatches').doc();
       const side=p=>p.bye?tm(p.bye):{pid:'',name:'('+(p.label||'승자')+')',school:'',scid:'',score:0};
       x.label=x.label||'';y.label=y.label||'';
-      const d=Object.assign({},base,{stage:'본선',round:rName(k)+(prev.length>2?' '+(i/2+1)+'경기':''),title:[DR.div,'본선',rName(k)].join(' · '),order:++order,a:side(x),b:side(y),from:{a:x.ref?x.ref.id:'',b:y.ref?y.ref.id:''}});
+      const d=Object.assign({},base,{stage:STG_K,round:rName(k)+(prev.length>2?' '+(i/2+1)+'경기':''),title:[DR.div,'본선',rName(k)].join(' · '),order:++order,a:side(x),b:side(y),from:{a:x.ref?x.ref.id:'',b:y.ref?y.ref.id:''}});
       if(x.ref)d.a.name='('+rName(k-1)+' '+(x.no||i+1)+'경기 승자)';if(y.ref)d.b.name='('+rName(k-1)+' '+(y.no||i+2)+'경기 승자)';
       docs.push([ref,d]);nx.push({ref:ref,bye:null,no:i/2+1})}
       if(DR.thirdPlace&&prev.length===4&&k===1){}   // 3·4위전은 결승과 함께 아래에서
-      if(nx.length===1&&DR.thirdPlace&&prev.length===2&&prev[0].ref&&prev[1].ref){const ref3=DB.collection('liveMatches').doc();docs.push([ref3,Object.assign({},base,{stage:'본선',round:'3·4위전',title:[DR.div,'본선','3·4위전'].join(' · '),order:++order,a:{pid:'',name:'(준결승 1경기 패자)',school:'',scid:'',score:0},b:{pid:'',name:'(준결승 2경기 패자)',school:'',scid:'',score:0},from:{a:prev[0].ref.id,b:prev[1].ref.id},loserFrom:true})])}
+      if(nx.length===1&&DR.thirdPlace&&prev.length===2&&prev[0].ref&&prev[1].ref){const ref3=DB.collection('liveMatches').doc();docs.push([ref3,Object.assign({},base,{stage:STG_K,round:'3·4위전',title:[DR.div,'본선','3·4위전'].join(' · '),order:++order,a:{pid:'',name:'(준결승 1경기 패자)',school:'',scid:'',score:0},b:{pid:'',name:'(준결승 2경기 패자)',school:'',scid:'',score:0},from:{a:prev[0].ref.id,b:prev[1].ref.id},loserFrom:true})])}
       prev=nx}}
-  else{DR.groups.forEach(g=>{const R=drRR(g.teams);R.forEach((ps,ri)=>ps.forEach(p=>{const ref=DB.collection('liveMatches').doc();docs.push([ref,Object.assign({},base,{stage:'예선',group:g.name,round:g.name+' '+(ri+1)+'R',title:[DR.div,'예선',g.name].join(' · '),order:++order,a:tm(p[0]),b:tm(p[1])})])}))})}
+  else{DR.groups.forEach(g=>{const R=drRR(g.teams);R.forEach((ps,ri)=>ps.forEach(p=>{const ref=DB.collection('liveMatches').doc();docs.push([ref,Object.assign({},base,{stage:STG_G,group:g.name,round:g.name+' '+(ri+1)+'R',title:[DR.div,'예선',g.name].join(' · '),order:++order,a:tm(p[0]),b:tm(p[1])})])}))})}
   try{for(let i=0;i<docs.length;i+=400){const b=DB.batch();docs.slice(i,i+400).forEach(x=>b.set(x[0],x[1]));await b.commit()}
     await DB.collection('compStats').doc(SLOT_ID).set({slotId:SLOT_ID,title:SLOT.title||'',date:SLOT.date||'',draws:{[DR.div]:{fmt:DR.fmt,groups:DR.groups.map(g=>({name:g.name,teams:g.teams.map(t=>t.name)})),at:new Date().toISOString(),by:whoAmI().name}},updatedAt:FV.serverTimestamp()},{merge:true}).catch(()=>{});
     document.getElementById('drModal').remove();BD_DIV=DR.div;say('✓ 경기 '+docs.length+'개를 만들었습니다. 시간표에 끌어다 놓거나 「⚡ 빈 칸 자동 배치」를 눌러 주세요.')}
