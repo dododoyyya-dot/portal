@@ -695,7 +695,7 @@ function drRender(){const dvs=divsOf();
   modal('drModal','<b style="font-size:17px">🎲 대진 편성</b><div class="mr-note">참가 신청 팀을 무작위로 나눕니다. 팀을 한 번 누르고 다른 조 제목을 누르면 옮겨집니다.</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="mr-lab">부문</label><select class="mr-in" onchange="DR.div=this.value;DR.teams=drTeams(DR.div);drDeal();drRender()">'+dvs.map(d=>'<option'+(d===DR.div?' selected':'')+'>'+esc(d)+'</option>').join('')+'</select></div>'
     +'<div><label class="mr-lab">방식</label><select class="mr-in" onchange="DR.fmt=this.value;drDeal();drRender()">'+[['group','조별 리그'],['league','풀리그(전체 한 조)'],['knockout','토너먼트']].map(x=>'<option value="'+x[0]+'"'+(DR.fmt===x[0]?' selected':'')+'>'+x[1]+'</option>').join('')+'</select></div></div>'
-    +(DR.fmt==='group'?'<label class="mr-lab">조 수</label><div class="mr-row">'+[2,3,4,6,8].map(n=>'<button class="mr-btn '+(+DR.ng===n?'':'s')+'" style="padding:7px 13px" onclick="DR.ng='+n+';drDeal();drRender()">'+n+'개 조</button>').join('')+'</div>':'')
+    +(DR.fmt==='group'?'<label class="mr-lab">조 수 <small style="font-weight:600;color:#6b7280">— 몇 개 조든 됩니다(1~16). 조마다 팀 수가 달라도 되고, 팀을 누른 뒤 다른 조 제목을 누르면 옮겨집니다</small></label><div class="mr-row" style="align-items:center">'+[2,3,4,5,6,7,8].map(n=>'<button class="mr-btn '+(+DR.ng===n?'':'s')+'" style="padding:7px 13px" onclick="DR.ng='+n+';drDeal();drRender()">'+n+'개 조</button>').join('')+'<label style="display:flex;gap:5px;align-items:center;font-size:12.5px;font-weight:800;white-space:nowrap">직접 <input class="mr-in" type="number" min="1" max="16" inputmode="numeric" style="width:66px;padding:6px 8px" value="'+(+DR.ng||2)+'" onchange="DR.ng=Math.max(1,Math.min(16,parseInt(this.value,10)||2));drDeal();drRender()">개 조</label></div>':'')
     +(DR.fmt==='knockout'?'<label class="mr-lab"><input type="checkbox" '+(DR.thirdPlace?'checked':'')+' onchange="DR.thirdPlace=this.checked;drRender()"> 3·4위전 포함</label>':'')
     +'<label class="mr-lab">명단 없는 팀 추가 (한 줄에 한 팀 · 선택)</label><textarea class="mr-in" rows="2" id="dr_extra" onchange="DR.extra=this.value">'+esc(DR.extra)+'</textarea>'
     +'<div class="mr-row" style="margin-top:8px"><button class="mr-btn y" onclick="DR.extra=document.getElementById(\'dr_extra\').value;drDeal();drRender()">🎲 다시 섞기</button><span class="mr-note">팀 '+DR.groups.reduce((s,g)=>s+g.teams.length,0)+' · 만들 경기 '+drPlanCount()+'</span></div>'
@@ -710,16 +710,16 @@ async function drCreate(){const n=drPlanCount();if(!n){say('팀이 부족합니�
   if(DR.fmt==='knockout'){const T=DR.groups[0].teams;let size=1;while(size<T.length)size*=2;const slots=T.concat(Array(size-T.length).fill(null));
     // 부전승은 고르게 — 상위 시드 자리에 배치
     const seedOrder=(function o(n){if(n===1)return [0];const p=o(n/2);return p.flatMap(x=>[x,n-1-x])})(size);const seeded=Array(size);seedOrder.forEach((pos,i)=>{seeded[pos]=slots[i]});
-    const rName=k=>{const m=size/Math.pow(2,k);return m===2?'결승':m===4?'준결승':m===8?'8강':m===16?'16강':m+'강'};
+    const rName=k=>{if(k===0&&T.length!==size)return T.length+'강';const m=size/Math.pow(2,k);return m===2?'결승':m===4?'준결승':m===8?'8강':m===16?'16강':m+'강'};let mn0=0;
     let prev=[];for(let i=0;i<size;i+=2){const A=seeded[i],B=seeded[i+1];const ref=DB.collection('liveMatches').doc();
-      if(A&&B){docs.push([ref,Object.assign({},base,{stage:'본선',round:rName(0)+' '+(i/2+1)+'경기',title:[DR.div,'본선',rName(0)].join(' · '),order:++order,a:tm(A),b:tm(B)})]);prev.push({ref:ref,bye:null})}
+      if(A&&B){mn0++;docs.push([ref,Object.assign({},base,{stage:'본선',round:rName(0)+' '+mn0+'경기',title:[DR.div,'본선',rName(0)].join(' · '),order:++order,a:tm(A),b:tm(B)})]);prev.push({ref:ref,bye:null,no:mn0})}
       else prev.push({ref:null,bye:A||B})}
     for(let k=1;size/Math.pow(2,k)>=2;k++){const nx=[];for(let i=0;i<prev.length;i+=2){const x=prev[i],y=prev[i+1];const ref=DB.collection('liveMatches').doc();
       const side=p=>p.bye?tm(p.bye):{pid:'',name:'('+(p.label||'승자')+')',school:'',scid:'',score:0};
       x.label=x.label||'';y.label=y.label||'';
       const d=Object.assign({},base,{stage:'본선',round:rName(k)+(prev.length>2?' '+(i/2+1)+'경기':''),title:[DR.div,'본선',rName(k)].join(' · '),order:++order,a:side(x),b:side(y),from:{a:x.ref?x.ref.id:'',b:y.ref?y.ref.id:''}});
-      if(x.ref)d.a.name='('+rName(k-1)+' '+(i+1)+'경기 승자)';if(y.ref)d.b.name='('+rName(k-1)+' '+(i+2)+'경기 승자)';
-      docs.push([ref,d]);nx.push({ref:ref,bye:null})}
+      if(x.ref)d.a.name='('+rName(k-1)+' '+(x.no||i+1)+'경기 승자)';if(y.ref)d.b.name='('+rName(k-1)+' '+(y.no||i+2)+'경기 승자)';
+      docs.push([ref,d]);nx.push({ref:ref,bye:null,no:i/2+1})}
       if(DR.thirdPlace&&prev.length===4&&k===1){}   // 3·4위전은 결승과 함께 아래에서
       if(nx.length===1&&DR.thirdPlace&&prev.length===2&&prev[0].ref&&prev[1].ref){const ref3=DB.collection('liveMatches').doc();docs.push([ref3,Object.assign({},base,{stage:'본선',round:'3·4위전',title:[DR.div,'본선','3·4위전'].join(' · '),order:++order,a:{pid:'',name:'(준결승 1경기 패자)',school:'',scid:'',score:0},b:{pid:'',name:'(준결승 2경기 패자)',school:'',scid:'',score:0},from:{a:prev[0].ref.id,b:prev[1].ref.id},loserFrom:true})])}
       prev=nx}}
