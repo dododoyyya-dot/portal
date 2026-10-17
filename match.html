@@ -543,7 +543,7 @@ async function matchDel(id){const m=MATCHES.find(x=>x.id===id);if(!m)return;if((
   try{await DB.collection('liveMatches').doc(id).delete();document.getElementById('mfModal').remove()}catch(e){say('삭제 실패: '+(e.message||e))}}
 // ══ [대진·시간표 2026-10-14] ══
 let BOARD=null,DRAWS={},BD_DAY='',BD_DIV='',BD_DRAG=null,BD_SEL=null,DR=null;
-function bdDays(){const ds=(COMP&&COMP.dates&&COMP.dates.length)?COMP.dates.slice():[];if(!ds.length&&SLOT.date)ds.push(String(SLOT.date).slice(0,10));MATCHES.forEach(m=>{if(m.day&&ds.indexOf(m.day)<0)ds.push(m.day)});return ds.sort()}
+function bdDays(){const ds=(COMP&&COMP.dates&&COMP.dates.length)?COMP.dates.slice():[];if(!ds.length&&SLOT.date)ds.push(String(SLOT.date).slice(0,10));((BOARD||{}).days||[]).forEach(d=>{if(d&&ds.indexOf(d)<0)ds.push(d)});   // [여러 날 2026-10-17] 시간표 설정에서 더한 날짜(예: 24일 예선 · 25일 토너먼트)MATCHES.forEach(m=>{if(m.day&&ds.indexOf(m.day)<0)ds.push(m.day)});return ds.sort()}
 function bdCfg(){const b=BOARD||{};return {courts:(b.courts&&b.courts.length)?b.courts:['1구장','2구장'],start:b.start||'09:00',step:+b.step||40,n:+b.n||12}}
 function bdTimes(c){const out=[];const p=c.start.split(':');let t=(+p[0])*60+(+p[1]||0);for(let i=0;i<c.n;i++){out.push(String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0'));t+=c.step}return out}
 function bdPlaced(m,c,times){return m.day&&m.time&&m.court&&c.courts.indexOf(m.court)>=0&&times.indexOf(m.time)>=0}
@@ -588,14 +588,19 @@ async function bdDrop(id,d){if(!STAFF){render();return}const m=MATCHES.find(x=>x
     await b.commit();if(clash.length)say('⚠ 같은 시간에 같은 팀 경기가 있습니다: '+clash.map(x=>(x.a||{}).name+' vs '+(x.b||{}).name+' ('+x.court+')').join(', '))}
   catch(e){say('배치 실패: '+(e.message||e))}}
 function bdSetup(){const c=bdCfg();modal('bdModal','<b style="font-size:16px">⚙ 시간표 설정</b>'
+  +'<label class="mr-lab">경기 날짜 (쉼표로 여러 날 · 예: 2026-10-24, 2026-10-25 — 날짜마다 시간표 탭이 생깁니다)</label><input class="mr-in" id="bd_days" value="'+esc(bdDays().join(', '))+'" placeholder="2026-10-24, 2026-10-25">'
   +'<label class="mr-lab">코트 이름 (쉼표로 구분 · 수만큼 열이 생깁니다)</label><input class="mr-in" id="bd_courts" value="'+esc(c.courts.join(', '))+'">'
   +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><div><label class="mr-lab">첫 경기 시각</label><input class="mr-in" id="bd_start" type="time" value="'+esc(c.start)+'"></div><div><label class="mr-lab">경기 간격(분)</label><input class="mr-in" id="bd_step" type="number" min="10" max="180" value="'+c.step+'"></div><div><label class="mr-lab">하루 시간대 수</label><input class="mr-in" id="bd_n" type="number" min="1" max="40" value="'+c.n+'"></div></div>'
   +'<div class="mr-note" style="margin-top:6px">이미 배치된 경기의 시각은 그대로 둡니다. 간격을 바꾸면 칸에 맞지 않는 경기는 「미배치」로 보입니다(다시 끌어다 놓으면 됩니다).</div>'
   +'<div class="mr-row" style="justify-content:flex-end;margin-top:14px"><button class="mr-btn s" onclick="document.getElementById(\'bdModal\').remove()">닫기</button><button class="mr-btn g" onclick="bdSetupSave()">💾 저장</button></div>')}
 async function bdSetupSave(){const courts=v('bd_courts').split(',').map(x=>x.trim()).filter(Boolean);if(!courts.length){say('코트를 하나 이상 적어 주세요');return}
-  const board={courts:courts,start:v('bd_start')||'09:00',step:Math.max(10,+v('bd_step')||40),n:Math.max(1,Math.min(40,+v('bd_n')||12))};
+  const days=v('bd_days').split(',').map(x=>x.trim().replace(/\./g,'-').replace(/\s/g,'')).filter(Boolean);const bad=days.find(d=>!/^\d{4}-\d{2}-\d{2}$/.test(d));if(bad){say('날짜 형식을 확인해 주세요: '+bad+' (예: 2026-10-24)');return}
+  const board={courts:courts,start:v('bd_start')||'09:00',step:Math.max(10,+v('bd_step')||40),n:Math.max(1,Math.min(40,+v('bd_n')||12)),days:days};
   try{await DB.collection('compStats').doc(SLOT_ID).set({slotId:SLOT_ID,title:SLOT.title||'',date:SLOT.date||'',board:board,updatedAt:FV.serverTimestamp()},{merge:true});document.getElementById('bdModal').remove()}catch(e){say('저장 실패: '+(e.message||e))}}
-async function bdAuto(){const c=bdCfg();const times=bdTimes(c);const pool=MATCHES.filter(m=>(!BD_DIV||m.div===BD_DIV)&&!bdPlaced(m,c,times)&&m.status!=='종료').sort((a,b)=>(+a.order||0)-(+b.order||0));if(!pool.length){say('배치할 경기가 없습니다');return}
+async function bdAuto(stage){const c=bdCfg();const times=bdTimes(c);let pool=MATCHES.filter(m=>(!BD_DIV||m.div===BD_DIV)&&!bdPlaced(m,c,times)&&m.status!=='종료').sort((a,b)=>(+a.order||0)-(+b.order||0));if(!pool.length){say('배치할 경기가 없습니다');return}
+  // [여러 날] 미배치 경기에 단계(예선·본선 …)가 섞여 있으면 어느 단계를 이 날짜에 넣을지 고름 — 24일 예선, 25일 토너먼트처럼
+  const stages=[...new Set(pool.map(m=>m.stage||'(단계 없음)'))];if(stage===undefined&&stages.length>1){modal('bdStageModal','<b style="font-size:16px">'+esc(dateK(BD_DAY))+' 시간표에 넣을 경기</b><div class="mr-note">미배치 경기에 여러 단계가 섞여 있습니다. 이 날짜에 배치할 단계를 고르세요.</div><div class="qa-chips" style="margin-top:10px">'+stages.map(st=>'<button class="qa-chip" onclick="document.getElementById('bdStageModal').remove();bdAuto(''+esc(st)+'')">'+esc(st)+' <small>'+pool.filter(m=>(m.stage||'(단계 없음)')===st).length+'경기</small></button>').join('')+'<button class="qa-chip" onclick="document.getElementById('bdStageModal').remove();bdAuto('')">전체 '+pool.length+'경기</button></div><div class="mr-row" style="justify-content:flex-end;margin-top:12px"><button class="mr-btn s" onclick="document.getElementById('bdStageModal').remove()">닫기</button></div>');return}
+  if(stage)pool=pool.filter(m=>(m.stage||'(단계 없음)')===stage);
   const busy={};MATCHES.forEach(m=>{if(m.day===BD_DAY&&m.time&&m.court)busy[m.time+'|'+m.court]=m});
   const teamAt={};MATCHES.forEach(m=>{if(m.day===BD_DAY&&m.time)[(m.a||{}).name,(m.b||{}).name].forEach(n=>{if(n)(teamAt[m.time]=teamAt[m.time]||{})[n]=1})});
   const plan=[];const left=pool.slice();
