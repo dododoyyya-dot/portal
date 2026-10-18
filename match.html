@@ -449,6 +449,7 @@ const EV_CATS=[
   {k:'fight',n:'다툼·폭언',s:-1,c:'#dc2626',bg:'#fee2e2'},{k:'clean',n:'쓰레기·청결',s:-1,c:'#ea580c',bg:'#ffedd5'},{k:'order',n:'응원·학부모 질서',s:-1,c:'#d97706',bg:'#fef3c7'},
   {k:'time',n:'시간·집합 미준수',s:-1,c:'#9333ea',bg:'#f3e8ff'},{k:'manner',n:'비교육적 행동',s:-1,c:'#be123c',bg:'#ffe4e6'},
   {k:'good',n:'선행·봉사',s:1,c:'#15803d',bg:'#dcfce7'},{k:'cheer',n:'모범 응원·매너',s:1,c:'#0d9488',bg:'#ccfbf1'},{k:'etc',n:'기타',s:0,c:'#475569',bg:'#e2e8f0'}];
+function evNow(){const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,19)}   /* 한국 시각 그대로 */
 function evCat(k){return EV_CATS.find(x=>x.k===k)||EV_CATS[EV_CATS.length-1]}
 function evMyRole(){if(STAFF)return '운영진';const p=(STAFFPICK||[]).find(x=>x.uid===(ME&&ME.uid));return p?((p.roles||[]).filter(r=>REC_ROLE.test(r)).join('·')||'심판'):'심판'}
 function evTeams(){const T=lkTeams();return Object.values(T).map(t=>({div:t.div,name:t.name,school:t.school,key:t.div+'|'+t.name}))}
@@ -458,10 +459,10 @@ async function evSave(){if(!canOfficial()){say('평가는 운영진과 이 대�
   if(!EV.team){say('팀(학교)을 골라 주세요');return}if(!EV.cat){say('사유 종류를 골라 주세요');return}const d=+EV.delta;if(!d||d<-3||d>3){say('점수를 −3 ~ +3 에서 골라 주세요');return}
   const note=String((document.getElementById('ev_note')||{}).value||'').trim().slice(0,200);if(!note&&EV.cat==='etc'){say('「기타」는 내용을 적어 주세요');return}
   const t=evTeams().find(x=>x.key===EV.team);if(!t){say('팀을 다시 골라 주세요');return}
-  try{await DB.collection('compEvals').add({slotId:SLOT_ID,div:t.div,team:t.name,school:t.school||'',teamKey:t.key,delta:d,cat:EV.cat,catName:evCat(EV.cat).n,note:note,by:{uid:ME.uid,name:(MY&&MY.name)||'',role:evMyRole()},at:new Date().toISOString(),createdAt:FV.serverTimestamp()});
+  try{await DB.collection('compEvals').add({slotId:SLOT_ID,div:t.div,team:t.name,school:t.school||'',teamKey:t.key,delta:d,cat:EV.cat,catName:evCat(EV.cat).n,note:note,by:{uid:ME.uid,name:(MY&&MY.name)||'',role:evMyRole()},at:evNow(),createdAt:FV.serverTimestamp()});
     EV.note='';EV.cat='';EV.delta=0;const n=document.getElementById('ev_note');if(n)n.value='';qkToastLite('✓ '+t.name+' '+(d>0?'+':'')+d+'점 기록')}catch(e){say('저장 실패: '+(/permission/i.test(String(e))?'권한이 없습니다(보안 규칙 v56 게시 필요하거나 이 대회 확정 심판이 아님)':(e.message||e)))}}
 async function evVoidRec(id){const r=EVALS.find(x=>x.id===id);if(!r)return;if(!(STAFF||(r.by&&r.by.uid===(ME&&ME.uid)))){say('본인이 적은 기록만 취소할 수 있습니다');return}if(!confirm('이 평가 기록을 취소할까요? (기록은 남고 점수에서 빠집니다)'))return;
-  try{await DB.collection('compEvals').doc(id).update({void:true,voidAt:new Date().toISOString()})}catch(e){say('취소 실패: '+(e.message||e))}}
+  try{await DB.collection('compEvals').doc(id).update({void:true,voidAt:evNow()})}catch(e){say('취소 실패: '+(e.message||e))}}
 function qkToastLite(t){let d=document.getElementById('evToast');if(!d){d=document.createElement('div');d.id='evToast';d.className='ev-toast';document.body.appendChild(d)}d.textContent=t;d.classList.add('on');clearTimeout(d._t);d._t=setTimeout(()=>d.classList.remove('on'),2200)}
 async function evXlsx(){try{const X=await MR.loadXlsx();const wb=X.utils.book_new();const sum=evSummary();
   const a1=[['부문','팀(학교)','학교 정식명','가감점 합계','가점 건수','감점 건수','경기 페어플레이 평균','순위']];Object.keys(sum).forEach(dv=>sum[dv].forEach(r=>a1.push([dv,r.name,r.school||'',r.total,r.plus,r.minus,r.fair!=null?r.fair:'',r.rank])));X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet(a1),'팀별 합계');
