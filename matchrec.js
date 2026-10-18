@@ -1,4 +1,4 @@
-// matchrec.js v20261017b · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
+// matchrec.js v20261018a · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
 //   화면: match.html(기록 콘솔·경기 관리) · competition.html(오더지 작성) · results.html(공개 결과) · live.html(중계 콘솔 호환)
 //   원칙 ① 경기 문서(liveMatches) 하나가 원본 ② 점수는 득점 기록(events)에서 계산해 a.score/b.score 에 같이 저장(중계 화면 호환)
 //        ③ 입력권(ctrl)은 한 번에 한 화면 ④ 기록 추가는 고유 id + 트랜잭션(중복 전송 무시) ⑤ 취소는 삭제 대신 void 표시
@@ -153,17 +153,20 @@
 
   // ── 대회 집계 (compStats) ──
   //   matches: liveMatches 문서 배열(slot 소속) · 순위표는 부문별 승점(승 3·무 1), 득실 → 다득점
+  // [조별 순위 2026-10-18] 집계 칸 이름 — 조가 있는 경기는 「부문 · A조」, 조를 쓰는 부문의 조 없는 경기(토너먼트)는 「부문 · 본선」, 조가 없는 부문은 부문 이름 그대로
+  function statKeyFn(matches){var gd={};(matches||[]).forEach(function(m){if(m&&!m.golf&&m.group)gd[m.div||'전체']=1});
+    return function(m){var dv=(m&&m.div)||'전체';if(m&&m.group)return dv+' · '+m.group;return gd[dv]?dv+' · '+((m&&m.stage)||'본선'):dv}}
   function computeStats(matches,orders,lots){lots=lots||{};
-    var byDiv={},scorers={},played=0;
-    (matches||[]).forEach(function(m){if(!m||m.golf)return;var dv=m.div||'전체';var D=byDiv[dv]=byDiv[dv]||{teams:{},matches:0};
+    var byDiv={},scorers={},played=0;var KEY=statKeyFn(matches);
+    (matches||[]).forEach(function(m){if(!m||m.golf)return;var dvName=m.div||'전체';var dv=KEY(m);var D=byDiv[dv]=byDiv[dv]||{teams:{},matches:0};
       var sc=score(m.events||[]);var fin=m.status==='종료';
       ['a','b'].forEach(function(side){var t=m[side]||{};var key=t.pid||t.name||'';if(!key)return;if(!t.pid&&/^\(.*\)$/.test(String(t.name||'').trim()))return;/* 「(준결승 1경기 승자)」 같은 자리 표시는 순위표에서 제외 */var T=D.teams[key]=D.teams[key]||{pid:t.pid||'',name:t.name||'',school:t.school||'',p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0,fair:0};
         if(fin){var me=side==='a'?sc.a:sc.b,op=side==='a'?sc.b:sc.a;T.p++;T.gf+=me;T.ga+=op;if(me>op)T.w++;else if(me<op)T.l++;else T.d++;T.pts=T.w*3+T.d;T.fair+=((m.fairplay||{})[side]||0);T.sanc=(T.sanc||0)+(m.events||[]).filter(function(e){return e&&!e.void&&e.type==='card'&&e.side===side}).length}});
       if(fin)(D.fin=D.fin||[]).push(m);
       if(fin){D.matches++;played++}
       (m.events||[]).forEach(function(e){if(!e||e.void||e.type!=='goal')return;var t=m[e.side]||{};
-        [['scorer','g'],['assist','a']].forEach(function(x){var p=e[x[0]];if(!p||!p.name)return;var k=dv+'|'+(t.pid||t.name)+'|'+p.no+'|'+p.name;var S=scorers[k]=scorers[k]||{div:dv,team:t.name||'',school:t.school||'',no:p.no,name:p.name,g:0,a:0};S[x[1]]++})})});
-    Object.keys(byDiv).forEach(function(dv){var T=byDiv[dv].teams;byDiv[dv].table=rankTable(Object.keys(T).map(function(k){return Object.assign({key:k,sanc:0},T[k])}),byDiv[dv].fin||[],lots[dv]||{});delete byDiv[dv].fin});
+        [['scorer','g'],['assist','a']].forEach(function(x){var p=e[x[0]];if(!p||!p.name)return;var k=dvName+'|'+(t.pid||t.name)+'|'+p.no+'|'+p.name;var S=scorers[k]=scorers[k]||{div:dvName,team:t.name||'',school:t.school||'',no:p.no,name:p.name,g:0,a:0};S[x[1]]++})})});
+    Object.keys(byDiv).forEach(function(dv){if(!Object.keys(byDiv[dv].teams).length){delete byDiv[dv];return}var T=byDiv[dv].teams;byDiv[dv].table=rankTable(Object.keys(T).map(function(k){return Object.assign({key:k,sanc:0},T[k])}),byDiv[dv].fin||[],lots[dv]||{});delete byDiv[dv].fin});
     var top=Object.keys(scorers).map(function(k){return scorers[k]}).sort(function(x,y){return y.g-x.g||y.a-x.a||String(x.name).localeCompare(String(y.name),'ko')});
     return {byDiv:byDiv,scorers:top,played:played,total:(matches||[]).filter(function(m){return m&&!m.golf}).length,at:new Date().toISOString()}}
 
@@ -306,15 +309,15 @@
     var ea=[['부문','경기','A팀','B팀','구간','시간','팀','구분','내용','점수','사유·메모']];(matches||[]).filter(function(m){return m&&!m.golf&&m.status!=='예정'}).forEach(function(m){matchRows(m).forEach(function(r){ea.push([m.div||'',m.round||'',teamLabel(m.a),teamLabel(m.b)].concat(r))})});X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet(ea),'경기 기록');
     X.writeFile(wb,'대회결과_'+String(title||'').replace(/[\\/:*?"<>|]/g,'').slice(0,40)+'.xlsx')})}
   // 대회 최종 결과 PDF(인쇄)
-  function printComp(title,st,matches){var w=pwin('대회 결과_'+(title||''));if(!w)return;
-    Object.keys(st.byDiv||{}).sort().forEach(function(dv){var T=st.byDiv[dv].table||[];var M=(matches||[]).filter(function(m){return m&&!m.golf&&(m.div||'전체')===dv});
+  function printComp(title,st,matches){var KF=statKeyFn(matches);var w=pwin('대회 결과_'+(title||''));if(!w)return;
+    Object.keys(st.byDiv||{}).sort().forEach(function(dv){var T=st.byDiv[dv].table||[];var M=(matches||[]).filter(function(m){return m&&!m.golf&&KF(m)===dv});
       w.document.write('<div class="pg"><div class="h1" style="font-size:18pt">'+esc(title||'')+'</div><div class="h2">'+esc(dv)+' 최종 결과</div>'
         +'<table><tr><th>순위</th><th>팀</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득</th><th>실</th><th>득실</th><th>승점</th><th>제재</th><th>비고</th></tr>'+T.map(function(t){return '<tr><td><b>'+t.rank+'</b></td><td class="l">'+esc(teamLabel(t))+'</td><td>'+t.p+'</td><td>'+t.w+'</td><td>'+t.d+'</td><td>'+t.l+'</td><td>'+t.gf+'</td><td>'+t.ga+'</td><td>'+(t.gf-t.ga)+'</td><td><b>'+t.pts+'</b></td><td>'+(t.sanc||0)+'</td><td class="s">'+esc(t.tb||'')+'</td></tr>'}).join('')+'</table>'
         +'<div class="s" style="margin:2mm 0 4mm">※ 순위: 승점(승3·무1·패0) → 득실차 → 다득점 → 승자승 → 제재 수 → 추첨</div>'
         +'<table><tr><th>단계</th><th>경기</th><th>일시·코트</th><th>A팀</th><th>점수</th><th>B팀</th><th>상태</th></tr>'+M.map(function(m){var sc=score(m.events||[]);return '<tr><td>'+esc(m.stage||'')+'</td><td>'+esc(m.round||'')+'</td><td class="s">'+esc([m.day,m.time,m.court].filter(Boolean).join(' '))+'</td><td class="l">'+esc(teamLabel(m.a))+'</td><td><b>'+sc.a+' : '+sc.b+'</b></td><td class="l">'+esc(teamLabel(m.b))+'</td><td>'+esc(m.status||'')+(m.locked?'·확정':'')+'</td></tr>'}).join('')+'</table></div>')});
     var S=(st.scorers||[]).slice(0,40);if(S.length)w.document.write('<div class="pg"><div class="h1" style="font-size:16pt">득점 · 어시스트</div><div class="h2">'+esc(title||'')+'</div><table><tr><th>순위</th><th>부문</th><th>팀</th><th>배번</th><th>선수</th><th>득점</th><th>어시스트</th></tr>'+S.map(function(p,i){return '<tr><td>'+(i+1)+'</td><td>'+esc(p.div)+'</td><td class="l">'+esc(p.team)+'</td><td>'+esc(p.no)+'</td><td>'+esc(p.name)+'</td><td><b>'+p.g+'</b></td><td>'+p.a+'</td></tr>'}).join('')+'</table></div>');
     pend(w)}
-  window.KFDF_MR={offList:offList,offOf:offOf,coachesOf:coachesOf,winnerOf:winnerOf,ROLE_LABEL:ROLE_LABEL,roundLabel:roundLabel,CARD_PICK:CARD_PICK,isOff:isOff,KIT_COLORS:KIT_COLORS,kitTextColor:kitTextColor,kitsOf:kitsOf,noFor:noFor,secOf:secOf,fmtSec:fmtSec,evSec:evSec,evTime:evTime,clockSetMs:clockSetMs,clockAdd:clockAdd,clockFloorMin:clockFloorMin,brkLeft:brkLeft,timeouts:timeouts,sentOff:sentOff,yellowCount:yellowCount,rankTable:rankTable,loadXlsx:loadXlsx,saveXlsxMatch:saveXlsxMatch,saveXlsxComp:saveXlsxComp,printComp:printComp,teamLabel:teamLabel,
+  window.KFDF_MR={statKeyFn:statKeyFn,offList:offList,offOf:offOf,coachesOf:coachesOf,winnerOf:winnerOf,ROLE_LABEL:ROLE_LABEL,roundLabel:roundLabel,CARD_PICK:CARD_PICK,isOff:isOff,KIT_COLORS:KIT_COLORS,kitTextColor:kitTextColor,kitsOf:kitsOf,noFor:noFor,secOf:secOf,fmtSec:fmtSec,evSec:evSec,evTime:evTime,clockSetMs:clockSetMs,clockAdd:clockAdd,clockFloorMin:clockFloorMin,brkLeft:brkLeft,timeouts:timeouts,sentOff:sentOff,yellowCount:yellowCount,rankTable:rankTable,loadXlsx:loadXlsx,saveXlsxMatch:saveXlsxMatch,saveXlsxComp:saveXlsxComp,printComp:printComp,teamLabel:teamLabel,
     PERIODS:PERIODS,CARDS:CARDS,esc:esc,uid8:uid8,tsMs:tsMs,score:score,goals:goals,clockMs:clockMs,clockTxt:clockTxt,minuteOf:minuteOf,clockSet:clockSet,clockAct:clockAct,
     ctrlState:ctrlState,ctrlLabel:ctrlLabel,CTRL_BEAT:CTRL_BEAT,addEvent:addEvent,voidEvent:voidEvent,editEvent:editEvent,qPush:qPush,qCount:qCount,flush:flush,
     canRecord:canRecord,isStaffUser:isStaffUser,orderId:orderId,orderFromEntry:orderFromEntry,orderCheck:orderCheck,lineup:lineup,playerStats:playerStats,computeStats:computeStats,

@@ -402,7 +402,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="matchrec.js?v=20261017b"></script>
+<script src="matchrec.js?v=20261018a"></script>
 <script>
 // ══════════ 경기 기록 (match.html) ══════════
 //   ?slot=참가공고ID            대회의 경기·오더지·디스크골프·순위 (운영진은 경기 생성·심판 배정)
@@ -567,11 +567,12 @@ function bdPlanOf(d){const p=(bdCfg().plan||{})[d]||{};const S=Array.isArray(p.s
 function bdDayName(d,i){const p=bdPlanOf(d);return (i+1)+'일차 '+dateK(d)+(p.stages.length?' · '+p.stages.join('·'):'')}
 function bdStageOf(m){return m.stage||'(단계 없음)'}
 function bdTimes(c){const out=[];const p=c.start.split(':');let t=(+p[0])*60+(+p[1]||0);for(let i=0;i<c.n;i++){out.push(String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0'));t+=c.step}return out}
-function bdPlaced(m,c,times){return m.day&&m.time&&m.court&&c.courts.indexOf(m.court)>=0&&times.indexOf(m.time)>=0}
+function bdPlaced(m,c,times){return !!(m.day&&m.time&&m.court&&c.courts.indexOf(m.court)>=0&&/^\d{1,2}:\d{2}$/.test(m.time))}
+function bdTimesDay(c,day){const T=bdTimes(c);MATCHES.forEach(m=>{if(m.day===day&&m.time&&m.court&&c.courts.indexOf(m.court)>=0&&/^\d{1,2}:\d{2}$/.test(m.time)&&T.indexOf(m.time)<0)T.push(m.time)});return T.sort()}   // [2026-10-18] 16:45 처럼 간격에 안 맞는 경기도 그 시각 줄로
 function bdCard(m){const sc=MR.score(m.events||[]);const a=m.a||{},b=m.b||{};const cls=m.status==='진행'?' live':m.status==='종료'?' done':'';
   return '<div class="bd-card'+cls+(BD_SEL===m.id?' sel':'')+'" data-mid="'+esc(m.id)+'"><span class="st"></span><div class="dv">'+esc([m.stage,m.div,m.group||m.round].filter(Boolean).join(' · '))+(m.day&&!m.time?' <span style="color:#b8860b">📅 '+esc(dateK(m.day).slice(5))+'</span>':'')+'</div><div class="vs">'+esc(a.name||'?')+(m.status!=='예정'?' <span class="sc">'+sc.a+':'+sc.b+'</span> ':' vs ')+esc(b.name||'?')+'</div>'+((m.officials||{}).ref1?'<div class="dv" style="color:#7c3aed">주심 '+esc(m.officials.ref1.name)+((m.officials||{}).recorder?' · 기록 '+esc(m.officials.recorder.name):'')+'</div>':'')+'</div>'}
 function boardTab(){
-  const days=bdDays();if(!BD_DAY||days.indexOf(BD_DAY)<0)BD_DAY=days[0]||'';const c=bdCfg();const times=bdTimes(c);
+  const days=bdDays();if(!BD_DAY||days.indexOf(BD_DAY)<0)BD_DAY=days[0]||'';const c=bdCfg();const times=bdTimesDay(c,BD_DAY);
   const divs=[...new Set(MATCHES.map(m=>m.div).filter(Boolean))].sort();
   const pool=MATCHES.filter(m=>(!BD_DIV||m.div===BD_DIV));
   const tray=pool.filter(m=>!bdPlaced(m,c,times)||(m.day!==BD_DAY&&!m.day));
@@ -617,7 +618,7 @@ function bdSetup(){const c=bdCfg();modal('bdModal','<b style="font-size:16px">�
   +'<label class="mr-lab">경기 날짜와 그 날 치를 단계 <small style="font-weight:600;color:#6b7280">— 첫날 예선 · 둘째날 토너먼트(본선)처럼 날짜마다 단계를 고르세요. 날짜마다 시간표 탭이 생기고, 자동 배치는 그 단계만 넣습니다</small></label><div id="bd_dayRows">'+bdDays().map((d,i)=>bdDayRow(d,i)).join('')+'</div><button class="mr-btn s" style="margin-top:6px" onclick="bdDayRowAdd()">＋ 날짜 추가</button>'
   +'<label class="mr-lab">코트 이름 (쉼표로 구분 · 수만큼 열이 생깁니다)</label><input class="mr-in" id="bd_courts" value="'+esc(c.courts.join(', '))+'">'
   +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><div><label class="mr-lab">첫 경기 시각</label><input class="mr-in" id="bd_start" type="time" value="'+esc(c.start)+'"></div><div><label class="mr-lab">경기 간격(분)</label><input class="mr-in" id="bd_step" type="number" min="10" max="180" value="'+c.step+'"></div><div><label class="mr-lab">하루 시간대 수</label><input class="mr-in" id="bd_n" type="number" min="1" max="40" value="'+c.n+'"></div></div>'
-  +'<div class="mr-note" style="margin-top:6px">이미 배치된 경기의 시각은 그대로 둡니다. 간격을 바꾸면 칸에 맞지 않는 경기는 「미배치」로 보입니다(다시 끌어다 놓으면 됩니다).</div>'
+  +'<div class="mr-note" style="margin-top:6px">이미 배치된 경기의 시각은 그대로 둡니다. 간격에 맞지 않는 시각의 경기는 그 시각 줄을 끼워 보여 줍니다.</div>'
   +'<div class="mr-row" style="justify-content:flex-end;margin-top:14px"><button class="mr-btn s" onclick="document.getElementById(\'bdModal\').remove()">닫기</button><button class="mr-btn g" onclick="bdSetupSave()">💾 저장</button></div>')}
 function bdDayRow(d,i){const p=bdPlanOf(d);const chips=bdStages().map(st=>'<button type="button" class="qa-chip'+(p.stages.indexOf(st)>=0?' on':'')+'" data-st="'+esc(st)+'" onclick="this.classList.toggle(\'on\')">'+esc(st)+'</button>').join('');
   return '<div class="bd-dayrow"><span class="n">'+(i+1)+'일차</span><input class="mr-in bd_d" type="date" value="'+esc(d)+'"><span class="qa-chips" style="margin:0">'+chips+'</span><button type="button" class="mr-btn s" style="padding:6px 10px" title="이 날짜 빼기" onclick="this.closest(\'.bd-dayrow\').remove();bdDayRenum()">✕</button></div>'}
@@ -653,7 +654,9 @@ function fmStages(div){return (((FORMAT||{})[div]||{}).stages||[])}
 function fmMatches(st){return MATCHES.filter(m=>m.stageId===st.id)}
 function fmIsPh(t){return !!(t&&t.seed&&/^\(.*\)$/.test(String(t.name||'').trim()))}
 function fmSrcTxt(st,i,div){const src=st.src||{};if(i===0||src.kind!=='prev')return '참가 팀 전체';const p=fmStages(div)[i-1];if(!p)return '이전 단계';return p.name+' '+(p.type==='group'?'각 조 상위 '+(+src.perGroup||1)+'팀':'상위 '+(+src.top||4)+'팀')+' 진출'}
-function fmPanel(){const dvs=divsOf();if(!FM_DIV||dvs.indexOf(FM_DIV)<0)FM_DIV=BD_DIV||dvs[0]||'';const S=fmStages(FM_DIV);const nT=drTeams(FM_DIV).length;const days=bdDays();
+function fmDivs(){const U=[...new Set(Object.keys(FORMAT||{}).filter(k=>fmStages(k).length).concat(MATCHES.filter(m=>!m.golf).map(m=>m.div).filter(Boolean)))];return U.length?U:divsOf()}
+function fmTeamN(dv){const n=drTeams(dv).length;if(n)return n;const S=new Set();MATCHES.forEach(m=>{if(m.div!==dv)return;['a','b'].forEach(s=>{const t=m[s]||{};if(t.name&&!/^\(.*\)$/.test(String(t.name).trim()))S.add(t.pid||t.name)})});return S.size}
+function fmPanel(){const dvs=fmDivs();if(!FM_DIV||dvs.indexOf(FM_DIV)<0)FM_DIV=(dvs.indexOf(BD_DIV)>=0?BD_DIV:dvs[0])||'';const S=fmStages(FM_DIV);const nT=fmTeamN(FM_DIV);const days=bdDays();
   const cards=S.map((st,i)=>{const ms=fmMatches(st);const fin=ms.filter(m=>m.status==='종료').length;const ph=ms.filter(m=>fmIsPh(m.a)||fmIsPh(m.b)).length;const hasSeed=ms.some(m=>(m.a||{}).seed||(m.b||{}).seed);const dayI=days.indexOf(st.day);const T=FM_TYPE[st.type]||FM_TYPE.group;
     const opt=st.type==='group'?(st.ng||2)+'개 조':st.type==='knockout'?(st.third?'3·4위전 포함':'3·4위전 없음'):'';
     return '<div class="fm-st'+(ms.length?' made':'')+'"><div class="fm-h"><span class="fm-n">'+(i+1)+'단계</span><b>'+esc(st.name||T.n)+'</b><span style="flex:1"></span>'+(STAFF?'<button class="fm-x" title="단계 설정 바꾸기" onclick="fmEdit('+i+')">✎ 설정</button>':'')+'</div>'
@@ -661,7 +664,7 @@ function fmPanel(){const dvs=divsOf();if(!FM_DIV||dvs.indexOf(FM_DIV)<0)FM_DIV=B
       +'<div class="fm-r">'+(ms.length?'🏁 경기 '+ms.length+'개'+(fin?' · 종료 '+fin:'')+(ph?' · <b style="color:#b8860b">진출팀 미정 '+ph+'</b>':''):'<b style="color:#C41E2F">경기 아직 안 만듦</b>')+'</div>'
       +(STAFF?'<div class="fm-b">'+(ms.length?(hasSeed?'<button class="mr-btn '+(ph?'y':'s')+'" onclick="fmFill('+i+')" title="이전 단계 결과(순위)로 진출팀을 넣습니다. 순위가 바뀌면 다시 눌러 고칠 수 있습니다">'+(ph?'⬇ 진출팀 채우기':'↻ 진출팀 다시 채우기')+'</button>':'')+'<button class="mr-btn s" onclick="BD_DIV=FM_DIV;setTab(\'match\')">경기 보기</button><button class="mr-btn s" onclick="fmDelMatches('+i+')">경기 지우기</button>':'<button class="mr-btn g" onclick="fmCreate('+i+')">⚡ 경기 만들기</button>')+(i===S.length-1?'<button class="mr-btn s" onclick="fmRemove('+i+')" title="이 단계를 구성에서 뺍니다">단계 삭제</button>':'')+'</div>':'')+'</div>'}).join('<div class="fm-arrow">→</div>');
   return '<div class="mr-card fm-card"><div class="mr-row"><b>🏗 대회 구성</b><span class="mr-note">부문마다 단계를 쌓습니다. 예: 1단계 예선(조별 리그) → 2단계 본선(토너먼트). 단계마다 「경기 만들기」로 경기를 만들고, 앞 단계가 끝나면 「진출팀 채우기」로 다음 단계 팀을 넣습니다.</span></div>'
-    +'<div class="mr-row" style="margin-top:8px"><span class="mr-note" style="font-weight:800">부문</span>'+dvs.map(dv=>'<button class="bd-day'+(FM_DIV===dv?' on':'')+'" onclick="FM_DIV=\''+esc(dv)+'\';render()">'+esc(dv)+' <small>'+drTeams(dv).length+'팀</small></button>').join('')+(dvs.length?'':'<span class="mr-note">참가 신청 팀이 아직 없습니다. 팀이 신청되면 부문이 나타납니다.</span>')+'</div>'
+    +'<div class="mr-row" style="margin-top:8px"><span class="mr-note" style="font-weight:800">부문</span>'+dvs.map(dv=>'<button class="bd-day'+(FM_DIV===dv?' on':'')+'" onclick="FM_DIV=\''+esc(dv)+'\';render()">'+esc(dv)+' <small>'+fmTeamN(dv)+'팀</small></button>').join('')+(dvs.length?'':'<span class="mr-note">참가 신청 팀이 아직 없습니다. 팀이 신청되면 부문이 나타납니다.</span>')+'</div>'
     +(FM_DIV?'<div class="fm-wrap">'+(cards||'<div class="fm-empty">아직 단계가 없습니다. 아래에서 자주 쓰는 구성을 고르거나 「＋ 단계 추가」로 직접 쌓으세요.</div>')+(STAFF?'<div class="fm-add" onclick="fmEdit(-1)">＋ 단계 추가<small>조별 리그 · 풀리그 · 토너먼트</small></div>':'')+'</div>'
       +(STAFF&&!S.length?'<div class="mr-row" style="margin-top:8px"><span class="mr-note" style="font-weight:800">자주 쓰는 구성</span><button class="qa-chip" onclick="fmPreset(\'gk\')">예선 조별 리그 → 본선 토너먼트</button><button class="qa-chip" onclick="fmPreset(\'league\')">풀리그만</button><button class="qa-chip" onclick="fmPreset(\'knockout\')">토너먼트만</button><button class="qa-chip" onclick="fmPreset(\'gl\')">조별 리그 → 순위별 풀리그</button><span style="flex:1"></span><button class="mr-btn ghost" onclick="drOpen()" title="단계 없이 바로 편성(옛 방식)">🎲 단계 없이 바로 편성</button></div>':'')
       +'<div class="mr-note" style="margin-top:6px">'+FM_DIV+' 참가 '+nT+'팀'+(S.length?' · 조별 리그·풀리그는 「경기 만들기」에서 무작위 추첨 뒤 손으로 조를 바꿀 수 있고, 토너먼트는 앞 단계 순위 자리(예: A조 1위)로 먼저 만들어 두고 결과가 나오면 채웁니다.':'')+'</div>':'')+'</div>'}
@@ -710,7 +713,7 @@ function fmCreate(i){const S=fmStages(FM_DIV);const st=S[i];if(!st)return;if(fmM
 async function fmFill(i){const S=fmStages(FM_DIV);const st=S[i];const prev=i>0?S[i-1]:null;if(!st||!prev){say('앞 단계가 없습니다');return}
   const pms=fmMatches(prev);const open=pms.filter(m=>m.status!=='종료');if(open.length&&!confirm('「'+prev.name+'」에 아직 끝나지 않은 경기가 '+open.length+'개 있습니다. 지금 순위대로 채울까요? (나중에 다시 「진출팀 채우기」를 누르면 바뀐 순위로 고쳐집니다)'))return;
   const tbl={};const need=[];
-  const tableOf=ms=>{const stt=MR.computeStats(ms,ORDERS,LOTS);return ((stt.byDiv[FM_DIV]||{}).table||[])};
+  const tableOf=ms=>{const stt=MR.computeStats(ms,ORDERS,LOTS);const v=Object.keys(stt.byDiv).map(k=>stt.byDiv[k])[0]||{};return v.table||[]};
   if(prev.type==='group'){[...new Set(pms.map(m=>m.group).filter(Boolean))].forEach(g=>{tbl[g]=tableOf(pms.filter(m=>m.group===g))})}else tbl['']=tableOf(pms);
   const teamsAll=drTeams(FM_DIV);const pick=(g,r)=>{const T=tbl[g]||[];const row=T.find(t=>+t.rank===+r);if(!row)return null;if(row.needLot)need.push((g?g+' ':'')+r+'위');const full=teamsAll.find(t=>t.pid&&t.pid===row.pid)||{};return {pid:row.pid||'',name:row.name||'',school:row.school||full.school||'',scid:full.scid||'',score:0}};
   const ms=fmMatches(st);const b=DB.batch();let n=0;
@@ -1299,7 +1302,7 @@ async function scSync(m){const a=m.a||{},b=m.b||{};if(!a.scid||!b.scid)return;co
 async function statsSave(quiet){const st=MR.computeStats(MATCHES,ORDERS,LOTS);const golf={};ROUNDS.forEach(r=>{golf[r.id]={title:r.title||'',holes:r.holes||18,div:r.div||'',rank:MR.golfRank(r),status:r.status||'',playoff:(r.playoff||[]).length}});
   try{await DB.collection('compStats').doc(SLOT_ID).set({slotId:SLOT_ID,compId:SLOT.compId||'',title:SLOT.title||'',date:SLOT.date||'',stats:st,golf:golf,updatedAt:FV.serverTimestamp(),by:whoAmI().name},{merge:true});if(!quiet)say('✓ 집계를 저장했습니다. 공개 결과 페이지에 반영됩니다.')}catch(e){if(!quiet)say('집계 저장 실패: '+(e.message||e))}}
 function statsTab(){const st=MR.computeStats(MATCHES,ORDERS,LOTS);const dvs=Object.keys(st.byDiv).sort();let h='';
-  h+='<div class="mr-row" style="margin-top:8px"><span class="mr-note" style="flex:1">순위: 승점(승 3·무 1·패 0) → 득실차 → 다득점 → 승자승 → 제재 수(적은 팀) → 추첨</span><button class="mr-btn ghost" onclick="compPdf()">📄 최종 결과 PDF</button><button class="mr-btn g" onclick="compXlsx()">📊 최종 결과 엑셀</button></div>';
+  h+='<div class="mr-row" style="margin-top:8px"><span class="mr-note" style="flex:1">순위: 승점(승 3·무 1·패 0) → 득실차 → 다득점 → 승자승 → 제재 수(적은 팀) → 추첨 · 조별 리그는 조마다, 토너먼트는 「본선」으로 따로 집계합니다</span><button class="mr-btn ghost" onclick="compPdf()">📄 최종 결과 PDF</button><button class="mr-btn g" onclick="compXlsx()">📊 최종 결과 엑셀</button></div>';
   if(!dvs.length)h+='<div class="bempty">아직 경기 기록이 없습니다.</div>';
   dvs.forEach(dv=>{const T=st.byDiv[dv].table||[];h+='<h3 style="font-size:15px;font-weight:900;margin:16px 0 4px">'+esc(dv)+' 순위표 <span style="font-size:12px;color:#6b7280;font-weight:700">'+st.byDiv[dv].matches+'경기 종료</span></h3><table class="mr-tbl"><tr><th>순위</th><th class="l">팀</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득</th><th>실</th><th>득실</th><th>승점</th><th>제재</th><th>비고</th></tr>'+T.map(t=>'<tr><td><b>'+t.rank+'</b></td><td class="l"><b>'+esc(t.name)+'</b>'+(t.school&&t.school!==t.name?' <small style="color:#6b7280">'+esc(t.school)+'</small>':'')+'</td><td>'+t.p+'</td><td>'+t.w+'</td><td>'+t.d+'</td><td>'+t.l+'</td><td>'+t.gf+'</td><td>'+t.ga+'</td><td>'+(t.gf-t.ga)+'</td><td><b>'+t.pts+'</b></td><td>'+(t.sanc||0)+'</td><td style="font-size:11.5px;color:#6b7280">'+(t.needLot?'<b style="color:#C41E2F">추첨 필요</b>':esc(t.tb||''))+'</td></tr>').join('')+'</table>'
     +((STAFF&&T.some(t=>t.needLot))?'<div class="mr-row" style="margin-top:6px"><span class="mr-note" style="color:#C41E2F">승점·득실·다득점·승자승·제재 수까지 모두 같은 팀이 있어 추첨으로 순위를 정해야 합니다.</span><button class="mr-btn y" onclick="lotOpen(\''+esc(dv)+'\')">🎲 추첨으로 순위 정하기</button></div>':'')+((STAFF&&LOTS[dv]&&Object.keys(LOTS[dv]).length)?'<div class="mr-row" style="margin-top:6px"><span class="mr-note">추첨 결과가 반영되어 있습니다.</span><button class="mr-btn s" onclick="lotClear(\''+esc(dv)+'\')">추첨 결과 지우기</button></div>':'')});

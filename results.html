@@ -131,7 +131,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
 <script src="career.js?v=20260907a"></script>
-<script src="matchrec.js?v=20261017b"></script>
+<script src="matchrec.js?v=20261018a"></script>
 <script>
 // ══════════ 대회 결과 (공개) — eventReports(연맹 대회 종료 보고) + schoolClubEvents(학교스포츠클럽 결과 요약, admin 업로드 도구가 생성) ══════════
 //  이름 공개 범위 = siteContent/results.nameMode : 'masked'(기본, 홍*동) | 'full' | 'hidden'(팀·학교와 인원수만). 생년월일·학년은 어디에도 싣지 않습니다.
@@ -166,7 +166,7 @@ async function rsLoad(){
 }
 function rsFilter(f,el){FILTER=f;[].forEach.call(document.querySelectorAll('.rs-top .rs-chip'),c=>c.classList.toggle('on',c===el));rsRender()}
 function rsStats(x){
-  if(x.src==='live'){const L=x.live||{};const t=Object.keys(L.byDiv||{}).reduce((n,dv)=>n+Object.keys((L.byDiv[dv]||{}).teams||{}).length,0);return {divs:Object.keys(L.byDiv||{}).length,teams:t,people:0,awards:0,matches:(L.played||0)+'/'+(L.total||0)}}
+  if(x.src==='live'){const L=x.live||{};const _tk=new Set();Object.keys(L.byDiv||{}).forEach(dv=>Object.keys((L.byDiv[dv]||{}).teams||{}).forEach(k=>_tk.add(dv.split(' · ')[0]+'|'+k)));const t=_tk.size;return {divs:new Set(Object.keys(L.byDiv||{}).map(k=>k.split(' · ')[0])).size,teams:t,people:0,awards:0,matches:(L.played||0)+'/'+(L.total||0)}}
   if(x.src==='fed'){const st=x.stats||{};return {divs:new Set((x.awards||[]).map(a=>a.division||'')).size,teams:st.teams||0,people:(st.members||0)+(st.individuals||0),awards:(x.awards||[]).length}}
   let teams=0,people=0,awards=0;const divs=Object.keys(x.divisions||{});
   divs.forEach(dv=>{const T=(x.divisions[dv]||{}).teams||{};Object.keys(T).forEach(k=>{teams++;people+=(T[k].members||[]).length;if(rankOf(T[k].result)<9)awards++})});
