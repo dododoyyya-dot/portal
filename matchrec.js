@@ -1,4 +1,4 @@
-// matchrec.js v20261018a · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
+// matchrec.js v20261018b · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
 //   화면: match.html(기록 콘솔·경기 관리) · competition.html(오더지 작성) · results.html(공개 결과) · live.html(중계 콘솔 호환)
 //   원칙 ① 경기 문서(liveMatches) 하나가 원본 ② 점수는 득점 기록(events)에서 계산해 a.score/b.score 에 같이 저장(중계 화면 호환)
 //        ③ 입력권(ctrl)은 한 번에 한 화면 ④ 기록 추가는 고유 id + 트랜잭션(중복 전송 무시) ⑤ 취소는 삭제 대신 void 표시
@@ -156,6 +156,37 @@
   // [조별 순위 2026-10-18] 집계 칸 이름 — 조가 있는 경기는 「부문 · A조」, 조를 쓰는 부문의 조 없는 경기(토너먼트)는 「부문 · 본선」, 조가 없는 부문은 부문 이름 그대로
   function statKeyFn(matches){var gd={};(matches||[]).forEach(function(m){if(m&&!m.golf&&m.group)gd[m.div||'전체']=1});
     return function(m){var dv=(m&&m.div)||'전체';if(m&&m.group)return dv+' · '+m.group;return gd[dv]?dv+' · '+((m&&m.stage)||'본선'):dv}}
+  // [본선 대진표 2026-10-18] 토너먼트 경기를 나무 모양으로 — from{a,b}(앞 경기 승자) 연결을 따라 결승에서 거꾸로 펼침. 3·4위전(loserFrom)은 아래 따로.
+  function isKnockout(m){return !!(m&&!m.golf&&!m.group&&(m.from||(m.a&&m.a.seed)||(m.b&&m.b.seed)||/강|결승|3·4위/.test(String(m.round||''))))}
+  var BKW=188,BKG=28;
+  var BKCSS='.kbk{margin:8px 0 4px}.kbk-sc{overflow-x:auto;padding:4px 2px 10px;-webkit-overflow-scrolling:touch}.kbk-root{display:inline-flex;flex-direction:column;gap:14px;min-width:max-content}'
+    +'.kbk-n{display:flex;align-items:center}.kbk-ch{display:flex;flex-direction:column;padding-right:14px}.kbk-ch>.kbk-n{position:relative;padding:5px 0}'
+    +'.kbk-ch>.kbk-n::after{content:"";position:absolute;right:-14px;top:50%;width:14px;border-top:1.5px solid #b6c1d2}'
+    +'.kbk-ch>.kbk-n:first-child:not(:last-child)::before{content:"";position:absolute;right:-14px;top:50%;bottom:0;border-right:1.5px solid #b6c1d2}'
+    +'.kbk-ch>.kbk-n:last-child:not(:first-child)::before{content:"";position:absolute;right:-14px;top:0;bottom:50%;border-right:1.5px solid #b6c1d2}'
+    +'.kbk-sp{flex:none}.kbk-m{box-sizing:border-box;width:'+BKW+'px;flex:none;margin-left:14px;position:relative;background:#fff;border:1.5px solid #dbe2ec;border-radius:12px;padding:7px 10px;box-shadow:0 2px 8px rgba(15,23,42,.05);text-align:left}'
+    +'.kbk-m.j::before{content:"";position:absolute;left:-15.5px;top:50%;width:14px;border-top:1.5px solid #b6c1d2}.kbk-m.ck{cursor:pointer}.kbk-m.ck:hover{border-color:#153A77}'
+    +'.kbk-m.live{border-color:#C41E2F;box-shadow:0 0 0 2px rgba(196,30,47,.12)}.kbk-m.done{background:#f6f9ff}.kbk-m.fin{border-color:#d4a017;box-shadow:0 0 0 2px rgba(212,160,23,.15)}'
+    +'.kbk-m .r{display:flex;justify-content:space-between;gap:6px;font-size:10.5px;font-weight:800;color:#6b7280;margin-bottom:3px;white-space:nowrap}.kbk-m .r b{color:#153A77}.kbk-m.fin .r b{color:#8a6a1f}'
+    +'.kbk-m .t{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12.5px;font-weight:700;padding:2px 0;color:#16181d}.kbk-m .t+.t{border-top:1px dashed #e8edf3}'
+    +'.kbk-m .t span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kbk-m .t.ph span{color:#8a919d;font-weight:600}.kbk-m .t.w{color:#153A77;font-weight:900}.kbk-m .t.w span::after{content:" ✓";color:#0f766e}.kbk-m .t i{font-style:normal;font-variant-numeric:tabular-nums;font-weight:900;min-width:16px;text-align:right}'
+    +'.kbk-3{display:flex;gap:10px;align-items:center;margin-top:2px}.kbk-3 small{font-size:11.5px;font-weight:800;color:#6b7280}.kbk-3 .kbk-m{margin-left:0}';
+  function bracketHtml(list,opt){opt=opt||{};list=(list||[]).filter(isKnockout);if(!list.length)return '';
+    var byId={};list.forEach(function(m){byId[m.id]=m});var main=list.filter(function(m){return !m.loserFrom});
+    var kids={};main.forEach(function(m){var f=m.from||{};var k=[];['a','b'].forEach(function(s){var c=byId[f[s]];if(c&&!c.loserFrom)k.push(c)});kids[m.id]=k});
+    var refd={};main.forEach(function(m){kids[m.id].forEach(function(c){refd[c.id]=1})});
+    var roots=main.filter(function(m){return !refd[m.id]}).sort(function(a,b){return (+a.order||0)-(+b.order||0)});
+    var depth=function(m,seen){seen=seen||{};if(seen[m.id])return 0;seen[m.id]=1;var d=0;kids[m.id].forEach(function(c){d=Math.max(d,1+depth(c,seen))});return d};
+    var card=function(m,j,isFinal){var sc=score(m.events||[]);var st=m.status||'예정';var win=st==='종료'?(sc.a>sc.b?'a':sc.b>sc.a?'b':''):'';
+      var row=function(s){var t=m[s]||{};var ph=/^\(.*\)$/.test(String(t.name||'').trim())||!t.name;return '<div class="t'+(ph?' ph':'')+(win===s?' w':'')+'"><span title="'+esc(t.name||'')+'">'+esc(t.name||'미정')+'</span>'+(st!=='예정'?'<i>'+(s==='a'?sc.a:sc.b)+'</i>':'')+'</div>'};
+      var meta=[m.day?String(m.day).slice(5).replace('-','.'):'',m.time||'',m.court||''].filter(Boolean).join(' ');
+      return '<div class="kbk-m'+(j?' j':'')+(st==='진행'?' live':st==='종료'?' done':'')+(isFinal?' fin':'')+(opt.click?' ck':'')+'"'+(opt.click?' onclick="'+opt.click+'(\''+m.id+'\')"':'')+'><div class="r"><b>'+esc(m.round||'')+'</b><span>'+esc(st==='진행'?'진행 중':meta)+'</span></div>'+row('a')+row('b')+'</div>'};
+    var node=function(m,level,L,isRoot){var k=kids[m.id];
+      if(k.length)return '<div class="kbk-n"><div class="kbk-ch">'+k.map(function(c){return node(c,level+1,L,false)}).join('')+'</div>'+card(m,true,isRoot)+'</div>';
+      var sp=(L-level)*(BKW+BKG);return '<div class="kbk-n">'+(sp>0?'<div class="kbk-sp" style="width:'+sp+'px"></div>':'')+card(m,false,isRoot)+'</div>'};
+    var body=roots.map(function(r){return node(r,0,depth(r),true)}).join('');
+    var third=list.filter(function(m){return m.loserFrom});
+    return '<div class="kbk"><style>'+BKCSS+'</style><div class="kbk-sc"><div class="kbk-root">'+body+(third.length?'<div class="kbk-3"><small>3·4위전</small>'+third.map(function(m){return card(m,false,false)}).join('')+'</div>':'')+'</div></div></div>'}
   function computeStats(matches,orders,lots){lots=lots||{};
     var byDiv={},scorers={},played=0;var KEY=statKeyFn(matches);
     (matches||[]).forEach(function(m){if(!m||m.golf)return;var dvName=m.div||'전체';var dv=KEY(m);var D=byDiv[dv]=byDiv[dv]||{teams:{},matches:0};
@@ -317,7 +348,7 @@
         +'<table><tr><th>단계</th><th>경기</th><th>일시·코트</th><th>A팀</th><th>점수</th><th>B팀</th><th>상태</th></tr>'+M.map(function(m){var sc=score(m.events||[]);return '<tr><td>'+esc(m.stage||'')+'</td><td>'+esc(m.round||'')+'</td><td class="s">'+esc([m.day,m.time,m.court].filter(Boolean).join(' '))+'</td><td class="l">'+esc(teamLabel(m.a))+'</td><td><b>'+sc.a+' : '+sc.b+'</b></td><td class="l">'+esc(teamLabel(m.b))+'</td><td>'+esc(m.status||'')+(m.locked?'·확정':'')+'</td></tr>'}).join('')+'</table></div>')});
     var S=(st.scorers||[]).slice(0,40);if(S.length)w.document.write('<div class="pg"><div class="h1" style="font-size:16pt">득점 · 어시스트</div><div class="h2">'+esc(title||'')+'</div><table><tr><th>순위</th><th>부문</th><th>팀</th><th>배번</th><th>선수</th><th>득점</th><th>어시스트</th></tr>'+S.map(function(p,i){return '<tr><td>'+(i+1)+'</td><td>'+esc(p.div)+'</td><td class="l">'+esc(p.team)+'</td><td>'+esc(p.no)+'</td><td>'+esc(p.name)+'</td><td><b>'+p.g+'</b></td><td>'+p.a+'</td></tr>'}).join('')+'</table></div>');
     pend(w)}
-  window.KFDF_MR={statKeyFn:statKeyFn,offList:offList,offOf:offOf,coachesOf:coachesOf,winnerOf:winnerOf,ROLE_LABEL:ROLE_LABEL,roundLabel:roundLabel,CARD_PICK:CARD_PICK,isOff:isOff,KIT_COLORS:KIT_COLORS,kitTextColor:kitTextColor,kitsOf:kitsOf,noFor:noFor,secOf:secOf,fmtSec:fmtSec,evSec:evSec,evTime:evTime,clockSetMs:clockSetMs,clockAdd:clockAdd,clockFloorMin:clockFloorMin,brkLeft:brkLeft,timeouts:timeouts,sentOff:sentOff,yellowCount:yellowCount,rankTable:rankTable,loadXlsx:loadXlsx,saveXlsxMatch:saveXlsxMatch,saveXlsxComp:saveXlsxComp,printComp:printComp,teamLabel:teamLabel,
+  window.KFDF_MR={bracketHtml:bracketHtml,isKnockout:isKnockout,statKeyFn:statKeyFn,offList:offList,offOf:offOf,coachesOf:coachesOf,winnerOf:winnerOf,ROLE_LABEL:ROLE_LABEL,roundLabel:roundLabel,CARD_PICK:CARD_PICK,isOff:isOff,KIT_COLORS:KIT_COLORS,kitTextColor:kitTextColor,kitsOf:kitsOf,noFor:noFor,secOf:secOf,fmtSec:fmtSec,evSec:evSec,evTime:evTime,clockSetMs:clockSetMs,clockAdd:clockAdd,clockFloorMin:clockFloorMin,brkLeft:brkLeft,timeouts:timeouts,sentOff:sentOff,yellowCount:yellowCount,rankTable:rankTable,loadXlsx:loadXlsx,saveXlsxMatch:saveXlsxMatch,saveXlsxComp:saveXlsxComp,printComp:printComp,teamLabel:teamLabel,
     PERIODS:PERIODS,CARDS:CARDS,esc:esc,uid8:uid8,tsMs:tsMs,score:score,goals:goals,clockMs:clockMs,clockTxt:clockTxt,minuteOf:minuteOf,clockSet:clockSet,clockAct:clockAct,
     ctrlState:ctrlState,ctrlLabel:ctrlLabel,CTRL_BEAT:CTRL_BEAT,addEvent:addEvent,voidEvent:voidEvent,editEvent:editEvent,qPush:qPush,qCount:qCount,flush:flush,
     canRecord:canRecord,isStaffUser:isStaffUser,orderId:orderId,orderFromEntry:orderFromEntry,orderCheck:orderCheck,lineup:lineup,playerStats:playerStats,computeStats:computeStats,

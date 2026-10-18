@@ -402,7 +402,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="matchrec.js?v=20261018a"></script>
+<script src="matchrec.js?v=20261018b"></script>
 <script>
 // ══════════ 경기 기록 (match.html) ══════════
 //   ?slot=참가공고ID            대회의 경기·오더지·디스크골프·순위 (운영진은 경기 생성·심판 배정)
@@ -667,6 +667,7 @@ function fmPanel(){const dvs=fmDivs();if(!FM_DIV||dvs.indexOf(FM_DIV)<0)FM_DIV=(
     +'<div class="mr-row" style="margin-top:8px"><span class="mr-note" style="font-weight:800">부문</span>'+dvs.map(dv=>'<button class="bd-day'+(FM_DIV===dv?' on':'')+'" onclick="FM_DIV=\''+esc(dv)+'\';render()">'+esc(dv)+' <small>'+fmTeamN(dv)+'팀</small></button>').join('')+(dvs.length?'':'<span class="mr-note">참가 신청 팀이 아직 없습니다. 팀이 신청되면 부문이 나타납니다.</span>')+'</div>'
     +(FM_DIV?'<div class="fm-wrap">'+(cards||'<div class="fm-empty">아직 단계가 없습니다. 아래에서 자주 쓰는 구성을 고르거나 「＋ 단계 추가」로 직접 쌓으세요.</div>')+(STAFF?'<div class="fm-add" onclick="fmEdit(-1)">＋ 단계 추가<small>조별 리그 · 풀리그 · 토너먼트</small></div>':'')+'</div>'
       +(STAFF&&!S.length?'<div class="mr-row" style="margin-top:8px"><span class="mr-note" style="font-weight:800">자주 쓰는 구성</span><button class="qa-chip" onclick="fmPreset(\'gk\')">예선 조별 리그 → 본선 토너먼트</button><button class="qa-chip" onclick="fmPreset(\'league\')">풀리그만</button><button class="qa-chip" onclick="fmPreset(\'knockout\')">토너먼트만</button><button class="qa-chip" onclick="fmPreset(\'gl\')">조별 리그 → 순위별 풀리그</button><span style="flex:1"></span><button class="mr-btn ghost" onclick="drOpen()" title="단계 없이 바로 편성(옛 방식)">🎲 단계 없이 바로 편성</button></div>':'')
+      +(function(){const ko=MATCHES.filter(m=>m.div===FM_DIV&&MR.isKnockout(m));if(!ko.length)return '';return '<div style="margin-top:12px;font-size:13.5px;font-weight:900;color:#8a6a1f">🏆 '+esc(FM_DIV)+' 본선 대진표 <span style="font-size:11.5px;color:#6b7280;font-weight:700">— 칸을 누르면 그 경기 기록 화면이 열립니다</span></div>'+MR.bracketHtml(ko,{click:'rcOpen'})})()
       +'<div class="mr-note" style="margin-top:6px">'+FM_DIV+' 참가 '+nT+'팀'+(S.length?' · 조별 리그·풀리그는 「경기 만들기」에서 무작위 추첨 뒤 손으로 조를 바꿀 수 있고, 토너먼트는 앞 단계 순위 자리(예: A조 1위)로 먼저 만들어 두고 결과가 나오면 채웁니다.':'')+'</div>':'')+'</div>'}
 function fmNewId(){return 's'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)}
 async function fmSave(){FORMAT[FM_DIV]=FORMAT[FM_DIV]||{stages:[]};try{await DB.collection('compStats').doc(SLOT_ID).set({slotId:SLOT_ID,title:SLOT.title||'',date:SLOT.date||'',format:FORMAT,updatedAt:FV.serverTimestamp()},{merge:true})}catch(e){say('저장 실패: '+(e.message||e))}}
