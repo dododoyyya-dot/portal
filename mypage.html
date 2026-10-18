@@ -629,8 +629,9 @@ function orgChip(o,region,title,fed){
         <div><label>수업일 *</label><input id="lgDate" type="date" onchange="lgTimeFill(true)"></div>
         <div><label>참여 인원 *</label><input id="lgCount" type="number" min="1" placeholder="예: 24"></div>
       </div>
-      <label style="margin-top:8px">수업 교시 * <span style="font-weight:600;color:#8a919d;font-size:12px">· 시작 교시 ~ 끝 교시 (0교시 = 아침 활동, 7·8교시 = 방과후)</span></label>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="lgT1" style="flex:1;min-width:120px" onchange="this.dataset.man=1;lgPeriodPair('lgT1','lgT2')"></select><span style="font-weight:800">~</span><select id="lgT2" style="flex:1;min-width:120px" onchange="this.dataset.man=1"></select></div>
+      <label style="margin-top:8px">수업 교시 * <span style="font-weight:600;color:#8a919d;font-size:12px">· 1차시 = 1교시 — 이 회차에 수업한 교시 하나를 고르세요 (0교시 = 아침 활동, 7·8교시 = 방과후)</span></label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="lgT1" style="flex:1;min-width:140px;max-width:260px" onchange="this.dataset.man=1;lgPeriodOne('lgT1','lgT2')"></select><select id="lgT2" style="display:none" onchange="this.dataset.man=1"></select></div>
+      <div style="font-size:12px;color:#8a919d;margin-top:3px">같은 반을 1·2교시 이어서 했으면 회차를 두 개로 나눠 적습니다(예: 3회차 1교시, 4회차 2교시).</div>
       <div id="lgTimeHint" style="font-size:12px;color:#8a919d;margin-top:4px"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
         <div><label>남학생 <span style="font-weight:600;color:#8a919d">(실적보고용)</span></label><input id="lgMale" type="number" min="0" placeholder="예: 12" oninput="lgSumMF()"></div>
@@ -2357,8 +2358,10 @@ function editLog(id){
     +(function(){const p=lgSplitTime(l.classTime);const sug=!l.classTime?lgAppTime(l.appId,l.date):null;const q=sug?lgSplitTime(sug.time):p;
       const opt=v=>'<option value="">선택</option>'+LG_PERIODS.map((n,i)=>'<option value="'+i+'"'+(String(v)===String(i)?' selected':'')+'>'+n+'</option>').join('');
       const old=KFDF_LOGBOOK.isClock(l.classTime);
-      return '<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">수업 교시 <span style="font-weight:600;color:#8a919d">· 시작 ~ 끝 (0교시 아침 · 7·8교시 방과후)</span></label>'
-        +'<div style="display:flex;gap:6px;align-items:center"><select id="elT1" '+inp+' onchange="lgPeriodPair(\'elT1\',\'elT2\')">'+opt(q[0])+'</select><b>~</b><select id="elT2" '+inp+'>'+opt(q[1])+'</select></div>'
+      const rng=q[0]!==''&&q[1]!==''&&q[0]!==q[1];
+      return '<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">수업 교시 <span style="font-weight:600;color:#8a919d">· 1차시 = 1교시 — 한 교시만 고르세요 (0교시 아침 · 7·8교시 방과후)</span></label>'
+        +'<div style="display:flex;gap:6px;align-items:center"><select id="elT1" '+inp+' onchange="lgPeriodOne(\'elT1\',\'elT2\')">'+opt(q[0])+'</select><select id="elT2" style="display:none">'+opt(rng?q[1]:q[0])+'</select></div>'
+        +(rng?'<div style="font-size:11.5px;color:#b45309;margin-top:3px">이 회차는 「'+esc(q[0])+'~'+esc(q[1])+'교시」로 적혀 있습니다. 교시를 고르면 한 교시로 바뀌고, 그대로 두면 지금 값이 유지됩니다.</div>':'')
         +'<div style="font-size:11.5px;color:#8a919d;margin-top:3px">'+(l.classTime?(old?'이전에 시각(「'+esc(l.classTime)+'」)으로 적힌 회차입니다. 표준 시간표로 환산한 교시를 넣어 두었으니 실제 교시로 고쳐 주세요.':(String(l.classTimeSrc||'').indexOf('신청서')===0?'강습 신청서의 희망 시간을 환산해 채워 둔 값입니다. 실제 수업 교시로 고쳐 주세요.':'')):(sug?'신청서의 희망 시간을 환산해 미리 넣었습니다. 실제 수업 교시로 고쳐 주세요.':'수업 시작·끝 교시를 골라 주세요.'))
         +' <b>교시만 고치면 담당교사 확인은 그대로 유지됩니다.</b></div>'})()
     +'<label style="font-size:12.5px;font-weight:800;display:block;margin-top:10px">참여 인원</label><input id="elCount" type="number" min="1" value="'+(l.count||'')+'" '+inp+'>'
@@ -2488,6 +2491,7 @@ async function selfConfirmFill(logs){
 // [교시 2026-10-08] 「3교시」「1~4교시」 ↔ [시작, 끝] · 옛 시각 값(「13:00~15:00」)은 표준 시간표로 환산해 보여 줌
 const LG_PERIODS=['0교시(아침)','1교시','2교시','3교시','4교시','5교시','6교시','7교시(방과후)','8교시(방과후)'];
 function lgPeriodOpts(sel,v){const el=document.getElementById(sel);if(!el)return;el.innerHTML='<option value="">선택</option>'+LG_PERIODS.map((n,i)=>'<option value="'+i+'"'+(String(v)===String(i)?' selected':'')+'>'+n+'</option>').join('')}
+function lgPeriodOne(a,b){const x=document.getElementById(a),y=document.getElementById(b);if(x&&y)y.value=x.value}   /* [2026-10-18] 1차시 = 1교시 */
 function lgPeriodPair(a,b){const x=document.getElementById(a),y=document.getElementById(b);if(x&&y&&x.value!==''&&(y.value===''||+y.value<+x.value))y.value=x.value}
 function lgSplitTime(t){const LB=window.KFDF_LOGBOOK||{};let p=LB.periodOf?LB.periodOf(t):null;if(!p&&LB.isClock&&LB.isClock(t)&&LB.clockToPeriod)p=LB.periodOf(LB.clockToPeriod(t));return p?[String(p.from),String(p.to)]:['','']}
 function lgAppTime(appId,date){try{const x=(MYASG||[]).find(d=>d.id===appId);if(!x||!window.KFDF_LOGBOOK||!KFDF_LOGBOOK.appPeriod)return null;return KFDF_LOGBOOK.appPeriod(x.data(),date)}catch(e){return null}}
@@ -2500,10 +2504,10 @@ function lgTimeFill(force){
   const sameWd=mine.find(l=>new Date(String(l.date)+'T00:00:00').getDay()===wd);
   if(sameWd)r={time:sameWd.classTime,src:'지난 회차'};else r=lgAppTime(appId,date);
   if(force||(!t1.dataset.man&&!t2.dataset.man)){
-    const p=lgSplitTime(r&&r.time);lgPeriodOpts('lgT1',p[0]);lgPeriodOpts('lgT2',p[1]);delete t1.dataset.man;delete t2.dataset.man}
+    const p=lgSplitTime(r&&r.time);lgPeriodOpts('lgT1',p[0]);lgPeriodOpts('lgT2',p[0]);delete t1.dataset.man;delete t2.dataset.man}
   if(h)h.textContent=r?(r.src==='지난 회차'?'같은 요일 지난 회차의 교시로 채웠습니다 — 실제와 다르면 고쳐 주세요.':'강습 신청서의 희망 시간을 교시로 환산해 채웠습니다 — 실제 수업 교시와 다르면 고쳐 주세요.'+(String(r.src).indexOf('요일 다름')>=0?' (신청서에 이 요일 시간이 없어 1지망 시간)':'')):'수업 시작·끝 교시를 골라 주세요.';
 }
-function lgTimeVal(a,b){a=String(a||'').trim();b=String(b||'').trim();if(a===''||b==='')return {err:'수업 시작·끝 교시를 골라 주세요'};if(+b<+a)return {err:'끝 교시가 시작 교시보다 앞설 수 없습니다'};return {v:KFDF_LOGBOOK.periodStr(+a,+b)}}
+function lgTimeVal(a,b){a=String(a||'').trim();b=String(b||'').trim();if(a==='')return {err:'수업 교시를 골라 주세요'};if(b==='')b=a;if(+b<+a)return {err:'끝 교시가 시작 교시보다 앞설 수 없습니다'};return {v:KFDF_LOGBOOK.periodStr(+a,+b)}}
 let LGBUSY=false;
 async function submitLog(){
   const m=document.getElementById('lgMsg');
