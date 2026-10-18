@@ -2213,6 +2213,8 @@ async function taImportXlsx(input){
     if(!rows.length){alert((errors[0]||'읽을 명단이 없습니다.')+'\n\n파일: '+f.name);return}
     const box=document.getElementById('taRosterBox');
     const have=[...box.querySelectorAll('#taRosterBox > div')].map(x=>({n:taNorm((x.querySelector('.taR-name')||{}).value),b:(x.querySelector('.taR-birth')||{}).value||''}));
+    // [예시 줄 2026-10-18] 양식의 예시(홍길동·김영희)를 지우지 않고 올려도 선수로 들어가지 않게
+    const _isEx=r=>(taNorm(r.name)==='홍길동'&&r.birth==='2013-05-05')||(taNorm(r.name)==='김영희'&&(r.birth==='2014-03-01'||r.birth==='1990-03-01'));let exN=0;rows=rows.filter(r=>{if(_isEx(r)){exN++;return false}return true});
     let added=0,member=0,dup=0;
     rows.forEach(r=>{
       if(have.some(h=>h.n===taNorm(r.name)&&(!h.b||!r.birth||h.b===r.birth))){dup++;return}
@@ -2226,7 +2228,7 @@ async function taImportXlsx(input){
     const linked=await taResolveMembers();   // [회원 색인] 클럽 명단에 없던 사람도 회원이면 회원으로
     // 번호 다시 매기기
     [...box.querySelectorAll('#taRosterBox > div')].forEach((x,i)=>{const s=x.querySelector('span');if(s&&/^\d+$/.test(s.textContent.trim()))s.textContent=String(i+1);x.style.marginTop=i?'6px':'0'});
-    alert('엑셀에서 '+added+'명을 담았습니다.'+((member+linked)?' (회원으로 확인 '+(member+linked)+'명)':'')+(dup?' · 이미 있는 '+dup+'명은 건너뜀':'')+(errors.length?'\n\n확인 필요:\n'+errors.slice(0,8).join('\n')+(errors.length>8?'\n… 외 '+(errors.length-8)+'건':''):'')+'\n\n비회원으로 표시된 팀원도 나중에 같은 성명·생년월일로 회원 가입하면 이 대회의 참가·입상 기록이 자동으로 경력에 연동됩니다.');
+    alert('엑셀에서 '+added+'명을 담았습니다.'+(exN?' (양식 예시 줄 '+exN+'개는 빼고)':'')+((member+linked)?' (회원으로 확인 '+(member+linked)+'명)':'')+(dup?' · 이미 있는 '+dup+'명은 건너뜀':'')+(errors.length?'\n\n확인 필요:\n'+errors.slice(0,8).join('\n')+(errors.length>8?'\n… 외 '+(errors.length-8)+'건':''):'')+'\n\n비회원으로 표시된 팀원도 나중에 같은 성명·생년월일로 회원 가입하면 이 대회의 참가·입상 기록이 자동으로 경력에 연동됩니다.');
   }catch(e){alert('엑셀 읽기 실패: '+(e.message||e)+'\n\n· 파일이 .xlsx 인지 확인해 주세요 (.xls·한셀 파일은 엑셀에서 .xlsx 로 다시 저장)\n· 첫 줄에 성명·생년월일 등 제목이 있어야 합니다\n· 계속 안 되면 「① 빈 명단 양식 내려받기」로 양식을 받아 옮겨 적어 주세요')}
 }
 async function taXlsxTemplate(){
@@ -2367,6 +2369,7 @@ async function ibFile(input){
       for(const w of wb.worksheets){const p=ibParse(w);if(p.rows.length){P=p;break}if(!P)P=p}
       if(!P)P={rows:[],errors:['시트가 없습니다.']};
     }
+    if(P.rows.length){const _ex=r=>(String(r.name||'').replace(/s+/g,'')==='홍길동'&&r.birth==='2013-05-05')||(String(r.name||'').replace(/s+/g,'')==='김영희'&&r.birth==='1990-03-01');P.rows=P.rows.filter(r=>!_ex(r))}   // 양식 예시 줄은 빼고
     if(!P.rows.length){ibSay(P.errors[0]||'읽을 명단이 없습니다.',true);return}
     const doc=CSLOTS.find(d=>d.id===IB.id);if(!doc)return;
     IB.rows=await ibEvaluate(doc.data(),P.rows,ibSay);IB.file=f.name;

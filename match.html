@@ -1347,7 +1347,7 @@ async function scSync(m){const a=m.a||{},b=m.b||{};if(!a.scid||!b.scid)return;co
   try{await DB.collection('scMatches').doc('live_'+m.id).set(doc,{merge:true})}catch(e){console.warn('scSync',e)}}
 // ══ 집계 (compStats) ══
 async function statsSave(quiet){const st=MR.computeStats(MATCHES,ORDERS,LOTS);const golf={};ROUNDS.forEach(r=>{golf[r.id]={title:r.title||'',holes:r.holes||18,div:r.div||'',rank:MR.golfRank(r),status:r.status||'',playoff:(r.playoff||[]).length}});
-  try{await DB.collection('compStats').doc(SLOT_ID).set({slotId:SLOT_ID,compId:SLOT.compId||'',title:SLOT.title||'',date:SLOT.date||'',stats:st,golf:golf,updatedAt:FV.serverTimestamp(),by:whoAmI().name},{merge:true});if(!quiet)say('✓ 집계를 저장했습니다. 공개 결과 페이지에 반영됩니다.')}catch(e){if(!quiet)say('집계 저장 실패: '+(e.message||e))}}
+  try{const _ref=DB.collection('compStats').doc(SLOT_ID);await _ref.set({slotId:SLOT_ID,compId:SLOT.compId||'',title:SLOT.title||'',date:SLOT.date||'',updatedAt:FV.serverTimestamp(),by:whoAmI().name},{merge:true});await _ref.update({stats:st,golf:golf});/* [2026-10-18] 통째로 바꿔 씀 — 덧쓰기(merge)면 지운 경기·바뀐 조의 옛 순위표가 공개 결과에 남음 */if(!quiet)say('✓ 집계를 저장했습니다. 공개 결과 페이지에 반영됩니다.')}catch(e){if(!quiet)say('집계 저장 실패: '+(e.message||e))}}
 function statsTab(){const st=MR.computeStats(MATCHES,ORDERS,LOTS);const dvs=MR.sortStatKeys(Object.keys(st.byDiv),MATCHES);let h='';
   h+='<div class="mr-row" style="margin-top:8px"><span class="mr-note" style="flex:1">순위: 승점(승 3·무 1·패 0) → 득실차 → 다득점 → 승자승 → 제재 수(적은 팀) → 추첨 · 조별 리그는 조마다, 토너먼트는 「본선」으로 따로 집계합니다</span><button class="mr-btn ghost" onclick="compPdf()">📄 최종 결과 PDF</button><button class="mr-btn g" onclick="compXlsx()">📊 최종 결과 엑셀</button></div>';
   if(!dvs.length)h+='<div class="bempty">아직 경기 기록이 없습니다.</div>';
