@@ -554,9 +554,18 @@ function matchCard(m){
 }
 // ── 경기 추가·설정 (운영진) ──
 let STAFFPICK=null;
+// [2026-10-18] 심판 공고 찾기 — 대회 번호(compId)가 비어 있는 공고도 있어 공고 번호(slotId)·대회 이름으로도 찾음. 신청 임무(prefs)·확정 날짜(days)도 함께
+async function staffPostIds(){const ids=new Set();const nm=s=>String(s||'').replace(/^🏆\s*/,'').replace(/\s+/g,'');const titles=[SLOT&&SLOT.title,COMP&&COMP.title].map(nm).filter(Boolean);
+  try{if(SLOT.compId){const q=await DB.collection('competitionStaff').where('compId','==',SLOT.compId).get();q.docs.forEach(d=>ids.add(d.id))}}catch(e){}
+  try{const q=await DB.collection('competitionStaff').where('slotId','==',SLOT_ID).get();q.docs.forEach(d=>ids.add(d.id))}catch(e){}
+  try{if(titles.length){const q=await DB.collection('competitionStaff').limit(300).get();q.docs.forEach(d=>{const x=d.data();if(titles.indexOf(nm(x.competitionName))>=0)ids.add(d.id)})}}catch(e){}
+  return [...ids]}
 async function staffPick(){if(STAFFPICK)return STAFFPICK;const out=[];try{
-  const posts=await DB.collection('competitionStaff').where('compId','==',SLOT.compId||'__none__').get();const ids=posts.docs.map(d=>d.id);
-  for(let i=0;i<ids.length;i+=10){const q=await DB.collection('staffApplications').where('postId','in',ids.slice(i,i+10)).get();q.docs.forEach(d=>{const x=d.data();if(x.cancelled)return;const ok=Object.values(x.status||{}).indexOf('확정')>=0;if(!out.some(o=>o.uid===x.uid))out.push({uid:x.uid,name:x.name||'',st:ok?'확정':'',ok:ok})})}
+  const ids=await staffPostIds();
+  for(let i=0;i<ids.length;i+=10){const q=await DB.collection('staffApplications').where('postId','in',ids.slice(i,i+10)).get();q.docs.forEach(d=>{const x=d.data();if(x.cancelled||!x.uid)return;const S=x.status||{};const days=Object.keys(S).filter(k=>S[k]==='확정').sort();const ok=days.length>0;
+    const P=x.prefs||{};const roles=[...new Set((ok?days:Object.keys(P)).map(k=>P[k]||[]).flat().filter(Boolean))];
+    const o=out.find(y=>y.uid===x.uid);if(o){o.ok=o.ok||ok;o.st=o.ok?'확정':'';o.days=[...new Set(o.days.concat(days))].sort();o.roles=[...new Set(o.roles.concat(roles))];return}
+    out.push({uid:x.uid,name:x.name||'',st:ok?'확정':'',ok:ok,days:days,roles:roles})})}
   }catch(e){}STAFFPICK=out;return out}
 async function matchForm(id){
   const m=id?MATCHES.find(x=>x.id===id):null;const picks=await staffPick();
@@ -794,37 +803,45 @@ async function qaChoose(t){if(!QA.a){QA.a=t;qaRender();return}if(QA.a.name===t.n
 //   같은 날 같은 시각 경기에는 한 사람을 두 번 넣지 않고, 배정 횟수가 적은 사람을 먼저 · 이미 배정된 자리는 그대로(덮어쓰기 선택 시만 바꿈)
 let RF=null;
 const RF_LEAD=/주심|심판총괄|심판위원장/,RF_REF=/부심|선심|점수|기록|심판|감독관/;
-async function rfPool(scope){const pool={};const add=(uid,name,src)=>{if(!uid)return;pool[uid]=pool[uid]||{uid:uid,name:name||'',src:src,lead:0,other:0,lic:'',licPt:0,score:0,on:true,items:[]};if(name&&!pool[uid].name)pool[uid].name=name};
-  (await staffPick()).forEach(p=>add(p.uid,p.name,'신청'));
+const RF_NONREF=/봉사|운영요원|환경|주차|안내|요원$/;
+function rfIsRefRole(r){r=String(r||'');return !!r&&!(RF_NONREF.test(r)&&!/심판/.test(r))}
+async function rfPool(scope){const pool={};const add=(uid,name,src,sp)=>{if(!uid)return;pool[uid]=pool[uid]||{uid:uid,name:name||'',src:src,lead:0,other:0,lic:'',licPt:0,score:0,on:true,items:[],roles:[],days:[]};if(name&&!pool[uid].name)pool[uid].name=name;if(sp){pool[uid].roles=sp.roles||[];pool[uid].days=sp.days||[]}};
+  const SP=await staffPick();
+  SP.filter(p=>scope==='confirmed'?(p.ok&&(p.roles||[]).some(rfIsRefRole)):true).forEach(p=>add(p.uid,p.name,p.ok?'확정':'신청',p));
   let car=[];try{const q=await DB.collection('staffCareer').where('group','in',['심판','위원']).limit(3000).get();car=q.docs.map(d=>d.data()).filter(c=>c.group==='심판'||RF_LEAD.test(String(c.role||c.duty||'')))}catch(e){}
-  if(scope==='all'||!Object.keys(pool).length)car.forEach(c=>add(c.uid,c.name,'경력'));
+  if(scope==='all')car.forEach(c=>add(c.uid,c.name,'경력'));
   car.forEach(c=>{const P=pool[c.uid];if(!P)return;const r=String(c.role||c.duty||'');if(RF_LEAD.test(r))P.lead++;else if(RF_REF.test(r))P.other++;P.items.push({date:c.date||'',comp:c.competitionName||c.title||'',role:r,loc:c.location||''})});
   const ids=Object.keys(pool);const today=new Date().toISOString().slice(0,10);
   for(let i=0;i<ids.length;i+=10){try{const q=await DB.collection('licenses').where('uid','in',ids.slice(i,i+10)).get();q.docs.forEach(d=>{const l=d.data();if(l.type!=='심판')return;if(l.status==='이관'||l.status==='승급'||(l.expireAt&&l.expireAt<today))return;const g=String(l.grade||'').replace(/급$/,'');const pt=g==='1'?6:g==='2'?4:g==='3'?2:0;const P=pool[l.uid];if(P&&pt>P.licPt){P.licPt=pt;P.lic=g+'급'}})}catch(e){}}
   ids.forEach(u=>{const P=pool[u];P.score=P.lead*3+P.other+P.licPt});
   return Object.values(pool).sort((a,b)=>b.score-a.score||String(a.name).localeCompare(String(b.name),'ko'))}
-async function rfOpen(){RF={scope:'apply',mode:'single',over:false,div:BD_DIV||'',day:'',pool:[],plan:null};modal('rfModal','<div class="bempty">심판 후보와 경력을 불러오는 중…</div>');RF.pool=await rfPool(RF.scope);rfRender()}
+async function rfOpen(){STAFFPICK=null;RF={scope:'confirmed',mode:'svr',over:false,div:BD_DIV||'',day:'',pool:[],plan:null};modal('rfModal','<div class="bempty">심판 후보와 경력을 불러오는 중…</div>');RF.pool=await rfPool(RF.scope);rfRender()}
 function rfRender(){const max=Math.max(1,...RF.pool.map(p=>p.score));const dvs=[...new Set(MATCHES.map(m=>m.div).filter(Boolean))].sort();
   const targets=rfTargets();
-  modal('rfModal','<div class="mr-row"><b style="font-size:17px">🧑‍⚖️ 심판 배정</b><span class="mr-note">활동경력·심판 자격으로 점수를 매겨 주심은 점수 높은 순, 기록심·부심은 고르게 나눕니다. 같은 시각 겹치기는 피합니다. 경기별 수동 배정은 「🏁 경기」 탭의 ✏️ 설정에서 그대로 할 수 있습니다.</span></div>'
+  modal('rfModal','<div class="mr-row"><b style="font-size:17px">🧑‍⚖️ 심판 배정</b><span class="mr-note">심판 공고에서 신청한 임무(감독관·주심·기록원 등)를 먼저 맞추고, 그 안에서 활동경력·심판 자격 점수로 주심·감독관은 점수 높은 순, 기록심·부심은 고르게 나눕니다. 확정된 날짜의 경기에만, 같은 시각 겹치기 없이 배정합니다. 경기별 수동 배정은 「🏁 경기」 탭의 ✏️ 설정에서 그대로 할 수 있습니다.</span></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><div><label class="mr-lab">대상 부문</label><select class="mr-in" onchange="RF.div=this.value;RF.plan=null;rfRender()"><option value="">전체 부문</option>'+dvs.map(d=>'<option'+(d===RF.div?' selected':'')+'>'+esc(d)+'</option>').join('')+'</select></div>'
-    +'<div><label class="mr-lab">심판 구성</label><select class="mr-in" onchange="RF.mode=this.value;RF.plan=null;rfRender()"><option value="single"'+(RF.mode==='single'?' selected':'')+'>주심 + 기록심</option><option value="three"'+(RF.mode==='three'?' selected':'')+'>3심제(주심·부심 2) + 기록심</option></select></div>'
-    +'<div><label class="mr-lab">후보</label><select class="mr-in" onchange="RF.scope=this.value;RF.plan=null;rfOpenScope()"><option value="apply"'+(RF.scope==='apply'?' selected':'')+'>이 대회 심판 신청자</option><option value="all"'+(RF.scope==='all'?' selected':'')+'>신청자 + 심판 경력자 전체</option></select></div></div>'
+    +'<div><label class="mr-lab">심판 구성</label><select class="mr-in" onchange="RF.mode=this.value;RF.plan=null;rfRender()"><option value="svr"'+(RF.mode==='svr'?' selected':'')+'>심판감독관 + 주심 + 기록심</option><option value="single"'+(RF.mode==='single'?' selected':'')+'>주심 + 기록심</option><option value="three"'+(RF.mode==='three'?' selected':'')+'>3심제(주심·부심 2) + 기록심</option></select></div>'
+    +'<div><label class="mr-lab">후보</label><select class="mr-in" onchange="RF.scope=this.value;RF.plan=null;rfOpenScope()"><option value="confirmed"'+(RF.scope==='confirmed'?' selected':'')+'>이 대회 심판 확정자 전원</option><option value="apply"'+(RF.scope==='apply'?' selected':'')+'>이 대회 심판 신청자 전체</option><option value="all"'+(RF.scope==='all'?' selected':'')+'>신청자 + 심판 경력자 전체</option></select></div></div>'
     +'<label class="mr-lab"><input type="checkbox" '+(RF.over?'checked':'')+' onchange="RF.over=this.checked;RF.plan=null;rfRender()"> 이미 배정된 경기도 다시 배정(덮어쓰기)</label>'
     +'<div class="mr-note" style="margin-top:4px">대상 경기 '+targets.length+'개 · 후보 '+RF.pool.filter(p=>p.on).length+'명</div>'
-    +'<div style="max-height:34vh;overflow:auto;margin-top:6px"><table class="rf-tbl"><tr><th>사용</th><th class="l">이름</th><th>주심 경력</th><th>기타 심판</th><th>자격</th><th class="l">점수</th><th>출처</th></tr>'
-    +(RF.pool.length?RF.pool.map((p,i)=>'<tr><td><input type="checkbox" '+(p.on?'checked':'')+' onchange="RF.pool['+i+'].on=this.checked;RF.plan=null;rfRender()"></td><td class="l"><b>'+esc(p.name)+'</b></td><td>'+p.lead+'</td><td>'+p.other+'</td><td>'+esc(p.lic||'-')+'</td><td class="l"><span class="rf-bar" style="width:'+Math.round(60*p.score/max)+'px"></span> '+p.score+'</td><td><button class="mr-btn ghost" style="padding:4px 9px;font-size:11.5px" onclick="rfCareer('+i+')" title="참여한 대회 목록 보기">'+esc(p.src)+(p.items.length?' · '+p.items.length+'건':'')+' ›</button></td></tr>').join(''):'<tr><td colspan="7" class="bempty">후보가 없습니다. 「후보」를 「신청자 + 심판 경력자 전체」로 바꿔 보세요.</td></tr>')+'</table></div>'
-    +(RF.plan?'<b style="display:block;margin-top:12px">미리보기</b><div style="max-height:30vh;overflow:auto"><table class="rf-tbl"><tr><th class="l">경기</th><th>시간·코트</th><th>주심</th>'+(RF.mode==='three'?'<th>부심</th><th>부심</th>':'')+'<th>기록심</th></tr>'+RF.plan.map(x=>'<tr><td class="l">'+esc((x.m.a||{}).name)+' vs '+esc((x.m.b||{}).name)+'<br><small style="color:#6b7280">'+esc(x.m.div||'')+'</small></td><td>'+esc([dateK(x.m.day),x.m.time,x.m.court].filter(Boolean).join(' ')||'미배치')+'</td>'+['ref1'].concat(RF.mode==='three'?['ref2','ref3']:[]).concat(['recorder']).map(r=>'<td>'+(x.o[r]?'<b>'+esc(x.o[r].name)+'</b>':'<span style="color:#C41E2F">부족</span>')+'</td>').join('')+'</tr>').join('')+'</table></div>'
+    +'<div style="max-height:34vh;overflow:auto;margin-top:6px"><table class="rf-tbl"><tr><th>사용</th><th class="l">이름</th><th class="l">신청 임무</th><th>확정 날짜</th><th>주심 경력</th><th>기타 심판</th><th>자격</th><th class="l">점수</th><th>출처</th></tr>'
+    +(RF.pool.length?RF.pool.map((p,i)=>'<tr><td><input type="checkbox" '+(p.on?'checked':'')+' onchange="RF.pool['+i+'].on=this.checked;RF.plan=null;rfRender()"></td><td class="l"><b>'+esc(p.name)+'</b></td><td class="l" style="font-size:12px">'+esc((p.roles||[]).join(' · ')||'-')+'</td><td style="font-size:12px;white-space:nowrap">'+esc((p.days||[]).map(d=>d.slice(5).replace('-','.')).join(' ')||'-')+'</td><td>'+p.lead+'</td><td>'+p.other+'</td><td>'+esc(p.lic||'-')+'</td><td class="l"><span class="rf-bar" style="width:'+Math.round(60*p.score/max)+'px"></span> '+p.score+'</td><td><button class="mr-btn ghost" style="padding:4px 9px;font-size:11.5px" onclick="rfCareer('+i+')" title="참여한 대회 목록 보기">'+esc(p.src)+(p.items.length?' · '+p.items.length+'건':'')+' ›</button></td></tr>').join(''):'<tr><td colspan="9" class="bempty">후보가 없습니다. 이 대회 심판 공고에 확정자가 없으면 「후보」를 「신청자 + 심판 경력자 전체」로 바꿔 보세요.</td></tr>')+'</table></div>'
+    +(RF.plan?'<b style="display:block;margin-top:12px">미리보기</b><div style="max-height:30vh;overflow:auto"><table class="rf-tbl"><tr><th class="l">경기</th><th>시간·코트</th>'+rfRoles().map(r=>'<th>'+RF_ROLE_LB[r]+'</th>').join('')+'</tr>'+RF.plan.map(x=>'<tr><td class="l">'+esc((x.m.a||{}).name)+' vs '+esc((x.m.b||{}).name)+'<br><small style="color:#6b7280">'+esc(x.m.div||'')+'</small></td><td>'+esc([dateK(x.m.day),x.m.time,x.m.court].filter(Boolean).join(' ')||'미배치')+'</td>'+rfRoles().map(r=>'<td>'+(x.o[r]?'<b>'+esc(x.o[r].name)+'</b>':'<span style="color:#C41E2F">부족</span>')+'</td>').join('')+'</tr>').join('')+'</table></div>'
       +'<div class="mr-note">사람별 배정: '+rfLoadTxt()+'</div>':'')
     +'<div class="mr-row" style="justify-content:flex-end;margin-top:14px"><button class="mr-btn s" onclick="document.getElementById(\'rfModal\').remove()">닫기</button><button class="mr-btn y" onclick="rfPlan();rfRender()">🎲 자동 배정 미리보기</button>'+(RF.plan?'<button class="mr-btn g" onclick="rfApply()">✅ '+RF.plan.length+'경기에 적용</button>':'')+'</div>')}
 async function rfOpenScope(){modal('rfModal','<div class="bempty">후보를 다시 불러오는 중…</div>');RF.pool=await rfPool(RF.scope);rfRender()}
-function rfTargets(){return MATCHES.filter(m=>(!RF.div||m.div===RF.div)&&m.status!=='종료'&&!m.locked&&(RF.over||!((m.officials||{}).ref1||(m.officials||{}).recorder))).sort((a,b)=>String(a.day||'9').localeCompare(String(b.day||'9'))||String(a.time||'99').localeCompare(String(b.time||'99'))||(+a.order||0)-(+b.order||0))}
-function rfPlan(){const pool=RF.pool.filter(p=>p.on);const roles=['ref1'].concat(RF.mode==='three'?['ref2','ref3']:[]).concat(['recorder']);const load={};pool.forEach(p=>load[p.uid]=0);
+function rfTargets(){return MATCHES.filter(m=>(!RF.div||m.div===RF.div)&&m.status!=='종료'&&!m.locked&&(RF.over||!((m.officials||{}).ref1||(m.officials||{}).recorder||(RF.mode==='svr'&&(m.officials||{}).supervisor)))).sort((a,b)=>String(a.day||'9').localeCompare(String(b.day||'9'))||String(a.time||'99').localeCompare(String(b.time||'99'))||(+a.order||0)-(+b.order||0))}
+function rfRoles(){return (RF.mode==='svr'?['supervisor']:[]).concat(['ref1']).concat(RF.mode==='three'?['ref2','ref3']:[]).concat(['recorder'])}
+const RF_ROLE_LB={supervisor:'감독관',ref1:'주심',ref2:'부심',ref3:'부심',recorder:'기록심'};
+const RF_WANT={supervisor:/감독관|심판위원장|심판장|심판총괄/,ref1:/주심/,ref2:/부심|선심/,ref3:/부심|선심/,recorder:/기록|점수|부심|선심|학생심/};
+function rfWants(p,r){return (p.roles||[]).some(x=>RF_WANT[r].test(String(x)))}
+function rfPlan(){const pool=RF.pool.filter(p=>p.on);const roles=rfRoles();const load={};pool.forEach(p=>load[p.uid]=0);
   // 이미 배정된(대상 밖) 경기의 사람·시각
   const busy={};const key=m=>m.day&&m.time?m.day+'|'+m.time:'';MATCHES.forEach(m=>{const k=key(m);const of=m.officials||{};Object.keys(of).forEach(r=>{const u=of[r]&&of[r].uid;if(!u)return;if(load[u]!=null&&!rfTargets().some(t=>t.id===m.id))load[u]++;if(k&&!(RF.over&&rfTargets().some(t=>t.id===m.id)))(busy[k]=busy[k]||{})[u]=1})});
   RF.plan=rfTargets().map(m=>{const k=key(m);const used=Object.assign({},k?busy[k]||{}:{});const o={};
-    roles.forEach(r=>{let c=pool.filter(p=>!used[p.uid]);if(!c.length)return;
-      if(r==='ref1')c.sort((a,b)=>(b.score-a.score)*1+(load[a.uid]-load[b.uid])*4);   // 주심: 점수 우선, 많이 맡은 사람은 뒤로
+    roles.forEach(r=>{let c=pool.filter(p=>!used[p.uid]&&!(m.day&&(p.days||[]).length&&(p.days||[]).indexOf(m.day)<0));if(!c.length)return;   // 확정되지 않은 날짜는 제외
+      const want=c.filter(p=>rfWants(p,r));if(want.length)c=want;   // 그 임무를 신청한 사람 먼저
+      if(r==='ref1'||r==='supervisor')c.sort((a,b)=>(b.score-a.score)*1+(load[a.uid]-load[b.uid])*4);   // 주심·감독관: 점수 우선, 많이 맡은 사람은 뒤로
       else c.sort((a,b)=>load[a.uid]-load[b.uid]||a.score-b.score);   // 기록심·부심: 적게 맡은 사람, 점수 낮은 사람부터(경력자는 주심으로 아껴 둠)
       const p=c[0];o[r]={uid:p.uid,name:p.name};used[p.uid]=1;load[p.uid]++});
     if(k)busy[k]=Object.assign(busy[k]||{},used);return {m:m,o:o}});RF.load=load}
@@ -834,7 +851,7 @@ function rfCareer(i){const p=RF.pool[i];if(!p)return;const L=(p.items||[]).slice
     +(L.length?'<div style="max-height:50vh;overflow:auto;margin-top:8px"><table class="rf-tbl"><tr><th>일자</th><th class="l">대회</th><th>역할</th><th>계산</th></tr>'+L.map(x=>'<tr><td>'+esc(x.date)+'</td><td class="l">'+esc(x.comp)+(x.loc?' <small style="color:#6b7280">'+esc(x.loc)+'</small>':'')+'</td><td>'+esc(x.role)+'</td><td>'+(RF_LEAD.test(x.role)?'<b style="color:#153A77">주심 +3</b>':RF_REF.test(x.role)?'+1':'-')+'</td></tr>').join('')+'</table></div>':'<div class="bempty" style="margin-top:8px">등록된 심판 활동 경력이 없습니다.</div>')
     +'<div class="mr-row" style="justify-content:flex-end;margin-top:12px"><button class="mr-btn s" onclick="document.getElementById(\'rfcModal\').remove()">닫기</button></div>')}
 function rfLoadTxt(){const L=RF.load||{};return RF.pool.filter(p=>p.on&&L[p.uid]).map(p=>esc(p.name)+' '+L[p.uid]).join(' · ')||'-'}
-async function rfApply(){if(!RF.plan)return;try{for(let i=0;i<RF.plan.length;i+=400){const b=DB.batch();RF.plan.slice(i,i+400).forEach(x=>{const of=RF.over?{}:Object.assign({},x.m.officials||{});Object.assign(of,x.o);const keep=(of.list||[]).filter(y=>['주심','부심','기록원'].indexOf(y.role)<0);const L=keep.slice();[['ref1','주심'],['ref2','부심'],['ref3','부심'],['recorder','기록원']].forEach(([k,r])=>{if(of[k]&&of[k].name)L.push({key:k,role:r,name:of[k].name,uid:of[k].uid||''})});of.list=L;const uids=[...new Set(L.map(y=>y.uid).filter(Boolean))];b.update(DB.collection('liveMatches').doc(x.m.id),{officials:of,officialUids:uids,refMode:RF.mode,updatedAt:FV.serverTimestamp()})});await b.commit()}
+async function rfApply(){if(!RF.plan)return;try{for(let i=0;i<RF.plan.length;i+=400){const b=DB.batch();RF.plan.slice(i,i+400).forEach(x=>{const of=RF.over?{}:Object.assign({},x.m.officials||{});Object.assign(of,x.o);const _rl=['주심','부심','기록원'].concat(RF.mode==='svr'?['감독관']:[]);const keep=(of.list||[]).filter(y=>_rl.indexOf(y.role)<0);const L=keep.slice();[['supervisor','감독관'],['ref1','주심'],['ref2','부심'],['ref3','부심'],['recorder','기록원']].forEach(([k,r])=>{if(of[k]&&of[k].name&&(k!=='supervisor'||RF.mode==='svr'||!keep.some(y=>y.role==='감독관')))L.push({key:k,role:r,name:of[k].name,uid:of[k].uid||''})});of.list=L;const uids=[...new Set(L.map(y=>y.uid).filter(Boolean))];b.update(DB.collection('liveMatches').doc(x.m.id),{officials:of,officialUids:uids,refMode:RF.mode==='svr'?'single':RF.mode,updatedAt:FV.serverTimestamp()})});await b.commit()}
   document.getElementById('rfModal').remove();say('✓ '+RF.plan.length+'경기에 심판을 배정했습니다. 배정된 심판은 그 경기의 기록 콘솔을 열 수 있습니다.')}catch(e){say('배정 실패: '+(e.message||e))}}
 // ── 대진 편성 ──
 function drTeams(div){return teamEntries().filter(c=>!div||((c.prefs||[])[0]===div)).map(c=>({pid:entryKey(c),name:c.name||'',school:c.teamOrg||'',scid:c.teamSchoolClubId||''}))}
