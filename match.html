@@ -434,7 +434,7 @@ function orderOf(pid){return ORDERS[MR.orderId(SLOT_ID,pid)]||null}
 // ══ [대진표 팀 ↔ 참가 신청 연결 2026-10-18] 대진표를 먼저 넣고(이름만) 학교가 나중에 신청·오더지를 내는 대회용 ══
 //  부문: 신청 부문 「초등부 남자(예선리그) A조」·「본선 경기 남초부」 → 「초등부 남자」. 학교: 시도·띄어쓰기·「초등학교/초」 차이를 지우고 비교.
 const LK_SIDO=/^(서울특별시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|경기도|강원특별자치도|강원도|충청북도|충청남도|전북특별자치도|전라북도|전라남도|경상북도|경상남도|제주특별자치도|서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/;
-function lkNorm(s){s=String(s||'').replace(/\s+/g,'').replace(/[()·.,\-]/g,'').replace(/대학교/g,'대').replace(/초등학교/g,'초').replace(/중학교/g,'중').replace(/고등학교/g,'고');let p,guard=0;while(guard++<3&&(p=LK_SIDO.exec(s))&&p[0].length<s.length-1)s=s.slice(p[0].length);return s}
+function lkNorm(s){s=String(s||'').replace(/\s+/g,'').replace(/[()·.,\-]/g,'').replace(/대학교/g,'대').replace(/초등학교/g,'초').replace(/중학교/g,'중').replace(/고등학교/g,'고').replace(/여자중/g,'여중').replace(/여자고/g,'여고');let p,guard=0;while(guard++<3&&(p=LK_SIDO.exec(s))&&p[0].length<s.length-1)s=s.slice(p[0].length);return s}
 function lkDiv(p){p=String(p||'');const a=/^(초등부|중등부|고등부)\s*(남자|여자)/.exec(p);if(a)return a[1]+' '+a[2];const b=/(남|여)(초|중|고)부/.exec(p);if(b)return {초:'초등부',중:'중등부',고:'고등부'}[b[2]]+' '+(b[1]==='남'?'남자':'여자');return p.replace(/\(.*?\)/g,'').replace(/\s*[A-Z]조$/,'').trim()}
 function lkIsPh(n){return !n||/^\(.*\)$/.test(String(n).trim())}
 function lkEntryDivs(c){return [...new Set((c.prefs||[]).map(lkDiv).filter(Boolean))]}
