@@ -576,7 +576,7 @@ function boardTab(){
   const divs=[...new Set(MATCHES.map(m=>m.div).filter(Boolean))].sort();
   const pool=MATCHES.filter(m=>(!BD_DIV||m.div===BD_DIV));
   const tray=pool.filter(m=>!bdPlaced(m,c,times)||(m.day!==BD_DAY&&!m.day));
-  const unplaced=pool.filter(m=>!bdPlaced(m,c,times));
+  const unplaced=pool.filter(m=>!bdPlaced(m,c,times)&&(!m.day||m.day===BD_DAY));const otherDay=pool.filter(m=>!bdPlaced(m,c,times)&&m.day&&m.day!==BD_DAY).length;   // [2026-10-18] 다른 날짜로 정해진 미배치 경기는 그 날 탭에서만
   const dayIdx=days.indexOf(BD_DAY);const planNow=bdPlanOf(BD_DAY);const byStage={};unplaced.forEach(m=>{const s=bdStageOf(m);byStage[s]=(byStage[s]||0)+1});
   const planNote=STAFF?(days.length>1||planNow.stages.length
       ?'<div class="bd-plan">'+(planNow.stages.length?'<b>'+esc(bdDayName(BD_DAY,dayIdx))+'</b> — 이 날은 <b>'+esc(planNow.stages.join(' · '))+'</b> 경기를 치릅니다. 「⚡ 자동 배치」는 '+esc(planNow.stages.join('·'))+' 미배치 경기('+planNow.stages.reduce((s,st)=>s+(byStage[st]||0),0)+')만 이 날 빈 칸에 넣습니다.':'<b>'+esc(bdDayName(BD_DAY,dayIdx))+'</b> — 이 날 치를 단계가 정해지지 않았습니다. 「⚙ 시간표 설정」에서 날짜마다 예선·본선을 고르면 탭과 자동 배치가 그 단계로 맞춰집니다.')+'</div>'
@@ -586,7 +586,7 @@ function boardTab(){
     +(STAFF?'<div class="bd-steps"><span>① 🏗 대회 구성에서 단계를 쌓고 「경기 만들기」</span><span>② ⚙ 시간표 설정(날짜·코트)</span><span>③ 날짜 탭 고르고 ⚡ 자동 배치(또는 끌어다 놓기)</span><span>④ 🧑‍⚖️ 심판 배정</span><span>⑤ 예선 끝나면 「⬇ 진출팀 채우기」</span></div>':'')
     +'<div class="bd-bar">'+days.map((d,i)=>'<button class="bd-day'+(d===BD_DAY?' on':'')+'" onclick="BD_DAY=\''+d+'\';render()">'+esc(bdDayName(d,i))+' <small>('+MATCHES.filter(m=>m.day===d&&m.time&&m.court).length+')</small></button>').join('')
     +'<span style="flex:1"></span>'+['',...divs].map(dv=>'<button class="bd-day'+(BD_DIV===dv?' on':'')+'" onclick="BD_DIV=\''+esc(dv)+'\';render()">'+(dv?esc(dv):'전체 부문')+'</button>').join('')+'</div>'
-    +planNote+'<div class="mr-note" style="font-weight:800;margin:4px 0">미배치 경기 '+unplaced.length+(unplaced.length?' <span style="font-weight:600">— '+Object.keys(byStage).map(s=>esc(s)+' '+byStage[s]).join(' · ')+'</span>':'')+'</div><div class="bd-tray" data-drop="tray">'+(unplaced.length?unplaced.map(bdCard).join(''):'<span class="mr-note" style="align-self:center">모든 경기가 배치되었습니다. 카드를 이곳에 놓으면 배치가 해제됩니다.</span>')+'</div>'
+    +planNote+'<div class="mr-note" style="font-weight:800;margin:4px 0">'+(otherDay?'<span style="font-weight:600;color:#6b7280">다른 날짜 미배치 '+otherDay+'경기는 그 날짜 탭에서 보입니다 · </span>':'')+'미배치 경기 '+unplaced.length+(unplaced.length?' <span style="font-weight:600">— '+Object.keys(byStage).map(s=>esc(s)+' '+byStage[s]).join(' · ')+'</span>':'')+'</div><div class="bd-tray" data-drop="tray">'+(unplaced.length?unplaced.map(bdCard).join(''):'<span class="mr-note" style="align-self:center">모든 경기가 배치되었습니다. 카드를 이곳에 놓으면 배치가 해제됩니다.</span>')+'</div>'
     +'<div class="bd-wrap"><table class="bd-grid"><tr><th class="tm">시간</th>'+c.courts.map(ct=>'<th>'+esc(ct)+'</th>').join('')+'</tr>'
     +times.map(t=>'<tr><td class="tm">'+t+'</td>'+c.courts.map(ct=>{const ms=pool.filter(m=>m.day===BD_DAY&&m.time===t&&m.court===ct);const cellAll=MATCHES.filter(m=>m.day===BD_DAY&&m.time===t&&m.court===ct);
       return '<td class="bd-cell" data-drop="cell" data-time="'+t+'" data-court="'+esc(ct)+'">'+(ms.length?ms.map(bdCard).join(''):(cellAll.length?'<div class="emp" style="font-size:11px;color:#9aa1ad">다른 부문</div>':'<div class="emp">'+(BD_SEL?'＋ 여기로':(STAFF?'＋':''))+'</div>'))+'</td>'}).join('')+'</tr>').join('')+'</table></div>';
@@ -654,7 +654,7 @@ function fmStages(div){return (((FORMAT||{})[div]||{}).stages||[])}
 function fmMatches(st){return MATCHES.filter(m=>m.stageId===st.id)}
 function fmIsPh(t){return !!(t&&t.seed&&/^\(.*\)$/.test(String(t.name||'').trim()))}
 function fmSrcTxt(st,i,div){const src=st.src||{};if(i===0||src.kind!=='prev')return '참가 팀 전체';const p=fmStages(div)[i-1];if(!p)return '이전 단계';return p.name+' '+(p.type==='group'?'각 조 상위 '+(+src.perGroup||1)+'팀':'상위 '+(+src.top||4)+'팀')+' 진출'}
-function fmDivs(){const U=[...new Set(Object.keys(FORMAT||{}).filter(k=>fmStages(k).length).concat(MATCHES.filter(m=>!m.golf).map(m=>m.div).filter(Boolean)))];return U.length?U:divsOf()}
+function fmDivs(){const U=[...new Set(Object.keys(FORMAT||{}).filter(k=>fmStages(k).length).concat(MATCHES.filter(m=>!m.golf).map(m=>m.div).filter(Boolean)))];const first=d=>{let o=1e9;MATCHES.forEach(m=>{if(m.div===d&&(+m.order||0)<o)o=+m.order||0});return o};U.sort((a,b)=>first(a)-first(b)||a.localeCompare(b,'ko'));return U.length?U:divsOf()}
 function fmTeamN(dv){const n=drTeams(dv).length;if(n)return n;const S=new Set();MATCHES.forEach(m=>{if(m.div!==dv)return;['a','b'].forEach(s=>{const t=m[s]||{};if(t.name&&!/^\(.*\)$/.test(String(t.name).trim()))S.add(t.pid||t.name)})});return S.size}
 function fmPanel(){const dvs=fmDivs();if(!FM_DIV||dvs.indexOf(FM_DIV)<0)FM_DIV=(dvs.indexOf(BD_DIV)>=0?BD_DIV:dvs[0])||'';const S=fmStages(FM_DIV);const nT=fmTeamN(FM_DIV);const days=bdDays();
   const cards=S.map((st,i)=>{const ms=fmMatches(st);const fin=ms.filter(m=>m.status==='종료').length;const ph=ms.filter(m=>fmIsPh(m.a)||fmIsPh(m.b)).length;const hasSeed=ms.some(m=>(m.a||{}).seed||(m.b||{}).seed);const dayI=days.indexOf(st.day);const T=FM_TYPE[st.type]||FM_TYPE.group;
