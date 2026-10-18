@@ -1,4 +1,4 @@
-// matchrec.js v20261018c · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
+// matchrec.js v20261018d · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
 //   화면: match.html(기록 콘솔·경기 관리) · competition.html(오더지 작성) · results.html(공개 결과) · live.html(중계 콘솔 호환)
 //   원칙 ① 경기 문서(liveMatches) 하나가 원본 ② 점수는 득점 기록(events)에서 계산해 a.score/b.score 에 같이 저장(중계 화면 호환)
 //        ③ 입력권(ctrl)은 한 번에 한 화면 ④ 기록 추가는 고유 id + 트랜잭션(중복 전송 무시) ⑤ 취소는 삭제 대신 void 표시
@@ -294,6 +294,69 @@
       +'<div class="sl">'+offLine('감독관')+offLine('기록원')+offLine('점수심')+'</div>'
       +'<div class="sl">'+offLine('주심',function(i){return '주심'+((byRole['주심']||[]).length>1?(i+1):'')})+offLine('부심',function(i){return '부심'+(i+1)})+'</div>'
       +'<div class="s" style="color:#666;margin-top:3mm">연맹 홈페이지 경기 기록 콘솔 기록 · '+(m.locked?'확정':'미확정')+(m.confirmedBy?' · 확정 '+esc(m.confirmedBy.name||'')+(m.confirmedBy.role?'('+esc(m.confirmedBy.role)+')':'')+' '+esc(String(m.confirmedBy.at||'').slice(0,16).replace('T',' ')):'')+' · 시간은 구간 안의 경기 시간(분:초)</div></div>'}
+  // ══ [타임라인 기록지 2026-10-18] 가운데 세로줄에 시간·점수, 왼쪽은 A팀·오른쪽은 B팀 사건(득점·도움·제재·작전타임), 구간마다 표시 ══
+  var KTLCSS='.ktl{font-family:Pretendard,"Malgun Gothic",sans-serif;color:#111827;max-width:780px;margin:0 auto;background:#fff}'
+    +'.ktl-hd{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;padding:18px 12px 12px}'
+    +'.ktl-tm{text-align:center;min-width:0}.ktl-tm .dot{width:46px;height:46px;border-radius:50%;margin:0 auto 7px;border:2px solid rgba(0,0,0,.12);box-shadow:inset 0 0 0 3px rgba(255,255,255,.55)}.ktl-tm b{display:block;font-size:16px;font-weight:900;word-break:keep-all;line-height:1.3}.ktl-tm small{display:block;font-size:11.5px;color:#6b7280;margin-top:2px;word-break:keep-all}'
+    +'.ktl-tm .wn{display:inline-block;margin-top:5px;background:#C41E2F;color:#fff;font-size:11px;font-weight:900;border-radius:999px;padding:2px 10px}'
+    +'.ktl-sc{text-align:center}.ktl-sc .n{font-size:42px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-1px;line-height:1}.ktl-sc .n i{font-style:normal;color:#c3c9d3;margin:0 8px}.ktl-sc small{display:block;font-size:11.5px;font-weight:800;color:#6b7280;margin-top:6px}'
+    +'.ktl-meta{text-align:center;font-size:12px;color:#6b7280;padding:0 10px 10px;border-bottom:1px solid #eef1f5}'
+    +'.ktl-bd{position:relative;padding:10px 0 14px}.ktl-bd::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:4px;margin-left:-2px;background:#e6e9ef;border-radius:2px}'
+    +'.ktl-r{position:relative;display:grid;grid-template-columns:1fr 78px 1fr;align-items:center;min-height:62px}'
+    +'.ktl-t{display:flex;flex-direction:column;align-items:center;gap:3px;z-index:1}.ktl-t span{display:inline-flex;align-items:center;justify-content:center;min-width:60px;height:36px;padding:0 9px;border:3px solid #e6e9ef;border-radius:999px;background:#fff;font-weight:900;font-size:14px;font-variant-numeric:tabular-nums;color:#111827}'
+    +'.ktl-t em{font-style:normal;font-size:11.5px;font-weight:900;color:#fff;background:#153A77;border-radius:999px;padding:1px 9px;font-variant-numeric:tabular-nums}'
+    +'.ktl-e{display:flex;align-items:center;gap:8px;padding:6px 12px}.ktl-l .ktl-e{justify-content:flex-end;text-align:right}.ktl-rr .ktl-e{justify-content:flex-start;text-align:left}'
+    +'.ktl-e .tx{min-width:0}.ktl-e .tx b{display:block;font-size:15px;font-weight:900;word-break:keep-all;line-height:1.3}.ktl-e .tx small{display:block;font-size:12px;color:#6b7280;margin-top:1px;word-break:keep-all}'
+    +'.ktl-chip{flex:none;font-size:11.5px;font-weight:900;border-radius:7px;padding:4px 8px;white-space:nowrap}.k-goal{background:#e5f5ea;color:#15803d}.k-y{background:#fff3c4;color:#a16207}.k-r{background:#fde2e4;color:#be123c}.k-c{background:#eef2f7;color:#475569}.k-o{background:#ffedd5;color:#c2410c}.k-to{background:#e6edfd;color:#1d4ed8}.k-x{background:#f1f2f4;color:#6b7280}'
+    +'.ktl-ic{flex:none;display:inline-flex;align-items:center}.ktl-cd{display:inline-block;width:12px;height:16px;border-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,.25)}.ktl-cd.y{background:#facc15}.ktl-cd.r{background:#e11d48}'
+    +'.ktl-p{position:relative;display:flex;flex-direction:column;align-items:center;margin:10px 0;z-index:1}.ktl-p .ck{width:46px;height:46px;border-radius:50%;background:#9aa3af;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 5px #fff}'
+    +'.ktl-p b{margin-top:5px;font-size:13px;font-weight:900;background:#fff;padding:0 8px}.ktl-p small{font-size:11.5px;color:#6b7280;background:#fff;padding:0 6px}.ktl-p.end .ck{background:#153A77}'
+    +'.ktl-r.void{opacity:.4}.ktl-r.void .tx b{text-decoration:line-through}.ktl-act{display:flex;gap:4px;margin-top:4px}.ktl-l .ktl-act{justify-content:flex-end}'
+    +'.ktl-act button{border:1px solid #d5dce8;background:#fff;color:#111827;border-radius:8px;padding:3px 9px;font-size:11.5px;font-weight:800;cursor:pointer;font-family:inherit}'
+    +'.ktl-empty{position:relative;z-index:1;text-align:center;font-size:13px;color:#6b7280;background:#fff;margin:14px auto;padding:6px 12px;max-width:80%}'
+    +'.ktl-ft{border-top:1px solid #eef1f5;padding:10px 14px;font-size:12.5px;color:#374151;line-height:1.75}.ktl-ft b{color:#111827}'
+    +'@media(max-width:520px){.ktl-r{grid-template-columns:1fr 64px 1fr}.ktl-e{padding:5px 6px;gap:5px}.ktl-e .tx b{font-size:13.5px}.ktl-chip{font-size:10.5px;padding:3px 6px}.ktl-t span{min-width:52px;height:32px;font-size:13px}.ktl-sc .n{font-size:34px}.ktl-tm b{font-size:14px}}'
+    +'@media print{.ktl-act{display:none}.ktl{max-width:none}}';
+  var CKSVG='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6M5 5l1.5 1.5M19 5l-1.5 1.5"/></svg>';
+  var DISCSVG='<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.5" fill="#15803d"/><circle cx="12" cy="12" r="6" fill="none" stroke="#fff" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="#fff"/></svg>';
+  function timelineBody(m,oa,ob,opt){opt=opt||{};var PO={'전반':0,'후반':1,'연장':2};var sc=score(m.events||[]);var win=winnerOf(m);
+    var all=(m.events||[]).map(function(e,i){return {e:e,i:i}}).filter(function(x){var e=x.e;if(!e||!(e.side==='a'||e.side==='b'))return false;if(e.void&&!opt.showVoid)return false;return e.type==='goal'||e.type==='card'||e.type==='timeout'||(e.type==null&&typeof e.d==='number')})
+      .sort(function(x,y){var a=x.e,b=y.e;return ((PO[a.period]!=null?PO[a.period]:9)-(PO[b.period]!=null?PO[b.period]:9))||((evSec(a)||0)-(evSec(b)||0))||(x.i-y.i)});
+    var items=[],run={a:0,b:0},curP=null,CL=m.clockLog||{};
+    all.forEach(function(x){var e=x.e;var p=e.period||'';if(p!==curP){curP=p;items.push({p:p})}var d=e.void?0:(e.type==='goal'?1:(e.type==null?(+e.d||0):0));if(d)run[e.side]=Math.max(0,run[e.side]+d);items.push({e:e,d:d,sa:run.a,sb:run.b})});
+    if(m.status==='종료')items.push({end:1});
+    if(opt.desc)items.reverse();
+    var pn=function(p){return p?((p.no?'#'+p.no+' ':'')+(p.name||'')):''};
+    var cell=function(e,side){var chip='',ic='',main='',sub='';
+      if(e.type==='goal'){ic=DISCSVG;main=e.scorer?pn(e.scorer):'득점자 미지정';sub='(득점'+(e.assist?' · 도움 '+pn(e.assist):'')+')'}
+      else if(e.type==null){chip='<span class="ktl-chip '+(e.d>0?'k-goal':'k-x')+'">'+(e.d>0?'득점':'득점 취소')+'</span>';main=(m[side]||{}).name||''}
+      else if(e.type==='card'){var c=e.card;var cls=c==='Y'?'k-y':(c==='R'||c==='W')?'k-r':c==='C'?'k-c':'k-o';chip='<span class="ktl-chip '+cls+'">'+esc(CARDS[c]||c||'제재')+'</span>';if(c==='Y')ic='<span class="ktl-cd y"></span>';else if(c==='R'||c==='W')ic='<span class="ktl-cd r"></span>';
+        var tg=e.target||{};main=tg.kind==='coach'?'지도자 '+(tg.name&&tg.name!=='지도자'?tg.name:''):pn(tg);sub=e.note?'('+e.note+')':''}
+      else if(e.type==='timeout'){chip='<span class="ktl-chip k-to">작전타임</span>';main=(m[side]||{}).name||'';sub=''}
+      if(e.void)sub=(sub?sub+' ':'')+'· 취소됨';
+      var tx='<div class="tx"><b>'+esc(main)+'</b>'+(sub?'<small>'+esc(sub)+'</small>':'')+(opt.act?'<div class="ktl-act">'+opt.act(e)+'</div>':'')+'</div>';
+      var marks=(ic?'<span class="ktl-ic">'+ic+'</span>':'')+chip;
+      return '<div class="ktl-e">'+(side==='a'?tx+marks:marks+tx)+'</div>'};
+    var body=items.map(function(it){
+      if(it.end)return '<div class="ktl-p end"><span class="ck">'+CKSVG+'</span><b>경기 종료</b><small>'+sc.a+' : '+sc.b+(win?' · '+esc(teamName(win))+' 승':' · 무승부')+'</small></div>';
+      if(it.p!=null)return '<div class="ktl-p"><span class="ck">'+CKSVG+'</span><b>'+esc(it.p||'구간 미정')+'</b>'+(CL[it.p]?'<small>'+esc(CL[it.p])+' 종료</small>':'')+'</div>';
+      var e=it.e;return '<div class="ktl-r'+(e.void?' void':'')+'"><div class="ktl-l">'+(e.side==='a'?cell(e,'a'):'')+'</div><div class="ktl-t"><span>'+esc(evTime(e)||'-')+'</span>'+(it.d?'<em>'+it.sa+' : '+it.sb+'</em>':'')+'</div><div class="ktl-rr">'+(e.side==='b'?cell(e,'b'):'')+'</div></div>'}).join('');
+    function teamName(s){var t=m[s]||{};return t.name||t.school||s.toUpperCase()}
+    var css=opt.noCss?'':'<style>'+KTLCSS+'</style>';
+    var bd='<div class="ktl-bd">'+(body||'<div class="ktl-empty">아직 기록이 없습니다</div>')+'</div>';
+    if(opt.inline)return css+'<div class="ktl">'+bd+'</div>';
+    var kit=function(side,o){var k=((m.kit||{})[side]===1)?1:0;return kitsOf(o||{})[k]};
+    var tmH=function(side,o){var t=m[side]||{};var K=kit(side,o);return '<div class="ktl-tm"><div class="dot" style="background:'+esc(K.color)+'"></div><b>'+esc(t.name||t.school||side.toUpperCase())+'</b>'+(t.school&&t.school!==t.name?'<small>'+esc(t.school)+'</small>':'')+(win===side?'<span class="wn">승</span>':'')+'</div>'};
+    var dd=m.day?String(m.day).replace(/-/g,'.'):'';
+    var offs=offList(m).map(function(x){return (x.role||'')+' '+(x.name||'')}).join(' · ');
+    var mv=(m.mvps&&m.mvps.length?m.mvps:(m.mvp?[m.mvp]:[])).map(function(p){return '#'+(p.no||'')+' '+(p.name||'')+(p.team?' ('+p.team+')':'')}).join(', ');
+    var fp=m.fairplay?(teamName('a')+' '+(m.fairplay.a!=null?m.fairplay.a:'-')+' · '+teamName('b')+' '+(m.fairplay.b!=null?m.fairplay.b:'-')):'';
+    var cA=coachesOf(m,'a',oa||{}).map(function(c){return c.name}).join(', '),cB=coachesOf(m,'b',ob||{}).map(function(c){return c.name}).join(', ');
+    return css+'<div class="ktl"><div class="ktl-hd">'+tmH('a',oa)+'<div class="ktl-sc"><div class="n">'+sc.a+'<i>:</i>'+sc.b+'</div><small>'+esc(m.status==='종료'?(m.locked?'경기 종료 · 확정':'경기 종료'):(m.status==='진행'?'진행 중 · '+(m.period||''):'경기 전'))+'</small></div>'+tmH('b',ob)+'</div>'
+      +'<div class="ktl-meta">'+esc([m.div,m.stage,m.group||'',m.round].filter(Boolean).join(' · '))+'<br>'+esc([dd,m.time,m.place,m.court].filter(Boolean).join(' · '))+'</div>'+bd
+      +'<div class="ktl-ft">'+(mv?'<div><b>최우수선수</b> '+esc(mv)+'</div>':'')+(fp?'<div><b>페어플레이</b> '+esc(fp)+'</div>':'')+((cA||cB)?'<div><b>감독교사</b> '+esc(teamName('a'))+' '+esc(cA||'-')+' · '+esc(teamName('b'))+' '+esc(cB||'-')+'</div>':'')+(offs?'<div><b>심판진</b> '+esc(offs)+'</div>':'')+'<div style="color:#9aa1ad;font-size:11.5px;margin-top:4px">대한민국플라잉디스크연맹 경기 기록 · 시간은 구간 안의 경기 시간(분:초)</div></div></div>'}
+  function timelineHtml(m,oa,ob){return '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc('경기 기록_'+teamLabel(m.a)+'_'+teamLabel(m.b))+'</title><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"><style>body{margin:0;background:#fff}@page{size:A4;margin:10mm}</style></head><body>'+timelineBody(m,oa,ob,{})+'</body></html>'}
+  function printTimeline(m,oa,ob){var w=pwin('경기 기록_'+teamLabel(m.a)+'_'+teamLabel(m.b));if(!w)return;w.document.write(timelineBody(m,oa,ob,{}));pend(w)}
   function printSheet(m,oa,ob,signs,opt){var w=pwin('경기 기록지_'+teamLabel(m.a)+'_'+teamLabel(m.b));if(!w)return;w.document.write(sheetBody(m,oa,ob,signs,opt));pend(w)}
   // 같은 화면 안(iframe)에서 보여 줄 완성 문서 — 좁은 화면에서는 A4 폭을 화면에 맞춰 축소(인쇄 때는 원래 크기)
   function sheetHtml(m,oa,ob,signs,opt){return '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc('경기 기록지_'+teamLabel(m.a)+'_'+teamLabel(m.b))+'</title><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"><style>'+PCSS+'body{background:#fff}@media print{.zw{zoom:1!important}}</style></head><body><div class="zw">'+sheetBody(m,oa,ob,signs,opt)+'</div><script>(function(){var z=document.querySelector(".zw");function fit(){var w=document.documentElement.clientWidth;var k=Math.min(1,(w-12)/740);z.style.zoom=k<1?k:""}fit();window.addEventListener("resize",fit);window.addEventListener("beforeprint",function(){z.style.zoom=""});window.addEventListener("afterprint",fit)})()<\/script></body></html>'}
@@ -350,7 +413,7 @@
         +'<table><tr><th>단계</th><th>경기</th><th>일시·코트</th><th>A팀</th><th>점수</th><th>B팀</th><th>상태</th></tr>'+M.map(function(m){var sc=score(m.events||[]);return '<tr><td>'+esc(m.stage||'')+'</td><td>'+esc(m.round||'')+'</td><td class="s">'+esc([m.day,m.time,m.court].filter(Boolean).join(' '))+'</td><td class="l">'+esc(teamLabel(m.a))+'</td><td><b>'+sc.a+' : '+sc.b+'</b></td><td class="l">'+esc(teamLabel(m.b))+'</td><td>'+esc(m.status||'')+(m.locked?'·확정':'')+'</td></tr>'}).join('')+'</table></div>')});
     var S=(st.scorers||[]).slice(0,40);if(S.length)w.document.write('<div class="pg"><div class="h1" style="font-size:16pt">득점 · 어시스트</div><div class="h2">'+esc(title||'')+'</div><table><tr><th>순위</th><th>부문</th><th>팀</th><th>배번</th><th>선수</th><th>득점</th><th>어시스트</th></tr>'+S.map(function(p,i){return '<tr><td>'+(i+1)+'</td><td>'+esc(p.div)+'</td><td class="l">'+esc(p.team)+'</td><td>'+esc(p.no)+'</td><td>'+esc(p.name)+'</td><td><b>'+p.g+'</b></td><td>'+p.a+'</td></tr>'}).join('')+'</table></div>');
     pend(w)}
-  window.KFDF_MR={sortStatKeys:sortStatKeys,bracketHtml:bracketHtml,isKnockout:isKnockout,statKeyFn:statKeyFn,offList:offList,offOf:offOf,coachesOf:coachesOf,winnerOf:winnerOf,ROLE_LABEL:ROLE_LABEL,roundLabel:roundLabel,CARD_PICK:CARD_PICK,isOff:isOff,KIT_COLORS:KIT_COLORS,kitTextColor:kitTextColor,kitsOf:kitsOf,noFor:noFor,secOf:secOf,fmtSec:fmtSec,evSec:evSec,evTime:evTime,clockSetMs:clockSetMs,clockAdd:clockAdd,clockFloorMin:clockFloorMin,brkLeft:brkLeft,timeouts:timeouts,sentOff:sentOff,yellowCount:yellowCount,rankTable:rankTable,loadXlsx:loadXlsx,saveXlsxMatch:saveXlsxMatch,saveXlsxComp:saveXlsxComp,printComp:printComp,teamLabel:teamLabel,
+  window.KFDF_MR={timelineBody:timelineBody,timelineHtml:timelineHtml,printTimeline:printTimeline,sortStatKeys:sortStatKeys,bracketHtml:bracketHtml,isKnockout:isKnockout,statKeyFn:statKeyFn,offList:offList,offOf:offOf,coachesOf:coachesOf,winnerOf:winnerOf,ROLE_LABEL:ROLE_LABEL,roundLabel:roundLabel,CARD_PICK:CARD_PICK,isOff:isOff,KIT_COLORS:KIT_COLORS,kitTextColor:kitTextColor,kitsOf:kitsOf,noFor:noFor,secOf:secOf,fmtSec:fmtSec,evSec:evSec,evTime:evTime,clockSetMs:clockSetMs,clockAdd:clockAdd,clockFloorMin:clockFloorMin,brkLeft:brkLeft,timeouts:timeouts,sentOff:sentOff,yellowCount:yellowCount,rankTable:rankTable,loadXlsx:loadXlsx,saveXlsxMatch:saveXlsxMatch,saveXlsxComp:saveXlsxComp,printComp:printComp,teamLabel:teamLabel,
     PERIODS:PERIODS,CARDS:CARDS,esc:esc,uid8:uid8,tsMs:tsMs,score:score,goals:goals,clockMs:clockMs,clockTxt:clockTxt,minuteOf:minuteOf,clockSet:clockSet,clockAct:clockAct,
     ctrlState:ctrlState,ctrlLabel:ctrlLabel,CTRL_BEAT:CTRL_BEAT,addEvent:addEvent,voidEvent:voidEvent,editEvent:editEvent,qPush:qPush,qCount:qCount,flush:flush,
     canRecord:canRecord,isStaffUser:isStaffUser,orderId:orderId,orderFromEntry:orderFromEntry,orderCheck:orderCheck,lineup:lineup,playerStats:playerStats,computeStats:computeStats,
