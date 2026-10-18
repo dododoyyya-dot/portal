@@ -403,7 +403,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="matchrec.js?v=20261018b"></script>
+<script src="matchrec.js?v=20261018c"></script>
 <script>
 // ══════════ 경기 기록 (match.html) ══════════
 //   ?slot=참가공고ID            대회의 경기·오더지·디스크골프·순위 (운영진은 경기 생성·심판 배정)
@@ -1348,7 +1348,7 @@ async function scSync(m){const a=m.a||{},b=m.b||{};if(!a.scid||!b.scid)return;co
 // ══ 집계 (compStats) ══
 async function statsSave(quiet){const st=MR.computeStats(MATCHES,ORDERS,LOTS);const golf={};ROUNDS.forEach(r=>{golf[r.id]={title:r.title||'',holes:r.holes||18,div:r.div||'',rank:MR.golfRank(r),status:r.status||'',playoff:(r.playoff||[]).length}});
   try{await DB.collection('compStats').doc(SLOT_ID).set({slotId:SLOT_ID,compId:SLOT.compId||'',title:SLOT.title||'',date:SLOT.date||'',stats:st,golf:golf,updatedAt:FV.serverTimestamp(),by:whoAmI().name},{merge:true});if(!quiet)say('✓ 집계를 저장했습니다. 공개 결과 페이지에 반영됩니다.')}catch(e){if(!quiet)say('집계 저장 실패: '+(e.message||e))}}
-function statsTab(){const st=MR.computeStats(MATCHES,ORDERS,LOTS);const dvs=Object.keys(st.byDiv).sort();let h='';
+function statsTab(){const st=MR.computeStats(MATCHES,ORDERS,LOTS);const dvs=MR.sortStatKeys(Object.keys(st.byDiv),MATCHES);let h='';
   h+='<div class="mr-row" style="margin-top:8px"><span class="mr-note" style="flex:1">순위: 승점(승 3·무 1·패 0) → 득실차 → 다득점 → 승자승 → 제재 수(적은 팀) → 추첨 · 조별 리그는 조마다, 토너먼트는 「본선」으로 따로 집계합니다</span><button class="mr-btn ghost" onclick="compPdf()">📄 최종 결과 PDF</button><button class="mr-btn g" onclick="compXlsx()">📊 최종 결과 엑셀</button></div>';
   if(!dvs.length)h+='<div class="bempty">아직 경기 기록이 없습니다.</div>';
   dvs.forEach(dv=>{const T=st.byDiv[dv].table||[];h+='<h3 style="font-size:15px;font-weight:900;margin:16px 0 4px">'+esc(dv)+' 순위표 <span style="font-size:12px;color:#6b7280;font-weight:700">'+st.byDiv[dv].matches+'경기 종료</span></h3><table class="mr-tbl"><tr><th>순위</th><th class="l">팀</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득</th><th>실</th><th>득실</th><th>승점</th><th>제재</th><th>비고</th></tr>'+T.map(t=>'<tr><td><b>'+t.rank+'</b></td><td class="l"><b>'+esc(t.name)+'</b>'+(t.school&&t.school!==t.name?' <small style="color:#6b7280">'+esc(t.school)+'</small>':'')+'</td><td>'+t.p+'</td><td>'+t.w+'</td><td>'+t.d+'</td><td>'+t.l+'</td><td>'+t.gf+'</td><td>'+t.ga+'</td><td>'+(t.gf-t.ga)+'</td><td><b>'+t.pts+'</b></td><td>'+(t.sanc||0)+'</td><td style="font-size:11.5px;color:#6b7280">'+(t.needLot?'<b style="color:#C41E2F">추첨 필요</b>':esc(t.tb||''))+'</td></tr>').join('')+'</table>'
