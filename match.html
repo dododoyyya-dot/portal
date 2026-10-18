@@ -516,6 +516,35 @@ async function lkApply(div,name,pid,quiet){const c=teamEntries().find(x=>entryKe
 async function lkUnlink(div,name){if(!confirm('「'+name+'」의 참가 신청 연결을 풀까요? (경기 기록은 그대로, 오더지 선수 카드만 빠집니다)'))return;const b=DB.batch();let n=0;
   MATCHES.forEach(m=>{if(m.div!==div)return;const u={};['a','b'].forEach(s=>{const t=m[s]||{};if(t.name===name&&t.pid){u[s]=Object.assign({},t,{pid:''});n++}});if(Object.keys(u).length){u.updatedAt=FV.serverTimestamp();b.update(DB.collection('liveMatches').doc(m.id),u)}});
   if(n)try{await b.commit()}catch(e){say('해제 실패: '+(e.message||e))}}
+// 관리자 입력 오더지를 대진표 팀(이름) 경기 자리에 연결 — 참가 신청 없이 pid 만
+async function lkApplyPid(div,name,pid){const b=DB.batch();let n=0;MATCHES.forEach(m=>{if(m.div!==div)return;const u={};['a','b'].forEach(s=>{const t=m[s]||{};if(t.name===name&&(!t.pid||t.pid===pid)&&t.pid!==pid){u[s]=Object.assign({},t,{pid:pid});n++}});if(Object.keys(u).length){u.updatedAt=FV.serverTimestamp();b.update(DB.collection('liveMatches').doc(m.id),u)}});if(!n)return 0;try{await b.commit();return n}catch(e){say('연결 실패: '+(e.message||e));return 0}}
+let AD=null;
+function adRosterOpen(div,pid){if(!STAFF){say('운영진만 입력할 수 있습니다');return}
+  if(pid&&!orderOf(pid)&&AD&&AD.pid===pid){adRender();return}
+  if(pid){const o=orderOf(pid)||{};AD={div:o.div,name:o.linkName||o.team,school:o.school||'',pid:pid,coach:(o.coach||{}).name||'',text:(o.players||[]).map(p=>[p.no||'',p.name,p.birth||'',p.gender||''].filter(x=>x!=='').join(' ')).join('\n')}}
+  else{const t=lkTeams()[div];if(!t){say('팀을 찾지 못했습니다');return}AD={div:t.div,name:t.name,school:t.school||'',pid:'',coach:'',text:''}}
+  adRender()}
+function adParse(text){const out=[],bad=[];String(text||'').split(/\r?\n/).forEach((ln,i)=>{const raw=ln.trim();if(!raw)return;const tk=raw.split(/\t|,|\s+/).map(x=>x.trim()).filter(Boolean);let no='',name='',birth='',g='';
+    tk.forEach(x=>{if(!birth&&/^(19|20)\d{2}[-./]?\d{1,2}[-./]?\d{1,2}$/.test(x)){const d=x.replace(/[./]/g,'-');const m=/^(\d{4})-?(\d{1,2})-?(\d{1,2})$/.exec(d);if(m)birth=m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');return}
+      if(!no&&/^\d{1,3}$/.test(x)){no=x;return}if(!g&&/^(남|여|남자|여자|M|F)$/i.test(x)){g=/여|F/i.test(x)?'여':'남';return}if(/^(성명|이름|배번|번호|생년월일|성별)$/.test(x))return;name+=(name?' ':'')+x});
+    if(!name){if(!/성명|이름/.test(raw))bad.push((i+1)+'번째 줄');return}out.push({no:no,name:name,birth:birth,gender:g})});return {rows:out,bad:bad}}
+function adRender(){const P=adParse(AD.text);const nos={};const dup=P.rows.filter(r=>r.no&&(nos[r.no]=(nos[r.no]||0)+1)>1).map(r=>r.no);
+  modal('adModal','<b style="font-size:17px">✍ 오더지 직접 입력</b><div class="mr-note">참가 신청을 하지 않은 팀의 오더지를 운영진이 대신 적습니다. 저장하면 대진표 「'+esc(AD.name)+'」 경기에 바로 연결되어 기록 화면 선수 카드가 됩니다. 감독교사 서명은 저장 뒤 PDF로 인쇄해 종이로 받으세요.</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px"><div><label class="mr-lab">부문 · 대진표 팀</label><div class="mr-in" style="background:#f6f8fb">'+esc(AD.div)+' · <b>'+esc(AD.name)+'</b></div></div><div><label class="mr-lab">학교 정식명</label><input class="mr-in" value="'+esc(AD.school)+'" oninput="AD.school=this.value"></div></div>'
+    +'<label class="mr-lab">감독교사 성명</label><input class="mr-in" value="'+esc(AD.coach)+'" oninput="AD.coach=this.value" placeholder="예: 김교사">'
+    +'<label class="mr-lab">선수 명단 <small style="font-weight:600;color:#6b7280">— 한 줄에 한 명: 「배번 이름」 (생년월일·성별은 있으면). 엑셀에서 칸째 복사해 붙여 넣어도 됩니다</small></label>'
+    +'<textarea class="mr-in" rows="9" style="font-family:inherit;line-height:1.6" placeholder="7 홍길동&#10;11 김영희 2014-03-01 여&#10;23 이철수" oninput="AD.text=this.value;clearTimeout(AD._t);AD._t=setTimeout(adPreview,350)">'+esc(AD.text)+'</textarea>'
+    +'<div id="adPrev">'+adPrevHtml(P,dup)+'</div>'
+    +'<div class="mr-row" style="justify-content:flex-end;margin-top:12px"><button class="mr-btn s" onclick="document.getElementById(\'adModal\').remove()">닫기</button><button class="mr-btn g" onclick="adNext()">다음: 오더지 확인 (경기복·주전/교체) ›</button></div>')}
+function adPrevHtml(P,dup){return '<div class="mr-note" style="margin-top:6px;font-weight:800">'+P.rows.length+'명 읽음'+(P.bad.length?' · <span style="color:#C41E2F">이름을 못 읽은 줄: '+esc(P.bad.join(', '))+'</span>':'')+(dup.length?' · <span style="color:#C41E2F">배번 중복: '+esc([...new Set(dup)].join(', '))+'</span>':'')+'</div>'
+  +(P.rows.length?'<div style="max-height:22vh;overflow:auto"><table class="mr-tbl"><tr><th>배번</th><th class="l">이름</th><th>생년월일</th><th>성별</th></tr>'+P.rows.map(r=>'<tr><td><b>'+esc(r.no||'-')+'</b></td><td class="l">'+esc(r.name)+'</td><td>'+esc(r.birth||'')+'</td><td>'+esc(r.gender||'')+'</td></tr>').join('')+'</table></div>':'')}
+function adPreview(){const el=document.getElementById('adPrev');if(!el)return;const P=adParse(AD.text);const nos={};const dup=P.rows.filter(r=>r.no&&(nos[r.no]=(nos[r.no]||0)+1)>1).map(r=>r.no);el.innerHTML=adPrevHtml(P,dup)}
+function adNext(){const P=adParse(AD.text);if(!P.rows.length){say('선수를 한 명 이상 적어 주세요');return}
+  const pid=AD.pid||('adm_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5));AD.pid=pid;
+  const c={pid:pid,uid:'',name:AD.name,teamOrg:AD.school,prefs:[AD.div],roster:P.rows.map(r=>({name:r.name,birth:r.birth,gender:r.gender,school:AD.school,no:r.no})),adminMade:true};
+  const prev=orderOf(pid);OD=MR.orderFromEntry(SLOT_ID,SLOT,c,prev);OD.div=AD.div;OD.entryDiv=AD.div;OD.kits=MR.kitsOf(prev||{}).map(k=>({name:k.name,color:k.color}));OD.adminMade=true;OD.linkName=AD.name;OD._pseudo=c;if(AD.coach)OD.coach.name=AD.coach;
+  P.rows.forEach((r,i)=>{if(r.no&&OD.players[i]&&!String(OD.players[i].no||'').trim())OD.players[i].no=r.no});OD_PID=pid;
+  const m=document.getElementById('adModal');if(m)m.remove();odRender()}
 function lkLinkSel(div,name,selId){const el=document.getElementById(selId);const pid=el&&el.value;if(!pid){say('연결할 참가 신청 팀을 골라 주세요');return}lkApply(div,name,pid)}
 // 자동 연결 — 운영진 화면이 열려 있을 때, 부문+학교가 정확히 하나로 맞고 아직 다른 팀에 쓰이지 않은 신청만
 let LK_T=null,LK_BUSY=false,LK_LOG=[];
@@ -532,10 +561,10 @@ function lkPanel(){if(!STAFF)return '';const T=lkTeams();const L=Object.values(T
     +(LK_LOG.length?'<div class="mr-note" style="margin-top:6px;color:#0f766e;font-weight:800">방금 자동 연결: '+LK_LOG.slice(0,5).map(esc).join(' · ')+(LK_LOG.length>5?' 외 '+(LK_LOG.length-5)+'건':'')+'</div>':'');
   divs.forEach(dv=>{const TL=L.filter(t=>t.div===dv);const un=TL.filter(t=>!t.pid);const ok=TL.filter(t=>t.pid);
     h+='<details class="lk-d"'+(un.length&&E.length?' open':'')+'><summary><b>'+esc(dv)+'</b> <span class="mr-note">연결 '+ok.length+' / '+TL.length+(un.length?' · 미연결 '+un.length:'')+'</span></summary><table class="mr-tbl"><tr><th class="l">대진표 팀</th><th class="l">참가 신청 팀</th><th></th></tr>'
-      +TL.map((t,i)=>{if(t.pid){const c=E.find(x=>entryKey(x)===t.pid);const o=orderOf(t.pid);return '<tr><td class="l"><b>'+esc(t.name)+'</b></td><td class="l">'+(c?esc(c.name||'')+(c.teamOrg&&c.teamOrg!==c.name?' <small style="color:#6b7280">'+esc(c.teamOrg)+'</small>':''):'<span style="color:#C41E2F">신청 없음(취소?)</span>')+' <span class="mr-pill" style="background:'+(o&&o.status!=='작성중'?'#0f766e':'#8a919d')+'">오더지 '+esc(o?o.status||'작성중':'미작성')+'</span></td><td><button class="mr-btn s" style="padding:5px 10px" onclick="lkUnlink(\''+esc(dv)+'\',\''+esc(t.name).replace(/'/g,'&#39;')+'\')">연결 해제</button></td></tr>'}
+      +TL.map((t,i)=>{if(t.pid){const c=E.find(x=>entryKey(x)===t.pid);const o=orderOf(t.pid);return '<tr><td class="l"><b>'+esc(t.name)+'</b></td><td class="l">'+(c?esc(c.name||'')+(c.teamOrg&&c.teamOrg!==c.name?' <small style="color:#6b7280">'+esc(c.teamOrg)+'</small>':''):(o&&o.adminMade?'<b style="color:#7c4a03">✍ 관리자 입력 오더지</b> <button class="mr-btn ghost" style="padding:3px 9px;font-size:11.5px" onclick="orderOpen(\''+esc(t.pid)+'\')">오더지 · PDF</button>':'<span style="color:#C41E2F">신청 없음(취소?)</span>'))+' <span class="mr-pill" style="background:'+(o&&o.status!=='작성중'?'#0f766e':'#8a919d')+'">오더지 '+esc(o?o.status||'작성중':'미작성')+'</span></td><td><button class="mr-btn s" style="padding:5px 10px" onclick="lkUnlink(\''+esc(dv)+'\',\''+esc(t.name).replace(/'/g,'&#39;')+'\')">연결 해제</button></td></tr>'}
         const C=lkCands(t,true);const id='lk_'+dv.replace(/\W/g,'')+'_'+i;const op=(arr,lab)=>arr.length?'<optgroup label="'+lab+'">'+arr.map(c=>'<option value="'+esc(entryKey(c))+'"'+(usedPid[entryKey(c)]?' disabled':'')+'>'+esc((c.name||'')+(c.teamOrg&&c.teamOrg!==c.name?' · '+c.teamOrg:'')+' ['+((c.prefs||[])[0]||'부문 없음')+']'+(usedPid[entryKey(c)]?' — 이미 '+usedPid[entryKey(c)].name:''))+'</option>').join('')+'</optgroup>':'';
         const any=C.exact.length+C.near.length+C.sameDiv.length;
-        return '<tr><td class="l"><b>'+esc(t.name)+'</b>'+(t.school?' <small style="color:#6b7280">'+esc(t.school)+'</small>':'')+'</td><td class="l">'+(any?'<select class="mr-in" id="'+id+'" style="padding:6px 8px;margin:0"><option value="">— 골라 주세요 —</option>'+op(C.exact,'학교·부문 일치')+op(C.near,'이름 비슷함')+op(C.sameDiv,'같은 부문 다른 이름')+'</select>':'<span class="mr-note">아직 이 부문 신청이 없습니다</span>')+'</td><td>'+(any?'<button class="mr-btn g" style="padding:5px 10px" onclick="lkLinkSel(\''+esc(dv)+'\',\''+esc(t.name).replace(/'/g,'&#39;')+'\',\''+id+'\')">연결</button>':'')+'</td></tr>'}).join('')+'</table></details>'});
+        return '<tr><td class="l"><b>'+esc(t.name)+'</b>'+(t.school?' <small style="color:#6b7280">'+esc(t.school)+'</small>':'')+'<br><button class="mr-btn ghost" style="padding:4px 9px;font-size:11.5px;margin-top:4px" onclick="adRosterOpen(\''+esc(dv+'|'+t.name).replace(/'/g,'&#39;')+'\')">✍ 오더지 직접 입력</button></td><td class="l">'+(any?'<select class="mr-in" id="'+id+'" style="padding:6px 8px;margin:0"><option value="">— 골라 주세요 —</option>'+op(C.exact,'학교·부문 일치')+op(C.near,'이름 비슷함')+op(C.sameDiv,'같은 부문 다른 이름')+'</select>':'<span class="mr-note">아직 이 부문 신청이 없습니다 — 학교가 신청하지 않으면 왼쪽 「✍ 오더지 직접 입력」</span>')+'</td><td>'+(any?'<button class="mr-btn g" style="padding:5px 10px" onclick="lkLinkSel(\''+esc(dv)+'\',\''+esc(t.name).replace(/'/g,'&#39;')+'\',\''+id+'\')">연결</button>':'')+'</td></tr>'}).join('')+'</table></details>'});
   if(orphan.length)h+='<div class="mr-note" style="margin-top:8px"><b style="color:#b8860b">대진표에 없는 신청 '+orphan.length+'팀</b>: '+orphan.map(c=>esc((c.name||'')+' ['+((c.prefs||[])[0]||'')+']')).join(', ')+' — 이름이 다르게 적혔으면 위 표에서 골라 연결하세요(시험 신청이면 무시).</div>';
   return h+'</div>'}
 function teamOf(side,m){return (m&&m[side])||{}}
@@ -983,15 +1012,17 @@ function orderTab(){
           +'<td style="white-space:nowrap">'+((mine||STAFF)?'<button class="mr-btn'+(o&&o.status!=='작성중'?' s':'')+'" style="padding:6px 11px;font-size:12px" onclick="orderOpen(\''+esc(key)+'\')">'+(o?'📝 열기':'📝 작성')+'</button> ':'')+(o?'<button class="mr-btn ghost" style="padding:6px 11px;font-size:12px" onclick="orderPdf(\''+esc(key)+'\')">📄 PDF</button>':'')+'</td></tr>'}).join('')+'</table>').join('');
 }
 let OD=null,OD_PID='';
+// [관리자 입력 오더지 2026-10-18] 참가 신청이 없는 팀은 관리자가 만든 오더지(adminMade)를 참가 항목처럼 씀
+function entryOrPseudo(pid){const c=teamEntries().find(x=>entryKey(x)===pid);if(c)return c;const o=orderOf(pid);if(o&&o.adminMade)return {pid:pid,uid:'',name:o.team||'',teamOrg:o.school||'',prefs:[o.div||''],roster:(o.players||[]).map(p=>({name:p.name,birth:p.birth||'',gender:p.gender||'',school:p.school||'',no:p.no||''})),adminMade:true};return null}
 function orderOpen(pid){
-  const c=teamEntries().find(x=>entryKey(x)===pid);if(!c){say('참가 항목을 찾지 못했습니다');return}
+  const c=entryOrPseudo(pid);if(!c){say('참가 항목을 찾지 못했습니다');return}
   const mine=ME&&c.uid===ME.uid;if(!mine&&!STAFF){say('이 팀의 대표자(신청자) 또는 운영진만 열 수 있습니다');return}
   const prev=orderOf(pid);OD=MR.orderFromEntry(SLOT_ID,SLOT,c,prev);if(prev&&prev.div)OD.div=prev.div;OD.entryDiv=(c.prefs||[])[0]||'';OD.kits=MR.kitsOf(prev||{}).map(k=>({name:k.name,color:k.color}));OD_PID=pid;
   const rk={'주장':0,'주전':0,'':1,'교체':2};OD.players.sort((a,b)=>((rk[a.role||'']!=null?rk[a.role||'']:1)-(rk[b.role||'']!=null?rk[b.role||'']:1))||((+a.no||999)-(+b.no||999))||(a.i-b.i));
   odRender();
 }
 function odRender(){
-  const pid=OD_PID;const c=teamEntries().find(x=>entryKey(x)===pid);const mine=ME&&c&&c.uid===ME.uid;
+  const pid=OD_PID;const c=entryOrPseudo(pid)||(OD&&OD._pseudo);const mine=ME&&c&&c.uid===ME.uid;
   const started=MATCHES.some(m=>((m.a||{}).pid===pid||(m.b||{}).pid===pid)&&m.status!=='예정');
   const locked=OD.status==='잠금'||(started&&!STAFF);const dis=locked?'disabled':'';
   const K=OD.kits;const sw=k=>'<span style="display:inline-block;width:14px;height:14px;border-radius:4px;border:1.5px solid rgba(17,17,20,.3);vertical-align:-2px;background:'+esc(k.color)+'"></span>';
@@ -1005,7 +1036,7 @@ function odRender(){
     +'<div class="mr-card" style="margin-top:10px"><div class="mr-row"><span class="mr-note" style="font-weight:800">소속</span><b style="font-size:16px">'+esc(OD.school||OD.team)+'</b>'+(OD.team&&OD.team!==OD.school?'<span style="color:#6b7280">팀명 '+esc(OD.team)+'</span>':'')+'<span style="flex:1"></span><span class="mr-pill" style="background:'+(OD.status==='제출'?'#0f766e':OD.status==='잠금'?'#153A77':'#b8860b')+'">'+esc(OD.status)+'</span></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="mr-lab">감독교사 성명</label><input class="mr-in" id="od_cn" value="'+esc(OD.coach.name)+'" '+dis+' oninput="OD.coach.name=this.value"></div><div><label class="mr-lab">직책</label><input class="mr-in" id="od_cr" value="'+esc(OD.coach.role)+'" placeholder="감독교사 · 지도자" '+dis+' oninput="OD.coach.role=this.value"></div></div>'
     +'<label class="mr-lab">서명 (자동 기입)</label><div class="mr-row">'+(sign?'<img src="'+esc(sign)+'" style="height:40px;background:#fff;border:1px solid #dfe5ee;border-radius:6px"> <span class="mr-note">'+(OD.coach.sign?'제출 때 기입된 서명':'회원 등록 서명이 제출 시 기입됩니다')+'</span>':'<span class="mr-note" style="color:#C41E2F">등록된 서명이 없습니다 — 마이페이지 › 프로필에서 서명을 등록하면 자동으로 들어갑니다(없어도 제출은 됩니다)</span>')+'</div></div>'
-    +'<div class="mr-note" style="margin-top:10px">신청 명단 '+OD.players.length+'명 · 배번은 숫자, 옷마다 중복 불가 · 비고에서 주장·주전·교체를 고르면 다음에 열 때 주전이 위, 교체가 아래로 정렬됩니다. 명단 자체를 바꾸려면 대회 공고의 「명단 수정」을 이용하세요.'+(started?' <b style="color:#C41E2F">첫 경기가 시작되어 대표자 수정은 잠겼습니다(운영진만 수정).</b>':'')+'</div>'
+    +'<div class="mr-note" style="margin-top:10px">신청 명단 '+OD.players.length+'명 · 배번은 숫자, 옷마다 중복 불가 · 비고에서 주장·주전·교체를 고르면 다음에 열 때 주전이 위, 교체가 아래로 정렬됩니다. '+((c&&c.adminMade)||(OD&&OD.adminMade)?'관리자가 입력한 오더지입니다 — <a href="javascript:void 0" onclick="adRosterOpen(null,\''+esc(pid)+'\')" style="font-weight:900;color:#153A77">명단 고치기</a> · 저장 후 「📄 PDF」로 인쇄해 감독교사 서명을 종이로 받으세요.':'명단 자체를 바꾸려면 대회 공고의 「명단 수정」을 이용하세요.')+(started?' <b style="color:#C41E2F">첫 경기가 시작되어 대표자 수정은 잠겼습니다(운영진만 수정).</b>':'')+'</div>'
     +'<div style="overflow:auto"><table class="mr-tbl"><tr><th>순번</th><th>'+sw(K[0])+' 1번 옷<br>배번</th><th class="l">선수 이름</th><th>소속</th><th>'+sw(K[1])+' 2번 옷<br>배번</th><th>비고</th></tr>'+rows+'</table></div>'
     +'<div class="mr-row" style="justify-content:flex-end;margin-top:14px">'+(orderOf(pid)?'<button class="mr-btn ghost" onclick="orderPdf(\''+esc(pid)+'\')">📄 PDF</button>':'')+'<span style="flex:1"></span><button class="mr-btn s" onclick="document.getElementById(\'odModal\').remove()">닫기</button>'+(locked?'':'<button class="mr-btn y" onclick="orderSave(\''+esc(pid)+'\',\'작성중\')">임시 저장</button><button class="mr-btn g" onclick="orderSave(\''+esc(pid)+'\',\'제출\')">✅ 제출</button>')+'</div>');
 }
@@ -1027,8 +1058,10 @@ async function orderSave(pid,status){
     kits:OD.kits.map((k,i)=>({name:String(k.name||'').trim()||((i+1)+'번 경기복'),color:k.color||'#ffffff'})),
     players:OD.players.slice().sort((a,b)=>a.i-b.i).map(p=>({i:p.i,key:p.key,name:p.name,birth:p.birth,school:p.school,gender:p.gender,no:String(p.no||'').trim(),subNo:String(p.subNo||'').trim(),role:p.role||'',uid:p.uid||'',guardianUid:p.guardianUid||''})),
     updatedAt:FV.serverTimestamp(),updatedBy:whoAmI().name,history:FV.arrayUnion({at:new Date().toISOString(),by:whoAmI().name,status:status})};
+  if(OD.adminMade){doc.adminMade=true;doc.linkName=OD.linkName||OD.team;doc.uid=''}
   try{await DB.collection('compOrders').doc(MR.orderId(SLOT_ID,pid)).set(doc,{merge:true});document.getElementById('odModal').remove();
-    if(STAFF&&OD.div&&OD.entryDiv!==OD.div&&confirm('참가 신청의 부문도 「'+OD.div+'」(으)로 바꿀까요?\n(대진 만들기·빠른 경기 추가·순위표에 쓰이는 부문입니다. 이미 만든 경기의 부문은 「✏️ 경기 정보」에서 고칩니다)'))await entryDivSave(pid,OD.div);if(status==='제출')say('✓ 오더지를 제출했습니다. PDF는 오더지 탭에서 내려받을 수 있습니다.')}
+    if(OD.adminMade&&OD.linkName){const n=await lkApplyPid(OD.div,OD.linkName,pid);if(n&&status!=='제출')say('✓ 임시 저장 · 대진표 「'+OD.linkName+'」 경기 '+n+'자리에 연결했습니다')}
+    if(STAFF&&OD.div&&OD.entryDiv!==OD.div&&confirm('참가 신청의 부문도 「'+OD.div+'」(으)로 바꿀까요?\n(대진 만들기·빠른 경기 추가·순위표에 쓰이는 부문입니다. 이미 만든 경기의 부문은 「✏️ 경기 정보」에서 고칩니다)'))await entryDivSave(pid,OD.div);if(status==='제출')say('✓ 오더지를 제출했습니다.'+(OD.adminMade?' 대진표 「'+(OD.linkName||OD.team)+'」 경기에 연결했습니다. 오더지 탭 연결 판의 「오더지」에서 다시 열어 「📄 PDF」로 인쇄해 서명을 받으세요.':' PDF는 오더지 탭에서 내려받을 수 있습니다.'))}
   catch(e){say('저장 실패: '+(/permission/i.test(String(e))?'권한이 없습니다 (보안 규칙 v52 게시 필요)':(e.message||e)))}
 }
 // 참가 신청(compSlots.claimed)의 이 팀 마지막 줄 부문만 바꿈 — 운영진(관리자·관할 시도임원)
@@ -1285,7 +1318,7 @@ function lpSelect(side,key){const m=RCM();const p=pickByKey(side,key);if(!p)retu
 function swapTap(side,key){const S=QK.swapSel;if(!S||S.side!==side){QK.swapSel={side:side,key:key};rcRender();return}if(S.key===key){QK.swapSel=null;rcRender();return}
   const m=RCM();const T=teamPl(m,side);const aOn=T.onKeys.indexOf(S.key)>=0,bOn=T.onKeys.indexOf(key)>=0;lineupMove(side,S.key,bOn?'on':'bench',key)}
 // ── 기록 화면에서 오더지 바로 열기 (대표자·운영진) — 저장하면 기록 화면에 바로 반영 ──
-function rcOrder(side){const m=RCM();const t=(m||{})[side]||{};if(!t.pid){say('이 팀은 아직 참가 신청과 연결되지 않아 오더지가 없습니다.\n학교가 단체전을 신청하면 자동으로 연결됩니다. 이름이 달라 안 붙었으면 「📝 오더지」 탭 맨 위 「대진표 팀 ↔ 참가 신청 연결」에서 골라 주세요.');return}
+function rcOrder(side){const m=RCM();const t=(m||{})[side]||{};if(t.pid&&!teamEntries().find(x=>entryKey(x)===t.pid)&&orderOf(t.pid)&&orderOf(t.pid).adminMade){orderOpen(t.pid);return}if(!t.pid){say('이 팀은 아직 참가 신청과 연결되지 않아 오더지가 없습니다.\n학교가 단체전을 신청하면 자동으로 연결됩니다. 이름이 달라 안 붙었으면 「📝 오더지」 탭 맨 위 「대진표 팀 ↔ 참가 신청 연결」에서 골라 주세요.');return}
   const c=teamEntries().find(x=>entryKey(x)===t.pid);if(!c){say('참가 신청에서 이 팀을 찾지 못했습니다(취소·반려되었을 수 있습니다).');return}
   if(!STAFF&&!(ME&&c.uid===ME.uid)){say('오더지는 그 팀 대표자와 운영진만 고칠 수 있습니다. 경기 중 배번만 바뀐 경우는 「# 배번 변경」을 이용해 주세요.');return}
   orderOpen(t.pid)}
