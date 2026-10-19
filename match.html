@@ -368,6 +368,12 @@
 .bd-card .st{position:absolute;top:5px;right:6px;width:8px;height:8px;border-radius:50%;background:#c3c9d4}
 .bd-card.live{border-left-color:#C41E2F}.bd-card.live .st{background:#C41E2F;animation:lvBlink 1s infinite}.bd-card.done{border-left-color:#0f766e;opacity:.85}.bd-card.done .st{background:#0f766e}
 .bd-card.sel{outline:3px solid #e6b422}
+.bd-card.mine{border:2.5px solid #7c3aed;border-left:6px solid #7c3aed;background:#f6f1ff;box-shadow:0 0 0 3px rgba(124,58,237,.14)}
+.my-badge{display:inline-block;margin-top:3px;background:#7c3aed;color:#fff;font-size:10.5px;font-weight:900;border-radius:999px;padding:1px 7px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.mr-card.mine{border:2.5px solid #7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.12)}
+.my-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:stretch;margin:8px 0;padding:10px;border-radius:14px;background:#f6f1ff;border:1.5px solid #d9c8fb}
+.my-chip{display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:1.5px solid #c4b0f5;background:#fff;color:#3b1d80;border-radius:10px;padding:5px 10px;font:inherit;font-size:12.5px;cursor:pointer;text-align:left}
+.my-chip small{color:#6b7280;font-size:11px;font-weight:700}.my-chip.live{border-color:#C41E2F}.my-chip.done{opacity:.6}
 .bd-ghost{position:fixed;z-index:99999;pointer-events:none;transform:translate(-50%,-60%) rotate(-2deg);box-shadow:0 18px 40px rgba(17,17,20,.3);opacity:.95}
 @keyframes lvBlink{50%{opacity:.25}}
 .dr-grp{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:10px}
@@ -651,7 +657,7 @@ function matchTab(){
 function matchCard(m){
   const sc=MR.score(m.events||[]);const a=m.a||{},b=m.b||{};const st=MR.ctrlState(m,ME&&ME.uid);const of=m.officials||{};
   const ofTxt=['recorder','ref1','ref2','ref3','scorer','supervisor'].filter(k=>of[k]&&of[k].name).map(k=>({recorder:'기록',ref1:'주심',ref2:'부심',ref3:'부심',scorer:'점수심',supervisor:'감독관'}[k])+' '+of[k].name).join(' · ');
-  return '<div class="mr-card'+(m.status==='진행'?' live':'')+'" data-newkey="'+esc(m.id)+'"><div class="mr-row" style="font-size:12px;color:#6b7280;font-weight:700"><span class="mr-pill" style="background:'+(STC[m.status]||'#8a919d')+'">'+esc(m.status||'예정')+'</span>'+(m.locked?'<span class="mr-pill" style="background:#0f766e">확정</span>':(m.status==='종료'?'<span class="mr-pill" style="background:#b8860b">확정 전</span>':''))+'<span>'+esc([m.stage,m.round,m.court].filter(Boolean).join(' · '))+'</span><span style="flex:1"></span><span>'+esc(dateK(m.day))+(m.time?' '+esc(m.time):'')+'</span></div>'
+  return '<div class="mr-card'+(m.status==='진행'?' live':'')+(myRoles(m).length?' mine':'')+'" data-newkey="'+esc(m.id)+'">'+(myRoles(m).length?'<div style="margin-bottom:6px">'+myBadge(m)+'</div>':'')+'<div class="mr-row" style="font-size:12px;color:#6b7280;font-weight:700"><span class="mr-pill" style="background:'+(STC[m.status]||'#8a919d')+'">'+esc(m.status||'예정')+'</span>'+(m.locked?'<span class="mr-pill" style="background:#0f766e">확정</span>':(m.status==='종료'?'<span class="mr-pill" style="background:#b8860b">확정 전</span>':''))+'<span>'+esc([m.stage,m.round,m.court].filter(Boolean).join(' · '))+'</span><span style="flex:1"></span><span>'+esc(dateK(m.day))+(m.time?' '+esc(m.time):'')+'</span></div>'
     +'<div class="mr-vs"><div class="n">'+esc(a.name||'A')+(a.school&&a.school!==a.name?'<br><small style="color:#6b7280">'+esc(a.school)+'</small>':'')+'</div><div class="s">'+sc.a+' : '+sc.b+'</div><div class="n" style="text-align:right">'+esc(b.name||'B')+(b.school&&b.school!==b.name?'<br><small style="color:#6b7280">'+esc(b.school)+'</small>':'')+'</div></div>'
     +(m.period||(m.clock&&(m.clock.running||m.clock.base))?'<div class="mr-note" style="margin-top:4px">'+esc(m.period||'')+(m.clock?' · ⏱ '+MR.clockTxt(m):'')+(st==='other'?' · <b style="color:#C41E2F">'+esc(MR.ctrlLabel(m))+' 입력 중</b>':'')+'</div>':'')
     +(ofTxt?'<div class="mr-note" style="margin-top:4px">'+esc(ofTxt)+'</div>':'')
@@ -720,7 +726,14 @@ async function matchSave(id){
 async function matchDel(id){const m=MATCHES.find(x=>x.id===id);if(!m)return;if((m.events||[]).some(e=>!e.void)&&!confirm('득점·제재 기록이 있는 경기입니다. 정말 삭제할까요?'))return;if(!confirm('이 경기를 삭제할까요?'))return;
   try{await DB.collection('liveMatches').doc(id).delete();document.getElementById('mfModal').remove()}catch(e){say('삭제 실패: '+(e.message||e))}}
 // ══ [대진·시간표 2026-10-14] ══
-let BD_EDIT=false,BD_TAP=null,BD_HINT=0;   /* 시간표 편집(끌어 옮기기) 잠금 — 기본 잠김 */
+let BD_EDIT=false,BD_TAP=null,BD_HINT=0,BD_MINE=false;
+/* [2026-10-19] 내 경기 — 이 경기에 내가 배정된 임무(감독관·주심·부심·기록 …). 배정표(officials) 기준이라 사람마다 다르게 보임 */
+const MY_RN={supervisor:'감독관',ref1:'주심',ref2:'부심',ref3:'부심',scorer:'점수심',recorder:'기록'};
+function myRoles(m){if(!ME||!m)return [];const of=m.officials||{};const out=[];
+  (of.list||[]).forEach(x=>{if(x&&x.uid&&x.uid===ME.uid&&x.role)out.push(String(x.role).replace('기록원','기록').replace('심판감독관','감독관'))});
+  if(!out.length)Object.keys(MY_RN).forEach(k=>{if(of[k]&&of[k].uid===ME.uid)out.push(MY_RN[k])});
+  return [...new Set(out)]}
+function myBadge(m){const r=myRoles(m);return r.length?'<span class="my-badge">🙋 내 경기 · '+esc(r.join('·'))+'</span>':''}   /* 시간표 편집(끌어 옮기기) 잠금 — 기본 잠김 */
 // [2026-10-19] 시간표 옮기기·경기 지우기는 관리자와 이 대회 심판위원장(심판장·심판총괄)만
 function canBoard(){if(!ME||!MY)return false;const roles=[MY.role].concat(MY.roles||[]);if(MY.owner===true||roles.indexOf('admin')>=0)return true;return /심판위원장|심판장|심판총괄/.test(((SLOT_ROLES||{})[ME.uid]||[]).join(' '))}
 function bdEditable(){return canBoard()&&BD_EDIT}
@@ -735,12 +748,13 @@ function bdStageOf(m){return m.stage||'(단계 없음)'}
 function bdTimes(c,day){const P=(day&&(c.plan||{})[day])||{};const st=String(P.start||c.start||'09:00');const step=+P.step||c.step;const out=[];const p=st.split(':');let t=(+p[0])*60+(+p[1]||0);for(let i=0;i<c.n;i++){out.push(String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0'));t+=step}return out}   /* 날짜별 시작·간격(dayPlan) 우선 */
 function bdPlaced(m,c,times){return !!(m.day&&m.time&&m.court&&c.courts.indexOf(m.court)>=0&&/^\d{1,2}:\d{2}$/.test(m.time))}
 function bdTimesDay(c,day){const T=bdTimes(c,day);MATCHES.forEach(m=>{if(m.day===day&&m.time&&m.court&&c.courts.indexOf(m.court)>=0&&/^\d{1,2}:\d{2}$/.test(m.time)&&T.indexOf(m.time)<0)T.push(m.time)});return T.sort()}   // [2026-10-18] 16:45 처럼 간격에 안 맞는 경기도 그 시각 줄로
-function bdCard(m){const sc=MR.score(m.events||[]);const a=m.a||{},b=m.b||{};const cls=m.status==='진행'?' live':m.status==='종료'?' done':'';
-  return '<div class="bd-card'+cls+(BD_SEL===m.id?' sel':'')+'" data-mid="'+esc(m.id)+'"><span class="st"></span>'+(bdEditable()?'<button class="bd-ed" title="날짜·시각·구장 직접 고치기" onclick="event.stopPropagation();bdTimeEdit(\''+esc(m.id)+'\')">✎</button>':'')+'<div class="dv">'+((m.mno||m.order)?'<b class="bdno">'+esc(m.mno||m.order)+'경기</b> ':'')+esc([m.stage,m.div,m.group||m.round].filter(Boolean).join(' · '))+(m.day&&!m.time?' <span style="color:#b8860b">📅 '+esc(dateK(m.day).slice(5))+'</span>':'')+'</div><div class="vs">'+esc(a.name||'?')+(m.status!=='예정'?' <span class="sc">'+sc.a+':'+sc.b+'</span> ':' vs ')+esc(b.name||'?')+'</div>'+((m.officials||{}).ref1?'<div class="dv" style="color:#7c3aed">주심 '+esc(m.officials.ref1.name)+((m.officials||{}).recorder?' · 기록 '+esc(m.officials.recorder.name):'')+'</div>':'')+'</div>'}
+function bdCard(m){const sc=MR.score(m.events||[]);const a=m.a||{},b=m.b||{};const cls=(m.status==='진행'?' live':m.status==='종료'?' done':'')+(myRoles(m).length?' mine':'');
+  return '<div class="bd-card'+cls+(BD_SEL===m.id?' sel':'')+'" data-mid="'+esc(m.id)+'"><span class="st"></span>'+(bdEditable()?'<button class="bd-ed" title="날짜·시각·구장 직접 고치기" onclick="event.stopPropagation();bdTimeEdit(\''+esc(m.id)+'\')">✎</button>':'')+'<div class="dv">'+((m.mno||m.order)?'<b class="bdno">'+esc(m.mno||m.order)+'경기</b> ':'')+esc([m.stage,m.div,m.group||m.round].filter(Boolean).join(' · '))+(m.day&&!m.time?' <span style="color:#b8860b">📅 '+esc(dateK(m.day).slice(5))+'</span>':'')+'</div><div class="vs">'+esc(a.name||'?')+(m.status!=='예정'?' <span class="sc">'+sc.a+':'+sc.b+'</span> ':' vs ')+esc(b.name||'?')+'</div>'+((m.officials||{}).ref1?'<div class="dv" style="color:#7c3aed">주심 '+esc(m.officials.ref1.name)+((m.officials||{}).recorder?' · 기록 '+esc(m.officials.recorder.name):'')+'</div>':'')+myBadge(m)+'</div>'}
 function boardTab(){
   const days=bdDays();if(!BD_DAY||days.indexOf(BD_DAY)<0)BD_DAY=days[0]||'';const c=bdCfg();const times=bdTimesDay(c,BD_DAY);
   const divs=[...new Set(MATCHES.map(m=>m.div).filter(Boolean))].sort();
-  const pool=MATCHES.filter(m=>(!BD_DIV||m.div===BD_DIV));
+  const MINE=MATCHES.filter(m=>myRoles(m).length);if(!MINE.length)BD_MINE=false;
+  const pool=MATCHES.filter(m=>(!BD_DIV||m.div===BD_DIV)&&(!BD_MINE||myRoles(m).length));
   const tray=pool.filter(m=>!bdPlaced(m,c,times)||(m.day!==BD_DAY&&!m.day));
   const unplaced=pool.filter(m=>!bdPlaced(m,c,times)&&(!m.day||m.day===BD_DAY));const otherDay=pool.filter(m=>!bdPlaced(m,c,times)&&m.day&&m.day!==BD_DAY).length;   // [2026-10-18] 다른 날짜로 정해진 미배치 경기는 그 날 탭에서만
   const dayIdx=days.indexOf(BD_DAY);const planNow=bdPlanOf(BD_DAY);const byStage={};unplaced.forEach(m=>{const s=bdStageOf(m);byStage[s]=(byStage[s]||0)+1});
@@ -751,8 +765,10 @@ function boardTab(){
     +(canBoard()?'<div class="mr-row" style="margin-top:10px"><button class="mr-btn '+(BD_EDIT?'r':'g')+'" onclick="BD_EDIT=!BD_EDIT;BD_SEL=null;render()" title="잠겨 있으면 카드를 끌어도 옮겨지지 않습니다">'+(BD_EDIT?'🔓 편집 중 — 다 했으면 눌러 잠그기':'🔒 시간표 잠김 · 눌러서 편집')+'</button><span class="mr-note">'+(BD_EDIT?'카드를 끌어 옮기거나(한 번 눌러 고른 뒤 칸 누르기), ✎ 로 날짜·시각·구장을 직접 고칩니다. 두 번 누르면 경기 화면.':'경기 화면은 카드를 두 번 누르면 열립니다. 시간표 옮기기·경기 지우기는 관리자와 심판위원장만 할 수 있습니다.')+'</span></div>':'')
     +(STAFF?'<div class="mr-row" style="margin-top:10px"><button class="mr-btn s" onclick="bdSetup()">⚙ 시간표 설정 · 코트 '+c.courts.length+'면 · '+c.start+'부터 '+c.step+'분 간격</button><button class="mr-btn ghost" onclick="bdAuto()" title="미배치 경기를 빈 칸에 순서대로 채웁니다(같은 팀 연속 경기는 피함)">⚡ 빈 칸 자동 배치</button><button class="mr-btn s" onclick="qaOpen(\'\',\'\')">＋ 경기 빠르게 추가</button><button class="mr-btn ghost" onclick="rfOpen()">🧑‍⚖️ 심판 배정</button></div>':'')+'</div>'
     +(STAFF?'<div class="bd-steps"><span>① 🏗 대회 구성에서 단계를 쌓고 「경기 만들기」</span><span>② ⚙ 시간표 설정(날짜·코트)</span><span>③ 날짜 탭 고르고 ⚡ 자동 배치(또는 끌어다 놓기)</span><span>④ 🧑‍⚖️ 심판 배정</span><span>⑤ 예선 끝나면 「⬇ 진출팀 채우기」</span></div>':'')
-    +'<div class="bd-bar">'+days.map((d,i)=>'<button class="bd-day'+(d===BD_DAY?' on':'')+'" onclick="BD_DAY=\''+d+'\';render()">'+esc(bdDayName(d,i))+' <small>('+MATCHES.filter(m=>m.day===d&&m.time&&m.court).length+')</small></button>').join('')
+    +'<div class="bd-bar">'+days.map((d,i)=>'<button class="bd-day'+(d===BD_DAY?' on':'')+'" onclick="BD_DAY=\''+d+'\';render()">'+esc(bdDayName(d,i))+' <small>('+MATCHES.filter(m=>m.day===d&&m.time&&m.court).length+(MINE.length?' · 내 '+MINE.filter(m=>m.day===d).length:'')+')</small></button>').join('')
     +'<span style="flex:1"></span>'+['',...divs].map(dv=>'<button class="bd-day'+(BD_DIV===dv?' on':'')+'" onclick="BD_DIV=\''+esc(dv)+'\';render()">'+(dv?esc(dv):'전체 부문')+'</button>').join('')+'</div>'
+    +(MINE.length?'<div class="my-bar"><button class="mr-btn '+(BD_MINE?'r':'s')+'" onclick="BD_MINE=!BD_MINE;BD_SEL=null;render()">'+(BD_MINE?'🙋 내 경기만 보는 중 — 전체 보기':'🙋 내 경기만 보기 ('+MINE.length+')')+'</button>'
+      +MINE.slice().sort((x,y)=>((x.day||'')+(x.time||'')).localeCompare((y.day||'')+(y.time||''))).map(m=>'<button class="my-chip'+(m.status==='종료'?' done':m.status==='진행'?' live':'')+'" onclick="'+(m.day&&m.day!==BD_DAY?'BD_DAY=\''+esc(m.day)+'\';':'')+'rcOpen(\''+esc(m.id)+'\')" title="누르면 경기 화면이 열립니다"><b>'+esc(m.day?dateK(m.day).slice(5):'')+' '+esc(m.time||'시각 미정')+'</b> '+esc(m.court||'')+' · '+esc(myRoles(m).join('·'))+'<small>'+esc((m.mno||m.order)?(m.mno||m.order)+'경기 ':'')+esc((m.a||{}).name||'?')+' vs '+esc((m.b||{}).name||'?')+'</small></button>').join('')+'</div>':'')
     +planNote+'<div class="mr-note" style="font-weight:800;margin:4px 0">'+(otherDay?'<span style="font-weight:600;color:#6b7280">다른 날짜 미배치 '+otherDay+'경기는 그 날짜 탭에서 보입니다 · </span>':'')+'미배치 경기 '+unplaced.length+(unplaced.length?' <span style="font-weight:600">— '+Object.keys(byStage).map(s=>esc(s)+' '+byStage[s]).join(' · ')+'</span>':'')+'</div><div class="bd-tray" data-drop="tray">'+(unplaced.length?unplaced.map(bdCard).join(''):'<span class="mr-note" style="align-self:center">모든 경기가 배치되었습니다. 카드를 이곳에 놓으면 배치가 해제됩니다.</span>')+'</div>'
     +'<div class="bd-wrap"><table class="bd-grid"><tr><th class="tm">시간</th>'+c.courts.map(ct=>'<th>'+esc(ct)+'</th>').join('')+'</tr>'
     +times.map(t=>'<tr><td class="tm">'+t+'</td>'+c.courts.map(ct=>{const ms=pool.filter(m=>m.day===BD_DAY&&m.time===t&&m.court===ct);const cellAll=MATCHES.filter(m=>m.day===BD_DAY&&m.time===t&&m.court===ct);
