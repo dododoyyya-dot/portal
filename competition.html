@@ -2201,6 +2201,13 @@ async function taResolveMembers(){
   }
   return n;
 }
+/* [배번 경고 2026-10-19] 명단의 배번 빈 칸·중복을 찾아 붉게 표시하고 안내 문구를 돌려줌(막지는 않음 — 오더지에서 고칠 수 있음) */
+function taNoCheck(){const rows=[...document.querySelectorAll('#taRosterBox > div')].filter(x=>((x.querySelector('.taR-name')||{}).value||'').trim());const empty=[],seen={},dup=[];
+  rows.forEach(x=>{const nm=x.querySelector('.taR-name').value.trim();const el=x.querySelector('.taR-no');if(!el)return;const v=String(el.value||'').replace(/[^0-9]/g,'');let bad=false;
+    if(!v){empty.push(nm);bad=true}else if(seen[v]){dup.push(v+'번('+seen[v]+'·'+nm+')');bad=true}else seen[v]=nm;
+    el.style.borderColor=bad?'#C41E2F':'';el.style.background=bad?'#fff1f2':'';if(!el.dataset.nb){el.dataset.nb='1';el.addEventListener('input',()=>{el.style.borderColor='';el.style.background=''})}});
+  const parts=[];if(empty.length)parts.push('배번이 비어 있는 팀원 '+empty.length+'명: '+empty.slice(0,8).join(', ')+(empty.length>8?' 외 '+(empty.length-8)+'명':''));if(dup.length)parts.push('배번이 겹칩니다: '+dup.slice(0,6).join(', '));
+  return {empty:empty,dup:dup,msg:parts.length?parts.join('\n')+'\n(붉은 칸) 배번은 오더지·경기 기록에 그대로 쓰이니 채워 주세요.':''}}
 async function taImportXlsx(input){
   const f=input&&input.files&&input.files[0];if(!f)return;input.value='';
   if(typeof ExcelJS==='undefined'){alert('엑셀 라이브러리를 아직 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');return}
@@ -2240,9 +2247,10 @@ async function taImportXlsx(input){
       taAddRow(v);added++;have.push({n:taNorm(r.name),b:r.birth});
     });
     const linked=await taResolveMembers();   // [회원 색인] 클럽 명단에 없던 사람도 회원이면 회원으로
+    const _nb=taNoCheck();   /* [배번 경고 2026-10-19] 빈 칸은 붉게 표시 */
     // 번호 다시 매기기
     [...box.querySelectorAll('#taRosterBox > div')].forEach((x,i)=>{const s=x.querySelector('span');if(s&&/^\d+$/.test(s.textContent.trim()))s.textContent=String(i+1);x.style.marginTop=i?'6px':'0'});
-    alert('엑셀에서 '+added+'명을 담았습니다.'+(exN?' (양식 예시 줄 '+exN+'개는 빼고)':'')+((member+linked)?' (회원으로 확인 '+(member+linked)+'명)':'')+(dup?' · 이미 있는 '+dup+'명은 건너뜀':'')+(errors.length?'\n\n확인 필요:\n'+errors.slice(0,8).join('\n')+(errors.length>8?'\n… 외 '+(errors.length-8)+'건':''):'')+'\n\n비회원으로 표시된 팀원도 나중에 같은 성명·생년월일로 회원 가입하면 이 대회의 참가·입상 기록이 자동으로 경력에 연동됩니다.');
+    alert('엑셀에서 '+added+'명을 담았습니다.'+(exN?' (양식 예시 줄 '+exN+'개는 빼고)':'')+((member+linked)?' (회원으로 확인 '+(member+linked)+'명)':'')+(dup?' · 이미 있는 '+dup+'명은 건너뜀':'')+(_nb.msg?'\n\n⚠ '+_nb.msg:'')+(errors.length?'\n\n확인 필요:\n'+errors.slice(0,8).join('\n')+(errors.length>8?'\n… 외 '+(errors.length-8)+'건':''):'')+'\n\n비회원으로 표시된 팀원도 나중에 같은 성명·생년월일로 회원 가입하면 이 대회의 참가·입상 기록이 자동으로 경력에 연동됩니다.');
   }catch(e){alert('엑셀 읽기 실패: '+(e.message||e)+'\n\n· 파일이 .xlsx 인지 확인해 주세요 (.xls·한셀 파일은 엑셀에서 .xlsx 로 다시 저장)\n· 첫 줄에 성명·생년월일 등 제목이 있어야 합니다\n· 계속 안 되면 「① 빈 명단 양식 내려받기」로 양식을 받아 옮겨 적어 주세요')}
 }
 async function taXlsxTemplate(){
@@ -2641,6 +2649,7 @@ async function submitTeam(){
   if(!roster.length)return alert('팀원을 1명 이상 입력해주세요.');
   // [연령확인] 생년월일이 비어 있으면 미성년 여부를 판단할 수 없어 보호자 동의 대상에서 빠집니다.
   //   막지는 않되(인솔자가 모를 수 있음), 어떤 인원이 그런지 알려주고 한 번 더 확인받습니다.
+  {const _nb=taNoCheck();if(_nb.msg&&!confirm('⚠ '+_nb.msg+'\n\n배번은 나중에 오더지에서도 고칠 수 있습니다. 이대로 신청할까요?'))return;}   /* [배번 경고 2026-10-19] */
   const _noBirth=roster.filter(x=>!x.birth);
   if(_noBirth.length&&!confirm('⚠ 생년월일이 비어 있는 팀원이 '+_noBirth.length+'명 있습니다.\n'
       +_noBirth.slice(0,8).map(x=>'· '+x.name+(x.school?' ('+x.school+')':'')).join('\n')
