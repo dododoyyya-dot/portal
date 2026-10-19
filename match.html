@@ -621,7 +621,7 @@ async function boot(){
   if(gid){try{const d=await DB.collection('golfRounds').doc(gid).get();if(d.exists)SLOT_ID=d.data().slotId||SLOT_ID}catch(e){}}
   if(!SLOT_ID){await pickLanding();return}
   try{const s=await DB.collection('compSlots').doc(SLOT_ID).get();SLOT=s.exists?s.data():null}catch(e){SLOT=null}
-  if(!SLOT){document.getElementById('mrMain').innerHTML='<div class="bempty">'+(ME?'대회 공고를 읽을 수 없습니다(승인 회원만 볼 수 있습니다).':'로그인 후 이용할 수 있습니다. <a href="login.html" style="font-weight:800;color:#153A77">로그인</a>')+'</div>';return}
+  if(!SLOT){document.getElementById('mrMain').innerHTML='<div class="bempty">'+(ME?'대회 공고를 읽을 수 없습니다(승인 회원만 볼 수 있습니다).':'로그인 후 이용할 수 있습니다. <a href="'+'login.html?next='+encodeURIComponent((location.pathname.split('/').pop()||'index.html')+location.search)+'" style="font-weight:800;color:#153A77">로그인</a>')+'</div>';return}
   if(SLOT.compId){try{const c=await DB.collection('competitions').doc(SLOT.compId).get();COMP=c.exists?Object.assign({id:c.id},c.data()):null}catch(e){}}
   document.getElementById('mrH1').textContent=SLOT.title||'경기 기록';
   if(/beta/.test(PAGE)){const bb=document.getElementById('mrBeta');if(bb)bb.style.display='block'}
@@ -644,7 +644,7 @@ async function boot(){
 }
 // ══ [첫 화면 2026-10-15] 대회 고르기 — 메뉴 「경기 기록 · 운영」으로 들어오면 대회 목록, 한 번 누르면 바로 그 대회의 시간표·기록 화면 ══
 async function pickLanding(){const main=document.getElementById('mrMain');document.getElementById('mrTop').innerHTML='';
-  if(!ME){main.innerHTML='<div class="bempty">로그인 후 이용할 수 있습니다. <a href="login.html" style="font-weight:800;color:#153A77">로그인</a></div>';return}
+  if(!ME){main.innerHTML='<div class="bempty">로그인 후 이용할 수 있습니다. <a href="'+'login.html?next='+encodeURIComponent((location.pathname.split('/').pop()||'index.html')+location.search)+'" style="font-weight:800;color:#153A77">로그인</a></div>';return}
   main.innerHTML='<div class="bempty">대회를 불러오는 중…</div>';
   let slots=[],stats={};
   try{const q=await DB.collection('compSlots').where('role','==','참가').get();slots=q.docs.map(d=>Object.assign({id:d.id},d.data()))}catch(e){main.innerHTML='<div class="bempty">대회 목록을 읽을 수 없습니다(승인 회원만 볼 수 있습니다).</div>';return}
