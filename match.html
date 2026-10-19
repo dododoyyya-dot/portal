@@ -203,6 +203,19 @@
 .rc .pc.off{opacity:.5;background:#eef1f6;cursor:not-allowed;border-style:dashed}.rc .pc.off b{text-decoration:line-through;color:var(--mut)}
 .rc .pc.sel{background:#fff7e0;border-color:var(--y);box-shadow:0 0 0 3px rgba(210,177,99,.45)}
 .rc .pc.dim{opacity:.35}.rc .pc.dragging{opacity:.3}
+/* [2026-10-19] 팀 칸 개편 — 팀명 가운데 · 오더지 우측 상단 · 선수 PC 6명 / 휴대폰 4명 · 위 줄 득점·제재 */
+.rc .qh2{position:relative;display:flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 74px;margin-bottom:10px;text-align:center}
+.rc .qh2 b{font-size:20px;font-weight:900;line-height:1.25;word-break:keep-all;overflow-wrap:break-word;min-width:0}
+.rc .qh2 .sw{flex:0 0 auto;width:14px;height:14px;border-radius:4px;border:1px solid rgba(0,0,0,.25)}
+.rc .qh2 .odb{position:absolute;top:0;right:0;border:1px solid var(--ln2);background:#fff;color:var(--b);border-radius:9px;padding:7px 11px;font-weight:800;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.rc .qt.cm{border-color:var(--y);box-shadow:0 0 0 2px rgba(210,177,99,.35),var(--sh)}
+.rc .cmh{background:#fff7e0;color:#7a5a00;border-radius:10px;padding:6px 10px;font-size:13px;font-weight:900;margin-bottom:8px;text-align:center}
+.rc .qt .pg{grid-template-columns:repeat(6,minmax(0,1fr))}
+.rc .qt .pc span{overflow-wrap:break-word;max-width:100%}
+.rc .ctrl .tmode{margin-left:auto;display:inline-flex;gap:6px;flex:0 0 auto}
+.rc .ctrl .tmode button{margin-left:0;border:1.5px solid var(--ln2);background:#fff;color:var(--ink);border-radius:10px;padding:8px 16px;font-size:14px;font-weight:900}
+.rc .ctrl .tmode button.g.on{background:var(--g);border-color:var(--g);color:#fff}.rc .ctrl .tmode button.c.on{background:var(--y);border-color:var(--y);color:#1f2937}
+@media(max-width:560px){.rc .qt .pg{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.rc .qt .pc{min-height:74px;padding:8px 2px 6px}.rc .qt .pc b{font-size:26px}.rc .qt .pc span{font-size:12px}.rc .qh2{padding:0 64px}.rc .qh2 b{font-size:17px}.rc .ctrl .tmode{width:100%}.rc .ctrl .tmode button{flex:1}}
 .rc.dragmode .zone{border-color:var(--b)}
 .pc-ghost{position:fixed;z-index:100000;pointer-events:none;transform:translate(-50%,-55%) rotate(-3deg) scale(1.06);background:#fff;border:2px solid #1c2e55;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:90px;font-family:inherit;color:#1f2937;box-shadow:0 18px 40px rgba(15,23,42,.35)}
 .pc-ghost b{font-size:34px;font-weight:900;line-height:1;color:#1c2e55}.pc-ghost span{font-size:13.5px;font-weight:800}.pc-ghost em,.pc-ghost i,.pc-ghost u,.pc-ghost s{display:none}
@@ -425,7 +438,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="matchrec.js?v=20261019b"></script>
+<script src="matchrec.js?v=20261019c"></script>
 <script>
 // ══════════ 경기 기록 (match.html) ══════════
 //   ?slot=참가공고ID            대회의 경기·오더지·디스크골프·순위 (운영진은 경기 생성·심판 배정)
@@ -657,7 +670,7 @@ function matchTab(){
 function matchCard(m){
   const sc=MR.score(m.events||[]);const a=m.a||{},b=m.b||{};const st=MR.ctrlState(m,ME&&ME.uid);const of=m.officials||{};
   const ofTxt=['recorder','ref1','ref2','ref3','scorer','supervisor'].filter(k=>of[k]&&of[k].name).map(k=>({recorder:'기록',ref1:'주심',ref2:'부심',ref3:'부심',scorer:'점수심',supervisor:'감독관'}[k])+' '+of[k].name).join(' · ');
-  return '<div class="mr-card'+(m.status==='진행'?' live':'')+(myRoles(m).length?' mine':'')+'" data-newkey="'+esc(m.id)+'">'+(myRoles(m).length?'<div style="margin-bottom:6px">'+myBadge(m)+'</div>':'')+'<div class="mr-row" style="font-size:12px;color:#6b7280;font-weight:700"><span class="mr-pill" style="background:'+(STC[m.status]||'#8a919d')+'">'+esc(m.status||'예정')+'</span>'+(m.locked?'<span class="mr-pill" style="background:#0f766e">확정</span>':(m.status==='종료'?'<span class="mr-pill" style="background:#b8860b">확정 전</span>':''))+'<span>'+esc([m.stage,m.round,m.court].filter(Boolean).join(' · '))+'</span><span style="flex:1"></span><span>'+esc(dateK(m.day))+(m.time?' '+esc(m.time):'')+'</span></div>'
+  return '<div class="mr-card'+(m.status==='진행'?' live':'')+(myRoles(m).length?' mine':'')+'" data-newkey="'+esc(m.id)+'">'+(myRoles(m).length?'<div style="margin-bottom:6px">'+myBadge(m)+'</div>':'')+'<div class="mr-row" style="font-size:12px;color:#6b7280;font-weight:700"><span class="mr-pill" style="background:'+(STC[m.status]||'#8a919d')+'">'+esc(m.status||'예정')+'</span>'+(m.locked?'<span class="mr-pill" style="background:#0f766e">확정</span>':(m.status==='종료'?'<span class="mr-pill" style="background:#b8860b">확정 전</span>':''))+'<span><b style="color:#1f2937">'+esc(mTitle(m))+'</b>'+(m.court?' · '+esc(m.court):'')+'</span><span style="flex:1"></span><span>'+esc(dateK(m.day))+(m.time?' '+esc(m.time):'')+'</span></div>'
     +'<div class="mr-vs"><div class="n">'+esc(a.name||'A')+(a.school&&a.school!==a.name?'<br><small style="color:#6b7280">'+esc(a.school)+'</small>':'')+'</div><div class="s">'+sc.a+' : '+sc.b+'</div><div class="n" style="text-align:right">'+esc(b.name||'B')+(b.school&&b.school!==b.name?'<br><small style="color:#6b7280">'+esc(b.school)+'</small>':'')+'</div></div>'
     +(m.period||(m.clock&&(m.clock.running||m.clock.base))?'<div class="mr-note" style="margin-top:4px">'+esc(m.period||'')+(m.clock?' · ⏱ '+MR.clockTxt(m):'')+(st==='other'?' · <b style="color:#C41E2F">'+esc(MR.ctrlLabel(m))+' 입력 중</b>':'')+'</div>':'')
     +(ofTxt?'<div class="mr-note" style="margin-top:4px">'+esc(ofTxt)+'</div>':'')
@@ -733,6 +746,13 @@ function myRoles(m){if(!ME||!m)return [];const of=m.officials||{};const out=[];
   (of.list||[]).forEach(x=>{if(x&&x.uid&&x.uid===ME.uid&&x.role)out.push(String(x.role).replace('기록원','기록').replace('심판감독관','감독관'))});
   if(!out.length)Object.keys(MY_RN).forEach(k=>{if(of[k]&&of[k].uid===ME.uid)out.push(MY_RN[k])});
   return [...new Set(out)]}
+/* 감독·코치진 전원: 경기 정보에 적은 지도자 → 오더지 감독교사 → 참가 신청 대표 인솔자·추가 인솔자(감독·코치·지도자), 같은 이름은 한 번 */
+function teamCoachTxt(m,side){const t=(m||{})[side]||{};const L=[];const add=(role,name)=>{name=String(name||'').trim();if(!name||L.some(x=>x.name===name))return;L.push({role:String(role||'').trim()||'지도자',name:name})};
+  const mc=(m.coaches||{})[side];if(Array.isArray(mc))mc.forEach(c=>{if(c)add(c.role||'감독',c.name)});
+  const o=orderOf(t.pid);if(o&&o.coach)add(o.coach.role||'감독',o.coach.name);
+  const c=t.pid?teamEntries().find(x=>entryKey(x)===t.pid):null;if(c){add(c.leaderRole||'인솔',c.leader);(c.staff||[]).forEach(x=>{if(x)add(x.role||'코치',x.name)})}
+  const g=[];L.forEach(x=>{let r=g.find(y=>y.role===x.role);if(!r){r={role:x.role,n:[]};g.push(r)}r.n.push(x.name)});return g.map(r=>r.role+' '+r.n.join('·')).join(' · ')}
+function mTitle(m){if(!m)return '';const r=MR.roundLabel(m);const st=m.stage||'';const sr=r?(st&&r.indexOf(st)!==0?st+' '+r:r):st;const g=(m.group&&sr.indexOf(m.group)<0)?m.group:'';return [m.div,g,sr].filter(Boolean).join(' ')}   /* 예: 고등부 남자 A조 예선 1경기 · 고등부 남자 본선 8강 1경기 */
 function myBadge(m){const r=myRoles(m);return r.length?'<span class="my-badge">🙋 내 경기 · '+esc(r.join('·'))+'</span>':''}   /* 시간표 편집(끌어 옮기기) 잠금 — 기본 잠김 */
 // [2026-10-19] 시간표 옮기기·경기 지우기는 관리자와 이 대회 심판위원장(심판장·심판총괄)만
 function canBoard(){if(!ME||!MY)return false;const roles=[MY.role].concat(MY.roles||[]);if(MY.owner===true||roles.indexOf('admin')>=0)return true;return /심판위원장|심판장|심판총괄/.test(((SLOT_ROLES||{})[ME.uid]||[]).join(' '))}
@@ -749,7 +769,7 @@ function bdTimes(c,day){const P=(day&&(c.plan||{})[day])||{};const st=String(P.s
 function bdPlaced(m,c,times){return !!(m.day&&m.time&&m.court&&c.courts.indexOf(m.court)>=0&&/^\d{1,2}:\d{2}$/.test(m.time))}
 function bdTimesDay(c,day){const T=bdTimes(c,day);MATCHES.forEach(m=>{if(m.day===day&&m.time&&m.court&&c.courts.indexOf(m.court)>=0&&/^\d{1,2}:\d{2}$/.test(m.time)&&T.indexOf(m.time)<0)T.push(m.time)});return T.sort()}   // [2026-10-18] 16:45 처럼 간격에 안 맞는 경기도 그 시각 줄로
 function bdCard(m){const sc=MR.score(m.events||[]);const a=m.a||{},b=m.b||{};const cls=(m.status==='진행'?' live':m.status==='종료'?' done':'')+(myRoles(m).length?' mine':'');
-  return '<div class="bd-card'+cls+(BD_SEL===m.id?' sel':'')+'" data-mid="'+esc(m.id)+'"><span class="st"></span>'+(bdEditable()?'<button class="bd-ed" title="날짜·시각·구장 직접 고치기" onclick="event.stopPropagation();bdTimeEdit(\''+esc(m.id)+'\')">✎</button>':'')+'<div class="dv">'+((m.mno||m.order)?'<b class="bdno">'+esc(m.mno||m.order)+'경기</b> ':'')+esc([m.stage,m.div,m.group||m.round].filter(Boolean).join(' · '))+(m.day&&!m.time?' <span style="color:#b8860b">📅 '+esc(dateK(m.day).slice(5))+'</span>':'')+'</div><div class="vs">'+esc(a.name||'?')+(m.status!=='예정'?' <span class="sc">'+sc.a+':'+sc.b+'</span> ':' vs ')+esc(b.name||'?')+'</div>'+((m.officials||{}).ref1?'<div class="dv" style="color:#7c3aed">주심 '+esc(m.officials.ref1.name)+((m.officials||{}).recorder?' · 기록 '+esc(m.officials.recorder.name):'')+'</div>':'')+myBadge(m)+'</div>'}
+  return '<div class="bd-card'+cls+(BD_SEL===m.id?' sel':'')+'" data-mid="'+esc(m.id)+'"><span class="st"></span>'+(bdEditable()?'<button class="bd-ed" title="날짜·시각·구장 직접 고치기" onclick="event.stopPropagation();bdTimeEdit(\''+esc(m.id)+'\')">✎</button>':'')+'<div class="dv">'+((m.mno||m.order)?'<b class="bdno">'+esc(m.mno||m.order)+'경기</b> ':'')+esc(mTitle(m))+(m.day&&!m.time?' <span style="color:#b8860b">📅 '+esc(dateK(m.day).slice(5))+'</span>':'')+'</div><div class="vs">'+esc(a.name||'?')+(m.status!=='예정'?' <span class="sc">'+sc.a+':'+sc.b+'</span> ':' vs ')+esc(b.name||'?')+'</div>'+((m.officials||{}).ref1?'<div class="dv" style="color:#7c3aed">주심 '+esc(m.officials.ref1.name)+((m.officials||{}).recorder?' · 기록 '+esc(m.officials.recorder.name):'')+'</div>':'')+myBadge(m)+'</div>'}
 function boardTab(){
   const days=bdDays();if(!BD_DAY||days.indexOf(BD_DAY)<0)BD_DAY=days[0]||'';const c=bdCfg();const times=bdTimesDay(c,BD_DAY);
   const divs=[...new Set(MATCHES.map(m=>m.div).filter(Boolean))].sort();
@@ -1178,12 +1198,12 @@ function rcRender(){
   const sc=MR.score(m.events||[]);const H=sc.half||{a:{},b:{}};const st=ME?MR.ctrlState(m,ME.uid):'other';const can=canRec(m)&&!m.locked;const mine=can&&st==='mine';
   const c=m.clock||{};const q=MR.qCount(RC_ID);
     const ofs=(function(){const L=MR.offList(m);const g={};L.forEach(x=>{(g[x.role||'심판']=g[x.role||'심판']||[]).push(x.name)});const parts=['감독관','주심','부심','점수심','기록원'].filter(r=>g[r]).map(r=>esc(r)+' <b>'+g[r].map(esc).join('·')+'</b>');
-    return '<span class="ofs'+(parts.length?'':' none')+'">'+(parts.join(' <i>·</i> ')||'심판 미배정')+'</span>'+(STAFF?'<button class="ed" onclick="matchForm(\''+m.id+'\')">경기 정보</button>':'')+(can&&st==='mine'?'<button class="ed u" '+(lastEv(m)?'':'disabled')+' onclick="qkUndoLast()" title="마지막 기록(득점·제재·작전타임)을 취소 표시합니다">↩ 되돌리기</button>':'')})();
+    return '<span class="ofs'+(parts.length?'':' none')+'">'+(parts.join(' <i>·</i> ')||'심판 미배정')+'</span>'+(STAFF?'<button class="ed" onclick="matchForm(\''+m.id+'\')">경기 정보</button>':'')+(can&&st==='mine'?'<button class="ed u" '+(lastEv(m)?'':'disabled')+' onclick="qkUndoLast()" title="마지막 기록(득점·제재·작전타임)을 취소 표시합니다">↩ 되돌리기</button>':'')+(can&&st==='mine'&&m.status!=='예정'?'<span class="tmode"><button class="g'+(QK.mode==='goal'?' on':'')+'" onclick="qkTop(\'goal\')" title="누르면 선수 명단으로 내려갑니다">⚽ 득점</button><button class="c'+(QK.mode==='card'?' on':'')+'" onclick="qkTop(\'card\')" title="누르면 선수 명단으로 내려갑니다 · 저장하면 점수판으로">🟨 제재</button></span>':'')})();
   const ctrl=!can?'<div class="ctrl"><span>보기 전용'+(m.locked?' · 확정된 경기':'')+'</span>'+ofs+'</div>'
     :st==='mine'?'<div class="ctrl mine"><span>입력 중 · '+esc(MY.name||'')+(q?' · <b>미전송 '+q+'건</b>':'')+'</span>'+ofs+'</div>'
     :st==='other'?'<div class="ctrl other"><span>'+esc(MR.ctrlLabel(m))+' 입력 중 — 보기 전용</span>'+ofs+'<button onclick="rcTake()">넘겨받기</button></div>'
     :'<div class="ctrl"><span>입력권이 비어 있습니다</span>'+ofs+'<button onclick="rcClaim(true)">입력 시작</button></div>';
-  let h='<div class="top"><span class="mr-pill" style="background:'+(STC[m.status]||'#8a919d')+'">'+esc(m.status||'예정')+'</span><b>'+esc([m.div,m.stage,MR.roundLabel(m)].filter(Boolean).join(' · ')||'경기')+'</b><span class="meta">'+esc([m.court,dateK(m.day),m.time].filter(Boolean).join(' · '))+'</span>'+(m.locked?'<span class="mr-pill" style="background:#0b6b3a">확정</span>':'')+'<button class="hb" onclick="rcHelp()">사용법</button><button class="x" onclick="rcClose()">✕ 닫기</button></div>'+ctrl;
+  let h='<div class="top"><span class="mr-pill" style="background:'+(STC[m.status]||'#8a919d')+'">'+esc(m.status||'예정')+'</span><b>'+esc(mTitle(m)||'경기')+'</b><span class="meta">'+esc([m.court,dateK(m.day),m.time].filter(Boolean).join(' · '))+'</span>'+(m.locked?'<span class="mr-pill" style="background:#0b6b3a">확정</span>':'')+'<button class="hb" onclick="rcHelp()">사용법</button><button class="x" onclick="rcClose()">✕ 닫기</button></div>'+ctrl;
   // ① 시작 전: 경기복·풀 고르기
   if(mine&&m.status==='예정'&&!m.kit){ov.innerHTML=h+'<div class="body">'+rcTipHtml()+setupHtml(m,false)+'</div>';return}
   const [L,R]=sidesLR(m);const per=m.period||'';const curP=per==='하프타임'?'':per;const TO=MR.timeouts(m);
@@ -1204,12 +1224,12 @@ function rcRender(){
   // ④ 입력 방식 · 팀 패널
   if(mine){
     if(QK.swap)h+='<div class="swapbar">'+(QK.swapSel?'⇅ 선택한 선수와 바꿀 선수를 누르세요':'⇅ 바꿀 두 선수를 차례로 누르세요 (주전 ↔ 후보)')+'<button onclick="swapMode()">취소</button></div>';
-    h+='<div class="qteams">'+qkTeam(m,L)+qkTeam(m,R)+'</div>';
+    h+='<div class="qteams" data-anc="qteams">'+qkTeam(m,L)+qkTeam(m,R)+'</div>';
   }
   // ⑤ 기록
   const evs=(m.events||[]).slice().reverse();
   h+='<div class="log" data-anc="log"><div class="h">경기 기록 <span style="color:#0b6b3a">'+(m.events||[]).filter(e=>e&&!e.void&&e.type==='goal').length+'득점</span><span>· 제재 '+(m.events||[]).filter(e=>e&&!e.void&&e.type==='card').length+'</span>'+(m.fairplay?'<span>· 페어 '+esc((m.a||{}).name||'A')+' '+(m.fairplay.a||0)+' · '+esc((m.b||{}).name||'B')+' '+(m.fairplay.b||0)+'</span>':'')+(m.mvp?'<span>· MVP #'+esc(m.mvp.no||'')+' '+esc(m.mvp.name||'')+'</span>':'')+'</div>'
-    +MR.timelineBody(m,orderOf((m.a||{}).pid)||{},orderOf((m.b||{}).pid)||{},{inline:true,compact:true,teamsHead:true,showVoid:true,act:e=>(mine&&!e.void&&e.type)?'<button onclick="evEdit(\''+esc(e.id)+'\')">수정</button><button onclick="evVoid(\''+esc(e.id)+'\')">취소</button>':''})
+    +MR.timelineBody(m,orderOf((m.a||{}).pid)||{},orderOf((m.b||{}).pid)||{},{inline:true,compact:true,teamsHead:true,showVoid:true,heads:{a:teamCoachTxt(m,'a'),b:teamCoachTxt(m,'b')},act:e=>(mine&&!e.void&&e.type)?'<button onclick="evEdit(\''+esc(e.id)+'\')">수정</button><button onclick="evVoid(\''+esc(e.id)+'\')">취소</button>':''})
     +(evs.length||!mine?'':'<div class="mr-note" style="padding:0 14px 12px">득점: 득점한 선수 카드 → 어시스트 선수(또는 「어시스트 없음」) 두 번 누르면 저장됩니다.</div>')+'</div>'
     +(m.status==='종료'?'<div class="mr-note" style="margin:10px 2px 0;font-weight:700">기록지는 아래 「기록지 보기 · 인쇄」로 이 화면에서 바로 봅니다(타임라인 · 진흥회 양식). 엑셀과 대회 전체 결과는 <a href="results.html?id=slot_'+esc(SLOT_ID)+'" style="color:#1c2e55;font-weight:900">대회 결과 페이지</a>에서 내려받습니다.</div>':'')+'</div>';
   // ⑥ 아래 고정 줄: 시작·종료·확정만
@@ -1220,19 +1240,19 @@ function rcRender(){
   if(QK.toast)h+='<div class="toast">'+esc(QK.toast.text)+(QK.toast.evId?'<button onclick="qkUndo()">되돌리기</button>':'')+'</div>';
   ov.innerHTML=h;const bd=ov.querySelector('.body');if(bd){bd.scrollTop=keep;if(anc){const e=bd.querySelector('[data-anc="'+anc.id+'"]');if(e){const t=e.getBoundingClientRect().top-bd.getBoundingClientRect().top;if(Math.abs(t-anc.t)>1)bd.scrollTop+=(t-anc.t)}}}rcBind();rcTick();
 }
-function rcTipHtml(){let seen=false;try{seen=localStorage.getItem('kfdf_rc_tip2')==='1'}catch(e){}if(seen)return '';return '<div class="tip">💡 처음이신가요? 득점·제재·주전 교체·작전타임 방법을 30초 만에 볼 수 있습니다.<button onclick="rcHelp()">사용법 보기</button><button class="nx" onclick="try{localStorage.setItem(\'kfdf_rc_tip2\',\'1\')}catch(e){};rcRender()">다시 보지 않기</button></div>'}
+function rcTipHtml(){let seen=false;try{seen=localStorage.getItem('kfdf_rc_tip2')==='1'}catch(e){}if(seen)return '';return '<div class="tip">💡 처음이신가요? 득점·제재·작전타임 방법을 30초 만에 볼 수 있습니다.<button onclick="rcHelp()">사용법 보기</button><button class="nx" onclick="try{localStorage.setItem(\'kfdf_rc_tip2\',\'1\')}catch(e){};rcRender()">다시 보지 않기</button></div>'}
 function rcHelp(){sheet('<div class="hd"><b>❓ 기록 콘솔 사용법</b><button class="x" onclick="sheetClose()">✕</button></div><ol class="help">'
   +'<li><b>경기복 고르기</b> — 처음 열면 오더지에서 「착용」으로 고른 옷이 미리 선택돼 있습니다. 현장에서 다른 옷(조끼 등)을 입었으면 그 첫 화면에서 바꿉니다.</li>'
   +'<li><b>경기 시작</b> — 아래 「▶ 경기 시작」을 누르면 전반이 시작되고 시계가 갑니다. 구간은 시계 위 「전반전」 옆 ◀ ▶ 로 넘깁니다(전반 → 하프타임 → 후반 → 연장).</li>'
   +'<li><b>풀</b> — 팀 칸 아래 「전반 풀」을 누르면 상대 팀에 「후반 풀」이 자동으로 표시됩니다.</li>'
-  +'<li><b>득점</b> — 팀 칸 머리의 「득점」 상태에서 득점한 선수 카드를 누르고, 이어서 어시스트 선수(또는 「어시스트 없음」)를 누르면 저장됩니다.</li>'
-  +'<li><b>제재</b> — 팀 칸 머리의 「제재」를 누르고 선수(또는 지도자)를 고른 뒤 주의·옐로·레드를 고르고 사유를 적어 저장합니다. 레드(또는 옐로 2장)를 받은 선수는 후보 칸으로 내려가 잠기고, 빈 자리에 다른 선수를 넣어 인원 그대로 진행합니다.</li>'
-  +'<li><b>주전·후보 교체</b> — 휴대폰·태블릿: 선수 카드를 <b>길게 누르면</b> 그 선수가 선택되고, 이어서 <b>바꿀 선수를 누르면</b> 자리가 바뀝니다. PC: 마우스로 끌어 다른 선수 위에 놓거나 주전·후보 칸으로 옮깁니다. 「⇅ 교체」 버튼을 켜고 두 선수를 차례로 눌러도 됩니다.</li>'
+  +'<li><b>득점</b> — 큰 점수 숫자나 위 줄 오른쪽 「⚽ 득점」을 누르면 선수 명단으로 내려갑니다. 득점한 선수 카드 → 어시스트 선수(또는 「어시스트 없음」)를 누르면 저장되고 점수판으로 돌아옵니다.</li>'
+  +'<li><b>제재</b> — 위 줄 오른쪽 「🟨 제재」를 누르면 선수 명단으로 내려갑니다. 선수(또는 「지도자 제재」)를 고른 뒤 주의·옐로·레드와 사유를 적어 저장하면 점수판으로 돌아오고 득점 입력으로 바뀝니다. 레드(또는 옐로 2장)를 받은 선수는 「퇴장」으로 잠깁니다.</li>'
+  +'<li><b>선수 명단</b> — 주전·후보 구분 없이 배번 순서로 모두 나옵니다(PC 한 줄 6명, 휴대폰 4명). 교체는 기록하지 않습니다.</li>'
   +'<li><b>작전타임</b> — 점수 아래 버튼. 경기 시계가 멈추고 1분 타이머가 따로 돕니다. 구간(전반·후반·연장)마다 팀당 1번입니다.</li>'
   +'<li><b>구간 시계</b> — 전반·후반·연장은 저마다 0:00 부터 셉니다. 구간이 끝나면 종료 시간이 시계 위에 작게 남고, 정한 구간 시간(기본 10분·연장 5분)이 지나면 시계가 붉게 깜박입니다(자동으로 멈추지 않음).</li>'
   +'<li><b>하프타임</b> — 시계 위 ▶ 로 「하프타임」에 들어가면 5분(설정 가능) 타이머가 돕니다. 시간이 끝나면 화면 테두리가 깜박이며 알려 주고, <b>「재개」를 눌러야</b> 후반과 시계가 함께 시작됩니다.</li>'
   +'<li><b>시간 고치기</b> — 시계를 누르면 ±1초·±10초·±1분 단추와 직접 입력으로 분:초를 맞춥니다. 「리셋」은 이 구간 시계를 0:00 으로. 각 기록의 시간도 「수정」에서 초 단위로 고칩니다.</li>'
-  +'<li><b>오더지·배번</b> — 팀 칸의 「오더지」로 기록 화면을 닫지 않고 배번·경기복을 바로 고칩니다(권한이 있을 때). 주전은 설정한 인원(기본 7명)만큼 자리가 있고 빈 자리는 「＋ 빈 자리」로 보입니다.</li>'
+  +'<li><b>오더지·배번</b> — 팀 칸 오른쪽 위 「오더지」로 기록 화면을 닫지 않고 배번·경기복을 바로 고칩니다(권한이 있을 때).</li>'
   +'<li><b>잘못 눌렀을 때</b> — 저장 직후 아래 「되돌리기」, 또는 기록 목록의 「취소」·「수정」.</li>'
   +'<li><b>경기 종료</b> — 「경기 종료」에서 페어플레이·지도자 가점·최우수선수를 고르고 확정하면 서명이 자동으로 들어가고 타임라인 기록지가 바로 열립니다(위쪽 「진흥회 양식」으로 바꿔 인쇄). 종료·확정은 감독관이, 감독관이 없는 경기는 주심·기록원이 합니다.</li></ol>'
   +'<button class="go b" onclick="try{localStorage.setItem(\'kfdf_rc_tip2\',\'1\')}catch(e){};sheetClose();rcRender()">알겠습니다</button>')}
@@ -1242,7 +1262,7 @@ function setupHtml(m,inSheet){const S=QK.setup||(QK.setup={a:kitIdx(m,'a'),b:kit
     return '<div class="su-team"><div class="su-h">'+esc(tname(m,side))+(o?'':' <span class="warn">· 오더지 없음 (기본 색으로 표시, 배번은 숫자판으로 입력)</span>')+'</div><div class="su-kits">'+[0,1].map(i=>{const k=K[i];const nos=o?(o.players||[]).map(p=>MR.noFor(p,i)).filter(Boolean):[];
       return '<button class="su-kit'+(S[side]===i?' on':'')+'" onclick="suPick(\''+side+'\','+i+')"><span class="sw" style="background:'+esc(k.color)+';color:'+MR.kitTextColor(k.color)+'">'+(i+1)+'</span><b>'+esc(k.name)+'</b><small>'+(nos.length?'배번 '+esc(nos.slice(0,10).join(' · '))+(nos.length>10?' …':''):'배번 미입력')+'</small>'+(S[side]===i?'<i>✓ 선택</i>':'')+'</button>'}).join('')+'</div></div>'};
   return '<div class="su"><div class="su-step">① 오늘 입은 경기복<small>오더지에서 「착용」으로 고른 옷이 미리 선택돼 있습니다 — 현장에서 다르면 여기서 바꾸세요</small></div>'+team('a')+team('b')
-    +'<div class="su-step">② 구간 시간(분)<small>구간마다 0:00 부터 세고, 정한 시간이 지나면 시계가 붉게 바뀌어 알립니다(자동으로 멈추지는 않습니다)</small></div><div class="seg2 plen"><label>전반 · 후반 <input type="number" min="1" max="90" inputmode="numeric" value="'+esc(S.reg)+'" oninput="QK.setup.reg=this.value">분</label><label>하프타임 <input type="number" min="1" max="30" inputmode="numeric" value="'+esc(S.half)+'" oninput="QK.setup.half=this.value">분</label><label>연장 <input type="number" min="1" max="60" inputmode="numeric" value="'+esc(S.ot)+'" oninput="QK.setup.ot=this.value">분</label><label>주전 <input type="number" min="1" max="15" inputmode="numeric" value="'+esc(S.on)+'" oninput="QK.setup.on=this.value">명</label></div>'
+    +'<div class="su-step">② 구간 시간(분)<small>구간마다 0:00 부터 세고, 정한 시간이 지나면 시계가 붉게 바뀌어 알립니다(자동으로 멈추지는 않습니다)</small></div><div class="seg2 plen"><label>전반 · 후반 <input type="number" min="1" max="90" inputmode="numeric" value="'+esc(S.reg)+'" oninput="QK.setup.reg=this.value">분</label><label>하프타임 <input type="number" min="1" max="30" inputmode="numeric" value="'+esc(S.half)+'" oninput="QK.setup.half=this.value">분</label><label>연장 <input type="number" min="1" max="60" inputmode="numeric" value="'+esc(S.ot)+'" oninput="QK.setup.ot=this.value">분</label></div>'
     +'<button class="su-go" onclick="setupSave()">'+(inSheet?'✔ 저장':'✔ 이 설정으로 기록 화면 열기')+'</button></div>'}
 function suPick(side,i){QK.setup[side]=i;suRefresh()}
 function suPull(sd){QK.setup.pull=QK.setup.pull===sd?'':sd;suRefresh()}
@@ -1301,8 +1321,8 @@ function rcSwap(){const m=RCM();rcUpdate({swap:!m.swap})}
 function qkCounts(m,side){const o={};(m.events||[]).forEach(e=>{if(!e||e.void||e.side!==side)return;const add=(p,f,v)=>{if(!p||!p.no)return;const k=p.no;o[k]=o[k]||{g:0,a:0,c:''};if(f==='c')o[k].c+=v;else o[k][f]++};if(e.type==='goal'){add(e.scorer,'g');add(e.assist,'a')}if(e.type==='card'&&e.target&&e.target.kind!=='coach')add(e.target,'c',e.card)});return o}
 function qkTeam(m,side){
   const t=m[side]||{};const T=teamPl(m,side);const P=QK.pend&&QK.pend.side===side?QK.pend:null;const cnt=qkCounts(m,side);const K=kitOfSide(m,side);
-  let h='<div class="qt'+(P?(P.stage==='card'?' hotc':' hot'):'')+'" data-anc="qt-'+side+'"><div class="qh"><div class="qn"><span class="sw" style="background:'+esc(K.color)+'"></span><b>'+esc((t.name||t.school||side.toUpperCase()))+'</b><span class="kinfo">'+esc(K.name)+(T?' · '+T.all.length+'명':' · 오더지 없음')+'</span></div>'
-    +(P?'':'<div class="qb">'+(function(){const cs=MR.coachesOf(m,side,orderOf(t.pid)||{});return cs.length?'<span class="co">감독 <b>'+esc(cs.map(c=>c.name).join('·'))+'</b></span>':''})()+'<span class="modeseg"><button class="g'+(QK.mode==='goal'?' on':'')+'" onclick="qkMode(\'goal\')">득점</button><button class="c'+(QK.mode==='card'?' on':'')+'" onclick="qkMode(\'card\')">제재</button></span>'+'<button class="'+(QK.swap?'on':'')+'" onclick="swapMode()" title="주전·후보 바꾸기">⇅ 교체</button><button onclick="rcOrder(\''+side+'\')" title="오더지 열기 (배번 수정은 여기서)">오더지</button></div>')+'</div>';
+  let h='<div class="qt'+(P?(P.stage==='card'?' hotc':' hot'):(QK.mode==='card'?' cm':''))+'" data-anc="qt-'+side+'"><div class="qh2"><span class="sw" style="background:'+esc(K.color)+'"></span><b>'+esc((t.name||t.school||side.toUpperCase()))+'</b>'+(P?'':'<button class="odb" onclick="rcOrder(\''+side+'\')" title="오더지 열기 (배번 수정은 여기서)">오더지</button>')+'</div>'
+    +(!P&&QK.mode==='card'?'<div class="cmh">🟨 제재 — 선수를 누르세요</div>':'');
   const chip=(p,zone,act)=>{const off=isOffP(m,side,p);const k=cnt[p.no]||{};const sel=QK.swapSel&&QK.swapSel.side===side&&QK.swapSel.key===p.key;
     return '<button class="pc'+(p.role==='주장'?' cap':'')+(off?' off':'')+(sel?' sel':'')+(QK.pend&&!P?' dim':'')+'" data-side="'+side+'" data-key="'+esc(p.key)+'" data-zone="'+zone+'"'+(act?' data-act="'+act+'"':'')+(off?' disabled':'')+'>'+(p.role==='주장'?'<em>C</em>':'')+((k.g||k.a)?'<i>'+(k.g?k.g+'득':'')+(k.a?' '+k.a+'도':'')+'</i>':'')+'<b>'+esc(p.no)+'</b><span>'+esc(p.name||'')+'</span>'+(k.c?'<u>'+esc(k.c.split('').map(x=>({C:'주',Y:'옐',R:'레',W:'퇴'})[x]||x).join(''))+'</u>':'')+(off?'<s>퇴장</s>':'')+'</button>'};
   if(P&&P.stage==='assist'){
@@ -1316,8 +1336,8 @@ function qkTeam(m,side){
       +'<input class="rsn" id="qkRsn" placeholder="사유를 적어 주세요 (예: 고의 접촉, 경기 지연, 항의)" value="'+esc(P.note||'')+'" oninput="QK.pend.note=this.value">'
       +'<div class="qa"><button class="ok c" '+(P.card?'':'disabled')+' onclick="qkCardSave()">✓ '+(P.card?esc(MR.CARDS[P.card])+' ':'')+'제재 저장</button><button class="no" onclick="qkCancel()">취소</button></div>';
   }else if(T&&T.all.length){
-    h+='<div class="zone" data-side="'+side+'" data-zone="on"><div class="zl">주전 <small>'+(T.on.length-T.on.filter(p=>isOffP(m,side,p)).length)+' / '+maxOn(m)+'명</small>'+(T.on.some(p=>isOffP(m,side,p))?'<span class="off">퇴장 '+T.on.filter(p=>isOffP(m,side,p)).length+' — 다른 선수를 넣어 주세요</span>':'')+'<span class="kbar" style="background:'+esc(K.color)+'"></span></div><div class="pg">'+T.on.map(p=>chip(p,'on')).join('')+Array.from({length:Math.max(0,maxOn(m)-T.on.length)}).map(()=>'<div class="pc empty"><b>＋</b><span>빈 자리</span></div>').join('')+'</div></div>'
-      +'<div class="zone bench" data-side="'+side+'" data-zone="bench"><div class="zl">후보 <small>'+T.bench.length+'명</small></div><div class="pg">'+(T.bench.map(p=>chip(p,'bench')).join('')||'<div class="ze">후보 없음 — 주전 카드를 여기로 끌면 후보가 됩니다</div>')+'</div></div>';
+    const byNo=(a,b)=>(+a.no)-(+b.no)||String(a.no).localeCompare(String(b.no));
+    h+='<div class="pg">'+T.all.slice().sort(byNo).map(p=>chip(p,'')).join('')+'</div>';   /* [2026-10-19] 주전·후보 구분·교체 없음 — 얼티미트는 교체가 자유로워 번호순 전원 */
     h+='<div class="qx">'+(QK.mode==='card'?'<button onclick="qkCoach(\''+side+'\')">👔 지도자 제재</button>':'<button onclick="qkScorerObj(\''+side+'\',null)">득점자 모름 — 점수만 올리기</button>')+'</div>';
   }else{
     h+=qkPad(side,QK.mode==='card'?'card':'scorer');
@@ -1391,9 +1411,11 @@ function qkTimeRow_old(P){return '<div class="qm"><span class="ql">시간</span>
 function qkT(d){if(!QK.pend)return;QK.pend.sec=Math.max(0,(+QK.pend.sec||0)+d);rcRender()}
 function qkNew(side,stage){const m=RCM();return {side:side,stage:stage,sec:MR.secOf(m),period:curPeriodRec(m)}}
 function qkMode(md){QK.mode=md;QK.pend=null;QK.swap=false;QK.swapSel=null;rcRender()}
-function qkCancel(){QK.pend=null;rcRender();qkJumpBack()}
+function qkCancel(){QK.pend=null;if(QK.mode==='card'&&QK.jump)QK.mode='goal';rcRender();qkJumpBack()}
+/* [2026-10-19] 위 줄 득점·제재 — 모드를 바꾸고 두 팀 선수 명단으로 내려감. 저장·취소하면 점수판으로 돌아옴(제재는 끝나면 득점으로) */
+function qkTop(md){QK.mode=md;QK.pend=null;QK.swap=false;QK.swapSel=null;QK.jump='all';rcRender();setTimeout(()=>rcScrollTo('qteams','start'),30)}
 // [13차] 스코어 숫자 → 그 팀 선수 명단(득점 모드)으로 바로 이동, 저장·취소 뒤 스코어로 복귀 — 휴대폰에서 스크롤을 줄이기 위함
-function rcScrollTo(id,block){const bd=document.querySelector('#rcOv .body');const e=bd&&bd.querySelector('[data-anc="'+id+'"]');if(!e)return;try{e.scrollIntoView({block:block||'start',behavior:'smooth'})}catch(x){e.scrollIntoView()}}
+function rcScrollTo(id,block){const bd=document.querySelector('#rcOv .body');const e=bd&&bd.querySelector('[data-anc="'+id+'"]');if(!e)return;try{e.scrollIntoView({block:block||'start',behavior:'smooth'})}catch(x){e.scrollIntoView()}setTimeout(()=>{const e2=bd.querySelector('[data-anc="'+id+'"]');if(!e2)return;const d=e2.getBoundingClientRect().top-bd.getBoundingClientRect().top;if(Math.abs(d)>40)bd.scrollTop+=d-8},700)}   /* 부드러운 스크롤이 멈추는 기기 대비 */
 function qkJump(side){QK.mode='goal';QK.pend=null;QK.swap=false;QK.swapSel=null;QK.jump=side;rcRender();setTimeout(()=>rcScrollTo('qt-'+side,'start'),30)}
 function qkJumpBack(){if(!QK.jump)return;QK.jump=null;setTimeout(()=>rcScrollTo('sb','start'),80)}
 function qkScorerObj(side,p){QK.pend=qkNew(side,'assist');QK.pend.scorer=p;rcRender()}
@@ -1406,7 +1428,7 @@ async function qkAssistObj(side,ap){const P=QK.pend;if(!P||P.side!==side)return;
 function qkCoach(side){const m=RCM();const o=orderOf((m[side]||{}).pid)||{};QK.pend=qkNew(side,'card');QK.pend.target={kind:'coach',no:'',name:((o.coach||{}).name)||''};rcRender()}
 async function qkCardSave(){const P=QK.pend;if(!P||P.stage!=='card'||!P.card)return;const m=RCM();const r=document.getElementById('qkRsn');const note=String((r&&r.value)||P.note||'').trim();
   P.sec=MR.secOf(m);P.period=curPeriodRec(m);
-  const ev={id:MR.uid8(),type:'card',side:P.side,sec:+P.sec,min:Math.floor((+P.sec)/60),period:P.period,card:P.card,note:note,target:P.target,clock:MR.fmtSec(P.sec)};QK.pend=null;
+  const ev={id:MR.uid8(),type:'card',side:P.side,sec:+P.sec,min:Math.floor((+P.sec)/60),period:P.period,card:P.card,note:note,target:P.target,clock:MR.fmtSec(P.sec)};QK.pend=null;QK.mode='goal';
   const willOff=P.target.kind!=='coach'&&(MR.isOff(P.card)||(P.card==='Y'&&MR.yellowCount(m,P.side,P.target)>=1));
   qkToast((m[P.side]||{}).name+' '+MR.CARDS[P.card]+' '+(P.target.kind==='coach'?'지도자':'#'+P.target.no)+(willOff?(P.card==='Y'?' · 옐로 2장 → 퇴장':' · 퇴장')+' — 한 명 적게 진행':'')+' · '+ev.clock,ev.id);
   await sendEvent({kind:'add',id:RC_ID,ev:ev,opts:{requireCtrl:true}});

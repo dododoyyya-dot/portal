@@ -316,7 +316,7 @@
     +'.ktl-empty{position:relative;z-index:1;text-align:center;font-size:13px;color:#6b7280;background:#fff;margin:14px auto;padding:6px 12px;max-width:80%}'
     +'.ktl-ft{border-top:1px solid #eef1f5;padding:10px 14px;font-size:12.5px;color:#374151;line-height:1.75}.ktl-ft b{color:#111827}'
     +'.ktl-e .ktl-gl{display:flex;gap:14px;align-items:flex-start}.ktl-l .ktl-e .ktl-gl{justify-content:flex-end}.ktl-e .ktl-pp b{display:block;font-size:15px;font-weight:900;line-height:1.3;white-space:nowrap}.ktl-e .ktl-pp small{display:block;font-size:11px;font-weight:700;color:#6b7280;margin-top:1px}'
-    +'.ktl-th{display:grid;grid-template-columns:1fr 78px 1fr;align-items:center;padding:10px 12px 6px;border-bottom:1px solid #eef1f5;position:relative;z-index:1;background:#fff}.ktl-th b{font-size:14px;font-weight:900;color:#153A77}.ktl-th b:first-child{text-align:right;padding-right:12px}.ktl-th b:last-child{padding-left:12px}.ktl-th span{text-align:center;font-size:11px;font-weight:800;color:#9aa1ad}'
+    +'.ktl-th{display:grid;grid-template-columns:1fr 78px 1fr;align-items:center;padding:10px 12px 6px;border-bottom:1px solid #eef1f5;position:relative;z-index:1;background:#fff}.ktl-th b{font-size:14px;font-weight:900;color:#153A77}.ktl-th b small{display:block;font-size:11.5px;font-weight:700;color:#4b5563;margin-top:2px;line-height:1.35;word-break:keep-all;overflow-wrap:break-word}.ktl-th b:first-child{text-align:right;padding-right:12px}.ktl-th b:last-child{padding-left:12px}.ktl-th span{text-align:center;font-size:11px;font-weight:800;color:#9aa1ad}'
     +'.ktl.cp .ktl-r{min-height:54px}.ktl.cp .ktl-p{margin:6px 0}.ktl.cp .ktl-p .ck{width:36px;height:36px}'
     +'@media(max-width:520px){.ktl-r{grid-template-columns:1fr 64px 1fr}.ktl-th{grid-template-columns:1fr 64px 1fr}.ktl-e .ktl-pp b{font-size:13px}.ktl-e .ktl-gl{gap:8px}.ktl-e{padding:5px 6px;gap:5px}.ktl-e .tx b{font-size:13.5px}.ktl-chip{font-size:10.5px;padding:3px 6px}.ktl-t span{min-width:52px;height:32px;font-size:13px}.ktl-sc .n{font-size:34px}.ktl-tm b{font-size:14px}}'
     +'@media print{.ktl-act{display:none}.ktl{max-width:none}}';
@@ -349,7 +349,7 @@
     function teamName(s){var t=m[s]||{};return t.name||t.school||s.toUpperCase()}
     var css=opt.noCss?'':'<style>'+KTLCSS+'</style>';
     var bd='<div class="ktl-bd">'+(body||'<div class="ktl-empty">아직 기록이 없습니다</div>')+'</div>';
-    var th=opt.teamsHead?'<div class="ktl-th"><b>'+esc(teamName('a'))+'</b><span>시간 · 점수</span><b>'+esc(teamName('b'))+'</b></div>':'';
+    var hd=opt.heads||{};var th=opt.teamsHead?'<div class="ktl-th"><b>'+esc(teamName('a'))+(hd.a?'<small>'+esc(hd.a)+'</small>':'')+'</b><span>시간 · 점수</span><b>'+esc(teamName('b'))+(hd.b?'<small>'+esc(hd.b)+'</small>':'')+'</b></div>':'';
     if(opt.inline)return css+'<div class="ktl'+(opt.compact?' cp':'')+'">'+th+bd+'</div>';
     var kit=function(side,o){var k=((m.kit||{})[side]===1)?1:0;return kitsOf(o||{})[k]};
     var tmH=function(side,o){var t=m[side]||{};var K=kit(side,o);return '<div class="ktl-tm"><div class="dot" style="background:'+esc(K.color)+'"></div><b>'+esc(t.name||t.school||side.toUpperCase())+'</b>'+(t.school&&t.school!==t.name?'<small>'+esc(t.school)+'</small>':'')+(win===side?'<span class="wn">승</span>':'')+'</div>'};
