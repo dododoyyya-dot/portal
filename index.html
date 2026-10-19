@@ -623,7 +623,10 @@
         sec.style.display='block';
       }
       // [홈 배너 슬라이드] ★배너 항목의 대표 사진을 메인 배너(.hero) 배경에 — 설정 siteContent/homeBanner {enabled,interval,caption,kenburns,max}
-      const all=pub.filter(x=>x.featured);
+      let all=pub.filter(x=>x.featured);
+      // [사진 공모전 2026-10-19] 10/22 19:00 ~ 11/6 동안 공모전에 올라온 최신 사진 10장을 메인 배너 앞쪽에 순환(올리는 대로 최신 순)
+      try{const _n=Date.now();if(_n>=Date.parse('2026-10-22T19:00:00+09:00')&&_n<Date.parse('2026-11-07T00:00:00+09:00')){const pq=await firebase.firestore().collection('photoContest').where('contest','==','2026-ultimate').limit(300).get();
+        const ph=pq.docs.map(d=>Object.assign({id:d.id},d.data())).filter(x=>x.img).sort((a,b)=>(+b.atMs||0)-(+a.atMs||0)).slice(0,10).map(x=>({id:x.id,title:[x.school,x.title].filter(Boolean).join(' · ')||'사진 공모전',cover:x.img,date:''}));all=ph.concat(all)}}catch(e){console.warn('photoContest banner',e)}
       if(all.length&&window.KFDF_BANNER){
         let cfg={};try{const c=await firebase.firestore().collection('siteContent').doc('homeBanner').get();if(c.exists)cfg=c.data()||{}}catch(e){}
         if(cfg.enabled!==false){const hero=document.querySelector('.hero');if(hero)KFDF_BANNER.mount(hero,all.slice(0,Math.max(1,Math.min(10,+cfg.max||5))),{interval:+cfg.interval||3,caption:false,kenburns:cfg.kenburns!==false})}
