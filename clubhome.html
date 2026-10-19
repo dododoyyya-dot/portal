@@ -225,6 +225,9 @@ async function loadClub(){
     document.getElementById('chGate').style.display='none';
     document.getElementById('chBody').style.display='block';
     renderHeader();
+    // [2026-10-19] 관리자: 학교 동아리가 일반 클럽으로 가입된 경우 학교스포츠클럽으로 옮기기(이름·학교 고쳐서) — 관리자 화면 등록 창으로
+    if(CH_IS_ADMIN&&!CCLUB.schoolClubId&&CCLUB.clubType!=='external'){try{const bx=document.getElementById('chBody');const ab=document.createElement('div');ab.style.cssText='background:#f6f3fd;border:1.5px dashed #b9a7f0;color:#4c2f9e;border-radius:12px;padding:10px 14px;margin:0 0 14px;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
+      ab.innerHTML='<b>관리자</b><span style="flex:1;min-width:200px">학교 동아리가 일반 클럽으로 가입했다면 학교스포츠클럽으로 옮길 수 있습니다. 회원·교류전·입상 기록은 그대로 남고, 「클럽 찾기」 목록에서는 학교스포츠클럽으로 보입니다.</span><a href="admin.html?tab=8&sccLink='+encodeURIComponent(CID||'')+'" style="background:#7c3aed;color:#fff;text-decoration:none;border-radius:10px;padding:8px 14px;font-weight:900;white-space:nowrap">🏫 학교스포츠클럽으로 옮기기</a>';bx.insertBefore(ab,bx.firstChild)}catch(e){}}
     // [학교스포츠클럽] 학교스포츠클럽으로 옮긴 클럽이면 새 팀 홈을 안내 (회원·교류전·입상 기록은 이 화면에 그대로)
     if(CCLUB.schoolClubId){try{const bx=document.getElementById('chBody');const nb=document.createElement('div');nb.style.cssText='background:#eef6f4;border:1.5px solid #bfe0da;color:#0f5f58;border-radius:12px;padding:12px 16px;margin:0 0 14px;font-size:13.5px;font-weight:700;line-height:1.7';nb.innerHTML='이 클럽은 <b>학교스포츠클럽</b>으로 옮겨 관리합니다. 대회 기록과 전적은 <a href="schoolclub.html?id='+encodeURIComponent(CCLUB.schoolClubId)+'" style="color:#0f766e;font-weight:900">학교스포츠클럽 팀 홈 →</a> 에서 볼 수 있습니다.';bx.insertBefore(nb,bx.firstChild)}catch(e){}}
     loadClubStats().catch(e=>console.warn('clubStats',e));

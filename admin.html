@@ -686,6 +686,10 @@ AUTH.onAuthStateChanged(async u=>{
   (function(){['rosterBtn','crimBoardBtn','logsPageBtn'].forEach(function(id){var rb=document.getElementById(id);if(rb)rb.style.display=isAdmin?'':'none'})})();   // [공문 붙임2 · 범죄경력조회] 중앙 사무국만
   document.getElementById('adminBody').style.display='block';loadDash();
   try{const _t=parseInt(new URLSearchParams(location.search).get('tab')||'',10);if(_t>=1&&_t<=10)tab(_t)}catch(e){}   // [화면 주소] admin.html?tab=번호 로 바로 열기
+  // [2026-10-19] 클럽 홈 「학교스포츠클럽으로 옮기기」 → admin.html?tab=8&sccLink=클럽ID : 학교스포츠클럽 등록 창을 그 클럽으로 채워 엶(중앙 관리자)
+  try{const _sl=new URLSearchParams(location.search).get('sccLink');if(_sl&&isAdmin){tab(8);setTimeout(async function(){try{const d=await DB.collection('clubs').doc(_sl).get();if(!d.exists){alert('클럽을 찾지 못했습니다.');return}const c=Object.assign({id:d.id},d.data());
+      if(c.schoolClubId){alert('이미 학교스포츠클럽으로 옮긴 클럽입니다 → '+c.schoolClubId);return}window.__sccClubs=[c];if(typeof sccLinkClub!=='function'){alert('학교스포츠클럽 도구를 불러오지 못했습니다. 새로 고침 후 다시 시도해 주세요.');return}
+      sccLinkClub(c.id,c.name);setTimeout(function(){const b=document.getElementById('sccBox');if(b)b.scrollIntoView({behavior:'smooth',block:'start'})},300)}catch(e){alert('클럽 불러오기 실패: '+(e.message||e))}},700)}}catch(e){}
   // [관할] 시도연맹 임원에게만 조회 범위 전환(관할 / 미판정)을 보여줍니다.
   //   ※ 예전에 넣었던 '첫 화면을 관할 시도로 미리 선택' 은 지웠습니다.
   //     그 필터는 거점(baseCity)이 비어 있는 회원을 모두 걸러내서, 명단이 통째로 비어 보였습니다.
