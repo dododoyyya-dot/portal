@@ -229,7 +229,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="matchrec.js?v=20261019b"></script>
+<script src="matchrec.js?v=20261019e"></script>
 <script>
 // ══════════ 라이브 중계 (공개) ══════════
 //   설정: siteContent/live = {on, title, comp, streams:[{videoId,label}], chat('youtube'|'off'), featured(경기 ID), note}
@@ -292,15 +292,21 @@ async function chatSend(){const i=document.getElementById('scIn');if(!i||!ME)ret
 async function chatDel(id){if(!CAN_OP||!CHAT_ROOM)return;try{await DB.collection('liveChat').doc(CHAT_ROOM).collection('msgs').doc(id).update({del:true,delBy:(MY&&MY.name)||''})}catch(e){alert('삭제 실패: '+(e.message||e))}}
 // 중계가 끝난 방의 채팅 정리 — 중계 시작부터 종료까지만 남깁니다 (운영자, 400건씩 삭제)
 async function chatPurge(room){let n=0;for(let k=0;k<20;k++){const q=await DB.collection('liveChat').doc(room).collection('msgs').limit(400).get();if(q.empty)break;const b=DB.batch();q.docs.forEach(d=>b.delete(d.ref));await b.commit();n+=q.size;if(q.size<400)break}return n}
+// [2026-10-19] 경기 기록(기록 콘솔) 경기 = rec 또는 events 에 type 이 있는 경기 → 점수·시계·이름을 경기 기록과 같은 방식으로
+function isRec(m){return !!(m&&(m.rec||(m.events||[]).some(e=>e&&e.type)))}
+function scoreOf(m){if(isRec(m))return KFDF_MR.score(m.events||[]);return {a:+((m.a||{}).score)||0,b:+((m.b||{}).score)||0}}
+function mLabel(m){if(!isRec(m))return m.title||'';const r=String(m.round||'');const st=m.stage||'';const sr=r?(st&&r.indexOf(st)!==0?st+' '+r:r):st;return [m.div,sr].filter(Boolean).join(' ')||m.title||''}
+function sc(m,side){return scoreOf(m)[side]}
 // ── 타이머·득점 기록 ──
 function clockMs(m){const c=m.clock||{};return (+c.base||0)+(c.running&&c.startedAt?Math.max(0,Date.now()-(+c.startedAt)):0)}
-function clockTxt(m){const t=Math.floor(clockMs(m)/1000);return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0')}
+function clockTxt(m){if(isRec(m))return KFDF_MR.clockTxt(m);const t=Math.floor(clockMs(m)/1000);return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0')}
 function clockHtml(m){const c=m.clock||{};if(!c.running&&!(+c.base))return '';return '<span class="lv-clock" data-mid="'+esc(m.id)+'">'+(c.running?'⏱ ':'⏸ ')+clockTxt(m)+'</span>'}
 setInterval(function(){document.querySelectorAll('.lv-clock[data-mid]').forEach(function(el){const m=MATCHES.find(x=>x.id===el.dataset.mid);if(m&&(m.clock||{}).running)el.textContent='⏱ '+clockTxt(m)})},1000);
-function evHtml(m,n){const ev=(m.events||[]).filter(e=>e&&!e.void&&(e.type==null||e.type==='goal')).slice(-(n||6));if(!ev.length)return '';return '<div class="lv-ev">'+ev.map(e=>'<span class="'+esc(e.side)+'">'+(e.d>0?'⚡ ':'↩ ')+esc(e.team||'')+' '+esc(e.score||'')+(e.clock?' · '+esc(e.clock):'')+'</span>').join('')+'</div>'}
+function evHtml(m,n){if(isRec(m)){const g=(m.events||[]).filter(e=>e&&!e.void&&e.type==='goal').slice(-(n||6));if(!g.length)return '';const pn=p=>p?((p.no?'#'+p.no+' ':'')+(p.name||'')):'';return '<div class="lv-ev">'+g.map(e=>'<span class="'+esc(e.side)+'">🥏 '+esc(((m[e.side]||{}).name)||'')+' '+esc(pn(e.scorer)||'득점')+(e.assist?' (도움 '+esc(pn(e.assist))+')':'')+(e.sec!=null?' · '+esc(KFDF_MR.evTime(e)):'')+'</span>').join('')+'</div>'}
+  const ev=(m.events||[]).filter(e=>e&&!e.void&&(e.type==null||e.type==='goal')).slice(-(n||6));if(!ev.length)return '';return '<div class="lv-ev">'+ev.map(e=>'<span class="'+esc(e.side)+'">'+(e.d>0?'⚡ ':'↩ ')+esc(e.team||'')+' '+esc(e.score||'')+(e.clock?' · '+esc(e.clock):'')+'</span>').join('')+'</div>'}
 // ── 스코어 ──
-function scoreRow(m,side){const me=m[side]||{},op=m[side==='a'?'b':'a']||{};const win=m.status==='종료'&&(+me.score||0)>(+op.score||0);return '<div class="row'+(win?' w':'')+'"><span class="n">'+(win?'🏆 ':'')+esc(me.name||'-')+'</span><span class="s">'+esc(me.score!=null?me.score:0)+'</span></div>'}
-function card(m){return '<div class="lv-card'+(m.status==='진행'?' live':'')+'"><div class="hd"><span>'+esc([m.title,m.court].filter(Boolean).join(' · ')||'경기')+'</span><span><span class="lv-pill" style="background:'+STC[m.status]+'">'+esc(m.status)+'</span></span></div>'
+function scoreRow(m,side){const me=m[side]||{};const S=scoreOf(m);const my=S[side],ot=S[side==='a'?'b':'a'];const win=m.status==='종료'&&my>ot;return '<div class="row'+(win?' w':'')+'"><span class="n">'+(win?'🏆 ':'')+esc(me.name||'-')+'</span><span class="s">'+esc(my)+'</span></div>'}
+function card(m){return '<div class="lv-card'+(m.status==='진행'?' live':'')+'"><div class="hd"><span>'+esc([mLabel(m),m.court].filter(Boolean).join(' · ')||'경기')+'</span><span><span class="lv-pill" style="background:'+STC[m.status]+'">'+esc(m.status)+'</span></span></div>'
   +scoreRow(m,'a')+scoreRow(m,'b')+'<div class="ft">'+(m.period?'<b>'+esc(m.period)+'</b>':'')+clockHtml(m)+(m.scSynced?'<span class="lv-sc-tag">🏫 학교클럽 전적 반영</span>':'')+(m.status==='예정'&&m.startAt?'<span>'+esc(hm(m.startAt))+' 시작 예정</span>':'')+(m.status==='종료'&&m.endAt?'<span>'+esc(hm(m.endAt))+' 종료</span>':'')+(m.note?'<span>'+esc(m.note)+'</span>':'')+(m.status==='진행'&&m.updatedAt?'<span style="margin-left:auto">'+esc(hm(m.updatedAt))+' 갱신</span>':'')+'</div></div>'}
 function render(){
   const live=MATCHES.filter(m=>m.status==='진행').sort((a,b)=>(a.order||0)-(b.order||0));
@@ -309,8 +315,8 @@ function render(){
   // 현재 중계 경기 = featured 지정 → 없으면 진행 중 첫 경기
   const vid=curVid();const fb=(LIVE.featuredBy||{})[vid];
   const feat=MATCHES.find(m=>m.id===fb&&m.status!=='종료')||live.find(m=>m.stream===vid)||MATCHES.find(m=>m.id===LIVE.featured&&m.status!=='종료')||live[0];const now=document.getElementById('lvNow');
-  if(feat){now.style.display='block';now.innerHTML='<div class="lab">'+(feat.status==='진행'?'🔴 지금 경기':'🕒 다음 경기')+' · '+esc([feat.title,feat.court].filter(Boolean).join(' · '))+(feat.period?' · '+esc(feat.period):'')+'</div>'
-    +'<div class="sb"><div class="tm">'+esc((feat.a||{}).name||'-')+'</div><div class="sc">'+esc((feat.a||{}).score||0)+'<em>:</em>'+esc((feat.b||{}).score||0)+'</div><div class="tm">'+esc((feat.b||{}).name||'-')+'</div></div>'
+  if(feat){now.style.display='block';now.innerHTML='<div class="lab">'+(feat.status==='진행'?'🔴 지금 경기':'🕒 다음 경기')+' · '+esc([mLabel(feat),feat.court].filter(Boolean).join(' · '))+(feat.period?' · '+esc(feat.period):'')+'</div>'
+    +'<div class="sb"><div class="tm">'+esc((feat.a||{}).name||'-')+'</div><div class="sc">'+esc(sc(feat,'a'))+'<em>:</em>'+esc(sc(feat,'b'))+'</div><div class="tm">'+esc((feat.b||{}).name||'-')+'</div></div>'
     +'<div class="mt">'+clockHtml(feat)+(feat.note?' '+esc(feat.note)+' · ':' ')+(feat.updatedAt?esc(hm(feat.updatedAt))+' 갱신':'')+'</div>'+evHtml(feat,6)}
   else now.style.display='none';
   const g=(id,cnt,arr)=>{document.getElementById(id).innerHTML=arr.map(card).join('');document.getElementById(cnt).textContent=arr.length?arr.length+'경기':''};
@@ -322,7 +328,7 @@ function render(){
   const done=doneAll.filter(m=>!sel.value||m.day===sel.value).sort((a,b)=>String(b.day||'').localeCompare(String(a.day||''))||(b.order||0)-(a.order||0));
   document.getElementById('cntDone').textContent=done.length?done.length+'경기':'';
   document.getElementById('tblDone').innerHTML=done.length?'<div style="overflow-x:auto"><table class="lv-tbl"><tr><th>일자</th><th>부문 · 라운드</th><th>코트</th><th>팀</th><th>스코어</th><th>팀</th><th>종료</th></tr>'
-    +done.map(m=>{const as=+(m.a||{}).score||0,bs=+(m.b||{}).score||0;return '<tr><td style="white-space:nowrap">'+esc(String(m.day||'').slice(5))+'</td><td>'+esc(m.title||'')+'</td><td>'+esc(m.court||'')+'</td><td class="'+(as>bs?'w':'')+'" style="font-weight:800">'+(as>bs?'🏆 ':'')+esc((m.a||{}).name||'')+'</td><td class="sc">'+as+' : '+bs+'</td><td class="'+(bs>as?'w':'')+'" style="font-weight:800">'+(bs>as?'🏆 ':'')+esc((m.b||{}).name||'')+'</td><td style="white-space:nowrap;color:#6b7280">'+esc(hm(m.endAt))+'</td></tr>'}).join('')+'</table></div>':'<div class="lv-empty">종료된 경기가 아직 없습니다.</div>';
+    +done.map(m=>{const as=sc(m,'a'),bs=sc(m,'b');return '<tr><td style="white-space:nowrap">'+esc(String(m.day||'').slice(5))+'</td><td>'+esc(mLabel(m))+'</td><td>'+esc(m.court||'')+'</td><td class="'+(as>bs?'w':'')+'" style="font-weight:800">'+(as>bs?'🏆 ':'')+esc((m.a||{}).name||'')+'</td><td class="sc">'+as+' : '+bs+'</td><td class="'+(bs>as?'w':'')+'" style="font-weight:800">'+(bs>as?'🏆 ':'')+esc((m.b||{}).name||'')+'</td><td style="white-space:nowrap;color:#6b7280">'+esc(hm(m.endAt))+'</td></tr>'}).join('')+'</table></div>':'<div class="lv-empty">종료된 경기가 아직 없습니다.</div>';
   document.getElementById('secDone').style.display=(doneAll.length||!MATCHES.length)?'':'none';
   document.getElementById('lvNone').style.display=MATCHES.length?'none':'block';
   if(OP_OPEN)opRender();if(SCORE_ID)scOvRender();
@@ -335,7 +341,11 @@ function fsToggle(){const el=document.getElementById('lvMain');const on=el.class
   if(CHAT_TAB!=='site'&&chatModes().indexOf('site')>=0&&chatModes().indexOf('youtube')<0){CHAT_TAB='site';renderChat()}}
 document.addEventListener('fullscreenchange',function(){if(!document.fullscreenElement)document.getElementById('lvMain').classList.remove('fs')});
 // [경기 기록 연동 2026-10-15] siteContent/live.slotId 가 있으면 「경기 기록 · 운영」에서 만든 그 대회의 경기만 중계 목록에 — 따로 등록하지 않음
-let ALLM=[];function applySlot(){MATCHES=LIVE.slotId?ALLM.filter(m=>m.slotId===LIVE.slotId):ALLM.filter(m=>!m.slotId||m.stream)}
+let ALLM=[],SLOTM=[],SLOT_UNSUB=null,SLOT_ON='';
+function applySlot(){if(LIVE.slotId!==SLOT_ON){SLOT_ON=LIVE.slotId||'';if(SLOT_UNSUB){SLOT_UNSUB();SLOT_UNSUB=null}SLOTM=[];
+    if(SLOT_ON)SLOT_UNSUB=DB.collection('liveMatches').where('slotId','==',SLOT_ON).onSnapshot(q=>{SLOTM=q.docs.map(d=>Object.assign({id:d.id},d.data()));MATCHES=SLOTM;render()},e=>console.warn('slot matches',e))}
+  if(SLOT_ON){MATCHES=SLOTM.length?SLOTM:ALLM.filter(m=>m.slotId===SLOT_ON);return}
+  const td=today();MATCHES=ALLM.filter(m=>!m.slotId||m.stream||(isRec(m)&&m.day===td))}   /* [2026-10-19] 중계를 대회와 연동하지 않았어도 오늘 경기 기록 경기는 보임 */
 DB.collection('siteContent').doc('live').onSnapshot(d=>{LIVE=d.exists?(d.data()||{}):{};applySlot();renderStream();render()},e=>console.warn('live cfg',e));
 DB.collection('liveMatches').orderBy('updatedAt','desc').limit(200).onSnapshot(s=>{ALLM=s.docs.map(d=>Object.assign({id:d.id},d.data()));applySlot();render()},e=>{console.warn('liveMatches',e);document.getElementById('lvNone').style.display='block';document.getElementById('lvNone').textContent='경기 정보를 불러오지 못했습니다 (보안 규칙 v43 게시 전이면 표시되지 않습니다).'});
 // ── 운영 콘솔 (사무국·시도임원·스코어 입력 권한자) ──
@@ -367,10 +377,11 @@ function opRender(){
   const sts=(LIVE.streams||[]).filter(x=>x&&x.videoId);const groups=[];
   if(sts.length>1){sts.forEach(x=>groups.push({key:x.videoId,label:'📺 '+(x.label||''),list:list.filter(m=>m.stream===x.videoId)}));const rest=list.filter(m=>!sts.some(x=>x.videoId===m.stream));if(rest.length)groups.push({key:'',label:'중계 화면 미지정',list:rest})}
   else groups.push({key:sts[0]?sts[0].videoId:'',label:'',list:list});
-  const row=m=>{const fb=(LIVE.featuredBy||{})[m.stream||(sts[0]||{}).videoId||''];return '<div class="op-row2'+(m.status==='진행'?' live':'')+'"><span class="lv-pill" style="background:'+STC[m.status]+'">'+esc(m.status)+'</span><b>'+esc([m.title,m.court].filter(Boolean).join(' · ')||'경기')+'</b><span style="color:#6b7280">#'+esc(m.order||'')+'</span>'
-    +'<span class="sc">'+esc((m.a||{}).name||'A')+' '+esc((m.a||{}).score||0)+' : '+esc((m.b||{}).score||0)+' '+esc((m.b||{}).name||'B')+'</span>'+clockHtml(m)
+  const row=m=>{const fb=(LIVE.featuredBy||{})[m.stream||(sts[0]||{}).videoId||''];return '<div class="op-row2'+(m.status==='진행'?' live':'')+'"><span class="lv-pill" style="background:'+STC[m.status]+'">'+esc(m.status)+'</span><b>'+esc([mLabel(m),m.court].filter(Boolean).join(' · ')||'경기')+'</b><span style="color:#6b7280">#'+esc(m.mno||m.order||'')+'</span>'
+    +'<span class="sc">'+esc((m.a||{}).name||'A')+' '+esc(sc(m,'a'))+' : '+esc(sc(m,'b'))+' '+esc((m.b||{}).name||'B')+'</span>'+clockHtml(m)
     +((m.a||{}).scid&&(m.b||{}).scid?'<span class="lv-sc-tag">🏫 '+(m.scSynced?'반영됨':'연결됨')+'</span>':'')+(fb===m.id?'<span class="lv-pill" style="background:#7c3aed">📺 상단</span>':'')
-    +'<span style="flex:1"></span><button class="op-btn g go" onclick="scOvOpen(\''+m.id+'\')">🎯 기록</button><button class="op-btn s" style="padding:5px 10px" onclick="opEdit(\''+m.id+'\')">✏️</button><button class="op-btn s" style="padding:5px 10px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="opDel(\''+m.id+'\')">🗑</button></div>'};
+    +'<span style="flex:1"></span>'+(isRec(m)?'<button class="op-btn s" style="padding:5px 10px" onclick="opFeature(\''+m.id+'\')" title="중계 화면 상단에 이 경기 표시">📺 상단</button><a class="op-btn g go" style="text-decoration:none" href="match.html?m='+esc(m.id)+'" title="득점·제재·시계는 경기 기록 화면에서 — 여기 점수는 그 기록을 그대로 보여 줍니다">🎯 경기 기록 화면</a>'
+      :'<button class="op-btn g go" onclick="scOvOpen(\''+m.id+'\')">🎯 기록</button><button class="op-btn s" style="padding:5px 10px" onclick="opEdit(\''+m.id+'\')">✏️</button><button class="op-btn s" style="padding:5px 10px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="opDel(\''+m.id+'\')">🗑</button>')+'</div>'};
   const ms='<h3 style="margin-top:18px">🎯 스코어 입력 <small style="font-size:12px;color:#6b7280;font-weight:700">오늘 경기 '+list.length+'건 · [🎯 기록]을 누르면 그 경기 전용 입력 화면(큰 버튼)이 열립니다</small></h3>'
     +(list.length?groups.map(g=>(g.label?'<div style="font-weight:900;margin-top:10px;color:#153A77">'+esc(g.label)+' <span style="font-size:12px;color:#6b7280;font-weight:700">'+g.list.length+'경기</span></div>':'')+'<div class="op-list">'+(g.list.map(row).join('')||'<div class="lv-empty" style="padding:12px">이 중계 화면에 배정된 경기가 없습니다.</div>')+'</div>').join(''):'<div class="lv-empty">등록된 경기가 없습니다. 위에서 경기를 추가하세요.</div>');
   b.innerHTML=cfg+add+ms;
@@ -443,11 +454,11 @@ async function opFeature(id){const m=MATCHES.find(x=>x.id===id)||{};const vid=m.
 let __nowT=null;function syncNow(cfg){cfg=cfg||LIVE;if(!CAN_OP)return;clearTimeout(__nowT);__nowT=setTimeout(async function(){
   const st=(cfg.streams||[]).filter(x=>x&&x.videoId);const vid=(st[0]||{}).videoId||'';const fb=(cfg.featuredBy||{})[vid];
   const live=MATCHES.filter(m=>m.status==='진행');const m=MATCHES.find(x=>x.id===fb&&x.status!=='종료')||live.find(x=>x.stream===vid)||live[0]||null;
-  const now=m?{id:m.id,a:(m.a||{}).name||'',b:(m.b||{}).name||'',sa:+(m.a||{}).score||0,sb:+(m.b||{}).score||0,title:m.title||'',court:m.court||'',status:m.status,period:m.period||''}:null;
+  const now=m?{id:m.id,a:(m.a||{}).name||'',b:(m.b||{}).name||'',sa:sc(m,'a'),sb:sc(m,'b'),title:mLabel(m),court:m.court||'',status:m.status,period:m.period||''}:null;
   if(JSON.stringify(now)===JSON.stringify(cfg.now||null))return;
   try{await DB.collection('siteContent').doc('live').set({now:now,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})}catch(e){}},400)}
 // ── 경기별 스코어 입력 화면 (큰 버튼 · 모바일) ──
-function scOvOpen(id){SCORE_ID=id;scCtrlClaim(id);let ov=document.getElementById('scOv');if(!ov){ov=document.createElement('div');ov.id='scOv';ov.className='sc-ov';document.body.appendChild(ov)}document.body.style.overflow='hidden';scOvRender()}
+function scOvOpen(id){{const mm=MATCHES.find(x=>x.id===id);if(isRec(mm)){location.href='match.html?m='+encodeURIComponent(id);return}}   /* 기록 콘솔 경기는 경기 기록 화면에서 */SCORE_ID=id;scCtrlClaim(id);let ov=document.getElementById('scOv');if(!ov){ov=document.createElement('div');ov.id='scOv';ov.className='sc-ov';document.body.appendChild(ov)}document.body.style.overflow='hidden';scOvRender()}
 function scOvClose(){scCtrlRelease(SCORE_ID);SCORE_ID=null;const ov=document.getElementById('scOv');if(ov)ov.remove();document.body.style.overflow=''}
 function scOvNav(d){const m=MATCHES.find(x=>x.id===SCORE_ID);if(!m)return;const same=MATCHES.filter(x=>x.day===m.day&&(x.stream||'')===(m.stream||'')).sort((a,b)=>(a.order||0)-(b.order||0));const i=same.findIndex(x=>x.id===m.id);const n=same[i+d];if(n){SCORE_ID=n.id;scOvRender()}else alert(d>0?'다음 경기가 없습니다':'이전 경기가 없습니다')}
 function scOvRender(){const ov=document.getElementById('scOv');const m=MATCHES.find(x=>x.id===SCORE_ID);if(!ov)return;if(!m){scOvClose();return}

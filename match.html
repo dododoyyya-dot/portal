@@ -269,7 +269,13 @@
 .rc .ctrl .ed{margin-left:8px;border:1px solid var(--ln2);background:#fff;color:var(--b);border-radius:9px;padding:6px 10px;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap}
 .rc .ppr{display:flex;gap:8px;width:100%}.rc .ppr .pp{flex:1}.rc .rs2{min-width:76px;border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.08);color:#fff;border-radius:14px;font-weight:800;font-size:14px;cursor:pointer}
 .rc .qh .co{font-size:12.5px;font-weight:700;color:var(--mut);align-self:center;margin:0 4px 0 8px;white-space:nowrap}.rc .qh span.kinfo{margin-right:0}
-.mfo{display:grid;grid-template-columns:110px 1fr auto;gap:6px;margin-top:6px;align-items:center}.mfo.c{grid-template-columns:1fr auto}.rc .qh .co b{color:var(--ink)}
+.mfo{display:grid;grid-template-columns:110px 1fr auto;gap:6px;margin-top:6px;align-items:start}
+.mfc{position:relative;min-width:0}.mfc .n.ok{border-color:#0f766e;background:#f0fbf7}.mfc .n.free{border-color:#e6b422}
+.mft{font-size:11.5px;color:#0f766e;font-weight:700;margin:2px 2px 0;min-height:0}.mfc .n.free~.mft{color:#8a5a00}
+.mfs{position:absolute;left:0;right:0;top:44px;z-index:20;background:#fff;border:1.5px solid #c7d2e2;border-radius:10px;max-height:260px;overflow:auto;box-shadow:0 12px 28px rgba(17,17,20,.18)}
+.mfh{font-size:11.5px;color:#6b7280;font-weight:800;padding:6px 10px 3px;background:#f8fafc;position:sticky;top:0}
+.mfi{display:block;width:100%;text-align:left;border:0;background:#fff;padding:8px 10px;font:inherit;font-size:14px;cursor:pointer;color:#111827}.mfi small{color:#6b7280;font-size:11.5px}
+.mfi:hover,.mfi.on{background:#eef3fb}.mfe{padding:8px 10px;color:#9aa1ad;font-size:13px}.mfo.c{grid-template-columns:1fr auto}.rc .qh .co b{color:var(--ink)}
 .rc .zl{display:flex;align-items:center;gap:8px}.rc .zl .kbar{flex:1;height:12px;border-radius:6px;border:1px solid rgba(0,0,0,.25);box-shadow:inset 0 0 0 2px rgba(255,255,255,.5);min-width:40px}
 .rc .pc.empty{border:2px dashed var(--ln2);background:transparent;box-shadow:none;cursor:default;color:var(--mut)}.rc .pc.empty b{color:var(--ln2);font-size:30px}.rc .pc.empty span{color:var(--mut);font-size:12px}
 .rc .sbt .kit .wb{display:inline-block;margin-left:8px;background:#fff;color:#9f1239;border-radius:7px;padding:1px 8px;font-size:13px;vertical-align:middle;border:1px solid #9f1239}
@@ -726,32 +732,40 @@ async function matchForm(id){
     +(m?'<label class="mr-lab">감독교사 · 코치 (A팀 '+esc(tname(m,'a'))+')</label><div id="mf_coach_a">'+coachRows('a')+'</div><button type="button" class="mr-btn ghost" style="padding:5px 10px;font-size:12px;margin-top:4px" onclick="mfCoachAdd(\'a\')">＋ 코치 추가</button>'
       +'<label class="mr-lab">감독교사 · 코치 (B팀 '+esc(tname(m,'b'))+')</label><div id="mf_coach_b">'+coachRows('b')+'</div><button type="button" class="mr-btn ghost" style="padding:5px 10px;font-size:12px;margin-top:4px" onclick="mfCoachAdd(\'b\')">＋ 코치 추가</button>':'')
     +'<label class="mr-lab">심판진 — 역할과 이름 (감독관·주심·부심·점수심·기록원은 몇 명이든 추가)</label><div id="mf_offs">'+rows.map(offRow).join('')+'</div><button type="button" class="mr-btn ghost" style="padding:5px 10px;font-size:12px;margin-top:4px" onclick="mfOffAdd()">＋ 심판 추가</button>'
-    +'<datalist id="mf_picks">'+picks.map(p=>'<option value="'+esc(p.name)+'">'+(p.st?esc(p.st):'신청')+'</option>').join('')+'</datalist>'+offDatalists(picks,m?m.div:'')
-    +'<div class="mr-note" style="margin-top:6px">임무를 고르면 옆 목록에 <b>그 임무로 확정된 사람 전원</b>이 나옵니다(심판 모집 「확정 현황」과 같은 임무 · 심판위원장은 감독관 목록에 함께). 그 아래는 다른 임무로 확정된 사람, 맨 아래 「직접 입력」. 신청자와 같은 이름이면 회원으로 연결되어 그 사람이 이 경기의 기록 콘솔을 열 수 있고 등록 서명이 기록지에 자동 기입됩니다. 확정된 심판은 배정하지 않아도 이 대회 모든 경기를 기록할 수 있습니다.</div>'
+    +'<datalist id="mf_picks">'+picks.map(p=>'<option value="'+esc(p.name)+'">'+(p.st?esc(p.st):'신청')+'</option>').join('')+'</datalist>'
+    +'<div class="mr-note" style="margin-top:6px">이름 칸을 누르면 <b>그 임무로 확정된 사람 전원</b>이 아래에 나오고(심판 모집 「확정 현황」과 같은 임무 · 심판위원장은 감독관 목록에), 글자를 치면 걸러집니다. 누르거나 이름을 정확히 치면 그 사람으로 적용되어 <b style="color:#0f766e">초록</b>으로 표시됩니다. 목록에 없는 이름도 그대로 저장됩니다. 신청자와 같은 이름이면 회원으로 연결되어 그 사람이 이 경기의 기록 콘솔을 열 수 있고 등록 서명이 기록지에 자동 기입됩니다. 확정된 심판은 배정하지 않아도 이 대회 모든 경기를 기록할 수 있습니다.</div>'
     +'<div class="mr-row" style="justify-content:flex-end;margin-top:14px">'+(m?'<button class="mr-btn r" onclick="matchDel(\''+m.id+'\')">🗑 삭제</button><span style="flex:1"></span>':'')+'<button class="mr-btn s" onclick="document.getElementById(\'mfModal\').remove()">닫기</button><button class="mr-btn g" onclick="matchSave(\''+(m?m.id:'')+'\')">💾 저장</button></div>');
+  mfMarkAll();
 }
-/* [2026-10-19] 심판진 한 줄 = 임무 고르기 + 사람 고르기(드롭다운) + 직접 입력 칸(목록에 없을 때만) */
+/* [2026-10-19] 심판진 한 줄 = 임무 고르기 + 이름 검색 칸(누르면 그 임무 확정자 전원 · 치면 걸러짐 · 누르거나 정확히 같은 이름이면 자동 적용) */
 let MF_PICKS=[],MF_DIV='';
 const OFF_ROLES=['감독관','주심','부심','점수심','기록원'];
-function mfOffRowHtml(x){x=x||{};const role=OFF_RK[x.role]?x.role:'감독관';const o=mfOpts(role,x);
+function mfOffRowHtml(x){x=x||{};const role=OFF_RK[x.role]?x.role:'감독관';
   return '<div class="mfo" data-key="'+esc(x.key||'')+'" data-uid="'+esc(x.uid||'')+'"><select class="mr-in r" onchange="mfRoleList(this)">'+OFF_ROLES.map(r=>'<option'+(role===r?' selected':'')+'>'+r+'</option>').join('')+'</select>'
-    +'<div style="min-width:0"><select class="mr-in p" onchange="mfPick(this)">'+o.html+'</select><input class="mr-in n" placeholder="이름 직접 입력" value="'+esc(x.name||'')+'" style="margin-top:4px;'+(o.free?'':'display:none')+'" oninput="this.closest(\'.mfo\').dataset.uid=\'\'"></div>'
+    +'<div class="mfc"><input class="mr-in n" autocomplete="off" placeholder="이름 검색 — 누르면 '+esc(role)+' 확정자 목록" value="'+esc(x.name||'')+'" onfocus="mfSug(this,true)" oninput="mfType(this)" onblur="mfBlur(this)" onkeydown="mfKey(event,this)"><div class="mfs" style="display:none"></div><div class="mft"></div></div>'
     +'<button type="button" class="mr-btn s" style="padding:6px 10px" onclick="this.parentNode.remove()" title="이 칸 삭제">✕</button></div>'}
-// 그 임무 확정자 전원(이 경기 부문 담당 먼저) → 다른 임무로 확정된 사람 → 직접 입력
-function mfOpts(role,cur){const rk=OFF_RK[role]||/./;const dk=divKey(MF_DIV);const ok=MF_PICKS.filter(p=>p.ok);
+function mfCands(role){const rk=OFF_RK[role]||/./;const dk=divKey(MF_DIV);const ok=MF_PICKS.filter(p=>p.ok);
   const fit=ok.filter(p=>(p.roles||[]).some(r=>rk.test(String(r))));const other=ok.filter(p=>fit.indexOf(p)<0&&(p.roles||[]).some(r=>!RF_NONREF.test(String(r))||/심판|기록|점수/.test(String(r))));
-  const hit=p=>(p.duties||[]).concat(p.roles||[]).some(d=>dkMatch(divKey(d),dk));const sort=L=>L.slice().sort((x,y)=>(hit(y)-hit(x))||String(x.name).localeCompare(String(y.name),'ko'));
-  let matched=false;const op=p=>{const sel=cur&&cur.name&&((cur.uid&&p.uid===cur.uid)||(!matched&&!cur.uid&&p.name===cur.name)||(!cur.uid&&p.name===cur.name&&!matched));if(sel)matched=true;
-    return '<option value="'+esc(p.uid||('n:'+p.name))+'" data-uid="'+esc(p.uid||'')+'" data-name="'+esc(p.name)+'"'+(sel?' selected':'')+'>'+esc(p.name)+' — '+esc(((p.duties||[]).length?p.duties:(p.roles||[])).join(', ')||'확정')+(p.uid?'':' (계정 없음)')+'</option>'};
-  let h='<option value="">— '+esc(role)+' 확정 '+fit.length+'명 중 고르기 —</option>'+sort(fit).map(op).join('');
-  if(other.length)h+='<optgroup label="다른 임무로 확정된 사람">'+sort(other).map(op).join('')+'</optgroup>';
-  const free=!!(cur&&cur.name&&!matched);h+='<option value="__free"'+(free?' selected':'')+'>✏️ 목록에 없음 — 직접 입력</option>';return {html:h,free:free}}
-function mfPick(sel){const row=sel.closest('.mfo');const inp=row.querySelector('.n');const v=sel.value;
-  if(v==='__free'){inp.style.display='';inp.value='';row.dataset.uid='';inp.focus();return}
-  if(!v){inp.value='';inp.style.display='none';row.dataset.uid='';return}
-  const o=sel.selectedOptions[0];inp.value=o.dataset.name||'';inp.style.display='none';row.dataset.uid=o.dataset.uid||''}
-function mfRoleList(sel){const row=sel.closest('.mfo');const inp=row.querySelector('.n');const cur={name:inp.value.trim(),uid:row.dataset.uid||''};const o=mfOpts(sel.value,cur);const ps=row.querySelector('.p');ps.innerHTML=o.html;inp.style.display=o.free?'':'none'}
-function mfOffAdd(){const w=document.getElementById('mf_offs');w.insertAdjacentHTML('beforeend',mfOffRowHtml({role:'주심'}));w.lastElementChild.querySelector('.p').focus()}
+  const hit=p=>(p.duties||[]).concat(p.roles||[]).some(d=>dkMatch(divKey(d),dk));const sort=L=>L.slice().sort((x,y)=>(hit(y)-hit(x))||String(x.name).localeCompare(String(y.name),'ko'));return {fit:sort(fit),other:sort(other)}}
+const mfN=v=>String(v||'').replace(/\s+/g,'');
+function mfDuty(p){return ((p.duties||[]).length?p.duties:(p.roles||[])).join(', ')||'확정'}
+function mfMark(row){const inp=row.querySelector('.n'),t=row.querySelector('.mft');const v=mfN(inp.value);const uid=row.dataset.uid||'';const p=v?MF_PICKS.find(q=>q.ok&&(uid?q.uid===uid:mfN(q.name)===v)):null;
+  inp.classList.toggle('ok',!!p);inp.classList.toggle('free',!!v&&!p);t.innerHTML=p?'✓ '+esc(mfDuty(p))+(p.uid?'':' · 계정 없음'):(v?'목록에 없는 이름 — 그대로 저장됩니다(직접 입력)':'')}
+function mfSug(inp,showAll){const row=inp.closest('.mfo');document.querySelectorAll('#mf_offs .mfs').forEach(b=>{if(!row.contains(b))b.style.display='none'});const role=row.querySelector('.r').value;const box=row.querySelector('.mfs');const C=mfCands(role);const q=mfN(inp.value);
+  const all=showAll&&(!q||inp.classList.contains('ok'));const f=L=>all?L:L.filter(p=>mfN(p.name).indexOf(q)>=0);const A=f(C.fit),B=f(C.other);
+  const it=p=>'<button type="button" class="mfi" data-uid="'+esc(p.uid||'')+'" data-name="'+esc(p.name)+'" onmousedown="event.preventDefault();mfChoose(this)">'+esc(p.name)+' <small>'+esc(mfDuty(p))+(p.uid?'':' · 계정 없음')+'</small></button>';
+  box.innerHTML='<div class="mfh">'+esc(role)+' 확정 '+C.fit.length+'명'+(all?'':' 중 「'+esc(inp.value.trim())+'」 '+A.length+'명')+'</div>'+(A.map(it).join('')||'<div class="mfe">없음</div>')+(B.length?'<div class="mfh">다른 임무로 확정된 사람</div>'+B.slice(0,40).map(it).join(''):'');box.style.display='block'}
+function mfType(inp){const row=inp.closest('.mfo');row.dataset.uid='';const v=mfN(inp.value);const role=row.querySelector('.r').value;
+  if(v){const C=mfCands(role);const ex=C.fit.filter(p=>mfN(p.name)===v);const ex2=ex.length?ex:C.other.filter(p=>mfN(p.name)===v);if(ex2.length===1){row.dataset.uid=ex2[0].uid||''}}   /* 이름이 정확히 같으면 그 사람으로 */
+  mfMark(row);mfSug(inp,false)}
+function mfChoose(btn){const row=btn.closest('.mfo');const inp=row.querySelector('.n');inp.value=btn.dataset.name||'';row.dataset.uid=btn.dataset.uid||'';row.querySelector('.mfs').style.display='none';mfMark(row)}
+function mfBlur(inp){setTimeout(()=>{const row=inp.closest('.mfo');if(!row)return;const box=row.querySelector('.mfs');if(box)box.style.display='none';mfMark(row)},160)}
+function mfKey(e,inp){const box=inp.closest('.mfo').querySelector('.mfs');const its=[...box.querySelectorAll('.mfi')];if(!its.length)return;let i=its.findIndex(x=>x.classList.contains('on'));
+  if(e.key==='ArrowDown'){e.preventDefault();i=Math.min(its.length-1,i+1)}else if(e.key==='ArrowUp'){e.preventDefault();i=Math.max(0,i-1)}else if(e.key==='Enter'){if(i>=0){e.preventDefault();mfChoose(its[i])}return}else return;
+  its.forEach((x,j)=>x.classList.toggle('on',j===i));its[i].scrollIntoView({block:'nearest'})}
+function mfRoleList(sel){const row=sel.closest('.mfo');const inp=row.querySelector('.n');inp.placeholder='이름 검색 — 누르면 '+sel.value+' 확정자 목록';mfMark(row)}
+function mfOffAdd(){const w=document.getElementById('mf_offs');w.insertAdjacentHTML('beforeend',mfOffRowHtml({role:'주심'}));w.lastElementChild.querySelector('.n').focus()}
+function mfMarkAll(){document.querySelectorAll('#mf_offs .mfo').forEach(mfMark)}
 function mfCoachAdd(side){const w=document.getElementById('mf_coach_'+side);w.insertAdjacentHTML('beforeend','<div class="mfo c"><input class="mr-in n" placeholder="감독교사·코치 이름" data-sign=""><button type="button" class="mr-btn s" style="padding:6px 10px" onclick="this.parentNode.remove()">✕</button></div>');w.lastElementChild.querySelector('.n').focus()}
 function mfFree(side){const s=document.getElementById('mf_'+side),n=document.getElementById('mf_'+side+'n');n.style.display=s.value==='__free__'?'block':'none'}
 function modal(id,html){const old=document.getElementById(id);if(old)old.remove();const d=document.createElement('div');d.id=id;d.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:10005;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';d.innerHTML='<div style="background:#fff;border-radius:18px;max-width:560px;width:100%;max-height:92vh;overflow:auto;padding:22px">'+html+'</div>';document.body.appendChild(d)}

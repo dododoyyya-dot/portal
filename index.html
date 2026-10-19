@@ -624,9 +624,9 @@
       }
       // [홈 배너 슬라이드] ★배너 항목의 대표 사진을 메인 배너(.hero) 배경에 — 설정 siteContent/homeBanner {enabled,interval,caption,kenburns,max}
       let all=pub.filter(x=>x.featured);
-      // [사진 공모전 2026-10-19] 10/22 19:00 ~ 11/6 동안 공모전에 올라온 최신 사진 10장을 메인 배너 앞쪽에 순환(올리는 대로 최신 순)
-      try{const _n=Date.now();if(_n>=Date.parse('2026-10-22T19:00:00+09:00')&&_n<Date.parse('2026-11-07T00:00:00+09:00')){const pq=await firebase.firestore().collection('photoContest').where('contest','==','2026-ultimate').limit(300).get();
-        const ph=pq.docs.map(d=>Object.assign({id:d.id},d.data())).filter(x=>x.img).sort((a,b)=>(+b.atMs||0)-(+a.atMs||0)).slice(0,10).map(x=>({id:x.id,title:[x.school,x.title].filter(Boolean).join(' · ')||'사진 공모전',cover:x.img,date:''}));all=ph.concat(all)}}catch(e){console.warn('photoContest banner',e)}
+      // [사진 공모전 2026-10-19] ~ 11/6 동안 공모전에 올라온 최신 사진 10장을 메인 배너 앞쪽에 순환(올리는 대로 최신 순) — 아직 한 장도 없으면 기존 사진첩 배너 그대로
+      try{const _n=Date.now();if(_n<Date.parse('2026-11-07T00:00:00+09:00')){const pq=await firebase.firestore().collection('photoContest').where('contest','==','2026-ultimate').limit(300).get();
+        const ph=pq.docs.map(d=>Object.assign({id:d.id},d.data())).filter(x=>x.img).sort((a,b)=>(+b.atMs||0)-(+a.atMs||0)).slice(0,10).map(x=>({id:x.id,title:[x.school,x.title].filter(Boolean).join(' · ')||'플라잉디스크 사진 공모전',cover:x.img,date:''}));all=ph.concat(all)}}catch(e){console.warn('photoContest banner',e)}
       if(all.length&&window.KFDF_BANNER){
         let cfg={};try{const c=await firebase.firestore().collection('siteContent').doc('homeBanner').get();if(c.exists)cfg=c.data()||{}}catch(e){}
         if(cfg.enabled!==false){const hero=document.querySelector('.hero');if(hero)KFDF_BANNER.mount(hero,all.slice(0,Math.max(1,Math.min(10,+cfg.max||5))),{interval:+cfg.interval||3,caption:false,kenburns:cfg.kenburns!==false})}
@@ -836,11 +836,14 @@ try{firebase.firestore().collection('siteContent').doc('live').onSnapshot(functi
     var t=function(id,x){var e=document.getElementById(id);if(e)e.textContent=x==null?'':String(x)};
     t('ctHead',m.status==='진행'?'구장별 실시간 스코어':'방금 끝난 경기');t('ctPage',L.length>1?(I+1)+' / '+L.length:'');t('ctMeta',[m.court,lab(m)].filter(Boolean).join(' · '));t('ctA',(m.a||{}).name||'');t('ctB',(m.b||{}).name||'');t('ctS',s[0]+' : '+s[1]);t('ctSt',m.status==='진행'?((m.period||'진행 중')+' · 눌러서 대진·결과 보기'):'경기 종료 · 눌러서 결과 보기');el.href=m.slotId?'results.html?id=slot_'+encodeURIComponent(m.slotId):'live.html'};
   var rot=function(){if(T)clearInterval(T);T=setInterval(function(){if(L.length<2)return;var b=document.getElementById('ctBody');if(b)b.style.opacity='0';setTimeout(function(){I=(I+1)%L.length;show();if(b)b.style.opacity='1'},350)},10000)};
-  firebase.firestore().collection('liveMatches').where('day','==',D).onSnapshot(function(q){var all=q.docs.map(function(d){var x=d.data()||{};x.id=d.id;return x});var now=Date.now();
-    var live=all.filter(function(m){return m.status==='진행'});var pick=live.length?live:all.filter(function(m){return m.status==='종료'&&now-tsec(m.endAt||m.updatedAt)<30*60e3});
+  var DAYM={},LIVEM={};var recalc=function(){var all=Object.values(Object.assign({},DAYM,LIVEM));var now=Date.now();
+    var live=all.filter(function(m){return m.status==='진행'&&m.day===D&&now-tsec(m.updatedAt)<6*3600e3});   /* 오늘 날짜 경기 + 6시간 안에 갱신(오래 방치된 시험 경기 제외) */var pick=live.length?live:all.filter(function(m){return m.status==='종료'&&now-tsec(m.endAt||m.updatedAt)<30*60e3});
     var byC={};pick.forEach(function(m){var k=m.court||m.id;var o=byC[k];if(!o||tsec(m.updatedAt)>tsec(o.updatedAt))byC[k]=m});
     var cur=L[I]&&L[I].id;L=Object.keys(byC).sort(function(a,b){return (parseInt(a,10)||99)-(parseInt(b,10)||99)||String(a).localeCompare(String(b),'ko')}).map(function(k){return byC[k]});
-    var j=L.findIndex(function(m){return m.id===cur});I=j>=0?j:0;show();rot()},function(e){console.warn('courtTicker',e)})}catch(e){}})();
+    var j=L.findIndex(function(m){return m.id===cur});I=j>=0?j:0;show();rot()};
+  var take=function(q){var o={};q.docs.forEach(function(d){var x=d.data()||{};x.id=d.id;o[d.id]=x});return o};
+  firebase.firestore().collection('liveMatches').where('status','==','진행').onSnapshot(function(q){LIVEM=take(q);recalc()},function(e){console.warn('courtTicker live',e)});
+  firebase.firestore().collection('liveMatches').where('day','==',D).onSnapshot(function(q){DAYM=take(q);recalc()},function(e){console.warn('courtTicker day',e)})}catch(e){}})();
 </script>
 <script src="auth_ui.js?v=20261015a"></script>
 </body>
