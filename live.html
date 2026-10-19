@@ -295,7 +295,7 @@ async function chatPurge(room){let n=0;for(let k=0;k<20;k++){const q=await DB.co
 // [2026-10-19] 경기 기록(기록 콘솔) 경기 = rec 또는 events 에 type 이 있는 경기 → 점수·시계·이름을 경기 기록과 같은 방식으로
 function isRec(m){return !!(m&&(m.rec||(m.events||[]).some(e=>e&&e.type)))}
 function scoreOf(m){if(isRec(m))return KFDF_MR.score(m.events||[]);return {a:+((m.a||{}).score)||0,b:+((m.b||{}).score)||0}}
-function mLabel(m){if(!isRec(m))return m.title||'';const r=String(m.round||'');const st=m.stage||'';const sr=r?(st&&r.indexOf(st)!==0?st+' '+r:r):st;return [m.div,sr].filter(Boolean).join(' ')||m.title||''}
+function mLabel(m){if(!isRec(m))return m.title||'';const r=String(m.round||'');const st=m.stage||'';const sr=r?(st&&r.indexOf(st)!==0?st+' '+r:r):st;const g=(m.group&&sr.indexOf(m.group)<0)?m.group:'';return [m.div,g,sr].filter(Boolean).join(' ')||m.title||''}
 function sc(m,side){return scoreOf(m)[side]}
 // ── 타이머·득점 기록 ──
 function clockMs(m){const c=m.clock||{};return (+c.base||0)+(c.running&&c.startedAt?Math.max(0,Date.now()-(+c.startedAt)):0)}
