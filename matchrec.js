@@ -1,4 +1,4 @@
-// matchrec.js v20261018d · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
+// matchrec.js v20261019a · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
 //   화면: match.html(기록 콘솔·경기 관리) · competition.html(오더지 작성) · results.html(공개 결과) · live.html(중계 콘솔 호환)
 //   원칙 ① 경기 문서(liveMatches) 하나가 원본 ② 점수는 득점 기록(events)에서 계산해 a.score/b.score 에 같이 저장(중계 화면 호환)
 //        ③ 입력권(ctrl)은 한 번에 한 화면 ④ 기록 추가는 고유 id + 트랜잭션(중복 전송 무시) ⑤ 취소는 삭제 대신 void 표시
@@ -228,7 +228,7 @@
     +'th{background:#e8f3ee;font-weight:800}.h1{text-align:center;font-size:22pt;font-weight:900;margin:2mm 0 1mm}.h2{text-align:center;font-size:12.5pt;font-weight:700;margin:0 0 4mm;color:#333}'
     +'.lab{background:#e8f3ee;font-weight:800}.sig{height:11mm;object-fit:contain;max-width:34mm;vertical-align:middle}.l{text-align:left}.s{font-size:9.5pt}.y{background:#fff59a}.b{background:#dcdcf0}.g{background:#bfe8d2}'
     +'.sl{display:flex;justify-content:space-between;margin-top:4mm;font-size:10.5pt;align-items:flex-end;gap:3mm;flex-wrap:wrap}.sl div{flex:1;min-width:40%}.sl b{margin-right:3mm}.sl u{display:inline-block;min-width:34mm;border-bottom:1px solid #333;text-align:center;text-decoration:none}'
-    +'.tt td.tm{font-variant-numeric:tabular-nums;font-size:9.5pt;white-space:nowrap}.tt td.l b{font-size:11pt}.tl td{padding:1.8mm 1.5mm;font-size:10pt}.tl td.l b{font-size:10.5pt}.tl td.tm{font-variant-numeric:tabular-nums;font-size:9.5pt;white-space:nowrap}.tl td.sc{font-variant-numeric:tabular-nums;font-size:11.5pt;font-weight:900;background:#fffbe6;white-space:nowrap}.tl td.sc .hi{color:#b00020}.tl th.tn{font-size:11pt}.tl th.mid{background:#fff3c4}.tl tr.pd td{background:#e8f3ee;font-weight:800;font-size:9pt;padding:0.8mm}.win{color:#b00020;font-weight:900}.winline{text-align:center;font-size:13pt;font-weight:900;margin:2mm 0 0;border:1.5px solid #333;padding:1.5mm;background:#f6f6f6}';
+    +'.tt td.tm{font-variant-numeric:tabular-nums;font-size:9.5pt;white-space:nowrap}.tt td.l b{font-size:11pt}.tl td{padding:1.8mm 1.5mm;font-size:10pt}.tl td.l b{font-size:10.5pt}.tl td.tm{font-variant-numeric:tabular-nums;font-size:9.5pt;white-space:nowrap}.tl td.sc{font-variant-numeric:tabular-nums;font-size:11.5pt;font-weight:900;background:#fffbe6;white-space:nowrap}.tl td.sc .hi{color:#b00020}.tl td.tm{background:#fffbe6;line-height:1.25}.tl td.tm .sc2{font-size:11pt;font-weight:900;margin-top:1px}.tl td.tm .sc2 .hi{color:#b00020}.tl th.tn{font-size:11pt}.tl th.mid{background:#fff3c4}.tl tr.pd td{background:#e8f3ee;font-weight:800;font-size:9pt;padding:0.8mm}.win{color:#b00020;font-weight:900}.winline{text-align:center;font-size:13pt;font-weight:900;margin:2mm 0 0;border:1.5px solid #333;padding:1.5mm;background:#f6f6f6}';
   function pwin(title){var w=window.open('','_blank');if(!w){alert('팝업이 차단되어 인쇄 창을 열 수 없습니다. 주소창의 팝업 차단 표시에서 허용해 주세요.');return null}
     w.document.write('<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>'+esc(title)+'</title><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"><style>'+PCSS+'</style></head><body><div class="bar"><button onclick="window.print()">🖨 인쇄 · PDF로 저장</button><span>인쇄 창에서 대상을 「PDF로 저장」, 용지 A4, 「배경 그래픽」 켜기</span></div>');return w}
   function pend(w){w.document.write('<script>setTimeout(function(){window.print()},500)<\/script></body></html>');w.document.close()}
@@ -261,19 +261,19 @@
       if(e.type==='timeout')return '<td colspan="3" class="s">작전타임</td>';
       return '<td class="l" colspan="3">'+(e.d>0?'득점':'득점 취소')+'</td>'};
     var run={a:0,b:0};var rows=[];var curP=null;
-    EV.forEach(function(x){var e=x.e;var p=e.period||'';if(p!==curP){curP=p;rows.push('<tr class="pd"><td colspan="3"></td><td colspan="2">'+esc(p||'구간 미정')+'</td><td colspan="3"></td></tr>')}
+    EV.forEach(function(x){var e=x.e;var p=e.period||'';if(p!==curP){curP=p;rows.push('<tr class="pd"><td colspan="3"></td><td>'+esc(p||'구간 미정')+'</td><td colspan="3"></td></tr>')}
       var d=e.type==='goal'?1:(e.type==null?(+e.d||0):0);if(d)run[e.side]=Math.max(0,run[e.side]+d);
       var C=cellsOf(e);var left=e.side==='a'?C:E3,right=e.side==='b'?C:E3;
       var scv=d?('<b'+(e.side==='a'?' class="hi"':'')+'>'+run.a+'</b> : <b'+(e.side==='b'?' class="hi"':'')+'>'+run.b+'</b>'):'';
-      rows.push('<tr>'+left+'<td class="tm">'+esc(evTime(e))+'</td><td class="sc">'+scv+'</td>'+right+'</tr>')});
-    var N=16;while(rows.length<N)rows.push('<tr>'+E3+'<td class="tm">&nbsp;</td><td class="sc"></td>'+E3+'</tr>');
+      rows.push('<tr>'+left+'<td class="tm">'+esc(evTime(e))+(scv?'<div class="sc2">'+scv+'</div>':'')+'</td>'+right+'</tr>')});
+    var N=16;while(rows.length<N)rows.push('<tr>'+E3+'<td class="tm">&nbsp;</td>'+E3+'</tr>');
     function th_(side,o){var t=m[side]||{};var kit=((m.kit||{})[side]===1)?1:0;var K=kitsOf(o||{})[kit];
       return '<th colspan="3" class="tn">'+esc(teamLabel(t))+(win===side?' <span class="win">승</span>':'')+' <span class="s" style="display:inline-block;border:1px solid #333;background:'+esc(K.color)+';color:'+kitTextColor(K.color)+';padding:0 2mm;border-radius:1mm;font-weight:600">'+esc(K.name)+'</span></th>'}
     function gp(side){var fp=(m.fairplay||{})[side];var cs=(m.coachScore||{})[side];return '<td class="g l" colspan="3" style="padding-left:3mm"><b>가점</b> &nbsp;페어플레이 <b>'+(fp!=null?fp:'')+'</b>'+(cs!=null?' &nbsp;·&nbsp; 지도자 <b>'+cs+'</b>':'')+'</td>'}
-    var timeline='<table class="tl"><colgroup><col style="width:28mm"><col style="width:26mm"><col style="width:22mm"><col style="width:14mm"><col style="width:20mm"><col style="width:28mm"><col style="width:26mm"><col style="width:22mm"></colgroup>'
-      +'<tr>'+th_('a',oa)+'<th rowspan="2" class="mid">TIME</th><th rowspan="2" class="mid">점수<br><span class="s" style="font-weight:600">왼쪽 : 오른쪽</span></th>'+th_('b',ob)+'</tr>'
+    var timeline='<table class="tl"><colgroup><col style="width:26mm"><col style="width:25mm"><col style="width:33mm"><col style="width:18mm"><col style="width:26mm"><col style="width:25mm"><col style="width:33mm"></colgroup>'
+      +'<tr>'+th_('a',oa)+'<th rowspan="2" class="mid">TIME<br><span class="s" style="font-weight:600">점수</span></th>'+th_('b',ob)+'</tr>'
       +'<tr><th>득점</th><th>도움</th><th>제재</th><th>득점</th><th>도움</th><th>제재</th></tr>'+rows.join('')
-      +'<tr>'+gp('a')+'<td colspan="2" class="g"></td>'+gp('b')+'</tr></table>';
+      +'<tr>'+gp('a')+'<td class="g"></td>'+gp('b')+'</tr></table>';
     var ta=m.a||{},tb=m.b||{};var day=m.day||'';var dd=day?new Date(day+'T00:00:00'):null;
     var sg=function(s){return s&&s.name?('<b>'+esc(s.name)+'</b> '+(s.img?'<img class="sig" src="'+esc(s.img)+'">':'<u>&nbsp;</u>')):'<u>&nbsp;</u>'};
     var coachBox=function(side,o){var cs=coachesOf(m,side,o);var key=side==='a'?'coachA':'coachB';var first=signs[key]&&signs[key].name?signs[key]:(cs[0]?{name:cs[0].name,img:cs[0].sign}:null);
@@ -288,7 +288,7 @@
       +['a','b'].map(function(side){var t=m[side]||{};var me=side==='a'?sc.a:sc.b,op=side==='a'?sc.b:sc.a;var res=m.status==='종료'?(me>op?'승':me<op?'패':'무'):'';return '<tr><td class="l" style="padding-left:3mm;font-weight:800">'+esc(teamLabel(t))+'</td><td class="y">'+((H[side]||{})['전반']||0)+'</td><td class="b">'+(((H[side]||{})['후반']||0)+((H[side]||{})['연장']||0))+'</td><td style="font-weight:900">'+me+'</td><td style="font-weight:900;font-size:12pt">'+res+'</td></tr>'}).join('')+'</table>'
       +(win?'<div class="winline">'+esc(t_('a'))+' <b>'+sc.a+'</b> : <b>'+sc.b+'</b> '+esc(t_('b'))+' &nbsp;—&nbsp; <span class="win">'+esc(t_(win))+' 승</span></div>':'')
       +'<div style="margin-top:2mm">'+timeline+'</div>'
-      +'<div class="s" style="margin-top:2mm">※ 한 줄에 사건 하나 — 왼쪽 팀 사건은 왼쪽 칸, 오른쪽 팀 사건은 오른쪽 칸에 적고 가운데 「점수」는 그 득점 직후의 점수(왼쪽 : 오른쪽) &nbsp; ※제재(지도자 포함): 주의 · 옐로(경고) · 레드(퇴장) — 옐로 2장은 퇴장 &nbsp; ※페어플레이·지도자 가점: 5 ~ −3</div>'
+      +'<div class="s" style="margin-top:2mm">※ 한 줄에 사건 하나 — 왼쪽 팀 사건은 왼쪽 칸, 오른쪽 팀 사건은 오른쪽 칸에 적고 가운데 칸은 위가 시간, 아래가 그 득점 직후의 점수(왼쪽 : 오른쪽) &nbsp; ※제재(지도자 포함): 주의 · 옐로(경고) · 레드(퇴장) — 옐로 2장은 퇴장 &nbsp; ※페어플레이·지도자 가점: 5 ~ −3</div>'
       +'<div class="s">최우수선수 추천: <b>'+esc(mvps)+'</b></div>'
       +'<div class="sl">'+coachBox('a',oa)+coachBox('b',ob)+'</div>'
       +'<div class="sl">'+offLine('감독관')+offLine('기록원')+offLine('점수심')+'</div>'
@@ -315,7 +315,10 @@
     +'.ktl-act button{border:1px solid #d5dce8;background:#fff;color:#111827;border-radius:8px;padding:3px 9px;font-size:11.5px;font-weight:800;cursor:pointer;font-family:inherit}'
     +'.ktl-empty{position:relative;z-index:1;text-align:center;font-size:13px;color:#6b7280;background:#fff;margin:14px auto;padding:6px 12px;max-width:80%}'
     +'.ktl-ft{border-top:1px solid #eef1f5;padding:10px 14px;font-size:12.5px;color:#374151;line-height:1.75}.ktl-ft b{color:#111827}'
-    +'@media(max-width:520px){.ktl-r{grid-template-columns:1fr 64px 1fr}.ktl-e{padding:5px 6px;gap:5px}.ktl-e .tx b{font-size:13.5px}.ktl-chip{font-size:10.5px;padding:3px 6px}.ktl-t span{min-width:52px;height:32px;font-size:13px}.ktl-sc .n{font-size:34px}.ktl-tm b{font-size:14px}}'
+    +'.ktl-e .gl{display:flex;gap:14px;align-items:flex-start}.ktl-l .ktl-e .gl{justify-content:flex-end}.ktl-e .pp b{display:block;font-size:15px;font-weight:900;line-height:1.3;white-space:nowrap}.ktl-e .pp small{display:block;font-size:11px;font-weight:700;color:#6b7280;margin-top:1px}'
+    +'.ktl-th{display:grid;grid-template-columns:1fr 78px 1fr;align-items:center;padding:10px 12px 6px;border-bottom:1px solid #eef1f5;position:relative;z-index:1;background:#fff}.ktl-th b{font-size:14px;font-weight:900;color:#153A77}.ktl-th b:first-child{text-align:right;padding-right:12px}.ktl-th b:last-child{padding-left:12px}.ktl-th span{text-align:center;font-size:11px;font-weight:800;color:#9aa1ad}'
+    +'.ktl.cp .ktl-r{min-height:54px}.ktl.cp .ktl-p{margin:6px 0}.ktl.cp .ktl-p .ck{width:36px;height:36px}'
+    +'@media(max-width:520px){.ktl-r{grid-template-columns:1fr 64px 1fr}.ktl-th{grid-template-columns:1fr 64px 1fr}.ktl-e .pp b{font-size:13px}.ktl-e .gl{gap:8px}.ktl-e{padding:5px 6px;gap:5px}.ktl-e .tx b{font-size:13.5px}.ktl-chip{font-size:10.5px;padding:3px 6px}.ktl-t span{min-width:52px;height:32px;font-size:13px}.ktl-sc .n{font-size:34px}.ktl-tm b{font-size:14px}}'
     +'@media print{.ktl-act{display:none}.ktl{max-width:none}}';
   var CKSVG='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6M5 5l1.5 1.5M19 5l-1.5 1.5"/></svg>';
   var DISCSVG='<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.5" fill="#15803d"/><circle cx="12" cy="12" r="6" fill="none" stroke="#fff" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="#fff"/></svg>';
@@ -332,9 +335,11 @@
       else if(e.type==null){chip='<span class="ktl-chip '+(e.d>0?'k-goal':'k-x')+'">'+(e.d>0?'득점':'득점 취소')+'</span>';main=(m[side]||{}).name||''}
       else if(e.type==='card'){var c=e.card;var cls=c==='Y'?'k-y':(c==='R'||c==='W')?'k-r':c==='C'?'k-c':'k-o';chip='<span class="ktl-chip '+cls+'">'+esc(CARDS[c]||c||'제재')+'</span>';if(c==='Y')ic='<span class="ktl-cd y"></span>';else if(c==='R'||c==='W')ic='<span class="ktl-cd r"></span>';
         var tg=e.target||{};main=tg.kind==='coach'?'지도자 '+(tg.name&&tg.name!=='지도자'?tg.name:''):pn(tg);sub=e.note?'('+e.note+')':''}
-      else if(e.type==='timeout'){chip='<span class="ktl-chip k-to">작전타임</span>';main=(m[side]||{}).name||'';sub=''}
+      else if(e.type==='timeout'){chip='<span class="ktl-chip k-to">작전타임</span>';main=opt.compact?'':((m[side]||{}).name||'');sub=''}
       if(e.void)sub=(sub?sub+' ':'')+'· 취소됨';
-      var tx='<div class="tx"><b>'+esc(main)+'</b>'+(sub?'<small>'+esc(sub)+'</small>':'')+(opt.act?'<div class="ktl-act">'+opt.act(e)+'</div>':'')+'</div>';
+      var act=opt.act?'<div class="ktl-act">'+opt.act(e)+'</div>':'';
+      var tx=e.type==='goal'?'<div class="tx"><div class="gl"><span class="pp"><b>'+esc(main)+'</b><small>득점</small></span>'+(e.assist?'<span class="pp"><b>'+esc(pn(e.assist))+'</b><small>도움</small></span>':'')+'</div>'+(e.void?'<small>· 취소됨</small>':'')+act+'</div>'
+        :'<div class="tx">'+(main?'<b>'+esc(main)+'</b>':'')+(sub?'<small>'+esc(sub)+'</small>':'')+act+'</div>';
       var marks=(ic?'<span class="ktl-ic">'+ic+'</span>':'')+chip;
       return '<div class="ktl-e">'+(side==='a'?tx+marks:marks+tx)+'</div>'};
     var body=items.map(function(it){
@@ -344,7 +349,8 @@
     function teamName(s){var t=m[s]||{};return t.name||t.school||s.toUpperCase()}
     var css=opt.noCss?'':'<style>'+KTLCSS+'</style>';
     var bd='<div class="ktl-bd">'+(body||'<div class="ktl-empty">아직 기록이 없습니다</div>')+'</div>';
-    if(opt.inline)return css+'<div class="ktl">'+bd+'</div>';
+    var th=opt.teamsHead?'<div class="ktl-th"><b>'+esc(teamName('a'))+'</b><span>시간 · 점수</span><b>'+esc(teamName('b'))+'</b></div>':'';
+    if(opt.inline)return css+'<div class="ktl'+(opt.compact?' cp':'')+'">'+th+bd+'</div>';
     var kit=function(side,o){var k=((m.kit||{})[side]===1)?1:0;return kitsOf(o||{})[k]};
     var tmH=function(side,o){var t=m[side]||{};var K=kit(side,o);return '<div class="ktl-tm"><div class="dot" style="background:'+esc(K.color)+'"></div><b>'+esc(t.name||t.school||side.toUpperCase())+'</b>'+(t.school&&t.school!==t.name?'<small>'+esc(t.school)+'</small>':'')+(win===side?'<span class="wn">승</span>':'')+'</div>'};
     var dd=m.day?String(m.day).replace(/-/g,'.'):'';

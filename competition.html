@@ -2836,6 +2836,21 @@ async function compRestoreClick(compId,slotId,btn){
   try{const r=await compRebuildSlot(compId,slotId);alert('✓ 참가 공고를 복구했습니다'+r.evMsg+'.');location.href='competition.html?slot='+r.id}
   catch(e){alert('복구 실패: '+e.message);if(btn){btn.disabled=false;btn.textContent='🛠 참가 공고 복구'}}
 }
+// [대회 삭제 2026-10-19] 시험 대회 등 — 대회·참가/심판 공고·캘린더 일정·경기(liveMatches)·오더지·집계를 함께 지움. 이름을 그대로 입력해야 진행(실수 방지)
+async function cc2Delete(id){const c=(CC2_LIST||[]).find(x=>x.id===id);if(!c)return;
+  const typed=prompt('이 대회를 완전히 지웁니다 — 참가 신청·오더지·경기 기록·결과까지 모두 사라지며 되돌릴 수 없습니다.\n\n지우려면 대회 이름을 그대로 입력하세요:\n'+(c.title||''));if(typed==null)return;
+  if(String(typed).trim()!==String(c.title||'').trim()){alert('대회 이름이 맞지 않아 지우지 않았습니다.');return}
+  try{const refs=[];const slotIds=c.slotIds||[];
+    for(const sid of slotIds){refs.push(DB.collection('compSlots').doc(sid));refs.push(DB.collection('compStats').doc(sid));
+      try{const q=await DB.collection('liveMatches').where('slotId','==',sid).get();q.docs.forEach(d=>refs.push(d.ref))}catch(e){}
+      try{const q=await DB.collection('compOrders').where('slotId','==',sid).get();q.docs.forEach(d=>refs.push(d.ref))}catch(e){}
+      try{const q=await DB.collection('compEvals').where('slotId','==',sid).get();q.docs.forEach(d=>refs.push(d.ref))}catch(e){}}
+    try{const q=await DB.collection('competitionStaff').where('compId','==',id).get();q.docs.forEach(d=>refs.push(d.ref))}catch(e){}
+    if(c.eventId)refs.push(DB.collection('events').doc(c.eventId));
+    refs.push(DB.collection('competitions').doc(id));
+    for(let i=0;i<refs.length;i+=400){const b=DB.batch();refs.slice(i,i+400).forEach(r=>b.delete(r));await b.commit()}
+    alert('✓ 「'+(c.title||'')+'」를 지웠습니다 (문서 '+refs.length+'개).');cc2LoadMine();try{if(typeof hubLoad==='function')hubLoad()}catch(e){}
+  }catch(e){alert('삭제 실패: '+(/permission/i.test(String(e))?'권한이 없습니다 — 관리자 페이지의 대회 관리에서 지우거나 사무국에 요청하세요':(e.message||e)))}}
 async function cc2LoadMine(){
   const el=document.getElementById('cc2MyList');if(!el)return;
   try{
@@ -2846,6 +2861,7 @@ async function cc2LoadMine(){
       +'<b>'+cesc(c.title||'')+'</b><span style="color:#6b7280;font-size:12px">📅 '+cesc(c.dateStart||'')+(c.dateEnd&&c.dateEnd!==c.dateStart?'~'+cesc(c.dateEnd):'')+' · 📍 '+cesc(c.place||'')+'</span>'
       +'<span style="flex:1"></span>'
       +'<button class="cbtn cbtn-soft" style="padding:5px 12px;font-size:12px" onclick="cc2Open(\''+c.id+'\')">✏️ 수정</button>'
+      +'<button class="cbtn cbtn-soft" style="padding:5px 12px;font-size:12px;background:#fdecee;color:#C41E2F" onclick="cc2Delete(\''+c.id+'\')" title="시험 대회 등 — 공고·일정·경기 기록까지 모두 지웁니다">🗑 삭제</button>'
       +'</div>').join('')
     :'<div style="font-size:12.5px;color:#8a919d;margin-top:6px">등록한 대회가 없습니다. [+ 대회 공고 등록]으로 시작하세요.</div>';
   }catch(e){el.innerHTML='<div style="font-size:12.5px;color:#C41E2F">목록 불러오기 실패: '+cesc(e.message)+'</div>'}
