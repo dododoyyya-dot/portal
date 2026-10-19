@@ -701,12 +701,12 @@ function offPickList(picks,role,div){const rk=OFF_RK[role]||/./;const dk=divKey(
 function offDatalists(picks,div){return Object.keys(OFF_RK).map(r=>'<datalist id="mf_pk_'+r+'">'+offPickList(picks,r,div).map(p=>'<option value="'+esc(p.name)+'">'+esc(p.lab||'확정')+'</option>').join('')+'</datalist>').join('')}
 async function staffPick(){if(STAFFPICK)return STAFFPICK;const out=[];try{
   const ids=await staffPostIds();
-  for(let i=0;i<ids.length;i+=10){const q=await DB.collection('staffApplications').where('postId','in',ids.slice(i,i+10)).get();q.docs.forEach(d=>{const x=d.data();if(x.cancelled||!x.uid)return;const S=x.status||{};const days=Object.keys(S).filter(k=>S[k]==='확정').sort();const ok=days.length>0;
+  for(let i=0;i<ids.length;i+=10){const q=await DB.collection('staffApplications').where('postId','in',ids.slice(i,i+10)).get();q.docs.forEach(d=>{const x=d.data();if(x.cancelled||!(x.uid||x.name))return;   /* [2026-10-19] 계정 없이 확정된 사람도 이름으로 포함 */const S=x.status||{};const days=Object.keys(S).filter(k=>S[k]==='확정').sort();const ok=days.length>0;
     const P=x.prefs||{};const applied=[...new Set((ok?days:Object.keys(P)).map(k=>P[k]||[]).flat().filter(Boolean))];
     const A=x.assign||{};const duties=[...new Set(days.map(d=>String((A[d]||{}).duty||'').trim()).filter(Boolean))];   /* [2026-10-19] 확정 때 정한 임무 */
     const roles=duties.length?[...new Set(duties.concat(duties.every(dutyHasRole)?[]:applied))]:applied;
-    const o=out.find(y=>y.uid===x.uid);if(o){o.ok=o.ok||ok;o.st=o.ok?'확정':'';o.days=[...new Set(o.days.concat(days))].sort();o.roles=[...new Set(o.roles.concat(roles))];o.duties=[...new Set(o.duties.concat(duties))];return}
-    out.push({uid:x.uid,name:x.name||'',st:ok?'확정':'',ok:ok,days:days,roles:roles,duties:duties,applied:applied})})}
+    const o=out.find(y=>x.uid?y.uid===x.uid:(!y.uid&&y.name===(x.name||'')));if(o){o.ok=o.ok||ok;o.st=o.ok?'확정':'';o.days=[...new Set(o.days.concat(days))].sort();o.roles=[...new Set(o.roles.concat(roles))];o.duties=[...new Set(o.duties.concat(duties))];return}
+    out.push({uid:x.uid||'',name:x.name||'',st:ok?'확정':'',ok:ok,days:days,roles:roles,duties:duties,applied:applied})})}
   }catch(e){}STAFFPICK=out;return out}
 async function matchForm(id){
   const m=id?MATCHES.find(x=>x.id===id):null;const picks=await staffPick();
@@ -714,7 +714,7 @@ async function matchForm(id){
   const tOpt=(sel)=>'<option value="">— 팀 선택 —</option>'+teams.map(c=>'<option value="'+esc(entryKey(c))+'"'+(sel===entryKey(c)?' selected':'')+'>'+esc(c.name||'')+(c.teamOrg&&c.teamOrg!==c.name?' ('+esc(c.teamOrg)+')':'')+' · '+esc((c.prefs||[])[0]||'')+'</option>').join('')+'<option value="__free__"'+(sel==='__free__'?' selected':'')+'>직접 입력(명단 없이)</option>';
   // [심판진 2026-10-15] 목록에서 고르지 않고 직접 적음(신청자는 자동완성, 이름이 신청자와 같으면 회원으로 연결). 역할별 칸은 「＋ 추가」로 늘림(주심 2·부심 4·감독관 2 …)
   const offs=m?MR.offList(m):[];const rows=offs.length?offs:[{role:'감독관'},{role:'주심'},{role:'부심'},{role:'부심'},{role:'점수심'},{role:'기록원'}];
-  const offRow=(x,i)=>'<div class="mfo" data-key="'+esc(x.key||'')+'" data-uid="'+esc(x.uid||'')+'"><select class="mr-in r" onchange="mfRoleList(this)">'+['감독관','주심','부심','점수심','기록원'].map(r=>'<option'+(x.role===r?' selected':'')+'>'+r+'</option>').join('')+'</select><input class="mr-in n" list="mf_pk_'+esc(OFF_RK[x.role]?x.role:'감독관')+'" placeholder="이름 검색 · 직접 입력" value="'+esc(x.name||'')+'" oninput="this.parentNode.dataset.uid=\'\'"><button type="button" class="mr-btn s" style="padding:6px 10px" onclick="this.parentNode.remove()" title="이 칸 삭제">✕</button></div>';
+  MF_PICKS=picks;MF_DIV=m?m.div||'':'';const offRow=(x,i)=>mfOffRowHtml(x);
   const coachRows=side=>{const cs=m?MR.coachesOf(m,side,orderOf(((m[side])||{}).pid)||{}):[];return (cs.length?cs:[{name:''}]).map(c=>'<div class="mfo c"><input class="mr-in n" placeholder="감독교사·코치 이름" value="'+esc(c.name||'')+'" data-sign="'+esc(c.sign||'')+'"><button type="button" class="mr-btn s" style="padding:6px 10px" onclick="this.parentNode.remove()">✕</button></div>').join('')};
   const of=(m&&m.officials)||{};
   modal('mfModal','<b style="font-size:16px">'+(m?'✏️ 경기 설정':'＋ 경기 추가')+'</b>'
@@ -727,11 +727,31 @@ async function matchForm(id){
       +'<label class="mr-lab">감독교사 · 코치 (B팀 '+esc(tname(m,'b'))+')</label><div id="mf_coach_b">'+coachRows('b')+'</div><button type="button" class="mr-btn ghost" style="padding:5px 10px;font-size:12px;margin-top:4px" onclick="mfCoachAdd(\'b\')">＋ 코치 추가</button>':'')
     +'<label class="mr-lab">심판진 — 역할과 이름 (감독관·주심·부심·점수심·기록원은 몇 명이든 추가)</label><div id="mf_offs">'+rows.map(offRow).join('')+'</div><button type="button" class="mr-btn ghost" style="padding:5px 10px;font-size:12px;margin-top:4px" onclick="mfOffAdd()">＋ 심판 추가</button>'
     +'<datalist id="mf_picks">'+picks.map(p=>'<option value="'+esc(p.name)+'">'+(p.st?esc(p.st):'신청')+'</option>').join('')+'</datalist>'+offDatalists(picks,m?m.div:'')
-    +'<div class="mr-note" style="margin-top:6px">이름 칸을 누르거나 글자를 치면 <b>그 임무로 확정된 심판</b>만 나옵니다(심판 모집에서 확정한 임무 기준 · 이 경기 부문 담당이 위). 직접 적어도 됩니다. 신청자와 같은 이름이면 회원으로 연결되어 그 사람이 이 경기의 기록 콘솔을 열 수 있고 등록 서명이 기록지에 자동 기입됩니다. 확정된 심판은 배정하지 않아도 이 대회 모든 경기를 기록할 수 있습니다.</div>'
+    +'<div class="mr-note" style="margin-top:6px">임무를 고르면 옆 목록에 <b>그 임무로 확정된 사람 전원</b>이 나옵니다(심판 모집 「확정 현황」과 같은 임무 · 심판위원장은 감독관 목록에 함께). 그 아래는 다른 임무로 확정된 사람, 맨 아래 「직접 입력」. 신청자와 같은 이름이면 회원으로 연결되어 그 사람이 이 경기의 기록 콘솔을 열 수 있고 등록 서명이 기록지에 자동 기입됩니다. 확정된 심판은 배정하지 않아도 이 대회 모든 경기를 기록할 수 있습니다.</div>'
     +'<div class="mr-row" style="justify-content:flex-end;margin-top:14px">'+(m?'<button class="mr-btn r" onclick="matchDel(\''+m.id+'\')">🗑 삭제</button><span style="flex:1"></span>':'')+'<button class="mr-btn s" onclick="document.getElementById(\'mfModal\').remove()">닫기</button><button class="mr-btn g" onclick="matchSave(\''+(m?m.id:'')+'\')">💾 저장</button></div>');
 }
-function mfRoleList(sel){const n=sel.parentNode.querySelector('.n');if(n)n.setAttribute('list','mf_pk_'+(OFF_RK[sel.value]?sel.value:'감독관'))}
-function mfOffAdd(){const w=document.getElementById('mf_offs');w.insertAdjacentHTML('beforeend','<div class="mfo" data-key="" data-uid=""><select class="mr-in r" onchange="mfRoleList(this)">'+['감독관','주심','부심','점수심','기록원'].map(r=>'<option>'+r+'</option>').join('')+'</select><input class="mr-in n" list="mf_pk_감독관" placeholder="이름 검색 · 직접 입력" oninput="this.parentNode.dataset.uid=\'\'"><button type="button" class="mr-btn s" style="padding:6px 10px" onclick="this.parentNode.remove()">✕</button></div>');w.lastElementChild.querySelector('.n').focus()}
+/* [2026-10-19] 심판진 한 줄 = 임무 고르기 + 사람 고르기(드롭다운) + 직접 입력 칸(목록에 없을 때만) */
+let MF_PICKS=[],MF_DIV='';
+const OFF_ROLES=['감독관','주심','부심','점수심','기록원'];
+function mfOffRowHtml(x){x=x||{};const role=OFF_RK[x.role]?x.role:'감독관';const o=mfOpts(role,x);
+  return '<div class="mfo" data-key="'+esc(x.key||'')+'" data-uid="'+esc(x.uid||'')+'"><select class="mr-in r" onchange="mfRoleList(this)">'+OFF_ROLES.map(r=>'<option'+(role===r?' selected':'')+'>'+r+'</option>').join('')+'</select>'
+    +'<div style="min-width:0"><select class="mr-in p" onchange="mfPick(this)">'+o.html+'</select><input class="mr-in n" placeholder="이름 직접 입력" value="'+esc(x.name||'')+'" style="margin-top:4px;'+(o.free?'':'display:none')+'" oninput="this.closest(\'.mfo\').dataset.uid=\'\'"></div>'
+    +'<button type="button" class="mr-btn s" style="padding:6px 10px" onclick="this.parentNode.remove()" title="이 칸 삭제">✕</button></div>'}
+// 그 임무 확정자 전원(이 경기 부문 담당 먼저) → 다른 임무로 확정된 사람 → 직접 입력
+function mfOpts(role,cur){const rk=OFF_RK[role]||/./;const dk=divKey(MF_DIV);const ok=MF_PICKS.filter(p=>p.ok);
+  const fit=ok.filter(p=>(p.roles||[]).some(r=>rk.test(String(r))));const other=ok.filter(p=>fit.indexOf(p)<0&&(p.roles||[]).some(r=>!RF_NONREF.test(String(r))||/심판|기록|점수/.test(String(r))));
+  const hit=p=>(p.duties||[]).concat(p.roles||[]).some(d=>dkMatch(divKey(d),dk));const sort=L=>L.slice().sort((x,y)=>(hit(y)-hit(x))||String(x.name).localeCompare(String(y.name),'ko'));
+  let matched=false;const op=p=>{const sel=cur&&cur.name&&((cur.uid&&p.uid===cur.uid)||(!matched&&!cur.uid&&p.name===cur.name)||(!cur.uid&&p.name===cur.name&&!matched));if(sel)matched=true;
+    return '<option value="'+esc(p.uid||('n:'+p.name))+'" data-uid="'+esc(p.uid||'')+'" data-name="'+esc(p.name)+'"'+(sel?' selected':'')+'>'+esc(p.name)+' — '+esc(((p.duties||[]).length?p.duties:(p.roles||[])).join(', ')||'확정')+(p.uid?'':' (계정 없음)')+'</option>'};
+  let h='<option value="">— '+esc(role)+' 확정 '+fit.length+'명 중 고르기 —</option>'+sort(fit).map(op).join('');
+  if(other.length)h+='<optgroup label="다른 임무로 확정된 사람">'+sort(other).map(op).join('')+'</optgroup>';
+  const free=!!(cur&&cur.name&&!matched);h+='<option value="__free"'+(free?' selected':'')+'>✏️ 목록에 없음 — 직접 입력</option>';return {html:h,free:free}}
+function mfPick(sel){const row=sel.closest('.mfo');const inp=row.querySelector('.n');const v=sel.value;
+  if(v==='__free'){inp.style.display='';inp.value='';row.dataset.uid='';inp.focus();return}
+  if(!v){inp.value='';inp.style.display='none';row.dataset.uid='';return}
+  const o=sel.selectedOptions[0];inp.value=o.dataset.name||'';inp.style.display='none';row.dataset.uid=o.dataset.uid||''}
+function mfRoleList(sel){const row=sel.closest('.mfo');const inp=row.querySelector('.n');const cur={name:inp.value.trim(),uid:row.dataset.uid||''};const o=mfOpts(sel.value,cur);const ps=row.querySelector('.p');ps.innerHTML=o.html;inp.style.display=o.free?'':'none'}
+function mfOffAdd(){const w=document.getElementById('mf_offs');w.insertAdjacentHTML('beforeend',mfOffRowHtml({role:'주심'}));w.lastElementChild.querySelector('.p').focus()}
 function mfCoachAdd(side){const w=document.getElementById('mf_coach_'+side);w.insertAdjacentHTML('beforeend','<div class="mfo c"><input class="mr-in n" placeholder="감독교사·코치 이름" data-sign=""><button type="button" class="mr-btn s" style="padding:6px 10px" onclick="this.parentNode.remove()">✕</button></div>');w.lastElementChild.querySelector('.n').focus()}
 function mfFree(side){const s=document.getElementById('mf_'+side),n=document.getElementById('mf_'+side+'n');n.style.display=s.value==='__free__'?'block':'none'}
 function modal(id,html){const old=document.getElementById(id);if(old)old.remove();const d=document.createElement('div');d.id=id;d.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:10005;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';d.innerHTML='<div style="background:#fff;border-radius:18px;max-width:560px;width:100%;max-height:92vh;overflow:auto;padding:22px">'+html+'</div>';document.body.appendChild(d)}
@@ -982,7 +1002,7 @@ const RF_NONREF=/봉사|운영요원|환경|주차|안내|요원$/;
 function rfIsRefRole(r){r=String(r||'');return !!r&&!(RF_NONREF.test(r)&&!/심판/.test(r))}
 async function rfPool(scope){const pool={};const add=(uid,name,src,sp)=>{if(!uid)return;pool[uid]=pool[uid]||{uid:uid,name:name||'',src:src,lead:0,other:0,lic:'',licPt:0,score:0,on:true,items:[],roles:[],days:[]};if(name&&!pool[uid].name)pool[uid].name=name;if(sp){pool[uid].roles=sp.roles||[];pool[uid].days=sp.days||[];pool[uid].duties=sp.duties||[]}};
   const SP=await staffPick();
-  SP.filter(p=>scope==='confirmed'?(p.ok&&(p.roles||[]).some(rfIsRefRole)):true).forEach(p=>add(p.uid,p.name,p.ok?'확정':'신청',p));
+  SP.filter(p=>scope==='confirmed'?(p.ok&&(p.roles||[]).some(rfIsRefRole)):true).forEach(p=>add(p.uid||('n:'+p.name),p.name,p.ok?'확정':'신청',p));
   let car=[];try{const q=await DB.collection('staffCareer').where('group','in',['심판','위원']).limit(3000).get();car=q.docs.map(d=>d.data()).filter(c=>c.group==='심판'||RF_LEAD.test(String(c.role||c.duty||'')))}catch(e){}
   if(scope==='all')car.forEach(c=>add(c.uid,c.name,'경력'));
   car.forEach(c=>{const P=pool[c.uid];if(!P)return;const r=String(c.role||c.duty||'');if(RF_LEAD.test(r))P.lead++;else if(RF_REF.test(r))P.other++;P.items.push({date:c.date||'',comp:c.competitionName||c.title||'',role:r,loc:c.location||''})});
@@ -1054,7 +1074,7 @@ function rfCareer(i){const p=RF.pool[i];if(!p)return;const L=(p.items||[]).slice
     +(L.length?'<div style="max-height:50vh;overflow:auto;margin-top:8px"><table class="rf-tbl"><tr><th>일자</th><th class="l">대회</th><th>역할</th><th>계산</th></tr>'+L.map(x=>'<tr><td>'+esc(x.date)+'</td><td class="l">'+esc(x.comp)+(x.loc?' <small style="color:#6b7280">'+esc(x.loc)+'</small>':'')+'</td><td>'+esc(x.role)+'</td><td>'+(RF_LEAD.test(x.role)?'<b style="color:#153A77">주심 +3</b>':RF_REF.test(x.role)?'+1':'-')+'</td></tr>').join('')+'</table></div>':'<div class="bempty" style="margin-top:8px">등록된 심판 활동 경력이 없습니다.</div>')
     +'<div class="mr-row" style="justify-content:flex-end;margin-top:12px"><button class="mr-btn s" onclick="document.getElementById(\'rfcModal\').remove()">닫기</button></div>')}
 function rfLoadTxt(){const L=RF.load||{};return RF.pool.filter(p=>p.on&&L[p.uid]).map(p=>esc(p.name)+' '+L[p.uid]).join(' · ')||'-'}
-async function rfApply(){if(!RF.plan)return;try{for(let i=0;i<RF.plan.length;i+=400){const b=DB.batch();RF.plan.slice(i,i+400).forEach(x=>{const of=RF.over?{}:Object.assign({},x.m.officials||{});Object.assign(of,x.o);const _rl=['주심','부심','기록원'].concat(RF.mode==='svr'?['감독관']:[]);const keep=(of.list||[]).filter(y=>_rl.indexOf(y.role)<0);const L=keep.slice();[['supervisor','감독관'],['ref1','주심'],['ref2','부심'],['ref3','부심'],['recorder','기록원']].forEach(([k,r])=>{if(of[k]&&of[k].name&&(k!=='supervisor'||RF.mode==='svr'||!keep.some(y=>y.role==='감독관')))L.push({key:k,role:r,name:of[k].name,uid:of[k].uid||''})});of.list=L;const uids=[...new Set(L.filter(y=>REC_ROLE.test(String(y.role||''))).map(y=>y.uid).filter(Boolean))];b.update(DB.collection('liveMatches').doc(x.m.id),{officials:of,officialUids:uids,refMode:RF.mode==='svr'?'single':RF.mode,updatedAt:FV.serverTimestamp()})});await b.commit()}
+async function rfApply(){if(!RF.plan)return;try{for(let i=0;i<RF.plan.length;i+=400){const b=DB.batch();RF.plan.slice(i,i+400).forEach(x=>{const of=RF.over?{}:Object.assign({},x.m.officials||{});Object.keys(x.o).forEach(k=>{const v=x.o[k]||{};of[k]={uid:String(v.uid||'').indexOf('n:')===0?'':(v.uid||''),name:v.name||''}});const _rl=['주심','부심','기록원'].concat(RF.mode==='svr'?['감독관']:[]);const keep=(of.list||[]).filter(y=>_rl.indexOf(y.role)<0);const L=keep.slice();[['supervisor','감독관'],['ref1','주심'],['ref2','부심'],['ref3','부심'],['recorder','기록원']].forEach(([k,r])=>{if(of[k]&&of[k].name&&(k!=='supervisor'||RF.mode==='svr'||!keep.some(y=>y.role==='감독관')))L.push({key:k,role:r,name:of[k].name,uid:of[k].uid||''})});of.list=L;const uids=[...new Set(L.filter(y=>REC_ROLE.test(String(y.role||''))).map(y=>y.uid).filter(Boolean))];b.update(DB.collection('liveMatches').doc(x.m.id),{officials:of,officialUids:uids,refMode:RF.mode==='svr'?'single':RF.mode,updatedAt:FV.serverTimestamp()})});await b.commit()}
   document.getElementById('rfModal').remove();say('✓ '+RF.plan.length+'경기에 심판을 배정했습니다. 배정된 심판은 그 경기의 기록 콘솔을 열 수 있습니다.')}catch(e){say('배정 실패: '+(e.message||e))}}
 // ── 대진 편성 ──
 function drTeams(div){return teamEntries().filter(c=>!div||((c.prefs||[])[0]===div)).map(c=>({pid:entryKey(c),name:c.name||'',school:c.teamOrg||'',scid:c.teamSchoolClubId||''}))}
