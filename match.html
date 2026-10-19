@@ -580,7 +580,7 @@ async function lkAuto(){if(!STAFF||LK_BUSY||!MATCHES.length||!SLOT)return;LK_BUS
 function lkPanel(){if(!STAFF)return '';const T=lkTeams();const L=Object.values(T);if(!L.length)return '';
   const divs=[...new Set(L.map(t=>t.div))];const E=teamEntries();const usedPid={};L.forEach(t=>{if(t.pid)usedPid[t.pid]=t});
   const linked=L.filter(t=>t.pid).length;const orphan=E.filter(c=>!usedPid[entryKey(c)]);
-  let h='<div class="mr-card lk"><div class="mr-row"><b>🔗 대진표 팀 ↔ 참가 신청 연결</b><span class="mr-pill" style="background:'+(linked===L.length?'#0f766e':'#b8860b')+'">연결 '+linked+' / '+L.length+'팀</span><span class="mr-note" style="flex:1">학교가 단체전을 신청하면(화면 입력·엑셀 모두) 부문과 학교 이름이 맞는 대진표 팀에 <b>자동으로 연결</b>됩니다. 연결된 팀은 오더지 선수·배번·경기복이 기록 화면에 나옵니다. 자동으로 못 붙인 팀만 아래에서 골라 연결하세요.</span></div>'
+  let h='<details class="mr-card lk"'+(LK_OPEN?' open':'')+' ontoggle="LK_OPEN=this.open"><summary style="cursor:pointer"><b>🔗 대진표 팀 ↔ 참가 신청 연결</b> <span class="mr-pill" style="background:'+(linked===L.length?'#0f766e':'#b8860b')+'">연결 '+linked+' / '+L.length+'팀</span>'+(L.length-linked?' <span class="mr-note" style="color:#b8860b;font-weight:800">미연결 '+(L.length-linked)+'팀</span>':'')+' <span class="mr-note">— 눌러서 '+(LK_OPEN?'접기':'펼치기')+'</span></summary><div class="mr-row" style="margin-top:8px"><span class="mr-note" style="flex:1">학교가 단체전을 신청하면(화면 입력·엑셀 모두) 부문과 학교 이름이 맞는 대진표 팀에 <b>자동으로 연결</b>됩니다. 연결된 팀은 오더지 선수·배번·경기복이 기록 화면에 나옵니다. 자동으로 못 붙인 팀만 아래에서 골라 연결하세요.</span></div>'
     +(LK_LOG.length?'<div class="mr-note" style="margin-top:6px;color:#0f766e;font-weight:800">방금 자동 연결: '+LK_LOG.slice(0,5).map(esc).join(' · ')+(LK_LOG.length>5?' 외 '+(LK_LOG.length-5)+'건':'')+'</div>':'');
   divs.forEach(dv=>{const TL=L.filter(t=>t.div===dv);const un=TL.filter(t=>!t.pid);const ok=TL.filter(t=>t.pid);
     h+='<details class="lk-d"'+(un.length&&E.length?' open':'')+'><summary><b>'+esc(dv)+'</b> <span class="mr-note">연결 '+ok.length+' / '+TL.length+(un.length?' · 미연결 '+un.length:'')+'</span></summary><table class="mr-tbl"><tr><th class="l">대진표 팀</th><th class="l">참가 신청 팀</th><th></th></tr>'
@@ -589,7 +589,8 @@ function lkPanel(){if(!STAFF)return '';const T=lkTeams();const L=Object.values(T
         const any=C.exact.length+C.near.length+C.sameDiv.length;
         return '<tr><td class="l"><b>'+esc(t.name)+'</b>'+(t.school?' <small style="color:#6b7280">'+esc(t.school)+'</small>':'')+'<br><button class="mr-btn ghost" style="padding:4px 9px;font-size:11.5px;margin-top:4px" onclick="adRosterOpen(\''+esc(dv+'|'+t.name).replace(/'/g,'&#39;')+'\')">✍ 오더지 직접 입력</button></td><td class="l">'+(any?'<select class="mr-in" id="'+id+'" style="padding:6px 8px;margin:0"><option value="">— 골라 주세요 —</option>'+op(C.exact,'학교·부문 일치')+op(C.near,'이름 비슷함')+op(C.sameDiv,'같은 부문 다른 이름')+'</select>':'<span class="mr-note">아직 이 부문 신청이 없습니다 — 학교가 신청하지 않으면 왼쪽 「✍ 오더지 직접 입력」</span>')+'</td><td>'+(any?'<button class="mr-btn g" style="padding:5px 10px" onclick="lkLinkSel(\''+esc(dv)+'\',\''+esc(t.name).replace(/'/g,'&#39;')+'\',\''+id+'\')">연결</button>':'')+'</td></tr>'}).join('')+'</table></details>'});
   if(orphan.length)h+='<div class="mr-note" style="margin-top:8px"><b style="color:#b8860b">대진표에 없는 신청 '+orphan.length+'팀</b>: '+orphan.map(c=>esc((c.name||'')+' ['+((c.prefs||[])[0]||'')+']')).join(', ')+' — 이름이 다르게 적혔으면 위 표에서 골라 연결하세요(시험 신청이면 무시).</div>';
-  return h+'</div>'}
+  return h+'</details>'}
+let LK_OPEN=false;   /* [2026-10-19] 연결 창은 기본 접힘 — 제출된 오더지 목록이 바로 보이게 */
 function teamOf(side,m){return (m&&m[side])||{}}
 let SLOT_REFS=[],SLOT_EVALS=[],SLOT_ROLES={};/* 기록 권한 uid · 평가 권한 uid(확정 심판 전원) · uid→확정 임무 */
 // [기록 권한 2026-10-18] 스코어판 조작·팀 평가 = 관리자(운영진) + 이 대회 심판 공고에서 감독관·주심·기록심(기록원)·심판위원장으로 확정된 사람(대회 전체 경기).
