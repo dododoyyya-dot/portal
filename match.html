@@ -439,6 +439,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
 <script src="matchrec.js?v=20261019e"></script>
 <script>
@@ -1147,12 +1148,43 @@ function odRender(){
     +'<div class="kit-pick"><div class="kh">👕 경기복 색상 — 인솔자가 두 벌을 골라 주세요</div><div class="mr-note">현장에서는 선수를 옷 색으로 구분합니다. 1번 옷은 신청 배번, 2번 옷(조끼)은 교체 배번을 씁니다(비우면 1번과 같음). 경기 당일 기록원이 둘 중 입은 옷을 고르고, 경기 중에도 바꿀 수 있습니다.</div>'+kitRow(0)+kitRow(1)+(dis?'':'<div class="mr-row" style="margin-top:8px"><button type="button" class="mr-btn ghost" style="padding:6px 12px;font-size:12.5px" onclick="odVestAuto()">조끼 번호 1~'+OD.players.length+' 자동 채우기 (위에서부터)</button><span class="mr-note">2번 옷(조끼) 배번을 명단 순서대로 1부터 채웁니다</span></div>')+'</div>'
     +'<div class="mr-card" style="margin-top:10px"><div class="mr-row"><span class="mr-note" style="font-weight:800">소속</span><b style="font-size:16px">'+esc(OD.school||OD.team)+'</b>'+(OD.team&&OD.team!==OD.school?'<span style="color:#6b7280">팀명 '+esc(OD.team)+'</span>':'')+'<span style="flex:1"></span><span class="mr-pill" style="background:'+(OD.status==='제출'?'#0f766e':OD.status==='잠금'?'#153A77':'#b8860b')+'">'+esc(OD.status)+'</span></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="mr-lab">감독교사 성명</label><input class="mr-in" id="od_cn" value="'+esc(OD.coach.name)+'" '+dis+' oninput="OD.coach.name=this.value"></div><div><label class="mr-lab">직책</label><input class="mr-in" id="od_cr" value="'+esc(OD.coach.role)+'" placeholder="감독교사 · 지도자" '+dis+' oninput="OD.coach.role=this.value"></div></div>'
-    +'<label class="mr-lab">서명 (자동 기입)</label><div class="mr-row">'+(sign?'<img src="'+esc(sign)+'" style="height:40px;background:#fff;border:1px solid #dfe5ee;border-radius:6px"> <span class="mr-note">'+(OD.coach.sign?'제출 때 기입된 서명':'회원 등록 서명이 제출 시 기입됩니다')+'</span>':'<span class="mr-note" style="color:#C41E2F">등록된 서명이 없습니다 — 마이페이지 › 프로필에서 서명을 등록하면 자동으로 들어갑니다(없어도 제출은 됩니다)</span>')+'</div></div>'
+    +'<label class="mr-lab">서명 (자동 기입)</label><div class="mr-row">'+(sign?'<img src="'+esc(sign)+'" style="height:40px;background:#fff;border:1px solid #dfe5ee;border-radius:6px"> <span class="mr-note">'+(OD.coach.sign?(OD.coach.signSrc==='onsite'?'현장에서 받은 서명(이 오더지에만)':'제출 때 기입된 서명'):'회원 등록 서명이 제출 시 기입됩니다')+'</span>'
+      +(!locked&&!mine&&STAFF?' <button type="button" class="mr-btn ghost" style="padding:5px 10px;font-size:12px" onclick="odSignPad(false)">✍ 다시 받기</button>':'')
+      :(locked?'<span class="mr-note" style="color:#C41E2F">서명 없음</span>'
+        :(mine?'<button type="button" class="mr-btn g" style="padding:7px 12px" onclick="odSignPad(true)">✍ 여기서 서명하기</button> <span class="mr-note">한 번 그리면 <b>마이페이지 등록 서명</b>으로도 저장되어, 다음 오더지·경기 결과지에 자동으로 들어갑니다</span>'
+          :(STAFF?'<button type="button" class="mr-btn g" style="padding:7px 12px" onclick="odSignPad(false)">✍ 감독교사 현장 서명 받기</button> <span class="mr-note">이 오더지에만 저장됩니다(운영진 프로필에는 저장하지 않음)</span>'
+            :'<span class="mr-note" style="color:#C41E2F">등록된 서명이 없습니다 — 마이페이지 › 프로필에서 서명을 등록하면 자동으로 들어갑니다(없어도 제출은 됩니다)</span>'))))+'</div></div>'
     +'<div class="mr-note" style="margin-top:10px">신청 명단 '+OD.players.length+'명 · 배번은 숫자, 옷마다 중복 불가 · 비고에서는 <b>주장만</b> 고르면 됩니다(주전·교체 구분 없음 — 경기 기록 화면에는 배번 순서로 전원이 나옵니다). '+((c&&c.adminMade)||(OD&&OD.adminMade)?'관리자가 입력한 오더지입니다 — <a href="javascript:void 0" onclick="adRosterOpen(null,\''+esc(pid)+'\')" style="font-weight:900;color:#153A77">명단 고치기</a> · 저장 후 「📄 PDF」로 인쇄해 감독교사 서명을 종이로 받으세요.':'명단 자체를 바꾸려면 대회 공고의 「명단 수정」을 이용하세요.')+(started?' <b style="color:#C41E2F">첫 경기가 시작되어 대표자 수정은 잠겼습니다(운영진만 수정).</b>':'')+'</div>'
     +(function(){const cap=OD.players.find(p=>p.role==='주장');const nn=OD.players.filter(p=>String(p.no==null?'':p.no).trim()!=='').length;return '<div class="od-cnt"><span class="ok">선수 '+OD.players.length+'명</span><span>'+(cap?'주장 '+esc(cap.name):'<span class="un">주장 미지정</span>')+'</span>'+(nn<OD.players.length?'<span class="un">배번 없음 '+(OD.players.length-nn)+'명</span>':'')+'<small>배번순으로 나열 — 조끼 나눠 줄 때 그대로 보면 됩니다</small></div>'})()
     +'<div style="overflow:auto"><table class="mr-tbl"><tr><th>순번</th><th>'+sw(K[0])+' 1번 옷<br>배번</th><th class="l">선수 이름</th><th>소속</th><th>'+sw(K[1])+' 2번 옷<br>배번</th><th>비고</th></tr>'+rows+'</table></div>'
     +'<div class="mr-row" style="justify-content:flex-end;margin-top:14px">'+(orderOf(pid)?'<button class="mr-btn ghost" onclick="orderPdf(\''+esc(pid)+'\')">📄 PDF</button>':'')+'<span style="flex:1"></span><button class="mr-btn s" onclick="document.getElementById(\'odModal\').remove()">닫기</button>'+(locked?'':'<button class="mr-btn y" onclick="orderSave(\''+esc(pid)+'\',\'작성중\')">임시 저장</button><button class="mr-btn g" onclick="orderSave(\''+esc(pid)+'\',\'제출\')">✅ 제출</button>')+'</div>');
 }
+// ── [2026-10-19] 오더지 서명 패드: toProfile=true(대표자 본인) → signatures/{uid}/ 에 올리고 users.signatureImg 저장 · false(운영진 대리) → compdocs/{uid}/ordersign_ 로 이 오더지에만 ──
+let SIGPAD=null;
+function odSignPad(toProfile){SIGPAD={toProfile:!!toProfile,drawn:false};
+  modal('sigModal','<b style="font-size:16px">✍ '+(toProfile?'내 서명 그리기':'감독교사 현장 서명')+'</b><div class="mr-note" style="margin:4px 0 8px">'+(toProfile?'손가락이나 마우스로 서명해 주세요. 저장하면 <b>마이페이지 등록 서명</b>이 되고, 이 오더지와 이후 경기 결과지에 자동으로 들어갑니다.':'감독교사가 직접 서명합니다. 이 오더지에만 저장됩니다.')+'</div>'
+    +'<canvas id="sigCv" style="width:100%;height:190px;border:2px dashed #c7d2e2;border-radius:12px;background:#fff;touch-action:none;display:block"></canvas>'
+    +'<div class="mr-row" style="justify-content:flex-end;margin-top:12px"><button class="mr-btn s" onclick="sigClear()">지우기</button><span style="flex:1"></span><button class="mr-btn s" onclick="document.getElementById(\'sigModal\').remove()">취소</button><button class="mr-btn g" id="sigSave" onclick="sigSave()">💾 서명 저장</button></div>');
+  const cv=document.getElementById('sigCv');const r=cv.getBoundingClientRect();const k=window.devicePixelRatio||1;cv.width=Math.round(r.width*k);cv.height=Math.round(r.height*k);const g=cv.getContext('2d');g.scale(k,k);g.lineWidth=2.6;g.lineCap='round';g.lineJoin='round';g.strokeStyle='#111';
+  let down=false,lx=0,ly=0;const pt=e=>{const b=cv.getBoundingClientRect();return [e.clientX-b.left,e.clientY-b.top]};
+  cv.addEventListener('pointerdown',e=>{down=true;cv.setPointerCapture(e.pointerId);[lx,ly]=pt(e);g.beginPath();g.arc(lx,ly,1.2,0,7);g.fill();SIGPAD.drawn=true});
+  cv.addEventListener('pointermove',e=>{if(!down)return;const [x,y]=pt(e);g.beginPath();g.moveTo(lx,ly);g.lineTo(x,y);g.stroke();lx=x;ly=y});
+  ['pointerup','pointercancel','pointerleave'].forEach(t=>cv.addEventListener(t,()=>{down=false}))}
+function sigClear(){const cv=document.getElementById('sigCv');if(!cv)return;cv.getContext('2d').clearRect(0,0,cv.width,cv.height);SIGPAD.drawn=false}
+function sigTrim(cv){const g=cv.getContext('2d');const d=g.getImageData(0,0,cv.width,cv.height).data;let x0=cv.width,y0=cv.height,x1=-1,y1=-1;
+  for(let y=0;y<cv.height;y++)for(let x=0;x<cv.width;x++){if(d[(y*cv.width+x)*4+3]>10){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}}
+  if(x1<0)return null;const pad=12;x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);x1=Math.min(cv.width-1,x1+pad);y1=Math.min(cv.height-1,y1+pad);
+  const o=document.createElement('canvas');o.width=x1-x0+1;o.height=y1-y0+1;o.getContext('2d').drawImage(cv,x0,y0,o.width,o.height,0,0,o.width,o.height);return o}   /* 여백 잘라 투명 배경 PNG */
+async function sigSave(){const cv=document.getElementById('sigCv');if(!cv||!SIGPAD||!SIGPAD.drawn){say('서명을 먼저 그려 주세요.');return}const o=sigTrim(cv);if(!o){say('서명을 먼저 그려 주세요.');return}
+  const btn=document.getElementById('sigSave');btn.disabled=true;btn.textContent='저장 중…';
+  try{const blob=await new Promise(r=>o.toBlob(r,'image/png'));const uid=ME.uid;
+    const path=SIGPAD.toProfile?'signatures/'+uid+'/sig_'+Date.now()+'_c2.png':'compdocs/'+uid+'/ordersign_'+Date.now()+'.png';
+    const ref=firebase.storage().ref(path);await ref.put(blob,{contentType:'image/png'});const url=await ref.getDownloadURL();
+    if(SIGPAD.toProfile){await DB.collection('users').doc(uid).update({signatureImg:url});if(MY)MY.signatureImg=url}   /* 본인 회원 문서의 서명 칸만 — 규칙상 본인이 고칠 수 있는 항목 */
+    OD.coach.sign=url;OD.coach.at=new Date().toISOString();OD.coach.signSrc=SIGPAD.toProfile?'profile':'onsite';
+    document.getElementById('sigModal').remove();odRender();
+    qkToastLite(SIGPAD.toProfile?'✓ 서명을 마이페이지에 등록했습니다 — 오더지를 저장(제출)하면 함께 저장됩니다':'✓ 현장 서명을 받았습니다 — 오더지를 저장(제출)하면 함께 저장됩니다')}
+  catch(e){btn.disabled=false;btn.textContent='💾 서명 저장';say('서명 저장 실패: '+(e.message||e))}}
 function odDiv(v){if(!v)return;if(v==='__new'){v=prompt('새 부문 이름을 적어 주세요 (예: 얼티미트 초등 혼성)');if(!v)return odRender();v=v.trim()}OD.div=v;odRender()}
 function odVestAuto(){OD.players.forEach((p,i)=>{p.subNo=String(i+1)});odRender()}
 // 오더지에 조끼 배번이 하나도 없으면 명단(배번순) 순서대로 1..N — 경기 기록에만 적용(m.nums), 오더지는 그대로   [2026-10-19 주전·교체 구분 없앰]
