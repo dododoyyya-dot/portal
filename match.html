@@ -1243,7 +1243,7 @@ function rcRender(){
     :st==='mine'?'<div class="ctrl mine"><span>입력 중 · '+esc(MY.name||'')+(q?' · <b>미전송 '+q+'건</b>':'')+'</span>'+ofs+'</div>'
     :st==='other'?'<div class="ctrl other"><span>'+esc(MR.ctrlLabel(m))+' 입력 중 — 보기 전용</span>'+ofs+'<button onclick="rcTake()">넘겨받기</button></div>'
     :'<div class="ctrl"><span>입력권이 비어 있습니다</span>'+ofs+'<button onclick="rcClaim(true)">입력 시작</button></div>';
-  let h='<div class="top"><span class="mr-pill" style="background:'+(STC[m.status]||'#8a919d')+'">'+esc(m.status||'예정')+'</span><b>'+esc(mTitle(m)||'경기')+'</b><span class="meta">'+esc([m.court,dateK(m.day),m.time].filter(Boolean).join(' · '))+'</span>'+(m.locked?'<span class="mr-pill" style="background:#0b6b3a">확정</span>':'')+'<button class="hb" onclick="rcHelp()">사용법</button><button class="x" onclick="rcClose()">✕ 닫기</button></div>'+ctrl;
+  let h='<div class="top"><span class="mr-pill" style="background:'+(STC[m.status]||'#8a919d')+'">'+esc(m.status||'예정')+'</span><b>'+esc(mTitle(m)||'경기')+'</b><span class="meta">'+esc([m.court,dateK(m.day),m.time].filter(Boolean).join(' · '))+'</span>'+(m.locked?'<span class="mr-pill" style="background:#0b6b3a">확정</span>':'')+(STAFF&&!m.locked&&(m.status!=='예정'||(m.events||[]).length||m.kit)?'<button class="hb" onclick="rcReset()" title="시험으로 입력한 기록을 모두 지우고 경기 전으로 (운영진)">🧹 초기화</button>':'')+'<button class="hb" onclick="rcHelp()">사용법</button><button class="x" onclick="rcClose()">✕ 닫기</button></div>'+ctrl;
   // ① 시작 전: 경기복·풀 고르기
   if(mine&&m.status==='예정'&&!m.kit){ov.innerHTML=h+'<div class="body">'+rcTipHtml()+setupHtml(m,false)+'</div>';return}
   const [L,R]=sidesLR(m);const per=m.period||'';const curP=per==='하프타임'?'':per;const TO=MR.timeouts(m);
@@ -1483,6 +1483,13 @@ function rcClockAdd(sec){const m=RCM();if(!m)return;rcUpdate({clock:MR.clockAdd(
 async function rcUpdate(upd,msg){try{await DB.collection('liveMatches').doc(RC_ID).update(Object.assign({updatedAt:FV.serverTimestamp(),by:whoAmI().name},upd))}catch(e){say((msg||'저장 실패')+': '+(e.message||e))}}
 function rcClock(act){const m=RCM();if(!m)return;if(act==='reset'&&!confirm('경기 시계를 00:00 으로 되돌릴까요?'))return;rcUpdate({clock:MR.clockAct(m,act)})}
 async function rcStatus(st){const m=RCM();if(!m)return;const upd={status:st};if(st==='진행'){upd.endAt=null;upd.locked=false;if(!m.period)upd.period='전반';upd.startAt=m.startAt||FV.serverTimestamp();if(m.status==='예정'&&!(m.clock||{}).running)upd.clock=MR.clockAct(m,'start')}await rcUpdate(upd);if(st==='진행')statsSave(true)}
+async function rcReset(){if(!STAFF)return;const m=RCM();if(!m)return;if(m.locked){say('확정된 경기는 먼저 「정정」으로 잠금을 푼 뒤 초기화할 수 있습니다.');return}
+  const n=(m.events||[]).length;const t=prompt('이 경기의 기록 '+n+'건(득점·제재·작전타임)과 시계·구간·풀·경기복 선택·종료 결과(페어플레이·최우수선수)를 모두 지우고 「경기 전」 상태로 되돌립니다.\n시험으로 입력한 경기에만 쓰세요. 되돌릴 수 없습니다.'+(m.status==='종료'?'\n(본선이면 다음 경기에 올라간 팀은 그대로 남으니 필요하면 경기 정보에서 고치세요)':'')+'\n\n계속하려면 「초기화」라고 적어 주세요.');
+  if(t==null)return;if(t.trim()!=='초기화'){say('「초기화」라고 적어야 진행됩니다.');return}
+  const D=FV.delete();QK.pend=null;QK.setup=null;QK.toast=null;QK.mode='goal';
+  await rcUpdate({status:'예정',period:'',events:[],clock:{running:false,base:0,startedAt:0},brk:D,pulls:{},kit:D,plen:D,lineup:D,nums:D,swap:false,clockLog:{},fairplay:D,coachScore:D,mvps:D,mvp:D,bestCoach:D,winner:D,startAt:null,endAt:null,locked:false,resetLog:FV.arrayUnion({by:whoAmI().name,uid:whoAmI().uid,at:new Date().toISOString(),events:n,was:m.status||''})},'초기화 실패');
+  if(m.status==='종료'&&typeof statsSave==='function')setTimeout(()=>{try{statsSave(true)}catch(e){}},1500);
+  qkToast('경기 기록을 초기화했습니다 — 경기 전 상태')}
 async function rcUnlock(){if(!STAFF)return;const r=prompt('잠금을 해제하고 정정합니다. 사유를 적어 주세요');if(r==null)return;await rcUpdate({locked:false,unlockLog:FV.arrayUnion({by:whoAmI().name,uid:whoAmI().uid,at:new Date().toISOString(),reason:r})})}
 async function rcXlsx(id){const m=MATCHES.find(x=>x.id===id);if(!m)return;try{await MR.saveXlsxMatch(m,orderOf((m.a||{}).pid)||{},orderOf((m.b||{}).pid)||{})}catch(e){say('엑셀 만들기 실패: '+(e.message||e))}}
 // ── 바텀 시트 공통 ──
