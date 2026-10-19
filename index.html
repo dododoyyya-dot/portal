@@ -230,6 +230,12 @@
         <div id="lhMeta" style="font-size:12px;opacity:.9;margin-top:4px;text-align:center"></div>
         <div style="margin-top:10px;text-align:center"><span style="display:inline-block;background:#fff;color:#C41E2F;font-weight:900;border-radius:999px;padding:8px 18px;font-size:13.5px">▶ 중계 보러가기 · 채팅 · 실시간 스코어</span></div>
       </a>
+      <a id="courtTicker" href="live.html" aria-live="polite" style="display:none;margin-top:14px;text-decoration:none;color:#fff;background:linear-gradient(135deg,rgba(13,27,56,.92),rgba(21,58,119,.88));border:1px solid rgba(230,180,34,.55);border-radius:16px;padding:12px 16px;box-shadow:0 10px 28px rgba(0,0,0,.28)">
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:900;letter-spacing:.3px;color:#f3d27a"><span style="width:8px;height:8px;border-radius:50%;background:#ff4d5e;animation:kfdfLiveBlink 1s infinite"></span><span id="ctHead">구장별 실시간 스코어</span><span style="flex:1"></span><span id="ctPage" style="color:#cfd8ea;font-weight:800"></span></div>
+        <div id="ctBody" style="transition:opacity .35s"><div id="ctMeta" style="font-size:12.5px;font-weight:800;color:#dbe4f5;margin-top:6px;text-align:center;word-break:keep-all"></div>
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;margin-top:4px"><div id="ctA" style="font-size:clamp(14px,1.9vw,19px);font-weight:900;text-align:right;word-break:keep-all;overflow-wrap:break-word"></div><div id="ctS" style="font-size:clamp(28px,4.2vw,40px);font-weight:900;font-variant-numeric:tabular-nums;white-space:nowrap"></div><div id="ctB" style="font-size:clamp(14px,1.9vw,19px);font-weight:900;word-break:keep-all;overflow-wrap:break-word"></div></div>
+        <div id="ctSt" style="font-size:11.5px;color:#cfd8ea;text-align:center;margin-top:2px"></div></div>
+      </a>
       <style>@keyframes kfdfLiveBlink{50%{opacity:.25}}</style>
       <div class="hcta">
         <a class="main" href="apply.html?type=school"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>학교 강습 신청</a>
@@ -816,6 +822,22 @@
 try{firebase.firestore().collection('siteContent').doc('live').onSnapshot(function(d){var v=d.exists?(d.data()||{}):{};var el=document.getElementById('liveHero');if(!el)return;var on=!!(v.on&&(v.streams||[]).length&&v.banner!==false);el.style.display=on?'block':'none';if(!on)return;
   var t=function(id,x){var e=document.getElementById(id);if(e)e.textContent=x==null?'':String(x)};var now=v.now||null;t('lhTitle',[v.comp,v.title].filter(Boolean).join(' · '));
   var sc=document.getElementById('lhScore');if(now){sc.style.display='grid';t('lhA',now.a);t('lhB',now.b);t('lhS',now.sa+' : '+now.sb);t('lhMeta',[now.title,now.court,now.period,now.status==='진행'?'진행 중':now.status].filter(Boolean).join(' · '))}else{sc.style.display='none';t('lhMeta',v.note||'경기 시작을 기다리고 있습니다')}},function(){})}catch(e){}
+</script>
+<script>
+// [2026-10-19] 구장별 실시간 스코어 — 오늘(한국 시간) 경기 중 진행 중인 경기를 구장마다 10초씩. 없으면 30분 안에 끝난 경기. 로그인 없이 보임
+(function(){try{var D=new Date(Date.now()+9*3600e3).toISOString().slice(0,10);var L=[],I=0,T=null;
+  var sc=function(m){var a=0,b=0,ev=m.events||[];if(m.rec||ev.some(function(e){return e&&e.type}))ev.forEach(function(e){if(!e||e.void)return;if(e.type==='goal'){if(e.side==='a')a++;else if(e.side==='b')b++}else if(e.type==null&&typeof e.d==='number'){if(e.side==='a')a=Math.max(0,a+e.d);else if(e.side==='b')b=Math.max(0,b+e.d)}});else{a=+((m.a||{}).score)||0;b=+((m.b||{}).score)||0}return [a,b]};
+  var tsec=function(x){return x&&x.toMillis?x.toMillis():(x&&x.seconds?x.seconds*1000:0)};
+  var lab=function(m){var r=String(m.round||'');var st=m.stage||'';var sr=r?(st&&r.indexOf(st)!==0?st+' '+r:r):st;return [m.div,sr].filter(Boolean).join(' ')||m.title||''};
+  var show=function(){var el=document.getElementById('courtTicker');if(!el)return;if(!L.length){el.style.display='none';return}el.style.display='block';if(I>=L.length)I=0;var m=L[I];var s=sc(m);
+    var t=function(id,x){var e=document.getElementById(id);if(e)e.textContent=x==null?'':String(x)};
+    t('ctHead',m.status==='진행'?'구장별 실시간 스코어':'방금 끝난 경기');t('ctPage',L.length>1?(I+1)+' / '+L.length:'');t('ctMeta',[m.court,lab(m)].filter(Boolean).join(' · '));t('ctA',(m.a||{}).name||'');t('ctB',(m.b||{}).name||'');t('ctS',s[0]+' : '+s[1]);t('ctSt',m.status==='진행'?((m.period||'진행 중')+' · 눌러서 대진·결과 보기'):'경기 종료 · 눌러서 결과 보기');el.href=m.slotId?'results.html?id=slot_'+encodeURIComponent(m.slotId):'live.html'};
+  var rot=function(){if(T)clearInterval(T);T=setInterval(function(){if(L.length<2)return;var b=document.getElementById('ctBody');if(b)b.style.opacity='0';setTimeout(function(){I=(I+1)%L.length;show();if(b)b.style.opacity='1'},350)},10000)};
+  firebase.firestore().collection('liveMatches').where('day','==',D).onSnapshot(function(q){var all=q.docs.map(function(d){var x=d.data()||{};x.id=d.id;return x});var now=Date.now();
+    var live=all.filter(function(m){return m.status==='진행'});var pick=live.length?live:all.filter(function(m){return m.status==='종료'&&now-tsec(m.endAt||m.updatedAt)<30*60e3});
+    var byC={};pick.forEach(function(m){var k=m.court||m.id;var o=byC[k];if(!o||tsec(m.updatedAt)>tsec(o.updatedAt))byC[k]=m});
+    var cur=L[I]&&L[I].id;L=Object.keys(byC).sort(function(a,b){return (parseInt(a,10)||99)-(parseInt(b,10)||99)||String(a).localeCompare(String(b),'ko')}).map(function(k){return byC[k]});
+    var j=L.findIndex(function(m){return m.id===cur});I=j>=0?j:0;show();rot()},function(e){console.warn('courtTicker',e)})}catch(e){}})();
 </script>
 <script src="auth_ui.js?v=20261015a"></script>
 </body>
