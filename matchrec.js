@@ -311,7 +311,7 @@
     +'.ktl-ic{flex:none;display:inline-flex;align-items:center}.ktl-cd{display:inline-block;width:12px;height:16px;border-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,.25)}.ktl-cd.y{background:#facc15}.ktl-cd.r{background:#e11d48}'
     +'.ktl-p{position:relative;display:flex;flex-direction:column;align-items:center;margin:10px 0;z-index:1}.ktl-p .ck{width:46px;height:46px;border-radius:50%;background:#9aa3af;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 5px #fff}'
     +'.ktl-p b{margin-top:5px;font-size:13px;font-weight:900;background:#fff;padding:0 8px}.ktl-p small{font-size:11.5px;color:#6b7280;background:#fff;padding:0 6px}.ktl-p.end .ck{background:#153A77}'
-    +'.ktl-r.void{opacity:.4}.ktl-r.void .tx b{text-decoration:line-through}.ktl-act{display:flex;gap:4px;margin-top:4px}.ktl-l .ktl-act{justify-content:flex-end}'
+    +'.ktl-r.void{opacity:.4}.ktl-r.void .tx b{text-decoration:line-through}.ktl-act{display:flex;gap:4px;margin-top:4px}.ktl-l .ktl-act{justify-content:flex-end}.ktl-ao{display:none;margin-top:0;flex:0 0 auto}.ktl-l .ktl-ao{margin-right:auto}.ktl-rr .ktl-ao{margin-left:auto}@media(min-width:700px){.ktl-ao{display:flex}.ktl-am{display:none}}'
     +'.ktl-act button{border:1px solid #d5dce8;background:#fff;color:#111827;border-radius:8px;padding:3px 9px;font-size:11.5px;font-weight:800;cursor:pointer;font-family:inherit}'
     +'.ktl-empty{position:relative;z-index:1;text-align:center;font-size:13px;color:#6b7280;background:#fff;margin:14px auto;padding:6px 12px;max-width:80%}'
     +'.ktl-ft{border-top:1px solid #eef1f5;padding:10px 14px;font-size:12.5px;color:#374151;line-height:1.75}.ktl-ft b{color:#111827}'
@@ -330,6 +330,7 @@
     if(m.status==='종료')items.push({end:1});
     if(opt.desc)items.reverse();
     var pn=function(p){return p?((p.no?'#'+p.no+' ':'')+(p.name||'')):''};
+    var LS=opt.swap?'b':'a',RS=opt.swap?'a':'b';   /* [2026-10-19] 코트 체인지 — 점수판과 같은 좌우 */
     var cell=function(e,side){var chip='',ic='',main='',sub='';
       if(e.type==='goal'){ic=DISCSVG;main=e.scorer?pn(e.scorer):'득점자 미지정';sub='(득점'+(e.assist?' · 도움 '+pn(e.assist):'')+')'}
       else if(e.type==null){chip='<span class="ktl-chip '+(e.d>0?'k-goal':'k-x')+'">'+(e.d>0?'득점':'득점 취소')+'</span>';main=(m[side]||{}).name||''}
@@ -337,19 +338,19 @@
         var tg=e.target||{};main=tg.kind==='coach'?'지도자 '+(tg.name&&tg.name!=='지도자'?tg.name:''):pn(tg);sub=e.note?'('+e.note+')':''}
       else if(e.type==='timeout'){chip='<span class="ktl-chip k-to">작전타임</span>';main=opt.compact?'':((m[side]||{}).name||'');sub=''}
       if(e.void)sub=(sub?sub+' ':'')+'· 취소됨';
-      var act=opt.act?'<div class="ktl-act">'+opt.act(e)+'</div>':'';
+      var _ac=opt.act?opt.act(e):'';var act=_ac?'<div class="ktl-act ktl-am">'+_ac+'</div>':'';var actO=_ac?'<div class="ktl-act ktl-ao">'+_ac+'</div>':'';
       var tx=e.type==='goal'?'<div class="tx"><div class="ktl-gl"><span class="ktl-pp"><b>'+esc(main)+'</b><small>득점</small></span>'+(e.assist?'<span class="ktl-pp"><b>'+esc(pn(e.assist))+'</b><small>도움</small></span>':'')+'</div>'+(e.void?'<small>· 취소됨</small>':'')+act+'</div>'
         :'<div class="tx">'+(main?'<b>'+esc(main)+'</b>':'')+(sub?'<small>'+esc(sub)+'</small>':'')+act+'</div>';
       var marks=(ic?'<span class="ktl-ic">'+ic+'</span>':'')+chip;
-      return '<div class="ktl-e">'+(side==='a'?tx+marks:marks+tx)+'</div>'};
+      return '<div class="ktl-e">'+(side===LS?actO+tx+marks:marks+tx+actO)+'</div>'};
     var body=items.map(function(it){
-      if(it.end)return '<div class="ktl-p end"><span class="ck">'+CKSVG+'</span><b>경기 종료</b><small>'+sc.a+' : '+sc.b+(win?' · '+esc(teamName(win))+' 승':' · 무승부')+'</small></div>';
+      if(it.end)return '<div class="ktl-p end"><span class="ck">'+CKSVG+'</span><b>경기 종료</b><small>'+(LS==='a'?sc.a+' : '+sc.b:sc.b+' : '+sc.a)+(win?' · '+esc(teamName(win))+' 승':' · 무승부')+'</small></div>';
       if(it.p!=null)return '<div class="ktl-p"><span class="ck">'+CKSVG+'</span><b>'+esc(it.p||'구간 미정')+'</b>'+(CL[it.p]?'<small>'+esc(CL[it.p])+' 종료</small>':'')+'</div>';
-      var e=it.e;return '<div class="ktl-r'+(e.void?' void':'')+'"><div class="ktl-l">'+(e.side==='a'?cell(e,'a'):'')+'</div><div class="ktl-t"><span>'+esc(evTime(e)||'-')+'</span>'+(it.d?'<em>'+it.sa+' : '+it.sb+'</em>':'')+'</div><div class="ktl-rr">'+(e.side==='b'?cell(e,'b'):'')+'</div></div>'}).join('');
+      var e=it.e;return '<div class="ktl-r'+(e.void?' void':'')+'"><div class="ktl-l">'+(e.side===LS?cell(e,LS):'')+'</div><div class="ktl-t"><span>'+esc(evTime(e)||'-')+'</span>'+(it.d?'<em>'+(LS==='a'?it.sa+' : '+it.sb:it.sb+' : '+it.sa)+'</em>':'')+'</div><div class="ktl-rr">'+(e.side===RS?cell(e,RS):'')+'</div></div>'}).join('');
     function teamName(s){var t=m[s]||{};return t.name||t.school||s.toUpperCase()}
     var css=opt.noCss?'':'<style>'+KTLCSS+'</style>';
     var bd='<div class="ktl-bd">'+(body||'<div class="ktl-empty">아직 기록이 없습니다</div>')+'</div>';
-    var hd=opt.heads||{};var th=opt.teamsHead?'<div class="ktl-th"><b>'+esc(teamName('a'))+(hd.a?'<small>'+esc(hd.a)+'</small>':'')+'</b><span>시간 · 점수</span><b>'+esc(teamName('b'))+(hd.b?'<small>'+esc(hd.b)+'</small>':'')+'</b></div>':'';
+    var hd=opt.heads||{};var th=opt.teamsHead?'<div class="ktl-th"><b>'+esc(teamName(LS))+(hd[LS]?'<small>'+esc(hd[LS])+'</small>':'')+'</b><span>시간 · 점수</span><b>'+esc(teamName(RS))+(hd[RS]?'<small>'+esc(hd[RS])+'</small>':'')+'</b></div>':'';
     if(opt.inline)return css+'<div class="ktl'+(opt.compact?' cp':'')+'">'+th+bd+'</div>';
     var kit=function(side,o){var k=((m.kit||{})[side]===1)?1:0;return kitsOf(o||{})[k]};
     var tmH=function(side,o){var t=m[side]||{};var K=kit(side,o);return '<div class="ktl-tm"><div class="dot" style="background:'+esc(K.color)+'"></div><b>'+esc(t.name||t.school||side.toUpperCase())+'</b>'+(t.school&&t.school!==t.name?'<small>'+esc(t.school)+'</small>':'')+(win===side?'<span class="wn">승</span>':'')+'</div>'};

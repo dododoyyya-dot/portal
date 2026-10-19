@@ -438,7 +438,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="matchrec.js?v=20261019c"></script>
+<script src="matchrec.js?v=20261019d"></script>
 <script>
 // ══════════ 경기 기록 (match.html) ══════════
 //   ?slot=참가공고ID            대회의 경기·오더지·디스크골프·순위 (운영진은 경기 생성·심판 배정)
@@ -1269,7 +1269,7 @@ function rcRender(){
   // ⑤ 기록
   const evs=(m.events||[]).slice().reverse();
   h+='<div class="log" data-anc="log"><div class="h">경기 기록 <span style="color:#0b6b3a">'+(m.events||[]).filter(e=>e&&!e.void&&e.type==='goal').length+'득점</span><span>· 제재 '+(m.events||[]).filter(e=>e&&!e.void&&e.type==='card').length+'</span>'+(m.fairplay?'<span>· 페어 '+esc((m.a||{}).name||'A')+' '+(m.fairplay.a||0)+' · '+esc((m.b||{}).name||'B')+' '+(m.fairplay.b||0)+'</span>':'')+(m.mvp?'<span>· MVP #'+esc(m.mvp.no||'')+' '+esc(m.mvp.name||'')+'</span>':'')+'</div>'
-    +MR.timelineBody(m,orderOf((m.a||{}).pid)||{},orderOf((m.b||{}).pid)||{},{inline:true,compact:true,teamsHead:true,showVoid:true,heads:{a:teamCoachTxt(m,'a'),b:teamCoachTxt(m,'b')},act:e=>(mine&&!e.void&&e.type)?'<button onclick="evEdit(\''+esc(e.id)+'\')">수정</button><button onclick="evVoid(\''+esc(e.id)+'\')">취소</button>':''})
+    +MR.timelineBody(m,orderOf((m.a||{}).pid)||{},orderOf((m.b||{}).pid)||{},{inline:true,compact:true,teamsHead:true,showVoid:true,swap:!!m.swap,heads:{a:teamCoachTxt(m,'a'),b:teamCoachTxt(m,'b')},act:e=>(mine&&!e.void&&e.type)?'<button onclick="evEdit(\''+esc(e.id)+'\')">수정</button><button onclick="evVoid(\''+esc(e.id)+'\')">취소</button>':''})
     +(evs.length||!mine?'':'<div class="mr-note" style="padding:0 14px 12px">득점: 득점한 선수 카드 → 어시스트 선수(또는 「어시스트 없음」) 두 번 누르면 저장됩니다.</div>')+'</div>'
     +(m.status==='종료'?'<div class="mr-note" style="margin:10px 2px 0;font-weight:700">기록지는 아래 「기록지 보기 · 인쇄」로 이 화면에서 바로 봅니다(타임라인 · 진흥회 양식). 엑셀과 대회 전체 결과는 <a href="results.html?id=slot_'+esc(SLOT_ID)+'" style="color:#1c2e55;font-weight:900">대회 결과 페이지</a>에서 내려받습니다.</div>':'')+'</div>';
   // ⑥ 아래 고정 줄: 시작·종료·확정만
