@@ -323,7 +323,7 @@ body[data-view] #secLive>.sec-label,body[data-view] #secLive>.sec-title,body[dat
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="career.js?v=20260907a"></script>
+<script src="career.js?v=20261019a"></script>
 <script src="schoolclub_core.js?v=20260922a"></script>
 <script src="post_alert.js?v=20260914a"></script>
 <script src="site_config.js"></script>
@@ -956,6 +956,11 @@ async function cfMatchMember(m,r){
   return null;
 }
 // [클럽 입상 2026-09-09] 입상한 팀(팀명=클럽명 또는 인솔자가 클럽장인 클럽)·개인(소속 클럽)의 클럽 페이지에 입상 기록을 남깁니다
+let CF_FIX={re:false,prev:{},ca:[],scr:{}};
+// 학교 참가(보류) 기록 — 정정 때 같은 사람·부문 기록이 있으면 순위만 고쳐 씀(이미 본인이 가져간 기록의 상태는 그대로), 없으면 새로
+async function cfScrPut(obj){const k=[obj.nameNorm||'',obj.birth||'',obj.division||'',obj.source||''].join('|');const ex=CF_FIX.re&&CF_FIX.scr[k];
+  if(ex){await ex.ref.update({result:obj.result,note:obj.note,by:obj.by,byUid:obj.byUid,at:obj.at,competitionName:obj.competitionName});return}
+  const r=await DB.collection('schoolClubResults').add(obj);return r}
 async function cfClubAward(r,s,base){
   if(!window.CAREER||!CAREER.clubAward)return;
   if(!r.team&&!r.award)return;
@@ -966,13 +971,20 @@ async function cfClubAward(r,s,base){
   else clubs=await CAREER.findClubs(DB,r.team?{name:r.name,uid:r.uid}:{uid:r.uid});
   if(!clubs.length)return;
   const members=r.team?(r.roster||[]).map(m=>m&&m.name).filter(Boolean):[base.name||r.name||''];
+  const _kind=r.team?'team':'member',_res=r.award||'참가';
+  if(CF_FIX.re)for(const k of clubs){const stale=(CF_FIX.ca||[]).filter(d=>{const x=d.data();return x.clubId===k.id&&(x.division||'')===(r.div||'')&&(x.kind||'team')===_kind&&(_kind==='team'?(x.teamName||'')===(r.name||''):(x.members||[]).join(',')===members.join(','))&&(x.result||'')!==_res});for(const d of stale){try{await d.ref.delete()}catch(e){console.warn('clubAward stale',e)}}}   /* 같은 클럽·부문의 옛 순위 기록 지움 */
   for(const k of clubs)await CAREER.clubAward(DB,{clubId:k.id,clubName:k.name,date:s.date||'',competitionName:s.title||'',sport:base.sport||'',division:r.div||'',result:r.award||'참가',kind:r.team?'team':'member',members:members,teamName:r.team?r.name:'',slotId:CF.id,source:'comp-complete',host:s.host||'',organizer:s.organizer||'',byUid:CME.uid},(CMY&&CMY.name)||'');
 }
 async function cfSave(){
   const doc=CSLOTS.find(d=>d.id===CF.id);if(!doc)return;const s=doc.data();
   const rows=CF.rows.filter(r=>r.on);
   const awards=rows.filter(r=>r.award);
-  if(!confirm('참가 '+rows.length+'건(입상 '+awards.length+'건)을 이력에 기록하고 종료 처리할까요?'))return;
+  const reFinish=!!s.finished;const prevRes=s.results||{};
+  const changes=reFinish?rows.filter(r=>((prevRes[r.key]||{}).award||'')!==(r.award||'')).map(r=>({name:r.name||'',div:r.div||'',from:(prevRes[r.key]||{}).award||'참가',to:r.award||'참가'})):[];
+  if(!confirm(reFinish?('이미 종료 처리한 대회입니다. 정정 저장할까요?\n\n바뀐 순위 '+changes.length+'건'+(changes.length?':\n· '+changes.slice(0,8).map(c=>c.name+' ('+c.div+') '+c.from+' → '+c.to).join('\n· ')+(changes.length>8?'\n· …':''):'')+'\n\n결과 페이지·클럽 기록·선수 경력의 옛 순위는 지우고 새 순위로 바꿉니다. 알림은 순위가 바뀐 팀에만 갑니다.'):('참가 '+rows.length+'건(입상 '+awards.length+'건)을 이력에 기록하고 종료 처리할까요?')))return;
+  CF_FIX={re:reFinish,prev:prevRes,ca:[],scr:{}};
+  if(reFinish){try{const q=await DB.collection('clubAwards').where('slotId','==',CF.id).get();CF_FIX.ca=q.docs}catch(e){}
+    try{const q=await DB.collection('schoolClubResults').where('importId','==','comp:'+CF.id).get();q.docs.forEach(d=>{const x=d.data();CF_FIX.scr[[x.nameNorm||'',x.birth||'',x.division||'',x.source||''].join('|')]=d})}catch(e){}}
   const btn=document.getElementById('cfSaveBtn');btn.disabled=true;btn.textContent='기록 중…';
   const msg=document.getElementById('cfMsg');const say=(t,bad)=>{if(msg){msg.textContent=t;msg.style.color=bad?'#C41E2F':'#0f766e'}};
   const sportOf=d=>String(d||'').split(' ')[0]||(s.title||'');
@@ -986,11 +998,11 @@ async function cfSave(){
         if(hit){
           const mb=Object.assign({},bb,{uid:hit.uid,kidName:hit.kidName||''});
           await CAREER.write(DB,Object.assign({},mb,{role:'선수'}),(CMY&&CMY.name)||'');
-          if(r.award)await CAREER.write(DB,Object.assign({},mb,{role:'입상',result:r.award}),(CMY&&CMY.name)||'');
-          try{await KFDF.notify(hit.uid,'🏅 ['+(s.title||'')+'] '+(hit.kidName?hit.kidName+' ':'')+'참가'+(r.award?' · '+r.award+' 입상 🏆':'')+' — 경력에 기록되었습니다. 마이페이지 [경력 여정]에서 확인하세요','mypage.html#careerBox')}catch(e){}
+          if(r.award)await CAREER.write(DB,Object.assign({},mb,{role:'입상',result:r.award}),(CMY&&CMY.name)||'');else if(reFinish&&CAREER.removeKey)await CAREER.removeKey(DB,Object.assign({},mb,{role:'입상'}));
+          if(!reFinish||((prevRes[r.key]||{}).award||'')!==(r.award||''))try{await KFDF.notify(hit.uid,'🏅 ['+(s.title||'')+'] '+(hit.kidName?hit.kidName+' ':'')+'참가'+(r.award?' · '+r.award+' 입상 🏆':'')+' — 경력에 기록되었습니다. 마이페이지 [경력 여정]에서 확인하세요','mypage.html#careerBox')}catch(e){}
           bulkOk++;
         }else{
-          await DB.collection('schoolClubResults').add({competitionName:s.title||'',organizer:bb.organizer,date:s.date||'',sport:bb.sport,division:r.div||'',school:r.school||'',schoolNorm:String(r.school||'').replace(/\s+/g,'').replace(/(초등학교|중학교|고등학교|초교|중교|고교|학교)$/,''),schoolCode:'',schoolSido:s.region||'',team:'',
+          await cfScrPut({competitionName:s.title||'',organizer:bb.organizer,date:s.date||'',sport:bb.sport,division:r.div||'',school:r.school||'',schoolNorm:String(r.school||'').replace(/\s+/g,'').replace(/(초등학교|중학교|고등학교|초교|중교|고교|학교)$/,''),schoolCode:'',schoolSido:s.region||'',team:'',
             name:r.name,nameNorm:String(r.name).replace(/\s+/g,''),birth:r.birth||'',gender:r.gender||'',result:r.award||'참가',note:'대회 종료 처리(개인전 일괄 신청)',status:'pending',importId:'comp:'+CF.id,source:'comp-bulk',by:(CMY&&CMY.name)||'',byUid:CME.uid,at:new Date().toISOString()});
           bulkHold++;
         }
@@ -1012,19 +1024,19 @@ async function cfSave(){
             const mb={uid:hit?hit.uid:'',name:m.name,date:s.date||'',competitionName:s.title||'',sport:sportOf(r.div),location:base.location,organizer:base.organizer,division:r.div,team:r.name,slotId:CF.id,source:'comp-team',kidName:(hit&&hit.kidName)||'',schoolName:m.school||'',gender:m.gender||''};
             if(hit){
               await CAREER.write(DB,Object.assign({},mb,{role:'선수'}),(CMY&&CMY.name)||'');
-              if(r.award)await CAREER.write(DB,Object.assign({},mb,{role:'입상',result:r.award+' ('+r.name+')'}),(CMY&&CMY.name)||'');
+              if(r.award)await CAREER.write(DB,Object.assign({},mb,{role:'입상',result:r.award+' ('+r.name+')'}),(CMY&&CMY.name)||'');else if(reFinish&&CAREER.removeKey)await CAREER.removeKey(DB,Object.assign({},mb,{role:'입상'}));
               teamOk++;
             }else{
-              await DB.collection('schoolClubResults').add({competitionName:s.title||'',organizer:base.organizer,date:s.date||'',sport:sportOf(r.div),division:r.div||'',school:m.school||'',schoolNorm:String(m.school||'').replace(/\s+/g,'').replace(/(초등학교|중학교|고등학교|초교|중교|고교|학교)$/,''),schoolCode:'',schoolSido:s.region||'',team:r.name,
+              await cfScrPut({competitionName:s.title||'',organizer:base.organizer,date:s.date||'',sport:sportOf(r.div),division:r.div||'',school:m.school||'',schoolNorm:String(m.school||'').replace(/\s+/g,'').replace(/(초등학교|중학교|고등학교|초교|중교|고교|학교)$/,''),schoolCode:'',schoolSido:s.region||'',team:r.name,
                 name:m.name,nameNorm:String(m.name).replace(/\s+/g,''),birth:m.birth||'',gender:m.gender||'',result:r.award?(r.award+' ('+r.name+')'):'참가',note:'대회 종료 처리(단체전 팀원)',status:'pending',importId:'comp:'+CF.id,source:'comp-team',by:(CMY&&CMY.name)||'',byUid:CME.uid,at:new Date().toISOString()});
               teamHold++;
             }
           }catch(e){teamFail++;console.warn('team member',m.name,e)}
         }
       }
-      if(r.award)await CAREER.write(DB,Object.assign({},base,{role:'입상',result:r.award+(r.team?' ('+r.name+')':''),team:r.team?r.name:''}),(CMY&&CMY.name)||'');
+      if(r.award)await CAREER.write(DB,Object.assign({},base,{role:'입상',result:r.award+(r.team?' ('+r.name+')':''),team:r.team?r.name:''}),(CMY&&CMY.name)||'');else if(reFinish&&CAREER.removeKey)await CAREER.removeKey(DB,Object.assign({},base,{role:'입상'}));
       if(r.team||r.award)try{await cfClubAward(r,s,base)}catch(e){console.warn('clubAward',e)}   // [클럽 입상·참가] 클럽 페이지용 공개 요약 (단체전은 참가도 기록)
-      try{await KFDF.notify(r.uid,'🏅 ['+(s.title||'')+'] '+(r.team?'팀 인솔':'참가')+(r.award?' · '+r.award+' 입상 🏆':'')+' — 경력에 기록되었습니다. 마이페이지 [경력 여정]에서 확인하세요','mypage.html#careerBox')}catch(e){}
+      if(!reFinish||((prevRes[r.key]||{}).award||'')!==(r.award||''))try{await KFDF.notify(r.uid,'🏅 ['+(s.title||'')+'] '+(r.team?'팀 인솔':'참가')+(r.award?' · '+r.award+' 입상 🏆':'')+' — 경력에 기록되었습니다. 마이페이지 [경력 여정]에서 확인하세요','mypage.html#careerBox')}catch(e){}
       ok++;
     }catch(e){fail++;console.warn('career',e)}
   }
@@ -1055,8 +1067,10 @@ async function cfSave(){
       stats:{teams:teams.length,members:members,individuals:inds.length,awards:awards.length},awards:awards.map(r=>({name:r.name,team:r.team,award:r.award,division:r.div})),
       summary:sum,note:note,photos:photos,by:(CMY&&CMY.name)||'',byUid:CME.uid,at:firebase.firestore.FieldValue.serverTimestamp()};
     let rid=s.reportId;
+    if(rid&&!photos.length)delete rep.photos;   /* 정정 때 사진을 새로 안 올리면 처음 올린 사진 유지 */
     if(rid){await DB.collection('eventReports').doc(rid).set(rep,{merge:true})}else{rid=(await DB.collection('eventReports').add(rep)).id}
     await DB.collection('compSlots').doc(CF.id).update({results:results,finished:{at:new Date().toISOString(),by:(CMY&&CMY.name)||'',count:ok},reportId:rid,report:{summary:sum,note:note,at:new Date().toISOString()}});
+    if(reFinish&&changes.length)try{await DB.collection('compSlots').doc(CF.id).update({finishLog:firebase.firestore.FieldValue.arrayUnion({at:new Date().toISOString(),by:(CMY&&CMY.name)||'',byUid:CME.uid,changes:changes})})}catch(e){console.warn('finishLog',e)}   /* 정정 이력 — 누가 언제 무엇을 바꿨는지 */
     let gmsg='';
     if(document.getElementById('cfGallery').checked){
       const g=await CAREER.galleryDraft(DB,{title:s.title||'',date:s.date||'',endDate:s.date||'',place:s.place||'',sport:rep.sport,summary:sum,refKind:'comp',refId:s.compId||CF.id,media:photos.map(u=>({type:'img',url:u,caption:''}))},(CMY&&CMY.name)||'');
