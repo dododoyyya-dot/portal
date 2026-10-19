@@ -1,4 +1,4 @@
-// matchrec.js v20261019a · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
+// matchrec.js v20261019b · 대회 경기기록 공용 모듈 — 출전 오더지 · 경기 기록(득점·어시스트·제재) · 디스크골프 스코어 · 결과지 PDF · 집계
 //   화면: match.html(기록 콘솔·경기 관리) · competition.html(오더지 작성) · results.html(공개 결과) · live.html(중계 콘솔 호환)
 //   원칙 ① 경기 문서(liveMatches) 하나가 원본 ② 점수는 득점 기록(events)에서 계산해 a.score/b.score 에 같이 저장(중계 화면 호환)
 //        ③ 입력권(ctrl)은 한 번에 한 화면 ④ 기록 추가는 고유 id + 트랜잭션(중복 전송 무시) ⑤ 취소는 삭제 대신 void 표시
@@ -315,10 +315,10 @@
     +'.ktl-act button{border:1px solid #d5dce8;background:#fff;color:#111827;border-radius:8px;padding:3px 9px;font-size:11.5px;font-weight:800;cursor:pointer;font-family:inherit}'
     +'.ktl-empty{position:relative;z-index:1;text-align:center;font-size:13px;color:#6b7280;background:#fff;margin:14px auto;padding:6px 12px;max-width:80%}'
     +'.ktl-ft{border-top:1px solid #eef1f5;padding:10px 14px;font-size:12.5px;color:#374151;line-height:1.75}.ktl-ft b{color:#111827}'
-    +'.ktl-e .gl{display:flex;gap:14px;align-items:flex-start}.ktl-l .ktl-e .gl{justify-content:flex-end}.ktl-e .pp b{display:block;font-size:15px;font-weight:900;line-height:1.3;white-space:nowrap}.ktl-e .pp small{display:block;font-size:11px;font-weight:700;color:#6b7280;margin-top:1px}'
+    +'.ktl-e .ktl-gl{display:flex;gap:14px;align-items:flex-start}.ktl-l .ktl-e .ktl-gl{justify-content:flex-end}.ktl-e .ktl-pp b{display:block;font-size:15px;font-weight:900;line-height:1.3;white-space:nowrap}.ktl-e .ktl-pp small{display:block;font-size:11px;font-weight:700;color:#6b7280;margin-top:1px}'
     +'.ktl-th{display:grid;grid-template-columns:1fr 78px 1fr;align-items:center;padding:10px 12px 6px;border-bottom:1px solid #eef1f5;position:relative;z-index:1;background:#fff}.ktl-th b{font-size:14px;font-weight:900;color:#153A77}.ktl-th b:first-child{text-align:right;padding-right:12px}.ktl-th b:last-child{padding-left:12px}.ktl-th span{text-align:center;font-size:11px;font-weight:800;color:#9aa1ad}'
     +'.ktl.cp .ktl-r{min-height:54px}.ktl.cp .ktl-p{margin:6px 0}.ktl.cp .ktl-p .ck{width:36px;height:36px}'
-    +'@media(max-width:520px){.ktl-r{grid-template-columns:1fr 64px 1fr}.ktl-th{grid-template-columns:1fr 64px 1fr}.ktl-e .pp b{font-size:13px}.ktl-e .gl{gap:8px}.ktl-e{padding:5px 6px;gap:5px}.ktl-e .tx b{font-size:13.5px}.ktl-chip{font-size:10.5px;padding:3px 6px}.ktl-t span{min-width:52px;height:32px;font-size:13px}.ktl-sc .n{font-size:34px}.ktl-tm b{font-size:14px}}'
+    +'@media(max-width:520px){.ktl-r{grid-template-columns:1fr 64px 1fr}.ktl-th{grid-template-columns:1fr 64px 1fr}.ktl-e .ktl-pp b{font-size:13px}.ktl-e .ktl-gl{gap:8px}.ktl-e{padding:5px 6px;gap:5px}.ktl-e .tx b{font-size:13.5px}.ktl-chip{font-size:10.5px;padding:3px 6px}.ktl-t span{min-width:52px;height:32px;font-size:13px}.ktl-sc .n{font-size:34px}.ktl-tm b{font-size:14px}}'
     +'@media print{.ktl-act{display:none}.ktl{max-width:none}}';
   var CKSVG='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6M5 5l1.5 1.5M19 5l-1.5 1.5"/></svg>';
   var DISCSVG='<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.5" fill="#15803d"/><circle cx="12" cy="12" r="6" fill="none" stroke="#fff" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="#fff"/></svg>';
@@ -338,7 +338,7 @@
       else if(e.type==='timeout'){chip='<span class="ktl-chip k-to">작전타임</span>';main=opt.compact?'':((m[side]||{}).name||'');sub=''}
       if(e.void)sub=(sub?sub+' ':'')+'· 취소됨';
       var act=opt.act?'<div class="ktl-act">'+opt.act(e)+'</div>':'';
-      var tx=e.type==='goal'?'<div class="tx"><div class="gl"><span class="pp"><b>'+esc(main)+'</b><small>득점</small></span>'+(e.assist?'<span class="pp"><b>'+esc(pn(e.assist))+'</b><small>도움</small></span>':'')+'</div>'+(e.void?'<small>· 취소됨</small>':'')+act+'</div>'
+      var tx=e.type==='goal'?'<div class="tx"><div class="ktl-gl"><span class="ktl-pp"><b>'+esc(main)+'</b><small>득점</small></span>'+(e.assist?'<span class="ktl-pp"><b>'+esc(pn(e.assist))+'</b><small>도움</small></span>':'')+'</div>'+(e.void?'<small>· 취소됨</small>':'')+act+'</div>'
         :'<div class="tx">'+(main?'<b>'+esc(main)+'</b>':'')+(sub?'<small>'+esc(sub)+'</small>':'')+act+'</div>';
       var marks=(ic?'<span class="ktl-ic">'+ic+'</span>':'')+chip;
       return '<div class="ktl-e">'+(side==='a'?tx+marks:marks+tx)+'</div>'};
