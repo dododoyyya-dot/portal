@@ -133,7 +133,7 @@
         <li>대회 기간 <b>선수들의 경기 모습</b>을 찍어 이 화면에서 응모합니다(회원 로그인 후).</li>
         <li>올린 사진은 연맹 홈페이지 사진첩(이 화면)의 <b>학교별 앨범</b>에 바로 게시됩니다.</li>
         <li>게시된 사진 중 후보작을 심사하여 <b>초·중·고 부문별 1위</b>에게 상품을 시상합니다.</li>
-        <li>1인 최대 <b id="pcMax">10</b>장 · 사진은 자동으로 줄여 올립니다(원본 보관은 촬영자 기기에).</li>
+        <li>계정당 최대 <b id="pcMax">10</b>장 · 사진은 자동으로 줄여 올립니다(원본 보관은 촬영자 기기에).</li>
       </ul>
       <div class="pc-dl" id="pcDl">⏰ 10월 30일(금) 접수 마감</div>
     </div>
@@ -152,13 +152,13 @@
 <script>
 // ══════════ 얼티미트 대회 사진 공모전 (photo.html · 2026-10-19) ══════════
 //  photoContest/{id} = {contest, level(초등부·중등부·고등부), school, title, img, w, h, by{uid,name}, at, atMs, pick(후보), award(1위)}  · 보안 규칙 v57
-//  사진 파일은 compdocs/{uid}/photo_… (기존 사진첩 업로드와 같은 경로 — 공개 열람). 1인 최대 10장, 10/30 23:59(한국 시간) 접수 마감
+//  사진 파일은 compdocs/{uid}/photo_… (기존 사진첩 업로드와 같은 경로 — 공개 열람). 계정당 최대 10장(문서 ID uid_1~uid_10 — 규칙이 서버에서 막음), 10/30 23:59(한국 시간) 접수 마감
 KFDF.initApp();
 const DB=firebase.firestore();
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const CONTEST='2026-ultimate',MAXN=10,LEVELS=['초등부','중등부','고등부'];
 const DEADLINE=Date.parse('2026-10-30T23:59:59+09:00');
-let ME=null,MY=null,ADMIN=false,ITEMS=[],LV='',UP={level:'',school:'',title:''},BUSY=false;
+let ME=null,MY=null,ADMIN=false,ITEMS=[],LV='',UP={level:'',school:'',title:''},BUSY=false,SLOTS_USED=[];   /* 계정당 10칸: 문서 ID uid_1 ~ uid_10 */
 KFDF.ready(async function(user,me){ME=user;MY=me;ADMIN=!!(me&&KFDF.isAdmin(me));await pcLoad();pcUpRender()});
 function open_(){return Date.now()<=DEADLINE}
 function mine(){return ME?ITEMS.filter(x=>(x.by||{}).uid===ME.uid):[]}
@@ -172,17 +172,18 @@ function pcUpRender(){const el=document.getElementById('pcUp');document.getEleme
     +'<label class="l">학교 (사진 속 선수의 학교)</label><input class="pc-in" id="pcSchool" list="pcSchools" value="'+esc(UP.school)+'" placeholder="예: 서울 보라매초" oninput="UP.school=this.value"><datalist id="pcSchools">'+[...new Set(schools.concat(ITEMS.map(x=>x.school).filter(Boolean)))].slice(0,200).map(s=>'<option value="'+esc(s)+'">').join('')+'</datalist>'
     +'<label class="l">사진 제목·설명 (선택)</label><input class="pc-in" id="pcTitle" value="'+esc(UP.title)+'" maxlength="60" placeholder="예: 결승전 마지막 득점" oninput="UP.title=this.value">'
     +'<label class="l">사진 고르기 (여러 장 가능 · 남은 '+left+'장)</label><input class="pc-in" type="file" id="pcFiles" accept="image/*" multiple '+(left?'':'disabled')+'>'
-    +'<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="pc-btn" id="pcGo" onclick="pcUpload()" '+(left&&!BUSY?'':'disabled')+'>📤 응모하기</button><span class="pc-note" id="pcMsg">'+(left?'':'1인 최대 '+MAXN+'장까지 응모했습니다. 다른 사진으로 바꾸려면 아래 내 사진에서 「삭제」 후 다시 올리세요.')+'</span></div>'}
+    +'<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="pc-btn" id="pcGo" onclick="pcUpload()" '+(left&&!BUSY?'':'disabled')+'>📤 응모하기</button><span class="pc-note" id="pcMsg">'+(left?'':'계정당 최대 '+MAXN+'장까지 응모했습니다. 다른 사진으로 바꾸려면 아래 내 사진에서 「삭제」 후 다시 올리세요.')+'</span></div>'}
 function pcCompress(file){return new Promise(res=>{const img=new Image();const u=URL.createObjectURL(file);img.onload=()=>{const MAX=1800;let w=img.width,h=img.height;if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r)}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);URL.revokeObjectURL(u);c.toBlob(b=>res({blob:b,w:w,h:h}),'image/jpeg',0.86)};img.onerror=()=>{URL.revokeObjectURL(u);res(null)};img.src=u})}
 async function pcUpload(){if(BUSY||!ME)return;if(!open_()){alert('접수가 마감되었습니다.');return}
   const fs=[...((document.getElementById('pcFiles')||{}).files||[])];UP.school=(document.getElementById('pcSchool').value||'').trim();UP.title=(document.getElementById('pcTitle').value||'').trim();
   if(!UP.level){alert('부문(초등부·중등부·고등부)을 골라 주세요.');return}if(!UP.school){alert('사진 속 선수의 학교를 적어 주세요.');return}if(!fs.length){alert('사진을 골라 주세요.');return}
-  const left=MAXN-mine().length;if(fs.length>left){alert('1인 최대 '+MAXN+'장입니다. 지금은 '+left+'장까지 올릴 수 있습니다.');return}
+  const left=MAXN-mine().length;if(fs.length>left){alert('계정당 최대 '+MAXN+'장입니다. 지금은 '+left+'장까지 올릴 수 있습니다.');return}
   BUSY=true;const btn=document.getElementById('pcGo'),msg=document.getElementById('pcMsg');btn.disabled=true;let ok=0,fail=0;
   for(let i=0;i<fs.length;i++){msg.textContent='올리는 중… '+(i+1)+' / '+fs.length;try{if(!/^image\//.test(fs[i].type||'image/'))throw new Error('이미지가 아님');const c=await pcCompress(fs[i]);if(!c||!c.blob)throw new Error('사진을 읽지 못함');
       const ref=firebase.storage().ref('compdocs/'+ME.uid+'/photo_'+Date.now()+'_'+i+'.jpg');await ref.put(c.blob,{contentType:'image/jpeg'});const url=await ref.getDownloadURL();
-      await DB.collection('photoContest').add({contest:CONTEST,level:UP.level,school:UP.school,title:UP.title,img:url,w:c.w,h:c.h,by:{uid:ME.uid,name:(MY&&MY.name)||''},at:firebase.firestore.FieldValue.serverTimestamp(),atMs:Date.now()});ok++}catch(e){console.warn('photo',e);fail++}}
-  BUSY=false;UP.title='';alert(ok?('✓ '+ok+'장 응모했습니다! 학교별 앨범에 게시되었습니다.'+(fail?'\n'+fail+'장은 올리지 못했습니다 — 다시 시도해 주세요.':'')):'사진을 올리지 못했습니다. 잠시 후 다시 시도해 주세요.');await pcLoad();pcUpRender()}
+      const used=new Set(ITEMS.filter(x=>(x.by||{}).uid===ME.uid).map(x=>x.id).concat(SLOTS_USED));let slot=0;for(let k=1;k<=MAXN;k++){if(!used.has(ME.uid+'_'+k)){slot=k;break}}if(!slot)throw new Error('계정당 '+MAXN+'장 초과');SLOTS_USED.push(ME.uid+'_'+slot);
+      await DB.collection('photoContest').doc(ME.uid+'_'+slot).set({contest:CONTEST,level:UP.level,school:UP.school,title:UP.title,img:url,w:c.w,h:c.h,by:{uid:ME.uid,name:(MY&&MY.name)||''},at:firebase.firestore.FieldValue.serverTimestamp(),atMs:Date.now()});ok++}catch(e){console.warn('photo',e);fail++}}
+  BUSY=false;SLOTS_USED=[];UP.title='';alert(ok?('✓ '+ok+'장 응모했습니다! 학교별 앨범에 게시되었습니다.'+(fail?'\n'+fail+'장은 올리지 못했습니다 — 다시 시도해 주세요.':'')):'사진을 올리지 못했습니다. 잠시 후 다시 시도해 주세요.');await pcLoad();pcUpRender()}
 function pcRender(){const bar=document.getElementById('pcBar');const cnt=l=>ITEMS.filter(x=>!l||x.level===l).length;
   bar.innerHTML=['',...LEVELS].map(l=>'<button class="pc-chip'+(LV===l?' on':'')+'" onclick="LV=\''+l+'\';pcRender()">'+(l||'전체')+' '+cnt(l)+'</button>').join('')+(ME&&mine().length?'<button class="pc-chip'+(LV==='__mine'?' on':'')+'" onclick="LV=\'__mine\';pcRender()">내 사진 '+mine().length+'</button>':'');
   const adm=document.getElementById('pcAdmin');adm.style.display='none';if(ADMIN){adm.style.display='flex';adm.innerHTML='<b>관리자</b> 총 '+ITEMS.length+'장 · 후보 '+ITEMS.filter(x=>x.pick).length+' · 1위 '+ITEMS.filter(x=>x.award).length+'<button class="pc-btn navy" style="padding:7px 12px;font-size:12.5px" onclick="pcCsv()">📋 목록 엑셀(CSV) — 원본 링크 포함</button><span class="pc-note" style="margin:0">사진마다 「원본」으로 내려받습니다. 「후보」·「1위」 표시는 심사용(부문마다 1위 한 장).</span>'}
