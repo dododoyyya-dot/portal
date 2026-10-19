@@ -1214,7 +1214,12 @@ async function go_(){
           typeDoc.employDoc=await eref.getDownloadURL();
         }
       }catch(e){console.warn('employ upload',e)}
-      await DB.collection('users').doc(cred.user.uid).set(Object.assign(baseDoc,typeDoc));
+      // [자동 승인 2026-10-19] 관리자가 켠 기간 안 + 요건(국가자격 신고 시 사본 · 교원은 재직증명서) 갖춤 → 바로 승인. 규칙(v57) 미게시·기간 밖이면 종전대로 승인 대기
+      let _auto=false;try{const _ac=await DB.collection('siteContent').doc('autoApprove').get();const c=_ac.exists?_ac.data():{};const ms=x=>x&&x.toMillis?x.toMillis():(+new Date(x)||0);const now=Date.now();
+        _auto=!!(c.on&&now>=ms(c.from)&&now<ms(c.until))&&!(baseDoc.natCertName&&!baseDoc.natCertDoc)&&!(SIGNUP_TYPE==='teacher'&&!typeDoc.employDoc)}catch(e){_auto=false}
+      if(_auto){try{await DB.collection('users').doc(cred.user.uid).set(Object.assign({},baseDoc,typeDoc,{status:'approved',autoApproved:true,autoApprovedAt:firebase.firestore.FieldValue.serverTimestamp()}))}catch(e){console.warn('auto approve → pending',e);_auto=false}}
+      if(!_auto)await DB.collection('users').doc(cred.user.uid).set(Object.assign(baseDoc,typeDoc));
+      window.__AUTO_OK=_auto;
       // [회원 색인] 성명|생년월일 → 계정 (단체전 명단·대회 기록 자동 연동용). 실패해도 가입은 진행
       try{if(name&&birth){const mk=name.replace(/\s+/g,'')+'|'+birth;const ref=DB.collection('memberKeys').doc(mk);const _doc={uid:cred.user.uid,kind:'self',name:name,minor:(SIGNUP_TYPE==='student'),at:firebase.firestore.FieldValue.serverTimestamp()};
         if(window.__MK_ABSENT)await ref.set(_doc);   // [중복 가입 차단] 가입 전 조회에서 없음이 확인된 경우 바로 기록 (승인 전 계정은 조회 권한이 없어 종전에는 기록되지 않던 문제)
@@ -1237,14 +1242,14 @@ async function go_(){
         if(window.__NC_UPLOAD_FAIL)alert('자격증 사본 업로드에 실패했습니다.\n가입은 완료되었으니, 마이페이지 → 내 정보에서 사본을 다시 첨부해 주세요. (첨부 전까지 승인 보류)');
       }
       if(SIGNUP_TYPE==='student'){
-        say('가입 신청 완료! 아이디 「'+loginId+'」 — 사무국 승인 후 이용할 수 있습니다. 다시 가입하지 마세요 (승인 전에도 이 아이디로 로그인하면 「승인 대기」로 표시됩니다). 아래에서 보호자와 연동해주세요.',true);
+        say(window.__AUTO_OK?('가입 완료! 아이디 「'+loginId+'」 — 바로 이용할 수 있습니다(가입 자동 승인 기간). 다시 가입하지 마세요. 아래에서 보호자와 연동해주세요.'):('가입 신청 완료! 아이디 「'+loginId+'」 — 사무국 승인 후 이용할 수 있습니다. 다시 가입하지 마세요 (승인 전에도 이 아이디로 로그인하면 「승인 대기」로 표시됩니다). 아래에서 보호자와 연동해주세요.'),true);
         window.__SIGNUP_DONE=true;try{const _gb=document.getElementById('goBtn');if(_gb){_gb.disabled=true;_gb.textContent='가입 신청 완료';}}catch(e){}   // [중복 가입 차단] 같은 화면에서 버튼을 또 눌러 재신청하는 일 방지
         document.getElementById('postSignupLink').style.display='block';
       }else if(SIGNUP_TYPE==='general'){
-        window.__SIGNUP_DONE=true;say('가입 신청 완료! 사무국 승인 후 이용할 수 있습니다. 강사 활동을 원하시면 마이페이지 → 강사 활동 지원에서 추가 정보를 입력해주세요.',true);
+        window.__SIGNUP_DONE=true;say((window.__AUTO_OK?'가입 완료! 바로 이용할 수 있습니다(가입 자동 승인 기간).':'가입 신청 완료! 사무국 승인 후 이용할 수 있습니다.')+' 강사 활동을 원하시면 마이페이지 → 강사 활동 지원에서 추가 정보를 입력해주세요.',true);
         setTimeout(()=>location.href='mypage.html',1800);
       }else{
-        window.__SIGNUP_DONE=true;say('가입 신청 완료! 사무국 승인 후 커뮤니티를 이용할 수 있습니다.',true);
+        window.__SIGNUP_DONE=true;say(window.__AUTO_OK?'가입 완료! 바로 이용할 수 있습니다(가입 자동 승인 기간).':'가입 신청 완료! 사무국 승인 후 커뮤니티를 이용할 수 있습니다.',true);
         setTimeout(()=>location.href='mypage.html',1500);
       }
     }

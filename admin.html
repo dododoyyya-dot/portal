@@ -355,8 +355,10 @@ function eduWho(v){return (v.name||'')+' ('+(v.birth||'생년월일 없음')+' �
       <div id="sidoKeyBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="noBirthBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
       <div id="ncWaiveBox" style="display:none;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;font-size:13px;line-height:1.8"></div>
+      <div id="autoApvBox" style="display:none;background:#fff;border:1.5px solid #c7d7f0;border-radius:14px;padding:14px 16px;margin-bottom:14px;font-size:13px;line-height:1.7"></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
         <button class="btn-sub ufl on" data-f="전체" onclick="userFilter('전체',this)">전체 회원</button>
+        <button class="btn-sub ufl" data-f="auto" onclick="userFilter('auto',this)" style="background:#8a919d">🤖 자동 승인 · 마무리 전</button>
         <button class="btn-sub ufl" data-f="pending" onclick="userFilter('pending',this)" style="background:#8a919d">⏳ 승인 대기</button>
         <button class="btn-sub ufl" data-f="any" onclick="userFilter('any',this)" style="background:#8a919d">🙋 사업 지원자 전체</button>
         <button class="btn-sub ufl" data-f="school" onclick="userFilter('school',this)" style="background:#8a919d">🏫 학교체육 지원</button>
@@ -5034,6 +5036,30 @@ async function ncDocRemind(){
   alert('✓ '+n+'명에게 알림을 보냈습니다.');
 }
 function userFilter(f,btn){UFL=f;document.querySelectorAll('.ufl').forEach(b=>{b.style.background=b.dataset.f===f?'':'#8a919d'});renderUsers();}
+// ── [가입 자동 승인 2026-10-19] 기간 안 가입은 승인 버튼 없이 바로 승인(요건 갖춘 경우 — 국가자격 사본·교원 재직증명서). 「마무리」는 승인 버튼이 하던 뒷일(자격번호 연결·연수 명단 대조·관할 시도)
+let AUTOAPV=null;
+async function autoApvLoad(){try{const d=await DB.collection('siteContent').doc('autoApprove').get();AUTOAPV=d.exists?d.data():{}}catch(e){AUTOAPV={}}autoApvRender()}
+function autoApvRender(){const box=document.getElementById('autoApvBox');if(!box)return;if(typeof IS_SIDO!=='undefined'&&IS_SIDO){box.style.display='none';return}if(AUTOAPV===null){autoApvLoad();return}
+  const c=AUTOAPV||{};const ms=x=>x&&x.toMillis?x.toMillis():(+new Date(x)||0);const now=Date.now();const live=!!(c.on&&now>=ms(c.from)&&now<ms(c.until));
+  const loc=t=>{if(!t)return '';const d=new Date(t+9*3600e3);return d.toISOString().slice(0,16)};const fromV=loc(ms(c.from))||loc(now),untilV=loc(ms(c.until))||'2026-10-30T19:00';
+  const list=(typeof USERS!=='undefined'?USERS:[]).filter(d=>{const v=d.data()||{};return v.autoApproved&&!v.autoChecked});
+  box.style.display='block';
+  box.innerHTML='<b style="font-size:14px">🤖 가입 자동 승인</b> <span style="background:'+(live?'#0f766e':'#8a919d')+';color:#fff;border-radius:999px;padding:2px 10px;font-size:11.5px;font-weight:900">'+(live?'진행 중':(c.on?'기간 밖':'꺼짐'))+'</span>'
+    +'<div style="color:var(--gray);margin:4px 0 8px">기간 안에 가입하면 승인 버튼 없이 바로 승인됩니다. 요건을 갖춘 경우만(국가공인자격 신고 시 사본 첨부 · 교원 유형은 재직증명서 첨부) — 나머지는 종전대로 승인 대기. <b>보안 규칙 v57</b>이 게시되어 있어야 작동합니다(미게시면 자동으로 승인 대기).</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><label>시작 <input type="datetime-local" id="aaFrom" value="'+fromV+'" style="padding:5px 8px;border:1.5px solid var(--line);border-radius:8px"></label><label>끝 <input type="datetime-local" id="aaUntil" value="'+untilV+'" style="padding:5px 8px;border:1.5px solid var(--line);border-radius:8px"></label>'
+    +'<button class="btn-sub" onclick="autoApvSave(true)" style="background:#0f766e">'+(c.on?'기간 저장':'자동 승인 켜기')+'</button>'+(c.on?'<button class="btn-sub" onclick="autoApvSave(false)" style="background:#C41E2F">끄기</button>':'')+'</div>'
+    +'<div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)">자동 승인된 회원 중 마무리 전 <b>'+list.length+'명</b>'+(list.length?' <button class="btn-sub" onclick="autoApvFinish()" style="background:#153A77">✔ '+list.length+'명 마무리 (자격번호 연결 · 연수 명단 대조 · 관할 시도)</button> <button class="btn-sub" onclick="userFilter(\'auto\')" style="background:#8a919d">명단 보기</button>':'')+'</div>'}
+async function autoApvSave(on){const f=document.getElementById('aaFrom').value,u=document.getElementById('aaUntil').value;const toTs=v=>firebase.firestore.Timestamp.fromDate(new Date(v+':00+09:00'));
+  if(on&&(!f||!u||new Date(u)<=new Date(f))){alert('시작·끝 시각을 확인해 주세요 (끝이 시작보다 늦어야 합니다).');return}
+  try{await DB.collection('siteContent').doc('autoApprove').set({on:!!on,from:toTs(f),until:toTs(u),by:(typeof ME!=='undefined'&&ME&&ME.name)||'',updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});AUTOAPV=null;autoApvLoad();alert(on?'✓ 가입 자동 승인을 켰습니다 — '+f.replace('T',' ')+' ~ '+u.replace('T',' '):'자동 승인을 껐습니다 — 이제 가입은 다시 승인 대기로 들어옵니다.')}catch(e){alert('저장 실패: '+(e.message||e))}}
+async function autoApvFinish(){const list=(typeof USERS!=='undefined'?USERS:[]).filter(d=>{const v=d.data()||{};return v.autoApproved&&!v.autoChecked});if(!list.length)return;
+  if(!confirm('자동 승인된 '+list.length+'명을 마무리합니다.\n· 가입 때 적은 지도자·심판 자격번호 연결\n· 2026 자율연수 명단과 같은 이름이면 이수 인증(+50점, 동명이인은 보류)\n· 관할 시도(sidoKey) 판정\n\n진행할까요?'))return;
+  let ok=0,lic=[],edu=0,skip=0;for(const d of list){const uid=d.id,v=d.data()||{};const patch={autoChecked:true,autoCheckedAt:firebase.firestore.FieldValue.serverTimestamp()};
+    try{const m=await autoLinkLicense(uid,v).catch(()=>[]);if(m&&m.length)lic.push((v.name||'')+': '+m.join(' / '))}catch(e){}
+    if(inRoster(v.name)&&!v.edu2026){if(eduClaimants(v.name,uid).length){patch.eduSkipNote='자동 승인 마무리 시 이수 인증 보류(동명이인) '+new Date().toISOString().slice(0,10);skip++}else{patch.edu2026=true;patch.points=Math.max(+v.points||0,50);edu++}}
+    if(!v.sidoKey){const sk=kfdfSidoKey(v);if(sk)Object.assign(patch,{sidoKey:sk,sidoKeyV:SIDOKEY_V,sidoKeyAt:firebase.firestore.FieldValue.serverTimestamp()})}
+    try{await DB.collection('users').doc(uid).update(patch);ok++}catch(e){console.warn('autoFinish',uid,e)}}
+  alert('✓ '+ok+'명 마무리'+(edu?' · 연수 이수 인증 '+edu+'명':'')+(skip?' · 동명이인 보류 '+skip+'명':'')+(lic.length?'\n\n자격번호 연결:\n'+lic.slice(0,10).join('\n'):''));if(typeof loadUsers==='function')loadUsers();else location.reload()}
 let VIEWMODE='table';
 function setView(m,btn){VIEWMODE=m;document.querySelectorAll('.vwl').forEach(b=>b.style.background=b.dataset.v===m?'':'#8a919d');renderUsers();}
 // 명단(표) 뷰 — 한눈에 스캔·검색용 (상세·승인은 카드 뷰)
@@ -5178,6 +5204,7 @@ function showMemberModal(uid){
 function uMatch(v){
   if(UTYPE!=='all'){const t=uTypeOf(v);if(UTYPE==='student'){if(!(t==='student'||v.memberGroup==='student'||v.isMinor))return false}else if(t!==UTYPE)return false}   // [회원 유형 필터]
   if(UFL==='pending'){if(v.status==='approved')return false}
+  if(UFL==='auto'){if(!(v.autoApproved&&!v.autoChecked))return false}
   else if(UFL==='any'){const f=v.instructorFor||{};if(v.status!=='approved')return false;if(!(f.school||f.after||f.referee||f.staff))return false}
   else if(UFL==='ncdoc'){if(!(v.natCertName&&!v.natCertDoc&&!v.natCertApproved))return false}
   else if(UFL==='hdoc'){const m=(v.submitDocs||{}).moonlight;if(!(m&&m.status==='대기'))return false}   // [위촉 서류] 겸직 허가서 미제출·반려(교원) 또는 확인 대기   // [사본 미첨부] 자격 신고만 하고 사본이 없는 회원
@@ -5744,7 +5771,7 @@ function uMoreBar(shown,total){
     +'<button class="btn-sub" style="background:#8a919d" onclick="uMore(0)">전체 보기 (느릴 수 있음)</button></div>';
 }
 function axFilterIfStale(){const s=document.getElementById('axUser');if(__AXV===__UVER&&s&&s.options.length)return;__AXV=__UVER;axFilter()}
-function renderUsers(){if(__DBV!==__UVER){__DBV=__UVER;try{dupBadge()}catch(e){}}
+function renderUsers(){try{autoApvRender()}catch(e){}if(__DBV!==__UVER){__DBV=__UVER;try{dupBadge()}catch(e){}}
   const el=document.getElementById('userList');
   // 시도 필터 선택 시에만 '권역 보정 포함' 옵션 노출
   (function(){
