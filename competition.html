@@ -1266,7 +1266,7 @@ async function viewRoster(id){
 }
 /* [2026-10-20] 신청 현황 찾기 — 학교·팀·인솔자·선수 이름(펼치지 않은 명단 포함) 검색 + 상태·부문. 다시 그리지 않고 줄만 숨김 */
 let RMF={q:'',st:'',dv:''};
-function rmBarHtml(s,list){if(!list||list.length<4)return '';const cnt={};list.forEach(c=>{const t=claimState(s,c).t.replace(/^\S+\s/,'');cnt[t]=(cnt[t]||0)+1});
+function rmBarHtml(s,list){if(!list||list.length<4)return '';const cnt={};list.forEach(c=>{const t=claimState(s,c).t.replace(/^[^가-힣]+/,'');cnt[t]=(cnt[t]||0)+1});
   const dvs=[...new Set(list.map(c=>String((c.prefs||[])[0]||'').replace(/\(.*$/,'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
   const chip=(k,lab,n)=>'<button type="button" class="rmChip" data-k="'+cesc(k)+'" onclick="RMF.st=this.dataset.k;rmFilter()" style="border:1.5px solid #c9d8ef;background:#fff;color:#153A77;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:900;cursor:pointer">'+lab+' '+n+'</button>';
   return '<div style="position:sticky;top:-24px;z-index:5;background:#fff;border:2px solid #153A77;border-radius:14px;padding:10px 12px;margin:6px 0 10px;box-shadow:0 6px 16px rgba(21,58,119,.1)">'
@@ -1277,7 +1277,7 @@ function rmBarHtml(s,list){if(!list||list.length<4)return '';const cnt={};list.f
     +'<div style="font-size:11.5px;color:#6b7280;margin-top:6px;line-height:1.5"><b>⏳ 승인 대기</b> = 신청은 접수됨, 담당자 승인 전 · <b>✅ 승인 완료</b> = 담당자가 승인함'+(s.extras&&s.extras.needPay?'(입금 확인까지 끝남)':'')+' · <b>💳 입금대기</b> = 승인됐지만 참가비 확인 전 · <b>⏸ 보류</b> = 확인할 것이 있어 잠시 멈춤</div></div>'}
 function rmFilter(){const m=document.getElementById('rosterModal');if(!m)return;const norm=t=>String(t||'').toLowerCase().replace(/\s+/g,'');const q=norm(RMF.q),st=RMF.st||'',dv=RMF.dv||'';let n=0,t=0;
   const rows=[...m.querySelectorAll('table.rsm tr')].filter(tr=>tr.cells.length>1&&/^\d+$/.test(String((tr.cells[0]||{}).textContent).trim()));
-  rows.forEach(tr=>{t++;const c=tr.querySelector('.cst');const sv=c?c.textContent.replace(/^\S+\s/,''):'';const ok=(!q||norm(tr.textContent).indexOf(q)>=0)&&(!st||sv===st)&&(!dv||tr.textContent.indexOf(dv)>=0);tr.style.display=ok?'':'none';if(ok)n++;
+  rows.forEach(tr=>{t++;const c=tr.querySelector('.cst');const sv=c?c.textContent.replace(/^[^가-힣]+/,'').trim():'';   /* 이모지는 화면에서 아이콘으로 바뀌므로 한글 앞부분은 무시 */const ok=(!q||norm(tr.textContent).indexOf(q)>=0)&&(!st||sv===st)&&(!dv||tr.textContent.indexOf(dv)>=0);tr.style.display=ok?'':'none';if(ok)n++;
     const nx=tr.nextElementSibling;if(nx&&nx.id&&nx.id.indexOf('rsd_')===0&&!ok)nx.style.display='none'});
   [...m.querySelectorAll('table.rsm tr')].filter(tr=>tr.cells.length===1&&/📍/.test(tr.textContent)).forEach(g=>{let x=g.nextElementSibling,any=false;while(x&&!(x.cells.length===1&&/📍/.test(x.textContent))){if(x.style.display!=='none'&&rows.indexOf(x)>=0){any=true;break}x=x.nextElementSibling}g.style.display=any?'':'none'});
   m.querySelectorAll('.rmChip').forEach(b=>{const on=b.dataset.k===st;b.style.background=on?'#153A77':'#fff';b.style.color=on?'#fff':'#153A77'});
