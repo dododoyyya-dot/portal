@@ -465,7 +465,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="matchrec.js?v=20261019e"></script>
+<script src="matchrec.js?v=20261020a"></script>
 <script>
 // ══════════ 경기 기록 (match.html) ══════════
 //   ?slot=참가공고ID            대회의 경기·오더지·디스크골프·순위 (운영진은 경기 생성·심판 배정)
@@ -731,7 +731,7 @@ async function staffPostIds(){const ids=new Set();const nm=s=>String(s||'').repl
 function dutyHasRole(d){return /감독|주심|부심|선심|점수|기록|위원장|심판장|총괄|요원|봉사/.test(String(d||''))}
 function divKey(s){s=String(s||'');const lv=/초/.test(s)?'초':/중/.test(s)?'중':/고/.test(s)?'고':'';const g=/남/.test(s)?'남':/여/.test(s)?'여':'';return lv+g}
 function dkMatch(a,b){if(!a||!b)return false;return a===b||(a.length===1&&b.charAt(0)===a)||(b.length===1&&a.charAt(0)===b)}
-const OFF_RK={'감독관':/감독관|위원장|심판장|총괄/,'주심':/주심/,'부심':/부심|선심/,'점수심':/점수/,'기록원':/기록/};
+const OFF_RK={'감독관':/감독관|위원장|심판장|총괄/,'주심':/주심/,'부심':/부심|선심/,'점수심':/점수/,'기록심':/기록/};
 /* 경기 정보 심판진: 임무마다 그 임무로 확정된 사람만(없으면 확정자 전체 → 신청자) — 이 경기 부문 담당이 위로 */
 function offPickList(picks,role,div){const rk=OFF_RK[role]||/./;const dk=divKey(div);let L=picks.filter(p=>p.ok&&(p.roles||[]).some(r=>rk.test(String(r))));if(!L.length)L=picks.filter(p=>p.ok);if(!L.length)L=picks;
   const hit=p=>(p.duties||[]).concat(p.roles||[]).some(d=>dkMatch(divKey(d),dk));return L.slice().sort((a,b)=>(hit(b)-hit(a))||String(a.name).localeCompare(String(b.name),'ko')).map(p=>({name:p.name,uid:p.uid,lab:((p.duties||[]).length?p.duties.join(', '):(p.roles||[]).join(', '))+(hit(p)?' · 이 부문':'')}))}
@@ -750,7 +750,7 @@ async function matchForm(id){
   const dvs=divsOf();const teams=teamEntries();
   const tOpt=(sel)=>'<option value="">— 팀 선택 —</option>'+teams.map(c=>'<option value="'+esc(entryKey(c))+'"'+(sel===entryKey(c)?' selected':'')+'>'+esc(c.name||'')+(c.teamOrg&&c.teamOrg!==c.name?' ('+esc(c.teamOrg)+')':'')+' · '+esc((c.prefs||[])[0]||'')+'</option>').join('')+'<option value="__free__"'+(sel==='__free__'?' selected':'')+'>직접 입력(명단 없이)</option>';
   // [심판진 2026-10-15] 목록에서 고르지 않고 직접 적음(신청자는 자동완성, 이름이 신청자와 같으면 회원으로 연결). 역할별 칸은 「＋ 추가」로 늘림(주심 2·부심 4·감독관 2 …)
-  const offs=m?MR.offList(m):[];const rows=offs.length?offs:[{role:'감독관'},{role:'주심'},{role:'부심'},{role:'부심'},{role:'점수심'},{role:'기록원'}];
+  const offs=m?MR.offList(m):[];const rows=offs.length?offs:[{role:'감독관'},{role:'주심'},{role:'부심'},{role:'부심'},{role:'점수심'},{role:'기록심'}];
   MF_PICKS=picks;MF_DIV=m?m.div||'':'';const offRow=(x,i)=>mfOffRowHtml(x);
   const coachRows=side=>{const cs=m?MR.coachesOf(m,side,orderOf(((m[side])||{}).pid)||{}):[];return (cs.length?cs:[{name:''}]).map(c=>'<div class="mfo c"><input class="mr-in n" placeholder="감독교사·코치 이름" value="'+esc(c.name||'')+'" data-sign="'+esc(c.sign||'')+'"><button type="button" class="mr-btn s" style="padding:6px 10px" onclick="this.parentNode.remove()">✕</button></div>').join('')};
   const of=(m&&m.officials)||{};
@@ -763,7 +763,7 @@ async function matchForm(id){
     +(m?'<label class="mr-lab">감독교사 · 코치 (A팀 '+esc(tname(m,'a'))+')</label><div id="mf_coach_a">'+coachRows('a')+'</div><button type="button" class="mr-btn ghost" style="padding:5px 10px;font-size:12px;margin-top:4px" onclick="mfCoachAdd(\'a\')">＋ 코치 추가</button>'
       +'<label class="mr-lab">감독교사 · 코치 (B팀 '+esc(tname(m,'b'))+')</label><div id="mf_coach_b">'+coachRows('b')+'</div><button type="button" class="mr-btn ghost" style="padding:5px 10px;font-size:12px;margin-top:4px" onclick="mfCoachAdd(\'b\')">＋ 코치 추가</button>':'')
     +(m?crQuickHtml(m):'')
-    +'<label class="mr-lab">심판진 — 역할과 이름 (감독관·주심·부심·점수심·기록원은 몇 명이든 추가)</label><div id="mf_offs">'+rows.map(offRow).join('')+'</div><button type="button" class="mr-btn ghost" style="padding:5px 10px;font-size:12px;margin-top:4px" onclick="mfOffAdd()">＋ 심판 추가</button>'
+    +'<label class="mr-lab">심판진 — 역할과 이름 (감독관·주심·부심·점수심·기록심은 몇 명이든 추가)</label><div id="mf_offs">'+rows.map(offRow).join('')+'</div><button type="button" class="mr-btn ghost" style="padding:5px 10px;font-size:12px;margin-top:4px" onclick="mfOffAdd()">＋ 심판 추가</button>'
     +'<datalist id="mf_picks">'+picks.map(p=>'<option value="'+esc(p.name)+'">'+(p.st?esc(p.st):'신청')+'</option>').join('')+'</datalist>'
     +'<div class="mr-note" style="margin-top:6px">이름 칸을 누르면 <b>그 임무로 확정된 사람 전원</b>이 아래에 나오고(심판 모집 「확정 현황」과 같은 임무 · 심판위원장은 감독관 목록에), 글자를 치면 걸러집니다. 누르거나 이름을 정확히 치면 그 사람으로 적용되어 <b style="color:#0f766e">초록</b>으로 표시됩니다. 목록에 없는 이름도 그대로 저장됩니다. 신청자와 같은 이름이면 회원으로 연결되어 그 사람이 이 경기의 기록 콘솔을 열 수 있고 등록 서명이 기록지에 자동 기입됩니다. 확정된 심판은 배정하지 않아도 이 대회 모든 경기를 기록할 수 있습니다.</div>'
     +'<div class="mr-row" style="justify-content:flex-end;margin-top:14px">'+(m?'<button class="mr-btn r" onclick="matchDel(\''+m.id+'\')">🗑 삭제</button><span style="flex:1"></span>':'')+'<button class="mr-btn s" onclick="document.getElementById(\'mfModal\').remove()">닫기</button><button class="mr-btn g" onclick="matchSave(\''+(m?m.id:'')+'\')">💾 저장</button></div>');
@@ -771,8 +771,8 @@ async function matchForm(id){
 }
 /* [2026-10-19] 심판진 한 줄 = 임무 고르기 + 이름 검색 칸(누르면 그 임무 확정자 전원 · 치면 걸러짐 · 누르거나 정확히 같은 이름이면 자동 적용) */
 let MF_PICKS=[],MF_DIV='';
-const OFF_ROLES=['감독관','주심','부심','점수심','기록원'];
-function mfOffRowHtml(x){x=x||{};const role=OFF_RK[x.role]?x.role:'감독관';
+const OFF_ROLES=['감독관','주심','부심','점수심','기록심'];
+function mfOffRowHtml(x){x=x||{};const role=OFF_RK[x.role==='기록원'?'기록심':x.role]?(x.role==='기록원'?'기록심':x.role):'감독관';
   return '<div class="mfo" data-key="'+esc(x.key||'')+'" data-uid="'+esc(x.uid||'')+'"><select class="mr-in r" onchange="mfRoleList(this)">'+OFF_ROLES.map(r=>'<option'+(role===r?' selected':'')+'>'+r+'</option>').join('')+'</select>'
     +'<div class="mfc"><input class="mr-in n" autocomplete="off" placeholder="이름 검색 — 누르면 '+esc(role)+' 확정자 목록" value="'+esc(x.name||'')+'" onfocus="mfSug(this,true)" oninput="mfType(this)" onblur="mfBlur(this)" onkeydown="mfKey(event,this)"><div class="mfs" style="display:none"></div><div class="mft"></div></div>'
     +'<button type="button" class="mr-btn s" style="padding:6px 10px" onclick="this.parentNode.remove()" title="이 칸 삭제">✕</button></div>'}
@@ -807,7 +807,7 @@ async function matchSave(id){
   const A=teamRef(v('mf_a'),v('mf_an')),B=teamRef(v('mf_b'),v('mf_bn'));if(!A||!B||!A.name||!B.name){say('A팀·B팀을 고르거나 이름을 입력해 주세요');return}
   const picks=await staffPick();const byName={};picks.slice().sort((a,b)=>(a.ok?1:0)-(b.ok?1:0)).forEach(p=>{if(p.name)byName[p.name.replace(/\s+/g,'')]=p.uid});
   const list=[],uids=[],seen={};let n=0;document.querySelectorAll('#mf_offs .mfo').forEach(r=>{const role=r.querySelector('.r').value,name=r.querySelector('.n').value.trim();if(!name)return;let uid=r.dataset.uid||byName[name.replace(/\s+/g,'')]||'';let key=r.dataset.key;if(!key||seen[key])key='o'+Date.now().toString(36)+(n++);seen[key]=1;list.push({key:key,role:role,name:name,uid:uid});if(uid&&uids.indexOf(uid)<0&&REC_ROLE.test(role))uids.push(uid)});
-  const officials={list:list};const first=role=>list.find(x=>x.role===role);const mir=(k,x)=>{if(x)officials[k]={uid:x.uid||'',name:x.name,key:x.key}};mir('supervisor',first('감독관'));mir('ref1',first('주심'));const subs=list.filter(x=>x.role==='부심');mir('ref2',subs[0]);mir('ref3',subs[1]);mir('scorer',first('점수심'));mir('recorder',first('기록원'));
+  const officials={list:list};const first=role=>list.find(x=>x.role===role);const mir=(k,x)=>{if(x)officials[k]={uid:x.uid||'',name:x.name,key:x.key}};mir('supervisor',first('감독관'));mir('ref1',first('주심'));const subs=list.filter(x=>x.role==='부심');mir('ref2',subs[0]);mir('ref3',subs[1]);mir('scorer',first('점수심'));mir('recorder',first('기록심')||first('기록원'));
   const coaches={};['a','b'].forEach(sd=>{const w=document.getElementById('mf_coach_'+sd);if(!w)return;coaches[sd]=[...w.querySelectorAll('.n')].map(i=>({name:i.value.trim(),sign:i.dataset.sign||''})).filter(c=>c.name)});
   const doc={slotId:SLOT_ID,compId:SLOT.compId||'',sport:'얼티미트',rec:true,div:v('mf_div'),stage:v('mf_stage'),round:v('mf_round'),court:v('mf_court'),day:v('mf_day'),time:v('mf_time'),order:+v('mf_order')||0,
     title:[v('mf_div'),v('mf_stage'),v('mf_round')].filter(Boolean).join(' · '),place:SLOT.place||'',refMode:'single',officials:officials,officialUids:uids,updatedAt:FV.serverTimestamp(),by:whoAmI().name};if(m)doc.coaches=coaches;
@@ -825,7 +825,7 @@ let BD_EDIT=false,BD_TAP=null,BD_HINT=0,BD_MINE=false;
 /* [2026-10-19] 내 경기 — 이 경기에 내가 배정된 임무(감독관·주심·부심·기록 …). 배정표(officials) 기준이라 사람마다 다르게 보임 */
 const MY_RN={supervisor:'감독관',ref1:'주심',ref2:'부심',ref3:'부심',scorer:'점수심',recorder:'기록'};
 function myRoles(m){if(!ME||!m)return [];const of=m.officials||{};const out=[];
-  (of.list||[]).forEach(x=>{if(x&&x.uid&&x.uid===ME.uid&&x.role)out.push(String(x.role).replace('기록원','기록').replace('심판감독관','감독관'))});
+  (of.list||[]).forEach(x=>{if(x&&x.uid&&x.uid===ME.uid&&x.role)out.push(String(x.role).replace('기록원','기록').replace('기록심','기록').replace('심판감독관','감독관'))});
   if(!out.length)Object.keys(MY_RN).forEach(k=>{if(of[k]&&of[k].uid===ME.uid)out.push(MY_RN[k])});
   return [...new Set(out)]}
 /* 감독·코치진 전원: 경기 정보에 적은 지도자 → 오더지 감독교사 → 참가 신청 대표 인솔자·추가 인솔자(감독·코치·지도자), 같은 이름은 한 번 */
@@ -1107,7 +1107,7 @@ async function qaChoose(t){if(!QA.a){QA.a=t;qaRender();return}if(QA.a.name===t.n
     a:tm(QA.a),b:tm(t),refMode:'single',officials:{},officialUids:[],status:'예정',period:'',note:'',startAt:null,endAt:null,events:[],clock:{running:false,base:0,startedAt:0},locked:false,createdAt:FV.serverTimestamp(),updatedAt:FV.serverTimestamp(),by:whoAmI().name};
   try{await DB.collection('liveMatches').add(doc);const box=document.getElementById('qaModal');if(box)box.remove();BD_DIV=QA.div}catch(e){say('추가 실패: '+(e.message||e))}}
 // ══ [심판 자동 배정 2026-10-14] 활동경력(staffCareer)·심판 자격(licenses)으로 경력 점수 → 주심은 점수 높은 순, 기록심·부심은 나머지에서 고르게 ══
-//   점수 = 주심·1/2주심·심판총괄·심판위원장 경력 ×3 + 부심·점수심·기록원 등 그 밖의 심판 경력 ×1 + 심판 자격 1급 6 · 2급 4 · 3급 2(유효)
+//   점수 = 주심·1/2주심·심판총괄·심판위원장 경력 ×3 + 부심·점수심·기록심 등 그 밖의 심판 경력 ×1 + 심판 자격 1급 6 · 2급 4 · 3급 2(유효)
 //   같은 날 같은 시각 경기에는 한 사람을 두 번 넣지 않고, 배정 횟수가 적은 사람을 먼저 · 이미 배정된 자리는 그대로(덮어쓰기 선택 시만 바꿈)
 let RF=null;
 const RF_LEAD=/주심|심판총괄|심판위원장/,RF_REF=/부심|선심|점수|기록|심판|감독관/;
@@ -1123,7 +1123,7 @@ async function rfPool(scope){const pool={};const add=(uid,name,src,sp)=>{if(!uid
   for(let i=0;i<ids.length;i+=10){try{const q=await DB.collection('licenses').where('uid','in',ids.slice(i,i+10)).get();q.docs.forEach(d=>{const l=d.data();if(l.type!=='심판')return;if(l.status==='이관'||l.status==='승급'||(l.expireAt&&l.expireAt<today))return;const g=String(l.grade||'').replace(/급$/,'');const pt=g==='1'?6:g==='2'?4:g==='3'?2:0;const P=pool[l.uid];if(P&&pt>P.licPt){P.licPt=pt;P.lic=g+'급'}})}catch(e){}}
   ids.forEach(u=>{const P=pool[u];P.score=P.lead*3+P.other+P.licPt});
   return Object.values(pool).sort((a,b)=>b.score-a.score||String(a.name).localeCompare(String(b.name),'ko'))}
-/* ══ [2026-10-20 · 2차] 심판 배정 = 날짜마다 구장 카드: 감독관 → 기록원 → 심판 1조 → 2조(주심·부심·부심·점수심) · 오른쪽 후보 패널에서 골라 넣음
+/* ══ [2026-10-20 · 2차] 심판 배정 = 날짜마다 구장 카드: 감독관 → 기록심 → 심판 1조 → 2조(주심·부심·부심·점수심) · 오른쪽 후보 패널에서 골라 넣음
    자료: compStats.courtPlan {날짜:{구장:{supervisor, recorder, crews:[{name, ref1, ref2, ref3, scorer}, …]}}} (사람 = {name, uid}) · 같은 날 한 사람은 한 자리만
    구장 경기에 시간순으로 1조 → 2조 → 1조… 번갈아 적용. 예전 형식(crewDefs 조 ID)은 열 때 내용으로 바꿔 읽음 */
 let CR=null;
@@ -1135,7 +1135,7 @@ function crMatchesAt(day,ct){return MATCHES.filter(m=>m.day===day&&m.court===ct)
 function crHas(c){return !!(c&&CR_SLOTS.some(([k])=>c[k]&&c[k].name))}
 function crExpected(m,plan){const Pc=(((plan||COURTPLAN)||{})[m.day]||{})[m.court]||{};const cz=crCrewsOf(Pc).map((c,i)=>({c:c,i:i})).filter(x=>crHas(x.c));if(!cz.length)return -1;const L=crMatchesAt(m.day,m.court);const i=L.findIndex(x=>x.id===m.id);return cz[(i<0?0:i)%cz.length].i}
 function crOfficials(Pc,crew){const list=[];const add=(k,role,p)=>{if(p&&p.name)list.push({key:k,role:role,name:p.name,uid:String(p.uid||'').indexOf('n:')===0?'':(p.uid||'')})};
-  add('supervisor','감독관',(Pc||{}).supervisor);add('ref1','주심',(crew||{}).ref1);add('ref2','부심',(crew||{}).ref2);add('ref3','부심',(crew||{}).ref3);add('scorer','점수심',(crew||{}).scorer);add('recorder','기록원',(Pc||{}).recorder);
+  add('supervisor','감독관',(Pc||{}).supervisor);add('ref1','주심',(crew||{}).ref1);add('ref2','부심',(crew||{}).ref2);add('ref3','부심',(crew||{}).ref3);add('scorer','점수심',(crew||{}).scorer);add('recorder','기록심',(Pc||{}).recorder);
   const of={list:list,crew:(crew||{}).name||''};list.forEach(x=>{of[x.key]={uid:x.uid,name:x.name,key:x.key}});return {of:of,uids:[...new Set(list.filter(x=>REC_ROLE.test(x.role)).map(x=>x.uid).filter(Boolean))]}}
 async function rfOpen(){if(!STAFF)return;STAFFPICK=null;modal('rfModal','<div class="bempty">심판 확정자와 경력을 불러오는 중…</div>');
   let pool=[];try{pool=await rfPool('confirmed')}catch(e){pool=[]}MF_PICKS=await staffPick();
@@ -1146,14 +1146,14 @@ async function rfOpen(){if(!STAFF)return;STAFFPICK=null;modal('rfModal','<div cl
   CR={day:(BD_DAY&&days.indexOf(BD_DAY)>=0)?BD_DAY:(days[0]||''),plan:plan,pool:pool,act:null,q:'',rf:'감독관',prev:null,ovr:{},st:''};
   const c0=rfCourts(CR.day)[0];if(c0)CR.act={ct:c0,key:'sup'};crRender()}
 function crPid(p){return p?(p.uid||('n:'+mfN(p.name))):''}
-function crRoleOf(key){return key==='sup'?'감독관':key==='rec'?'기록원':({ref1:'주심',ref2:'부심',ref3:'부심',scorer:'점수심'})[key.split('.')[1]]}
+function crRoleOf(key){return key==='sup'?'감독관':key==='rec'?'기록심':({ref1:'주심',ref2:'부심',ref3:'부심',scorer:'점수심'})[key.split('.')[1]]}
 function crGet(ct,key){const Pc=CR.plan[CR.day][ct]||{};if(key==='sup')return Pc.supervisor;if(key==='rec')return Pc.recorder;const p=key.split('.');return ((Pc.crews||[])[+p[0]]||{})[p[1]]}
 function crSetP(ct,key,v){const Pc=CR.plan[CR.day][ct];if(key==='sup')Pc.supervisor=v;else if(key==='rec')Pc.recorder=v;else{const p=key.split('.');Pc.crews[+p[0]]=Pc.crews[+p[0]]||{name:ct+' '+(+p[0]+1)+'조'};Pc.crews[+p[0]][p[1]]=v}}
 function crKeys(){const K=['sup','rec'];[0,1].forEach(i=>CR_SLOTS.forEach(([k])=>K.push(i+'.'+k)));return K}
-function crUsed(){const M={};const DP=CR.plan[CR.day]||{};Object.keys(DP).forEach(ct=>{const Pc=DP[ct];const add=(p,lab)=>{if(p&&p.name){const id=crPid(p);(M[id]=M[id]||[]).push(lab)}};add(Pc.supervisor,ct+' 감독관');add(Pc.recorder,ct+' 기록원');(Pc.crews||[]).forEach((c,i)=>CR_SLOTS.forEach(([k,lb])=>add(c[k],ct+' '+(i+1)+'조 '+lb)))});return M}
+function crUsed(){const M={};const DP=CR.plan[CR.day]||{};Object.keys(DP).forEach(ct=>{const Pc=DP[ct];const add=(p,lab)=>{if(p&&p.name){const id=crPid(p);(M[id]=M[id]||[]).push(lab)}};add(Pc.supervisor,ct+' 감독관');add(Pc.recorder,ct+' 기록심');(Pc.crews||[]).forEach((c,i)=>CR_SLOTS.forEach(([k,lb])=>add(c[k],ct+' '+(i+1)+'조 '+lb)))});return M}
 function crSlot(ct,key){const p=crGet(ct,key);const act=CR.act&&CR.act.ct===ct&&CR.act.key===key;const U=crUsed();const dup=p&&p.name&&(U[crPid(p)]||[]).length>1;
   return '<div class="crs'+(act?' on':'')+(p&&p.name?' fill':'')+(dup?' dup':'')+'" role="button" tabindex="0" onclick="crAct(\''+esc(ct)+'\',\''+key+'\')"><i>'+crRoleOf(key)+'</i><b>'+(p&&p.name?esc(p.name):'＋ 고르기')+'</b>'+(p&&p.name?'<span class="x" title="비우기" onclick="event.stopPropagation();crClear(\''+esc(ct)+'\',\''+key+'\')">✕</span>':'')+(dup?'<em>중복</em>':'')+'</div>'}
-function crPanel(){const U=crUsed();const day=CR.day;const tabs=['감독관','주심','부심','점수심','기록원','전체'];const rk=OFF_RK[CR.rf]||null;const q=mfN(CR.q);
+function crPanel(){const U=crUsed();const day=CR.day;const tabs=['감독관','주심','부심','점수심','기록심','전체'];const rk=OFF_RK[CR.rf]||null;const q=mfN(CR.q);
   let L=CR.pool.filter(p=>(!rk||(p.roles||[]).some(r=>rk.test(String(r))))&&(!q||mfN(p.name).indexOf(q)>=0));
   L=L.map(p=>{const id=String(p.uid||'').indexOf('n:')===0?'n:'+mfN(p.name):p.uid;return {p:p,id:id,used:U[id]||null,avail:!(p.days||[]).length||(p.days||[]).indexOf(day)>=0}}).sort((x,y)=>(x.used?1:0)-(y.used?1:0)||(y.avail?1:0)-(x.avail?1:0)||(y.p.score||0)-(x.p.score||0)||String(x.p.name).localeCompare(String(y.p.name),'ko'));
   const role=CR.act?crRoleOf(CR.act.key):'';
@@ -1166,7 +1166,7 @@ function crPanel(){const U=crUsed();const day=CR.day;const tabs=['감독관','�
         +(x.used?'<em>배정: '+esc(x.used.join(', '))+'</em>':(!x.avail?'<em class="w">이 날은 확정 아님</em>':''))+'</button>'}).join(''):'<div class="bempty">해당하는 확정자가 없습니다.</div>')+'</div></div>'}
 function crRender(){const days=[...new Set(MATCHES.map(m=>m.day).filter(Boolean))].sort();const day=CR.day;const courts=rfCourts(day);const DP=CR.plan[day]||{};const U=crUsed();const dupN=Object.values(U).filter(v=>v.length>1).length;
   const keep={};['.crL','.crList'].forEach(sel=>{const el=document.querySelector('#rfModal '+sel);if(el)keep[sel]=el.scrollTop});
-  let h='<div class="mr-row"><b style="font-size:17px">🧑‍⚖️ 심판 배정</b><span class="mr-note">구장마다 <b>감독관 → 기록원 → 심판 1조 → 2조</b> 순서로 칸을 누르고 오른쪽 후보에서 고르세요. 같은 날 한 사람은 한 자리만 · 바꾸면 자동 저장</span><span style="flex:1"></span><span class="mr-note" id="crSt" style="font-weight:800;color:#0f766e">'+esc(CR.st||'')+'</span></div>'
+  let h='<div class="mr-row"><b style="font-size:17px">🧑‍⚖️ 심판 배정</b><span class="mr-note">구장마다 <b>감독관 → 기록심 → 심판 1조 → 2조</b> 순서로 칸을 누르고 오른쪽 후보에서 고르세요. 같은 날 한 사람은 한 자리만 · 바꾸면 자동 저장</span><span style="flex:1"></span><span class="mr-note" id="crSt" style="font-weight:800;color:#0f766e">'+esc(CR.st||'')+'</span></div>'
     +'<div class="mr-row" style="gap:6px;flex-wrap:wrap;margin:6px 0">'+days.map((d,i)=>'<button class="bd-day'+(d===day?' on':'')+'" onclick="CR.day=\''+d+'\';CR.prev=null;CR.act=null;crRender()">'+(i+1)+'일차 '+esc(dateK(d).slice(5))+'</button>').join('')
       +(days.length>1?days.filter(d=>d!==day).map(d=>'<button class="mr-btn ghost" style="padding:5px 10px;font-size:12px" onclick="crCopyDay(\''+d+'\')">'+(days.indexOf(d)+1)+'일차 배치 그대로 가져오기</button>').join(''):'')
       +(dupN?'<span class="mr-note" style="color:#C41E2F;font-weight:800">⚠ 중복 배정 '+dupN+'명 — 붉은 칸을 비워 주세요</span>':'')+'</div>'
@@ -1175,7 +1175,7 @@ function crRender(){const days=[...new Set(MATCHES.map(m=>m.day).filter(Boolean)
         +'<div class="crtop">'+crSlot(ct,'sup')+crSlot(ct,'rec')+'</div>'
         +'<div class="crtwo">'+[0,1].map(i=>{const c=(Pc.crews||[])[i]||{name:ct+' '+(i+1)+'조'};return '<div class="crb"><input class="mr-in cn" value="'+esc(c.name||'')+'" oninput="crName(\''+esc(ct)+'\','+i+',this.value)">'+CR_SLOTS.map(([k])=>crSlot(ct,i+'.'+k)).join('')+'</div>'}).join('')+'</div></div>'}).join('')
       :'<div class="bempty">이 날 구장이 정해진 경기가 없습니다.</div>')+'</div>'+crPanel()+'</div>'
-    +(CR.prev?'<b style="display:block;margin-top:12px">미리보기 — 적용 '+CR.prev.filter(x=>!x.skip).length+'경기</b><div style="max-height:30vh;overflow:auto"><table class="rf-tbl"><tr><th>시각</th><th>구장</th><th class="l">경기</th><th>심판조</th><th class="l">감독관 · 주심 · 점수심 · 기록원</th></tr>'
+    +(CR.prev?'<b style="display:block;margin-top:12px">미리보기 — 적용 '+CR.prev.filter(x=>!x.skip).length+'경기</b><div style="max-height:30vh;overflow:auto"><table class="rf-tbl"><tr><th>시각</th><th>구장</th><th class="l">경기</th><th>심판조</th><th class="l">감독관 · 주심 · 점수심 · 기록심</th></tr>'
       +CR.prev.map(x=>{const cz=crCrewsOf(x.Pc);const cw=cz[x.ci]||{};const o=crOfficials(x.Pc,cw).of;return '<tr'+(x.skip?' style="opacity:.45"':'')+'><td>'+esc(x.m.time||'')+'</td><td>'+esc(x.m.court||'')+'</td><td class="l">'+esc((x.m.a||{}).name||'')+' vs '+esc((x.m.b||{}).name||'')+'<br><small style="color:#6b7280">'+esc(mTitle(x.m))+'</small></td><td><select class="mr-in" style="padding:4px 6px" '+(x.skip?'disabled':'')+' onchange="CR.ovr[\''+esc(x.m.id)+'\']=+this.value;crPreview()">'+cz.map((c,i)=>crHas(c)?'<option value="'+i+'"'+(i===x.ci?' selected':'')+'>'+esc(c.name||((i+1)+'조'))+'</option>':'').join('')+'</select></td><td class="l" style="font-size:12px">'+(x.skip?'건너뜀('+esc(x.m.locked?'확정':x.m.status)+')':esc([(o.supervisor||{}).name,(o.ref1||{}).name,(o.scorer||{}).name,(o.recorder||{}).name].map(v=>v||'—').join(' · ')))+'</td></tr>'}).join('')+'</table></div>':'')
     +'<div class="mr-row" style="justify-content:flex-end;margin-top:12px"><span class="mr-note" style="flex:1">경기 순서대로 1조 → 2조 → 1조… 번갈아 들어갑니다(조 하나만 채우면 그 조가 전부). 끝난·확정된 경기는 건너뜁니다.</span><button class="mr-btn s" onclick="document.getElementById(\'rfModal\').remove()">닫기</button><button class="mr-btn y" onclick="crPreview()">👀 미리보기</button>'+(CR.prev?'<button class="mr-btn g" onclick="crApply()">✅ '+CR.prev.filter(x=>!x.skip).length+'경기에 적용</button>':'')+'</div>';
   modal('rfModal',h);const bx=document.querySelector('#rfModal > div');if(bx)bx.style.maxWidth='1240px';
@@ -1194,7 +1194,7 @@ async function crAutoSave(){try{const upd={courtPlan:CR.plan,updatedAt:FV.server
 function crPreview(){const day=CR.day;const DP=CR.plan[day]||{};const out=[];
   rfCourts(day).forEach(ct=>{const Pc=DP[ct]||{};const cz=crCrewsOf(Pc);const use=cz.map((c,i)=>i).filter(i=>crHas(cz[i]));if(!use.length&&!(Pc.supervisor||Pc.recorder))return;
     crMatchesAt(day,ct).forEach((m,i)=>{const ci=(CR.ovr[m.id]!=null&&crHas(cz[CR.ovr[m.id]]))?CR.ovr[m.id]:(use.length?use[i%use.length]:0);out.push({m:m,ci:ci,Pc:Pc,skip:m.status==='종료'||!!m.locked})})});
-  CR.prev=out.length?out:null;if(!out.length)say('구장마다 감독관·기록원·심판조를 넣은 뒤 미리보기를 눌러 주세요.');crRender()}
+  CR.prev=out.length?out:null;if(!out.length)say('구장마다 감독관·기록심·심판조를 넣은 뒤 미리보기를 눌러 주세요.');crRender()}
 async function crApply(){const L=(CR.prev||[]).filter(x=>!x.skip);if(!L.length)return;const U=crUsed();if(Object.values(U).some(v=>v.length>1)&&!confirm('중복 배정된 사람이 있습니다. 그래도 적용할까요?'))return;
   if(!confirm(L.length+'경기에 심판진을 넣습니다. 이미 넣은 심판진은 바뀝니다. 진행할까요?'))return;
   try{clearTimeout(CR.t);await crAutoSave();for(let i=0;i<L.length;i+=400){const bt=DB.batch();L.slice(i,i+400).forEach(x=>{const r=crOfficials(x.Pc,crCrewsOf(x.Pc)[x.ci]||{});bt.update(DB.collection('liveMatches').doc(x.m.id),{officials:r.of,officialUids:r.uids,refMode:'three',updatedAt:FV.serverTimestamp()})});await bt.commit()}
@@ -1227,7 +1227,7 @@ function rfCareer(i){const p=RF.pool[i];if(!p)return;const L=(p.items||[]).slice
     +(L.length?'<div style="max-height:50vh;overflow:auto;margin-top:8px"><table class="rf-tbl"><tr><th>일자</th><th class="l">대회</th><th>역할</th><th>계산</th></tr>'+L.map(x=>'<tr><td>'+esc(x.date)+'</td><td class="l">'+esc(x.comp)+(x.loc?' <small style="color:#6b7280">'+esc(x.loc)+'</small>':'')+'</td><td>'+esc(x.role)+'</td><td>'+(RF_LEAD.test(x.role)?'<b style="color:#153A77">주심 +3</b>':RF_REF.test(x.role)?'+1':'-')+'</td></tr>').join('')+'</table></div>':'<div class="bempty" style="margin-top:8px">등록된 심판 활동 경력이 없습니다.</div>')
     +'<div class="mr-row" style="justify-content:flex-end;margin-top:12px"><button class="mr-btn s" onclick="document.getElementById(\'rfcModal\').remove()">닫기</button></div>')}
 function rfLoadTxt(){const L=RF.load||{};return RF.pool.filter(p=>p.on&&L[p.uid]).map(p=>esc(p.name)+' '+L[p.uid]).join(' · ')||'-'}
-async function rfApply(){if(!RF.plan)return;try{for(let i=0;i<RF.plan.length;i+=400){const b=DB.batch();RF.plan.slice(i,i+400).forEach(x=>{const of=RF.over?{}:Object.assign({},x.m.officials||{});Object.keys(x.o).forEach(k=>{const v=x.o[k]||{};of[k]={uid:String(v.uid||'').indexOf('n:')===0?'':(v.uid||''),name:v.name||''}});const _rl=['주심','부심','기록원'].concat(RF.mode==='svr'?['감독관']:[]);const keep=(of.list||[]).filter(y=>_rl.indexOf(y.role)<0);const L=keep.slice();[['supervisor','감독관'],['ref1','주심'],['ref2','부심'],['ref3','부심'],['recorder','기록원']].forEach(([k,r])=>{if(of[k]&&of[k].name&&(k!=='supervisor'||RF.mode==='svr'||!keep.some(y=>y.role==='감독관')))L.push({key:k,role:r,name:of[k].name,uid:of[k].uid||''})});of.list=L;const uids=[...new Set(L.filter(y=>REC_ROLE.test(String(y.role||''))).map(y=>y.uid).filter(Boolean))];b.update(DB.collection('liveMatches').doc(x.m.id),{officials:of,officialUids:uids,refMode:RF.mode==='svr'?'single':RF.mode,updatedAt:FV.serverTimestamp()})});await b.commit()}
+async function rfApply(){if(!RF.plan)return;try{for(let i=0;i<RF.plan.length;i+=400){const b=DB.batch();RF.plan.slice(i,i+400).forEach(x=>{const of=RF.over?{}:Object.assign({},x.m.officials||{});Object.keys(x.o).forEach(k=>{const v=x.o[k]||{};of[k]={uid:String(v.uid||'').indexOf('n:')===0?'':(v.uid||''),name:v.name||''}});const _rl=['주심','부심','기록원','기록심'].concat(RF.mode==='svr'?['감독관']:[]);const keep=(of.list||[]).filter(y=>_rl.indexOf(y.role)<0);const L=keep.slice();[['supervisor','감독관'],['ref1','주심'],['ref2','부심'],['ref3','부심'],['recorder','기록심']].forEach(([k,r])=>{if(of[k]&&of[k].name&&(k!=='supervisor'||RF.mode==='svr'||!keep.some(y=>y.role==='감독관')))L.push({key:k,role:r,name:of[k].name,uid:of[k].uid||''})});of.list=L;const uids=[...new Set(L.filter(y=>REC_ROLE.test(String(y.role||''))).map(y=>y.uid).filter(Boolean))];b.update(DB.collection('liveMatches').doc(x.m.id),{officials:of,officialUids:uids,refMode:RF.mode==='svr'?'single':RF.mode,updatedAt:FV.serverTimestamp()})});await b.commit()}
   document.getElementById('rfModal').remove();say('✓ '+RF.plan.length+'경기에 심판을 배정했습니다. 배정된 심판은 그 경기의 기록 콘솔을 열 수 있습니다.')}catch(e){say('배정 실패: '+(e.message||e))}}
 // ── 대진 편성 ──
 function drTeams(div){return teamEntries().filter(c=>!div||((c.prefs||[])[0]===div)).map(c=>({pid:entryKey(c),name:c.name||'',school:c.teamOrg||'',scid:c.teamSchoolClubId||''}))}
@@ -1318,7 +1318,7 @@ function odRender(){
   const sign=OD.coach.sign||(mine&&MY&&MY.signatureImg)||'';
   modal('odModal','<b style="font-size:16px">📝 출전 선수 오더지</b><div class="mr-note">'+esc(SLOT.title||'')+'</div>'
     +'<div class="od-div">출전 부문 : '+esc(OD.div||'미지정')+(STAFF?' <select class="mr-in" style="width:auto;display:inline-block;margin-left:8px;font-size:14px;padding:5px 8px" onchange="odDiv(this.value)"><option value="">부문 변경…</option>'+divsOf().filter(x=>x!==OD.div).map(x=>'<option>'+esc(x)+'</option>').join('')+'<option value="__new">＋ 직접 입력</option></select>':'')+'</div>'+(OD.entryDiv&&OD.entryDiv!==OD.div?'<div class="mr-note" style="color:#b8860b;text-align:center">참가 신청 부문(\''+esc(OD.entryDiv)+'\')과 다릅니다 — 저장할 때 신청 부문도 함께 바꿀 수 있습니다</div>':'')+''
-    +'<div class="kit-pick"><div class="kh">👕 경기복 색상 — 인솔자가 두 벌을 골라 주세요</div><div class="mr-note">현장에서는 선수를 옷 색으로 구분합니다. 1번 옷은 신청 배번, 2번 옷(조끼)은 교체 배번을 씁니다(비우면 1번과 같음). 경기 당일 기록원이 둘 중 입은 옷을 고르고, 경기 중에도 바꿀 수 있습니다.</div>'+kitRow(0)+kitRow(1)+(dis?'':'<div class="mr-row" style="margin-top:8px"><button type="button" class="mr-btn ghost" style="padding:6px 12px;font-size:12.5px" onclick="odVestAuto()">조끼 번호 1~'+OD.players.length+' 자동 채우기 (위에서부터)</button><span class="mr-note">2번 옷(조끼) 배번을 명단 순서대로 1부터 채웁니다</span></div>')+'</div>'
+    +'<div class="kit-pick"><div class="kh">👕 경기복 색상 — 인솔자가 두 벌을 골라 주세요</div><div class="mr-note">현장에서는 선수를 옷 색으로 구분합니다. 1번 옷은 신청 배번, 2번 옷(조끼)은 교체 배번을 씁니다(비우면 1번과 같음). 경기 당일 기록심이 둘 중 입은 옷을 고르고, 경기 중에도 바꿀 수 있습니다.</div>'+kitRow(0)+kitRow(1)+(dis?'':'<div class="mr-row" style="margin-top:8px"><button type="button" class="mr-btn ghost" style="padding:6px 12px;font-size:12.5px" onclick="odVestAuto()">조끼 번호 1~'+OD.players.length+' 자동 채우기 (위에서부터)</button><span class="mr-note">2번 옷(조끼) 배번을 명단 순서대로 1부터 채웁니다</span></div>')+'</div>'
     +'<div class="mr-card" style="margin-top:10px"><div class="mr-row"><span class="mr-note" style="font-weight:800">소속</span><b style="font-size:16px">'+esc(OD.school||OD.team)+'</b>'+(OD.team&&OD.team!==OD.school?'<span style="color:#6b7280">팀명 '+esc(OD.team)+'</span>':'')+'<span style="flex:1"></span><span class="mr-pill" style="background:'+(OD.status==='제출'?'#0f766e':OD.status==='잠금'?'#153A77':'#b8860b')+'">'+esc(OD.status)+'</span></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="mr-lab">감독교사 성명</label><input class="mr-in" id="od_cn" value="'+esc(OD.coach.name)+'" '+dis+' oninput="OD.coach.name=this.value"></div><div><label class="mr-lab">직책</label><input class="mr-in" id="od_cr" value="'+esc(OD.coach.role)+'" placeholder="감독교사 · 지도자" '+dis+' oninput="OD.coach.role=this.value"></div></div>'
     +'<label class="mr-lab">서명 (자동 기입)</label><div class="mr-row">'+(sign?'<img src="'+esc(sign)+'" style="height:40px;background:#fff;border:1px solid #dfe5ee;border-radius:6px"> <span class="mr-note">'+(OD.coach.sign?(OD.coach.signSrc==='onsite'?'현장에서 받은 서명(이 오더지에만)':'제출 때 기입된 서명'):'회원 등록 서명이 제출 시 기입됩니다')+'</span>'
@@ -1444,7 +1444,7 @@ function rcRender(){
   const bd0=ov.querySelector('.body');const keep=(bd0||{}).scrollTop||0;let anc=null;if(bd0){const top0=bd0.getBoundingClientRect().top;bd0.querySelectorAll('[data-anc]').forEach(e=>{const t=e.getBoundingClientRect().top-top0;if(anc===null||(t<=8&&t>anc.t)||(anc.t>8&&t<anc.t))anc={id:e.dataset.anc,t:t}})}
   const sc=MR.score(m.events||[]);const H=sc.half||{a:{},b:{}};const st=ME?MR.ctrlState(m,ME.uid):'other';const can=canRec(m)&&!m.locked;const mine=can&&st==='mine';
   const c=m.clock||{};const q=MR.qCount(RC_ID);
-    const ofs=(function(){const L=MR.offList(m);const g={};L.forEach(x=>{(g[x.role||'심판']=g[x.role||'심판']||[]).push(x.name)});const parts=['감독관','주심','부심','점수심','기록원'].filter(r=>g[r]).map(r=>esc(r)+' <b>'+g[r].map(esc).join('·')+'</b>');
+    const ofs=(function(){const L=MR.offList(m);const g={};L.forEach(x=>{(g[x.role||'심판']=g[x.role||'심판']||[]).push(x.name)});const parts=['감독관','주심','부심','점수심','기록심'].filter(r=>g[r]).map(r=>esc(r)+' <b>'+g[r].map(esc).join('·')+'</b>');
     return '<span class="ofs'+(parts.length?'':' none')+'">'+(parts.join(' <i>·</i> ')||'심판 미배정')+'</span>'+(STAFF?'<button class="ed" onclick="matchForm(\''+m.id+'\')">경기 정보</button>':'')+(can&&st==='mine'?'<button class="ed u" '+(lastEv(m)?'':'disabled')+' onclick="qkUndoLast()" title="마지막 기록(득점·제재·작전타임)을 취소 표시합니다">↩ 되돌리기</button>':'')+(can&&st==='mine'&&m.status!=='예정'?'<span class="tmode"><button class="g'+(QK.mode==='goal'?' on':'')+'" onclick="qkTop(\'goal\')" title="누르면 선수 명단으로 내려갑니다"><svg class="dk" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.5" class="d"/><circle cx="12" cy="12" r="6.2" class="r"/><circle cx="12" cy="12" r="1.9" class="c"/></svg> 득점</button><button class="c'+(QK.mode==='card'?' on':'')+'" onclick="qkTop(\'card\')" title="누르면 선수 명단으로 내려갑니다 · 저장하면 점수판으로">🟨 제재</button></span>':'')})();
   const ctrl=!can?'<div class="ctrl"><span>보기 전용'+(m.locked?' · 확정된 경기':'')+'</span>'+ofs+'</div>'
     :st==='mine'?'<div class="ctrl mine"><span>입력 중 · '+esc(MY.name||'')+(q?' · <b>미전송 '+q+'건</b>':'')+'</span>'+ofs+'</div>'
@@ -1501,7 +1501,7 @@ function rcHelp(){sheet('<div class="hd"><b>❓ 기록 콘솔 사용법</b><butt
   +'<li><b>시간 고치기</b> — 시계를 누르면 ±1초·±10초·±1분 단추와 직접 입력으로 분:초를 맞춥니다. 「리셋」은 이 구간 시계를 0:00 으로. 각 기록의 시간도 「수정」에서 초 단위로 고칩니다.</li>'
   +'<li><b>오더지·배번</b> — 팀 칸 오른쪽 위 「오더지」로 기록 화면을 닫지 않고 배번·경기복을 바로 고칩니다(권한이 있을 때).</li>'
   +'<li><b>잘못 눌렀을 때</b> — 저장 직후 아래 「되돌리기」, 또는 기록 목록의 「취소」·「수정」.</li>'
-  +'<li><b>경기 종료</b> — 「경기 종료」에서 페어플레이·지도자 가점·최우수선수를 고르고 확정하면 서명이 자동으로 들어가고 타임라인 기록지가 바로 열립니다(위쪽 「진흥회 양식」으로 바꿔 인쇄). 종료·확정은 감독관이, 감독관이 없는 경기는 주심·기록원이 합니다.</li></ol>'
+  +'<li><b>경기 종료</b> — 「경기 종료」에서 페어플레이·지도자 가점·최우수선수를 고르고 확정하면 서명이 자동으로 들어가고 타임라인 기록지가 바로 열립니다(위쪽 「진흥회 양식」으로 바꿔 인쇄). 종료·확정은 감독관이, 감독관이 없는 경기는 주심·기록심이 합니다.</li></ol>'
   +'<button class="go b" onclick="try{localStorage.setItem(\'kfdf_rc_tip2\',\'1\')}catch(e){};sheetClose();rcRender()">알겠습니다</button>')}
 // ── 시작 전 설정: 경기복 2벌 중 선택 · 전반 풀 ──
 function setupHtml(m,inSheet){const S=QK.setup||(QK.setup={a:kitIdx(m,'a'),b:kitIdx(m,'b'),pull:(m.pulls||{})['전반']||'',reg:(m.plen||{}).reg||10,ot:(m.plen||{}).ot||5,half:(m.plen||{}).half||5,on:(m.plen||{}).on||7});
@@ -1740,7 +1740,7 @@ async function clockSave(){const m=RCM();const sec=+SHEET.sec;const c=MR.clockSe
 const FP_SCALE=[5,4,3,2,1,0,-1,-2,-3];
 function endRoleInfo(m){const me=MR.offOf(m,ME&&ME.uid);const hasSup=MR.offList(m).some(x=>x.role==='감독관');const uid=ME&&ME.uid;const compSup=!!uid&&/감독관|심판위원장|심판장|심판총괄/.test(((SLOT_ROLES||{})[uid]||[]).join(' '));
   const isSup=!!(me&&me.role==='감독관')||compSup;const isRec=!!uid&&SLOT_REFS.indexOf(uid)>=0;return {me,hasSup,isSup,can:STAFF||isSup||(!hasSup&&(!!me||isRec))}}/* [2026-10-18] 당일 다른 감독관이 대신 서도 종료 가능 */
-function endSheet(){const m=MATCHES.find(x=>x.id===RC_ID);const R=endRoleInfo(m);if(!R.can){say('경기 종료·결과 확정은 감독관이 합니다. 기록원은 경기 중 기록까지만 담당합니다.');return}
+function endSheet(){const m=MATCHES.find(x=>x.id===RC_ID);const R=endRoleInfo(m);if(!R.can){say('경기 종료·결과 확정은 감독관이 합니다. 기록심은 경기 중 기록까지만 담당합니다.');return}
   const v=(o,k,d)=>(o&&o[k]!=null)?o[k]:d;const mv=side=>(m.mvps||[]).find(p=>p.side===side)||(m.mvp&&m.mvp.side===side?m.mvp:null);
   SHEET={kind:'end',fa:v(m.fairplay,'a',3),fb:v(m.fairplay,'b',3),ca:v(m.coachScore,'a',3),cb:v(m.coachScore,'b',3),mvpA:mv('a'),mvpB:mv('b'),side:'a'};endRender()}
 function endRender(){const S=SHEET;const m=MATCHES.find(x=>x.id===RC_ID);const sc=MR.score(m.events||[]);const oa=orderOf((m.a||{}).pid)||{},ob=orderOf((m.b||{}).pid)||{};const R=endRoleInfo(m);

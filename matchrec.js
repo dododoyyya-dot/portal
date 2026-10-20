@@ -242,8 +242,8 @@
       +'<table style="margin-top:0;border-top:none"><tr><th>순번</th><th>신청 배번<br><span class="s">1번 옷</span></th><th>선 수 이 름</th><th>소속</th><th>교체 배번<br><span class="s">2번 옷</span></th><th>비고(주장, 주전, 교체)</th></tr>'+rows+'</table>'
       +'<div class="s" style="color:#666;margin-top:3mm">연맹 홈페이지 참가 신청 명단 기준 · 제출 '+esc(o.status||'')+(o.updatedAt?' · '+esc(String(tsMs(o.updatedAt)?new Date(tsMs(o.updatedAt)).toLocaleString('ko-KR'):'')):'')+' · 대한민국플라잉디스크연맹</div></div>');pend(w)}
   // ── 심판진 목록(역할 라벨 포함) — officials.list(동적 칸) 또는 옛 고정 키(ref1~3·scorer·recorder·supervisor) ──
-  var ROLE_LABEL={ref1:'주심',ref2:'부심',ref3:'부심',scorer:'점수심',recorder:'기록원',supervisor:'감독관'};
-  function offList(m){var o=(m&&m.officials)||{};if(Array.isArray(o.list))return o.list.filter(function(x){return x&&(x.name||x.uid)});var out=[];['supervisor','ref1','ref2','ref3','scorer','recorder'].forEach(function(k){if(o[k]&&(o[k].name||o[k].uid))out.push({key:k,role:ROLE_LABEL[k],name:o[k].name||'',uid:o[k].uid||''})});return out}
+  var ROLE_LABEL={ref1:'주심',ref2:'부심',ref3:'부심',scorer:'점수심',recorder:'기록심',supervisor:'감독관'};
+  function offList(m){var o=(m&&m.officials)||{};if(Array.isArray(o.list))return o.list.filter(function(x){return x&&(x.name||x.uid)}).map(function(x){return x.role==='기록원'?Object.assign({},x,{role:'기록심'}):x});   /* [2026-10-20] 기록원 → 기록심 */var out=[];['supervisor','ref1','ref2','ref3','scorer','recorder'].forEach(function(k){if(o[k]&&(o[k].name||o[k].uid))out.push({key:k,role:ROLE_LABEL[k],name:o[k].name||'',uid:o[k].uid||''})});return out}
   function offOf(m,uid){if(!uid)return null;return offList(m).filter(function(x){return x.uid===uid})[0]||null}
   // 팀 지도자 목록 — 경기 정보에서 고친 것(m.coaches[side]) 우선, 없으면 오더지 감독교사
   function coachesOf(m,side,o){var c=m&&m.coaches&&m.coaches[side];if(Array.isArray(c)&&c.length)return c.filter(function(x){return x&&x.name});var oc=(o&&o.coach)||{};return oc.name?[{name:oc.name,role:oc.role||'',sign:oc.sign||''}]:[]}
@@ -291,7 +291,7 @@
       +'<div class="s" style="margin-top:2mm">※ 한 줄에 사건 하나 — 왼쪽 팀 사건은 왼쪽 칸, 오른쪽 팀 사건은 오른쪽 칸에 적고 가운데 칸은 위가 시간, 아래가 그 득점 직후의 점수(왼쪽 : 오른쪽) &nbsp; ※제재(지도자 포함): 주의 · 옐로(경고) · 레드(퇴장) — 옐로 2장은 퇴장 &nbsp; ※페어플레이·지도자 가점: 5 ~ −3</div>'
       +'<div class="s">최우수선수 추천: <b>'+esc(mvps)+'</b></div>'
       +'<div class="sl">'+coachBox('a',oa)+coachBox('b',ob)+'</div>'
-      +'<div class="sl">'+offLine('감독관')+offLine('기록원')+offLine('점수심')+'</div>'
+      +'<div class="sl">'+offLine('감독관')+offLine('기록심')+offLine('점수심')+'</div>'
       +'<div class="sl">'+offLine('주심',function(i){return '주심'+((byRole['주심']||[]).length>1?(i+1):'')})+offLine('부심',function(i){return '부심'+(i+1)})+'</div>'
       +'<div class="s" style="color:#666;margin-top:3mm">연맹 홈페이지 경기 기록 콘솔 기록 · '+(m.locked?'확정':'미확정')+(m.confirmedBy?' · 확정 '+esc(m.confirmedBy.name||'')+(m.confirmedBy.role?'('+esc(m.confirmedBy.role)+')':'')+' '+esc(String(m.confirmedBy.at||'').slice(0,16).replace('T',' ')):'')+' · 시간은 구간 안의 경기 시간(분:초)</div></div>'}
   // ══ [타임라인 기록지 2026-10-18] 가운데 세로줄에 시간·점수, 왼쪽은 A팀·오른쪽은 B팀 사건(득점·도움·제재·작전타임), 구간마다 표시 ══
