@@ -3003,11 +3003,14 @@ function badgeCelebrate(bd){
   const uid=(AUTH.currentUser||{}).uid;if(!uid)return;
   const key='kfdf_badges_'+uid;let seen=null;
   try{const raw=localStorage.getItem(key);seen=raw?JSON.parse(raw):null}catch(e){seen=null}
+  const srv=(MYD&&Array.isArray(MYD.badgeSeen))?MYD.badgeSeen:null;if(srv)seen=(seen||[]).concat(srv);   /* [2026-10-20] 계정에 남긴 「본 배지」(다른 기기·브라우저도 한 번만) */
   const done=bd.filter(b=>b.done);const order={legendary:0,epic:1,rare:2,uncommon:3,fun:4,common:5};
   let fresh;
   if(!seen)fresh=done.slice().sort((a,b)=>order[a.rarity]-order[b.rarity]).slice(0,3);   // 처음 보는 기기: 가장 귀한 배지 3개만 축하
   else fresh=done.filter(b=>seen.indexOf(b.id)<0).sort((a,b)=>order[a.rarity]-order[b.rarity]).slice(0,5);
-  try{localStorage.setItem(key,JSON.stringify(done.map(b=>b.id)))}catch(e){}
+  const all=[...new Set((seen||[]).concat(done.map(b=>b.id)))];   // 본 목록은 지우지 않고 합침(잠깐 계산이 빠져도 다시 축하하지 않게)
+  try{localStorage.setItem(key,JSON.stringify(all))}catch(e){}
+  if(!srv||all.some(id=>srv.indexOf(id)<0)){DB.collection('users').doc(uid).update({badgeSeen:all}).then(()=>{if(MYD)MYD.badgeSeen=all}).catch(()=>{})}   // 보안 규칙 v58 전에는 조용히 브라우저만
   if(!fresh.length)return;
   BADGE_Q=fresh.map(b=>b.id);
   const next=()=>{const id=BADGE_Q.shift();if(!id)return;badgePop(id,next)};

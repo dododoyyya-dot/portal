@@ -465,7 +465,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="matchrec.js?v=20261020a"></script>
+<script src="matchrec.js?v=20261020b"></script>
 <script>
 // ══════════ 경기 기록 (match.html) ══════════
 //   ?slot=참가공고ID            대회의 경기·오더지·디스크골프·순위 (운영진은 경기 생성·심판 배정)
@@ -1283,14 +1283,22 @@ async function bdAdvance(m){const sc=MR.score(m.events||[]);if(sc.a===sc.b)retur
 // ══ 오더지 ══
 function orderTab(){
   const teams=teamEntries();const LKP=lkPanel();if(!teams.length)return LKP+'<div class="bempty">단체전 참가 신청이 없습니다. 학교가 신청하면 여기 나타나고 대진표 팀과 자동으로 연결됩니다.</div>';
-  const by={};teams.forEach(c=>{const o=orderOf(entryKey(c));const dv=lkDiv((o&&o.div)||(c.prefs||[])[0]||'')||'부문 미지정';(by[dv]=by[dv]||[]).push(c)});
+  const by={};teams.forEach(c=>{const o=orderOf(entryKey(c));const dv=lkDiv((c.prefs||[])[0]||(o&&o.div)||'')||'부문 미지정';(by[dv]=by[dv]||[]).push(c)});
   const sw=k=>'<span title="'+esc(k.name)+'" style="display:inline-block;width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(17,17,20,.25);vertical-align:middle;background:'+esc(k.color)+'"></span>';
   return LKP+'<div class="mr-note" style="margin:6px 0 2px">참가 신청 명단이 오더지에 그대로 들어가고, 대표자가 <b>경기복 2벌(색상)</b>과 옷별 배번, 주장만 적어 제출합니다. 제출된 오더지의 선수가 기록 콘솔의 선수 카드가 됩니다. 한 대표자가 여러 팀을 신청했다면 팀마다 따로 작성합니다.</div>'
     +Object.keys(by).sort().map(dv=>'<div style="margin:18px 0 4px;display:flex;align-items:center;gap:8px"><span style="font-size:17px;font-weight:900;color:#153A77;border-left:5px solid #153A77;padding-left:10px">'+esc(dv)+'</span><span class="mr-note">'+by[dv].length+'팀</span></div><table class="mr-tbl"><tr><th class="l">팀 · 소속</th><th>경기복</th><th>명단</th><th>배번</th><th>상태</th><th>감독교사</th><th></th></tr>'
       +by[dv].map(c=>{const key=entryKey(c);const o=orderOf(key);const n=(c.roster||[]).length;const nn=o?(o.players||[]).filter(p=>String(p.no||'').trim()!=='').length:0;const mine=ME&&c.uid===ME.uid;const K=MR.kitsOf(o||{});
-        return '<tr><td class="l"><b>'+esc(c.name||'')+'</b>'+(c.teamOrg&&c.teamOrg!==c.name?'<br><small style="color:#6b7280">'+esc(c.teamOrg)+'</small>':'')+(mine?' <span class="mr-pill" style="background:#0f766e;font-size:10.5px;padding:2px 8px">내 팀</span>':'')+'</td><td>'+(o&&o.kits?sw(K[0])+' '+sw(K[1]):'<span class="mr-note">-</span>')+'</td><td>'+n+'명</td><td>'+(o?nn+'/'+n:'-')+'</td><td>'+(o?'<span class="mr-pill" style="background:'+(o.status==='제출'?'#0f766e':o.status==='잠금'?'#153A77':'#b8860b')+'">'+esc(o.status)+'</span>':'<span class="mr-pill">미작성</span>')+'</td><td>'+esc(o&&o.coach&&o.coach.name||c.leader||'')+(o&&o.coach&&o.coach.sign?' ✍':'')+'</td>'
-          +'<td style="white-space:nowrap">'+((mine||STAFF)?'<button class="mr-btn'+(o&&o.status!=='작성중'?' s':'')+'" style="padding:6px 11px;font-size:12px" onclick="orderOpen(\''+esc(key)+'\')">'+(o?'📝 열기':'📝 작성')+'</button> ':'')+(o?'<button class="mr-btn ghost" style="padding:6px 11px;font-size:12px" onclick="orderPdf(\''+esc(key)+'\')">📄 PDF</button>':'')+'</td></tr>'}).join('')+'</table>').join('');
+        return '<tr><td class="l"><b>'+esc(c.name||'')+'</b>'+(c.teamOrg&&c.teamOrg!==c.name?'<br><small style="color:#6b7280">'+esc(c.teamOrg)+'</small>':'')+(mine?' <span class="mr-pill" style="background:#0f766e;font-size:10.5px;padding:2px 8px">내 팀</span>':'')+(o&&o.div&&(c.prefs||[])[0]&&lkDiv(o.div)!==lkDiv(c.prefs[0])?'<br><small style="color:#C41E2F;font-weight:800">⚠ 오더지 부문('+esc(o.div)+')이 신청 부문과 달라요 — 열어서 저장하면 맞춰집니다</small>':'')+'</td><td>'+(o&&o.kits?sw(K[0])+' '+sw(K[1]):'<span class="mr-note">-</span>')+'</td><td>'+n+'명</td><td>'+(o?nn+'/'+n:'-')+'</td><td>'+(o?'<span class="mr-pill" style="background:'+(o.status==='제출'?'#0f766e':o.status==='잠금'?'#153A77':'#b8860b')+'">'+esc(o.status)+'</span>':'<span class="mr-pill">미작성</span>')+'</td><td>'+esc(o&&o.coach&&o.coach.name||c.leader||'')+(o&&o.coach&&o.coach.sign?' ✍':'')+'</td>'
+          +'<td style="white-space:nowrap">'+((mine||STAFF)?'<button class="mr-btn'+(o&&o.status!=='작성중'?' s':'')+'" style="padding:6px 11px;font-size:12px" onclick="orderOpen(\''+esc(key)+'\')">'+(o?'📝 열기':'📝 작성')+'</button> ':'')+(o?'<button class="mr-btn ghost" style="padding:6px 11px;font-size:12px" onclick="orderPdf(\''+esc(key)+'\')">📄 PDF</button>':'')+'</td></tr>'}).join('')+'</table>').join('')+(STAFF?orderHiddenHtml():'');
 }
+/* [2026-10-20] 운영진용 — 팀 신청이 있는데 오더지 목록에 안 나오는 경우(반려·취소) 이유를 보여 줌 */
+function orderHiddenHtml(){const s=SLOT||{};const ck=c=>c.pid||c.uid;const shown=new Set(teamEntries().map(entryKey));
+  const keys=[...new Set((s.claimed||[]).filter(c=>c&&c.team).map(ck))].filter(k=>k&&!shown.has(k));if(!keys.length)return '';
+  return '<details style="margin-top:18px"><summary class="mr-note" style="cursor:pointer;font-weight:800">목록에서 빠진 팀 신청 '+keys.length+'건 (반려·취소) — 운영진만 보임</summary><table class="mr-tbl"><tr><th class="l">팀 · 소속</th><th>부문</th><th class="l">빠진 이유</th></tr>'
+    +keys.map(k=>{const arr=(s.claimed||[]).filter(c=>c&&ck(c)===k);const c=arr[arr.length-1]||{};const n=arr.length,x=(s.cancels||[]).filter(y=>y&&ck(y)===k).length;const rv=((s.reviewStatus||{})[k])||{};
+      const why=rv.st==='반려'?'반려'+(rv.reason?' — '+rv.reason:''):(n<=x?'신청 취소 ('+n+'번 신청 · '+x+'번 취소)':(c.cancelled?'취소 표시':'-'));
+      return '<tr><td class="l"><b>'+esc(c.name||'')+'</b><br><small style="color:#6b7280">'+esc(c.teamOrg||'')+(c.leader?' · '+esc(c.leader):'')+'</small></td><td>'+esc((c.prefs||[])[0]||'')+'</td><td class="l">'+esc(why)+'</td></tr>'}).join('')
+    +'</table><div class="mr-note">되살리려면 대회 공고 신청 관리에서 반려를 되돌리거나, 학교가 다시 신청하면 됩니다.</div></details>'}
 let OD=null,OD_PID='';
 // [관리자 입력 오더지 2026-10-18] 참가 신청이 없는 팀은 관리자가 만든 오더지(adminMade)를 참가 항목처럼 씀
 function entryOrPseudo(pid){const c=teamEntries().find(x=>entryKey(x)===pid);if(c)return c;const o=orderOf(pid);if(o&&o.adminMade)return {pid:pid,uid:'',name:o.team||'',teamOrg:o.school||'',prefs:[o.div||''],roster:(o.players||[]).map(p=>({name:p.name,birth:p.birth||'',gender:p.gender||'',school:p.school||'',no:p.no||''})),adminMade:true};return null}

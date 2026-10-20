@@ -127,8 +127,8 @@
   // ── 오더지 ──
   function orderId(slotId,pid){return slotId+'_'+String(pid||'').replace(/[^A-Za-z0-9_-]/g,'')}
   function orderFromEntry(slotId,s,c,prev){
-    var p=prev||{};var pm={};(p.players||[]).forEach(function(x){pm[x.key]=x});
-    var players=(c.roster||[]).map(function(r,i){var key=String(r.name||'').replace(/\s+/g,'')+'|'+(r.birth||'');var o=pm[key]||{};
+    var p=prev||{};var pm={},pn={};(p.players||[]).forEach(function(x){pm[x.key]=x;var nk=String(x.name||'').replace(/\s+/g,'');pn[nk]=pn[nk]?'dup':x});   /* [2026-10-20] 명단 수정으로 생년월일이 바뀌어도 같은 이름(한 명뿐)이면 배번 유지 */
+    var players=(c.roster||[]).map(function(r,i){var key=String(r.name||'').replace(/\s+/g,'')+'|'+(r.birth||'');var nk0=String(r.name||'').replace(/\s+/g,'');var o=pm[key]||(pn[nk0]&&pn[nk0]!=='dup'?pn[nk0]:null)||{};
       return {i:i+1,key:key,name:r.name||'',birth:r.birth||'',school:r.school||'',gender:r.gender||'',no:(o.no!=null&&String(o.no).trim()!=='')?o.no:String(r.no||'').trim(),subNo:o.subNo||'',role:o.role||'',uid:r.memberUid||r.uid||'',guardianUid:r.guardianUid||''}});   // [배번] 오더지에 아직 배번이 없으면 참가 신청 명단(엑셀·화면)의 배번을 그대로
     return {slotId:slotId,pid:c.pid||'',uid:c.uid||'',team:c.name||'',school:c.teamOrg||'',teamType:c.teamType||'',div:(c.prefs||[])[0]||'',gender:c.teamGender||'',
       compTitle:s.title||'',coach:{name:p.coach&&p.coach.name||c.leader||'',role:p.coach&&p.coach.role||c.leaderRole||'',sign:p.coach&&p.coach.sign||'',at:p.coach&&p.coach.at||''},
