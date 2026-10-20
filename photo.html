@@ -152,7 +152,10 @@
 .pc-fd::before{content:"";position:absolute;top:-10px;left:50%;width:64px;height:20px;margin-left:-32px;background:rgba(255,209,102,.8);transform:rotate(-3deg);border-radius:2px;z-index:2}
 .pc-fd:nth-child(3n+2)::before{background:rgba(255,126,170,.6);transform:rotate(4deg)}.pc-fd:nth-child(3n)::before{background:rgba(76,201,168,.6)}
 .pc-fd .cv{position:relative;aspect-ratio:1/1;border-radius:3px;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.pc-fd.l1 .cv{background:var(--mint2)}.pc-fd.l2 .cv{background:var(--lav2)}.pc-fd.l3 .cv{background:var(--peach2)}
+.pc-fd.l1 .cv{background:var(--mint2)}.pc-fd.l2 .cv{background:var(--lav2)}.pc-fd.l3 .cv{background:var(--peach2)}.pc-fd.l4 .cv{background:#e3f1ff}.pc-fd.l5 .cv{background:#fff3c4}
+.pc-fd.l4 .bd span{background:#e3f1ff;color:#2f6db5}.pc-fd.l5 .bd span{background:#fff3c4;color:#8a6a00}
+.pc-seg button.on:nth-child(4){background:#5aa9f0;border-color:#5aa9f0;color:#fff}.pc-seg button.on:nth-child(5){background:#e6b422;border-color:#e6b422;color:#fff}
+.pc-stats span:nth-child(6){background:#e3f1ff}.pc-stats span:nth-child(7){background:#fff3c4}
 .pc-fd .cv img{width:100%;height:100%;object-fit:cover;display:block}
 .pc-fd .cv .ph{color:var(--ink2);font-family:Jua,Pretendard,sans-serif;font-size:14.5px;text-align:center;line-height:1.45;padding:0 10px;word-break:keep-all}
 .pc-fd .cv .ph svg{width:62px;height:62px;display:block;margin:0 auto 4px}
@@ -200,6 +203,7 @@
         <li data-e="📷">대회 동안 <b>선수들이 뛰는 모습</b>을 찍어서 여기에 올려요 (회원 로그인)</li>
         <li data-e="🏫">참가 학교마다 <b>앨범</b>이 있어요. 학교를 고르면 그 앨범에 쏙!</li>
         <li data-e="🏆">올라온 사진 중에서 <b>초·중·고 부문별 1위</b>를 뽑아 선물을 드려요</li>
+        <li data-e="🎽">학교 앨범 말고 <b>운영진</b>·<b>심판진</b> 앨범도 있어요 (각각 1위도 뽑아요)</li>
         <li data-e="🎀">한 계정에 <b>10장</b>까지! 사진은 알아서 예쁘게 줄여서 올라가요</li>
       </ul>
       <div class="pc-dl" id="pcDl">⏰ 10월 30일(금) 접수 마감</div>
@@ -224,7 +228,7 @@
 KFDF.initApp();
 const DB=firebase.firestore();
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const CONTEST='2026-ultimate',MAXN=10,LEVELS=['초등부','중등부','고등부'],SLOT='DTxbzDpc1D0m1hiEi0lA';
+const CONTEST='2026-ultimate',MAXN=10,LEVELS=['초등부','중등부','고등부','운영진','심판진'],SPECIAL=['운영진','심판진'],SLOT='DTxbzDpc1D0m1hiEi0lA';
 const DEADLINE=Date.parse('2026-10-30T23:59:59+09:00');
 /* 웃는 원반 마스코트 */
 const MASCOT='<svg viewBox="0 0 100 100" aria-hidden="true"><ellipse cx="50" cy="58" rx="44" ry="26" fill="#ff7eaa"/><ellipse cx="50" cy="52" rx="44" ry="26" fill="#ffb3cc"/><ellipse cx="50" cy="52" rx="28" ry="15" fill="none" stroke="#fff" stroke-width="3" opacity=".8"/><circle cx="38" cy="50" r="4" fill="#4b3a57"/><circle cx="62" cy="50" r="4" fill="#4b3a57"/><circle cx="39.4" cy="48.6" r="1.3" fill="#fff"/><circle cx="63.4" cy="48.6" r="1.3" fill="#fff"/><path d="M43 58 Q50 65 57 58" fill="none" stroke="#4b3a57" stroke-width="3" stroke-linecap="round"/><ellipse cx="30" cy="58" rx="5" ry="3" fill="#ff7eaa" opacity=".7"/><ellipse cx="70" cy="58" rx="5" ry="3" fill="#ff7eaa" opacity=".7"/><path d="M84 22 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3z" fill="#ffd166"/><path d="M14 18 l2 4 4 2 -4 2 -2 4 -2 -4 -4 -2 4 -2z" fill="#9b87f5"/></svg>';
@@ -243,8 +247,9 @@ function mine(){return ME?ITEMS.filter(x=>(x.by||{}).uid===ME.uid):[]}
 // 참가 학교 = 대진표 팀(부문별). 남녀 팀 이름이 같으면 한 폴더
 async function pcTeams(){try{const q=await DB.collection('liveMatches').where('slotId','==',SLOT).limit(400).get();const map={};
   q.docs.forEach(d=>{const m=d.data()||{};const lv=lvOf(m.div);if(!lv)return;['a','b'].forEach(sd=>{const t=m[sd]||{};const nm=String(t.name||'').trim();if(!nm||/[A-Z]조\s*\d+\s*위|\d+\s*위\)?$|승자|패자|미정|TBD|^\(/i.test(nm))return;   /* 본선 자리표시(「(B조 2위)」·승자) 제외 */const fk=fkOf(lv,nm);
-    const o=map[fk]||(map[fk]={fk:fk,level:lv,name:nm,divs:[]});if(m.div&&o.divs.indexOf(m.div)<0)o.divs.push(m.div)})});TEAMS=Object.values(map)}catch(e){console.warn('teams',e);TEAMS=[]}}
-async function pcLoad(silent){try{const q=await DB.collection('photoContest').where('contest','==',CONTEST).limit(3000).get();ITEMS=q.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>(+b.atMs||0)-(+a.atMs||0));ITEMS.forEach(x=>{if(!x.fk)x.fk=fkOf(x.level||'',x.school||'')})}
+    const o=map[fk]||(map[fk]={fk:fk,level:lv,name:nm,divs:[]});if(m.div&&o.divs.indexOf(m.div)<0)o.divs.push(m.div)})});TEAMS=Object.values(map)}catch(e){console.warn('teams',e);TEAMS=[]}
+  SPECIAL.forEach(l=>{const fk=fkOf(l,l);if(!TEAMS.some(t=>t.fk===fk))TEAMS.unshift({fk:fk,level:l,name:(l==='운영진'?'🎽 운영진':'🧑‍⚖️ 심판진'),divs:[],special:true})})}   /* [2026-10-20] 운영진·심판진 앨범(사진 없어도 항상) */
+async function pcLoad(silent){try{const q=await DB.collection('photoContest').where('contest','==',CONTEST).limit(3000).get();ITEMS=q.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>(+b.atMs||0)-(+a.atMs||0));ITEMS.forEach(x=>{const sn=norm(x.school);const sp=SPECIAL.find(l=>sn===l||sn.indexOf(l)>=0&&sn.length<=l.length+3);if(sp){x.level=sp;x.fk=fkOf(sp,sp)}else if(!x.fk)x.fk=fkOf(x.level||'',x.school||'')})   /* 학교 칸에 「운영진」「심판진」이라 적어 올린 사진도 그 앨범으로 */}
   catch(e){ITEMS=[];window.__PCERR=/permission/i.test(String(e&&e.message))?'앨범을 꾸미는 중이에요! 조금 뒤에 다시 와 주세요 🎀':'불러오기 실패: '+(e.message||e)}if(!silent)pcRender()}
 // 폴더 목록: 대진표 학교 + 대진표에 없던 학교(직접 입력한 사진)
 function folders(){const F={};TEAMS.forEach(t=>{F[t.fk]={fk:t.fk,level:t.level,name:t.name,divs:t.divs,photos:[]}});
@@ -254,10 +259,11 @@ function pcUpRender(){const el=document.getElementById('pcUp');document.getEleme
   if(!open_()){el.innerHTML='<h3>접수가 끝났어요 💐</h3><div class="pc-note">참여해 주셔서 고마워요! 앨범 구경은 계속할 수 있고, 결과는 홈페이지 공지로 알려 드릴게요.</div>';return}
   if(!ME){el.innerHTML='<h3>사진 올리기 💌</h3><div class="pc-note">로그인하면 바로 올릴 수 있어요. 아직 회원이 아니면 가입하고 바로 참여해요! 구경은 로그인 없이도 마음껏 💕</div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><a class="pc-btn navy" href="login.html?next='+encodeURIComponent('photo.html'+(location.hash||''))+'">로그인</a><a class="pc-btn" href="login.html?tab=signup&next='+encodeURIComponent('photo.html')+'">회원가입</a></div>';return}
   if(!UP.level&&!UP.fk&&MY&&MY.school){const ms=norm(MY.school);const t=TEAMS.find(t=>norm(t.name)===ms||norm(t.name).indexOf(ms)>=0||ms.indexOf(norm(t.name))>=0);if(t){UP.level=t.level;UP.fk=t.fk}}   /* 내 학교와 이름이 맞는 앨범을 미리 골라 둠 */
-  const n=mine().length,left=Math.max(0,MAXN-n);const opts=TEAMS.filter(t=>!UP.level||t.level===UP.level).sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+  const n=mine().length,left=Math.max(0,MAXN-n);const opts=TEAMS.filter(t=>!UP.level||t.level===UP.level).sort((a,b)=>(b.special?1:0)-(a.special?1:0)||a.name.localeCompare(b.name,'ko'));
+  const sp=SPECIAL.indexOf(UP.level)>=0;if(sp)UP.fk=fkOf(UP.level,UP.level);   /* 운영진·심판진은 앨범이 하나뿐 */
   el.innerHTML='<h3>사진 올리기 💌 <small style="font-family:Pretendard,sans-serif;font-size:12.5px;color:#8a7a96;font-weight:700">'+esc((MY&&MY.name)||'')+'님 · '+n+' / '+MAXN+'장</small></h3>'
     +'<label class="l">부문</label><div class="pc-seg">'+LEVELS.map(l=>'<button type="button" class="'+(UP.level===l?'on':'')+'" onclick="UP.level=\''+l+'\';if(UP.fk&&UP.fk.indexOf(\''+l+'|\')!==0)UP.fk=\'\';pcUpRender()">'+l+'</button>').join('')+'</div>'
-    +'<label class="l">어느 학교 앨범에 넣을까요? (사진 속 선수의 학교)</label><select class="pc-in" id="pcFk" onchange="UP.fk=this.value;if(this.value&&this.value!==\'__free\')UP.level=this.value.split(\'|\')[0];pcUpRender()"><option value="">'+(UP.level?'— '+UP.level+' 학교를 고르세요 —':'— 부문을 먼저 고르면 학교가 나옵니다 —')+'</option>'+opts.map(t=>'<option value="'+esc(t.fk)+'"'+(UP.fk===t.fk?' selected':'')+'>'+esc(t.name)+(UP.level?'':' · '+esc(t.level))+'</option>').join('')+'<option value="__free"'+(UP.fk==='__free'?' selected':'')+'>목록에 없음 — 직접 적기</option></select>'
+    +(sp?'<label class="l">앨범</label><div class="pc-in" style="background:#f6f1ff;font-weight:800">'+(UP.level==='운영진'?'🎽 운영진 앨범':'🧑‍⚖️ 심판진 앨범')+'</div>':'<label class="l">어느 학교 앨범에 넣을까요? (사진 속 선수의 학교)</label><select class="pc-in" id="pcFk" onchange="UP.fk=this.value;if(this.value&&this.value!==\'__free\')UP.level=this.value.split(\'|\')[0];pcUpRender()"><option value="">'+(UP.level?'— '+UP.level+' 학교를 고르세요 —':'— 부문을 먼저 고르면 학교가 나옵니다 —')+'</option>'+opts.map(t=>'<option value="'+esc(t.fk)+'"'+(UP.fk===t.fk?' selected':'')+'>'+esc(t.name)+(UP.level?'':' · '+esc(t.level))+'</option>').join('')+'<option value="__free"'+(UP.fk==='__free'?' selected':'')+'>목록에 없음 — 직접 적기</option></select>')
     +(UP.fk==='__free'?'<input class="pc-in" id="pcFree" style="margin-top:6px" value="'+esc(UP.free)+'" placeholder="학교 이름 (예: 서울 보라매초)" oninput="UP.free=this.value">':'')
     +'<label class="l">사진에 한마디 (선택)</label><input class="pc-in" id="pcTitle" value="'+esc(UP.title)+'" maxlength="60" placeholder="예: 결승전 마지막 득점! 🎉" oninput="UP.title=this.value">'
     +'<label class="l">사진 고르기 (여러 장 OK · '+left+'장 더 올릴 수 있어요)</label><input class="pc-in" type="file" id="pcFiles" accept="image/*" multiple '+(left?'':'disabled')+'>'
@@ -283,7 +289,7 @@ function pcRender(){pcStats();pcAdminBar();const el=document.getElementById('pcM
   if(OPEN){const f=folderOf(OPEN);if(f){el.innerHTML=pcFolderHtml(f);return}OPEN=''}
   const now=Date.now();const latest=ITEMS.slice(0,14);
   let F=folders().filter(f=>(!LV||f.level===LV)&&(!Q||norm(f.name).indexOf(norm(Q))>=0||String(f.name).indexOf(Q)>=0));
-  F.sort((a,b)=>(b.photos.length?1:0)-(a.photos.length?1:0)||((b.photos[0]||{}).atMs||0)-((a.photos[0]||{}).atMs||0)||LEVELS.indexOf(a.level)-LEVELS.indexOf(b.level)||a.name.localeCompare(b.name,'ko'));
+  F.sort((a,b)=>(SPECIAL.indexOf(a.level)>=0?0:1)-(SPECIAL.indexOf(b.level)>=0?0:1)||(b.photos.length?1:0)-(a.photos.length?1:0)||((b.photos[0]||{}).atMs||0)-((a.photos[0]||{}).atMs||0)||LEVELS.indexOf(a.level)-LEVELS.indexOf(b.level)||a.name.localeCompare(b.name,'ko'));
   const cnt=l=>folders().filter(f=>!l||f.level===l).length;
   el.innerHTML=(latest.length?'<div class="pc-sec"><h2>방금 올라온 따끈따끈 사진 🔥 <small>누르면 크게 볼 수 있어요</small></h2><div class="pc-strip">'+latest.map((x,i)=>'<button onclick="pcLb(\'__latest\','+i+')"><img src="'+esc(x.img)+'" alt="" loading="lazy"><span>'+esc(x.school||'')+'</span></button>').join('')+'</div></div>':'')
     +'<div class="pc-sec"><h2>학교 앨범 구경하기 🏫 <small>참가 학교 '+cnt('')+'곳 · 사진 많은 앨범이 앞에 와요</small></h2>'
