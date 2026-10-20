@@ -88,7 +88,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
 <script src="liccert.js?v=20260929a"></script>
-<script src="career.js?v=20261019a"></script>
+<script src="career.js?v=20261020a"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
 <script src="seal.js?v=20260929b"></script>
 <script src="region_map.js?v=20260910a"></script>
@@ -2171,6 +2171,7 @@ AUTH.onAuthStateChanged(async u=>{
     const careerSnap=await DB.collection('staffCareer').where('uid','==',u.uid).limit(500).get();
     MYCAREER=careerSnap.docs.map(d2=>Object.assign({id:d2.id},d2.data())).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
     renderCareer();
+    if(CAREER.loadExtra)CAREER.loadExtra(DB,u.uid,MYD||{}).then(x=>{CAREER_X=x;renderCareer()}).catch(()=>{CAREER_X={};renderCareer()});   /* [2026-10-20] 경기기록·오더지·일지·사진·자격 배지 */
     try{athSyncChildKeys();athSyncMemberKeys();athFind(true).then(function(){if(ATH_FOUND&&ATH_FOUND.length)athClaim(true)}).catch(function(){})}catch(e){}   // [자동 연동] 색인 기록 + 보류 기록 자동 반영
     try{awardClaimsLoad()}catch(e){}try{fpLoad().catch(function(){})}catch(e){}   // [입상 기록 신청] 내 신청 현황 · [3단계] 나의 발자취   // [선수 경력] 보호자 자녀 키 저장 · 가져올 기록이 있으면 조용히 표시
     if(false&&!careerSnap.empty){
@@ -2887,12 +2888,13 @@ async function hdMoonUpload(inp){
 // ══════════ [경력 여정] 통계 · 등급 · 배지 · 다음 도전 · 타임라인 · 경력증명서 ══════════
 let MYCAREER=[];
 let CAREER_ERR=null;
+let CAREER_X=null;   // 배지용 추가 자료(CAREER.loadExtra)
 function renderCareer(){
   const box=document.getElementById('careerBox');if(!box||!window.CAREER)return;
   const recs=MYCAREER||[];
   box.style.display='block';
   const errNote=CAREER_ERR?'<div style="font-size:12.5px;font-weight:800;color:#C41E2F;background:#fdf1f1;border:1.5px solid #f1c7cc;border-radius:10px;padding:8px 12px;margin-bottom:10px">경력 기록을 불러오는 중 문제가 생겼습니다 ('+esc(CAREER_ERR.code||CAREER_ERR.message||'')+'). 잠시 후 다시 열어 주세요.</div>':'';
-  const st=CAREER.stats(recs);const tier=st.tier;const bd=CAREER.badges(st);
+  const st=CAREER.stats(recs,CAREER_X);const tier=st.tier;const bd=CAREER.badges(st);
   const G=CAREER.GROUP_ICON,C=CAREER.GROUP_COLOR,I=(n,o)=>CAREER.svg(n,o||{});
   const ti=document.getElementById('careerTitleIcon');if(ti)ti.innerHTML=I('gamepad',{size:22,color:'#153A77',stroke:2});
   const ci=document.getElementById('careerCertIcon');if(ci&&!ci.dataset.ok){ci.dataset.ok='1';ci.insertAdjacentHTML('afterbegin',I('doc',{size:16,color:'#153A77',stroke:2.2}))}
@@ -2912,17 +2914,17 @@ function renderCareer(){
     +'</div>'
     +(grp.length?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">'+grp.map(g=>'<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.14);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:800">'+I(CAREER.GROUP_GLYPH[g],{size:14,color:'#fff',stroke:2.2})+g+' <b>'+st.byGroup[g]+'</b></span>').join('')+'</div>'
       :'<div style="font-size:13px;opacity:.9;margin-top:10px">아직 기록이 없습니다. 심판·운영요원 모집이나 대회에 참가하면 첫 배지가 열립니다 →</div>');
-  const done=bd.filter(b=>b.done),todo=bd.filter(b=>!b.done).sort((a,b)=>b.pct-a.pct);
+  const done=bd.filter(b=>b.done),todo=bd.filter(b=>!b.done&&!b.hidden).sort((a,b)=>b.pct-a.pct);
   const RC=CAREER.RARITY;const rOrder={legendary:0,epic:1,rare:2,uncommon:3,fun:4,common:5};
   const sorted=bd.slice().sort((a,b)=>(a.done===b.done?(rOrder[a.rarity]-rOrder[b.rarity])||(b.pct-a.pct):(a.done?-1:1)));
   const hd=document.getElementById('careerBadgeHead');
-  if(hd)hd.innerHTML='<span style="display:inline-flex;align-items:center;gap:5px">'+I('medal',{size:16,color:'#153A77',stroke:2.2})+'배지 <b style="color:#153A77">'+done.length+'</b> / '+bd.length+'</span>'
+  if(hd)hd.innerHTML=badgeShowRow(bd)+'<span style="display:inline-flex;align-items:center;gap:5px">'+I('medal',{size:16,color:'#153A77',stroke:2.2})+'배지 <b style="color:#153A77">'+done.length+'</b> / '+bd.length+'</span>'
     +Object.keys(rOrder).map(r=>'<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#6b7280"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,'+RC[r][0]+','+RC[r][1]+')"></i>'+CAREER.RARITY_LABEL[r]+' '+bd.filter(b=>b.rarity===r&&b.done).length+'/'+bd.filter(b=>b.rarity===r).length+'</span>').join('');
   window.CAREER_BD=bd;
-  document.getElementById('careerBadges').innerHTML=sorted.map(b=>{const rc=RC[b.rarity]||RC.common;
+  document.getElementById('careerBadges').innerHTML=sorted.map(b0=>{const b=(b0.hidden&&!b0.done)?Object.assign({},b0,{name:'???',desc:'숨은 배지 — 조건은 비밀이에요',icon:'question',pct:0}):b0;const rc=RC[b.rarity]||RC.common;const shown=((MYD&&MYD.badgeShow)||[]).indexOf(b.id)>=0;
     return '<div title="'+esc(b.desc)+(b.done?' — 눌러서 다시 보기':'')+'" '+(b.done?'onclick="badgePop(\''+b.id+'\')" ':'')+'style="display:flex;gap:10px;align-items:center;border:1.5px solid '+(b.done?rc[0]:'#e2e7f0')+';background:'+(b.done?'linear-gradient(135deg,#fff,'+rc[0]+'22)':'#fafbfd')+';border-radius:14px;padding:9px 10px;position:relative;overflow:hidden;cursor:'+(b.done?'pointer':'default')+'">'
       +CAREER.medal({icon:b.icon,rarity:b.rarity,locked:!b.done,size:54})
-      +'<div style="min-width:0;flex:1"><div style="font-size:13px;font-weight:900;line-height:1.25;color:'+(b.done?'#111':'#4b5563')+'">'+esc(b.name)+'</div>'
+      +'<div style="min-width:0;flex:1"><div style="font-size:13px;font-weight:900;line-height:1.25;color:'+(b.done?'#111':'#4b5563')+'">'+esc(b.name)+(b.done?' <span role="button" title="'+(shown?'대표 배지에서 빼기':'대표 배지로 걸기(3개까지)')+'" onclick="event.stopPropagation();badgeShowToggle(\''+b.id+'\')" style="cursor:pointer;color:'+(shown?'#e6a700':'#c3cad6')+';font-size:15px">'+(shown?'★':'☆')+'</span>':'')+'</div>'
       +'<div style="font-size:10.5px;font-weight:800;color:'+(b.done?rc[1]:'#8a919d')+';margin-top:1px">'+esc(b.rarityLabel)+(b.done?' · 획득':'')+'</div>'
       +'<div style="font-size:11px;color:#6b7280;margin-top:2px;line-height:1.35">'+esc(b.desc)+'</div>'
       +(b.done?'':'<div style="height:5px;background:#eef1f5;border-radius:999px;margin-top:5px;overflow:hidden"><i style="display:block;height:100%;width:'+b.pct+'%;background:linear-gradient(90deg,'+rc[0]+','+rc[1]+')"></i></div><div style="font-size:10.5px;color:#8a919d;margin-top:2px">'+b.cur+' / '+b.need+'</div>')
@@ -2986,7 +2988,17 @@ function badgePop(id,cb){
   let closed=false;const close=()=>{if(closed)return;closed=true;w.style.transition='opacity .25s';w.style.opacity='0';setTimeout(()=>{w.remove();if(cb)cb()},260)};
   w.onclick=close;document.body.appendChild(w);setTimeout(close,4200);
 }
+/* [2026-10-20] 대표 배지 — users.badgeShow(최대 3개, 보안 규칙 v58). 원반 놀이터 랭킹·예측 이름 옆에도 보임 */
+function badgeShowRow(bd){const ids=(MYD&&MYD.badgeShow)||[];const L=ids.map(id=>bd.find(b=>b.id===id&&b.done)).filter(Boolean);
+  return '<div style="flex-basis:100%;display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;background:#f6f8fc;border:1.5px solid #e2e8f2;border-radius:12px;padding:8px 12px;margin-bottom:4px"><b style="font-size:12.5px;color:#153A77">대표 배지</b>'
+    +(L.length?L.map(b=>'<span style="display:inline-flex;align-items:center;gap:5px">'+CAREER.medal({icon:b.icon,rarity:b.rarity,size:30})+'<b style="font-size:12px">'+esc(b.name)+'</b></span>').join(''):'<span style="font-size:12px;color:#6b7280;font-weight:600">획득한 배지 이름 옆 ☆를 눌러 3개까지 걸어 보세요</span>')
+    +'<a href="play.html#dex" style="margin-left:auto;font-size:12px;font-weight:800;color:#153A77;text-decoration:none">🥏 배지 도감 · 카드 만들기 →</a></div>'}
+async function badgeShowToggle(id){const cur=((MYD&&MYD.badgeShow)||[]).slice();const i=cur.indexOf(id);
+  if(i>=0)cur.splice(i,1);else{if(cur.length>=3){alert('대표 배지는 3개까지예요. 걸려 있는 배지의 ★를 눌러 먼저 빼 주세요.');return}cur.push(id)}
+  try{await DB.collection('users').doc(AUTH.currentUser.uid).update({badgeShow:cur});MYD.badgeShow=cur;renderCareer()}
+  catch(e){alert('대표 배지를 저장하지 못했습니다 — 보안 규칙 v58 게시 후 쓸 수 있어요. ('+(e.code||e.message)+')')}}
 function badgeCelebrate(bd){
+  if(!CAREER_X)return;   // 추가 자료까지 계산된 뒤 한 번만
   if(BADGE_DONE_ONCE)return;BADGE_DONE_ONCE=true;
   const uid=(AUTH.currentUser||{}).uid;if(!uid)return;
   const key='kfdf_badges_'+uid;let seen=null;
@@ -4224,7 +4236,7 @@ document.getElementById('sigModal').addEventListener('click',function(e){if(e.ta
 <script src="logbook.js?v=20261014a"></script>
 <script src="crimcheck.js?v=20260918a"></script>
 <script src="birthpick.js?v=20261018b"></script>
-<script src="auth_ui.js?v=20261015a"></script>
-<script src="firstguide.js?v=20261020a"></script>
+<script src="auth_ui.js?v=20261020a"></script>
+<script src="firstguide.js?v=20261020b"></script>
 </body>
 </html>

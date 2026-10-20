@@ -71,7 +71,40 @@
     scale:'M12 3v18M4 7h16M6 7l-3 7a4 4 0 0 0 8 0zM18 7l-3 7a4 4 0 0 0 8 0zM8 21h8',
     numbers:'M4 8h4M6 8v9M12 12a2 2 0 1 1 4 0c0 2-4 3-4 5h4M20 8v9',
     eye:'M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
-    smile:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9 10h.01M15 10h.01M8.5 14a4 4 0 0 0 7 0'
+    smile:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9 10h.01M15 10h.01M8.5 14a4 4 0 0 0 7 0',
+    /* [2026-10-20] 배지 확장용 */
+    dumbbell:'M6.5 6.5v11M3.5 9v6M17.5 6.5v11M20.5 9v6M6.5 12h11',
+    dove:'M4 14c4 1 7-1 9-5 2 2 4 3 7 3-1 4-5 7-10 7-2 0-4-.5-5-1.5L2 20l1.5-3.5C3 15.5 3.5 14.5 4 14zM13 9c0-3 2-5 5-5-.5 2-2 3.5-4 4',
+    ycard:'M8 3h8a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM10 21h7a2 2 0 0 0 2-2V8',
+    pulse:'M2 12h4l2-5 4 10 3-7 2 2h5',
+    orbit:'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM3 12c0-2 4-3.6 9-3.6s9 1.6 9 3.6-4 3.6-9 3.6S3 14 3 12zM19 5h.01M5 19h.01',
+    note:'M9 3h6v3H9zM8 4.5H5.5V21h13V4.5H16M8.5 11h7M8.5 15h4.5',
+    undo:'M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11',
+    stopwatch:'M12 8a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM12 11.5v3l2 1.5M10 2.5h4M12 2.5V8M18 6.5l1.5-1.5',
+    list:'M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01',
+    pen:'M3 17c2-3 3-6 5-6 1.5 0 0 5 2 5s3-4 4.5-4 1 3 2.5 3 2-1 4-1M3 21h18',
+    tophat:'M7 4h10v11H7zM3 15h18v3H3zM7 11h10',
+    wall:'M3 5h18v14H3zM3 9.7h18M3 14.3h18M9 5v4.7M15 5v4.7M6 9.7v4.6M12 9.7v4.6M18 9.7v4.6M9 14.3V19M15 14.3V19',
+    swap:'M4 8h13l-3.5-3.5M20 16H7l3.5 3.5',
+    gradcap:'M2 9l10-5 10 5-10 5zM6 11v5c3 2.2 9 2.2 12 0v-5M22 9v6',
+    book:'M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 1 6.5 18H19v3H6.5M8 7.5h7M8 11h5',
+    stamp:'M9.5 3h5v5l3 4h-11l3-4zM4 14.5h16V18H4zM6 21h12',
+    film:'M4 4h16v16H4zM4 8.5h16M4 15.5h16M8 4v4.5M12 4v4.5M16 4v4.5M8 15.5V20M12 15.5V20M16 15.5V20',
+    frame:'M3 3h18v18H3zM6.5 6.5h11v11h-11zM6.5 15l3-3 3 3 2-2 3 3',
+    castle:'M4 21V9h3V6h2v3h2V5h2v4h2V6h2v3h3v12zM10 21v-4a2 2 0 0 1 4 0v4',
+    idcard:'M3 5h18v14H3zM7 10a2 2 0 1 0 4 0 2 2 0 0 0-4 0M5.5 16c.5-2 2-3 3.5-3s3 1 3.5 3M14.5 9h4.5M14.5 13h3.5',
+    badge1:'M12 2.5l7 3.5v6c0 5-3 8-7 9.5-4-1.5-7-4.5-7-9.5V6zM11 9.5l1.8-1.3V16M10.5 16h4.2',
+    bird:'M16 7a3 3 0 1 0-6 0c0 1 .3 1.8.8 2.5L4 17c4 2 9 1 12-2 2-2 2.5-5 2-7l2.5-1L18 6M14 6.5h.01',
+    owl:'M5 4l3 3h8l3-3v9a7 7 0 0 1-14 0zM9.5 11a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM14.5 11a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM12 15.5v1.5',
+    pumpkin:'M12 7c-5 0-8 3-8 7s3 7 8 7 8-3 8-7-3-7-8-7zM12 7V4c1 0 2 .5 2.5 1.5M12 7c-2 2-2.5 4.5-2.5 7s.5 5 2.5 7c2-2 2.5-4.5 2.5-7S14 9 12 7M7.5 13l1.5 1M16.5 13L15 14',
+    tree:'M12 2l5 7h-3l4 6h-4l3 4H7l3-4H6l4-6H7zM12 19v3',
+    sunrise:'M3 18h18M6 18a6 6 0 0 1 12 0M12 4v4M4.5 9.5l2 2M19.5 9.5l-2 2M8 21.5h8',
+    clover:'M12 11.5C10 9 8 7 9.5 5.5s3 0 2.5 2c-.5-2 1-3.5 2.5-2S14 9 12 11.5zM12.5 12c2.5-2 4.5-4 6-2.5s0 3-2 2.5c2 .5 3.5 2 2 3.5S15 15 12.5 12zM11.5 12c-2.5 2-4.5 4-6 2.5s0-3 2-2.5c-2-.5-3.5-2-2-3.5S9 9 11.5 12zM12 13l-1 8',
+    seven:'M5 5h14l-7 15M8.5 12.5h7',
+    binoculars:'M7 20a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM17 20a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM3 16l2-10h4l1 6M21 16l-2-10h-4l-1 6M10 13h4',
+    laurel:'M12 21c-4-2-7-6-7-11M12 21c4-2 7-6 7-11M5 10c-1-2 0-4 1-5 1 2 1 4-1 5zM7 15c-2-1-3-3-3-5 2 1 3 3 3 5zM19 10c1-2 0-4-1-5-1 2-1 4 1 5zM17 15c2-1 3-3 3-5-2 1-3 3-3 5zM12 6l1 2h2l-1.5 1.5.5 2-2-1-2 1 .5-2L9 8h2z',
+    pause:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM10 9v6M14 9v6',
+    question:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7v.5M12 17h.01'
   };
   var _gid=0;
   function svg(name,o){
@@ -127,7 +160,7 @@
   var TIERS=[[0,'루키','RK','#8a919d'],[20,'브론즈','BR','#b87333'],[60,'실버','SV','#8a9bb0'],[150,'골드','GD','#d4a017'],[300,'플래티넘','PT','#3aa7a0'],[600,'다이아몬드','DIA','#3b82f6'],[1200,'마스터','MS','#7c3aed'],[2500,'레전드','LG','#C41E2F']];
   function tierOf(pts){var t=TIERS[0],i;for(i=0;i<TIERS.length;i++){if(pts>=TIERS[i][0])t=TIERS[i]}var nx=null;for(i=0;i<TIERS.length;i++){if(TIERS[i][0]>pts){nx={min:TIERS[i][0],name:TIERS[i][1]};break}}return {min:t[0],name:t[1],short:t[2],color:t[3],next:nx}}
   /* ────────── 4. 통계 (배지 계산용 파생값 포함) ────────── */
-  function stats(recs){
+  function stats(recs,x){
     var s={total:0,days:0,points:0,byGroup:{},byRole:{},sports:{},places:{},years:{},events:{},awards:[],first:'',last:'',
       byDow:{},byMonth:{},perDay:{},eventRepeat:{},placeRepeat:{},results:{},kids:0,teams:0,firstGroup:'',sorted:[]};
     var arr=(recs||[]).slice().sort(function(a,b){return String(a.date||'').localeCompare(String(b.date||''))});
@@ -164,10 +197,14 @@
     var ys=Object.keys(s.years).map(Number).sort();var yb=0,yr=0,yp=null;ys.forEach(function(y){yr=(yp!==null&&y===yp+1)?yr+1:1;if(yr>yb)yb=yr;yp=y});s.yearStreak=yb;
     s.firstAward=!!(arr.length&&s.awards.length&&arr.findIndex(function(c){return (c.group||careerGroup(c.role||c.duty))==='입상'})<=1);
     s.tier=tierOf(s.points);
+    /* [2026-10-20] 추가 자료(loadExtra) — 경기기록·오더지·운영일지·사진·자격. 없으면 0 */
+    s.x=x||{};var allD=arr.map(function(c){return String(c.date||'')}).concat((s.x.dates||[]).map(String)).filter(Boolean);
+    s.hallo=allD.filter(function(d){return d.slice(5,10)==='10-31'}).length;s.xmas=allD.filter(function(d){return d.slice(5,10)==='12-25'}).length;s.jan=allD.filter(function(d){return d.slice(5,7)==='01'}).length;
     return s;
   }
   /* ────────── 5. 배지 — 희귀도(common·uncommon·rare·epic·legendary) + 재미(fun) ────────── */
   var G=function(s,g){return s.byGroup[g]||0};
+  var X=function(s,k){return (s.x&&+s.x[k])||0};
   var BADGES=[
     // 시작
     {id:'first',icon:'rocket',rarity:'common',name:'첫 발걸음',desc:'첫 임무·참가 기록',need:function(s){return [s.total,1]}},
@@ -224,11 +261,103 @@
     {id:'days30',icon:'clock',rarity:'rare',name:'100시간 클럽',desc:'활동 30일 누적',need:function(s){return [s.days,30]}},
     {id:'fifty',icon:'balloon',rarity:'epic',name:'반백 기록',desc:'기록 50건',need:function(s){return [s.total,50]}},
     {id:'century',icon:'cake',rarity:'legendary',name:'백전노장',desc:'기록 100건',need:function(s){return [s.total,100]}},
-    {id:'smile',icon:'smile',rarity:'fun',name:'그냥 좋아서',desc:'기록 3건 — 이유는 필요 없죠',need:function(s){return [s.total,3]}}
+    {id:'smile',icon:'smile',rarity:'fun',name:'그냥 좋아서',desc:'기록 3건 — 이유는 필요 없죠',need:function(s){return [s.total,3]}},
+    /* ══ [2026-10-20] 확장 — 경기기록 심판 ══ */
+    {id:'games10',icon:'scale',rarity:'uncommon',cat:'심판',name:'경기장 단골',desc:'심판·기록으로 배정된 경기 10',need:function(s){return [X(s,'games'),10]}},
+    {id:'games50',icon:'laurel',rarity:'legendary',cat:'심판',name:'반백 휘슬',desc:'배정된 경기 50',need:function(s){return [X(s,'games'),50]}},
+    {id:'whistle20',icon:'whistle',rarity:'rare',cat:'심판',name:'휘슬 장인',desc:'주심으로 20경기',need:function(s){return [X(s,'refMain'),20]}},
+    {id:'sup10',icon:'binoculars',rarity:'rare',cat:'심판',name:'경기의 눈',desc:'감독관으로 10경기',need:function(s){return [X(s,'sup'),10]}},
+    {id:'score10',icon:'numbers',rarity:'uncommon',cat:'심판',name:'점수판 지킴이',desc:'점수심으로 10경기',need:function(s){return [X(s,'scorerN'),10]}},
+    {id:'iron',icon:'dumbbell',rarity:'epic',cat:'심판',name:'철인 심판',desc:'하루에 6경기 이상 배정',need:function(s){return [X(s,'maxDay'),6]}},
+    {id:'peace',icon:'dove',rarity:'rare',cat:'심판',name:'평화주의자',desc:'카드 없이 끝난 경기 10번',need:function(s){return [X(s,'clean'),10]}},
+    {id:'firstcard',icon:'ycard',rarity:'fun',cat:'심판',name:'첫 카드',desc:'처음으로 카드를 꺼냄 — 단호함도 실력',need:function(s){return [X(s,'cards'),1]}},
+    {id:'close1',icon:'pulse',rarity:'uncommon',cat:'심판',name:'손에 땀',desc:'1점 차로 끝난 경기를 맡음',need:function(s){return [X(s,'close'),1]}},
+    {id:'universe',icon:'orbit',rarity:'epic',cat:'심판',name:'유니버스 포인트',desc:'동점에서 마지막 한 점으로 끝난 경기',need:function(s){return [X(s,'uni'),1]}},
+    {id:'rec100',icon:'note',rarity:'rare',cat:'심판',name:'기록 장인',desc:'기록심으로 맡은 경기 득점 100개',need:function(s){return [X(s,'recGoals'),100]}},
+    {id:'mvpeye',icon:'star',rarity:'rare',cat:'심판',name:'별을 찾는 눈',desc:'주심으로 최우수선수를 5번 뽑음',need:function(s){return [X(s,'mvpPick'),5]}},
+    {id:'breath',icon:'pause',rarity:'fun',cat:'심판',name:'숨 고르기',desc:'작전타임이 10번 있었던 경기들을 맡음',need:function(s){return [X(s,'tos'),10]}},
+    {id:'oops',icon:'undo',rarity:'fun',cat:'심판',hidden:true,name:'괜찮아요 사람이니까',desc:'기록 되돌리기 5번',need:function(s){return [X(s,'voids'),5]}},
+    /* ══ 선생님·지도자 ══ */
+    {id:'sign',icon:'pen',rarity:'common',cat:'지도',name:'사인 장인',desc:'마이페이지에 서명 등록',need:function(s){return [X(s,'sign'),1]}},
+    {id:'order1',icon:'list',rarity:'common',cat:'지도',name:'첫 오더지',desc:'대회 오더지 제출',need:function(s){return [X(s,'orders'),1]}},
+    {id:'orders3',icon:'list',rarity:'uncommon',cat:'지도',name:'단골 감독님',desc:'오더지 3번 제출',need:function(s){return [X(s,'orders'),3]}},
+    {id:'fullroster',icon:'users',rarity:'uncommon',cat:'지도',name:'꽉 찬 명단',desc:'선수 12명을 다 채운 오더지',need:function(s){return [X(s,'full'),1]}},
+    {id:'quick',icon:'stopwatch',rarity:'fun',cat:'지도',name:'번개 제출',desc:'대회에서 오더지를 가장 먼저 제출',need:function(s){return [X(s,'first'),1]}},
+    {id:'twoteams',icon:'layers',rarity:'rare',cat:'지도',name:'멀티 인솔',desc:'한 대회에서 두 팀 이상 인솔',need:function(s){return [X(s,'multi'),1]}},
+    {id:'hattrick',icon:'tophat',rarity:'epic',cat:'지도',name:'우리 반 해트트릭',desc:'우리 팀 선수가 한 경기 3득점',need:function(s){return [X(s,'hat'),1]}},
+    {id:'wall',icon:'wall',rarity:'rare',cat:'지도',name:'철벽 수비',desc:'우리 팀 무실점 승리',need:function(s){return [X(s,'cleanWin'),1]}},
+    {id:'comeback',icon:'swap',rarity:'epic',cat:'지도',name:'역전의 명수',desc:'지고 있다가 뒤집은 승리',need:function(s){return [X(s,'comeback'),1]}},
+    {id:'pupilwin',icon:'gradcap',rarity:'legendary',cat:'지도',name:'제자 우승',desc:'지도한 팀이 결승전 승리',need:function(s){return [X(s,'pupilWin'),1]}},
+    {id:'teach10',icon:'book',rarity:'uncommon',cat:'지도',name:'강습 10회차',desc:'학교 강습 운영일지 10건',need:function(s){return [X(s,'logs'),10]}},
+    {id:'teach50',icon:'book',rarity:'epic',cat:'지도',name:'강습 50회차',desc:'학교 강습 운영일지 50건',need:function(s){return [X(s,'logs'),50]}},
+    {id:'teach100',icon:'book',rarity:'legendary',cat:'지도',name:'강습 100회차',desc:'학교 강습 운영일지 100건',need:function(s){return [X(s,'logs'),100]}},
+    {id:'stamp',icon:'stamp',rarity:'rare',cat:'지도',name:'확인 도장 100%',desc:'운영일지 10건 이상, 모두 담당교사 확인',need:function(s){return [X(s,'logsOk'),1]}},
+    /* ══ 사진 공모전 ══ */
+    {id:'snap1',icon:'camera',rarity:'common',cat:'사진',name:'찰칵 데뷔',desc:'공모전에 사진 1장',need:function(s){return [X(s,'photos'),1]}},
+    {id:'snap5',icon:'image',rarity:'uncommon',cat:'사진',name:'앨범 채우기',desc:'공모전에 사진 5장',need:function(s){return [X(s,'photos'),5]}},
+    {id:'snap10',icon:'film',rarity:'rare',cat:'사진',name:'10장 꽉',desc:'공모전 10장을 다 올림',need:function(s){return [X(s,'photos'),10]}},
+    {id:'photo1',icon:'frame',rarity:'legendary',cat:'사진',name:'공모전 1위',desc:'사진 공모전 1위 선정',need:function(s){return [X(s,'photoWin'),1]}},
+    /* ══ 자격·계정 ══ */
+    {id:'founder',icon:'castle',rarity:'fun',cat:'계정',name:'개국공신',desc:'2026년에 가입한 첫 세대',need:function(s){return [X(s,'founder'),1]}},
+    {id:'lic1',icon:'idcard',rarity:'common',cat:'계정',name:'자격 데뷔',desc:'연맹 자격 1개 보유',need:function(s){return [X(s,'lic'),1]}},
+    {id:'licboth',icon:'idcard',rarity:'rare',cat:'계정',name:'자격 수집가',desc:'지도자·심판 자격 모두 보유',need:function(s){return [(X(s,'licLead')?1:0)+(X(s,'licRef')?1:0),2]}},
+    {id:'ref1grade',icon:'badge1',rarity:'epic',cat:'계정',name:'1급 심판',desc:'심판 1급 자격 보유',need:function(s){return [X(s,'ref1'),1]}},
+    /* ══ 숨은 배지 — 얻기 전에는 「???」 ══ */
+    {id:'early',icon:'bird',rarity:'rare',cat:'숨은',hidden:true,name:'얼리버드',desc:'오전 9시 전 경기 담당',need:function(s){return [X(s,'early'),1]}},
+    {id:'owl',icon:'owl',rarity:'rare',cat:'숨은',hidden:true,name:'올빼미',desc:'오후 6시 이후 경기 담당',need:function(s){return [X(s,'owl'),1]}},
+    {id:'halloween',icon:'pumpkin',rarity:'epic',cat:'숨은',hidden:true,name:'할로윈 원반',desc:'10월 31일에 활동',need:function(s){return [s.hallo||0,1]}},
+    {id:'xmas',icon:'tree',rarity:'epic',cat:'숨은',hidden:true,name:'메리 디스크마스',desc:'12월 25일에 활동',need:function(s){return [s.xmas||0,1]}},
+    {id:'newyear',icon:'sunrise',rarity:'rare',cat:'숨은',hidden:true,name:'새해 첫 원반',desc:'1월에 활동',need:function(s){return [s.jan||0,1]}},
+    {id:'lucky7',icon:'clover',rarity:'uncommon',cat:'숨은',hidden:true,name:'럭키 7',desc:'기록 7건',need:function(s){return [s.total,7]}},
+    {id:'s777',icon:'seven',rarity:'legendary',cat:'숨은',hidden:true,name:'777',desc:'기록 77건',need:function(s){return [s.total,77]}}
   ];
   var RARITY_LABEL={common:'일반',uncommon:'고급',rare:'희귀',epic:'영웅',legendary:'전설',fun:'재미'};
   function badges(s){
-    return BADGES.map(function(b){var n=b.need(s);var cur=Math.min(n[0],n[1]);return {id:b.id,icon:b.icon,rarity:b.rarity,rarityLabel:RARITY_LABEL[b.rarity]||'',name:b.name,desc:b.desc,cur:cur,need:n[1],done:n[0]>=n[1],pct:Math.round(cur/n[1]*100)}});
+    return BADGES.map(function(b){var n=b.need(s);var cur=Math.min(n[0],n[1]);return {id:b.id,icon:b.icon,rarity:b.rarity,rarityLabel:RARITY_LABEL[b.rarity]||'',name:b.name,desc:b.desc,cat:b.cat||'',hidden:!!b.hidden,cur:cur,need:n[1],done:n[0]>=n[1],pct:Math.round(cur/n[1]*100)}});
+  }
+  /* [2026-10-20] 배지용 추가 자료 — 내가 읽을 수 있는 자료만(공개 경기기록·본인 오더지·본인 운영일지·본인 자격·공모전 사진). 실패한 부분은 0 */
+  function loadExtra(DB,uid,user){
+    var x={dates:[]};user=user||{};if(!DB||!uid)return Promise.resolve(x);
+    x.sign=user.signatureImg?1:0;
+    var ca=user.createdAt||user.joinedAt||user.registeredAt;var cy=ca&&ca.toDate?ca.toDate().getFullYear():(typeof ca==='string'?+ca.slice(0,4):0);x.founder=(cy&&cy<=2026)?1:0;
+    var live=function(e){return e&&!e.void};
+    var run=function(m){var a=0,b=0,trail={a:false,b:false},lastTie=false;(m.events||[]).forEach(function(e){if(!live(e))return;var d=e.type==='goal'?1:(e.type==null&&typeof e.d==='number'?e.d:0);if(!d||!(e.side==='a'||e.side==='b'))return;lastTie=(a===b);if(e.side==='a')a+=d;else b+=d;if(a<b)trail.a=true;if(b<a)trail.b=true});return {a:Math.max(0,a),b:Math.max(0,b),trail:trail,lastTie:lastTie}};
+    var J=[];
+    J.push(DB.collection('liveMatches').where('officialUids','array-contains',uid).limit(800).get().then(function(q){
+      var perDay={};x.games=0;['refMain','sup','scorerN','clean','cards','close','uni','recGoals','voids','early','owl','mvpPick','tos'].forEach(function(k){x[k]=0});
+      q.docs.forEach(function(d){var m=d.data()||{};if(m.test||m.golf)return;var o=m.officials||{};
+        var roles=(o.list||[]).filter(function(y){return y&&y.uid===uid}).map(function(y){return String(y.role||'')});
+        if(!roles.length)['supervisor','ref1','ref2','ref3','scorer','recorder'].forEach(function(k){if(o[k]&&o[k].uid===uid)roles.push({supervisor:'감독관',ref1:'주심',ref2:'부심',ref3:'부심',scorer:'점수심',recorder:'기록심'}[k])});
+        if(!roles.length)return;x.games++;
+        var has=function(re){return roles.some(function(r){return re.test(r)})};
+        if(has(/주심/))x.refMain++;if(has(/감독/))x.sup++;if(has(/점수/))x.scorerN++;
+        if(m.day){perDay[m.day]=(perDay[m.day]||0)+1;x.dates.push(m.day)}
+        var evs=m.events||[];var fin=m.status==='종료';var cardN=evs.filter(function(e){return live(e)&&e.type==='card'}).length;
+        if(has(/주심|감독/))x.cards+=cardN;if(fin&&!cardN)x.clean++;
+        var r=run(m);if(fin&&Math.abs(r.a-r.b)===1){x.close++;if(r.lastTie)x.uni++}
+        if(has(/기록/))x.recGoals+=evs.filter(function(e){return live(e)&&e.type==='goal'}).length;
+        x.voids+=evs.filter(function(e){return e&&e.void&&e.void.uid===uid}).length;
+        x.tos+=evs.filter(function(e){return live(e)&&e.type==='timeout'}).length;
+        if(fin&&has(/주심/)&&((m.mvps&&m.mvps.length)||m.mvp))x.mvpPick++;
+        var t=String(m.time||'');if(t&&t<'09:00')x.early++;if(t>='18:00')x.owl++});
+      x.maxDay=Math.max.apply(null,[0].concat(Object.keys(perDay).map(function(k){return perDay[k]})))}).catch(function(e){console.warn('badge matches',e)}));
+    J.push(DB.collection('compOrders').where('uid','==',uid).limit(100).get().then(function(q){
+      var mine=q.docs.map(function(d){return Object.assign({id:d.id},d.data())}).filter(function(o){return !o.test&&o.status==='제출'});
+      x.orders=mine.length;x.full=mine.filter(function(o){return (o.players||[]).length>=12}).length;
+      var bySlot={};mine.forEach(function(o){(bySlot[o.slotId]=bySlot[o.slotId]||[]).push(o)});x.multi=Object.keys(bySlot).some(function(k){return bySlot[k].length>=2})?1:0;
+      ['first','hat','cleanWin','comeback','pupilWin'].forEach(function(k){x[k]=0});
+      var subAt=function(o){var h=(o.history||[]).filter(function(y){return y&&y.status==='제출'}).map(function(y){return String(y.at||'')}).sort();return h[0]||''};
+      return Promise.all(Object.keys(bySlot).filter(Boolean).map(function(sid){var pids=bySlot[sid].map(function(o){return o.pid});
+        return Promise.all([DB.collection('compOrders').where('slotId','==',sid).get().catch(function(){return null}),DB.collection('liveMatches').where('slotId','==',sid).get().catch(function(){return null})]).then(function(R){
+          if(R[0]){var all=R[0].docs.map(function(d){return d.data()}).filter(function(o){return o.status==='제출'&&subAt(o)}).sort(function(a,b){return subAt(a).localeCompare(subAt(b))});if(all.length>1&&pids.indexOf(all[0].pid)>=0)x.first=1}
+          if(R[1])R[1].docs.forEach(function(d){var m=d.data()||{};if(m.golf)return;['a','b'].forEach(function(sd){var t=m[sd]||{};if(!t.pid||pids.indexOf(t.pid)<0)return;var op=sd==='a'?'b':'a';
+            if(m.day)x.dates.push(m.day);
+            var G={};(m.events||[]).forEach(function(e){if(live(e)&&e.type==='goal'&&e.side===sd&&e.scorer){var k=(e.scorer.no||'')+'|'+(e.scorer.name||'');G[k]=(G[k]||0)+1}});if(Object.keys(G).some(function(k){return G[k]>=3}))x.hat++;
+            if(m.status!=='종료')return;var r=run(m);if(r[sd]>r[op]){if(r[op]===0)x.cleanWin++;if(r.trail[sd])x.comeback++;if(/결승/.test(String(m.round||m.stage||''))&&!/준결승/.test(String(m.round||m.stage||'')))x.pupilWin++}})})})}))}).catch(function(e){console.warn('badge orders',e)}));
+    J.push(DB.collection('sessionLogs').where('uid','==',uid).limit(500).get().then(function(q){var L=q.docs.map(function(d){return d.data()});x.logs=L.length;var ok=L.filter(function(l){return !!l.teacherConfirm}).length;x.logsOk=(L.length>=10&&ok===L.length)?1:0;L.forEach(function(l){if(l.date)x.dates.push(l.date)})}).catch(function(){}));
+    J.push(DB.collection('licenses').where('uid','==',uid).get().then(function(q){var L=q.docs.map(function(d){return d.data()});x.lic=L.length;x.licRef=L.some(function(l){return /심판/.test(l.type||'')})?1:0;x.licLead=L.some(function(l){return /지도/.test(l.type||'')})?1:0;x.ref1=L.some(function(l){return /심판/.test(l.type||'')&&/1/.test(String(l.grade||''))})?1:0}).catch(function(){}));
+    J.push(DB.collection('photoContest').where('by.uid','==',uid).limit(20).get().then(function(q){var L=q.docs.map(function(d){return d.data()});x.photos=L.length;x.photoWin=L.some(function(p){return /1위|대상|최우수/.test(String(p.award||''))})?1:0}).catch(function(){}));
+    return Promise.all(J).then(function(){x.ready=true;return x});
   }
   /* ────────── 6. 경력 문서 쓰기 / 갤러리 초안 ────────── */
   // [주최·주관 2026-09-09] 기록의 주최(host)·주최/주관(organizer)·주관(coorganizer)을 중복 없이 ' / '로 합쳐 표기
@@ -344,6 +473,6 @@
   function ovlFontCss(fs){return 'font-size:calc(var(--ovk,1)*'+(fs||14)+'px)'}
   window.CAREER={removeKey:removeKey,findClubs:findClubs,clubAward:clubAward,orgText:orgText,pdfPages:pdfPages,ovlFit:ovlFit,ovlWatch:ovlWatch,OVL_PRINT_JS:OVL_PRINT_JS,OVL_SAMPLE:OVL_SAMPLE,SIGN_SVG:SIGN_SVG,ovlFontCss:ovlFontCss,
     checkMark:function(px){px=px||18;return '<svg viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;width:calc(var(--ovk,1)*'+px+'px);height:calc(var(--ovk,1)*'+px+'px)"><path d="M4 12.5l5 5L20 6"/></svg>'},ROLES:ROLES,GROUP_ICON:GROUP_ICON,GROUP_GLYPH:GROUP_GLYPH,GROUP_COLOR:GROUP_COLOR,POINTS:POINTS,TIERS:TIERS,RARITY:RARITY,RARITY_LABEL:RARITY_LABEL,
-    group:careerGroup,tierOf:tierOf,stats:stats,badges:badges,BADGES:BADGES,write:write,galleryDraft:galleryDraft,roleChips:roleChips,groupTag:groupTag,key:key,
+    group:careerGroup,tierOf:tierOf,stats:stats,badges:badges,BADGES:BADGES,loadExtra:loadExtra,write:write,galleryDraft:galleryDraft,roleChips:roleChips,groupTag:groupTag,key:key,
     svg:svg,medal:medal,emblem:emblem,ICONS:P};
 })();
