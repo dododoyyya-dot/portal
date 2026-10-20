@@ -684,7 +684,7 @@ function render(){
   const teams=teamEntries();const subm=teams.filter(c=>{const o=orderOf(entryKey(c));return o&&o.status!=='작성중'}).length;
   top.innerHTML='<div class="mr-card"><div class="mr-row"><b style="font-size:17px">'+esc(SLOT.title||'')+'</b><span class="mr-pill" style="background:#153A77">경기 '+MATCHES.length+'</span>'+(live?'<span class="mr-pill" style="background:#C41E2F">진행 중 '+live+'</span>':'')+'<span class="mr-pill" style="background:#0f766e">종료 '+fin+'</span><span class="mr-pill" style="background:#b8860b">오더지 '+subm+'/'+teams.length+'</span>'
     +(STAFF?'<span class="mr-pill" style="background:#7c4a03" title="이 대회 심판 공고 확정자 기준 — 운영진이 이 화면을 열 때마다 자동으로 맞춥니다">🧑‍⚖️ 기록 권한 '+SLOT_REFS.length+'명 · 평가 '+Math.max(SLOT_EVALS.length,SLOT_REFS.length)+'명</span>':(ME&&SLOT_REFS.indexOf(ME.uid)>=0?'<span class="mr-pill" style="background:#7c4a03">🧑‍⚖️ 내 권한: 경기 기록·종료</span>':(ME&&SLOT_EVALS.indexOf(ME.uid)>=0?'<span class="mr-pill" style="background:#7c4a03">🧑‍⚖️ 내 권한: 팀 평가</span>':'')))+'<span style="flex:1"></span><a href="competition.html?slot='+esc(SLOT_ID)+'" class="mr-btn ghost" style="text-decoration:none">← 대회 공고</a><a href="results.html?id=slot_'+esc(SLOT_ID)+'" class="mr-btn ghost" style="text-decoration:none">🏆 결과 · PDF/엑셀</a><a href="'+PAGE+'" class="mr-btn ghost" style="text-decoration:none">다른 대회</a></div>'
-    +(STAFF?'<div class="mr-row" style="margin-top:10px"><button class="mr-btn" onclick="qaOpen(\'\',\'\')">＋ 경기 추가</button><button class="mr-btn g" onclick="golfForm()">⛳ 디스크골프 라운드 추가</button><button class="mr-btn s" onclick="statsSave()" title="순위표·선수 기록을 공개 결과 페이지용으로 저장합니다(경기 종료 때마다 자동 저장되지만 수동으로도 가능)">🔄 집계 저장</button><button class="mr-btn s" onclick="sigStatus()" title="심판·선생님 서명 등록 여부와 오더지 서명 기입 여부">✍ 서명 현황</button>'+(isAdminMe()?'<span style="flex:1"></span><button class="mr-btn ghost" style="color:#C41E2F;border-color:#f1c7cc" onclick="slotDelete()" title="시험용 공고 정리 — 대회는 그대로 두고 이 참가 공고와 그 경기 기록만 지웁니다(관리자)">🗑 이 참가 공고만 삭제</button>':'')+'</div>':'')
+    +(STAFF?'<div class="mr-row" style="margin-top:10px"><button class="mr-btn" onclick="qaOpen(\'\',\'\')">＋ 경기 추가</button><button class="mr-btn g" onclick="golfForm()">⛳ 디스크골프 라운드 추가</button><button class="mr-btn s" onclick="statsSave()" title="순위표·선수 기록을 공개 결과 페이지용으로 저장합니다(경기 종료 때마다 자동 저장되지만 수동으로도 가능)">🔄 집계 저장</button><button class="mr-btn s" onclick="sigStatus()" title="심판·선생님 서명 등록 여부와 오더지 서명 기입 여부">✍ 서명 현황</button>'+(isAdminMe()?'<span style="flex:1"></span>'+(SLOT&&SLOT.test?'<span class="mr-pill" style="background:#7c3aed">🧪 연습용 공고 — 학교·대회 일정에 안 보임</span>':'<button class="mr-btn ghost" onclick="slotCloneTest()" title="이 대회를 연습용으로 복제(숨김) — 심판·운영진이 미리 눌러 보도록">🧪 연습용 대회 만들기</button>')+'<button class="mr-btn ghost" style="color:#C41E2F;border-color:#f1c7cc" onclick="slotDelete()" title="시험용 공고 정리 — 대회는 그대로 두고 이 참가 공고와 그 경기 기록만 지웁니다(관리자)">🗑 이 참가 공고만 삭제</button>':'')+'</div>':'')
     +'</div><div class="mr-tabs">'+[['board','🗓 대진 · 시간표'],['eval','⭐ 팀·학교 평가'],['match','🏁 경기'],['order','📝 오더지'],['golf','⛳ 디스크골프'],['stats','📊 순위 · 기록']].map(t=>'<button class="mr-tab'+(TAB===t[0]?' on':'')+'" onclick="setTab(\''+t[0]+'\')">'+t[1]+'</button>').join('')+'</div>';
   main.innerHTML=TAB==='board'?boardTab():TAB==='eval'?evalTab():TAB==='order'?orderTab():TAB==='golf'?golfTab():TAB==='stats'?statsTab():matchTab();if(TAB==='board')bdBind();
 }
@@ -846,18 +846,48 @@ async function sigNotify(){const L=(SIGST&&SIGST.miss)||[];if(!L.length)return;i
   for(const u of L){try{await KFDF.notify(u,'✍ ['+(SLOT.title||'대회')+'] 서명을 등록해 주세요 — 오더지·경기 결과지에 자동으로 들어갑니다','mypage.html#sigBox');n++}catch(e){}}say('✓ '+n+'명에게 알림을 보냈습니다.')}
 function isAdminMe(){if(!MY)return false;const roles=[MY.role].concat(MY.roles||[]);return MY.owner===true||roles.indexOf('admin')>=0}
 /* [2026-10-19] 참가 공고 하나만 삭제 — 시험 공고가 실제 대회에 붙어 있을 때 대회 전체 삭제 대신. 되돌릴 수 없음 */
+/* 참가 공고 하나를 그 경기·오더지·집계·서명·평가와 함께 지우고, 대회 slotIds 에서 뺌. 남은 대회 문서 목록을 돌려줌 */
+async function slotPurge(sid){const refs=[DB.collection('compSlots').doc(sid),DB.collection('compStats').doc(sid)];
+  const add=async(col)=>{const out=[];try{const q=await DB.collection(col).where('slotId','==',sid).get();q.docs.forEach(d=>{refs.push(d.ref);out.push(d.id)})}catch(e){console.warn(col,e)}return out};
+  const mids=await add('liveMatches');await add('compOrders');await add('compEvals');await add('golfRounds');mids.forEach(id=>refs.push(DB.collection('compSigns').doc(id)));
+  let comps=[];try{const q=await DB.collection('competitions').where('slotIds','array-contains',sid).get();comps=q.docs}catch(e){}
+  for(let i=0;i<refs.length;i+=400){const b=DB.batch();refs.slice(i,i+400).forEach(r=>b.delete(r));await b.commit()}
+  for(const c of comps){try{await c.ref.update({slotIds:firebase.firestore.FieldValue.arrayRemove(sid)})}catch(e){console.warn('comp slotIds',e)}}return comps}
+/* [2026-10-20] 학교 이름 한 글자 바꾸기 — 지역 다음 첫 글자의 초성을 두 칸 옮김(된소리 건너뜀), 겹치면 더 옮김. 예: 서울 보라매초 → 서울 소라매초 */
+function tweakName(n,used){n=String(n||'');if(lkIsPh(n))return n;const parts=n.split(' ');let idx=parts.length>1?1:0;const w=parts[idx]||'';const pos=[...w].findIndex(ch=>{const c=ch.charCodeAt(0);return c>=0xAC00&&c<=0xD7A3});if(pos<0)return n+'(연습)';
+  const chars=[...w];const c0=chars[pos].charCodeAt(0)-0xAC00;const cho=Math.floor(c0/588),rest=c0%588;const TENSE=[1,4,8,10,13];
+  for(let k=2;k<40;k++){const nc=(cho+k)%19;if(TENSE.indexOf(nc)>=0||nc===cho)continue;chars[pos]=String.fromCharCode(0xAC00+nc*588+rest);parts[idx]=chars.join('');const out=parts.join(' ');if(!used[out]){used[out]=1;return out}}
+  return n+'(연습)'}
+async function slotCloneTest(){if(!isAdminMe()||!SLOT||SLOT.test)return;
+  if(!confirm('「'+(SLOT.title||'')+'」 연습용 공고를 만듭니다.\n\n· 경기 '+MATCHES.length+'건(날짜·시각·구장·대진·심판 설정)을 복제하고 기록은 비웁니다\n· 학교 이름은 한 글자씩 바꾸고, 팀마다 연습 오더지(선수 1~12)를 넣습니다\n· 학교·대회 일정·홈 화면에는 보이지 않고, 「경기 기록 · 운영」에서 심판·운영진만 봅니다\n\n진행할까요?'))return;
+  try{say('연습용 공고를 만드는 중…');const used={},NM={};const nm=x=>{x=String(x||'');if(!x||lkIsPh(x))return x;if(!(x in NM))NM[x]=tweakName(x,used);return NM[x]};
+    const skip=['claimed','cancels','confirmed','results','finished','finishLog','reportId','report','reviewStatus','createdAt','updatedAt'];const sd={};Object.keys(SLOT).forEach(k=>{if(skip.indexOf(k)<0)sd[k]=SLOT[k]});
+    Object.assign(sd,{title:'[연습] '+(SLOT.title||''),test:true,hidden:true,srcSlotId:SLOT_ID,claimed:[],cancels:[],confirmed:[],createdAt:FV.serverTimestamp(),by:whoAmI().name});
+    const sref=await DB.collection('compSlots').add(sd);const nid=sref.id;
+    const st=await DB.collection('compStats').doc(SLOT_ID).get();const sx=st.exists?st.data():{};const cs={test:true,srcSlotId:SLOT_ID,updatedAt:FV.serverTimestamp()};['board','format','draws','lots','refUids','evalUids','refRoles','crewDefs','courtPlan'].forEach(k=>{if(sx[k]!=null)cs[k]=sx[k]});
+    await DB.collection('compStats').doc(nid).set(cs);
+    // 팀마다 연습 오더지(대진표 팀 이름 기준) — pid = test_번호
+    const teams={};MATCHES.forEach(m=>['a','b'].forEach(sd2=>{const t=m[sd2]||{};if(!t.name||lkIsPh(t.name))return;const k=m.div+'|'+t.name;if(!teams[k])teams[k]={div:m.div,name:nm(t.name),school:nm(t.school||t.name),pid:'test_'+(Object.keys(teams).length+1)}}));
+    const KC=[['흰색 유니폼','#ffffff'],['검정 유니폼','#1f2937'],['빨강 유니폼','#dc2626'],['파랑 유니폼','#1d4ed8'],['초록 유니폼','#15803d'],['주황 조끼','#f97316'],['노랑 조끼','#facc15'],['하늘 조끼','#38bdf8']];
+    const ops=[];Object.values(teams).forEach((t,i)=>{const k1=KC[i%5],k2=KC[5+(i%3)];ops.push(['set',DB.collection('compOrders').doc(MR.orderId(nid,t.pid)),{slotId:nid,pid:t.pid,team:t.name,school:t.school,linkName:t.name,div:t.div,entryDiv:t.div,teamType:'학교팀',compTitle:sd.title,adminMade:true,test:true,
+      kits:[{name:k1[0],color:k1[1]},{name:k2[0],color:k2[1]}],wear:0,coach:{name:'연습 감독',role:'감독교사',sign:'',at:''},players:Array.from({length:12},(_,j)=>({i:j+1,key:t.pid+'_'+(j+1),name:'선수 '+(j+1),birth:'',school:t.school,no:String(j+1),subNo:'',role:j===0?'주장':''})),status:'제출',updatedAt:FV.serverTimestamp(),updatedBy:whoAmI().name}])});
+    // 경기 복제(새 ID 먼저 만들어 대진 연결 from 을 바꿔 줌)
+    const idMap={};MATCHES.forEach(m=>{idMap[m.id]=DB.collection('liveMatches').doc().id});
+    const drop=['events','kit','plen','lineup','nums','pulls','brk','ctrl','fairplay','coachScore','mvps','mvp','bestCoach','winner','clockLog','resetLog','unlockLog','scSynced','swap','createdAt','updatedAt'];
+    MATCHES.forEach(m=>{const d={};Object.keys(m).forEach(k=>{if(k!=='id'&&drop.indexOf(k)<0)d[k]=m[k]});const side=x=>{x=x||{};const k=m.div+'|'+x.name;return {name:nm(x.name),school:nm(x.school||''),pid:(teams[k]||{}).pid||'',scid:'',score:0}};
+      Object.assign(d,{slotId:nid,test:true,a:side(m.a),b:side(m.b),status:'예정',period:'',events:[],clock:{running:false,base:0,startedAt:0},locked:false,startAt:null,endAt:null,updatedAt:FV.serverTimestamp(),by:whoAmI().name});
+      if(m.from)d.from={a:idMap[(m.from||{}).a]||'',b:idMap[(m.from||{}).b]||''};
+      ops.push(['set',DB.collection('liveMatches').doc(idMap[m.id]),d])});
+    for(let i=0;i<ops.length;i+=400){const b=DB.batch();ops.slice(i,i+400).forEach(o=>b.set(o[1],o[2]));await b.commit()}
+    let delMsg='';try{const OLD='8pDAnnbpsMnfanCVNO6S';const od=await DB.collection('compSlots').doc(OLD).get();const oq=await DB.collection('liveMatches').where('slotId','==',OLD).limit(1).get();
+      if((od.exists||!oq.empty)&&confirm('예전 시험 공고'+(od.exists?' 「'+((od.data()||{}).title||'')+'」':'')+'(연맹 시험 경기장 · 가상 팀)도 지울까요?\n같은 대회(해운대)의 다른 공고는 그대로 남습니다.')){await slotPurge(OLD);delMsg='\n예전 시험 공고도 지웠습니다.'}}catch(e){console.warn('old test',e)}
+    alert('✓ 연습용 공고를 만들었습니다 — 경기 '+MATCHES.length+'건 · 연습 오더지 '+Object.keys(teams).length+'팀.'+delMsg+'\n\n「경기 기록 · 운영」 목록에서 「[연습] '+(SLOT.title||'')+'」를 열어 심판·운영진이 마음껏 눌러 보세요(실제 대회에는 영향 없음).');location.href=PAGE+'?slot='+nid}
+  catch(e){say('연습용 공고 만들기 실패: '+(e.message||e))}}
 async function slotDelete(){if(!isAdminMe()||!SLOT_ID||!SLOT)return;const title=String(SLOT.title||'').trim();
   const nM=MATCHES.length,nO=Object.keys(ORDERS||{}).length;
   const typed=prompt('이 참가 공고를 지웁니다 — 공고·참가 신청 '+((SLOT.claimed||[]).length)+'건·오더지 '+nO+'건·경기 '+nM+'건과 기록·집계·평가가 모두 사라지며 되돌릴 수 없습니다.\n같은 대회의 다른 공고와 대회 자체는 그대로 남습니다.\n\n지우려면 공고 제목을 그대로 입력하세요:\n'+title);
   if(typed==null)return;if(String(typed).trim()!==title){say('공고 제목이 맞지 않아 지우지 않았습니다.');return}
-  try{const refs=[DB.collection('compSlots').doc(SLOT_ID),DB.collection('compStats').doc(SLOT_ID)];
-    const add=async(col,field)=>{try{const q=await DB.collection(col).where(field||'slotId','==',SLOT_ID).get();q.docs.forEach(d=>refs.push(d.ref))}catch(e){console.warn(col,e)}};
-    await add('liveMatches');await add('compOrders');await add('compEvals');await add('golfRounds');
-    MATCHES.forEach(m=>refs.push(DB.collection('compSigns').doc(m.id)));
-    let comps=[];try{const q=await DB.collection('competitions').where('slotIds','array-contains',SLOT_ID).get();comps=q.docs}catch(e){}
-    for(let i=0;i<refs.length;i+=400){const b=DB.batch();refs.slice(i,i+400).forEach(r=>b.delete(r));await b.commit()}
-    for(const c of comps){try{await c.ref.update({slotIds:firebase.firestore.FieldValue.arrayRemove(SLOT_ID)})}catch(e){console.warn('comp slotIds',e)}}
-    UNSUB.forEach(f=>{try{f()}catch(e){}});UNSUB=[];
+  try{UNSUB.forEach(f=>{try{f()}catch(e){}});UNSUB=[];const comps=await slotPurge(SLOT_ID);
     alert('✓ 참가 공고 「'+title+'」를 지웠습니다 (경기 '+nM+'건 포함).'+(comps.length?' 대회 「'+(comps[0].data().title||'')+'」는 그대로 남았습니다.':''));location.href=PAGE}
   catch(e){say('삭제 실패: '+(e.message||e))}}
 function canBoard(){if(!ME||!MY)return false;const roles=[MY.role].concat(MY.roles||[]);if(MY.owner===true||roles.indexOf('admin')>=0)return true;return /심판위원장|심판장|심판총괄/.test(((SLOT_ROLES||{})[ME.uid]||[]).join(' '))}

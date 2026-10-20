@@ -345,7 +345,7 @@ let ALLM=[],SLOTM=[],SLOT_UNSUB=null,SLOT_ON='';
 function applySlot(){if(LIVE.slotId!==SLOT_ON){SLOT_ON=LIVE.slotId||'';if(SLOT_UNSUB){SLOT_UNSUB();SLOT_UNSUB=null}SLOTM=[];
     if(SLOT_ON)SLOT_UNSUB=DB.collection('liveMatches').where('slotId','==',SLOT_ON).onSnapshot(q=>{SLOTM=q.docs.map(d=>Object.assign({id:d.id},d.data()));MATCHES=SLOTM;render()},e=>console.warn('slot matches',e))}
   if(SLOT_ON){MATCHES=SLOTM.length?SLOTM:ALLM.filter(m=>m.slotId===SLOT_ON);return}
-  const td=today();MATCHES=ALLM.filter(m=>!m.slotId||m.stream||(isRec(m)&&m.day===td))}   /* [2026-10-19] 중계를 대회와 연동하지 않았어도 오늘 경기 기록 경기는 보임 */
+  const td=today();MATCHES=ALLM.filter(m=>!m.test&&(!m.slotId||m.stream||(isRec(m)&&m.day===td)))}   /* [2026-10-19] 중계를 대회와 연동하지 않았어도 오늘 경기 기록 경기는 보임 */
 DB.collection('siteContent').doc('live').onSnapshot(d=>{LIVE=d.exists?(d.data()||{}):{};applySlot();renderStream();render()},e=>console.warn('live cfg',e));
 DB.collection('liveMatches').orderBy('updatedAt','desc').limit(200).onSnapshot(s=>{ALLM=s.docs.map(d=>Object.assign({id:d.id},d.data()));applySlot();render()},e=>{console.warn('liveMatches',e);document.getElementById('lvNone').style.display='block';document.getElementById('lvNone').textContent='경기 정보를 불러오지 못했습니다 (보안 규칙 v43 게시 전이면 표시되지 않습니다).'});
 // ── 운영 콘솔 (사무국·시도임원·스코어 입력 권한자) ──

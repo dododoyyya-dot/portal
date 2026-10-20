@@ -3733,7 +3733,7 @@ async function loadLiveComps(){
       if(sd){rows.push({html:compRowOfSlot(sd,today,c),date:c.dateStart||'',end:c.dateEnd||c.dateStart||''});return}
       // 공고 문서를 못 읽는 경우(로그인 전)에도 공개 대회 정보로 행을 만들고 상세로 연결 · [공고 복구] 읽었는데 없으면(지워짐) 표시
       rows.push({html:compRow({key:sid||'',href:sid?'competition.html?slot='+sid:'',broken:!!(sl&&sid),date:c.dateStart||'',end:c.dateEnd||c.dateStart||'',title:c.title||'',place:c.place||'',host:c.host||'',region:c.sido||'',deadline:c.deadline||'',closed:!!(c.deadline&&c.deadline<today),team:!!((c.teamTypes||[]).length)},today),date:c.dateStart||'',end:c.dateEnd||c.dateStart||''});});
-    if(sl)sl.docs.forEach(d=>{const s=d.data();if(seen.has(d.id)||s.compId||s.role!=='참가')return;rows.push({html:compRowOfSlot(d,today),date:s.date||'',end:s.date||''})});
+    if(sl)sl.docs.forEach(d=>{const s=d.data();if(seen.has(d.id)||s.compId||s.test||s.role!=='참가')return;rows.push({html:compRowOfSlot(d,today),date:s.date||'',end:s.date||''})});
     // [공고 허브] 심판·운영 모집 공고를 같은 목록에 (승인된 공고만 · 로그인 시)
     HUB_STAFF=sp?sp.docs.map(x=>Object.assign({id:x.id},x.data())).filter(p=>p.approved):(u?[]:null);
     (HUB_STAFF||[]).forEach(p=>{const comp=(p.compId&&cmap[p.compId])||{};const ds=(p.dates||[]).map(x=>x.date).filter(Boolean).sort();const d0=ds[0]||p.startDate||'',d1=ds[ds.length-1]||p.endDate||d0;
@@ -3822,7 +3822,7 @@ async function loadSlots(){
       if(slots.length)html+=slots.map(d=>compRowOfSlot(d,today,c)).join('');
       else html+=compRow({key:'',href:'',date:c.dateStart||'',end:c.dateEnd||c.dateStart||'',title:c.title||'',place:c.place||'',host:'참가 모집 공고 준비 중',region:c.sido||'',deadline:''},today);
     });
-    html+=snap.docs.filter(d=>!linked.has(d.id)&&d.data().role==='참가').map(d=>compRowOfSlot(d,today)).join('');
+    html+=snap.docs.filter(d=>!linked.has(d.id)&&d.data().role==='참가'&&!d.data().test).map(d=>compRowOfSlot(d,today)).join('');   /* 연습용 공고 제외 */
     renderMyEntryBox();    el.innerHTML=html||'<div class="bempty">현재 모집 중인 대회 참가 공고가 없습니다.</div>';
     // [구조개편] 심판·운영 위촉 공고(compSlots)는 별도 섹션에 렌더 — 참가 모집과 분리
     const refEl=document.getElementById('cRefSlotList');
