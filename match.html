@@ -270,6 +270,20 @@
 .rc .ppr{display:flex;gap:8px;width:100%}.rc .ppr .pp{flex:1}.rc .rs2{min-width:76px;border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.08);color:#fff;border-radius:14px;font-weight:800;font-size:14px;cursor:pointer}
 .rc .qh .co{font-size:12.5px;font-weight:700;color:var(--mut);align-self:center;margin:0 4px 0 8px;white-space:nowrap}.rc .qh span.kinfo{margin-right:0}
 .mfo{display:grid;grid-template-columns:110px 1fr auto;gap:6px;margin-top:6px;align-items:start}
+.crwrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;margin-top:6px;align-items:start}
+.crL{max-height:62vh;overflow:auto;padding-right:4px}.court{border:1.5px solid #dfe5ee;border-radius:14px;padding:10px 12px;margin-bottom:10px;background:#fbfcfe}
+.cth{display:flex;gap:8px;align-items:baseline;margin-bottom:6px}.cth b{font-size:16px;color:#153A77}.cth small{color:#6b7280;font-size:12px}
+.crtop{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}.crtwo{display:grid;grid-template-columns:1fr 1fr;gap:8px}.crb{border:1px dashed #cfd8e6;border-radius:10px;padding:6px;background:#fff}.crb .cn{font-weight:900;padding:6px 8px;margin-bottom:4px;font-size:13px}
+.crs{position:relative;display:flex;align-items:center;gap:6px;border:1.5px solid #dfe5ee;border-radius:10px;padding:7px 9px;margin-top:4px;background:#fff;cursor:pointer;min-height:38px}
+.crs i{font-style:normal;font-size:11.5px;font-weight:800;color:#6b7280;min-width:40px}.crs b{font-size:14px;color:#9aa1ad;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crs.fill b{color:#111827;font-weight:900}.crs.on{border-color:#153A77;box-shadow:0 0 0 3px rgba(21,58,119,.18);background:#eef3fb}.crs.dup{border-color:#C41E2F;background:#fff1f2}.crs em{font-style:normal;font-size:11px;font-weight:900;color:#C41E2F}
+.crs .x{font-size:12px;color:#9aa1ad;padding:0 4px}.crs .x:hover{color:#C41E2F}
+.crR{position:sticky;top:0;border:1.5px solid #dfe5ee;border-radius:14px;padding:10px;background:#fff;max-height:62vh;display:flex;flex-direction:column}
+.crRh{display:flex;gap:8px;align-items:baseline;margin-bottom:6px}.crTabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}.crTabs button{border:1.5px solid #dfe5ee;background:#fff;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit}.crTabs button.on{background:#153A77;color:#fff;border-color:#153A77}
+.crList{overflow:auto;margin-top:6px;flex:1}.cnd{display:block;width:100%;text-align:left;border:1px solid #eef1f5;background:#fff;border-radius:10px;padding:7px 9px;margin-bottom:4px;cursor:pointer;font-family:inherit}
+.cnd:hover{background:#eef3fb;border-color:#c7d2e2}.cnd .nm{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}.cnd .nm b{font-size:14px}.cnd .dt{font-size:11.5px;color:#7c3aed;font-weight:800}.cnd small{display:block;font-size:11.5px;color:#6b7280}
+.cnd em{display:block;font-style:normal;font-size:11.5px;font-weight:800;color:#C41E2F}.cnd em.w{color:#b8860b}.cnd.used{opacity:.45;cursor:not-allowed}.cnd.na{background:#fffbea}
+@media(max-width:860px){.crwrap{grid-template-columns:1fr}.crR{position:static;max-height:none}.crL{max-height:none}.crtwo{grid-template-columns:1fr}}
 .crews{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px;margin-top:10px}
 .crew{border:1.5px solid #dfe5ee;border-radius:14px;padding:10px 12px;background:#fbfcfe}.crew .ch{display:flex;gap:6px;margin-bottom:4px}.crew .cn{font-weight:900}
 .crew .mfo,.crt .mfo{grid-template-columns:70px 1fr}.crew .mfo>button,.crt .mfo>button{display:none}.crew .mfo .r,.crt .mfo .r{padding:6px 4px;font-size:12.5px;background:#f3f5f9}
@@ -1109,67 +1123,87 @@ async function rfPool(scope){const pool={};const add=(uid,name,src,sp)=>{if(!uid
   for(let i=0;i<ids.length;i+=10){try{const q=await DB.collection('licenses').where('uid','in',ids.slice(i,i+10)).get();q.docs.forEach(d=>{const l=d.data();if(l.type!=='심판')return;if(l.status==='이관'||l.status==='승급'||(l.expireAt&&l.expireAt<today))return;const g=String(l.grade||'').replace(/급$/,'');const pt=g==='1'?6:g==='2'?4:g==='3'?2:0;const P=pool[l.uid];if(P&&pt>P.licPt){P.licPt=pt;P.lic=g+'급'}})}catch(e){}}
   ids.forEach(u=>{const P=pool[u];P.score=P.lead*3+P.other+P.licPt});
   return Object.values(pool).sort((a,b)=>b.score-a.score||String(a.name).localeCompare(String(b.name),'ko'))}
-/* ══ [2026-10-20] 심판 배정 = ① 심판조 편성(주심·부심·부심·점수심) → ② 구장 배치(날짜·구장마다 감독관·기록원 1명 + 심판조 2개, 시간순 번갈아) ══
-   자료: compStats.crewDefs {조ID:{name, ref1, ref2, ref3, scorer}} · compStats.courtPlan {날짜:{구장:{supervisor, recorder, crews:[조ID, 조ID]}}}  (사람 = {name, uid}) */
+/* ══ [2026-10-20 · 2차] 심판 배정 = 날짜마다 구장 카드: 감독관 → 기록원 → 심판 1조 → 2조(주심·부심·부심·점수심) · 오른쪽 후보 패널에서 골라 넣음
+   자료: compStats.courtPlan {날짜:{구장:{supervisor, recorder, crews:[{name, ref1, ref2, ref3, scorer}, …]}}} (사람 = {name, uid}) · 같은 날 한 사람은 한 자리만
+   구장 경기에 시간순으로 1조 → 2조 → 1조… 번갈아 적용. 예전 형식(crewDefs 조 ID)은 열 때 내용으로 바꿔 읽음 */
 let CR=null;
-const CR_ROLES=[['ref1','주심'],['ref2','부심'],['ref3','부심'],['scorer','점수심']];
-async function rfOpen(){if(!STAFF)return;STAFFPICK=null;modal('rfModal','<div class="bempty">심판 확정자를 불러오는 중…</div>');MF_PICKS=await staffPick();MF_DIV='';
-  const days=[...new Set(MATCHES.map(m=>m.day).filter(Boolean))].sort();
-  CR={tab:Object.keys(CREWDEFS||{}).length?'courts':'crews',day:(BD_DAY&&days.indexOf(BD_DAY)>=0)?BD_DAY:(days[0]||''),defs:JSON.parse(JSON.stringify(CREWDEFS||{})),plan:JSON.parse(JSON.stringify(COURTPLAN||{})),prev:null,ovr:{}};crRender()}
+const CR_SLOTS=[['ref1','주심'],['ref2','부심'],['ref3','부심'],['scorer','점수심']];
 function rfCourts(day){const C=[...new Set(MATCHES.filter(m=>m.day===day&&m.court).map(m=>m.court))];return C.sort((a,b)=>(parseInt(a,10)||99)-(parseInt(b,10)||99)||String(a).localeCompare(String(b),'ko'))}
-function crId(){return 'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)}
-function crList(defs){defs=defs||CR.defs;return Object.keys(defs).map(id=>Object.assign({id:id},defs[id])).sort((x,y)=>String(x.name||'').localeCompare(String(y.name||''),'ko',{numeric:true}))}
-function crRow(role,p,div,k){return mfOffRowHtml({role:role,name:(p||{}).name||'',uid:(p||{}).uid||''}).replace('<div class="mfo"','<div class="mfo" data-div="'+esc(div||'')+'" data-k="'+k+'"')}
-function crReadDom(){if(!CR)return;if(CR.tab==='crews'){document.querySelectorAll('#rfModal .crew').forEach(el=>{const id=el.dataset.id;const d=Object.assign({},CR.defs[id]||{});d.name=el.querySelector('.cn').value.trim()||'심판조';el.querySelectorAll('.mfo').forEach(r=>{const nm=r.querySelector('.n').value.trim();d[r.dataset.k]=nm?{name:nm,uid:String(r.dataset.uid||'').indexOf('n:')===0?'':(r.dataset.uid||'')}:null});CR.defs[id]=d})}
-  else{document.querySelectorAll('#rfModal .crt').forEach(tr=>{const ct=tr.dataset.court;CR.plan[CR.day]=CR.plan[CR.day]||{};const Pc=Object.assign({},CR.plan[CR.day][ct]||{});tr.querySelectorAll('.mfo').forEach(r=>{const nm=r.querySelector('.n').value.trim();Pc[r.dataset.k]=nm?{name:nm,uid:r.dataset.uid||''}:null});Pc.crews=[tr.querySelector('.c1').value,tr.querySelector('.c2').value].filter(Boolean);CR.plan[CR.day][ct]=Pc})}}
-function crTab(t){crReadDom();CR.tab=t;CR.prev=null;crRender()}
-function crAdd(){crReadDom();const n=Object.keys(CR.defs).length;CR.defs[crId()]={name:'심판 '+(n+1)+'조'};crRender()}
-function crDel(id){crReadDom();if(!confirm('「'+((CR.defs[id]||{}).name||'')+'」 심판조를 지울까요? (저장해야 반영)'))return;delete CR.defs[id];crRender()}
-function crNameChg(inp){inp.closest('.crew').querySelectorAll('.mfo').forEach(r=>r.dataset.div=inp.value)}
-function crDupMap(){const M={};crList().forEach(c=>CR_ROLES.forEach(([k])=>{const p=c[k];if(!p||!p.name)return;const key=p.uid||('n:'+mfN(p.name));(M[key]=M[key]||{name:p.name,in:[]}).in.push(c.name)}));return Object.values(M).filter(x=>x.in.length>1)}
+function crList(defs){return Object.keys(defs||{}).map(id=>Object.assign({id:id},defs[id])).sort((x,y)=>String(x.name||'').localeCompare(String(y.name||''),'ko',{numeric:true}))}
+function crCrewsOf(Pc){return ((Pc||{}).crews||[]).map(x=>typeof x==='string'?CREWDEFS[x]:x).filter(Boolean)}
 function crMatchesAt(day,ct){return MATCHES.filter(m=>m.day===day&&m.court===ct).sort((x,y)=>String(x.time||'99').localeCompare(String(y.time||'99'))||(+x.order||0)-(+y.order||0))}
-function crExpected(m,plan){const Pc=(((plan||COURTPLAN)||{})[m.day]||{})[m.court]||{};const ids=(Pc.crews||[]);if(!ids.length)return '';const L=crMatchesAt(m.day,m.court);const i=L.findIndex(x=>x.id===m.id);return ids[(i<0?0:i)%ids.length]}
-/* 감독관·주심·부심 2·점수심·기록원 → 경기 officials */
+function crHas(c){return !!(c&&CR_SLOTS.some(([k])=>c[k]&&c[k].name))}
+function crExpected(m,plan){const Pc=(((plan||COURTPLAN)||{})[m.day]||{})[m.court]||{};const cz=crCrewsOf(Pc).map((c,i)=>({c:c,i:i})).filter(x=>crHas(x.c));if(!cz.length)return -1;const L=crMatchesAt(m.day,m.court);const i=L.findIndex(x=>x.id===m.id);return cz[(i<0?0:i)%cz.length].i}
 function crOfficials(Pc,crew){const list=[];const add=(k,role,p)=>{if(p&&p.name)list.push({key:k,role:role,name:p.name,uid:String(p.uid||'').indexOf('n:')===0?'':(p.uid||'')})};
   add('supervisor','감독관',(Pc||{}).supervisor);add('ref1','주심',(crew||{}).ref1);add('ref2','부심',(crew||{}).ref2);add('ref3','부심',(crew||{}).ref3);add('scorer','점수심',(crew||{}).scorer);add('recorder','기록원',(Pc||{}).recorder);
   const of={list:list,crew:(crew||{}).name||''};list.forEach(x=>{of[x.key]={uid:x.uid,name:x.name,key:x.key}});return {of:of,uids:[...new Set(list.filter(x=>REC_ROLE.test(x.role)).map(x=>x.uid).filter(Boolean))]}}
-function crRender(){const crews=CR.tab==='crews';const L=crList();let h='<div class="mr-row"><b style="font-size:17px">🧑‍⚖️ 심판 배정</b><span class="mr-note">① 심판조를 만들고 → ② 구장마다 감독관·기록원과 심판조 2개를 넣으면 그 구장 경기에 시간순으로 번갈아 들어갑니다.</span></div>'
-    +'<div class="mr-row" style="gap:6px;margin:8px 0"><button class="mr-btn '+(crews?'g':'ghost')+'" onclick="crTab(\'crews\')">① 심판조 편성 ('+L.length+'조)</button><button class="mr-btn '+(crews?'ghost':'g')+'" onclick="crTab(\'courts\')">② 구장 배치 · 적용</button></div>';
-  if(crews){const dup=crDupMap();
-    h+='<div class="mr-note">조마다 주심·부심·부심·점수심을 넣습니다(이름 칸을 누르면 그 임무 확정자 목록, 글자를 치면 검색). 조 이름은 「남초 A조」처럼 — 부문 글자가 들어가면 그 부문 담당이 목록 위로 옵니다. 감독관·기록원은 ② 구장 배치에서 구장마다 넣습니다.</div>'
-      +(dup.length?'<div class="mr-note" style="color:#C41E2F;font-weight:800;margin-top:6px">⚠ 두 조 이상에 들어간 사람: '+dup.map(x=>esc(x.name)+'('+x.in.map(esc).join('·')+')').join(', ')+'</div>':'')
-      +'<div class="crews">'+(L.length?L.map(c=>'<div class="crew" data-id="'+esc(c.id)+'"><div class="ch"><input class="mr-in cn" value="'+esc(c.name||'')+'" oninput="crNameChg(this)" placeholder="예: 남초 A조"><button type="button" class="mr-btn s" style="padding:6px 10px" onclick="crDel(\''+esc(c.id)+'\')">삭제</button></div>'+CR_ROLES.map(([k,lb])=>crRow(lb,c[k],c.name,k)).join('')+'</div>').join(''):'<div class="bempty">아직 심판조가 없습니다. 「＋ 심판조 추가」를 눌러 주세요.</div>')+'</div>'
-      +'<div class="mr-row" style="justify-content:flex-end;margin-top:12px"><button class="mr-btn ghost" onclick="crAdd()">＋ 심판조 추가</button><span style="flex:1"></span><button class="mr-btn s" onclick="document.getElementById(\'rfModal\').remove()">닫기</button><button class="mr-btn g" onclick="crSave(\'defs\')">💾 심판조 저장</button></div>'}
-  else{const days=[...new Set(MATCHES.map(m=>m.day).filter(Boolean))].sort();const day=CR.day;const courts=rfCourts(day);const DP=CR.plan[day]||{};
-    const opt=(cur)=>'<option value="">— 심판조 —</option>'+L.map(c=>'<option value="'+esc(c.id)+'"'+(cur===c.id?' selected':'')+'>'+esc(c.name||'')+'</option>').join('');
-    h+='<div class="mr-row" style="gap:6px;flex-wrap:wrap">'+days.map((d,i)=>'<button class="bd-day'+(d===day?' on':'')+'" onclick="crReadDom();CR.day=\''+d+'\';CR.prev=null;crRender()">'+(i+1)+'일차 '+esc(dateK(d).slice(5))+'</button>').join('')+'</div>'
-      +(L.length?'':'<div class="mr-note" style="color:#C41E2F;font-weight:800;margin-top:6px">먼저 ① 심판조 편성에서 조를 만들고 저장해 주세요.</div>')
-      +'<div style="overflow:auto;margin-top:8px"><table class="rf-tbl crt-tbl"><tr><th class="l">구장</th><th class="l">감독관</th><th class="l">기록원</th><th class="l">심판조 ①</th><th class="l">심판조 ②</th></tr>'
-      +(courts.length?courts.map(ct=>{const Pc=DP[ct]||{};const dv={};crMatchesAt(day,ct).forEach(m=>{dv[m.div||'-']=(dv[m.div||'-']||0)+1});const hint=Object.keys(dv).join(' ');const ids=Pc.crews||[];
-        return '<tr class="crt" data-court="'+esc(ct)+'"><td class="l"><b>'+esc(ct)+'</b><br><small style="color:#6b7280">'+esc(Object.keys(dv).map(k=>k+' '+dv[k]).join(' · '))+'</small></td><td class="l crp">'+crRow('감독관',Pc.supervisor,hint,'supervisor')+'</td><td class="l crp">'+crRow('기록원',Pc.recorder,hint,'recorder')+'</td><td class="l"><select class="mr-in c1">'+opt(ids[0]||'')+'</select></td><td class="l"><select class="mr-in c2">'+opt(ids[1]||'')+'</select></td></tr>'}).join('')
-        :'<tr><td colspan="5" class="bempty">이 날 구장이 정해진 경기가 없습니다.</td></tr>')+'</table></div>'
-      +'<div class="mr-note" style="margin-top:6px">심판조 ①이 그 구장 첫 경기, ②가 둘째 경기, 다시 ①… 순서로 들어갑니다(조를 하나만 고르면 그 조가 전부). 경기별로 바꾸려면 미리보기에서 고릅니다. 끝난·확정된 경기는 건너뜁니다.</div>'
-      +(CR.prev?'<b style="display:block;margin-top:12px">미리보기 — 적용 '+CR.prev.filter(x=>!x.skip).length+'경기</b><div style="max-height:34vh;overflow:auto"><table class="rf-tbl"><tr><th>시각</th><th>구장</th><th class="l">경기</th><th>심판조</th><th class="l">감독관 · 주심 · 점수심 · 기록원</th></tr>'
-        +CR.prev.map(x=>{const cw=CR.defs[x.cid]||{};const o=crOfficials(x.Pc,cw).of;return '<tr'+(x.skip?' style="opacity:.45"':'')+'><td>'+esc(x.m.time||'')+'</td><td>'+esc(x.m.court||'')+'</td><td class="l">'+esc((x.m.a||{}).name||'')+' vs '+esc((x.m.b||{}).name||'')+'<br><small style="color:#6b7280">'+esc(mTitle(x.m))+'</small></td><td><select class="mr-in" style="padding:4px 6px" '+(x.skip?'disabled':'')+' onchange="CR.ovr[\''+esc(x.m.id)+'\']=this.value;crPreview()">'+L.map(c=>'<option value="'+esc(c.id)+'"'+(c.id===x.cid?' selected':'')+'>'+esc(c.name||'')+'</option>').join('')+'</select></td><td class="l" style="font-size:12px">'+(x.skip?'건너뜀('+esc(x.m.locked?'확정':x.m.status)+')':esc([(o.supervisor||{}).name,(o.ref1||{}).name,(o.scorer||{}).name,(o.recorder||{}).name].map(v=>v||'—').join(' · ')))+'</td></tr>'}).join('')+'</table></div>':'')
-      +'<div class="mr-row" style="justify-content:flex-end;margin-top:12px"><button class="mr-btn s" onclick="document.getElementById(\'rfModal\').remove()">닫기</button><button class="mr-btn ghost" onclick="crSave(\'plan\')">💾 배치 저장</button><button class="mr-btn y" onclick="crPreview()">👀 미리보기</button>'+(CR.prev?'<button class="mr-btn g" onclick="crApply()">✅ '+CR.prev.filter(x=>!x.skip).length+'경기에 적용</button>':'')+'</div>'}
-  modal('rfModal',h);const bx=document.querySelector('#rfModal > div');if(bx)bx.style.maxWidth='1100px';
-  document.querySelectorAll('#rfModal .mfo .r').forEach(sel=>{sel.disabled=true});mfMarkAll2()}
-function mfMarkAll2(){document.querySelectorAll('#rfModal .mfo').forEach(r=>{try{mfMark(r)}catch(e){}})}
-async function crSave(kind){crReadDom();const upd=kind==='defs'?{crewDefs:CR.defs}:{courtPlan:CR.plan};upd.updatedAt=FV.serverTimestamp();
-  try{try{await DB.collection('compStats').doc(SLOT_ID).update(upd)}catch(e){await DB.collection('compStats').doc(SLOT_ID).set(upd,{merge:true})}
-    if(kind==='defs')CREWDEFS=JSON.parse(JSON.stringify(CR.defs));else COURTPLAN=JSON.parse(JSON.stringify(CR.plan));qkToastLite(kind==='defs'?'✓ 심판조를 저장했습니다':'✓ 구장 배치를 저장했습니다');crRender()}catch(e){say('저장 실패: '+(e.message||e))}}
-function crPreview(){crReadDom();const day=CR.day;const DP=CR.plan[day]||{};const out=[];
-  rfCourts(day).forEach(ct=>{const Pc=DP[ct]||{};const ids=(Pc.crews||[]).filter(id=>CR.defs[id]);if(!ids.length&&!(Pc.supervisor||Pc.recorder))return;
-    crMatchesAt(day,ct).forEach((m,i)=>{const cid=CR.ovr[m.id]||ids[i%Math.max(1,ids.length)]||'';out.push({m:m,cid:cid,Pc:Pc,skip:m.status==='종료'||!!m.locked})})});
-  CR.prev=out;if(!out.length){say('구장마다 감독관·기록원과 심판조를 고른 뒤 미리보기를 눌러 주세요.');CR.prev=null}crRender()}
-async function crApply(){const L=(CR.prev||[]).filter(x=>!x.skip);if(!L.length)return;if(!confirm(L.length+'경기에 심판진을 넣습니다. 이미 넣은 심판진은 바뀝니다. 진행할까요?'))return;
-  try{await crSave('plan');for(let i=0;i<L.length;i+=400){const bt=DB.batch();L.slice(i,i+400).forEach(x=>{const r=crOfficials(x.Pc,CR.defs[x.cid]||{});bt.update(DB.collection('liveMatches').doc(x.m.id),{officials:r.of,officialUids:r.uids,refMode:'three',updatedAt:FV.serverTimestamp()})});await bt.commit()}
-    document.getElementById('rfModal').remove();say('✓ '+L.length+'경기에 심판진을 넣었습니다. 시간표 카드에 심판조 이름이 보이고, 배정된 심판에게는 보라색 「내 경기」로 표시됩니다.')}catch(e){say('적용 실패: '+(e.message||e))}}
-/* ④ 경기 정보: 그 구장 심판조 한 번에 */
-function crQuickHtml(m){const ids=Object.keys(CREWDEFS||{});if(!ids.length)return '';const Pc=((COURTPLAN||{})[m.day]||{})[m.court]||{};const cz=(Pc.crews||[]).filter(id=>CREWDEFS[id]);const exp=crExpected(m);
-  return '<label class="mr-lab">심판조 한 번에 넣기</label><div class="mr-row" style="gap:6px;flex-wrap:wrap">'+cz.map(id=>'<button type="button" class="mr-btn '+(id===exp?'g':'s')+'" style="padding:7px 12px" onclick="crFill(\''+esc(m.id)+'\',\''+esc(id)+'\')">'+esc(m.court||'')+' '+esc(CREWDEFS[id].name||'')+' 적용'+(id===exp?' · 이 경기 차례':'')+'</button>').join('')
-    +'<select class="mr-in" style="width:auto;padding:6px 8px" onchange="if(this.value){crFill(\''+esc(m.id)+'\',this.value);this.value=\'\'}"><option value="">다른 심판조 불러오기…</option>'+crList(CREWDEFS).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name||'')+'</option>').join('')+'</select></div>'}
-function crFill(mid,cid){const m=MATCHES.find(x=>x.id===mid);const crew=CREWDEFS[cid];if(!m||!crew)return;const Pc=((COURTPLAN||{})[m.day]||{})[m.court]||{};const r=crOfficials(Pc,crew);
+async function rfOpen(){if(!STAFF)return;STAFFPICK=null;modal('rfModal','<div class="bempty">심판 확정자와 경력을 불러오는 중…</div>');
+  let pool=[];try{pool=await rfPool('confirmed')}catch(e){pool=[]}MF_PICKS=await staffPick();
+  const days=[...new Set(MATCHES.map(m=>m.day).filter(Boolean))].sort();const plan=JSON.parse(JSON.stringify(COURTPLAN||{}));
+  days.forEach(d=>{const DP=plan[d]=plan[d]||{};rfCourts(d).forEach(ct=>{const Pc=DP[ct]=DP[ct]||{};Pc.crews=crCrewsOf(Pc).map(c=>{const o=Object.assign({},c);delete o.id;return o});
+    if(!Pc.crews.some(crHas)){const nn=parseInt(ct,10);const mine=crList(CREWDEFS).filter(c=>{const m=/(\d+)\s*구장.*?(\d)\s*조/.exec(c.name||'');return m&&+m[1]===nn});if(mine.length)Pc.crews=mine.slice(0,2).map(c=>{const o=Object.assign({},c);delete o.id;return o})}   /* 예전에 만든 「1구장 심판 1조」 등은 그 구장에 */
+    while(Pc.crews.length<2)Pc.crews.push({name:ct+' '+(Pc.crews.length+1)+'조'})})});
+  CR={day:(BD_DAY&&days.indexOf(BD_DAY)>=0)?BD_DAY:(days[0]||''),plan:plan,pool:pool,act:null,q:'',rf:'감독관',prev:null,ovr:{},st:''};
+  const c0=rfCourts(CR.day)[0];if(c0)CR.act={ct:c0,key:'sup'};crRender()}
+function crPid(p){return p?(p.uid||('n:'+mfN(p.name))):''}
+function crRoleOf(key){return key==='sup'?'감독관':key==='rec'?'기록원':({ref1:'주심',ref2:'부심',ref3:'부심',scorer:'점수심'})[key.split('.')[1]]}
+function crGet(ct,key){const Pc=CR.plan[CR.day][ct]||{};if(key==='sup')return Pc.supervisor;if(key==='rec')return Pc.recorder;const p=key.split('.');return ((Pc.crews||[])[+p[0]]||{})[p[1]]}
+function crSetP(ct,key,v){const Pc=CR.plan[CR.day][ct];if(key==='sup')Pc.supervisor=v;else if(key==='rec')Pc.recorder=v;else{const p=key.split('.');Pc.crews[+p[0]]=Pc.crews[+p[0]]||{name:ct+' '+(+p[0]+1)+'조'};Pc.crews[+p[0]][p[1]]=v}}
+function crKeys(){const K=['sup','rec'];[0,1].forEach(i=>CR_SLOTS.forEach(([k])=>K.push(i+'.'+k)));return K}
+function crUsed(){const M={};const DP=CR.plan[CR.day]||{};Object.keys(DP).forEach(ct=>{const Pc=DP[ct];const add=(p,lab)=>{if(p&&p.name){const id=crPid(p);(M[id]=M[id]||[]).push(lab)}};add(Pc.supervisor,ct+' 감독관');add(Pc.recorder,ct+' 기록원');(Pc.crews||[]).forEach((c,i)=>CR_SLOTS.forEach(([k,lb])=>add(c[k],ct+' '+(i+1)+'조 '+lb)))});return M}
+function crSlot(ct,key){const p=crGet(ct,key);const act=CR.act&&CR.act.ct===ct&&CR.act.key===key;const U=crUsed();const dup=p&&p.name&&(U[crPid(p)]||[]).length>1;
+  return '<div class="crs'+(act?' on':'')+(p&&p.name?' fill':'')+(dup?' dup':'')+'" role="button" tabindex="0" onclick="crAct(\''+esc(ct)+'\',\''+key+'\')"><i>'+crRoleOf(key)+'</i><b>'+(p&&p.name?esc(p.name):'＋ 고르기')+'</b>'+(p&&p.name?'<span class="x" title="비우기" onclick="event.stopPropagation();crClear(\''+esc(ct)+'\',\''+key+'\')">✕</span>':'')+(dup?'<em>중복</em>':'')+'</div>'}
+function crPanel(){const U=crUsed();const day=CR.day;const tabs=['감독관','주심','부심','점수심','기록원','전체'];const rk=OFF_RK[CR.rf]||null;const q=mfN(CR.q);
+  let L=CR.pool.filter(p=>(!rk||(p.roles||[]).some(r=>rk.test(String(r))))&&(!q||mfN(p.name).indexOf(q)>=0));
+  L=L.map(p=>{const id=String(p.uid||'').indexOf('n:')===0?'n:'+mfN(p.name):p.uid;return {p:p,id:id,used:U[id]||null,avail:!(p.days||[]).length||(p.days||[]).indexOf(day)>=0}}).sort((x,y)=>(x.used?1:0)-(y.used?1:0)||(y.avail?1:0)-(x.avail?1:0)||(y.p.score||0)-(x.p.score||0)||String(x.p.name).localeCompare(String(y.p.name),'ko'));
+  const role=CR.act?crRoleOf(CR.act.key):'';
+  return '<div class="crR"><div class="crRh"><b>후보</b>'+(CR.act?'<span class="mr-note">→ <b>'+esc(CR.act.ct)+' '+esc(role)+'</b> 칸에 넣기</span>':'<span class="mr-note">왼쪽에서 칸을 먼저 누르세요</span>')+'</div>'
+    +'<div class="crTabs">'+tabs.map(t=>'<button class="'+(CR.rf===t?'on':'')+'" onclick="CR.rf=\''+t+'\';crRender()">'+t+'</button>').join('')+'</div>'
+    +'<input class="mr-in" id="crQ" placeholder="🔍 이름 검색" value="'+esc(CR.q)+'" oninput="CR.q=this.value;crRenderKeep()">'
+    +'<div class="crList">'+(L.length?L.map(x=>{const p=x.p;const duty=((p.duties||[]).length?p.duties:(p.roles||[])).join(', ');
+      return '<button class="cnd'+(x.used?' used':'')+(!x.avail?' na':'')+'" '+(x.used?'disabled':'')+' onclick="crPick(\''+esc(p.uid).replace(/'/g,'&#39;')+'\')"><span class="nm"><b>'+esc(p.name)+'</b><span class="dt">'+esc(duty||'-')+'</span></span>'
+        +'<small>'+(p.lic?'심판 '+esc(p.lic)+' · ':'')+'주심 경력 '+(p.lead||0)+' · 심판 경력 '+(p.other||0)+(String(p.uid).indexOf('n:')===0?' · 계정 없음':'')+'</small>'
+        +(x.used?'<em>배정: '+esc(x.used.join(', '))+'</em>':(!x.avail?'<em class="w">이 날은 확정 아님</em>':''))+'</button>'}).join(''):'<div class="bempty">해당하는 확정자가 없습니다.</div>')+'</div></div>'}
+function crRender(){const days=[...new Set(MATCHES.map(m=>m.day).filter(Boolean))].sort();const day=CR.day;const courts=rfCourts(day);const DP=CR.plan[day]||{};const U=crUsed();const dupN=Object.values(U).filter(v=>v.length>1).length;
+  const keep={};['.crL','.crList'].forEach(sel=>{const el=document.querySelector('#rfModal '+sel);if(el)keep[sel]=el.scrollTop});
+  let h='<div class="mr-row"><b style="font-size:17px">🧑‍⚖️ 심판 배정</b><span class="mr-note">구장마다 <b>감독관 → 기록원 → 심판 1조 → 2조</b> 순서로 칸을 누르고 오른쪽 후보에서 고르세요. 같은 날 한 사람은 한 자리만 · 바꾸면 자동 저장</span><span style="flex:1"></span><span class="mr-note" id="crSt" style="font-weight:800;color:#0f766e">'+esc(CR.st||'')+'</span></div>'
+    +'<div class="mr-row" style="gap:6px;flex-wrap:wrap;margin:6px 0">'+days.map((d,i)=>'<button class="bd-day'+(d===day?' on':'')+'" onclick="CR.day=\''+d+'\';CR.prev=null;CR.act=null;crRender()">'+(i+1)+'일차 '+esc(dateK(d).slice(5))+'</button>').join('')
+      +(days.length>1?days.filter(d=>d!==day).map(d=>'<button class="mr-btn ghost" style="padding:5px 10px;font-size:12px" onclick="crCopyDay(\''+d+'\')">'+(days.indexOf(d)+1)+'일차 배치 그대로 가져오기</button>').join(''):'')
+      +(dupN?'<span class="mr-note" style="color:#C41E2F;font-weight:800">⚠ 중복 배정 '+dupN+'명 — 붉은 칸을 비워 주세요</span>':'')+'</div>'
+    +'<div class="crwrap"><div class="crL">'+(courts.length?courts.map(ct=>{const Pc=DP[ct]||{crews:[]};const dv={};crMatchesAt(day,ct).forEach(m=>{dv[m.div||'-']=(dv[m.div||'-']||0)+1});
+      return '<div class="court"><div class="cth"><b>'+esc(ct)+'</b><small>'+esc(Object.keys(dv).map(k=>k+' '+dv[k]).join(' · '))+'</small></div>'
+        +'<div class="crtop">'+crSlot(ct,'sup')+crSlot(ct,'rec')+'</div>'
+        +'<div class="crtwo">'+[0,1].map(i=>{const c=(Pc.crews||[])[i]||{name:ct+' '+(i+1)+'조'};return '<div class="crb"><input class="mr-in cn" value="'+esc(c.name||'')+'" oninput="crName(\''+esc(ct)+'\','+i+',this.value)">'+CR_SLOTS.map(([k])=>crSlot(ct,i+'.'+k)).join('')+'</div>'}).join('')+'</div></div>'}).join('')
+      :'<div class="bempty">이 날 구장이 정해진 경기가 없습니다.</div>')+'</div>'+crPanel()+'</div>'
+    +(CR.prev?'<b style="display:block;margin-top:12px">미리보기 — 적용 '+CR.prev.filter(x=>!x.skip).length+'경기</b><div style="max-height:30vh;overflow:auto"><table class="rf-tbl"><tr><th>시각</th><th>구장</th><th class="l">경기</th><th>심판조</th><th class="l">감독관 · 주심 · 점수심 · 기록원</th></tr>'
+      +CR.prev.map(x=>{const cz=crCrewsOf(x.Pc);const cw=cz[x.ci]||{};const o=crOfficials(x.Pc,cw).of;return '<tr'+(x.skip?' style="opacity:.45"':'')+'><td>'+esc(x.m.time||'')+'</td><td>'+esc(x.m.court||'')+'</td><td class="l">'+esc((x.m.a||{}).name||'')+' vs '+esc((x.m.b||{}).name||'')+'<br><small style="color:#6b7280">'+esc(mTitle(x.m))+'</small></td><td><select class="mr-in" style="padding:4px 6px" '+(x.skip?'disabled':'')+' onchange="CR.ovr[\''+esc(x.m.id)+'\']=+this.value;crPreview()">'+cz.map((c,i)=>crHas(c)?'<option value="'+i+'"'+(i===x.ci?' selected':'')+'>'+esc(c.name||((i+1)+'조'))+'</option>':'').join('')+'</select></td><td class="l" style="font-size:12px">'+(x.skip?'건너뜀('+esc(x.m.locked?'확정':x.m.status)+')':esc([(o.supervisor||{}).name,(o.ref1||{}).name,(o.scorer||{}).name,(o.recorder||{}).name].map(v=>v||'—').join(' · ')))+'</td></tr>'}).join('')+'</table></div>':'')
+    +'<div class="mr-row" style="justify-content:flex-end;margin-top:12px"><span class="mr-note" style="flex:1">경기 순서대로 1조 → 2조 → 1조… 번갈아 들어갑니다(조 하나만 채우면 그 조가 전부). 끝난·확정된 경기는 건너뜁니다.</span><button class="mr-btn s" onclick="document.getElementById(\'rfModal\').remove()">닫기</button><button class="mr-btn y" onclick="crPreview()">👀 미리보기</button>'+(CR.prev?'<button class="mr-btn g" onclick="crApply()">✅ '+CR.prev.filter(x=>!x.skip).length+'경기에 적용</button>':'')+'</div>';
+  modal('rfModal',h);const bx=document.querySelector('#rfModal > div');if(bx)bx.style.maxWidth='1240px';
+  Object.keys(keep).forEach(sel=>{const el=document.querySelector('#rfModal '+sel);if(el)el.scrollTop=keep[sel]})}
+let _crq=null;function crRenderKeep(){clearTimeout(_crq);_crq=setTimeout(()=>{const pos=(document.getElementById('crQ')||{}).selectionStart;crRender();const q=document.getElementById('crQ');if(q){q.focus();try{q.setSelectionRange(pos,pos)}catch(e){}}},150)}
+function crAct(ct,key){CR.act={ct:ct,key:key};CR.rf=crRoleOf(key);crRender()}
+function crPick(uid){if(!CR.act){say('왼쪽에서 넣을 칸을 먼저 누르세요.');return}const p=CR.pool.find(x=>x.uid===uid);if(!p)return;const person={name:p.name,uid:String(uid).indexOf('n:')===0?'':uid};
+  const U=crUsed();const cur=crGet(CR.act.ct,CR.act.key);const id=crPid(person);if(U[id]&&!(cur&&crPid(cur)===id)){say('「'+p.name+'」은(는) 이미 '+U[id].join(', ')+'에 배정되어 있습니다. 같은 날 한 사람은 한 자리만 — 그 칸을 먼저 비워 주세요.');return}
+  crSetP(CR.act.ct,CR.act.key,person);const K=crKeys();const i=K.indexOf(CR.act.key);const nx=K.slice(i+1).find(k=>!(crGet(CR.act.ct,k)||{}).name);if(nx){CR.act={ct:CR.act.ct,key:nx};CR.rf=crRoleOf(nx)}crDirty()}   /* 다음 빈 칸으로 */
+function crClear(ct,key){crSetP(ct,key,null);CR.act={ct:ct,key:key};CR.rf=crRoleOf(key);crDirty()}
+function crName(ct,i,v){const Pc=CR.plan[CR.day][ct];Pc.crews[i]=Pc.crews[i]||{};Pc.crews[i].name=v;crSaveSoon()}
+function crCopyDay(from){if(!confirm((CR.day?dateK(CR.day):'')+' 배치를 '+dateK(from)+' 배치와 같게 바꿀까요? (지금 날짜의 배치는 덮어씁니다)'))return;const src=CR.plan[from]||{};const DP={};rfCourts(CR.day).forEach(ct=>{DP[ct]=src[ct]?JSON.parse(JSON.stringify(src[ct])):{crews:[{name:ct+' 1조'},{name:ct+' 2조'}]}});CR.plan[CR.day]=DP;crDirty()}
+function crDirty(){CR.prev=null;crSaveSoon();crRender()}
+function crSaveSoon(){CR.st='저장 중…';const st=document.getElementById('crSt');if(st)st.textContent=CR.st;clearTimeout(CR.t);CR.t=setTimeout(crAutoSave,700)}
+async function crAutoSave(){try{const upd={courtPlan:CR.plan,updatedAt:FV.serverTimestamp()};try{await DB.collection('compStats').doc(SLOT_ID).update(upd)}catch(e){await DB.collection('compStats').doc(SLOT_ID).set(upd,{merge:true})}COURTPLAN=JSON.parse(JSON.stringify(CR.plan));CR.st='✓ 저장됨'}catch(e){CR.st='저장 실패: '+(e.message||e)}const st=document.getElementById('crSt');if(st)st.textContent=CR.st}
+function crPreview(){const day=CR.day;const DP=CR.plan[day]||{};const out=[];
+  rfCourts(day).forEach(ct=>{const Pc=DP[ct]||{};const cz=crCrewsOf(Pc);const use=cz.map((c,i)=>i).filter(i=>crHas(cz[i]));if(!use.length&&!(Pc.supervisor||Pc.recorder))return;
+    crMatchesAt(day,ct).forEach((m,i)=>{const ci=(CR.ovr[m.id]!=null&&crHas(cz[CR.ovr[m.id]]))?CR.ovr[m.id]:(use.length?use[i%use.length]:0);out.push({m:m,ci:ci,Pc:Pc,skip:m.status==='종료'||!!m.locked})})});
+  CR.prev=out.length?out:null;if(!out.length)say('구장마다 감독관·기록원·심판조를 넣은 뒤 미리보기를 눌러 주세요.');crRender()}
+async function crApply(){const L=(CR.prev||[]).filter(x=>!x.skip);if(!L.length)return;const U=crUsed();if(Object.values(U).some(v=>v.length>1)&&!confirm('중복 배정된 사람이 있습니다. 그래도 적용할까요?'))return;
+  if(!confirm(L.length+'경기에 심판진을 넣습니다. 이미 넣은 심판진은 바뀝니다. 진행할까요?'))return;
+  try{clearTimeout(CR.t);await crAutoSave();for(let i=0;i<L.length;i+=400){const bt=DB.batch();L.slice(i,i+400).forEach(x=>{const r=crOfficials(x.Pc,crCrewsOf(x.Pc)[x.ci]||{});bt.update(DB.collection('liveMatches').doc(x.m.id),{officials:r.of,officialUids:r.uids,refMode:'three',updatedAt:FV.serverTimestamp()})});await bt.commit()}
+    document.getElementById('rfModal').remove();say('✓ '+L.length+'경기에 심판진을 넣었습니다. 시간표 카드에 조 이름이 보이고, 배정된 심판에게는 보라색 「내 경기」로 표시됩니다.')}catch(e){say('적용 실패: '+(e.message||e))}}
+/* 경기 정보: 그 구장 1조·2조 한 번에 (다른 구장 조도 불러오기) */
+function crQuickHtml(m){const DP=(COURTPLAN||{})[m.day]||{};const Pc=DP[m.court]||{};const cz=crCrewsOf(Pc);const exp=crExpected(m);const all=[];Object.keys(DP).forEach(ct=>crCrewsOf(DP[ct]).forEach((c,i)=>{if(crHas(c))all.push({ct:ct,i:i,c:c})}));if(!all.length)return '';
+  return '<label class="mr-lab">심판조 한 번에 넣기</label><div class="mr-row" style="gap:6px;flex-wrap:wrap">'+cz.map((c,i)=>crHas(c)?'<button type="button" class="mr-btn '+(i===exp?'g':'s')+'" style="padding:7px 12px" onclick="crFill(\''+esc(m.id)+'\',\''+esc(m.court)+'\','+i+')">'+esc(c.name||(m.court+' '+(i+1)+'조'))+' 적용'+(i===exp?' · 이 경기 차례':'')+'</button>':'').join('')
+    +'<select class="mr-in" style="width:auto;padding:6px 8px" onchange="if(this.value){const v=this.value.split(\'|\');crFill(\''+esc(m.id)+'\',v[0],+v[1]);this.value=\'\'}"><option value="">다른 구장 심판조 불러오기…</option>'+all.map(x=>'<option value="'+esc(x.ct)+'|'+x.i+'">'+esc(x.c.name||(x.ct+' '+(x.i+1)+'조'))+'</option>').join('')+'</select></div>'}
+function crFill(mid,ct,i){const m=MATCHES.find(x=>x.id===mid);if(!m)return;const DP=(COURTPLAN||{})[m.day]||{};const crew=crCrewsOf(DP[ct]||{})[i];if(!crew)return;const r=crOfficials(DP[m.court]||{},crew);
   const w=document.getElementById('mf_offs');if(!w)return;w.innerHTML=r.of.list.map(x=>mfOffRowHtml({role:x.role,name:x.name,uid:x.uid,key:x.key})).join('');mfMarkAll();qkToastLite('「'+(crew.name||'')+'」 심판진을 넣었습니다 — 저장을 눌러 주세요')}
 async function rfOpenScope(){modal('rfModal','<div class="bempty">후보를 다시 불러오는 중…</div>');RF.pool=await rfPool(RF.scope);rfRender()}
 function rfTargets(){return MATCHES.filter(m=>(!RF.div||m.div===RF.div)&&m.status!=='종료'&&!m.locked&&(RF.over||!((m.officials||{}).ref1||(m.officials||{}).recorder||(RF.mode==='svr'&&(m.officials||{}).supervisor)))).sort((a,b)=>String(a.day||'9').localeCompare(String(b.day||'9'))||String(a.time||'99').localeCompare(String(b.time||'99'))||(+a.order||0)-(+b.order||0))}
