@@ -548,8 +548,8 @@ function evTab(){
 function evalTab(){return evTab()}
 // ══ [대진표 팀 ↔ 참가 신청 연결 2026-10-18] 대진표를 먼저 넣고(이름만) 학교가 나중에 신청·오더지를 내는 대회용 ══
 //  부문: 신청 부문 「초등부 남자(예선리그) A조」·「본선 경기 남초부」 → 「초등부 남자」. 학교: 시도·띄어쓰기·「초등학교/초」 차이를 지우고 비교.
-const LK_SIDO=/^(서울특별시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|경기도|강원특별자치도|강원도|충청북도|충청남도|전북특별자치도|전라북도|전라남도|경상북도|경상남도|제주특별자치도|서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/;
-function lkNorm(s){s=String(s||'').replace(/\s+/g,'').replace(/[()·.,\-]/g,'').replace(/대학교/g,'대').replace(/초등학교/g,'초').replace(/중학교/g,'중').replace(/고등학교/g,'고').replace(/여자중/g,'여중').replace(/여자고/g,'여고');let p,guard=0;while(guard++<3&&(p=LK_SIDO.exec(s))&&p[0].length<s.length-1)s=s.slice(p[0].length);return s}
+const LK_SIDO=/^(서울시|부산시|대구시|인천시|광주시|대전시|울산시|세종시|서울특별시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|경기도|강원특별자치도|강원도|충청북도|충청남도|전북특별자치도|전라북도|전라남도|경상북도|경상남도|제주특별자치도|서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/;
+function lkNorm(s){s=String(s||'').replace(/\s+/g,'').replace(/[()·.,\-]/g,'').replace(/대학교/g,'대').replace(/초등학교/g,'초').replace(/중학교/g,'중').replace(/고등학교/g,'고').replace(/여자중/g,'여중').replace(/여자고/g,'여고').replace(/(플라잉디스크|얼티미트|디스크)(부|동아리|클럽|팀)?$/,'').replace(/(스포츠클럽|동아리)$/,'').replace(/(초|중|고)(남|여)(초|중|고)부$/,'$1');let p,guard=0;   /* [2026-10-20] 꼬리 이름(플라잉디스크부·남초부) 무시 */while(guard++<3&&(p=LK_SIDO.exec(s))&&p[0].length<s.length-1)s=s.slice(p[0].length);return s}
 function lkDiv(p){p=String(p||'');const a=/^(초등부|중등부|고등부)\s*(남자|여자)/.exec(p);if(a)return a[1]+' '+a[2];
   {const LV={초:'초등부',중:'중등부',고:'고등부'};let lv='',g='';const x=/(초등|중등|고등)/.exec(p);if(x)lv=x[1]+'부';const y=/(남|여)(초|중|고)부?/.exec(p);if(y){if(!lv)lv=LV[y[2]];g=y[1]==='남'?'남자':'여자'}
     if(!g){const z=/(남자|여자)/.exec(p)||/(초|중|고|등)부?\s*\(?(남|여)\)?/.exec(p);if(z)g=String(z[z.length-1]).charAt(0)==='남'?'남자':'여자'}if(!lv){const w=/(초|중|고)부/.exec(p);if(w)lv=LV[w[1]]}if(lv&&g)return lv+' '+g}   /* [2026-10-20] 「얼티미트 초등부 남자」「초등 남자부」「남초부」 등도 */const b=/(남|여)(초|중|고)부/.exec(p);if(b)return {초:'초등부',중:'중등부',고:'고등부'}[b[2]]+' '+(b[1]==='남'?'남자':'여자');return p.replace(/\(.*?\)/g,'').replace(/\s*[A-Z]조$/,'').trim()}
@@ -574,6 +574,9 @@ function lkCands(t,all){const E=teamEntries();const tn=[lkNorm(t.school),lkNorm(
   const near=E.filter(c=>exact.indexOf(c)<0&&lkEntryNames(c).some(n=>tn.some(x=>x.length>=3&&(n.indexOf(x)>=0||x.indexOf(n)>=0))));
   const sameDiv=E.filter(c=>exact.indexOf(c)<0&&near.indexOf(c)<0&&lkEntryDivs(c).indexOf(t.div)>=0);
   return {exact:exact,near:near,sameDiv:sameDiv}}
+async function lkRelink(div,name,oldPid,pid){const c=teamEntries().find(x=>entryKey(x)===pid);if(!c)return 0;const b=DB.batch();let n=0;
+  MATCHES.forEach(m=>{if(m.div!==div)return;const u={};['a','b'].forEach(s=>{const t=m[s]||{};if(t.name===name&&t.pid===oldPid){u[s]=Object.assign({},t,{pid:pid,scid:c.teamSchoolClubId||t.scid||'',noAuto:false});n++}});if(Object.keys(u).length){u.updatedAt=FV.serverTimestamp();b.update(DB.collection('liveMatches').doc(m.id),u)}});
+  if(!n)return 0;try{await b.commit();return n}catch(e){console.warn('relink',e);return 0}}
 async function lkApply(div,name,pid,quiet){const c=teamEntries().find(x=>entryKey(x)===pid);if(!c){if(!quiet)say('참가 신청 팀을 찾지 못했습니다');return 0}
   const b=DB.batch();let n=0;MATCHES.forEach(m=>{if(m.div!==div)return;const u={};['a','b'].forEach(s=>{const t=m[s]||{};if(t.name===name&&(!t.pid||t._vp)){u[s]=Object.assign({},t,{pid:pid,scid:t.scid||c.teamSchoolClubId||'',noAuto:false});n++}});if(Object.keys(u).length){u.updatedAt=FV.serverTimestamp();b.update(DB.collection('liveMatches').doc(m.id),u)}});
   if(!n)return 0;try{await b.commit();if(!quiet)say('✓ 「'+name+'」 경기 '+n+'자리를 참가 신청 「'+(c.name||'')+'」과 연결했습니다. 오더지의 선수·배번·경기복이 기록 화면에 나옵니다.');return n}catch(e){if(!quiet)say('연결 실패: '+(e.message||e));return 0}}
@@ -631,7 +634,11 @@ async function claimRepair(){if(!STAFF||CLR_DONE||!SLOT)return;CLR_DONE=true;con
 function lkAutoSoon(){if(!STAFF)return;clearTimeout(LK_T);LK_T=setTimeout(lkAuto,1200)}
 async function lkAuto(){if(!STAFF||LK_BUSY||!MATCHES.length||!SLOT)return;LK_BUSY=true;try{
   const T=lkTeams();const used={};Object.values(T).forEach(t=>{if(t.pid)used[t.div+'|'+t.pid]=1});
-  for(const k of Object.keys(T)){const t=T[k];if(t.noAuto&&!t.pid)continue;if(t.pid){if(t.miss)await lkApply(t.div,t.name,t.pid,true);continue}const ex=lkCandsAuto(t,used);if(ex.length!==1)continue;
+  const live=new Set(teamEntries().map(entryKey));
+    for(const k of Object.keys(T)){const t=T[k];if(t.noAuto&&!t.pid)continue;
+      if(t.pid&&!live.has(t.pid)){   /* [2026-10-20] 연결된 신청이 취소·반려됨 → 같은 학교·부문의 현재 신청이 하나면 그쪽으로 옮김 */
+        const ex2=lkCandsAuto(t,used);if(ex2.length===1){const np=entryKey(ex2[0]);const n2=await lkRelink(t.div,t.name,t.pid,np);if(n2){used[t.div+'|'+np]=1;LK_LOG.unshift(new Date().toTimeString().slice(0,5)+' '+t.div+' 「'+t.name+'」 취소된 신청 → 현재 신청 「'+(ex2[0].name||'')+'」')}}continue}
+      if(t.pid){if(t.miss)await lkApply(t.div,t.name,t.pid,true);continue}const ex=lkCandsAuto(t,used);if(ex.length!==1)continue;
     const pid=entryKey(ex[0]);const n=await lkApply(t.div,t.name,pid,true);if(n){used[t.div+'|'+pid]=1;LK_LOG.unshift(new Date().toTimeString().slice(0,5)+' '+t.div+' 「'+t.name+'」 ← 신청 「'+(ex[0].name||'')+'」')}}
   }finally{LK_BUSY=false}}
 function lkPanel(){if(!STAFF)return '';const T=lkTeams();const L=Object.values(T);if(!L.length)return '';
