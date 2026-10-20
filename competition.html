@@ -841,9 +841,9 @@ function claimState(s,c){
   if(rv.st==='승인'){
     const needPay=!!(s.extras&&s.extras.needPay);
     if(needPay&&c.payStatus!=='입금확인')return {t:'💳 입금대기',col:'#8a5a00',reason:''};
-    return {t:'✅ 완료',col:'#0f766e',reason:''};
+    return {t:'✅ 승인 완료',col:'#0f766e',reason:''};
   }
-  return {t:'⏳ 신청대기',col:'#6b7280',reason:''};
+  return {t:'⏳ 승인 대기',col:'#6b7280',reason:''};   // [2026-10-20] 「신청대기」가 「아직 신청 전」처럼 읽혀 이름을 바꿈(신청은 접수됨, 담당자 승인 전)
 }
 async function setClaimReview(slotId,key,st,name,uid){
   let reason='';
@@ -894,7 +894,7 @@ async function setClaimReview(slotId,key,st,name,uid){
   }catch(e){ alert('처리 실패: '+e.message+'\n(중앙 관리자 권한이 필요할 수 있습니다)'); }
 }
 async function clearClaimReview(slotId,key){
-  if(!confirm('심사 결과를 지우고 [신청대기] 상태로 되돌릴까요?'))return;
+  if(!confirm('심사 결과를 지우고 [승인 대기] 상태로 되돌릴까요?'))return;
   try{
     await DB.collection('compSlots').doc(slotId).update(
       new firebase.firestore.FieldPath('reviewStatus',key), firebase.firestore.FieldValue.delete());
@@ -1105,8 +1105,8 @@ async function viewRoster(id){
   const rosterMark=(name,birth)=>{if(!ROSTER_SET)return '';const nm=String(name||'').replace(/\s+/g,'');return (ROSTER_SET.has(nm+'|'+(birth||''))||ROSTER_SET.has(nm+'|'))?' <b style="color:#0f766e;font-size:10.5px" title="주최 측 참가 명단과 일치">✓ 명단 확인</b>':' <b style="color:#b45309;font-size:10.5px" title="올려 둔 참가 명단에 없음 — 확인 필요 (신청을 막지는 않습니다)">⚠ 명단에 없음</b>'};
   const entry=s.role==='참가';
   const confirmed=s.confirmed||[];
-  const old=document.getElementById('rosterModal');if(old)old.remove();
-  const div=document.createElement('div');div.id='rosterModal';
+  const old=document.getElementById('rosterModal');const _rmTop=(old&&old.dataset.sid===String(id)&&old.firstElementChild)?old.firstElementChild.scrollTop:0;if(old)old.remove();   // [2026-10-20] 승인·보류 뒤 보던 자리 유지
+  const div=document.createElement('div');div.id='rosterModal';div.dataset.sid=String(id);
   div.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
   // [모바일 2026-09-21] 좁은 화면(≤640px): 표의 각 줄을 카드처럼 세로로, 창은 전체 폭·바닥 붙임
   if(!document.getElementById('rsMobileCss')){const st=document.createElement('style');st.id='rsMobileCss';st.textContent='@media(max-width:640px){#rosterModal{padding:0!important;align-items:flex-end!important}#rosterModal>div{max-width:none!important;border-radius:16px 16px 0 0!important;max-height:96vh!important;padding:16px 12px!important}#rosterModal table.rsm{display:block}#rosterModal table.rsm thead,#rosterModal table.rsm th{display:none}#rosterModal table.rsm tbody,#rosterModal table.rsm tr{display:block}#rosterModal table.rsm tr{border:1.5px solid #dfe5ee;border-radius:12px;margin-bottom:8px;padding:6px 8px;background:#fff}#rosterModal table.rsm td{display:block;border:none!important;padding:3px 4px!important;font-size:13px!important}#rosterModal table.rsm td[colspan]{padding:6px!important}#rosterModal table.rsm td:first-child{font-size:11px!important;color:#8a919d}}';document.head.appendChild(st)}
@@ -1137,7 +1137,7 @@ async function viewRoster(id){
       +(staff?' <button onclick="markPaper(\''+id+'\',\''+key+'\',\''+cesc(c.name||'')+'\')" style="border:1.5px solid #e6b422;background:#fffbeb;color:#8a5a00;border-radius:8px;padding:2px 8px;font-size:10.5px;font-weight:800;cursor:pointer" title="담당자가 서면(수기) 동의서를 수령한 경우 클릭">📄 수기동의서 확인완료</button>':'');
   };
   // [참가자 상태] 상태 표시 + 담당자용 승인·반려 버튼
-  const stCell=c=>{const q=claimState(s,c);return '<b style="color:'+q.col+'">'+q.t+'</b>'+(q.reason?'<div style="font-size:10.5px;color:#8a919d;margin-top:2px">'+cesc(q.reason)+'</div>':'')
+  const stCell=c=>{const q=claimState(s,c);return '<b class="cst" style="color:'+q.col+'">'+q.t+'</b>'+(q.reason?'<div style="font-size:10.5px;color:#8a919d;margin-top:2px">'+cesc(q.reason)+'</div>':'')
     +(c.restored?'<div style="font-size:10.5px;color:#0f766e;font-weight:800;margin-top:2px" title="'+cesc(String(c.restoredAt||'').slice(0,10))+'">↩ 되살림'+(c.restoredBy?' · '+cesc(c.restoredBy):'')+'</div>':'')};
   const _rvb='border-radius:8px;padding:2px 8px;font-size:10.5px;font-weight:800;cursor:pointer;white-space:nowrap';
   const revCell=c=>{const key=ckey(c);const q=claimState(s,c);const ruid=cesc(c.uid||'');
@@ -1145,7 +1145,7 @@ async function viewRoster(id){
       +'<button onclick="setClaimReview(\''+id+'\',\''+key+'\',\'승인\',\''+cesc(c.name||'')+'\',\''+ruid+'\')" style="border:1.5px solid #0f766e;background:#e4f2ef;color:#0f766e;'+_rvb+'">✅ 승인</button> '
       +'<button onclick="setClaimReview(\''+id+'\',\''+key+'\',\'보류\',\''+cesc(c.name||'')+'\',\''+ruid+'\')" style="border:1.5px solid #b8860b;background:#fffbeb;color:#8a5a00;'+_rvb+'">⏸ 보류</button> '
       +'<button onclick="setClaimReview(\''+id+'\',\''+key+'\',\'반려\',\''+cesc(c.name||'')+'\',\''+ruid+'\')" style="border:1.5px solid #C41E2F;background:#fff;color:#C41E2F;'+_rvb+'">❌ 반려</button>'
-      +(q.t==='⏳ 신청대기'?'':'<br><button onclick="clearClaimReview(\''+id+'\',\''+key+'\')" style="border:1px solid #dfe5ee;background:#fff;color:#8a919d;'+_rvb+';margin-top:3px">↩ 되돌리기</button>')
+      +(q.t==='⏳ 승인 대기'?'':'<br><button onclick="clearClaimReview(\''+id+'\',\''+key+'\')" style="border:1px solid #dfe5ee;background:#fff;color:#8a919d;'+_rvb+';margin-top:3px">↩ 되돌리기</button>')
       +'</td>';};
   // [반려목록] 명단(quota)에서는 빠졌지만 담당자는 사유 확인·되돌리기가 필요할 수 있어 별도로 모읍니다.
   const rejList=staff?[...new Set((s.claimed||[]).map(ckey))]
@@ -1211,7 +1211,7 @@ async function viewRoster(id){
   const head=staff
     ?'<tr><th '+th+'>연번</th><th '+th+'>성명</th>'+(entry?'<th '+th+'>생년월일</th><th '+th+'>성별</th><th '+th+'>학교·클럽</th>':'')+'<th '+th+'>희망 '+(entry?'부문':'임무')+'</th><th '+th+'>신청일</th><th '+th+'>상태</th>'+(entry?'<th '+th+'>입금</th>':'')+'<th '+th+'>심사</th></tr>'
     :'<tr><th '+th+'>연번</th><th '+th+'>성명</th><th '+th+'>'+(entry?'부문':'임무')+'</th><th '+th+'>상태</th></tr>';
-  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:'+(staff?'720px':'480px')+';width:100%;max-height:90vh;overflow:auto;padding:24px">'
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:'+(staff?'1100px':'640px')+';width:100%;max-height:94vh;overflow:auto;padding:24px">'
     +'<b style="font-size:16px">👥 신청 현황 — '+cesc(s.title)+'</b>'
     +'<div style="font-size:12.5px;color:#666;margin:4px 0 4px">'+cesc(s.date||'')+' · '+cesc(s.role)+(entry?' (선수)':'요원')+' · 신청 '+list.length+'/'+s.quota+'명'+(sumTxt?' — '+sumTxt:'')+(staff&&rejList.length?' · 반려 '+rejList.length+'건(명단·정원 제외, 아래 별도 확인)':'')+(staff&&canList.length?' · 취소 '+canList.length+'건(아래에서 되살리기)':'')+'</div>'
     +(staff?'<div style="font-size:12px;color:#0f766e;font-weight:700;margin-bottom:8px">🔓 권한자 보기 — 세부정보가 표시됩니다. <a href="admin.html" style="color:#153A77;font-weight:800">관리자 페이지에서 수정 →</a></div>'
@@ -1222,6 +1222,7 @@ async function viewRoster(id){
         +'<span style="font-size:12px;color:#6b7280">'+regs.map(r=>cesc(r)+' '+cnt[r]).join(' · ')+'</span>'
         +'<span style="flex:1"></span><button id="rsCsvBtn" class="cbtn" style="padding:6px 12px;font-size:12px;background:#153A77;color:#fff" onclick="rsCsv(\''+id+'\')">📥 신청자 명단 CSV</button></div>'
         +'<div style="font-size:11.5px;color:#8a919d;margin:-4px 0 8px">성명 옆 [👤 상세·경력]을 누르면 생년월일·거점 지역·심판 자격(유효기간)과 심판·운영 활동 경력(2026 이전 수기 등록 + 이후 시스템 기록)을 함께 봅니다.</div>'})():'')
+    +rmBarHtml(s,list)
     +'<div style="overflow-x:auto"><table class="rsm" style="width:100%;border-collapse:collapse">'+head+rows+'</table></div>'
     +(rejList.length?('<details style="margin-top:14px;border-top:1px dashed #e5e9f0;padding-top:10px">'
       +'<summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#C41E2F">🗑 반려된 신청 ('+rejList.length+'건) — 명단·정원에서는 제외됨</summary>'
@@ -1261,7 +1262,26 @@ async function viewRoster(id){
     +(staff&&entry?'<button class="cbtn" style="background:'+(s.finished?'#0f766e':'#7c3aed')+';color:#fff" onclick="document.getElementById(\'rosterModal\').remove();openCompFinish(\''+id+'\')" title="참가·입상 이력 기록 + 약식 종료 보고 + 사진첩 초안"><span style="display:inline-flex;align-items:center;gap:5px">'+CAREER.svg('flag',{size:14,color:'#fff',stroke:2.2})+(s.finished?'종료 처리됨 (결과 수정)':'대회 종료 · 결과 입력')+'</span></button>':'')
     +'<button class="cbtn cbtn-ghost" onclick="document.getElementById(\'rosterModal\').remove()">닫기</button></div></div>';
   document.body.appendChild(div);
+  rmFilter();if(_rmTop&&div.firstElementChild)div.firstElementChild.scrollTop=_rmTop;
 }
+/* [2026-10-20] 신청 현황 찾기 — 학교·팀·인솔자·선수 이름(펼치지 않은 명단 포함) 검색 + 상태·부문. 다시 그리지 않고 줄만 숨김 */
+let RMF={q:'',st:'',dv:''};
+function rmBarHtml(s,list){if(!list||list.length<4)return '';const cnt={};list.forEach(c=>{const t=claimState(s,c).t.replace(/^\S+\s/,'');cnt[t]=(cnt[t]||0)+1});
+  const dvs=[...new Set(list.map(c=>String((c.prefs||[])[0]||'').replace(/\(.*$/,'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const chip=(k,lab,n)=>'<button type="button" class="rmChip" data-k="'+cesc(k)+'" onclick="RMF.st=this.dataset.k;rmFilter()" style="border:1.5px solid #c9d8ef;background:#fff;color:#153A77;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:900;cursor:pointer">'+lab+' '+n+'</button>';
+  return '<div style="position:sticky;top:-24px;z-index:5;background:#fff;border:2px solid #153A77;border-radius:14px;padding:10px 12px;margin:6px 0 10px;box-shadow:0 6px 16px rgba(21,58,119,.1)">'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap"><input id="rmQ" type="search" value="'+cesc(RMF.q)+'" oninput="RMF.q=this.value;rmFilter()" placeholder="🔍 학교·팀·인솔자·선수 이름으로 찾기" style="flex:1;min-width:190px;padding:10px 12px;border:1.5px solid #c9d8ef;border-radius:10px;font-size:15px;font-weight:700">'
+    +(dvs.length>1?'<select id="rmDv" onchange="RMF.dv=this.value;rmFilter()" style="padding:9px 10px;border:1.5px solid #c9d8ef;border-radius:10px;font-size:13px;font-weight:700"><option value="">부문 전체</option>'+dvs.map(d=>'<option'+(RMF.dv===d?' selected':'')+'>'+cesc(d)+'</option>').join('')+'</select>':'')+'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">'+chip('','전체',list.length)+Object.keys(cnt).map(k=>chip(k,k,cnt[k])).join('')
+    +'<span id="rmCnt" style="font-size:12px;font-weight:800;color:#153A77;margin-left:auto"></span></div>'
+    +'<div style="font-size:11.5px;color:#6b7280;margin-top:6px;line-height:1.5"><b>⏳ 승인 대기</b> = 신청은 접수됨, 담당자 승인 전 · <b>✅ 승인 완료</b> = 담당자가 승인함'+(s.extras&&s.extras.needPay?'(입금 확인까지 끝남)':'')+' · <b>💳 입금대기</b> = 승인됐지만 참가비 확인 전 · <b>⏸ 보류</b> = 확인할 것이 있어 잠시 멈춤</div></div>'}
+function rmFilter(){const m=document.getElementById('rosterModal');if(!m)return;const norm=t=>String(t||'').toLowerCase().replace(/\s+/g,'');const q=norm(RMF.q),st=RMF.st||'',dv=RMF.dv||'';let n=0,t=0;
+  const rows=[...m.querySelectorAll('table.rsm tr')].filter(tr=>tr.cells.length>1&&/^\d+$/.test(String((tr.cells[0]||{}).textContent).trim()));
+  rows.forEach(tr=>{t++;const c=tr.querySelector('.cst');const sv=c?c.textContent.replace(/^\S+\s/,''):'';const ok=(!q||norm(tr.textContent).indexOf(q)>=0)&&(!st||sv===st)&&(!dv||tr.textContent.indexOf(dv)>=0);tr.style.display=ok?'':'none';if(ok)n++;
+    const nx=tr.nextElementSibling;if(nx&&nx.id&&nx.id.indexOf('rsd_')===0&&!ok)nx.style.display='none'});
+  [...m.querySelectorAll('table.rsm tr')].filter(tr=>tr.cells.length===1&&/📍/.test(tr.textContent)).forEach(g=>{let x=g.nextElementSibling,any=false;while(x&&!(x.cells.length===1&&/📍/.test(x.textContent))){if(x.style.display!=='none'&&rows.indexOf(x)>=0){any=true;break}x=x.nextElementSibling}g.style.display=any?'':'none'});
+  m.querySelectorAll('.rmChip').forEach(b=>{const on=b.dataset.k===st;b.style.background=on?'#153A77':'#fff';b.style.color=on?'#fff':'#153A77'});
+  const e=document.getElementById('rmCnt');if(e)e.textContent=(q||st||dv)?n+'건 표시 / '+t+'건':''}
 // ── [취소 되살리기 2026-09-15] 신청자가 (실수로) 취소한 신청을 담당자가 취소 전 내용 그대로 되살립니다 ──
 //   claimed 는 쌓기만 하는 이력이라 마지막 신청을 복사해 한 건 더 붙이면(신청 수 > 취소 수) 명단에 돌아옵니다.
 //   심사 상태(reviewStatus)·수기동의(paperConsents)는 키(pid) 단위라 그대로 이어집니다. 원래 신청 시각은 origAt 에 남깁니다.
