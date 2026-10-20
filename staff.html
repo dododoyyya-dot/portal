@@ -68,6 +68,18 @@ body.onepost #stWriteBox{display:none!important}   /* [1공고 1상세] PC 에�
   .sttbl.strs td[colspan]{display:block}
   .sttbl.strs td br{display:none}
   #dtModal>div{padding:16px 12px!important}
+  /* [2026-10-20] 휴대폰: 상세 창을 화면 꽉 채움 · 찾기 막대는 맨 위에 붙음 */
+  #dtModal{padding:0!important}
+  #dtModal>.dtBox{margin:0!important;border-radius:0!important;min-height:100%;box-sizing:border-box}
+  #stFind{top:0!important;border-radius:0 0 12px 12px!important;margin:8px -12px 6px!important}
+  #stQ{font-size:16px!important}
+  /* 신청자 카드 촘촘하게 — 연락처·지역·나이 / 자격·임무 / 상태 를 3칸으로 (필터로 숨긴 줄은 그대로 숨김) */
+  .sttbl.strs tr.stR{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 8px;align-items:center;padding:8px 10px}
+  .sttbl.strs tr.stR>td{font-size:12px}
+  .sttbl.strs tr.stR>td:nth-child(2),.sttbl.strs tr.stR>td:nth-child(8),.sttbl.strs tr.stR>td:last-child{grid-column:1/-1}
+  .sttbl.strs tr.stR>td:nth-child(2){font-size:15px}
+  .sttbl.strs tr.stR>td:last-child{display:flex!important;gap:6px;flex-wrap:wrap;align-items:center}
+  .sttbl.strs tr.stR>td:last-child .stbtn{margin-top:0!important;padding:7px 12px!important;font-size:12.5px!important}
 }
 @media (max-width:820px){
   /* [모바일 표 넘침 수정] min-width:640px 를 모든 .sttbl 에 걸면, 수당표처럼 폭이 좁은
@@ -1570,13 +1582,16 @@ async function _renderDetailInner(isStale){
   isStale=isStale||function(){return false};
   const p=POSTS.find(x=>x.id===DT_ID);if(!p)return;
   const apps=APPS[p.id]||[];
-  const old=document.getElementById('dtModal');if(old)old.remove();
+  const old=document.getElementById('dtModal');
+  const _keepTop=(old&&old.dataset.pid===String(p.id)&&old.dataset.day===String(DT_DAY))?old.scrollTop:0;const _keepHtml=_keepTop?old.innerHTML:'';   /* [2026-10-20] 확정·보류 뒤 맨 위로 튀지 않게 */
+  if(old)old.remove();
   const div=document.createElement('div');div.id='dtModal';
-  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.6);z-index:9998;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto';
+  div.style.cssText='position:fixed;inset:0;background:rgba(10,15,30,.6);z-index:9998;display:flex;align-items:flex-start;justify-content:center;padding:12px;overflow:auto;overscroll-behavior:contain';
   // [권한개선] 열람권(신청현황·공고수정) vs 결정권(확정·경력등록) 분리
   const _decide=canDecide(p);
   // BUG-2 fix: await 전에 DOM에 추가해야 동시 호출 시 중복 모달 방지
   document.body.appendChild(div);
+  if(_keepHtml){div.innerHTML=_keepHtml;div.scrollTop=_keepTop}
   const dates=p.dates||[];
   const dd=dates[DT_DAY]||dates[0]||{};
   const manage=canManage(p);
@@ -1647,15 +1662,17 @@ async function _renderDetailInner(isStale){
         +'<button id="stSizeBtn" class="stbtn" style="padding:5px 11px;font-size:12px;background:#0f766e;color:#fff" onclick="stSizeXlsx(\''+p.id+'\')" title="확정된 심판·운영요원의 피복 사이즈(상의·하의·신발·모자)와 사이즈별 집계 — 심판복 준비용 (엑셀)">📏 확정 심판 사이즈 엑셀</button></div>'
         +'<div style="font-size:11.5px;color:#8a919d;margin:2px 0 0"><b style="color:#153A77">경력 점수</b> = 주심 계열 경력 ×3 + 기타 심판 경력 ×1 + 유효 심판 자격(1급 6 · 2급 4 · 3급 2) — 대회 심판 배정과 같은 기준입니다. 「📋 대회 N건 ›」을 누르면 참가한 대회 목록이 펼쳐집니다.<br>성명 옆 [👤 상세·경력]: 생년월일·거점 지역·심판 자격(유효기간)·심판 활동 경력(2026 이전 수기 등록 + 이후 시스템 기록). 지역은 회원 정보의 거점(활동 지역·주소) 기준입니다.</div>'}
     const stCols=manage?12:6;const stMax=manage?Math.max(1,...dayApps.map(a=>stScore(a.uid).score)):1;
-    appsHtml=stBar+'<div class="sttbl-wrap"><table class="sttbl'+(manage?' strs':'')+'" style="margin-top:6px"><tr><th>번호</th><th>성명</th>'+(manage?'<th>연락처</th><th>지역</th><th>나이</th>':'')+(manage?'<th>심판 자격</th><th>지도자 자격</th><th style="min-width:150px">경력 점수</th>':'<th>자격증</th>')+'<th>희망 임무</th><th>상태</th>'+(manage?'<th>동의서</th>':'')+(manage?'<th>선정</th>':'')+'</tr>'
+    appsHtml=(manage?stFilterBar(dayApps,dd):'')+stBar+'<div class="sttbl-wrap"><table class="sttbl'+(manage?' strs':'')+'" style="margin-top:6px"><tr><th>번호</th><th>성명</th>'+(manage?'<th>연락처</th><th>지역</th><th>나이</th>':'')+(manage?'<th>심판 자격</th><th>지도자 자격</th><th style="min-width:150px">경력 점수</th>':'<th>자격증</th>')+'<th>희망 임무</th><th>상태</th>'+(manage?'<th>동의서</th>':'')+(manage?'<th>선정</th>':'')+'</tr>'
       +stRows.map((a,i)=>{
         const _pr=manage?(STRS.prof[a.uid]||{}):{};const _rg=manage?rgOf(a):'';
-        const _gh=(manage&&STRS.view==='group'&&(i===0||rgOf(stRows[i-1])!==_rg))?'<tr><td colspan="'+stCols+'" style="background:#eef3fb;font-weight:900;color:#153A77">📍 '+esc(_rg)+' <span style="font-weight:700;color:#6b7280">'+stRows.filter(x=>rgOf(x)===_rg).length+'명</span></td></tr>':'';
+        const _gh=(manage&&STRS.view==='group'&&(i===0||rgOf(stRows[i-1])!==_rg))?'<tr class="stG"><td colspan="'+stCols+'" style="background:#eef3fb;font-weight:900;color:#153A77">📍 '+esc(_rg)+' <span style="font-weight:700;color:#6b7280">'+stRows.filter(x=>rgOf(x)===_rg).length+'명</span></td></tr>':'';
         const st=(a.status&&a.status[dd.date])||'대기';
         const asg=a.assign&&a.assign[dd.date];
         const stHtml=st==='확정'?'<b style="color:#0f766e">✅ 확정'+(asg?' <span style="font-size:11px">('+esc(asg.duty)+')</span>':'')+'</b>':st==='거절'?'<b style="color:#C41E2F">❌ 거절</b>':st==='보류'?'<b style="color:#b8860b">⏳ 보류</b>':'<span style="color:#6b7280">대기</span>';
         const cache=manage?(LIC_CACHE[a.uid]||{}):{};
-        return _gh+'<tr>'
+        const _pf=((a.prefs||{})[dd.date]||[]);
+        const _sq=manage?stNorm([a.name,a.phone,String(a.phone||'').replace(/\D/g,''),_pr.region,_pf.join(' '),asg&&asg.duty,cache.ref&&((cache.ref.type||'')+(cache.ref.grade||'')),cache.ins&&((cache.ins.type||'')+(cache.ins.grade||'')),st].join(' ')):'';
+        return _gh+'<tr'+(manage?' class="stR" data-id="'+esc(a.id)+'" data-st="'+esc(st)+'" data-role="'+esc(_pf.join('|'))+'" data-q="'+esc(_sq)+'"':'')+'>'
           +'<td style="text-align:center;color:#8a919d">'+(i+1)+'</td>'
           +'<td><b>'+esc(manage?a.name:mname(a.name))+'</b>'+(manage?' <button onclick="stToggle(\''+a.id+'\',\''+esc(a.uid||'')+'\')" style="border:1.5px solid #c9d8ef;background:#fff;color:#153A77;border-radius:7px;padding:1px 7px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap">👤 상세·경력</button>':'')+'</td>'
           +(manage?'<td style="font-size:12px">'+esc(a.phone||'-')+'</td><td style="font-size:12px;white-space:nowrap">'+stPill(esc(_pr.region||'미상'),_pr.region&&_pr.region!=='미상'&&_pr.region!=='열람 불가'?'#153A77':'#8a919d')+'</td><td style="font-size:12px;text-align:center">'+(_pr.age!==''&&_pr.age!=null?_pr.age:'-')+'</td>':'')
@@ -1673,7 +1690,7 @@ async function _renderDetailInner(isStale){
           +(manage?'<tr id="strs_'+a.id+'" style="display:none"><td colspan="'+stCols+'" style="background:#fbfcfe;padding:8px 12px">'+(STRS.career[a.uid]?stDetailHtml(a.uid):'')+'</td></tr>':'');
       }).join('')+'</table></div>';
   }
-  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:1260px;width:100%;padding:24px 26px;margin:10px 0">'
+  div.innerHTML='<div class="dtBox" style="background:#fff;border-radius:16px;max-width:1600px;width:100%;padding:24px 26px;margin:10px 0">'
     +'<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">'
     +'<span class="stpill" style="background:#7c3aed">모집 기관: '+esc((p.author&&p.author.organization)||'')+'</span>'
     +'<b style="font-size:17px">'+esc(p.competitionName)+'</b>'
@@ -1723,7 +1740,28 @@ async function _renderDetailInner(isStale){
     +((payConsentReady(p)&&SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid&&a.payInfo))?'<button class="stbtn stbtn-soft" style="padding:11px 18px" onclick="printPayConsent(\''+p.id+'\',SME.uid)" title="내 수당 정보와 전자서명이 기입된 동의서">📄 내 수당 동의서 인쇄</button>':'')
     +'</div></div>';
   // div는 await 전에 이미 DOM에 추가됨 — innerHTML 설정만으로 내용 갱신
+  div.dataset.pid=String(p.id);div.dataset.day=String(DT_DAY);
+  if(manage)stFilter();
+  if(_keepTop)div.scrollTop=_keepTop;
 }
+/* [2026-10-20] 신청 현황 찾기 — 이름·연락처·지역·자격·희망 임무 검색 + 상태 칩 + 희망 임무. 화면을 다시 그리지 않고 줄만 숨김(입력 중 글자 유지) */
+function stFilterBar(apps,dd){const stOf=a=>(a.status&&a.status[dd.date])||'대기';const cnt={전체:apps.length,대기:0,보류:0,확정:0,거절:0};apps.forEach(a=>{const x=stOf(a);if(cnt[x]!=null)cnt[x]++});
+  const roles=[...new Set([].concat(dd.roles||[],...apps.map(a=>(a.prefs||{})[dd.date]||[])))].filter(Boolean);
+  const col={전체:'#153A77',대기:'#6b7280',보류:'#b8860b',확정:'#0f766e',거절:'#C41E2F'};
+  return '<div id="stFind" style="position:sticky;top:-12px;z-index:6;background:#fff;border:2px solid #153A77;border-radius:14px;padding:10px 12px;margin:8px 0 6px;box-shadow:0 6px 16px rgba(21,58,119,.12)">'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div style="position:relative;flex:1;min-width:200px"><input id="stQ" type="search" value="'+esc(STRS.q||'')+'" placeholder="🔍 이름·연락처 뒷자리·지역·자격·임무로 찾기" oninput="STRS.q=this.value;stFilter()" onkeydown="if(event.key===\'Enter\'){event.preventDefault();stJump()}" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #c9d8ef;border-radius:10px;font-size:14.5px;font-weight:700"></div>'
+    +'<select id="stRole" onchange="STRS.role=this.value;stFilter()" style="padding:9px 10px;border:1.5px solid #c9d8ef;border-radius:10px;font-size:13px;font-weight:700"><option value="">희망 임무 전체</option>'+roles.map(r=>'<option'+(STRS.role===r?' selected':'')+'>'+esc(r)+'</option>').join('')+'</select></div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">'+Object.keys(cnt).map(k=>{const on=(STRS.st||'전체')===k;return '<button type="button" class="stChip" data-k="'+k+'" onclick="STRS.st=\''+k+'\';stFilter()" style="border:1.5px solid '+col[k]+';background:'+(on?col[k]:'#fff')+';color:'+(on?'#fff':col[k])+';border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:900;cursor:pointer">'+k+' '+cnt[k]+'</button>'}).join('')
+    +'<span id="stCnt" style="font-size:12.5px;font-weight:800;color:#153A77;margin-left:auto"></span><button type="button" id="stReset" onclick="STRS.q=\'\';STRS.st=\'전체\';STRS.role=\'\';var q=document.getElementById(\'stQ\');if(q)q.value=\'\';var r=document.getElementById(\'stRole\');if(r)r.value=\'\';stFilter()" style="display:none;border:0;background:#eef3fa;color:#153A77;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:800;cursor:pointer">필터 해제</button></div></div>'}
+function stNorm(t){return String(t||'').toLowerCase().replace(/[\s\-·]/g,'')}
+function stFilter(){const m=document.getElementById('dtModal');if(!m)return;const q=stNorm(STRS.q),st=STRS.st||'전체',role=STRS.role||'';let n=0,tot=0;
+  m.querySelectorAll('tr.stR').forEach(tr=>{tot++;const ok=(!q||tr.dataset.q.indexOf(q)>=0)&&(st==='전체'||tr.dataset.st===st)&&(!role||('|'+tr.dataset.role+'|').indexOf('|'+role+'|')>=0);tr.style.display=ok?'':'none';if(ok)n++;
+    const d=document.getElementById('strs_'+tr.dataset.id);if(d&&!ok)d.style.display='none'});
+  m.querySelectorAll('tr.stG').forEach(g=>{let x=g.nextElementSibling,any=false;while(x&&!x.classList.contains('stG')){if(x.classList.contains('stR')&&x.style.display!=='none'){any=true;break}x=x.nextElementSibling}g.style.display=any?'':'none'});
+  m.querySelectorAll('.stChip').forEach(b=>{const on=b.dataset.k===st;const c=b.style.borderColor;b.style.background=on?c:'#fff';b.style.color=on?'#fff':c});
+  const c=document.getElementById('stCnt');const f=!!(q||st!=='전체'||role);if(c)c.textContent=f?n+'명 표시 / '+tot+'명':'';const r=document.getElementById('stReset');if(r)r.style.display=f?'':'none';
+  let e=document.getElementById('stNone');if(!n&&tot){if(!e){e=document.createElement('div');e.id='stNone';e.style.cssText='text-align:center;color:#8a919d;font-size:13px;padding:16px';e.textContent='조건에 맞는 신청자가 없습니다.';const w=m.querySelector('.strs');if(w&&w.parentNode)w.parentNode.insertBefore(e,w.nextSibling)}}else if(e)e.remove()}
+function stJump(){const m=document.getElementById('dtModal');if(!m)return;const tr=[...m.querySelectorAll('tr.stR')].find(x=>x.style.display!=='none');if(!tr)return;tr.scrollIntoView({block:'center',behavior:'smooth'});tr.style.transition='background .6s';tr.style.background='#fff3c4';setTimeout(()=>{tr.style.background=''},1400)}
 // ══════════════ 신청 ══════════════
 function openApplyForm(id){
   const p=POSTS.find(x=>x.id===id);if(!p)return;
