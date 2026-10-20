@@ -612,6 +612,22 @@ function adNext(){const P=adParse(AD.text);if(!P.rows.length){say('선수를 한
 function lkLinkSel(div,name,selId){const el=document.getElementById(selId);const pid=el&&el.value;if(!pid){say('연결할 참가 신청 팀을 골라 주세요');return}lkApply(div,name,pid)}
 // 자동 연결 — 운영진 화면이 열려 있을 때, 부문+학교가 정확히 하나로 맞고 아직 다른 팀에 쓰이지 않은 신청만
 let LK_T=null,LK_BUSY=false,LK_LOG=[];
+/* [2026-10-20] 팀 수정 신청이 부문·팀 구분·소속 빈칸으로 저장된 경우(바뀐 부문명 때문) — 같은 팀의 앞 신청 값으로 채워 공고에 한 번 저장.
+   운영진(공고 수정 권한 있는 계정)이 이 화면을 열 때 자동으로 실행, 권한이 없으면 조용히 건너뜀(화면 표시는 entries() 가 이미 채워 보여 줌) */
+let CLR_DONE=false;
+async function claimRepair(){if(!STAFF||CLR_DONE||!SLOT)return;CLR_DONE=true;const ck=c=>c&&(c.pid||c.uid);const cl=SLOT.claimed||[];const fix=[];
+  cl.forEach((c,i)=>{if(!c||!c.team)return;if((c.prefs||[])[0]&&c.teamType&&c.teamOrg)return;const prev=cl.slice(0,i).filter(p=>p&&p.team&&ck(p)===ck(c));if(!prev.length)return;
+    const f=Object.assign({},c);let ch=false;for(let j=prev.length-1;j>=0;j--){const p=prev[j];
+      if(!(f.prefs||[])[0]&&(p.prefs||[])[0]){f.prefs=p.prefs.slice();ch=true}
+      if(!f.teamType&&p.teamType){f.teamType=p.teamType;ch=true}
+      if(!f.teamOrg&&p.teamOrg){f.teamOrg=p.teamOrg;if(!f.teamOrgId&&p.teamOrgId)f.teamOrgId=p.teamOrgId;if(!f.teamSchoolCode&&p.teamSchoolCode)f.teamSchoolCode=p.teamSchoolCode;ch=true}}
+    if(ch){f.repairedAt=new Date().toISOString();fix.push([i,f])}});
+  if(!fix.length)return;
+  try{const ref=DB.collection('compSlots').doc(SLOT_ID);let n=0;
+    await DB.runTransaction(async tx=>{const d=await tx.get(ref);const arr=((d.data()||{}).claimed||[]).slice();n=0;
+      fix.forEach(([i,f])=>{const cur=arr[i];if(cur&&ck(cur)===ck(f)&&String(cur.at||'')===String(f.at||'')){arr[i]=f;n++}});if(n)tx.update(ref,{claimed:arr})});
+    if(n)say('✓ 빈칸으로 저장됐던 팀 수정 신청 '+n+'건의 부문·소속을 앞 신청 값으로 채웠습니다')}
+  catch(e){console.warn('claim repair',e)}}
 function lkAutoSoon(){if(!STAFF)return;clearTimeout(LK_T);LK_T=setTimeout(lkAuto,1200)}
 async function lkAuto(){if(!STAFF||LK_BUSY||!MATCHES.length||!SLOT)return;LK_BUSY=true;try{
   const T=lkTeams();const used={};Object.values(T).forEach(t=>{if(t.pid)used[t.div+'|'+t.pid]=1});
@@ -663,7 +679,7 @@ async function boot(){
   UNSUB.push(DB.collection('compOrders').where('slotId','==',SLOT_ID).onSnapshot(s=>{ORDERS={};s.docs.forEach(d=>ORDERS[d.id]=Object.assign({id:d.id},d.data()));lkVirtual();render();if(RC_ID)rcRender()},e=>console.warn('orders',e)));
   UNSUB.push(DB.collection('compStats').doc(SLOT_ID).onSnapshot(d=>{BOARD=(d.exists&&d.data().board)||null;FORMAT=(d.exists&&d.data().format)||{};DRAWS=(d.exists&&d.data().draws)||{};LOTS=(d.exists&&d.data().lots)||{};SLOT_REFS=(d.exists&&d.data().refUids)||[];SLOT_EVALS=(d.exists&&d.data().evalUids)||[];SLOT_ROLES=(d.exists&&d.data().refRoles)||{};CREWDEFS=(d.exists&&d.data().crewDefs)||{};COURTPLAN=(d.exists&&d.data().courtPlan)||{};if(RC_ID)rcRender();if((TAB==='board'&&!BD_DRAG)||TAB==='stats')render()},e=>console.warn('board',e)));
   UNSUB.push(DB.collection('compEvals').where('slotId','==',SLOT_ID).onSnapshot(s=>{EVALS=s.docs.map(d=>Object.assign({id:d.id},d.data()));EVAL_ERR='';if(TAB==='eval')render()},e=>{EVAL_ERR=String(e&&e.code||e);if(TAB==='eval')render()}));
-  UNSUB.push(DB.collection('compSlots').doc(SLOT_ID).onSnapshot(d=>{if(!d.exists)return;SLOT=d.data();lkVirtual();render();lkAutoSoon()},e=>console.warn('slot',e)));   // [연결 2026-10-18] 새 신청이 들어오면 바로 반영·자동 연결
+  UNSUB.push(DB.collection('compSlots').doc(SLOT_ID).onSnapshot(d=>{if(!d.exists)return;SLOT=d.data();lkVirtual();render();lkAutoSoon();claimRepair()},e=>console.warn('slot',e)));   // [연결 2026-10-18] 새 신청이 들어오면 바로 반영·자동 연결
   UNSUB.push(DB.collection('golfRounds').where('slotId','==',SLOT_ID).onSnapshot(s=>{ROUNDS=s.docs.map(d=>Object.assign({id:d.id},d.data()));render();if(GOLF_ID)golfRender()},e=>console.warn('golf',e)));
   render();
   // [확정 심판 권한 2026-10-15] 운영진이 열면 이 대회 심판 공고에서 확정된 신청자 uid 를 compStats.refUids 로 맞춰 둠 → 경기별 배정 없이도 기록 가능(보안 규칙 v55)
