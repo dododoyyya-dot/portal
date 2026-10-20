@@ -825,7 +825,7 @@ async function togglePayStatus(slotId,uid,pid,at){
     const nd=await ref.get();
     const ci=CSLOTS.findIndex(x=>x.id===slotId);
     if(ci>=0)CSLOTS[ci]=nd;
-    const old=document.getElementById('rosterModal');if(old)old.remove();
+    /* [2026-10-20] 창을 지우지 않고 viewRoster 가 자리 유지하며 바꿔 그림 */
     viewRoster(slotId);
   }catch(e){alert('입금상태 변경 실패: '+e.message)}
 }
@@ -889,7 +889,7 @@ async function setClaimReview(slotId,key,st,name,uid){
           KFDF.notify(_k,(st==='승인'?'✅ ['+ttl+'] 참가 신청이 승인되었습니다':'❌ ['+ttl+'] 참가 신청이 반려되었습니다'+(reason.trim()?' — 사유: '+reason.trim():''))+' (보호자 신청)','competition.html?slot='+slotId);
       }catch(e){}
     }
-    const m=document.getElementById('rosterModal'); if(m)m.remove();
+    /* [2026-10-20] 자리 유지 */
     viewRoster(slotId);
   }catch(e){ alert('처리 실패: '+e.message+'\n(중앙 관리자 권한이 필요할 수 있습니다)'); }
 }
@@ -899,7 +899,7 @@ async function clearClaimReview(slotId,key){
     await DB.collection('compSlots').doc(slotId).update(
       new firebase.firestore.FieldPath('reviewStatus',key), firebase.firestore.FieldValue.delete());
     await _refreshSlot(slotId);
-    const m=document.getElementById('rosterModal'); if(m)m.remove();
+    /* [2026-10-20] 자리 유지 */
     viewRoster(slotId);
   }catch(e){ alert('처리 실패: '+e.message); }
 }
@@ -1309,7 +1309,7 @@ async function restoreClaim(slotId,key){
   }catch(e){alert(/permission|insufficient/i.test(String((e&&e.message)||e))?'되살리기 권한이 없습니다 — 관리자 또는 이 대회 관할 시도임원만 할 수 있습니다.':'되살리기 실패: '+cErrMsg(e));return}
   try{if(last0.uid&&last0.uid!==CME.uid)Promise.resolve(KFDF.notify(last0.uid,'↩ ['+(s0.title||'대회')+'] 취소되었던 「'+(last0.name||'')+'」 '+(last0.team?'팀 ':'')+'신청을 담당자가 되살렸습니다','competition.html?slot='+slotId)).catch(function(){})}catch(e){}
   try{await _refreshSlot(slotId)}catch(e){}
-  const m=document.getElementById('rosterModal');if(m)m.remove();
+  /* [2026-10-20] 자리 유지 */
   try{await viewRoster(slotId)}catch(e){}
   alert('↩ ['+(last0.name||'')+'] 신청을 되살렸습니다.');
 }

@@ -126,7 +126,7 @@
 .rc .ctrl button{margin-left:auto;border:none;border-radius:10px;padding:8px 14px;font-weight:900;cursor:pointer;background:var(--b);color:#fff}
 .rc .tip{display:flex;gap:8px;align-items:center;background:#fff;border:1px solid var(--ln);border-left:4px solid var(--y);color:var(--ink);border-radius:12px;padding:9px 12px;font-size:13px;font-weight:700;margin-bottom:10px;flex-wrap:wrap;box-shadow:var(--sh)}
 .rc .tip button{border:none;background:var(--b);color:#fff;border-radius:999px;padding:6px 12px;font-weight:900;cursor:pointer;font-size:12.5px}.rc .tip .nx{background:transparent;color:var(--mut);text-decoration:underline;margin-left:auto}
-.rc .body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:14px 14px 100px}
+.rc .body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:14px 14px 100px}
 @media(min-width:760px){.rc .body{max-width:1180px;margin:0 auto;width:100%}}
 /* 점수판 (네이비) */
 .rc .sb{display:grid;grid-template-columns:1fr minmax(250px,1.35fr) 1fr;gap:12px;align-items:stretch;background:linear-gradient(145deg,#111c35 0%,#1c2e55 60%,#223a6a 100%);color:#fff;border:1px solid #2b3f6b;border-radius:22px;padding:16px 16px 14px;box-shadow:0 18px 40px rgba(15,23,42,.22)}
@@ -1424,11 +1424,14 @@ async function entryDivSave(pid,dv){const ref=DB.collection('compSlots').doc(SLO
   catch(e){say('신청 부문 변경 실패: '+(/permission/i.test(String(e))?'권한이 없습니다(관리자·관할 시도연맹 임원만)':(e.message||e))+'\n오더지의 출전 부문은 저장되었습니다.')}}
 function orderPdf(pid){const o=orderOf(pid);if(!o){say('아직 저장된 오더지가 없습니다');return}MR.printOrder(o)}
 // ══ 기록 콘솔 ══
+let RC_SIG='';
 function rcOpen(id){
-  RC_ID=id;const m=MATCHES.find(x=>x.id===id);
+  RC_ID=id;RC_SIG='';const m=MATCHES.find(x=>x.id===id);
   let ov=document.getElementById('rcOv');if(!ov){ov=document.createElement('div');ov.id='rcOv';ov.className='rc';document.body.appendChild(ov);document.body.style.overflow='hidden'}
   try{history.replaceState(null,'',PAGE+'?m='+id)}catch(e){}
-  if(RC_UNSUB)RC_UNSUB();let first=true;RC_UNSUB=DB.collection('liveMatches').doc(id).onSnapshot(d=>{if(!d.exists){rcClose();return}const x=Object.assign({id:d.id},d.data());const i=MATCHES.findIndex(y=>y.id===id);if(i>=0)MATCHES[i]=x;else MATCHES.push(x);if(first){first=false;if(!m&&canRec(x)&&!x.locked&&MR.ctrlState(x,ME&&ME.uid)!=='other')rcClaim(false)}rcRender()},e=>console.warn('rc',e));
+  if(RC_UNSUB)RC_UNSUB();let first=true;RC_UNSUB=DB.collection('liveMatches').doc(id).onSnapshot(d=>{if(!d.exists){rcClose();return}const x=Object.assign({id:d.id},d.data());const i=MATCHES.findIndex(y=>y.id===id);if(i>=0)MATCHES[i]=x;else MATCHES.push(x);if(first){first=false;if(!m&&canRec(x)&&!x.locked&&MR.ctrlState(x,ME&&ME.uid)!=='other')rcClaim(false)}
+    const sig=JSON.stringify(Object.assign({},x,{ctrl:Object.assign({},x.ctrl||{},{at:0}),updatedAt:0}));if(!first&&sig===RC_SIG){rcTick();return}RC_SIG=sig;   /* [2026-10-20] 입력권 심장박동만 바뀐 건 다시 그리지 않음(휴대폰 스크롤 끊김 방지) */
+    rcRender()},e=>console.warn('rc',e));
   DB.collection('compSigns').doc(id).get().then(d=>{SIGNS=d.exists?d.data():{}}).catch(()=>{SIGNS={}});
   if(RC_TICK)clearInterval(RC_TICK);RC_TICK=setInterval(rcTick,1000);
   if(m&&canRec(m))rcClaim(false);
@@ -1519,7 +1522,9 @@ function rcRender(){
   if(m.locked&&STAFF)fb.push('<button class="act" onclick="rcUnlock()">정정</button>');
   if(fb.length)h+='<div class="foot">'+fb.join('')+'</div>';
   if(QK.toast)h+='<div class="toast">'+esc(QK.toast.text)+(QK.toast.evId?'<button onclick="qkUndo()">되돌리기</button>':'')+'</div>';
-  ov.innerHTML=h;const bd=ov.querySelector('.body');if(bd){bd.scrollTop=keep;if(anc){const e=bd.querySelector('[data-anc="'+anc.id+'"]');if(e){const t=e.getBoundingClientRect().top-bd.getBoundingClientRect().top;if(Math.abs(t-anc.t)>1)bd.scrollTop+=(t-anc.t)}}}rcBind();rcTick();
+  ov.innerHTML=h;const bd=ov.querySelector('.body');if(bd){const w=QK.want&&Date.now()<QK.want.until?rcAncTop(bd,QK.want.id):null;
+    if(w!=null)bd.scrollTop=w;   /* 이동 중이면 목표 위치로 */
+    else{bd.scrollTop=keep;if(anc){const e=bd.querySelector('[data-anc="'+anc.id+'"]');if(e){const t=e.getBoundingClientRect().top-bd.getBoundingClientRect().top;if(Math.abs(t-anc.t)>1)bd.scrollTop+=(t-anc.t)}}}}rcBind();rcTick();
 }
 function rcTipHtml(){let seen=false;try{seen=localStorage.getItem('kfdf_rc_tip2')==='1'}catch(e){}if(seen)return '';return '<div class="tip">💡 처음이신가요? 득점·제재·작전타임 방법을 30초 만에 볼 수 있습니다.<button onclick="rcHelp()">사용법 보기</button><button class="nx" onclick="try{localStorage.setItem(\'kfdf_rc_tip2\',\'1\')}catch(e){};rcRender()">다시 보지 않기</button></div>'}
 function rcHelp(){sheet('<div class="hd"><b>❓ 기록 콘솔 사용법</b><button class="x" onclick="sheetClose()">✕</button></div><ol class="help">'
@@ -1696,7 +1701,11 @@ function qkCancel(){QK.pend=null;if(QK.mode==='card'&&QK.jump)QK.mode='goal';rcR
 /* [2026-10-19] 위 줄 득점·제재 — 모드를 바꾸고 두 팀 선수 명단으로 내려감. 저장·취소하면 점수판으로 돌아옴(제재는 끝나면 득점으로) */
 function qkTop(md){QK.mode=md;QK.pend=null;QK.swap=false;QK.swapSel=null;QK.jump='all';rcRender();setTimeout(()=>rcScrollTo('qteams','start'),30)}
 // [13차] 스코어 숫자 → 그 팀 선수 명단(득점 모드)으로 바로 이동, 저장·취소 뒤 스코어로 복귀 — 휴대폰에서 스크롤을 줄이기 위함
-function rcScrollTo(id,block){const bd=document.querySelector('#rcOv .body');const e=bd&&bd.querySelector('[data-anc="'+id+'"]');if(!e)return;try{e.scrollIntoView({block:block||'start',behavior:'smooth'})}catch(x){e.scrollIntoView()}setTimeout(()=>{const e2=bd.querySelector('[data-anc="'+id+'"]');if(!e2)return;const d=e2.getBoundingClientRect().top-bd.getBoundingClientRect().top;if(Math.abs(d)>40)bd.scrollTop+=d-8},700)}   /* 부드러운 스크롤이 멈추는 기기 대비 */
+function rcAncTop(bd,id){const e=bd&&bd.querySelector('[data-anc="'+id+'"]');if(!e)return null;return bd.scrollTop+(e.getBoundingClientRect().top-bd.getBoundingClientRect().top)-8}
+function rcScrollTo(id,block){const bd=document.querySelector('#rcOv .body');const top=rcAncTop(bd,id);if(top==null)return;QK.want={id:id,until:Date.now()+1500};
+  const coarse=(function(){try{return matchMedia('(pointer:coarse)').matches}catch(e){return false}})();
+  if(coarse){bd.scrollTop=top}else{try{bd.scrollTo({top:top,behavior:'smooth'})}catch(x){bd.scrollTop=top}}
+  [450,900].forEach(ms=>setTimeout(()=>{if(!QK.want||QK.want.id!==id)return;const bd2=document.querySelector('#rcOv .body');const t2=rcAncTop(bd2,id);if(t2!=null&&Math.abs(bd2.scrollTop-t2)>40)bd2.scrollTop=t2},ms))}   /* 부드러운 스크롤이 멈추는 기기 대비 */
 function qkJump(side){QK.mode='goal';QK.pend=null;QK.swap=false;QK.swapSel=null;QK.jump=side;rcRender();setTimeout(()=>rcScrollTo('qt-'+side,'start'),30)}
 function qkJumpBack(){if(!QK.jump)return;QK.jump=null;setTimeout(()=>rcScrollTo('sb','start'),80)}
 function qkScorerObj(side,p){QK.pend=qkNew(side,'assist');QK.pend.scorer=p;rcRender()}
@@ -1715,7 +1724,7 @@ async function qkCardSave(){const P=QK.pend;if(!P||P.stage!=='card'||!P.card)ret
   await sendEvent({kind:'add',id:RC_ID,ev:ev,opts:{requireCtrl:true}});
   // 퇴장 선수는 주전에서 빼 후보 칸으로(잠김) — 빈 자리에 다른 선수를 넣어 인원 그대로 진행
   if(willOff&&P.target.key){const T=teamPl(m,P.side);if(T&&T.onKeys.indexOf(P.target.key)>=0){const Lu=Object.assign({},m.lineup||{});Lu[P.side]={on:T.onKeys.filter(k=>k!==P.target.key)};await rcUpdate({lineup:Lu})}}}
-function qkToast(text,evId){try{if(navigator.vibrate)navigator.vibrate(35)}catch(e){}QK.toast={text:'✓ '+text,evId:evId};clearTimeout(QK.toastT);QK.toastT=setTimeout(()=>{QK.toast=null;rcRender()},9000);rcRender();qkJumpBack()}
+function qkToast(text,evId){try{if(navigator.vibrate)navigator.vibrate(35)}catch(e){}QK.toast={text:'✓ '+text,evId:evId};clearTimeout(QK.toastT);QK.toastT=setTimeout(()=>{QK.toast=null;const t=document.querySelector('#rcOv .toast');if(t)t.remove()},9000);rcRender();qkJumpBack()}
 function lastEv(m){const L=(m.events||[]).filter(e=>e&&!e.void&&e.type&&['goal','card','timeout'].indexOf(e.type)>=0);return L[L.length-1]||null}
 async function qkUndoLast(){const m=RCM();const e=lastEv(m);if(!e)return;const L=MR.evLine(e);if(!confirm('마지막 기록을 되돌릴까요?\n'+((m[e.side]||{}).name||'')+' · '+(e.type==='timeout'?'작전타임':L.who)+(L.min?' · '+L.min:'')+'\n(기록은 지워지지 않고 취소 표시만 남습니다)'))return;QK.toast=null;await sendEvent({kind:'void',id:RC_ID,evId:e.id});if(m.brk&&m.brk.evId===e.id)await rcUpdate({brk:null});if(e.type==='card')await capClear(e.side,e.id)}
 async function qkUndo(){const t=QK.toast;if(!t||!t.evId)return;QK.toast=null;clearTimeout(QK.toastT);const m=RCM();rcRender();await sendEvent({kind:'void',id:RC_ID,evId:t.evId});if(m&&m.brk&&m.brk.evId===t.evId)await rcUpdate({brk:null});const ev=m&&(m.events||[]).find(x=>x.id===t.evId);if(ev&&ev.type==='card')await capClear(ev.side,ev.id)}
