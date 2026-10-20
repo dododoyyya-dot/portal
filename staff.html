@@ -1720,6 +1720,7 @@ async function _renderDetailInner(isStale){
     +'<div style="font-size:13px;margin-top:5px"><b>임무:</b> '+esc((dd.roles||[]).join(' · ')||'-')+'</div>'
     +'<div style="font-size:13px;margin-top:5px"><b>수당:</b> '+payHtml+'</div>'
     +((p.consentForm&&p.consentForm!=='none'&&p.consentFormUrl)?'<div style="font-size:13px;margin-top:5px"><b>서면 동의서 양식:</b> <a href="'+esc(p.consentFormUrl)+'" target="_blank" style="color:#153A77;font-weight:800">📎 '+esc(p.consentFormName||'내려받기')+' →</a></div>':'')
+    +'<div id="stPractice"></div>'
     +'<div style="font-size:13px;margin-top:12px"><b>👥 신청 현황 ('+dayApps.length+'명)</b></div>'+appsHtml
     +'</div>'
     +confirmPanelHtml(Object.assign({_postId:p.id},dd),dayApps,_decide,manage)   // [확정현황] 역할별 인원수·명단 패널 (+임무 완료 버튼) · manage=false 면 인원수만
@@ -1743,7 +1744,14 @@ async function _renderDetailInner(isStale){
   div.dataset.pid=String(p.id);div.dataset.day=String(DT_DAY);
   if(manage)stFilter();
   if(_keepTop)div.scrollTop=_keepTop;
+  stPracticeLoad(p,apps);
 }
+/* [2026-10-20] 연습용 대회 — 이 공고의 확정자(어느 날짜든)와 관리자에게 「🧪 연습 대회에서 미리 해 보기」 */
+async function stPracticeLoad(p,apps){const el=document.getElementById('stPractice');if(!el||!SME)return;
+  const mine=(apps||[]).find(a=>a.uid===SME.uid);const ok=canManage(p)||!!(mine&&Object.values(mine.status||{}).indexOf('확정')>=0);if(!ok)return;
+  const nm=t=>String(t||'').replace(/^🏆\s*/,'').replace(/^\[연습\]\s*/,'').replace(/\s+/g,'');
+  try{const q=await DB.collection('compSlots').where('test','==',true).get();const hit=q.docs.map(d=>Object.assign({id:d.id},d.data())).find(x=>nm(x.title)===nm(p.competitionName)||(x.srcSlotId&&x.srcSlotId===p.slotId));if(!hit)return;
+    el.innerHTML='<div style="margin-top:12px;background:#f5f3ff;border:1.5px solid #ddd6fe;border-radius:12px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:200px;font-size:13px;color:#4c1d95;font-weight:800;line-height:1.5">🧪 <b>연습 대회</b>가 준비돼 있어요 — 진짜 대회와 똑같은 대진에서 경기 시작·득점·제재·종료, 심판 배정·시간표까지 마음껏 눌러 보세요. 실제 대회에는 영향이 없습니다.</div><a class="stbtn" style="background:#7c3aed;color:#fff;text-decoration:none;padding:9px 14px" href="match.html?slot='+esc(hit.id)+'&tab=board">🧪 연습 대회 열기 →</a></div>'}catch(e){}}
 /* [2026-10-20] 신청 현황 찾기 — 이름·연락처·지역·자격·희망 임무 검색 + 상태 칩 + 희망 임무. 화면을 다시 그리지 않고 줄만 숨김(입력 중 글자 유지) */
 function stFilterBar(apps,dd){const stOf=a=>(a.status&&a.status[dd.date])||'대기';const cnt={전체:apps.length,대기:0,보류:0,확정:0,거절:0};apps.forEach(a=>{const x=stOf(a);if(cnt[x]!=null)cnt[x]++});
   const roles=[...new Set([].concat(dd.roles||[],...apps.map(a=>(a.prefs||{})[dd.date]||[])))].filter(Boolean);

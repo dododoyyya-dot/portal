@@ -316,6 +316,15 @@ body:has(#rfModal),body:has(#mfModal),body:has(#odModal){overflow:hidden}
   .rc .top .meta{display:none}.rc .top .hb,.rc .top .x{padding:7px 10px}
   .rc .pbar button{min-width:0;flex:1;font-size:14.5px}.rc .pg{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))}.rc .pc{min-height:84px}.rc .pc b{font-size:30px}
   .rc .qh .qb{margin-left:0;width:100%}.rc .qh .qb button{flex:1}.rc .ctrl{flex-wrap:wrap}.rc .ctrl .ofs{margin-left:0;padding-left:0;border-left:none;width:100%;white-space:normal;font-size:12px}
+@media(max-width:640px){   /* [2026-10-20] 휴대폰: 상태·버튼 한 줄 / 심판진 한 줄 / 득점·제재 44px — 화면의 1/3을 차지하던 것 */
+  .rc .ctrl{flex-wrap:wrap;gap:4px 6px;padding:6px 10px;font-size:12px}
+  .rc .ctrl>span:first-child{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rc .ctrl .ofs{order:3;flex:1 1 100%;width:auto;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+  .rc .ctrl .ed{order:2;margin-left:0;padding:5px 8px;font-size:11.5px;border-radius:8px}
+  .rc .ctrl>button{order:2;margin-left:0;padding:6px 10px;font-size:12px}
+  .rc .ctrl .tmode{order:4;width:100%;gap:6px}
+  .rc .ctrl .tmode button{padding:0 8px;min-height:44px;font-size:15px}
+}
 }
 @media(min-width:561px) and (max-width:900px){.rc .sb{grid-template-columns:1fr minmax(230px,1.45fr) 1fr}.rc .clk{font-size:clamp(58px,9.5vw,88px)}.rc .sbt .v{font-size:clamp(44px,7vw,64px)}.rc .sbt .kit{font-size:13.5px}}
 /* 바텀 시트 */
@@ -665,7 +674,7 @@ function lkPanel(){if(!STAFF)return '';const T=lkTeams();const L=Object.values(T
   return h+'</details>'}
 let LK_OPEN=false;   /* [2026-10-19] 연결 창은 기본 접힘 — 제출된 오더지 목록이 바로 보이게 */
 function teamOf(side,m){return (m&&m[side])||{}}
-let SLOT_REFS=[],SLOT_EVALS=[],SLOT_ROLES={},CREWDEFS={},COURTPLAN={};   /* [2026-10-20] 심판조 편성(crewDefs)·구장 배치(courtPlan) */
+let SLOT_REFS=[],SLOT_EVALS=[],SLOT_ROLES={},CREWDEFS={},COURTPLAN={},PRACTICE=false;   /* PRACTICE: 연습용 공고에서 확정 심판이 운영진 기능을 쓰는 중(보안 규칙 v59) */   /* [2026-10-20] 심판조 편성(crewDefs)·구장 배치(courtPlan) */
 /* 기록 권한 uid · 평가 권한 uid(확정 심판 전원) · uid→확정 임무 */
 // [기록 권한 2026-10-18] 스코어판 조작·팀 평가 = 관리자(운영진) + 이 대회 심판 공고에서 감독관·주심·기록심(기록원)·심판위원장으로 확정된 사람(대회 전체 경기).
 //   경기별로 이름이 올라간 사람도 그 경기에서 감독관·주심·기록원 역할일 때만. 부심·점수원·봉사요원은 보기만.
@@ -693,7 +702,9 @@ async function boot(){
   document.getElementById('mrHp').textContent=[dateK(SLOT.date),SLOT.place,SLOT.host].filter(Boolean).join(' · ');
   UNSUB.push(DB.collection('liveMatches').where('slotId','==',SLOT_ID).onSnapshot(s=>{MATCHES=s.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>String(a.day||'').localeCompare(String(b.day||''))||(+a.order||0)-(+b.order||0));lkVirtual();render();lkAutoSoon();if(RC_ID)rcRender()},e=>console.warn('matches',e)));
   UNSUB.push(DB.collection('compOrders').where('slotId','==',SLOT_ID).onSnapshot(s=>{ORDERS={};ORDERS_READY=true;s.docs.forEach(d=>ORDERS[d.id]=Object.assign({id:d.id},d.data()));lkVirtual();render();if(RC_ID)rcRender()},e=>console.warn('orders',e)));
-  UNSUB.push(DB.collection('compStats').doc(SLOT_ID).onSnapshot(d=>{BOARD=(d.exists&&d.data().board)||null;FORMAT=(d.exists&&d.data().format)||{};DRAWS=(d.exists&&d.data().draws)||{};LOTS=(d.exists&&d.data().lots)||{};SLOT_REFS=(d.exists&&d.data().refUids)||[];SLOT_EVALS=(d.exists&&d.data().evalUids)||[];SLOT_ROLES=(d.exists&&d.data().refRoles)||{};CREWDEFS=(d.exists&&d.data().crewDefs)||{};COURTPLAN=(d.exists&&d.data().courtPlan)||{};if(RC_ID)rcRender();if((TAB==='board'&&!BD_DRAG)||TAB==='stats')render()},e=>console.warn('board',e)));
+  UNSUB.push(DB.collection('compStats').doc(SLOT_ID).onSnapshot(d=>{BOARD=(d.exists&&d.data().board)||null;FORMAT=(d.exists&&d.data().format)||{};DRAWS=(d.exists&&d.data().draws)||{};LOTS=(d.exists&&d.data().lots)||{};SLOT_REFS=(d.exists&&d.data().refUids)||[];SLOT_EVALS=(d.exists&&d.data().evalUids)||[];SLOT_ROLES=(d.exists&&d.data().refRoles)||{};CREWDEFS=(d.exists&&d.data().crewDefs)||{};COURTPLAN=(d.exists&&d.data().courtPlan)||{};
+    if(ME&&SLOT&&SLOT.test&&!STAFF&&(SLOT_REFS.indexOf(ME.uid)>=0||SLOT_EVALS.indexOf(ME.uid)>=0)){STAFF=true;PRACTICE=true;render();return}   /* [2026-10-20] 연습용 공고 — 확정 심판은 운영진처럼 */
+    if(RC_ID)rcRender();if((TAB==='board'&&!BD_DRAG)||TAB==='stats')render()},e=>console.warn('board',e)));
   UNSUB.push(DB.collection('compEvals').where('slotId','==',SLOT_ID).onSnapshot(s=>{EVALS=s.docs.map(d=>Object.assign({id:d.id},d.data()));EVAL_ERR='';if(TAB==='eval')render()},e=>{EVAL_ERR=String(e&&e.code||e);if(TAB==='eval')render()}));
   UNSUB.push(DB.collection('compSlots').doc(SLOT_ID).onSnapshot(d=>{if(!d.exists)return;SLOT=d.data();lkVirtual();render();lkAutoSoon();claimRepair()},e=>console.warn('slot',e)));   // [연결 2026-10-18] 새 신청이 들어오면 바로 반영·자동 연결
   UNSUB.push(DB.collection('golfRounds').where('slotId','==',SLOT_ID).onSnapshot(s=>{ROUNDS=s.docs.map(d=>Object.assign({id:d.id},d.data()));render();if(GOLF_ID)golfRender()},e=>console.warn('golf',e)));
@@ -718,7 +729,7 @@ async function pickLanding(){const main=document.getElementById('mrMain');docume
   const myRef=s=>{const x=stats[s.id]||{};const u=ME.uid;return (x.refUids||[]).indexOf(u)>=0?'rec':(x.evalUids||[]).indexOf(u)>=0?'eval':''};
   slots.sort((a,b)=>(myRef(b)?1:0)-(myRef(a)?1:0));
   const row=s=>{const st=(stats[s.id]||{}).stats||{};const mr=myRef(s);const n=st.total||0,p=st.played||0;const live=n>p&&p>=0&&(stats[s.id]||{}).updatedAt&&String(s.date||'')===today;
-    return '<a class="mr-pk'+(live?' live':'')+'" href="'+PAGE+'?slot='+esc(s.id)+'"'+(mr?' style="border-color:#d4a017;box-shadow:0 0 0 3px #fbefc4"':'')+'>'+(mr?'<div style="font-size:12px;font-weight:900;color:#7c4a03;margin-bottom:4px">🧑‍⚖️ 내 심판 업무 · '+(mr==='rec'?'경기 기록·종료 가능':'팀 평가 가능')+'</div>':'')+'<div class="t">'+esc(s.title||'')+'</div><div class="d">'+esc([dateK(s.date),s.place,s.region].filter(Boolean).join(' · '))+'</div><div class="s">'+(n?'<span class="mr-pill" style="background:#153A77">경기 '+n+'</span><span class="mr-pill" style="background:#0f766e">종료 '+p+'</span>':'<span class="mr-pill">경기 미생성</span>')+'<span class="mr-pill" style="background:#b8860b">참가 '+((s.claimed||[]).filter(c=>c&&!c.cancelled).length)+'건</span></div></a>'};
+    return '<a class="mr-pk'+(live?' live':'')+'" href="'+PAGE+'?slot='+esc(s.id)+'"'+(mr?' style="border-color:#d4a017;box-shadow:0 0 0 3px #fbefc4"':'')+'>'+(mr?'<div style="font-size:12px;font-weight:900;color:#7c4a03;margin-bottom:4px">🧑‍⚖️ 내 심판 업무 · '+(mr==='rec'?'경기 기록·종료 가능':'팀 평가 가능')+'</div>':'')+'<div class="t">'+(s.test?'<span class="mr-pill" style="background:#7c3aed;margin-right:6px">🧪 연습</span>':'')+esc(s.title||'')+'</div><div class="d">'+esc([dateK(s.date),s.place,s.region].filter(Boolean).join(' · '))+'</div><div class="s">'+(n?'<span class="mr-pill" style="background:#153A77">경기 '+n+'</span><span class="mr-pill" style="background:#0f766e">종료 '+p+'</span>':'<span class="mr-pill">경기 미생성</span>')+'<span class="mr-pill" style="background:#b8860b">참가 '+((s.claimed||[]).filter(c=>c&&!c.cancelled).length)+'건</span></div></a>'};
   const up=slots.filter(s=>String(s.date||'')>=today).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
   const past=slots.filter(s=>String(s.date||'')<today).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).filter(s=>STAFF||stats[s.id]);
   main.innerHTML='<div class="mr-note" style="margin:4px 0 2px">대회를 누르면 바로 그 대회의 대진·시간표가 열리고, 경기 카드를 누르면 기록 화면이 열립니다.</div>'
@@ -735,7 +746,7 @@ function render(){
     +(STAFF?'<div class="mr-row" style="margin-top:10px"><button class="mr-btn" onclick="qaOpen(\'\',\'\')">＋ 경기 추가</button><button class="mr-btn g" onclick="golfForm()">⛳ 디스크골프 라운드 추가</button><button class="mr-btn s" onclick="statsSave()" title="순위표·선수 기록을 공개 결과 페이지용으로 저장합니다(경기 종료 때마다 자동 저장되지만 수동으로도 가능)">🔄 집계 저장</button><button class="mr-btn s" onclick="sigStatus()" title="심판·선생님 서명 등록 여부와 오더지 서명 기입 여부">✍ 서명 현황</button>'+(isAdminMe()?'<span style="flex:1"></span>'+(SLOT&&SLOT.test?'<span class="mr-pill" style="background:#7c3aed">🧪 연습용 공고 — 학교·대회 일정에 안 보임</span>':'<button class="mr-btn ghost" onclick="slotCloneTest()" title="이 대회를 연습용으로 복제(숨김) — 심판·운영진이 미리 눌러 보도록">🧪 연습용 대회 만들기</button>')+'<button class="mr-btn ghost" style="color:#C41E2F;border-color:#f1c7cc" onclick="slotDelete()" title="시험용 공고 정리 — 대회는 그대로 두고 이 참가 공고와 그 경기 기록만 지웁니다(관리자)">🗑 이 참가 공고만 삭제</button>':'')+'</div>':'')
     +'</div><div class="mr-tabs">'+[['board','🗓 대진 · 시간표'],['eval','⭐ 팀·학교 평가'],['match','🏁 경기'],['order','📝 오더지'],['golf','⛳ 디스크골프'],['stats','📊 순위 · 기록']].map(t=>'<button class="mr-tab'+(TAB===t[0]?' on':'')+'" onclick="setTab(\''+t[0]+'\')">'+t[1]+'</button>').join('')+'</div>';
   const _bw=document.querySelector('.bd-wrap');const _bk=_bw?{t:_bw.scrollTop,l:_bw.scrollLeft}:null;   /* [2026-10-20] 갱신 때 시간표 스크롤 유지 */
-  main.innerHTML=TAB==='board'?boardTab():TAB==='eval'?evalTab():TAB==='order'?orderTab():TAB==='golf'?golfTab():TAB==='stats'?statsTab():matchTab();if(TAB==='board'){const w=document.querySelector('.bd-wrap');if(w&&_bk){w.scrollTop=_bk.t;w.scrollLeft=_bk.l}bdBind()}
+  main.innerHTML=practiceBanner()+(TAB==='board'?boardTab():TAB==='eval'?evalTab():TAB==='order'?orderTab():TAB==='golf'?golfTab():TAB==='stats'?statsTab():matchTab());if(TAB==='board'){const w=document.querySelector('.bd-wrap');if(w&&_bk){w.scrollTop=_bk.t;w.scrollLeft=_bk.l}bdBind()}
 }
 function setTab(t){TAB=t;try{history.replaceState(null,'',PAGE+'?slot='+SLOT_ID+'&tab='+t)}catch(e){}render()}
 function matchTab(){
@@ -757,7 +768,8 @@ function matchCard(m){
 // ── 경기 추가·설정 (운영진) ──
 let STAFFPICK=null;
 // [2026-10-18] 심판 공고 찾기 — 대회 번호(compId)가 비어 있는 공고도 있어 공고 번호(slotId)·대회 이름으로도 찾음. 신청 임무(prefs)·확정 날짜(days)도 함께
-async function staffPostIds(){const ids=new Set();const nm=s=>String(s||'').replace(/^🏆\s*/,'').replace(/\s+/g,'');const titles=[SLOT&&SLOT.title,COMP&&COMP.title].map(nm).filter(Boolean);
+async function staffPostIds(){const ids=new Set();const nm=s=>String(s||'').replace(/^🏆\s*/,'').replace(/^\[연습\]\s*/,'').replace(/\s+/g,'');const titles=[SLOT&&SLOT.title,COMP&&COMP.title].map(nm).filter(Boolean);
+  try{if(SLOT.srcSlotId){const q=await DB.collection('competitionStaff').where('slotId','==',SLOT.srcSlotId).get();q.docs.forEach(d=>ids.add(d.id))}}catch(e){}   /* [2026-10-20] 연습용 공고는 원본 공고의 심판 공고를 씀 */
   try{if(SLOT.compId){const q=await DB.collection('competitionStaff').where('compId','==',SLOT.compId).get();q.docs.forEach(d=>ids.add(d.id))}}catch(e){}
   try{const q=await DB.collection('competitionStaff').where('slotId','==',SLOT_ID).get();q.docs.forEach(d=>ids.add(d.id))}catch(e){}
   try{if(titles.length){const q=await DB.collection('competitionStaff').limit(300).get();q.docs.forEach(d=>{const x=d.data();if(titles.indexOf(nm(x.competitionName))>=0)ids.add(d.id)})}}catch(e){}
@@ -939,7 +951,8 @@ async function slotDelete(){if(!isAdminMe()||!SLOT_ID||!SLOT)return;const title=
   try{UNSUB.forEach(f=>{try{f()}catch(e){}});UNSUB=[];const comps=await slotPurge(SLOT_ID);
     alert('✓ 참가 공고 「'+title+'」를 지웠습니다 (경기 '+nM+'건 포함).'+(comps.length?' 대회 「'+(comps[0].data().title||'')+'」는 그대로 남았습니다.':''));location.href=PAGE}
   catch(e){say('삭제 실패: '+(e.message||e))}}
-function canBoard(){if(!ME||!MY)return false;const roles=[MY.role].concat(MY.roles||[]);if(MY.owner===true||roles.indexOf('admin')>=0)return true;return /심판위원장|심판장|심판총괄/.test(((SLOT_ROLES||{})[ME.uid]||[]).join(' '))}
+function practiceBanner(){if(!SLOT||!SLOT.test)return '';return '<div style="background:#f5f3ff;border:1.5px solid #ddd6fe;border-radius:12px;padding:10px 14px;margin:0 0 10px;color:#4c1d95;font-size:13px;font-weight:800;line-height:1.5">🧪 <b>연습용 대회</b> — 마음껏 눌러 보세요. 실제 대회·학교 화면에는 전혀 영향이 없습니다.'+(PRACTICE?' 확정 심판은 여기서 <b>운영진 기능</b>(경기 추가·심판 배정·시간표 편집·오더지·경기 정보·종료 처리)도 써 볼 수 있습니다. 망가뜨려도 괜찮아요 — 경기 화면의 「🧹 초기화」로 되돌립니다.':'')+'</div>'}
+function canBoard(){if(!ME||!MY)return false;if(PRACTICE)return true;const roles=[MY.role].concat(MY.roles||[]);if(MY.owner===true||roles.indexOf('admin')>=0)return true;return /심판위원장|심판장|심판총괄/.test(((SLOT_ROLES||{})[ME.uid]||[]).join(' '))}
 function bdEditable(){return canBoard()&&BD_EDIT}
 let BOARD=null,DRAWS={},BD_DAY='',BD_DIV='',BD_DRAG=null,BD_SEL=null,DR=null;let FORMAT={},FM_DIV='',FM_ED=null;   // [대회 구성] compStats.format{부문:{stages:[]}}
 function bdDays(){const ds=(COMP&&COMP.dates&&COMP.dates.length)?COMP.dates.slice():[];if(!ds.length&&SLOT.date)ds.push(String(SLOT.date).slice(0,10));((BOARD||{}).days||[]).forEach(d=>{if(d&&ds.indexOf(d)<0)ds.push(d)});MATCHES.forEach(m=>{if(m.day&&ds.indexOf(m.day)<0)ds.push(m.day)});return ds.sort()}
@@ -1942,6 +1955,6 @@ async function golfStatus(st){const r=ROUNDS.find(x=>x.id===GOLF_ID);const upd={
 async function golfUnlock(){const reason=prompt('잠금을 해제하고 정정합니다. 사유를 적어 주세요');if(reason==null)return;try{await DB.collection('golfRounds').doc(GOLF_ID).update({locked:false,status:'진행',unlockLog:FV.arrayUnion({by:whoAmI().name,at:new Date().toISOString(),reason:reason})})}catch(e){say('실패: '+(e.message||e))}}
 </script>
 <script src="auth_ui.js?v=20261020a"></script>
-<script src="firstguide.js?v=20261020b" data-auto="1"></script>
+<script src="firstguide.js?v=20261020c" data-auto="1"></script>
 </body>
 </html>
