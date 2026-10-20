@@ -487,7 +487,9 @@ function say(t,bad){alert(t)}
 function dateK(s){s=String(s||'');return s?s.replace(/-/g,'.'):''}
 function whoAmI(){return {uid:ME?ME.uid:'',name:(MY&&MY.name)||''}}
 function entries(){const s=SLOT||{};const ck=c=>c.pid||c.uid;const keys=[...new Set((s.claimed||[]).filter(Boolean).map(ck))];
-  return keys.filter(k=>{const n=(s.claimed||[]).filter(x=>x&&ck(x)===k).length;const x=(s.cancels||[]).filter(y=>y&&ck(y)===k).length;const rv=((s.reviewStatus||{})[k])||{};return rv.st!=='반려'&&n>x}).map(k=>{const arr=(s.claimed||[]).filter(c=>c&&ck(c)===k);return arr[arr.length-1]}).filter(c=>c&&!c.cancelled)}
+  return keys.filter(k=>{const n=(s.claimed||[]).filter(x=>x&&ck(x)===k).length;const x=(s.cancels||[]).filter(y=>y&&ck(y)===k).length;const rv=((s.reviewStatus||{})[k])||{};return rv.st!=='반려'&&n>x}).map(k=>{const arr=(s.claimed||[]).filter(c=>c&&ck(c)===k);const last=Object.assign({},arr[arr.length-1]);
+    for(let j=arr.length-2;j>=0;j--){const p=arr[j];if(!(last.prefs||[])[0]&&(p.prefs||[])[0])last.prefs=p.prefs;if(!last.teamOrg&&p.teamOrg)last.teamOrg=p.teamOrg;if(!last.teamType&&p.teamType)last.teamType=p.teamType}   /* [2026-10-20] 수정 신청에서 빈 부문·소속은 앞 신청 값으로 */
+    return last}).filter(c=>c&&!c.cancelled)}
 function teamEntries(){return entries().filter(c=>c.team)}
 function indivEntries(){return entries().filter(c=>!c.team)}
 function entryKey(c){return c.pid||c.uid||''}

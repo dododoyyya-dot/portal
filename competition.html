@@ -1867,7 +1867,11 @@ async function openTeamApply(id,fresh){
   if(TA_EDIT){
     // [팀원 후속 추가] 기존 신청 내용을 그대로 채워 넣고, 팀원 행을 추가하거나 고쳐서 저장하게 합니다.
     const c=TA_EDIT;
-    const setv=(id2,val)=>{const e=document.getElementById(id2);if(e&&val!=null&&val!=='')e.value=val};
+    // [2026-10-20] 선택칸(부문·팀 구분)은 옛 값이 선택지에 없으면 가장 가까운 것을 고름 — 전에는 빈칸이 되어 부문 없이 저장됨(「초등부 남자(예선리그) B조」→「초등부 남자」, 「학교팀」→「학교클럽」)
+    const setv=(id2,val)=>{const e=document.getElementById(id2);if(!e||val==null||val==='')return;if(e.tagName!=='SELECT'){e.value=val;return}
+      const ops=[...e.options].filter(x=>x.value);const nv=String(val).replace(/\s+/g,'');const nz=x=>String(x.value).replace(/\s+/g,'');
+      const o=ops.find(x=>x.value===val)||ops.filter(x=>nv.indexOf(nz(x))===0).sort((a,b)=>nz(b).length-nz(a).length)[0]||ops.filter(x=>nz(x).indexOf(nv)===0)[0]||ops.find(x=>nz(x).indexOf(nv.slice(0,2))>=0);
+      if(o)e.value=o.value};
     setv('taType',c.teamType);setv('taName',c.name);setv('taDiv',(c.prefs||[])[0]);setv('taGender',c.teamGender);setv('taRole',c.leaderRole);
     (c.staff||[]).forEach(x=>taAddStaff(x));   // [추가 인솔자]
     taTypeUI();
@@ -2610,9 +2614,11 @@ async function taUploadFiles(files,slotId,pid){
 async function submitTeam(){
   const s0=CSLOTS.find(d=>d.id===TA_ID);if(!s0)return;
   const teamName=document.getElementById('taName').value.trim();
-  const teamType=document.getElementById('taType').value;
-  const divName=document.getElementById('taDiv').value;
+  let teamType=document.getElementById('taType').value;
+  let divName=document.getElementById('taDiv').value;
+  if(TA_EDIT){if(!divName)divName=(TA_EDIT.prefs||[])[0]||'';if(!teamType)teamType=TA_EDIT.teamType||''}   // [2026-10-20] 수정 때 빈칸이면 원래 값 유지
   if(!teamName)return alert('팀명을 입력해주세요.');
+  if(!divName)return alert('참가 부문을 골라 주세요.');
   const orgEl=document.getElementById('taOrg');
   let teamOrg='',teamOrgId='',teamSchoolCode='';
   if(teamType==='클럽팀'){
@@ -2634,6 +2640,7 @@ async function submitTeam(){
     if(teamType==='학교팀'&&!teamOrg)return alert('소속 학교를 입력해주세요.');
     teamSchoolCode=(teamType==='학교팀'&&orgEl&&orgEl.dataset&&orgEl.dataset.code)||'';   // [학교 자동완성] 학교코드(있을 때만)
   }
+  if(TA_EDIT&&!teamOrg){teamOrg=TA_EDIT.teamOrg||'';if(!teamOrgId)teamOrgId=TA_EDIT.teamOrgId||'';if(!teamSchoolCode)teamSchoolCode=TA_EDIT.teamSchoolCode||''}   // [2026-10-20] 수정 때 소속이 비면 원래 소속
   try{await taResolveMembers()}catch(e){}   // [회원 색인] 직접 입력한 팀원도 회원이면 회원으로 저장
   const roster=[...document.querySelectorAll('#taRosterBox > div')].map(r=>Object.assign({},r.dataset.self==='1'?{self:true,uid:CME.uid}:{},(r.dataset.uid&&r.dataset.self!=='1')?{memberUid:r.dataset.uid}:{},r.dataset.guardianUid?{guardianUid:r.dataset.guardianUid}:{},{   // [회원 연동] 확인된 회원·자녀는 uid 를 함께 저장 (종료 처리 시 경력 연동)   // [클럽장 본인 참가] 본인 행만 self·uid 기록 (종료 처리 시 '선수' 경력용)
     name:r.querySelector('.taR-name').value.trim(),
