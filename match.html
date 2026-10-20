@@ -692,7 +692,7 @@ async function boot(){
   if(/beta/.test(PAGE)){const bb=document.getElementById('mrBeta');if(bb)bb.style.display='block'}
   document.getElementById('mrHp').textContent=[dateK(SLOT.date),SLOT.place,SLOT.host].filter(Boolean).join(' · ');
   UNSUB.push(DB.collection('liveMatches').where('slotId','==',SLOT_ID).onSnapshot(s=>{MATCHES=s.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>String(a.day||'').localeCompare(String(b.day||''))||(+a.order||0)-(+b.order||0));lkVirtual();render();lkAutoSoon();if(RC_ID)rcRender()},e=>console.warn('matches',e)));
-  UNSUB.push(DB.collection('compOrders').where('slotId','==',SLOT_ID).onSnapshot(s=>{ORDERS={};s.docs.forEach(d=>ORDERS[d.id]=Object.assign({id:d.id},d.data()));lkVirtual();render();if(RC_ID)rcRender()},e=>console.warn('orders',e)));
+  UNSUB.push(DB.collection('compOrders').where('slotId','==',SLOT_ID).onSnapshot(s=>{ORDERS={};ORDERS_READY=true;s.docs.forEach(d=>ORDERS[d.id]=Object.assign({id:d.id},d.data()));lkVirtual();render();if(RC_ID)rcRender()},e=>console.warn('orders',e)));
   UNSUB.push(DB.collection('compStats').doc(SLOT_ID).onSnapshot(d=>{BOARD=(d.exists&&d.data().board)||null;FORMAT=(d.exists&&d.data().format)||{};DRAWS=(d.exists&&d.data().draws)||{};LOTS=(d.exists&&d.data().lots)||{};SLOT_REFS=(d.exists&&d.data().refUids)||[];SLOT_EVALS=(d.exists&&d.data().evalUids)||[];SLOT_ROLES=(d.exists&&d.data().refRoles)||{};CREWDEFS=(d.exists&&d.data().crewDefs)||{};COURTPLAN=(d.exists&&d.data().courtPlan)||{};if(RC_ID)rcRender();if((TAB==='board'&&!BD_DRAG)||TAB==='stats')render()},e=>console.warn('board',e)));
   UNSUB.push(DB.collection('compEvals').where('slotId','==',SLOT_ID).onSnapshot(s=>{EVALS=s.docs.map(d=>Object.assign({id:d.id},d.data()));EVAL_ERR='';if(TAB==='eval')render()},e=>{EVAL_ERR=String(e&&e.code||e);if(TAB==='eval')render()}));
   UNSUB.push(DB.collection('compSlots').doc(SLOT_ID).onSnapshot(d=>{if(!d.exists)return;SLOT=d.data();lkVirtual();render();lkAutoSoon();claimRepair()},e=>console.warn('slot',e)));   // [연결 2026-10-18] 새 신청이 들어오면 바로 반영·자동 연결
@@ -1338,7 +1338,7 @@ function orderTab(){
     +Object.keys(by).sort().map(dv=>'<div style="margin:18px 0 4px;display:flex;align-items:center;gap:8px"><span style="font-size:17px;font-weight:900;color:#153A77;border-left:5px solid #153A77;padding-left:10px">'+esc(dv)+'</span><span class="mr-note">'+by[dv].length+'팀</span></div><table class="mr-tbl"><tr><th class="l">팀 · 소속</th><th>경기복</th><th>명단</th><th>배번</th><th>상태</th><th>감독교사</th><th></th></tr>'
       +by[dv].map(c=>{const key=entryKey(c);const o=orderOf(key);const n=(c.roster||[]).length;const nn=o?(o.players||[]).filter(p=>String(p.no||'').trim()!=='').length:0;const mine=ME&&c.uid===ME.uid;const K=MR.kitsOf(o||{});
         return '<tr><td class="l"><b>'+esc(c.name||'')+'</b>'+(c.teamOrg&&c.teamOrg!==c.name?'<br><small style="color:#6b7280">'+esc(c.teamOrg)+'</small>':'')+(mine?' <span class="mr-pill" style="background:#0f766e;font-size:10.5px;padding:2px 8px">내 팀</span>':'')+(o&&o.div&&(c.prefs||[])[0]&&lkDiv(o.div)!==lkDiv(c.prefs[0])?'<br><small style="color:#C41E2F;font-weight:800">⚠ 오더지 부문('+esc(o.div)+')이 신청 부문과 달라요 — 열어서 저장하면 맞춰집니다</small>':'')+'</td><td>'+(o&&o.kits?sw(K[0])+' '+sw(K[1]):'<span class="mr-note">-</span>')+'</td><td>'+n+'명</td><td>'+(o?nn+'/'+n:'-')+'</td><td>'+(o?'<span class="mr-pill" style="background:'+(o.status==='제출'?'#0f766e':o.status==='잠금'?'#153A77':'#b8860b')+'">'+esc(o.status)+'</span>':'<span class="mr-pill">미작성</span>')+'</td><td>'+esc(o&&o.coach&&o.coach.name||c.leader||'')+(o&&o.coach&&o.coach.sign?' ✍':'')+'</td>'
-          +'<td style="white-space:nowrap">'+((mine||STAFF)?'<button class="mr-btn'+(o&&o.status!=='작성중'?' s':'')+'" style="padding:6px 11px;font-size:12px" onclick="orderOpen(\''+esc(key)+'\')">'+(o?'📝 열기':'📝 작성')+'</button> ':'')+(o?'<button class="mr-btn ghost" style="padding:6px 11px;font-size:12px" onclick="orderPdf(\''+esc(key)+'\')">📄 PDF</button>':'')+'</td></tr>'}).join('')+'</table>').join('')+(STAFF?orderHiddenHtml():'');
+          +'<td style="white-space:nowrap">'+((mine||STAFF)?'<button class="mr-btn'+(o&&o.status!=='작성중'?' s':'')+'" style="padding:6px 11px;font-size:12px" onclick="orderOpen(\''+esc(key)+'\')" '+(!o&&!ORDERS_READY?'disabled':'')+'>'+(o?'📝 열기':(ORDERS_READY?'📝 작성':'⏳ 불러오는 중'))+'</button> ':'')+(o?'<button class="mr-btn ghost" style="padding:6px 11px;font-size:12px" onclick="orderPdf(\''+esc(key)+'\')">📄 PDF</button>':'')+'</td></tr>'}).join('')+'</table>').join('')+(STAFF?orderHiddenHtml():'');
 }
 /* [2026-10-20] 운영진용 — 팀 신청이 있는데 오더지 목록에 안 나오는 경우(반려·취소) 이유를 보여 줌 */
 function orderHiddenHtml(){const s=SLOT||{};const ck=c=>c.pid||c.uid;const shown=new Set(teamEntries().map(entryKey));
@@ -1348,13 +1348,15 @@ function orderHiddenHtml(){const s=SLOT||{};const ck=c=>c.pid||c.uid;const shown
       const why=rv.st==='반려'?'반려'+(rv.reason?' — '+rv.reason:''):(n<=x?'신청 취소 ('+n+'번 신청 · '+x+'번 취소)':(c.cancelled?'취소 표시':'-'));
       return '<tr><td class="l"><b>'+esc(c.name||'')+'</b><br><small style="color:#6b7280">'+esc(c.teamOrg||'')+(c.leader?' · '+esc(c.leader):'')+'</small></td><td>'+esc((c.prefs||[])[0]||'')+'</td><td class="l">'+esc(why)+'</td></tr>'}).join('')
     +'</table><div class="mr-note">되살리려면 대회 공고 신청 관리에서 반려를 되돌리거나, 학교가 다시 신청하면 됩니다.</div></details>'}
-let OD=null,OD_PID='';
+let OD=null,OD_PID='',ORDERS_READY=false;
 // [관리자 입력 오더지 2026-10-18] 참가 신청이 없는 팀은 관리자가 만든 오더지(adminMade)를 참가 항목처럼 씀
 function entryOrPseudo(pid){const c=teamEntries().find(x=>entryKey(x)===pid);if(c)return c;const o=orderOf(pid);if(o&&o.adminMade)return {pid:pid,uid:'',name:o.team||'',teamOrg:o.school||'',prefs:[o.div||''],roster:(o.players||[]).map(p=>({name:p.name,birth:p.birth||'',gender:p.gender||'',school:p.school||'',no:p.no||''})),adminMade:true};return null}
-function orderOpen(pid){
+async function orderOpen(pid){
   const c=entryOrPseudo(pid);if(!c){say('참가 항목을 찾지 못했습니다');return}
   const mine=ME&&c.uid===ME.uid;if(!mine&&!STAFF){say('이 팀의 대표자(신청자) 또는 운영진만 열 수 있습니다');return}
-  const prev=orderOf(pid);OD=MR.orderFromEntry(SLOT_ID,SLOT,c,prev);if(prev&&prev.div)OD.div=prev.div;OD.entryDiv=(c.prefs||[])[0]||'';OD.kits=MR.kitsOf(prev||{}).map(k=>({name:k.name,color:k.color}));OD_PID=pid;
+  let prev=orderOf(pid);
+  if(!prev){try{const d=await DB.collection('compOrders').doc(MR.orderId(SLOT_ID,pid)).get();if(d.exists){prev=Object.assign({id:d.id},d.data());ORDERS[d.id]=prev}}catch(e){}}   /* [2026-10-20] 목록보다 먼저 눌렀을 때 저장분을 직접 읽음 */
+  OD=MR.orderFromEntry(SLOT_ID,SLOT,c,prev);if(prev&&prev.div)OD.div=prev.div;OD.entryDiv=(c.prefs||[])[0]||'';OD.kits=MR.kitsOf(prev||{}).map(k=>({name:k.name,color:k.color}));OD_PID=pid;
   OD.players.sort((a,b)=>odNoKey(a)-odNoKey(b)||(a.i-b.i));   /* [2026-10-19] 조끼 나눠 주기 쉽게 배번순 한 줄 */
   OD.wear=(prev&&prev.wear===1)?1:0;
   odRender();
