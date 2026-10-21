@@ -107,10 +107,12 @@
       <button class="bcat" data-cat="사업소식">사업소식</button>
       <button class="bcat" data-cat="대회">대회</button>
     </div>
-    <div class="bsearch"><input id="bq" type="text" placeholder="제목·내용 검색"></div>
+    <div class="bsearch"><button id="noticeNew" class="adm-b" style="display:none;margin-right:8px;font-size:14px;padding:9px 16px" onclick="noticeEdit('')">✏️ 새 글 쓰기</button><input id="bq" type="text" placeholder="제목·내용 검색"></div>
   </div>
   <div class="board" id="board"></div>
   <p style="margin-top:22px;font-size:13.5px;color:var(--gray)">※ 게시글 등록·수정 문의: 사무국 (kfdf60@hanmail.net)</p>
+  <style>.adm-b{border:1.5px solid var(--blue,#153A77);background:#fff;color:var(--blue,#153A77);font-weight:800;font-size:13px;padding:6px 13px;border-radius:9px;cursor:pointer;font-family:inherit}.adm-b:hover{background:var(--blue,#153A77);color:#fff}.adm-b.del{border-color:#C41E2F;color:#C41E2F}.adm-b.del:hover{background:#C41E2F;color:#fff}
+  #nwOv{position:fixed;inset:0;background:rgba(15,20,40,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px}#nwOv .bx{background:#fff;border-radius:16px;max-width:680px;width:100%;max-height:92vh;overflow:auto;padding:22px 24px}#nwOv label{display:block;font-size:13px;font-weight:800;margin:12px 0 4px}#nwOv input[type=text],#nwOv input[type=date],#nwOv select,#nwOv textarea{width:100%;box-sizing:border-box;border:1.5px solid #d6dbe6;border-radius:9px;padding:10px 12px;font-size:15px;font-family:inherit}#nwOv textarea{min-height:260px;line-height:1.7;resize:vertical}</style>
 </div></section>
 <script>
 const POSTS = [
@@ -148,19 +150,25 @@ const POSTS = [
 ];
 const board = document.getElementById('board');
 let cat = "전체", q = "";
+/* [2026-10-21] 관리자가 쓴 글(EXTRA)과 숨긴 기본 글(HIDDEN) — siteContent/noticeBoard */
+var EXTRA=[], HIDDEN=[], IS_ADMIN=false;
+function escH(x){return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function bodyH(t){return escH(t).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:var(--blue);font-weight:700;text-decoration:underline">$1</a>')}
 function render(){
-  const list = POSTS.map((p,idx)=>Object.assign({idx:idx},p))
+  const all = POSTS.map((p,idx)=>Object.assign({idx:idx,base:true},p)).filter(p=>(IS_ADMIN?true:HIDDEN.indexOf(p.title)<0))
+    .concat(EXTRA.map(p=>Object.assign({},p,{idx:p.id,body:bodyH(p.body),title:escH(p.title),base:false})));
+  const list = all
     .filter(p => (cat==="전체"||p.cat===cat) && (p.title.includes(q)||p.body.includes(q)))
     .sort((a,b)=> (b.pin-a.pin) || b.date.localeCompare(a.date));
   board.innerHTML = list.length ? list.map((p,i)=>`
     <div class="brow" data-i="${p.idx}" onclick="this.classList.toggle('open')">
       <div class="head">
         <div class="no ${p.pin?'pin':''}">${p.pin?'공지':list.length-i}</div>
-        <div class="tt">${p.title}${(new Date()-new Date(p.date))/864e5<14?'<span class="new">N</span>':''}</div>
+        <div class="tt">${p.title}${(new Date()-new Date(p.date))/864e5<14?'<span class="new">N</span>':''}${p.base&&HIDDEN.indexOf(p.title)>=0?'<span style="margin-left:6px;font-size:11px;color:#C41E2F;font-weight:800">(숨김)</span>':''}</div>
         <div class="cat">${p.cat}</div>
         <div class="dt">${p.date.replaceAll('-','.')}</div>
       </div>
-      <div class="body">${p.body}</div>
+      <div class="body">${p.body}${IS_ADMIN?'<div style="margin-top:14px;display:flex;gap:6px;flex-wrap:wrap" onclick="event.stopPropagation()">'+(p.base?'<button class="adm-b" onclick="noticeHide('+p.idx+')">'+(HIDDEN.indexOf(p.title)>=0?'👁 다시 보이기':'🙈 숨기기')+'</button>':'<button class="adm-b" onclick="noticeEdit(\''+p.id+'\')">✏️ 수정</button><button class="adm-b del" onclick="noticeDel(\''+p.id+'\')">🗑 삭제</button>')+'</div>':''}</div>
     </div>`).join('') : '<div class="bempty">검색 결과가 없습니다.</div>';
 }
 document.querySelectorAll('.bcat').forEach(b=>b.onclick=()=>{
@@ -170,7 +178,8 @@ document.querySelectorAll('.bcat').forEach(b=>b.onclick=()=>{
 document.getElementById('bq').oninput=e=>{q=e.target.value.trim();render();};
 render();
 // [개별 페이지] notice.html?i=번호 로 들어오면 그 글만 펼쳐 보이고 나머지는 숨김 (목록으로 돌아가는 링크 제공)
-(function(){try{const i=new URLSearchParams(location.search).get('i');if(i==null)return;const rows=[...document.querySelectorAll('#board .brow')];const hit=rows.find(r=>r.dataset.i===String(i));if(!hit)return;rows.forEach(r=>{if(r!==hit)r.style.display='none'});hit.classList.add('open');hit.onclick=null;document.getElementById('board').insertAdjacentHTML('afterbegin','<div style="padding:10px 0 12px"><a href="notice.html" style="font-weight:800;color:var(--blue);font-size:13.5px">← 전체 게시글 목록</a></div>');const tools=document.querySelector('.board-tools');if(tools)tools.style.display='none';window.scrollTo(0,0)}catch(e){}})();
+function noticeOne(){try{const i=new URLSearchParams(location.search).get('i');if(i==null||document.getElementById('noticeBack'))return;const rows=[...document.querySelectorAll('#board .brow')];const hit=rows.find(r=>r.dataset.i===String(i));if(!hit)return;rows.forEach(r=>{if(r!==hit)r.style.display='none'});hit.classList.add('open');hit.onclick=null;document.getElementById('board').insertAdjacentHTML('afterbegin','<div id="noticeBack" style="padding:10px 0 12px"><a href="notice.html" style="font-weight:800;color:var(--blue);font-size:13.5px">← 전체 게시글 목록</a></div>');const tools=document.querySelector('.board-tools');if(tools)tools.style.display='none';window.scrollTo(0,0)}catch(e){}}
+noticeOne();
 </script>
 
 <footer><div class="wrap">
@@ -234,5 +243,53 @@ function _kfdfBind(){try{if(!window.KFDF_VIEW)return;const board=[...document.qu
 if(window.KFDF_VIEW)_kfdfBind();else document.addEventListener("DOMContentLoaded",_kfdfBind);
 </script>
 <script src="auth_ui.js?v=20261020a"></script>
+<script>
+/* [2026-10-21] 공지사항 관리자 글쓰기 — siteContent/noticeBoard {posts:[{id,cat,date,title,body,pin}], hidden:[기본 글 제목]} (읽기 공개·쓰기 관리자) */
+(function(){
+  var REF=null;
+  function db(){return firebase.firestore()}
+  function load(){
+    return db().collection('siteContent').doc('noticeBoard').get().then(function(d){var v=d.exists?d.data():{};EXTRA=(v.posts||[]).slice();HIDDEN=(v.hidden||[]).slice()}).catch(function(e){console.warn('noticeBoard',e)}).then(function(){render();noticeOne()});
+  }
+  function save(mut){   // 읽고-고치고-쓰기 한 번에(동시 편집 보호)
+    var ref=db().collection('siteContent').doc('noticeBoard');
+    return db().runTransaction(function(tx){return tx.get(ref).then(function(d){var v=d.exists?d.data():{};var o={posts:(v.posts||[]).slice(),hidden:(v.hidden||[]).slice()};mut(o);EXTRA=o.posts;HIDDEN=o.hidden;tx.set(ref,{posts:o.posts,hidden:o.hidden,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})})}).then(function(){render()});
+  }
+  window.noticeHide=function(i){var t=POSTS[i]&&POSTS[i].title;if(!t)return;save(function(o){var k=o.hidden.indexOf(t);if(k>=0)o.hidden.splice(k,1);else o.hidden.push(t)}).catch(function(e){alert('저장 실패: '+(e.code==='permission-denied'?'권한이 없습니다(관리자만)':e.message))})};
+  window.noticeDel=function(id){var p=EXTRA.find(function(x){return x.id===id});if(!p||!confirm('「'+p.title+'」 글을 삭제할까요?'))return;save(function(o){o.posts=o.posts.filter(function(x){return x.id!==id})}).catch(function(e){alert('삭제 실패: '+e.message)})};
+  window.noticeEdit=function(id){
+    var p=id?EXTRA.find(function(x){return x.id===id}):null;var today=new Date();var td=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+    var old=document.getElementById('nwOv');if(old)old.remove();
+    var ov=document.createElement('div');ov.id='nwOv';
+    ov.innerHTML='<div class="bx"><div style="display:flex;align-items:center"><b style="font-size:18px;flex:1">'+(p?'✏️ 글 수정':'✏️ 새 글 쓰기')+'</b><button class="adm-b" onclick="document.getElementById(\'nwOv\').remove()">닫기</button></div>'
+     +'<label>구분</label><select id="nwCat">'+['공고','자격검정','사업소식','대회'].map(function(c){return '<option'+((p&&p.cat===c)?' selected':'')+'>'+c+'</option>'}).join('')+'</select>'
+     +'<label>날짜</label><input type="date" id="nwDate" value="'+(p?p.date:td)+'">'
+     +'<label>제목</label><input type="text" id="nwTitle" maxlength="120" placeholder="예: [공지] 제19회 전국학교스포츠클럽축전 플라잉디스크 안내" value="'+escH(p?p.title:'')+'">'
+     +'<label>내용 <span style="font-weight:600;color:#8a919d;font-size:12px">— 줄바꿈 그대로 표시됩니다. 주소(https://…)는 자동으로 링크가 됩니다.</span></label><textarea id="nwBody" placeholder="내용을 입력하세요">'+escH(p?p.body:'')+'</textarea>'
+     +'<label style="display:flex;align-items:center;gap:8px;font-weight:700"><input type="checkbox" id="nwPin"'+((p&&p.pin)?' checked':'')+'> 📌 상단에 고정(「공지」 표시)</label>'
+     +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px"><button class="adm-b" onclick="document.getElementById(\'nwOv\').remove()">취소</button><button class="adm-b" style="background:var(--blue,#153A77);color:#fff" id="nwSave">💾 게시하기</button></div></div>';
+    document.body.appendChild(ov);
+    document.getElementById('nwSave').onclick=function(){
+      var t=document.getElementById('nwTitle').value.trim(),b=document.getElementById('nwBody').value.trim();
+      if(!t||!b){alert('제목과 내용을 입력해 주세요.');return}
+      var rec={id:p?p.id:'n'+Date.now().toString(36)+Math.floor(Math.random()*900+100),cat:document.getElementById('nwCat').value,date:document.getElementById('nwDate').value||td,title:t,body:b,pin:document.getElementById('nwPin').checked};
+      this.disabled=true;this.textContent='저장 중…';
+      save(function(o){var k=o.posts.findIndex(function(x){return x.id===rec.id});if(k>=0)o.posts[k]=rec;else o.posts.push(rec)}).then(function(){ov.remove()}).catch(function(e){alert('저장 실패: '+(e.code==='permission-denied'?'권한이 없습니다(관리자만 글을 쓸 수 있습니다)':e.message));var sb=document.getElementById('nwSave');if(sb){sb.disabled=false;sb.textContent='💾 게시하기'}});
+    };
+  };
+  function boot(n){
+    if(window.firebase&&firebase.apps&&firebase.apps.length&&firebase.firestore&&firebase.auth){
+      load();
+      firebase.auth().onAuthStateChanged(function(u){
+        if(!u){IS_ADMIN=false;var b=document.getElementById('noticeNew');if(b)b.style.display='none';render();return}
+        db().collection('users').doc(u.uid).get().then(function(d){var v=d.exists?d.data():{};var roles=[v.role].concat(v.roles||[]);IS_ADMIN=(v.owner===true||roles.indexOf('admin')>=0);var b=document.getElementById('noticeNew');if(b)b.style.display=IS_ADMIN?'inline-block':'none';render()}).catch(function(){});
+      });
+      return;
+    }
+    if(n>60)return;setTimeout(function(){boot(n+1)},250);
+  }
+  boot(0);
+})();
+</script>
 </body>
 </html>
