@@ -1626,6 +1626,7 @@ function rcRender(){
   // ⑥ 아래 고정 줄: 시작·종료·확정만
   const fb=[];if(!mine&&can&&m.status==='예정')fb.push('<button class="act g" onclick="rcStartTake()">▶ 경기 시작 (전반 · 시계 시작)</button>');   /* [2026-10-20] 입력권이 이 기기에 없어도 시작은 바로(눌러서 가져옴) */
     if(mine){if(m.status==='예정')fb.push('<button class="act g" onclick="rcStatus(\'진행\')">▶ 경기 시작 (전반 · 시계 시작)</button>');if(m.status==='진행'){const R=endRoleInfo(m);fb.push('<button class="act r" '+(R.can?'':'disabled title="경기 종료·확정은 감독관이 합니다"')+' onclick="endSheet()">경기 종료'+(R.can?'':' (감독관)')+'</button>')}if(m.status==='종료'&&!m.locked)fb.push('<button class="act y" onclick="endSheet()">결과 확정 · 서명</button>','<button class="act" onclick="rcStatus(\'진행\')">다시 진행</button>')}
+ else if(aux){const R=endRoleInfo(m);if(R.isSup){if(m.status==='진행')fb.push('<button class="act r" onclick="endSheet()">경기 종료 (감독관)</button>');if(m.status==='종료'&&!m.locked)fb.push('<button class="act y" onclick="endSheet()">결과 확정 · 서명 (감독관)</button>')}}   /* [2026-10-21] 감독관은 기록심 기기가 아니어도 자기 기기에서 종료·확정 */
   if(m.status==='종료')fb.push('<button class="act b" onclick="sheetPdf(\''+m.id+'\')">📄 기록지 보기 · 인쇄</button>');
   if(m.locked)fb.push(canFix(m)?'<button class="act" onclick="rcUnlock()">정정 (감독관·심판위원장)</button>':'<button class="act" disabled title="확정된 경기의 정정은 그 경기 감독관이나 대회 심판위원장만 할 수 있습니다">정정은 감독관·심판위원장만</button>');
   if(fb.length)h+='<div class="foot">'+fb.join('')+'</div>';
@@ -1690,7 +1691,7 @@ const ZERO_CLK={running:false,base:0,startedAt:0};
 function clkFromTxt(t){const a=String(t||'0:00').split(':');return {running:false,base:((+a[0]||0)*60+(+a[1]||0))*1000,startedAt:0}}
 async function rcPeriod(p){const m=RCM();if(!m)return;const cur=m.period||'';if(p===cur)return;const sec=MR.secOf(m);const log=Object.assign({},m.clockLog||{});const upd={};
   if(p==='하프타임'){if(m.brk)return;const from=(cur&&cur!=='하프타임')?cur:'전반';if(sec>0)log[from]=MR.fmtSec(sec);
-    Object.assign(upd,{period:'하프타임',clockLog:log,clock:ZERO_CLK,brk:{kind:'half',side:'',start:Date.now(),dur:((m.plen||{}).half||5)*60,from:from}});await rcUpdate(upd);qkToast(from+' 종료 '+MR.fmtSec(sec)+' · 하프타임 10분');return}
+    Object.assign(upd,{period:'하프타임',clockLog:log,clock:ZERO_CLK,brk:{kind:'half',side:'',start:Date.now(),dur:((m.plen||{}).half||5)*60,from:from}});await rcUpdate(upd);qkToast(from+' 종료 '+MR.fmtSec(sec)+' · 하프타임 '+((m.plen||{}).half||5)+'분 — 끝나면 「▶ 재개 · 후반 시작」을 눌러 주세요');return}
   if(cur&&cur!=='하프타임'&&sec>0&&!log[cur])log[cur]=MR.fmtSec(sec);
   if(cur==='하프타임'&&m.brk&&m.brk.kind==='half')upd.brk=null;
   const back=!!log[p];let msg;
@@ -1893,7 +1894,8 @@ function secParse(v){v=String(v||'').trim();const mm=v.match(/^(\d{1,3})\s*[:분
 function secTyped(v){const t=secParse(v);if(t==null){say('예: 12:34 처럼 분:초로 적어 주세요');return}SHEET.sec=t;const e=document.getElementById('shSec');if(e&&e.firstChild)e.firstChild.nodeValue=MR.fmtSec(t)}
 function sendEventSafe(op){return sendEvent(op)}
 async function sendEvent(op){
-  const opts=Object.assign(whoAmI(),{screen:'match'},op.opts||{}); if(opts.requireCtrl){const mm=RCM();if(mm&&MR.ctrlState(mm,ME&&ME.uid)==='other'&&isAssist(mm))opts.requireCtrl=false}   /* 보조 입력 */
+  const opts=Object.assign(whoAmI(),{screen:'match'},op.opts||{}); if(opts.requireCtrl){const mm=RCM();if(mm&&MR.ctrlState(mm,ME&&ME.uid)==='other'&&isAssist(mm)){opts.requireCtrl=false;
+    if(op.kind==='add'&&op.ev&&op.ev.type==='goal'){const last=(mm.events||[]).filter(e=>e&&!e.void&&e.type==='goal'&&e.side===op.ev.side).slice(-1)[0];if(last&&last.t&&Date.now()-new Date(last.t).getTime()<30000&&!confirm('30초 안에 같은 팀 득점이 이미 기록됐습니다('+esc(MR.ctrlLabel(mm))+' 입력). 기록심이 넣은 것과 같은 득점이면 「취소」를 눌러 주세요.\n\n다른 득점이 맞으면 확인.'))return}}}   /* 보조 입력 · 득점 중복 경고 */
   try{if(op.kind==='add')await MR.addEvent(DB,firebase,op.id,op.ev,opts);else if(op.kind==='void')await MR.voidEvent(DB,firebase,op.id,op.evId,opts);}
   catch(e){const c=String(e&&(e.code||e.message)||'');if(/unavailable|network|deadline|offline|Failed to fetch/i.test(c)){MR.qPush(op);say('연결이 끊겨 기기에 저장했습니다. 연결되면 자동 전송됩니다(미전송 '+MR.qCount(RC_ID)+'건)');rcRender()}else say('저장 실패: '+(/permission/i.test(c)?'권한이 없습니다(배정되지 않았거나 보안 규칙 v52 게시 전)':c))}
 }
