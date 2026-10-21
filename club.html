@@ -436,7 +436,7 @@ function clMapLab(){
 function clMapRender(){
   if(!window.KFDF_MAP||!document.getElementById('clMap'))return;
   const cnt={},sub={};
-  ALLCLUBS.forEach(d=>{const c=d.data();if(c.hidden||c.clubType==='external'||c.status!=='승인'||c.schoolClubId)return;   // [학교스포츠클럽] 연결된 학교 동아리는 학교스포츠클럽에서
+  ALLCLUBS.forEach(d=>{const c=d.data();if(c.hidden||c.clubType==='external'||c.status!=='승인')return;   // [2026-10-21] 학교스포츠클럽에 연결된 클럽도 가입은 여기서(학교스포츠클럽은 전적용)
     const r=KFDF_MAP.SIDO[c.sido]||'';if(!r)return;cnt[r]=(cnt[r]||0)+1;sub[r]=sub[r]||{};sub[r][c.sido]=(sub[r][c.sido]||0)+1});
   window.__clMap=KFDF_MAP.render('clMap',{mode:'single',selected:REG_F?[REG_F]:[],counts:cnt,subCounts:sub,sub:SIDO_F,
     onChange:sel=>{REG_F=(sel&&sel[0])||'';if(!REG_F||(SIDO_F&&KFDF_MAP.SIDO[SIDO_F]!==REG_F))SIDO_F='';if(window.__clMap)__clMap.setSub(SIDO_F);renderSido();renderClubs();clMapLab()},
@@ -474,7 +474,7 @@ function renderClubs(){
   const el=document.getElementById('clubList');
   const q=((document.getElementById('clSearch')||{}).value||'').trim().toLowerCase();
   const docs=ALLCLUBS.filter(d=>{const c=d.data();
-    if(c.hidden||c.clubType==='external'||c.schoolClubId||(SIDO_F&&c.sido!==SIDO_F))return false;   // [학교스포츠클럽] 연결된 학교 동아리 제외
+    if(c.hidden||c.clubType==='external'||(SIDO_F&&c.sido!==SIDO_F))return false;   // [2026-10-21] 학교스포츠클럽 연결 클럽도 표시(가입은 일반클럽에서)
     if(REG_F&&!SIDO_F&&window.KFDF_MAP&&(KFDF_MAP.SIDO[c.sido]||'')!==REG_F)return false;
     if(q&&[c.name,c.sido,c.gugun,c.intro].map(x=>String(x||'').toLowerCase()).join(' ').indexOf(q)<0)return false;
     return true});
