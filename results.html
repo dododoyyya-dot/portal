@@ -131,7 +131,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
 <script src="career.js?v=20261020a"></script>
-<script src="matchrec.js?v=20261020b"></script>
+<script src="matchrec.js?v=20261021a"></script><script src="sigclean.js?v=20261021a"></script>
 <script>
 // ══════════ 대회 결과 (공개) — eventReports(연맹 대회 종료 보고) + schoolClubEvents(학교스포츠클럽 결과 요약, admin 업로드 도구가 생성) ══════════
 //  이름 공개 범위 = siteContent/results.nameMode : 'masked'(기본, 홍*동) | 'full' | 'hidden'(팀·학교와 인원수만). 생년월일·학년은 어디에도 싣지 않습니다.
@@ -265,6 +265,7 @@ async function rsTimelinePdf(id){const MR=window.KFDF_MR;const m=REC.matches.fin
 async function rsSheetPdf(id){const MR=window.KFDF_MR;const m=REC.matches.find(x=>x.id===id);if(!m)return;const O=await rsOrders();let signs={};
   if(firebase.auth&&firebase.auth().currentUser){try{const d=await DB.collection('compSigns').doc(id).get();signs=d.exists?d.data():{}}catch(e){}}
   const oa=rsOrderOf(O,(m.a||{}).pid),ob=rsOrderOf(O,(m.b||{}).pid);if(!signs.coachA&&oa.coach&&oa.coach.name)signs.coachA={name:oa.coach.name,img:oa.coach.sign};if(!signs.coachB&&ob.coach&&ob.coach.name)signs.coachB={name:ob.coach.name,img:ob.coach.sign};
+  if(window.KFDF_SIG)signs=await window.KFDF_SIG.cleanSigns(signs);   /* [2026-10-21] 서명 배경 제거 */
   MR.printSheet(m,oa,ob,signs)}
 async function rsMatchXlsx(id){const MR=window.KFDF_MR;const m=REC.matches.find(x=>x.id===id);if(!m)return;const O=await rsOrders();try{await MR.saveXlsxMatch(m,rsOrderOf(O,(m.a||{}).pid),rsOrderOf(O,(m.b||{}).pid))}catch(e){alert('엑셀 만들기 실패: '+(e.message||e))}}
 function rsCompPdf(){const MR=window.KFDF_MR;MR.printComp((CUR&&CUR.title)||'',MR.computeStats(REC.matches,{},(CUR&&CUR.lots)||{}),REC.matches)}
