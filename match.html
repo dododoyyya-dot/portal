@@ -1566,7 +1566,7 @@ function rcOpen(id){
   RC_ID=id;RC_SIG='';const m=MATCHES.find(x=>x.id===id);
   let ov=document.getElementById('rcOv');if(!ov){ov=document.createElement('div');ov.id='rcOv';ov.className='rc';document.body.appendChild(ov);document.body.style.overflow='hidden'}
   try{history.replaceState(null,'',PAGE+'?m='+id)}catch(e){}
-  if(RC_UNSUB)RC_UNSUB();let first=true;RC_UNSUB=DB.collection('liveMatches').doc(id).onSnapshot(d=>{if(!d.exists){rcClose();return}const x=Object.assign({id:d.id},d.data());const i=MATCHES.findIndex(y=>y.id===id);if(i>=0)MATCHES[i]=x;else MATCHES.push(x);if(first){first=false;if(!m&&canRec(x)&&!x.locked&&MR.ctrlState(x,ME&&ME.uid)!=='other')rcClaim(false)}
+  if(RC_UNSUB)RC_UNSUB();let first=true;RC_UNSUB=DB.collection('liveMatches').doc(id).onSnapshot(d=>{if(!d.exists){rcClose();return}const x=Object.assign({id:d.id},d.data());const i=MATCHES.findIndex(y=>y.id===id);if(i>=0)MATCHES[i]=x;else MATCHES.push(x);try{lkVirtual()}catch(e){}   /* [2026-10-22] 경기 문서가 새로 오면 가상 연결(_vp)이 사라져 선수 카드가 숫자판으로 바뀌던 것 */if(first){first=false;if(!m&&canRec(x)&&!x.locked&&MR.ctrlState(x,ME&&ME.uid)!=='other')rcClaim(false)}
     const sig=JSON.stringify(Object.assign({},x,{ctrl:Object.assign({},x.ctrl||{},{at:0}),updatedAt:0}));if(!first&&sig===RC_SIG){rcTick();return}RC_SIG=sig;   /* [2026-10-20] 입력권 심장박동만 바뀐 건 다시 그리지 않음(휴대폰 스크롤 끊김 방지) */
     rcRender()},e=>console.warn('rc',e));
   DB.collection('compSigns').doc(id).get().then(d=>{SIGNS=d.exists?d.data():{}}).catch(()=>{SIGNS={}});
@@ -1787,6 +1787,8 @@ function qkTeam(m,side){
     const byNo=(a,b)=>(+a.no)-(+b.no)||String(a.no).localeCompare(String(b.no));
     h+='<div class="pg">'+T.all.slice().sort(byNo).map(p=>chip(p,'')).join('')+'</div>';   /* [2026-10-19] 주전·후보 구분·교체 없음 — 얼티미트는 교체가 자유로워 번호순 전원 */
     h+='<div class="qx">'+(QK.mode==='card'?'<button onclick="qkCoach(\''+side+'\')">👔 지도자 제재</button>':'<button onclick="qkScorerObj(\''+side+'\',null)">득점자 모름 — 점수만 올리기</button>')+'</div>';
+  }else if(!ORDERS_READY){
+    h+='<div class="mr-note" style="padding:14px;text-align:center">오더지 명단을 불러오는 중…</div>';   /* [2026-10-22] 불러오기 전 숫자판이 먼저 떠서 바뀌어 보이던 것 */
   }else{
     h+=qkPad(side,QK.mode==='card'?'card':'scorer');
     h+='<div class="qx">'+(QK.mode==='card'?'<button onclick="qkCoach(\''+side+'\')">👔 지도자 제재</button>':'<button onclick="qkScorerObj(\''+side+'\',null)">득점자 모름 — 점수만 올리기</button>')+'</div>';
