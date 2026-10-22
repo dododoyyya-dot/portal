@@ -7,14 +7,14 @@ let GM=null;
 function gameRender(el){
   const best=+ls('pgGolfBest')||0;
   el.innerHTML='<div class="pg-card"><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap"><div><h2 class="pg-h">원반 골프 챌린지</h2><p class="pg-sub" style="margin:0">원반을 <b>뒤로 끌었다가 놓으면</b> 날아가요. 바람을 보고 바스켓에 쏙! 5홀 합계 점수로 겨뤄요.</p></div><div class="pg-note"><b>내 최고 점수</b> <b style="font-size:18px;color:var(--pn)" id="gmBest">'+best+'</b>점'+(ME?'':' · 로그인하면 전국 랭킹에 올라가요')+'</div></div>'
-    +'<div class="gm-box" style="margin-top:12px"><canvas id="gmCv" width="'+GW+'" height="'+GH+'"></canvas><div class="gm-over" id="gmOver"></div></div>'
+    +'<div class="gm-box" style="margin-top:12px"><canvas id="gmCv" width="'+GW+'" height="'+(window.innerWidth<640?660:GH)+'"></canvas><div class="gm-over" id="gmOver"></div></div>'
     +'<div class="gm-side"><div class="pg-note">'+I('target',{size:16,color:'#13306b'})+' <b>점수</b> — 바스켓 인 <b>100점 + 거리×2</b>, 못 넣으면 가까울수록 최대 60점. 멀수록, 바람이 셀수록 대박 점수!</div><div class="pg-note">'+I('flag',{size:16,color:'#13306b'})+' <b>요령</b> — 길게 당길수록 세게, 아래로 당길수록 높이 날아가요. 등바람(→)이면 덜 세게, 맞바람(←)이면 더 세게.</div></div></div>';
   gmInit()}
 function gmStop(){if(GM&&GM.raf)cancelAnimationFrame(GM.raf);GM=null}
 function gmHoles(){const r=Math.random;const ds=[[13,18],[16,23],[20,27],[23,31],[26,34]];return ds.map((d,i)=>({d:Math.round(d[0]+r()*(d[1]-d[0])),w:Math.round(((r()*2-1)*(i===0?2:4.5))*10)/10}))}
 function gmInit(){gmStop();const cv=document.getElementById('gmCv');if(!cv)return;const g=cv.getContext('2d');
   GM={cv:cv,g:g,holes:gmHoles(),h:0,total:0,res:[],st:'intro',disc:null,trail:[],parts:[],drag:null,msg:null,t:0,clouds:[[120,70,1],[420,46,.8],[700,96,1.1],[880,40,.7]].map(c=>({x:c[0],y:c[1],s:c[2]}))};
-  const pt=e=>{const r=cv.getBoundingClientRect();const p=e.touches?e.touches[0]:e;return {x:(p.clientX-r.left)*GW/r.width,y:(p.clientY-r.top)*GH/r.height}};
+  const pt=e=>{const r=cv.getBoundingClientRect();const p=e.touches?e.touches[0]:e;return {x:(p.clientX-r.left)*GW/r.width,y:(p.clientY-r.top)*cv.height/r.height}};
   const down=e=>{if(!GM||GM.st!=='aim')return;e.preventDefault();const p=pt(e);GM.drag={x0:p.x,y0:p.y,x:p.x,y:p.y}};
   const move=e=>{if(!GM||!GM.drag)return;e.preventDefault();const p=pt(e);GM.drag.x=p.x;GM.drag.y=p.y};
   const up=e=>{if(!GM||!GM.drag)return;const a=gmAim();GM.drag=null;if(a.p<.06)return;gmThrow(a)};
@@ -48,12 +48,12 @@ async function gmEnd(){GM.st='end';const total=GM.total,ins=GM.res.filter(r=>r.i
     catch(e){const x=document.getElementById('gmSave');if(x)x.textContent='랭킹 저장은 보안 규칙 v58 게시 후에 돼요'}}}
 function gmShare(total,ins,lv,acc){shareCard({kicker:'원반 골프 챌린지',title:total+'점',pill:lv,lines:['5홀 중 바스켓 인 '+ins+'번!','나보다 잘 던질 수 있을까?'],c1:'#2d63c4',c2:'#13306b',art:mascot({size:560,acc:acc}),who:ME?myName():''},'KFDF_원반골프_'+total)}
 function gmDraw(){const g=GM.g,H=GM.holes[GM.h]||GM.holes[GM.holes.length-1];const sx=x=>TX+x*PX,sy=y=>GG-y*PX;
-  let sk=g.createLinearGradient(0,0,0,GG);sk.addColorStop(0,'#2d63c4');sk.addColorStop(1,'#a9dcff');g.fillStyle=sk;g.fillRect(0,0,GW,GH);
+  let sk=g.createLinearGradient(0,0,0,GG);sk.addColorStop(0,'#2d63c4');sk.addColorStop(1,'#a9dcff');g.fillStyle=sk;g.fillRect(0,0,GW,GM.cv.height);
   const su=g.createRadialGradient(840,70,10,840,70,90);su.addColorStop(0,'rgba(255,242,168,1)');su.addColorStop(.4,'rgba(255,210,63,.9)');su.addColorStop(1,'rgba(255,210,63,0)');g.fillStyle=su;g.fillRect(740,0,200,170);
   g.fillStyle='rgba(255,255,255,.92)';GM.clouds.forEach(c=>{g.beginPath();g.ellipse(c.x,c.y,46*c.s,14*c.s,0,0,7);g.ellipse(c.x+24*c.s,c.y-8*c.s,28*c.s,15*c.s,0,0,7);g.ellipse(c.x-26*c.s,c.y-3*c.s,22*c.s,11*c.s,0,0,7);g.fill()});
   g.fillStyle='#57c99c';g.beginPath();g.moveTo(0,300);g.bezierCurveTo(200,240,380,270,560,300);g.bezierCurveTo(740,250,880,262,960,280);g.lineTo(960,GG);g.lineTo(0,GG);g.fill();
   g.fillStyle='#2f9e78';[[170,300],[204,296],[640,302],[676,297],[712,294]].forEach(t=>{g.fillRect(t[0]-2,t[1],4,16);g.beginPath();g.arc(t[0],t[1]-2,13,0,7);g.fill()});
-  const gr=g.createLinearGradient(0,GG,0,GH);gr.addColorStop(0,'#4cc98f');gr.addColorStop(1,'#2a9d6e');g.fillStyle=gr;g.fillRect(0,GG,GW,GH-GG);
+  const gr=g.createLinearGradient(0,GG,0,GH);gr.addColorStop(0,'#4cc98f');gr.addColorStop(1,'#2a9d6e');g.fillStyle=gr;g.fillRect(0,GG,GW,GM.cv.height-GG);
   g.fillStyle='rgba(255,255,255,.08)';for(let i=0;i<12;i++)if(i%2)g.fillRect(i*80,GG,80,GH-GG);
   g.font='700 11px Pretendard,sans-serif';g.textAlign='center';for(let m=10;m<=45;m+=10){const x=sx(m);g.fillStyle='rgba(255,255,255,.85)';g.fillRect(x-1,GG-10,2,10);g.fillText(m+'m',x,GG+16)}
   g.fillStyle='#d7c39a';g.beginPath();g.roundRect?g.roundRect(TX-26,GG-4,52,9,4):g.rect(TX-26,GG-4,52,9);g.fill();

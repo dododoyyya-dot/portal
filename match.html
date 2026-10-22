@@ -134,7 +134,7 @@
 .rc .sbt{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:4px}
 .rc .sbt .kit{width:100%;border-radius:12px;padding:6px 10px;font-weight:900;font-size:clamp(13px,2.5vw,16px);text-align:center;line-height:1.2;word-break:keep-all;border:1px solid rgba(255,255,255,.35);box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);min-height:calc(2.4em + 12px);display:flex;flex-direction:column;align-items:center;justify-content:center}.rc .sbt .kit small{display:-webkit-box!important;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
 .rc .sbt .v.tap{cursor:pointer;border-radius:18px;transition:background .15s}.rc .sbt .v.tap:active{background:rgba(255,255,255,.12)}.rc .sbt small .tapHint{display:block;font-style:normal;font-size:10.5px;font-weight:800;color:rgba(255,255,255,.55);margin-top:2px;letter-spacing:0}
-.rc .sbt .v{flex:1;display:flex;align-items:center;font-size:clamp(84px,15vw,160px);font-weight:900;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-3px;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.25)}.rc .sbt>small{margin-top:-2px}
+.rc .sbt.go{cursor:pointer;border-radius:18px;transition:background .15s}.rc .sbt.go:active{background:rgba(255,255,255,.12)} .rc .sbt .v{flex:1;display:flex;align-items:center;font-size:clamp(104px,19vw,208px);font-weight:900;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-3px;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.25)}.rc .sbt>small{margin-top:-2px}
 .rc .sbt small{font-size:12.5px;color:#c9d3e8;font-weight:700;letter-spacing:.3px}
 .rc .sbt .to{width:100%;min-height:46px;border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.08);color:#fff;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;line-height:1.2}
 .rc .sbt .to small{display:block;font-size:11px;font-weight:700;color:#c9d3e8}
@@ -311,7 +311,7 @@ body:has(#rfModal),body:has(#mfModal),body:has(#odModal){overflow:hidden}
 @media(max-width:560px){
   .rc .body{padding:10px 8px 100px}
   .rc .tadj{grid-template-columns:repeat(7,1fr);gap:4px}.rc .tadj button{min-height:38px;font-size:11.5px;padding:0 2px}
-  .rc .sb{grid-template-columns:1fr 1fr;padding:12px 10px;gap:8px}.rc .sb .cc{grid-column:1/-1;order:-1}.rc .clk{font-size:64px;padding:10px}.rc .pp{min-height:48px;font-size:17px}.rc .sbt .v{font-size:64px}.rc .sbt .kit{font-size:12.5px}
+  .rc .sb{grid-template-columns:1fr 1fr;padding:12px 10px;gap:8px}.rc .sb .cc{grid-column:1/-1;order:-1}.rc .clk{font-size:64px;padding:10px}.rc .pp{min-height:48px;font-size:17px}.rc .sbt .v{font-size:92px}.rc .sbt .kit{font-size:12.5px}
   .rc .ppr{grid-template-columns:64px 1fr 64px}.rc .pnav b{font-size:17px}
   .rc .top .meta{display:none}.rc .top .hb,.rc .top .x{padding:7px 10px}
   .rc .pbar button{min-width:0;flex:1;font-size:14.5px}.rc .pg{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))}.rc .pc{min-height:84px}.rc .pc b{font-size:30px}
@@ -1630,10 +1630,10 @@ function rcRender(){
   // ① 시작 전: 경기복·풀 고르기
   if(mine&&m.status==='예정'&&!m.kit){ov.innerHTML=h+'<div class="body">'+rcTipHtml()+setupHtml(m,false)+'</div>';return}
   const [L,R]=sidesLR(m);const per=m.period||'';const curP=per==='하프타임'?'':per;const TO=MR.timeouts(m);
-  const sideBox=(side)=>{const K=kitOfSide(m,side);const used=(TO[side][curP]||[]);const v=side==='a'?sc.a:sc.b;
+  const sideBox=(side)=>{const K=kitOfSide(m,side);const used=(TO[side][curP]||[]);const v=side==='a'?sc.a:sc.b;const canG=(mine||aux)&&m.status==='진행';   /* [2026-10-22] 팀 칸 어디를 눌러도 득점 입력(버튼 제외) · 보조 입력도 */
     const hs=['전반','후반','연장'].filter(p=>H[side][p]!=null).map(p=>p.charAt(0)+' '+H[side][p]).join(' · ');
-    const tm=m[side]||{};const won=m.status==='종료'&&MR.winnerOf(m)===side;return '<div class="sbt"><div class="kit" style="background:'+esc(K.color)+';color:'+MR.kitTextColor(K.color)+'" title="'+esc(tname(m,side))+'">'+esc(tm.name||tm.school||side.toUpperCase())+(won?'<span class="wb">승</span>':'')+(tm.school&&tm.school!==tm.name?'<small style="display:block;font-size:11.5px;font-weight:800;color:inherit;opacity:.9">'+esc(tm.school)+'</small>':'')+'</div><div class="v'+(mine&&m.status==='진행'?' tap':'')+'"'+(mine&&m.status==='진행'?' role="button" title="누르면 이 팀 선수 명단으로 바로 내려가 득점을 입력합니다" onclick="qkJump(\''+side+'\')"':'')+'>'+v+'</div><small>'+esc(hs)+(mine&&m.status==='진행'?'<em class="tapHint">숫자를 누르면 득점 입력</em>':'')+'&nbsp;</small>'
-      +'<div class="sbb">'+pullBtn(m,side,mine,curP)+(mine&&m.status==='진행'?'<button class="to" '+((used.length||!curP||m.brk)?'disabled':'')+' onclick="toStart(\''+side+'\')">작전타임<small>'+(curP?(used.length?'사용 '+esc(MR.evTime(used[0])):'1회 남음'):'구간 시작 후')+'</small></button>'
+    const tm=m[side]||{};const won=m.status==='종료'&&MR.winnerOf(m)===side;return '<div class="sbt'+(canG?' go':'')+'"'+(canG?' role="button" title="누르면 이 팀 선수 명단으로 내려가 득점을 입력합니다" onclick="qkJump(\''+side+'\')"':'')+'><div class="kit" style="background:'+esc(K.color)+';color:'+MR.kitTextColor(K.color)+'" title="'+esc(tname(m,side))+'">'+esc(tm.name||tm.school||side.toUpperCase())+(won?'<span class="wb">승</span>':'')+(tm.school&&tm.school!==tm.name?'<small style="display:block;font-size:11.5px;font-weight:800;color:inherit;opacity:.9">'+esc(tm.school)+'</small>':'')+'</div><div class="v">'+v+'</div><small>'+esc(hs)+'&nbsp;</small>'
+      +'<div class="sbb" onclick="event.stopPropagation()">'+pullBtn(m,side,mine,curP)+(mine&&m.status==='진행'?'<button class="to" '+((used.length||!curP||m.brk)?'disabled':'')+' onclick="toStart(\''+side+'\')">작전타임<small>'+(curP?(used.length?'사용 '+esc(MR.evTime(used[0])):'1회 남음'):'구간 시작 후')+'</small></button>'
         :(curP&&used.length?'<small class="tou">작전타임 '+esc(MR.evTime(used[0]))+'</small>':''))+'</div></div>'};
   // ② 점수판 · 시계
   h+='<div class="body">'+(mine?rcTipHtml():'')
