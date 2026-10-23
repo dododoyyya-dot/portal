@@ -209,6 +209,9 @@
 .pv-ac.on{border-color:#9b87f5;background:#f1edff;box-shadow:0 0 0 2px #9b87f5 inset}.pv-ac .ck{position:absolute;top:8px;left:8px;background:#9b87f5;color:#fff;border-radius:50%;width:24px;height:24px;line-height:24px;font-style:normal;font-weight:900}
 .pv-ac .ey{position:absolute;top:8px;right:8px;border:0;background:rgba(255,255,255,.9);border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:14px;padding:0}
 .pv-ft{position:sticky;bottom:0;background:#fffdf7;display:flex;gap:8px;justify-content:flex-end;padding:10px 0 14px;border-top:1.5px dashed #eee4f5;margin-top:8px}
+.pv-ac .ck{background:#fff;font-size:15px;box-shadow:0 1px 4px rgba(0,0,0,.15)}.pv-ac.on .ck{background:#ffe3ec}.pv-ac.on{border-color:#ff7eaa;background:#fff2f7;box-shadow:0 0 0 2px #ff7eaa inset}
+.pc-btn.pv-like{background:#fff;color:#d14f7f;border:2px solid #ffb3cb;box-shadow:none}.pc-btn.pv-like.on{background:#ff7eaa;color:#fff;border-color:#ff7eaa}.pc-btn.pv-like small{font-size:11px;opacity:.8;margin-left:2px}
+.pc-fd .pv-hrt{position:absolute;top:46px;right:14px;z-index:1;background:#fff;border-radius:999px;padding:1px 7px;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.12)}
 .pc-ph .tag.pv{left:auto;right:8px;background:#9b87f5;color:#fff}
 .pc-admin{background:#fffbea;border:2.5px dashed #f5d77a;border-radius:18px;padding:10px 14px;margin-top:18px;font-size:12.5px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .pc-empty{text-align:center;padding:30px 10px;font-family:Jua,Pretendard,sans-serif;font-size:17px;color:var(--ink2)}
@@ -254,11 +257,11 @@
       <ul class="pc-rules">
         <li data-e="📷">대회 동안 <b>선수들이 뛰는 모습</b>을 찍어서 여기에 올려요 (회원 로그인)</li>
         <li data-e="🏫">참가 학교마다 <b>앨범</b>이 있어요. 학교를 고르면 그 앨범에 쏙!</li>
-        <li data-e="🏆">올라온 사진 중에서 <b>초·중·고 부문별 1위</b>를 뽑아 선물을 드려요 — 수상작은 <b>심판님과 운영진의 투표</b>로 정해요</li>
+        <li data-e="🏆">올라온 사진 중에서 <b>초·중·고 부문별 1위</b>를 뽑아 선물을 드려요 — 수상작은 <b>심판님과 운영진의 좋아요</b>를 모아 정해요</li>
         <li data-e="🎽">학교 앨범 말고 <b>운영진</b>·<b>심판진</b> 앨범도 있어요 (각각 1위도 뽑아요)</li>
         <li data-e="🎀">한 계정에 <b>10장</b>까지(운영진·심판진 앨범은 <b>50장</b>)! 사진은 알아서 예쁘게 줄여서 올라가요</li>
       </ul>
-      <div class="pc-must"><b>🎽 우리 학교 유니폼 자랑하기 <em>필수 1장</em></b>원반을 들고 멋진 포즈로! 유니폼 <b>앞모습과 뒷모습(등번호)</b>이 모두 잘 보이게 찍은 사진을 학교마다 <b>꼭 1장</b> 올려 주세요.<ol class="pc-eval"><b>평가 요소</b><li><b>유니폼 자랑하기</b> — 우리 학교 유니폼이 얼마나 멋지게 잘 보이나요?</li><li><b>포즈 점수</b> — 원반과 함께한 포즈가 개성 있고 재미있나요?</li><li><b>얼티미트와 조화</b> — 플라잉디스크·얼티미트다운 느낌이 살아 있나요?</li></ol><small>🗳 1위는 심판님과 운영진의 투표로 결정합니다</small></div>
+      <div class="pc-must"><b>🎽 우리 학교 유니폼 자랑하기 <em>필수 1장</em></b>원반을 들고 멋진 포즈로! 유니폼 <b>앞모습과 뒷모습(등번호)</b>이 모두 잘 보이게 찍은 사진을 학교마다 <b>꼭 1장</b> 올려 주세요.<ol class="pc-eval"><b>평가 요소</b><li><b>유니폼 자랑하기</b> — 우리 학교 유니폼이 얼마나 멋지게 잘 보이나요?</li><li><b>포즈 점수</b> — 원반과 함께한 포즈가 개성 있고 재미있나요?</li><li><b>얼티미트와 조화</b> — 플라잉디스크·얼티미트다운 느낌이 살아 있나요?</li></ol><small>💗 1위는 심판님과 운영진의 좋아요를 모아 결정합니다</small></div>
       <div class="pc-dl" id="pcDl">⏰ 10월 30일(금) 접수 마감</div>
       <div class="pc-stats" id="pcStats"></div>
     </div>
@@ -321,7 +324,7 @@ async function pvSync(){if(!ADMIN)return;const prev=PV_VOTERS||{};const names=Ob
 function pvCompose(o){const man=o.manual||[],blk=o.blocked||[],lead=o.lead||[];return [...new Set((o.auto||[]).filter(u=>lead.indexOf(u)<0).concat(man))].filter(u=>blk.indexOf(u)<0).sort()}
 async function pvSave(prev,patch){const o=Object.assign({auto:[],manual:[],blocked:[],lead:[],names:{}},prev,patch);delete o.err;delete o.updatedAt;delete o.by;o.uids=pvCompose(o);
   const K=['auto','manual','blocked','lead','uids'];const same=JSON.stringify(K.map(k=>(o[k]||[]).slice().sort()))===JSON.stringify(K.map(k=>(prev[k]||[]).slice().sort()))&&JSON.stringify(o.names)===JSON.stringify(prev.names||{});if(same)return;
-  try{await DB.collection('photoVoters').doc(SLOT).set(Object.assign({},o,{updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:(MY&&MY.name)||''}));PV_VOTERS=o}catch(e){console.warn('pvSave',e);alert('투표권 명단을 저장하지 못했습니다: '+(e.message||e))}}
+  try{await DB.collection('photoVoters').doc(SLOT).set(Object.assign({},o,{updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:(MY&&MY.name)||''}));PV_VOTERS=o}catch(e){console.warn('pvSave',e);alert('좋아요 권한 명단을 저장하지 못했습니다: '+(e.message||e))}}
 async function pvBlock(u){const p=PV_VOTERS||{};const nm=(p.names||{})[u]||u;if(!confirm(nm+' 님의 투표권을 뺄까요? (이미 한 투표는 그대로 남습니다)'))return;await pvSave(p,{blocked:[...new Set((p.blocked||[]).concat(u))],manual:(p.manual||[]).filter(x=>x!==u)});pcAdminBar()}
 async function pvUnblock(u){const p=PV_VOTERS||{};await pvSave(p,{blocked:(p.blocked||[]).filter(x=>x!==u),manual:(p.lead||[]).indexOf(u)>=0?[...new Set((p.manual||[]).concat(u))]:(p.manual||[])});pcAdminBar()}
 async function pvAddByName(){const inp=document.getElementById('pvAddName');const n=String(inp&&inp.value||'').trim();if(!n)return;
@@ -329,28 +332,34 @@ async function pvAddByName(){const inp=document.getElementById('pvAddName');cons
     let d=q.docs[0];if(q.size>1){const lst=q.docs.map((x,i)=>{const y=x.data()||{};return (i+1)+'. '+(y.name||'')+' · '+(y.sido||y.region||'')+(y.phone?' · 끝번호 '+String(y.phone).slice(-4):'')}).join('\n');const k=parseInt(prompt('같은 이름이 '+q.size+'명입니다. 번호를 고르세요:\n'+lst,'1'),10);if(!(k>=1&&k<=q.size))return;d=q.docs[k-1]}
     const u=d.id,p=PV_VOTERS||{};const names=Object.assign({},p.names||{});names[u]=(d.data()||{}).name||n;await pvSave(p,{manual:[...new Set((p.manual||[]).concat(u))],blocked:(p.blocked||[]).filter(x=>x!==u),names:names});inp.value='';pcAdminBar()}
   catch(e){alert('찾지 못했습니다: '+(e.message||e))}}
-/* [2026-10-24 v2] 학교 앨범 단위 투표 — 투표권자 화면에만 「투표하기」, 초·중·고 부문마다 학교 앨범 한 곳(문서 photoVotes/{SLOT}_{부문}_{uid}: fk·school). 투표권 명단은 화면에 안 보임(관리자가 열 때 자동으로 맞춤) */
-async function pvLoad(){if(!ME||!pcCanVote()){PV=null;return}try{const q=await DB.collection('photoVotes').where('slot','==',SLOT).get();const all=q.docs.map(d=>d.data()).filter(v=>v&&v.fk);const mine={},cnt={};all.forEach(v=>{cnt[v.fk]=(cnt[v.fk]||0)+1;if(v.uid===ME.uid)mine[v.level]=v.fk});PV={all:all,mine:mine,cnt:cnt}}catch(e){PV={all:[],mine:{},cnt:{},err:e.code||e.message}}}
+/* [2026-10-24 v3] 투표 → 좋아요 — 축전 심판·운영진(photoVoters 명단·관리자)이 초·중·고 부문마다 학교 앨범 LIKE_MAX 곳까지 좋아요. 문서 photoVotes/{SLOT}_{부문}_{uid} 하나에 fks(앨범 키 목록). 누르면 바로 저장, 다시 누르면 취소. 집계는 관리자만 */
+const LIKE_MAX=5;let PV_BUSY=false;
+async function pvLoad(){if(!ME||!pcCanVote()){PV=null;return}const mine={};VOTE_LV.forEach(l=>mine[l]=[]);
+  try{const q=await DB.collection('photoVotes').where('slot','==',SLOT).get();const all=q.docs.map(d=>{const v=d.data()||{};if(!Array.isArray(v.fks))v.fks=v.fk?[v.fk]:[];return v}).filter(v=>v.fks.length);const cnt={};
+    all.forEach(v=>{v.fks.forEach(fk=>{cnt[fk]=(cnt[fk]||0)+1});if(v.uid===ME.uid&&mine[v.level])mine[v.level]=v.fks.slice()});PV={all:all,mine:mine,cnt:cnt}}
+  catch(e){PV={all:[],mine:mine,cnt:{},err:e.code||e.message}}}
 function pvBtnHtml(x){return ''}
 function pvAlbums(lv){return folders().filter(f=>f.level===lv&&f.photos.length).sort((a,b)=>String(a.name).localeCompare(String(b.name),'ko'))}
 function pvName(fk){const f=folderOf(fk);return f?f.name:String(fk||'').split('|').slice(1).join('|')}
-let PV_SEL=null;
-function pvOpen(){if(!PV)return;PV_SEL=Object.assign({},PV.mine);pvDraw()}
-function pvClose(){const d=document.getElementById('pvMd');if(d)d.remove();PV_SEL=null;document.body.style.overflow=''}
-function pvPick(lv,fk){if(!PV_SEL)return;PV_SEL[lv]=PV_SEL[lv]===fk?'':fk;pvDraw()}
-function pvDraw(){let d=document.getElementById('pvMd');if(!d){d=document.createElement('div');d.id='pvMd';d.className='pv-md';document.body.appendChild(d);d.addEventListener('click',e=>{if(e.target===d)pvClose()})}document.body.style.overflow='hidden';
-  const n=VOTE_LV.filter(l=>PV_SEL[l]).length;const q=s=>esc(s).replace(/'/g,'&#39;');
-  d.innerHTML='<div class="pv-box"><div class="pv-hd"><b>🗳 베스트 학교 투표</b><button type="button" onclick="pvClose()" aria-label="닫기">✕</button></div><div class="pc-note" style="margin:0 0 6px">초등부·중등부·고등부에서 <b>학교 앨범 한 곳씩</b> 골라 주세요. 다시 누르면 선택이 풀리고, 투표 뒤에도 바꿀 수 있어요. 👀 를 누르면 그 학교 사진을 크게 봅니다.</div>'
-    +VOTE_LV.map(l=>{const A=pvAlbums(l);return '<div class="pv-lv"><h3>'+l+' <span>'+(PV_SEL[l]?'✓ '+esc(pvName(PV_SEL[l])):'선택 안 함')+'</span></h3>'+(A.length?'<div class="pv-al">'+A.map(f=>{const on=PV_SEL[l]===f.fk;return '<div class="pv-ac'+(on?' on':'')+'" role="button" tabindex="0" onclick="pvPick(\''+l+'\',\''+q(f.fk)+'\')"><img src="'+esc(f.photos[0].img)+'" alt="" loading="lazy"><b>'+esc(f.name)+'</b><small>'+f.photos.length+'장</small>'+(on?'<i class="ck">✓</i>':'')+'<button type="button" class="ey" title="사진 크게 보기" onclick="event.stopPropagation();pcLb(\''+q(f.fk)+'\',0)">👀</button></div>'}).join('')+'</div>':'<div class="pc-note">아직 사진이 올라온 학교가 없어요</div>')+'</div>'}).join('')
-    +'<div class="pv-ft"><button type="button" class="pv-btn" style="background:#fff;box-shadow:none;border:1.5px solid #e6d8f0" onclick="pvClose()">닫기</button><button type="button" class="pv-btn on" onclick="pvSubmit()">투표하기 ('+n+'/3)</button></div></div>'}
-async function pvSubmit(){if(!PV||!PV_SEL||!ME)return;const ch=VOTE_LV.filter(l=>(PV_SEL[l]||'')!==(PV.mine[l]||''));if(!ch.length){pvClose();return}
-  const n=VOTE_LV.filter(l=>PV_SEL[l]).length;if(n<3&&!confirm('고르지 않은 부문이 있습니다('+VOTE_LV.filter(l=>!PV_SEL[l]).join('·')+'). 이대로 투표할까요?'))return;
-  try{for(const l of ch){const ref=DB.collection('photoVotes').doc(SLOT+'_'+l+'_'+ME.uid);if(PV_SEL[l])await ref.set({slot:SLOT,uid:ME.uid,name:(MY&&MY.name)||'',level:l,fk:PV_SEL[l],school:pvName(PV_SEL[l]).slice(0,80),at:firebase.firestore.FieldValue.serverTimestamp()});else await ref.delete()}
-    await pvLoad();pvClose();pcAdminBar();alert('투표했습니다 🗳\n'+VOTE_LV.map(l=>l+': '+(PV.mine[l]?pvName(PV.mine[l]):'—')).join('\n'))}
-  catch(e){alert('투표하지 못했습니다: '+(/permission/i.test(String(e))?'투표권이 없습니다(운영본부에 문의)':(e.message||e)))}}
-function pvBarHtml(){if(!PV)return '';const mine=VOTE_LV.map(l=>{const fk=PV.mine[l];return '<span class="pv-chip'+(fk?' on':'')+'">'+l.replace('부','')+' '+(fk?'✓ '+esc(pvName(fk)):'—')+'</span>'}).join('');
-  let rank='';if(ADMIN){rank=VOTE_LV.map(l=>{const L=Object.keys(PV.cnt).filter(fk=>fk.split('|')[0]===l).sort((a,b)=>PV.cnt[b]-PV.cnt[a]).slice(0,5);return '<div class="pv-rank"><b>'+l+'</b> '+(L.length?L.map((fk,i)=>(i+1)+'. '+esc(pvName(fk))+' <b>'+PV.cnt[fk]+'표</b>').join(' · '):'아직 표 없음')+'</div>'}).join('')+'<div class="pc-note" style="margin:0">투표 '+PV.all.length+'건(관리자만 보임) · 1위 지정은 앨범의 「1위」 버튼으로</div>'}
-  return '<div class="pv-bar"><div class="pv-mine"><button type="button" class="pv-btn" onclick="pvOpen()">🗳 베스트 학교 투표하기</button><span class="pc-note" style="margin:0">축전 심판·운영진 투표 · 초·중·고 학교 한 곳씩</span></div><div class="pv-mine">내 투표 '+mine+'</div>'+rank+(PV.err?'<div style="color:#c0392b">투표 정보를 불러오지 못했습니다('+esc(PV.err)+')</div>':'')+'</div>'}
+function pvLiked(lv,fk){return !!(PV&&(PV.mine[lv]||[]).indexOf(fk)>=0)}
+async function pvToggle(lv,fk){if(!PV||!ME||PV_BUSY||VOTE_LV.indexOf(lv)<0)return;const cur=(PV.mine[lv]||[]).slice();const i=cur.indexOf(fk);
+  if(i>=0)cur.splice(i,1);else{if(cur.length>=LIKE_MAX){alert(lv+' 좋아요는 학교 '+LIKE_MAX+'곳까지 누를 수 있어요.\n다른 학교의 좋아요를 먼저 취소(💗 다시 누르기)해 주세요.');return}cur.push(fk)}
+  PV_BUSY=true;const ref=DB.collection('photoVotes').doc(SLOT+'_'+lv+'_'+ME.uid);
+  try{if(cur.length)await ref.set({slot:SLOT,uid:ME.uid,name:(MY&&MY.name)||'',level:lv,fks:cur,at:firebase.firestore.FieldValue.serverTimestamp()});else await ref.delete();PV.mine[lv]=cur;await pvLoad()}
+  catch(e){alert('좋아요를 저장하지 못했습니다: '+(/permission/i.test(String(e))?'좋아요는 축전 심판·운영진만 누를 수 있어요(운영본부에 문의)':(e.message||e)))}
+  PV_BUSY=false;if(document.getElementById('pvMd'))pvDraw();pcAdminBar();if(OPEN)pcRender()}
+function pvOpen(){if(!PV)return;pvDraw()}
+function pvClose(){const d=document.getElementById('pvMd');if(d)d.remove();document.body.style.overflow=''}
+function pvDraw(){let d=document.getElementById('pvMd');const keep=d?(d.querySelector('.pv-box')||{}).scrollTop||0:0;if(!d){d=document.createElement('div');d.id='pvMd';d.className='pv-md';document.body.appendChild(d);d.addEventListener('click',e=>{if(e.target===d)pvClose()})}document.body.style.overflow='hidden';
+  const q=x=>esc(x).replace(/'/g,'&#39;');
+  d.innerHTML='<div class="pv-box"><div class="pv-hd"><b>💗 베스트 학교 좋아요</b><button type="button" onclick="pvClose()" aria-label="닫기">✕</button></div><div class="pc-note" style="margin:0 0 6px">초등부·중등부·고등부마다 마음에 드는 <b>학교 앨범 '+LIKE_MAX+'곳까지</b> 💗를 눌러 주세요. 누르면 바로 저장되고, 다시 누르면 취소돼요. 👀 를 누르면 그 학교 사진을 크게 봅니다.</div>'
+    +VOTE_LV.map(l=>{const A=pvAlbums(l);const n=(PV.mine[l]||[]).length;return '<div class="pv-lv"><h3>'+l+' <span>💗 '+n+' / '+LIKE_MAX+'</span></h3>'+(A.length?'<div class="pv-al">'+A.map(f=>{const on=pvLiked(l,f.fk);return '<div class="pv-ac'+(on?' on':'')+'" role="button" tabindex="0" onclick="pvToggle(\''+l+'\',\''+q(f.fk)+'\')"><img src="'+esc(f.photos[0].img)+'" alt="" loading="lazy"><b>'+esc(f.name)+'</b><small>'+f.photos.length+'장</small><i class="ck">'+(on?'💗':'🤍')+'</i><button type="button" class="ey" title="사진 크게 보기" onclick="event.stopPropagation();pcLb(\''+q(f.fk)+'\',0)">👀</button></div>'}).join('')+'</div>':'<div class="pc-note">아직 사진이 올라온 학교가 없어요</div>')+'</div>'}).join('')
+    +'<div class="pv-ft"><span class="pc-note" style="margin:0 auto 0 0">누르는 즉시 저장돼요</span><button type="button" class="pv-btn on" onclick="pvClose()">다 했어요</button></div></div>';
+  const bx=d.querySelector('.pv-box');if(bx)bx.scrollTop=keep}
+function pvFolderBtn(f){if(!PV||!f||VOTE_LV.indexOf(f.level)<0||f.fk==='__mine'||!(f.photos||[]).length)return '';const on=pvLiked(f.level,f.fk);const n=(PV.mine[f.level]||[]).length;return '<button type="button" class="pc-btn pv-like'+(on?' on':'')+'" onclick="pvToggle(\''+esc(f.level)+'\',\''+esc(f.fk).replace(/'/g,'&#39;')+'\')">'+(on?'💗 좋아요 취소':'🤍 좋아요')+' <small>'+esc(f.level.replace('부',''))+' '+n+'/'+LIKE_MAX+'</small></button>'}
+function pvBarHtml(){if(!PV)return '';const mine=VOTE_LV.map(l=>{const n=(PV.mine[l]||[]).length;return '<span class="pv-chip'+(n?' on':'')+'">'+l.replace('부','')+' 💗 '+n+'/'+LIKE_MAX+'</span>'}).join('');
+  let rank='';if(ADMIN){rank=VOTE_LV.map(l=>{const L=Object.keys(PV.cnt).filter(fk=>fk.split('|')[0]===l).sort((a,b)=>PV.cnt[b]-PV.cnt[a]).slice(0,5);return '<div class="pv-rank"><b>'+l+'</b> '+(L.length?L.map((fk,i)=>(i+1)+'. '+esc(pvName(fk))+' <b>💗'+PV.cnt[fk]+'</b>').join(' · '):'아직 좋아요 없음')+'</div>'}).join('')+'<div class="pc-note" style="margin:0">좋아요 누른 사람 '+new Set(PV.all.map(v=>v.uid)).size+'명(집계는 관리자만 보임) · 1위 지정은 앨범의 「1위」 버튼으로</div>'}
+  return '<div class="pv-bar"><div class="pv-mine"><button type="button" class="pv-btn" onclick="pvOpen()">💗 베스트 학교 좋아요</button><span class="pc-note" style="margin:0">축전 심판·운영진 · 초·중·고 부문마다 학교 '+LIKE_MAX+'곳까지</span></div><div class="pv-mine">내 좋아요 '+mine+'</div>'+rank+(PV.err?'<div style="color:#c0392b">좋아요 정보를 불러오지 못했습니다('+esc(PV.err)+')</div>':'')+'</div>'}
 function pcIsSp(l){return SPECIAL.indexOf(l)>=0}
 function pcFreeSlots(sp,extra){const used=new Set(mine().map(x=>x.id).concat(extra||[]));const out=[];const order=sp?[...Array(40).keys()].map(i=>i+11).concat([...Array(10).keys()].map(i=>i+1)):[...Array(10).keys()].map(i=>i+1);order.forEach(k=>{if(!used.has(ME.uid+'_'+k))out.push(k)});return out}
 function pcLeft(level){const sp=pcIsSp(level);const n=mine().filter(x=>pcIsSp(x.level)===sp).length;return Math.max(0,Math.min((sp?MAXSP:MAXN)-n,pcFreeSlots(sp).length))}
@@ -407,14 +416,14 @@ function pcRender(){pcStats();pcAdminBar();const el=document.getElementById('pcM
     +'<div class="pc-bar">'+['',...LEVELS].map(l=>'<button class="pc-chip'+(LV===l?' on':'')+'" onclick="LV=\''+l+'\';pcRender()">'+(l||'전체')+' '+cnt(l)+'</button>').join('')+(ME&&mine().length?'<button class="pc-chip" onclick="pcMine()">💗 내 사진 '+mine().length+'</button>':'')+'<input class="pc-in pc-search" id="pcQ" value="'+esc(Q)+'" placeholder="🔍 우리 학교 찾기" oninput="Q=this.value;pcRenderKeep()"></div>'
     +(F.length?'<div class="pc-folders">'+F.map(f=>{const p=f.photos;const isNew=p.length&&now-(+p[0].atMs||0)<24*3600e3;
       return '<button class="pc-fd l'+(LEVELS.indexOf(f.level)+1)+(p.length?'':' empty')+'" onclick="pcOpen(\''+esc(f.fk).replace(/'/g,'&#39;')+'\')"><div class="cv">'+(p.length?'<img src="'+esc(p[0].img)+'" alt="" loading="lazy">'+(p.length>1?'<div class="mini">'+p.slice(1,3).map(x=>'<img src="'+esc(x.img)+'" alt="" loading="lazy">').join('')+'</div>':''):'<div class="ph">'+DISC+'첫 사진을<br>기다리는 중 ♡</div>')+'</div>'
-        +(isNew?'<span class="nw">NEW ✨</span>':'')+(p.length?'<span class="ct">'+p.length+'장</span>':'')+'<div class="bd"><b>'+esc(f.name)+'</b><span>'+esc(f.level)+(f.divs&&f.divs.length>1?' · 남녀':f.divs&&f.divs[0]&&/여/.test(f.divs[0])?' · 여자':f.divs&&f.divs[0]?' · 남자':'')+'</span></div></button>'}).join('')+'</div>'
+        +(isNew?'<span class="nw">NEW ✨</span>':'')+(p.length?'<span class="ct">'+p.length+'장</span>':'')+(pvLiked(f.level,f.fk)?'<span class="pv-hrt" title="내가 좋아요한 학교">💗</span>':'')+'<div class="bd"><b>'+esc(f.name)+'</b><span>'+esc(f.level)+(f.divs&&f.divs.length>1?' · 남녀':f.divs&&f.divs[0]&&/여/.test(f.divs[0])?' · 여자':f.divs&&f.divs[0]?' · 남자':'')+'</span></div></button>'}).join('')+'</div>'
       :'<div class="pc-empty">'+DISC+'앗, 그 학교는 못 찾았어요</div>')+'</div>'}
 let _qt=null;function pcRenderKeep(){clearTimeout(_qt);_qt=setTimeout(()=>{const pos=(document.getElementById('pcQ')||{}).selectionStart;pcRender();const q=document.getElementById('pcQ');if(q){q.focus();try{q.setSelectionRange(pos,pos)}catch(e){}}},150)}
 function pcOpen(fk){location.hash='f='+encodeURIComponent(fk)}
 function pcBack(){history.replaceState(null,'',location.pathname+location.search);OPEN='';pcRender();const s=document.querySelector('.pc-folders');if(s)s.scrollIntoView({block:'start'})}
 function pcMine(){if(!ME)return;const fks=[...new Set(mine().map(x=>x.fk))];if(fks.length===1){pcOpen(fks[0]);return}LV='';Q='';OPEN='__mine';const el=document.getElementById('pcMain');el.innerHTML=pcFolderHtml({fk:'__mine',name:'내 사진',level:'',photos:mine()});}
 function pcFolderHtml(f){const p=f.photos;const own=x=>ME&&(x.by||{}).uid===ME.uid;
-  return '<div class="pc-sec"><div class="pc-fhead"><button class="pc-btn soft" onclick="pcBack()">← 앨범 목록</button><h2>'+esc(f.name)+' 앨범 📒</h2><span class="pc-note" style="margin:0">'+esc(f.level||'')+' · '+p.length+'장</span><span style="flex:1"></span>'+(p.length?'<button class="pc-btn navy" onclick="pcLb(\''+esc(f.fk).replace(/'/g,'&#39;')+'\',0,true)">▶ 자동으로 넘겨 보기</button>':'')+(ME&&open_()&&f.fk!=='__mine'?'<button class="pc-btn" onclick="pcUpFor(\''+esc(f.fk).replace(/'/g,'&#39;')+'\')">📤 우리 학교 사진 올리기</button>':'')+(!ME&&open_()?'<a class="pc-btn" href="login.html?next='+encodeURIComponent('photo.html?f='+encodeURIComponent(f.fk))+'">로그인하고 사진 올리기</a>':'')+'</div>'
+  return '<div class="pc-sec"><div class="pc-fhead"><button class="pc-btn soft" onclick="pcBack()">← 앨범 목록</button><h2>'+esc(f.name)+' 앨범 📒</h2><span class="pc-note" style="margin:0">'+esc(f.level||'')+' · '+p.length+'장</span>'+pvFolderBtn(f)+'<span style="flex:1"></span>'+(p.length?'<button class="pc-btn navy" onclick="pcLb(\''+esc(f.fk).replace(/'/g,'&#39;')+'\',0,true)">▶ 자동으로 넘겨 보기</button>':'')+(ME&&open_()&&f.fk!=='__mine'?'<button class="pc-btn" onclick="pcUpFor(\''+esc(f.fk).replace(/'/g,'&#39;')+'\')">📤 우리 학교 사진 올리기</button>':'')+(!ME&&open_()?'<a class="pc-btn" href="login.html?next='+encodeURIComponent('photo.html?f='+encodeURIComponent(f.fk))+'">로그인하고 사진 올리기</a>':'')+'</div>'
     +(p.length?'<div class="pc-grid">'+p.map((x,i)=>'<div class="pc-ph"><img src="'+esc(x.img)+'" alt="'+esc(x.title||f.name)+'" loading="lazy" onclick="pcLb(\''+esc(f.fk).replace(/'/g,'&#39;')+'\','+i+')">'+(x.award?'<span class="tag aw">🏆 '+esc(x.level||'')+' 1위</span>':(x.pick&&ADMIN?'<span class="tag">후보</span>':''))
       +'<div class="cap">'+(x.title?'<b>'+esc(x.title)+'</b>':'')+'<span>📷 '+esc(pcWho(x))+(f.fk==='__mine'?' · '+esc(x.school||''):'')+'</span></div>'
       +((own(x)&&open_())||ADMIN?'<div class="tools">'+(ADMIN?'<button onclick="pcMark(\''+x.id+'\',\'pick\')">'+(x.pick?'후보 해제':'후보')+'</button><button onclick="pcMark(\''+x.id+'\',\'award\')">'+(x.award?'1위 해제':'1위')+'</button><a href="'+esc(x.img)+'" target="_blank" rel="noopener">원본</a>':'')+'<button onclick="pcDel(\''+x.id+'\')" style="color:#C41E2F">삭제</button></div>':'')+'</div>').join('')+'</div>'
