@@ -266,7 +266,7 @@ function pkSummary(div,list){const fin=list.filter(m=>m.status==='종료').lengt
   const my=ME?list.filter(m=>(RK._byM[m.id]||[]).some(p=>p.uid===ME.uid)).length:0;
   const hit=ME?list.filter(m=>{const w=pkWinner(m);return w&&(RK._byM[m.id]||[]).some(p=>p.uid===ME.uid&&p.pick===w)}).length:0;
   return '<span>'+esc(div)+'</span><small>'+list.length+'경기'+(fin?' · 종료 '+fin:'')+'</small><span class="pk-cnt">'+(ME?'내 예측 '+my+'/'+list.length+((fin&&my)?' · 적중 '+hit:''):'')+'</span>'}
-function pkSection(div,list,idx){const key=pkDivKey(div);if(RK.secOpen[key]==null)RK.secOpen[key]=idx===0;
+function pkSection(div,list,idx){const key=pkDivKey(div);if(RK.secOpen[key]==null)RK.secOpen[key]=false;   /* [2026-10-24] 처음엔 모든 부문 접힘 — 첫 부문만 펼쳐 두니 아래 부문이 있는 줄 모름 */
   return '<details class="pk-sec" data-pks="'+key+'"'+(RK.secOpen[key]?' open':'')+' ontoggle="pkSecToggle(this,\''+key+'\')"><summary>'+pkSummary(div,list)+'</summary><div class="pk-body">'+list.map(pkCard).join('')+'</div></details>'}
 function pkSecToggle(el,key){RK.secOpen[key]=!!el.open}
 function pkCard(m){const L=RK._byM[m.id]||[];const na=L.filter(p=>p.pick==='a').length;const pa=L.length?Math.round(na/L.length*100):50;const mp=ME?(L.find(p=>p.uid===ME.uid)||{}).pick:'';
