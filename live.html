@@ -230,8 +230,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="matchrec.js?v=20261024b"></script>
-<script src="comments.js?v=20261024b"></script>
+<script src="matchrec.js?v=20261024c"></script>
+<script src="comments.js?v=20261024c"></script>
 <script>
 // ══════════ 라이브 중계 (공개) ══════════
 //   설정: siteContent/live = {on, title, comp, streams:[{videoId,label}], chat('youtube'|'off'), featured(경기 ID), note}
@@ -294,7 +294,7 @@ function lvcWhy(msg){const el=document.getElementById('lvcWhy');if(!el){if(msg)a
 async function chatSend(){const i=document.getElementById('scIn');if(!i||!ME)return;const t=i.value.trim();if(!t)return;
   let text=t;if(!CAN_OP&&window.KFDF_CMT&&KFDF_CMT.clean){const c=KFDF_CMT.clean(t);if(!c.ok){lvcWhy(c.why||'보낼 수 없는 내용입니다');i.focus();return}text=c.text}else if(t.length>300){alert('300자 이내로 적어 주세요');return}
   const room=curVid();if(!room){alert('중계가 켜져 있을 때만 채팅할 수 있습니다');return}
-  lvcWhy('');i.disabled=true;try{await DB.collection('liveChat').doc(room).collection('msgs').add({uid:ME.uid,name:(MY&&MY.name)||'',text:text,op:!!CAN_OP,room:room,at:firebase.firestore.FieldValue.serverTimestamp()});i.value=''}catch(e){alert('전송 실패: '+(/permission/i.test(String(e))?'권한이 없습니다 (승인 회원만 · 보안 규칙 v44)':(e.message||e)))}i.disabled=false;i.focus()}
+  lvcWhy('');i.disabled=true;try{await DB.collection('liveChat').doc(room).collection('msgs').add({uid:ME.uid,name:CAN_OP?((MY&&MY.name)||''):(window.KFDF_CMT?KFDF_CMT.mask((MY&&MY.name)||''):((MY&&MY.name)||'')),text:text,op:!!CAN_OP,room:room,at:firebase.firestore.FieldValue.serverTimestamp()});i.value=''}catch(e){alert('전송 실패: '+(/permission/i.test(String(e))?'권한이 없습니다 (승인 회원만 · 보안 규칙 v44)':(e.message||e)))}i.disabled=false;i.focus()}
 async function chatDel(id){if(!CAN_OP||!CHAT_ROOM)return;try{await DB.collection('liveChat').doc(CHAT_ROOM).collection('msgs').doc(id).update({del:true,delBy:(MY&&MY.name)||''})}catch(e){alert('삭제 실패: '+(e.message||e))}}
 // 중계가 끝난 방의 채팅 정리 — 중계 시작부터 종료까지만 남깁니다 (운영자, 400건씩 삭제)
 async function chatPurge(room){let n=0;for(let k=0;k<20;k++){const q=await DB.collection('liveChat').doc(room).collection('msgs').limit(400).get();if(q.empty)break;const b=DB.batch();q.docs.forEach(d=>b.delete(d.ref));await b.commit();n+=q.size;if(q.size<400)break}return n}
@@ -338,7 +338,7 @@ function render(){
   document.getElementById('cntDone').textContent=done.length?done.length+'경기':'';
   document.getElementById('tblDone').innerHTML=done.length?'<div style="overflow-x:auto"><table class="lv-tbl"><tr><th>일자</th><th>부문 · 라운드</th><th>코트</th><th>팀</th><th>스코어</th><th>팀</th><th>종료</th></tr>'
     +done.map(m=>{const as=sc(m,'a'),bs=sc(m,'b');return '<tr><td style="white-space:nowrap">'+esc(String(m.day||'').slice(5))+'</td><td>'+esc(mLabel(m))+'</td><td>'+esc(m.court||'')+'</td><td class="'+(as>bs?'w':'')+'" style="font-weight:800">'+(as>bs?'🏆 ':'')+esc((m.a||{}).name||'')+'</td><td class="sc">'+as+' : '+bs+'</td><td class="'+(bs>as?'w':'')+'" style="font-weight:800">'+(bs>as?'🏆 ':'')+esc((m.b||{}).name||'')+'</td><td style="white-space:nowrap;color:#6b7280">'+esc(hm(m.endAt))+'</td></tr>'}).join('')+'</table></div>':'<div class="lv-empty">종료된 경기가 아직 없습니다.</div>';
-  document.getElementById('secDone').style.display=(doneAll.length||!MATCHES.length)?'':'none';
+  document.getElementById('secDone').style.display=(ME&&(doneAll.length||!MATCHES.length))?'':'none';
   document.getElementById('lvNone').style.display=MATCHES.length?'none':'block';
   if(OP_OPEN)opRender();if(SCORE_ID)scOvRender();
   if(chatModes().indexOf('site')>=0&&CHAT_TAB==='site')chatListen(curVid());

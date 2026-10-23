@@ -233,9 +233,10 @@ function pkTick(){clearTimeout(RK._t);const el=document.getElementById('pkDl');i
   const now=Date.now(),tgt=now<PICK_DEADLINE?PICK_DEADLINE:now<CHAMP_DEADLINE?CHAMP_DEADLINE:0;let wait=tgt?(tgt-now)%60000:60000;if(wait<=0)wait+=60000;RK._t=setTimeout(pkTick,Math.max(1000,wait+300))}
 function pkIndex(){RK._byM={};(RK.picks||[]).forEach(p=>{(RK._byM[p.matchId]=RK._byM[p.matchId]||[]).push(p)})}
 async function pkLoad(){RK._ld=true;
-  try{const [m,p,c]=await Promise.all([DB.collection('liveMatches').where('slotId','==',SLOT).get(),DB.collection('matchPicks').where('slotId','==',SLOT).get().catch(e=>{RK.perr=e.code||e.message;return null}),DB.collection('champPicks').where('slotId','==',SLOT).get().catch(e=>{RK.cerr=e.code||e.message;return null})]);
+  try{const [m,p,c]=await Promise.all([DB.collection('liveMatches').where('slotId','==',SLOT).get(),((pkClosed()&&RK.picksAt&&RK.picksAt>=PICK_DEADLINE)?Promise.resolve('keep'):DB.collection('matchPicks').where('slotId','==',SLOT).get()).catch(e=>{RK.perr=e.code||e.message;return null}),DB.collection('champPicks').where('slotId','==',SLOT).get().catch(e=>{RK.cerr=e.code||e.message;return null})]);
     RK.ms=m.docs.map(d=>Object.assign({id:d.id},d.data())).filter(x=>!x.golf&&!x.test).sort((a,b)=>String(a.day||'').localeCompare(String(b.day||''))||String(a.time||'').localeCompare(String(b.time||''))||(+a.order||0)-(+b.order||0));
-    RK.picks=p?p.docs.map(d=>d.data()):[];RK.cpicks=c?c.docs.map(d=>d.data()):[];if(p)RK.perr=null;if(c)RK.cerr=null}
+    if(p!=='keep'){RK.picks=p?p.docs.map(d=>d.data()):(RK.picks||[]);if(p){RK.perr=null;RK.picksAt=Date.now()}}   /* [2026-10-24] 10:00 마감 뒤엔 예측이 안 바뀌니 한 번 받은 것을 계속 씀(수만 건을 3분마다 다시 받던 것) */
+    RK.cpicks=c?c.docs.filter(d=>{const x=d.data()||{};return d.id===SLOT+'_'+pkDivKey(x.div||'')+'_'+x.uid}).map(d=>d.data()):(RK.cpicks||[]);if(c)RK.cerr=null}   /* 문서 ID 가 부문과 맞는 것만(같은 부문을 여러 문서로 만들어 점수를 부풀리는 것 방지) */
   catch(e){RK.ms=RK.ms||[];RK.picks=RK.picks||[];RK.cpicks=RK.cpicks||[]}
   RK.msAt=Date.now();RK._ld=false}
 function pkReload(){RK.ms=null;RK.msAt=0;render()}
@@ -286,7 +287,7 @@ function pkRefreshAll(){if(TAB!=='rank'||RK.sub!=='pick')return;const g=document
   Object.keys(RK._secs).forEach(k=>{const X=RK._secs[k],sum=document.querySelector('.pk-sec[data-pks="'+k+'"] > summary');if(sum&&X)sum.innerHTML=pkSummary(X.div,X.list)});
   swap(document.getElementById('pkBoard'),pkBoardHtml(board));const c=document.getElementById('pkChamp');if(c)c.innerHTML=pkChampHtml()}
 function pkBoard(){const U={};const add=(p,ok)=>{const u=U[p.uid]=U[p.uid]||{name:p.name,badges:p.badges,ok:0,n:0,m:0,c:0,at:0};u.ok+=ok;u.n++;return u};
-  (RK.ms||[]).forEach(m=>{const w=pkWinner(m);if(!w)return;(RK._byM[m.id]||[]).forEach(p=>{const h=p.pick===w?1:0;add(p,h).m+=h})});
+  (RK.ms||[]).forEach(m=>{if(pkKO(m))return;const w=pkWinner(m);if(!w)return;(RK._byM[m.id]||[]).forEach(p=>{const h=p.pick===w?1:0;add(p,h).m+=h})});
   const CR=pkChampResults();(RK.cpicks||[]).forEach(p=>{const r=CR[pkDivKey(p.div)];if(!r)return;const pts=pkChampPts(p,r);add(p,pts).c+=pts});
   (RK.picks||[]).concat(RK.cpicks||[]).forEach(p=>{const u=U[p.uid];if(u)u.at=Math.max(u.at,pkMs(p.at))});   // 마지막 예측 시각 — 모든 예측 기준
   return Object.keys(U).map(k=>Object.assign({uid:k},U[k])).filter(u=>u.n>0).sort((a,b)=>b.ok-a.ok||(b.ok/b.n)-(a.ok/a.n)||a.at-b.at)}
@@ -299,8 +300,9 @@ function pkBoardHtml(board){const hasC=board.some(x=>x.c>0);const myI=ME?board.f
     +(board.length?'<div class="pk-rows">'+board.slice(0,30).map(row).join('')+'</div>'+(myI>=30?'<div class="pk-rows pk-mine" style="margin-top:6px">'+row(board[myI],myI)+'</div>':''):'<div class="pg-empty">경기가 끝나면 적중 순위가 나와요.</div>')+'</div>'}
 /* ── 부문별 1·2위 맞히기(2일차) — 본선 경기에 실제 팀이 4팀 이상 들어온 부문부터 열림 ── */
 function pkChampTeams(){const T={},P={};(RK.ms||[]).forEach(m=>{const d=m.div||'기타',B=pkKO(m)?T:P;['a','b'].forEach(s=>{const t=m[s]||{};if(pkPh(t.name))return;const id=t.pid||t.name;const o=B[d]=B[d]||{};if(!o[id])o[id]={pid:pkPid(t),name:t.name||''}})});
+  const PH={};(RK.ms||[]).forEach(m=>{if(pkKO(m)&&['a','b'].some(s=>pkPh((m[s]||{}).name))&&!/승자|패자/.test(((m.a||{}).name||'')+((m.b||{}).name||'')))PH[m.div||'기타']=1});   /* 조 순위 자리표시(「A조 1위」)가 남은 부문은 아직 다 안 채워짐 */
   const out={};RK._cpre={};Object.keys(Object.assign({},P,T)).sort(pkDivSort).forEach(d=>{let L=Object.keys(T[d]||{}).map(k=>T[d][k]);
-    if(L.length<4){L=Object.keys(P[d]||{}).map(k=>P[d][k]);if(L.length<4)return;RK._cpre[d]=true}   // 본선 명단(4팀 이상)이 아직 없으면 예선 참가팀 전체에서 고름 — 「진출팀 채우기」가 늦어도, 고등부처럼 본선 문서가 없어도 열림. 명단이 차면 자동으로 좁혀짐
+    if(L.length<4||PH[d]){L=Object.keys(P[d]||{}).map(k=>P[d][k]);if(L.length<4)return;RK._cpre[d]=true}   // 본선 명단(4팀 이상)이 아직 없으면 예선 참가팀 전체에서 고름 — 「진출팀 채우기」가 늦어도, 고등부처럼 본선 문서가 없어도 열림. 명단이 차면 자동으로 좁혀짐
     out[d]=L.sort((a,b)=>a.name.localeCompare(b.name,'ko'))});return out}
 function pkChampReady(){return Object.keys(pkChampTeams()).length>0}
 function pkChampResults(){const R={};(RK.ms||[]).forEach(m=>{if(!pkKO(m)||!/^결승/.test(String(m.round||'').trim())||m.status!=='종료')return;const w=pkWinner(m);if(!w)return;const l=w==='a'?'b':'a';R[pkDivKey(m.div)]={first:{pid:pkPid(m[w]),name:(m[w]||{}).name||''},second:{pid:pkPid(m[l]),name:(m[l]||{}).name||''}}});return R}

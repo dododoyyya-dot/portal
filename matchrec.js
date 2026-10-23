@@ -82,6 +82,7 @@
       if(m.locked)throw new Error('확정(잠금)된 경기입니다 — 사무국 정정으로만 바꿀 수 있습니다');
       var st=ctrlState(m,opts.uid);if(opts.requireCtrl&&st==='other')throw new Error('다른 화면('+ctrlLabel(m)+')이 입력 중입니다. 「넘겨받기」 후 다시 눌러 주세요');
       var evs=(m.events||[]).slice();if(evs.some(function(e){return e&&e.id&&e.id===ev.id}))return {dup:true};
+      if(opts.dupCheck&&heldDup({kind:'add',ev:ev},evs))throw new Error('중복 의심 — 같은 팀·같은 선수 득점이 이미 들어가 있습니다');   /* [2026-10-24] 끊김 중 기록이 늦게 올라올 때 */
       var rec=Object.assign({},ev,{t:ev.t||new Date().toISOString(),by:{uid:opts.uid||'',name:opts.name||''}});
       if(rec.type==='goal'){rec.d=1;rec.team=(m[rec.side]||{}).name||''}
       evs.push(rec);var sc=score(evs);if(rec.type==='goal')rec.score=sc.a+':'+sc.b;
@@ -127,9 +128,10 @@
     var chain=Promise.resolve();
     q.forEach(function(op){chain=chain.then(function(){
       if(op.held){left.push(op);return}   /* [2026-10-24] 보류 기록은 사람이 확인해서 보냄 */
-      var p=op.kind==='add'?addEvent(DB,fb,op.id,op.ev,Object.assign({},opts,op.opts||{})):op.kind==='void'?voidEvent(DB,fb,op.id,op.evId,Object.assign({},opts,op.opts||{})):Promise.resolve();
+      var oo=Object.assign({},opts,op.opts||{},{dupCheck:true});if(oo.extra&&now()-(+op.at||0)>60000)delete oo.extra;   /* 1분 넘게 지난 작전타임의 시계·쉬는 시간 값은 다시 적용하지 않음(시계가 되감기던 것) */
+      var p=op.kind==='add'?addEvent(DB,fb,op.id,op.ev,oo):op.kind==='void'?voidEvent(DB,fb,op.id,op.evId,Object.assign({},opts,op.opts||{})):Promise.resolve();
       return p.then(function(){},function(e){var c=String(e&&(e.code||e.message)||'');if(/unavailable|network|deadline|offline|Failed to fetch/i.test(c))left.push(op);else{op.held=true;op.err=c;left.push(op);fails.push({op:op,err:c})}})})});
-    return chain.then(function(){qSave(left);flushing=false;if(onDone)onDone({sent:q.length-left.length,left:left.length,fails:fails})},function(){flushing=false})}
+    return chain.then(function(){var L={};left.forEach(function(o){L[o.qid]=o});var orig={};q.forEach(function(o){orig[o.qid]=1});qSave(qLoad().filter(function(o){return !orig[o.qid]||L[o.qid]}).map(function(o){return L[o.qid]||o}));flushing=false;   /* [2026-10-24] 보내는 동안 새로 쌓인 기록을 덮어써 지우던 것 */if(onDone)onDone({sent:q.length-left.length,left:left.length,fails:fails})},function(){flushing=false})}
 
   // ── 기록 권한 ──
   function canRecord(m,uid,my){my=my||{};var roles=[my.role].concat(my.roles||[]);
@@ -212,7 +214,7 @@
       if(fin){D.matches++;played++}
       (m.events||[]).forEach(function(e){if(!e||e.void||e.type!=='goal')return;var t=m[e.side]||{};
         [['scorer','g'],['assist','a']].forEach(function(x){var p=e[x[0]];if(!p||!p.name)return;var k=dvName+'|'+(t.pid||t.name)+'|'+p.no+'|'+p.name;var S=scorers[k]=scorers[k]||{div:dvName,team:t.name||'',school:t.school||'',no:p.no,name:p.name,g:0,a:0};S[x[1]]++})})});
-    Object.keys(byDiv).forEach(function(dv){if(!Object.keys(byDiv[dv].teams).length){delete byDiv[dv];return}var T=byDiv[dv].teams;byDiv[dv].table=rankTable(Object.keys(T).map(function(k){return Object.assign({key:k,sanc:0},T[k])}),byDiv[dv].fin||[],lots[dv]||{});delete byDiv[dv].fin});
+    Object.keys(byDiv).forEach(function(dv){if(!Object.keys(byDiv[dv].teams).length){delete byDiv[dv];return}var T=byDiv[dv].teams;byDiv[dv].table=rankTable(Object.keys(T).map(function(k){return Object.assign({key:k,sanc:0},T[k])}),byDiv[dv].fin||[],lots[dv]||{});if(/본선$/.test(dv))byDiv[dv].table=koRank(byDiv[dv].table,byDiv[dv].fin||[]);delete byDiv[dv].fin});
     var top=Object.keys(scorers).map(function(k){return scorers[k]}).sort(function(x,y){return y.g-x.g||y.a-x.a||String(x.name).localeCompare(String(y.name),'ko')});
     return {byDiv:byDiv,scorers:top,played:played,total:(matches||[]).filter(function(m){return m&&!m.golf}).length,at:new Date().toISOString()}}
 
@@ -401,6 +403,15 @@
       +'<div class="sl"><div><b>마커:</b><u>&nbsp;</u></div><div><b>경기위원:</b><u>&nbsp;</u></div></div></div>')});pend(w)}
 
   // ── 순위: 승점(승3·무1·패0) → 득실차 → 다득점 → 승자승(동률 팀끼리 경기 승점·득실) → 제재 수 적은 팀 → 추첨(lots: {팀키:순번}) ──
+  /* [2026-10-24] 토너먼트 순위 — 우승(결승 승)·준우승·3위/4위(3·4위전, 없으면 4강 탈락 공동 3위)·8강·10강 탈락 순. 아직 남은 팀은 앞에 */
+  function koRank(T,fin){var rk=function(r){r=String(r||'');if(/^결승/.test(r))return 1;if(/3.?4위/.test(r))return 2;if(/준결승|4강/.test(r))return 3;var mm=/(\d+)강/.exec(r);return mm?(+mm[1]<=8?4:+mm[1]<=10?5:6):7};
+    var info={};T.forEach(function(t){info[t.key]={tier:0,lab:''}});
+    (fin||[]).forEach(function(m){var sc=score(m.events||[]);if(sc.a===sc.b)return;var w=sc.a>sc.b?'a':'b',l=w==='a'?'b':'a';var kw=(m[w]||{}).pid||(m[w]||{}).name,kl=(m[l]||{}).pid||(m[l]||{}).name;var r=rk(m.round);
+      if(r===1){if(info[kw])info[kw]={tier:1,lab:'우승'};if(info[kl])info[kl]={tier:2,lab:'준우승'}}
+      else if(r===2){if(info[kw])info[kw]={tier:3,lab:'3위'};if(info[kl])info[kl]={tier:4,lab:'4위'}}
+      else if(info[kl]&&info[kl].tier===0)info[kl]={tier:r===3?3.5:r===4?5:r===5?6:7,lab:r===3?'4강':r===4?'8강':r===5?'10강':'본선 탈락'}});
+    var L=T.map(function(t,i){return {t:t,i:i,f:info[t.key]||{tier:0,lab:''}}}).sort(function(a,b){return a.f.tier-b.f.tier||a.i-b.i});
+    var prev=null,rank=0;return L.map(function(x,i){var tie=prev&&x.f.tier>=3.5&&x.f.tier===prev.f.tier;if(!tie)rank=i+1;prev=x;return Object.assign({},x.t,{rank:rank,needLot:false,tb:x.f.lab})})}
   function rankTable(teams,fin,lot){
     var sig=function(t){return [t.pts,t.gf-t.ga,t.gf].join('|')};
     teams.sort(function(x,y){return y.pts-x.pts||(y.gf-y.ga)-(x.gf-x.ga)||y.gf-x.gf});

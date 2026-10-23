@@ -17,8 +17,8 @@
   //    [2026-10-24b] 일상어와 겹치는 짧은 말(새끼손가락·보지 못해·닥치는 대로·3개년·구호로·등 신나게…)까지 글자만 남겨 부분 비교하면 정상 응원이 대량으로 막혀서 둘로 나눔:
   //      HARD      — 명백한 욕설만. 띄어쓰기·기호를 지운 글자열에서 부분 일치해도 차단
   //      HARD_WORD — 원문에서 어절 첫머리에 그 말이 통째로 올 때만 차단(뒤에 공백·문장부호·끝, 또는 아/야/들/이/의/임/같/어/라/냐/네/지/할/럴). '보지'·'자지'·'ㅅㅅ' 는 동사·줄임말과 구분이 안 돼 뺌
-  var HARD=['씨발','씨빨','시빨','씨팔','시팔','ㅅㅂ','ㅆㅂ','병신','븅신','빙신','개새끼','개세끼','섹스','좆','좃','존나','ㅈㄴ','지랄','느금','뒈져','후레자식','썅','개놈','개자식','미친놈','미친년','빡대가리','찐따','fuck','shit','bitch','asshole','porn'];
-  var HARD_WORD=['시발','새끼','새끼가','개색','졸라','염병','엿먹','니미','니애미','니엄마','창녀','창년','걸레','꺼져','뒤져','디져','닥쳐','닥치','호로','개년','쌍년','쌍놈','등신','애미','애비','ㅂㅅ','ㅈㄹ','ㅁㅊ','sex'];
+  var HARD=['씨발','씨빨','시빨','씨팔','ㅅㅂ','ㅆㅂ','병신','븅신','빙신','개새끼','개세끼','섹스','좆','좃','존나','ㅈㄴ','지랄','느금','뒈져','후레자식','썅','개놈','개자식','미친놈','미친년','빡대가리','찐따','fuck','shit','bitch','asshole','porn'];
+  var HARD_WORD=['시발','시팔','새끼','새끼가','개색','졸라','염병','엿먹','니미','니애미','니엄마','창녀','창년','걸레','꺼져','뒤져','디져','닥쳐','닥치','호로','개년','쌍년','쌍놈','등신','애미','애비','ㅂㅅ','ㅈㄹ','ㅁㅊ','sex'];
   var reWord=new RegExp('(^|\\s)('+HARD_WORD.join('|')+')(아|야|들|이|의|임|같|어|라|냐|네|지|할|럴|$|[\\s!?.,~…ㅋㅎ])');
   var SOFT=['멍청','못생','꼴통','또라이','돌아이','쓰레기','한심','찌질','빻','ㅗ'];
   var ZW=/[\s​‌‍⁠\.\,\-\_\~\!\?\*\#\@\^\&\(\)\[\]\{\}\/\\\|\+\=\:\;\'\"\`<>·ㆍ]/g;
@@ -29,7 +29,7 @@
     t=t.replace(/(.)\1{4,}/g,'$1$1$1$1$1');   /* [2026-10-24b] 같은 글자 반복(ㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋ·!!!!!!!!!!)은 흔한 응원이라 막지 않고 5개로 접음 */
     if(t.length>300)return {ok:false,text:t,why:'300자 이내로 적어 주세요'};
     var n=norm(t),why='욕설·비방으로 보이는 말이 있어 보낼 수 없어요. 응원하는 말로 바꿔 주세요';
-    for(var i=0;i<HARD.length;i++){if(n.indexOf(norm(HARD[i]))>=0)return {ok:false,text:t,why:why}}
+    var n2=n.replace(/[0-9]/g,'');for(var i=0;i<HARD.length;i++){var h=norm(HARD[i]);if(n.indexOf(h)>=0||n2.indexOf(h)>=0)return {ok:false,text:t,why:why}}
     if(reWord.test(t.toLowerCase()))return {ok:false,text:t,why:why};
     if(/01[016789][\s\-\.]?\d{3,4}[\s\-\.]?\d{4}/.test(t))return {ok:false,text:t,why:'전화번호 같은 개인정보는 적을 수 없어요'};
     if(/(https?:\/\/|www\.)/i.test(t))return {ok:false,text:t,why:'링크는 적을 수 없어요'};
@@ -46,7 +46,7 @@
     if(!me)return Promise.reject(new Error('로그인 후 적을 수 있어요'));
     if(!canWrite(me,my))return Promise.reject(new Error('가입 승인 뒤에 적을 수 있어요'));
     var c=clean(text);if(!c.ok)return Promise.reject(new Error(c.why));
-    return db().collection('liveChat').doc(room).collection('msgs').add({uid:me.uid,name:my.name||'',text:c.text,op:false,room:room,at:firebase.firestore.FieldValue.serverTimestamp()})
+    return db().collection('liveChat').doc(room).collection('msgs').add({uid:me.uid,name:mask(my.name||''),text:c.text,op:false,room:room,at:firebase.firestore.FieldValue.serverTimestamp()})
       .catch(function(e){throw new Error(/permission/i.test(String(e))?'권한이 없어요 (가입 승인 뒤에 적을 수 있어요)':(e.message||String(e)))})}
   function del(room,id,by){return db().collection('liveChat').doc(room).collection('msgs').doc(id).update({del:true,delBy:by||''})}
   function timeAgo(ts){try{var d=ts&&ts.toDate?ts.toDate():(ts?new Date(ts):null);if(!d||isNaN(d))return '';var s=(Date.now()-d.getTime())/1000;if(s<60)return '방금';if(s<3600)return Math.floor(s/60)+'분 전';return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}catch(e){return ''}}

@@ -382,7 +382,7 @@ function ageOf(birth){if(!birth)return 0;const t=new Date(birth);if(isNaN(t.getT
         <button type="button" onclick="postRedeemCode()" style="background:#0f766e;color:#fff;border:none;padding:0 18px;border-radius:10px;font-weight:800;cursor:pointer;font-family:inherit">연동</button>
       </div>
       <div id="postLinkMsg" style="font-size:12px;margin-top:8px;font-weight:700"></div>
-      <a href="mypage.html" style="display:inline-block;margin-top:10px;font-size:12.5px;color:var(--gray);font-weight:700">나중에 할게요, 마이페이지로 이동 →</a>
+      <a href="mypage.html" id="postSkip" style="display:inline-block;margin-top:10px;font-size:12.5px;color:var(--gray);font-weight:700">나중에 할게요, 마이페이지로 이동 →</a>
     </div>
     <div style="margin-top:14px;font-size:13px;color:var(--gray)">
       비밀번호를 잊으셨나요? <a href="#" onclick="resetPw();return false" style="color:var(--blue);font-weight:700">재설정 메일 받기</a>
@@ -409,7 +409,7 @@ function mode(m){
   // [아이디 가입] 가입 모드에서만 아이디 칸·알림 동의 표시, 라벨 전환
   (function(){const l=document.getElementById('aEmailLbl');if(l)l.textContent=(m==='L')?'아이디 또는 이메일':'이메일';['sIdBlock','sNotifyBlock'].forEach(function(k){const e=document.getElementById(k);if(e)e.style.display=(m==='S')?'':'none'});const sh=document.getElementById('sEmailHint');if(sh)sh.style.display=(m==='S')?'inline':'none'})();
   document.getElementById('postSignupLink').style.display='none';
-  if(m==='S'){aaRender();setSignupType('instructor');}
+  if(m==='S'){aaRender();const _qt=(new URLSearchParams(location.search).get('type')||'').toLowerCase();setSignupType(['general','student','teacher','athlete','instructor','natcert'].indexOf(_qt)>=0?_qt:(NEXT?'general':'instructor'));}   /* [2026-10-24] 대회 화면(next=)에서 온 가입은 일반회원(학부모) 양식부터 — 심판·지도자 양식(주민번호·계좌)으로 열리던 것 */
 }
 // ── 회원 유형 4분류 (강사·교사 = 지도자군 / 일반회원 / 학생회원) ──
 // 통화 반영: "강사냐 교사냐 일반회원이냐 3분류 + 학생은 별도", "교사는 강사와 묶어 관리",
@@ -1245,9 +1245,9 @@ async function go_(){
       if(SIGNUP_TYPE==='student'){
         say(window.__AUTO_OK?('가입 완료! 아이디 「'+loginId+'」 — 바로 이용할 수 있습니다(가입 자동 승인 기간). 다시 가입하지 마세요. 아래에서 보호자와 연동해주세요.'):('가입 신청 완료! 아이디 「'+loginId+'」 — 사무국 승인 후 이용할 수 있습니다. 다시 가입하지 마세요 (승인 전에도 이 아이디로 로그인하면 「승인 대기」로 표시됩니다). 아래에서 보호자와 연동해주세요.'),true);
         window.__SIGNUP_DONE=true;try{const _gb=document.getElementById('goBtn');if(_gb){_gb.disabled=true;_gb.textContent='가입 신청 완료';}}catch(e){}   // [중복 가입 차단] 같은 화면에서 버튼을 또 눌러 재신청하는 일 방지
-        document.getElementById('postSignupLink').style.display='block';
+        document.getElementById('postSignupLink').style.display='block';try{const _sk=document.getElementById('postSkip');if(_sk&&NEXT){_sk.href=NEXT;_sk.textContent='나중에 할게요, 보던 화면으로 돌아가기 →'}}catch(e){}
       }else if(SIGNUP_TYPE==='general'){
-        window.__SIGNUP_DONE=true;say((window.__AUTO_OK?'가입 완료! 바로 이용할 수 있습니다(가입 자동 승인 기간).':'가입 신청 완료! 사무국 승인 후 이용할 수 있습니다.')+' 마이페이지로 이동하면 먼저 ✍ 서명을 등록해 주세요(오더지·결과지에 자동 기입).'+' 강사 활동을 원하시면 마이페이지 → 강사 활동 지원에서 추가 정보를 입력해주세요.',true);
+        window.__SIGNUP_DONE=true;say((window.__AUTO_OK?'가입 완료! 바로 이용할 수 있습니다(가입 자동 승인 기간).':'가입 신청 완료! 사무국 승인 후 이용할 수 있습니다.')+(NEXT?' 보던 화면으로 돌아갑니다.':' 마이페이지로 이동하면 먼저 ✍ 서명을 등록해 주세요(오더지·결과지에 자동 기입).'+' 강사 활동을 원하시면 마이페이지 → 강사 활동 지원에서 추가 정보를 입력해주세요.'),true);
         setTimeout(()=>location.href=NEXT||'mypage.html#sigBox',1800);   /* 가입 직후 서명 등록 칸으로 */
       }else{
         window.__SIGNUP_DONE=true;say(window.__AUTO_OK?'가입 완료! 바로 이용할 수 있습니다(가입 자동 승인 기간).':'가입 신청 완료! 사무국 승인 후 커뮤니티를 이용할 수 있습니다.',true);

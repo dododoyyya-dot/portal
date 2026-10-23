@@ -257,7 +257,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="comments.js?v=20261024b"></script>
+<script src="comments.js?v=20261024c"></script>
 <script>
 // ══════════ 플라잉디스크 사진 공모전 (photo.html · 2026-10-19) ══════════
 //  학교 앨범(폴더) = 제19회 전국학교스포츠클럽축전 대진표(liveMatches · slotId)의 참가 팀을 부문(초·중·고)별로 자동 정리. 사진이 없어도 폴더는 있음
@@ -278,11 +278,14 @@ function norm(s){s=String(s||'').replace(/\s+/g,'').replace(/[()·.,\-]/g,'').re
 function lvOf(div){div=String(div||'');return /초/.test(div)?'초등부':/중/.test(div)?'중등부':/고/.test(div)?'고등부':''}
 function fkOf(level,name){return level+'|'+norm(name)}
 try{document.querySelector('.pk-mascot').innerHTML=MASCOT}catch(e){}
-KFDF.ready(async function(user,me){ME=user;MY=me;ADMIN=!!(me&&KFDF.isAdmin(me));PCC_OP=pccOpOf(me);pccQueryToHash();await Promise.all([pcTeams(),pcLoad(true)]);pcFromHash();pcUpRender();pcRender()});
+KFDF.ready(async function(user,me){ME=user;MY=me;ADMIN=!!(me&&KFDF.isAdmin(me));if(PC_STAFF===null){PC_STAFF=[];DB.collection('compStats').doc(SLOT).get().then(d=>{const v=d.exists?(d.data()||{}):{};PC_STAFF=[...new Set((v.refUids||[]).concat(v.evalUids||[]))];try{pcUpRender()}catch(e){}}).catch(()=>{})}PCC_OP=pccOpOf(me);pccQueryToHash();await Promise.all([pcTeams(),pcLoad(true)]);pcFromHash();pcUpRender();pcRender()});
 window.addEventListener('hashchange',()=>{pcFromHash();pcRender()});
 function pcFromHash(){const m=/f=([^&]+)/.exec(location.hash||'');OPEN=m?decodeURIComponent(m[1]):''}
 function open_(){return Date.now()<=DEADLINE}
 /* [2026-10-24] 학교 앨범은 칸 1~10(계정당 10장), 운영진·심판진 앨범은 칸 1~50(계정당 50장 — 11~50번 칸은 운영진·심판진만, 보안 규칙 v65) */
+function pcWho(x){const n=(x.by||{}).name||'';if(ADMIN)return n;return window.KFDF_CMT?KFDF_CMT.mask(n):(n?n[0]+'*'.repeat(Math.max(1,n.length-1)):'')}   /* [2026-10-24] 학생이 올린 사진도 있어 공개 화면은 김*수 */
+let PC_STAFF=null;   /* 운영진·심판진 앨범에 올릴 수 있는 사람(관리자·대회 확정 심판·평가자) — compStats 공개 명단 */
+function pcCanSp(){return ADMIN||!!(PC_STAFF&&ME&&PC_STAFF.indexOf(ME.uid)>=0)}
 function pcIsSp(l){return SPECIAL.indexOf(l)>=0}
 function pcFreeSlots(sp,extra){const used=new Set(mine().map(x=>x.id).concat(extra||[]));const out=[];const order=sp?[...Array(40).keys()].map(i=>i+11).concat([...Array(10).keys()].map(i=>i+1)):[...Array(10).keys()].map(i=>i+1);order.forEach(k=>{if(!used.has(ME.uid+'_'+k))out.push(k)});return out}
 function pcLeft(level){const sp=pcIsSp(level);const n=mine().filter(x=>pcIsSp(x.level)===sp).length;return Math.max(0,Math.min((sp?MAXSP:MAXN)-n,pcFreeSlots(sp).length))}
@@ -305,7 +308,7 @@ function pcUpRender(){const el=document.getElementById('pcUp');document.getEleme
   const _sp0=pcIsSp(UP.level);const n=mine().filter(x=>pcIsSp(x.level)===_sp0).length,left=pcLeft(UP.level);const opts=TEAMS.filter(t=>!UP.level||t.level===UP.level).sort((a,b)=>(b.special?1:0)-(a.special?1:0)||a.name.localeCompare(b.name,'ko'));
   const sp=SPECIAL.indexOf(UP.level)>=0;if(sp)UP.fk=fkOf(UP.level,UP.level);   /* 운영진·심판진은 앨범이 하나뿐 */
   el.innerHTML='<h3>사진 올리기 💌 <small style="font-family:Pretendard,sans-serif;font-size:12.5px;color:#8a7a96;font-weight:700">'+esc((MY&&MY.name)||'')+'님 · '+(_sp0?UP.level+' 앨범 ':'')+n+' / '+(_sp0?MAXSP:MAXN)+'장</small></h3>'
-    +'<label class="l">부문</label><div class="pc-seg">'+LEVELS.map(l=>'<button type="button" class="'+(UP.level===l?'on':'')+'" onclick="UP.level=\''+l+'\';if(UP.fk&&UP.fk.indexOf(\''+l+'|\')!==0)UP.fk=\'\';pcUpRender()">'+l+'</button>').join('')+'</div>'
+    +'<label class="l">부문</label><div class="pc-seg">'+LEVELS.filter(l=>!pcIsSp(l)||pcCanSp()).map(l=>'<button type="button" class="'+(UP.level===l?'on':'')+'" onclick="UP.level=\''+l+'\';if(UP.fk&&UP.fk.indexOf(\''+l+'|\')!==0)UP.fk=\'\';pcUpRender()">'+l+'</button>').join('')+'</div>'
     +(sp?'<label class="l">앨범</label><div class="pc-in" style="background:#f6f1ff;font-weight:800">'+(UP.level==='운영진'?'🎽 운영진 앨범':'🧑‍⚖️ 심판진 앨범')+'</div>':'<label class="l">어느 학교 앨범에 넣을까요? (사진 속 선수의 학교)</label><select class="pc-in" id="pcFk" onchange="UP.fk=this.value;if(this.value&&this.value!==\'__free\')UP.level=this.value.split(\'|\')[0];pcUpRender()"><option value="">'+(UP.level?'— '+UP.level+' 학교를 고르세요 —':'— 부문을 먼저 고르면 학교가 나옵니다 —')+'</option>'+opts.map(t=>'<option value="'+esc(t.fk)+'"'+(UP.fk===t.fk?' selected':'')+'>'+esc(t.name)+(UP.level?'':' · '+esc(t.level))+'</option>').join('')+'<option value="__free"'+(UP.fk==='__free'?' selected':'')+'>목록에 없음 — 직접 적기</option></select>')
     +(UP.fk==='__free'?'<input class="pc-in" id="pcFree" style="margin-top:6px" value="'+esc(UP.free)+'" placeholder="학교 이름 (예: 서울 보라매초)" oninput="UP.free=this.value">':'')
     +'<label class="l">사진에 한마디 (선택)</label><input class="pc-in" id="pcTitle" value="'+esc(UP.title)+'" maxlength="60" placeholder="예: 결승전 마지막 득점! 🎉" oninput="UP.title=this.value">'
@@ -348,7 +351,7 @@ function pcMine(){if(!ME)return;const fks=[...new Set(mine().map(x=>x.fk))];if(f
 function pcFolderHtml(f){const p=f.photos;const own=x=>ME&&(x.by||{}).uid===ME.uid;
   return '<div class="pc-sec"><div class="pc-fhead"><button class="pc-btn soft" onclick="pcBack()">← 앨범 목록</button><h2>'+esc(f.name)+' 앨범 📒</h2><span class="pc-note" style="margin:0">'+esc(f.level||'')+' · '+p.length+'장</span><span style="flex:1"></span>'+(p.length?'<button class="pc-btn navy" onclick="pcLb(\''+esc(f.fk).replace(/'/g,'&#39;')+'\',0,true)">▶ 자동으로 넘겨 보기</button>':'')+(ME&&open_()&&f.fk!=='__mine'?'<button class="pc-btn" onclick="pcUpFor(\''+esc(f.fk).replace(/'/g,'&#39;')+'\')">📤 우리 학교 사진 올리기</button>':'')+(!ME&&open_()?'<a class="pc-btn" href="login.html?next='+encodeURIComponent('photo.html?f='+encodeURIComponent(f.fk))+'">로그인하고 사진 올리기</a>':'')+'</div>'
     +(p.length?'<div class="pc-grid">'+p.map((x,i)=>'<div class="pc-ph"><img src="'+esc(x.img)+'" alt="'+esc(x.title||f.name)+'" loading="lazy" onclick="pcLb(\''+esc(f.fk).replace(/'/g,'&#39;')+'\','+i+')">'+(x.award?'<span class="tag aw">🏆 '+esc(x.level||'')+' 1위</span>':(x.pick&&ADMIN?'<span class="tag">후보</span>':''))
-      +'<div class="cap">'+(x.title?'<b>'+esc(x.title)+'</b>':'')+'<span>📷 '+esc((x.by||{}).name||'')+(f.fk==='__mine'?' · '+esc(x.school||''):'')+'</span></div>'
+      +'<div class="cap">'+(x.title?'<b>'+esc(x.title)+'</b>':'')+'<span>📷 '+esc(pcWho(x))+(f.fk==='__mine'?' · '+esc(x.school||''):'')+'</span></div>'
       +((own(x)&&open_())||ADMIN?'<div class="tools">'+(ADMIN?'<button onclick="pcMark(\''+x.id+'\',\'pick\')">'+(x.pick?'후보 해제':'후보')+'</button><button onclick="pcMark(\''+x.id+'\',\'award\')">'+(x.award?'1위 해제':'1위')+'</button><a href="'+esc(x.img)+'" target="_blank" rel="noopener">원본</a>':'')+'<button onclick="pcDel(\''+x.id+'\')" style="color:#C41E2F">삭제</button></div>':'')+'</div>').join('')+'</div>'
       :'<div class="pc-empty">'+DISC+'아직 사진이 없어요'+(open_()?'<br>첫 사진의 주인공이 되어 주세요! 📸':'')+'</div>')+'</div>'}
 function pcUpFor(fk){const t=TEAMS.find(t=>t.fk===fk);if(t){UP.level=t.level;UP.fk=t.fk}else{const f=folderOf(fk);if(f){UP.level=f.level;UP.fk='__free';UP.free=f.name}}pcUpRender();document.getElementById('pcUp').scrollIntoView({behavior:'smooth',block:'center'})}
@@ -363,7 +366,7 @@ function lbDraw(){let d=document.getElementById('pcLbx');const L=lbList(LB.key);
   const room=pccRoomOf(x);const prevIn=document.getElementById('pccIn');const draft=(prevIn&&LB.room===room)?prevIn.value:'';if(LB.play){pccUnsub();LB.room=room;LB.cmts=[]}else pccSub(room);   /* [2026-10-24] 사진마다 댓글 방(photo_<사진ID>) 구독 · 같은 사진이면 쓰던 글 유지 · 자동 넘기기 중엔 구독 생략(멈추면 구독) */
   d.innerHTML='<div class="tp"><span>'+(LB.i+1)+' / '+L.length+'</span><span class="pcc-cnt" id="pccCnt" title="댓글 수">'+pccCntHtml()+'</span><span style="flex:1"></span>'+(L.length>1?'<button id="pccPlayBtn" onclick="lbPlay()">'+pccPlayLbl()+'</button>':'')+(x.fk&&LB.key!==x.fk&&folderOf(x.fk)?'<button onclick="lbClose();pcOpen(\''+esc(x.fk).replace(/'/g,'&#39;')+'\')" title="학교 앨범">🏫<span class="pcc-tl"> 학교 앨범</span></button>':'')+'<button onclick="lbClose()" title="닫기" aria-label="닫기">✕<span class="pcc-tl"> 닫기</span></button></div>'
     +'<div class="pcc-body"><div class="pcc-ph">'+(L.length>1?'<button class="nv p" onclick="lbGo(-1)" aria-label="이전">‹</button><button class="nv n" onclick="lbGo(1)" aria-label="다음">›</button>':'')
-    +'<img src="'+esc(x.img)+'" alt="'+esc(x.title||'')+'"><div class="cp">'+esc([x.school,x.title].filter(Boolean).join(' · '))+(x.award?' 🏆':'')+'<small>'+esc(x.level||'')+' · 📷 '+esc((x.by||{}).name||'')+'</small></div></div>'+pccPanelHtml(draft)+'</div>';
+    +'<img src="'+esc(x.img)+'" alt="'+esc(x.title||'')+'"><div class="cp">'+esc([x.school,x.title].filter(Boolean).join(' · '))+(x.award?' 🏆':'')+'<small>'+esc(x.level||'')+' · 📷 '+esc(pcWho(x))+'</small></div></div>'+pccPanelHtml(draft)+'</div>';
   const ls=document.getElementById('pccList');if(ls)ls.scrollTop=ls.scrollHeight;
   const nx=L[(LB.i+1)%L.length];if(nx){const im=new Image();im.src=nx.img}
   clearTimeout(LB.t);if(LB.play&&L.length>1)LB.t=setTimeout(()=>lbGo(1),3000)}

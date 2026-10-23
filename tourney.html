@@ -275,8 +275,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="matchrec.js?v=20261024b"></script>
-<script src="comments.js?v=20261024b"></script>
+<script src="matchrec.js?v=20261024c"></script>
+<script src="comments.js?v=20261024c"></script>
 <script>
 // ══════════ 대회 현황 (tourney.html · 2026-10-24) — 회원 유입용 공개 화면 ══════════
 //  비회원: 「실시간」(구장별 지금 경기 점수 + 최근 득점)만 · 회원(로그인, 승인 여부 무관): 전체 경기·타임라인·순위·득점/어시스트
@@ -422,8 +422,10 @@ function tnTimelineHtml(m){const PO={'전반':0,'후반':1,'연장':2};
   return out.length?'<div class="tn-tl">'+out.join('')+'</div>':'<div class="tn-note" style="padding:14px">'+(m.status==='예정'?'경기 전이에요. 시작하면 득점이 바로 올라와요.':'아직 기록이 없어요.')+'</div>'}
 
 // ── 순위 탭 (회원) — compStats.stats.byDiv (운영진이 경기 시작·종료 때 저장) + 본선은 경기 목록에서 ──
-function tnRankHtml(){const st=TN.stats;const by=(st&&st.byDiv)||{};const keys=TN_MR.sortStatKeys(Object.keys(by),TN.M);
-  let h='<div class="tn-info">순위표는 운영진이 경기 시작·종료 때 갱신합니다'+(st&&st.at?' <b>(마지막 갱신 '+tnEsc(tnKst(st.at))+')</b>':'')+'<br><small>순위 규칙: 승점(승 3 · 무 1) → 득실 → 다득점 → 승자승 → 제재 수 → 추첨</small></div>';
+/* [2026-10-24] 순위·득점 순위를 경기 문서로 바로 계산 — 운영진 화면이 집계를 저장하지 않아도 최신(심판만 기록해도 반영). 추첨 결과(lots)는 compStats 것을 씀 */
+let TN_LS={sig:'',st:null};function tnLiveStats(){try{const sig=TN.M.map(m=>m.id+(m.status||'')+((m.events||[]).length)+(m.locked?1:0)).join('|')+JSON.stringify(TN.lots||{});if(sig!==TN_LS.sig){TN_LS={sig:sig,st:TN_MR.computeStats(TN.M,{},TN.lots||{})}}return TN_LS.st}catch(e){return TN.stats}}
+function tnRankHtml(){const st=tnLiveStats();const by=(st&&st.byDiv)||{};const keys=TN_MR.sortStatKeys(Object.keys(by),TN.M);
+  let h='<div class="tn-info">순위표는 경기 기록에서 바로 계산합니다(실시간)'+(st&&st.at?' <b>(마지막 갱신 '+tnEsc(tnKst(st.at))+')</b>':'')+'<br><small>순위 규칙: 승점(승 3 · 무 1) → 득실 → 다득점 → 승자승 → 제재 수 → 추첨</small></div>';
   const divs=tnDivs();if(!divs.length)return h+'<div class="tn-note">순위표는 첫 경기가 끝난 뒤 올라와요.</div>';
   divs.forEach(dv=>{const gk=keys.filter(k=>String(k).split(' · ')[0]===dv&&!/본선$/.test(k));
     h+='<div class="tn-dv"><h3>'+tnEsc(dv)+'</h3>';
@@ -439,12 +441,12 @@ function tnTableHtml(T){if(!T.length)return '<div class="tn-note" style="padding
     +T.map(t=>{const gd=(+t.gf||0)-(+t.ga||0);return '<tr><td><b>'+tnEsc(t.rank)+'</b>'+(t.needLot?'<span class="tn-lot">추첨 대기</span>':'')+'</td><td class="l"><b>'+tnDot(t.pid)+tnEsc(t.name||'')+'</b>'+(t.school&&t.school!==t.name?'<small>'+tnEsc(t.school)+'</small>':'')+'</td><td>'+(+t.p||0)+'</td><td>'+(+t.w||0)+'</td><td>'+(+t.d||0)+'</td><td>'+(+t.l||0)+'</td><td>'+(+t.gf||0)+'</td><td>'+(+t.ga||0)+'</td><td>'+(gd>0?'+':'')+gd+'</td><td><b>'+(+t.pts||0)+'</b></td></tr>'}).join('')+'</tbody></table></div>'}
 
 // ── 득점 · 어시스트 탭 (회원) — compStats.stats.scorers ──
-function tnScorersHtml(){const st=TN.stats;const all=((st&&st.scorers)||[]).slice();const divs=tnDivs();
+function tnScorersHtml(){const st=tnLiveStats();const all=((st&&st.scorers)||[]).slice();const divs=tnDivs();
   let h='<div class="tn-chips"><button type="button" class="tn-chip'+(TN.sc==='g'?' on':'')+'" onclick="TN.sc=\'g\';tnRender(\'scorers\')">득점순</button><button type="button" class="tn-chip'+(TN.sc==='a'?' on':'')+'" onclick="TN.sc=\'a\';tnRender(\'scorers\')">어시스트순</button></div>';
   h+='<div class="tn-chips"><span class="lb">부문</span><button type="button" class="tn-chip'+(!TN.scDiv?' on':'')+'" data-v="" onclick="tnScDiv(this.dataset.v)">전체</button>'+divs.map(d=>'<button type="button" class="tn-chip'+(TN.scDiv===d?' on':'')+'" data-v="'+tnEsc(d)+'" onclick="tnScDiv(this.dataset.v)">'+tnEsc(d)+'</button>').join('')+'</div>';
   const key=TN.sc==='a'?'a':'g',other=key==='g'?'a':'g';
   const L=all.filter(p=>p&&(!TN.scDiv||p.div===TN.scDiv)&&(+p[key]||0)>0).sort((x,y)=>(+y[key]||0)-(+x[key]||0)||(+y[other]||0)-(+x[other]||0)||String(x.name||'').localeCompare(String(y.name||''),'ko')).slice(0,30);
-  h+='<div class="tn-info" style="margin-top:4px">'+(key==='g'?'득점':'어시스트')+' 상위 30명 · 운영진이 경기 시작·종료 때 갱신'+(st&&st.at?' <b>(마지막 갱신 '+tnEsc(tnKst(st.at))+')</b>':'')+'<br><small>선수 이름은 일부 가려서 표시돼요</small></div>';
+  h+='<div class="tn-info" style="margin-top:4px">'+(key==='g'?'득점':'어시스트')+' 상위 30명 · 경기 기록에서 바로 계산(실시간)'+(st&&st.at?' <b>(마지막 갱신 '+tnEsc(tnKst(st.at))+')</b>':'')+'<br><small>선수 이름은 일부 가려서 표시돼요</small></div>';
   if(!L.length)return h+'<div class="tn-note">첫 골이 나오면 여기에 올라와요.</div>';
   h+='<div class="tn-scroll"><table class="tn-tbl"><thead><tr><th>#</th><th class="l">선수</th><th class="l">팀</th><th>부문</th><th>득점</th><th>어시스트</th></tr></thead><tbody>'
     +L.map((p,i)=>'<tr><td><b>'+(i+1)+'</b></td><td class="l"><b>'+tnEsc(tnMask(p.name))+'</b>'+(p.no!=null&&String(p.no)!==''?' <small style="display:inline">'+tnEsc(p.no)+'번</small>':'')+'</td><td class="l">'+tnEsc(p.team||'')+(p.school&&p.school!==p.team?'<small>'+tnEsc(p.school)+'</small>':'')+'</td><td>'+tnEsc(p.div||'')+'</td><td'+(key==='g'?' class="hi"':'')+'>'+(+p.g||0)+'</td><td'+(key==='a'?' class="hi"':'')+'>'+(+p.a||0)+'</td></tr>').join('')+'</tbody></table></div>';
@@ -463,7 +465,7 @@ function tnPickHtml(){return '<div class="tn-pick">'+TN_DISC+'<h3>승부 예측 
   TN_DB.collection('liveMatches').where('slotId','==',TN_SLOT).onSnapshot(q=>{TN.M=q.docs.map(d=>Object.assign({id:d.id},d.data())).filter(m=>!m.test&&!m.golf);tnSortM();TN.loaded=true;TN.err='';
     if(TN.want){const w=TN.M.find(x=>x.id===TN.want);if(w){TN.f.day=w.day||'';TN.f.div='';TN.f.court='';TN.f.st=''}}
     tnRender(TN.tab)},e=>{console.warn('tourney liveMatches',e);TN.err='경기 정보를 불러오지 못했습니다: '+(e.message||e);tnRender(TN.tab)});
-  TN_DB.collection('compStats').doc(TN_SLOT).onSnapshot(d=>{const x=d.exists?d.data():{};TN.stats=x.stats||null;TN.kits=x.kits||{};TN.format=x.format||{};
+  TN_DB.collection('compStats').doc(TN_SLOT).onSnapshot(d=>{const x=d.exists?d.data():{};TN.stats=x.stats||null;TN.lots=x.lots||{};TN.kits=x.kits||{};TN.format=x.format||{};
     if(TN_SLOT!==TN_DEFAULT_SLOT&&x.title){const t=document.getElementById('tnHeroTitle');if(t)t.textContent=x.title;document.title='대회 현황 · '+x.title+' | 대한민국플라잉디스크연맹';const p=document.querySelector('.tn-hero p');if(p)p.innerHTML=tnEsc(String(x.date||'').replace(/-/g,'/'))+' · <b id="tnHeroStat"></b>'}   /* 다른 공고를 ?slot= 로 열었을 때는 축전 고정 문구 대신 그 공고 제목·날짜 */
     tnRender(TN.tab)},e=>console.warn('tourney compStats',e));
   setInterval(()=>{document.querySelectorAll('.tn-clock[data-mid]').forEach(el=>{const m=TN.M.find(x=>x.id===el.dataset.mid);if(m&&(m.clock||{}).running)el.textContent=TN_MR.clockTxt(m)})},1000);

@@ -106,7 +106,7 @@ async function dexShow(id){if(!ME)return;const cur=myBadges();const i=cur.indexO
 
 /* ══ B. 명예의 전당 ══ */
 let HL={slot:SLOT,list:null,data:{},nameMode:'masked'};
-function recName(n){return HL.nameMode==='hidden'?'비공개':String(n||'')}
+function recName(n){return HL.nameMode==='hidden'?'비공개':(HL.nameMode==='full'?String(n||''):mask(n))}   /* [2026-10-24] 공개 화면 — 학생 이름 가림(김*수) */
 async function hallRender(el){
   if(!HL.list){el.innerHTML='<div class="pg-card"><div class="pg-empty">대회 기록을 모으는 중…</div></div>';
     try{const s=await DB.collection('siteContent').doc('results').get();if(s.exists&&s.data().nameMode)HL.nameMode=s.data().nameMode}catch(e){}
