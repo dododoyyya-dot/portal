@@ -1777,7 +1777,7 @@ function myTeamsBox(s,id,closed){const T=myTeamEntries(s);if(!T.length)return ''
     +T.map(m=>'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px dashed #e2e7f0"><b style="font-size:13.5px">'+cesc(m.name||'')+'</b><span style="font-size:12px;color:#6b7280">'+cesc((m.prefs||[])[0]||'')+' · '+((m.roster||[]).length||m.rosterN||0)+'명</span><span style="flex:1"></span>'
       +(!closed?'<button class="cbtn cbtn-soft" style="padding:5px 10px;font-size:12px" onclick="editTeamEntry(\''+id+'\',\''+cesc(m.pid)+'\')">✏️ 팀원 추가·변경</button>':'')
       +'<button class="cbtn cbtn-ghost" style="padding:5px 10px;font-size:12px" onclick="teamConsentUpload(\''+id+'\',\''+cesc(m.pid)+'\')">📎 동의서</button>'
-      +'<a class="cbtn cbtn-soft" style="padding:5px 10px;font-size:12px;text-decoration:none" href="match.html?slot='+id+'&order='+encodeURIComponent(m.pid)+'">📝 오더지</a>'
+      +'<a class="cbtn cbtn-soft" style="padding:5px 10px;font-size:12px;text-decoration:none;background:#fff3c4;border-color:#e6b422;color:#7a5a00" href="match.html?slot='+id+'&order='+encodeURIComponent(m.pid)+'" title="참가 신청과 별도로 경기복·배번·주장·감독교사 서명을 적어 제출해야 경기 기록에 선수가 나옵니다">📝 오더지 작성·제출</a>'
       +'<button class="cbtn cbtn-ghost" style="padding:5px 10px;font-size:12px;color:#C41E2F" onclick="cancelClaim(\''+id+'\',\''+cesc(m.pid)+'\')">취소</button></div>').join('')+'</div>'}
 function myTeamEntries(s){
   if(!CME)return [];
@@ -2736,6 +2736,8 @@ async function submitTeam(){
           try{KFDF.notify(u,p[1]+'['+_t+'] 「'+teamName+'」 팀 명단으로 참가 신청되었습니다 (인솔: '+(CMY.name||'')+')','competition.html?slot='+TA_ID)}catch(e){}})})}catch(e){console.warn('guardian notify',e)}
     document.getElementById('taModal').remove();
     alert('👥 ['+teamName+'] 팀 참가 신청 완료! ('+roster.length+'명)'+(files.length?'\n동의서 '+files.length+'건이 함께 제출되었습니다.':'\n\n📎 서면 동의서는 대회 전까지 [📎 동의서 업로드] 버튼으로 제출해주세요.')+(sigSaveOk?'':'\n\n⚠ 인솔자 서명 저장에 실패했습니다 — [📄 내 신청서]에서 서명이 비어있으면 신청을 다시 열어 서명해주세요.'));
+    /* [2026-10-23] 참가 신청 = 오더지가 아님 — 선생님이 여기서 끝났다고 알고 오더지를 안 내던 것 */
+    if(!TA_EDIT&&confirm('📝 다음 단계 — 출전 오더지\n\n참가 신청과 별도로 「출전 오더지」(경기복 색·배번·주장·감독교사 서명)를 첫 경기 전까지 제출해야 경기 기록 화면에 선수가 나옵니다.\n\n지금 바로 오더지를 작성할까요?\n(나중에 하려면 대회 공고 아래 「내 팀」의 📝 오더지 버튼)'))location.href='match.html?slot='+TA_ID+'&order='+encodeURIComponent(pid);
     loadSlots();
   }catch(e){alert(cErrMsg(e))}
 }

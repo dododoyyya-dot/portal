@@ -1461,6 +1461,11 @@ async function orderOpen(pid){
   const mine=ME&&c.uid===ME.uid;OD_KIT=!mine&&!STAFF&&canOfficial();if(!mine&&!STAFF&&!OD_KIT){say('이 팀의 대표자(신청자) 또는 운영진만 열 수 있습니다');return}   /* [2026-10-21] 확정 심판은 경기복·운영조끼만 */
   let prev=orderOf(pid);
   if(!prev){try{const d=await DB.collection('compOrders').doc(MR.orderId(SLOT_ID,pid)).get();if(d.exists){prev=Object.assign({id:d.id},d.data());ORDERS[d.id]=prev}}catch(e){}}   /* [2026-10-20] 목록보다 먼저 눌렀을 때 저장분을 직접 읽음 */
+
+  if(!prev){ /* [2026-10-23] 취소 후 다시 신청해 pid 가 바뀐 팀 — 같은 학교·부문의 옛 오더지가 남아 있으면 그 내용(배번·경기복·서명)을 가져옴 */
+    const live=new Set(teamEntries().map(entryKey));const nm=[c.name,c.teamOrg].map(lkNorm).filter(Boolean);
+    const old=Object.values(ORDERS).find(o=>o&&o.slotId===SLOT_ID&&o.pid&&o.pid!==pid&&!live.has(o.pid)&&[o.team,o.school,o.linkName].map(lkNorm).some(x=>x&&nm.some(y=>lkSameName(x,y)))&&(!o.div||!(c.prefs||[])[0]||lkDiv(o.div)===lkDiv((c.prefs||[])[0])));
+    if(old){prev=Object.assign({},old,{id:MR.orderId(SLOT_ID,pid),pid:pid,uid:c.uid||old.uid||'',status:'작성중',adoptedFrom:old.pid});say('이 학교가 전에 낸 오더지('+(old.status||'작성중')+')를 찾아 가져왔습니다. 내용을 확인하고 「✅ 제출」을 눌러 주세요.')}}
   OD=MR.orderFromEntry(SLOT_ID,SLOT,c,prev);if(prev&&prev.div)OD.div=prev.div;OD.entryDiv=(c.prefs||[])[0]||'';OD.kits=MR.kitsOf(prev||{}).map(k=>({name:k.name,color:k.color,none:!!k.none}));OD_PID=pid;
   OD.players.sort((a,b)=>odNoKey(a)-odNoKey(b)||(a.i-b.i));   /* [2026-10-19] 조끼 나눠 주기 쉽게 배번순 한 줄 */
   OD.wear=(prev&&prev.wear===1)?1:0;
