@@ -2059,6 +2059,8 @@ async function endSave(confirmNow){const S=SHEET;const m=MATCHES.find(x=>x.id===
   MR.offList(m).forEach(x=>{if(x.key&&SIGNS[x.key]&&!sigOk(SIGNS[x.key],x))signs[x.key]={name:x.name,img:'',uid:x.uid||'',at:new Date().toISOString(),cleared:true}});   /* 배정자와 다른 사람 서명은 지움 */
   const me=MR.offOf(m,ME&&ME.uid);if(me&&MY.signatureImg&&!(SIGNS[me.key]&&SIGNS[me.key].img))signs[me.key]={name:MY.name||'',img:MY.signatureImg,uid:ME.uid,at:new Date().toISOString()};
   const lock=true;const sc=MR.score(m.events||[]);
+  /* [2026-10-23] 본선 경기가 동점이면 다음 경기 자리가 채워지지 않음 — 연장·서든데스로 승자를 가리도록 경고 */
+  if(sc.a===sc.b&&MR.isKnockout(m)&&!confirm('⚠ 본선(토너먼트) 경기인데 동점('+sc.a+':'+sc.b+')입니다.\n연장·서든데스로 승자를 가린 뒤 종료해야 다음 경기 자리가 자동으로 채워집니다.\n\n그래도 동점으로 확정할까요? (다음 경기 팀은 운영진이 「경기 정보」에서 직접 넣어야 합니다)'))return;
   const _cur=m.period||'';const _log=Object.assign({},m.clockLog||{});if(_cur&&_cur!=='하프타임'&&!_log[_cur]&&MR.secOf(m)>0)_log[_cur]=MR.fmtSec(MR.secOf(m));
   const mvps=[S.mvpA?Object.assign({},S.mvpA,{side:'a',team:tname(m,'a')}):null,S.mvpB?Object.assign({},S.mvpB,{side:'b',team:tname(m,'b')}):null].filter(Boolean);
   const upd={status:'종료',clockLog:_log,endAt:m.endAt||FV.serverTimestamp(),fairplay:{a:S.fa,b:S.fb},coachScore:{a:S.ca,b:S.cb},mvps:mvps,mvp:mvps[0]||null,bestCoach:(S.ca!==S.cb)?{side:S.ca>S.cb?'a':'b',name:((S.ca>S.cb?cA:cB)[0]||{}).name||'',team:tname(m,S.ca>S.cb?'a':'b')}:null,winner:sc.a>sc.b?'a':sc.b>sc.a?'b':'',locked:lock,brk:null};
