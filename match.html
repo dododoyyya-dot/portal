@@ -483,7 +483,7 @@ body:has(#rfModal),body:has(#mfModal),body:has(#odModal){overflow:hidden}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="matchrec.js?v=20261021a"></script><script src="sigclean.js?v=20261021a"></script>
+<script src="matchrec.js?v=20261023a"></script><script src="sigclean.js?v=20261021a"></script>
 <script>
 // ══════════ 경기 기록 (match.html) ══════════
 //   ?slot=참가공고ID            대회의 경기·오더지·디스크골프·순위 (운영진은 경기 생성·심판 배정)
@@ -1440,6 +1440,7 @@ function orderTab(){
   const by={};teams.forEach(c=>{const o=orderOf(entryKey(c));const dv=lkDiv((c.prefs||[])[0]||(o&&o.div)||'')||'부문 미지정';(by[dv]=by[dv]||[]).push(c)});
   const sw=k=>'<span title="'+esc(k.name)+'" style="display:inline-block;width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(17,17,20,.25);vertical-align:middle;background:'+esc(k.color)+'"></span>';
   return LKP+'<div class="mr-note" style="margin:6px 0 2px">참가 신청 명단이 오더지에 그대로 들어가고, 대표자가 <b>경기복 2벌(색상)</b>과 옷별 배번, 주장만 적어 제출합니다. 제출된 오더지의 선수가 기록 콘솔의 선수 카드가 됩니다. 한 대표자가 여러 팀을 신청했다면 팀마다 따로 작성합니다.</div>'
+ +(STAFF?'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 2px"><span class="mr-note" style="font-weight:800">운영진 · 오더지 전체</span><button class="mr-btn ghost" style="padding:6px 12px;font-size:12.5px" onclick="ordersAllPdf()">📄 전체 PDF(인쇄)</button><button class="mr-btn ghost" style="padding:6px 12px;font-size:12.5px" onclick="ordersAllXlsx()">📊 전체 엑셀</button><span class="mr-note">제출 현황 표 + 팀당 1쪽 · 엑셀은 선수 한 줄씩</span></div>':'')
     +Object.keys(by).sort().map(dv=>'<div style="margin:18px 0 4px;display:flex;align-items:center;gap:8px"><span style="font-size:17px;font-weight:900;color:#153A77;border-left:5px solid #153A77;padding-left:10px">'+esc(dv)+'</span><span class="mr-note">'+by[dv].length+'팀</span></div><table class="mr-tbl"><tr><th class="l">팀 · 소속</th><th>경기복</th><th>명단</th><th>배번</th><th>상태</th><th>감독교사</th><th></th></tr>'
       +by[dv].map(c=>{const key=entryKey(c);const o=orderOf(key);const n=(c.roster||[]).length;const nn=o?(o.players||[]).filter(p=>String(p.no||'').trim()!=='').length:0;const mine=ME&&c.uid===ME.uid;const K=MR.kitsOf(o||{});
         return '<tr><td class="l"><b>'+esc(c.name||'')+'</b>'+(c.teamOrg&&c.teamOrg!==c.name?'<br><small style="color:#6b7280">'+esc(c.teamOrg)+'</small>':'')+(mine?' <span class="mr-pill" style="background:#0f766e;font-size:10.5px;padding:2px 8px">내 팀</span>':'')+(o&&o.div&&(c.prefs||[])[0]&&lkDiv(o.div)!==lkDiv(c.prefs[0])?'<br><small style="color:#C41E2F;font-weight:800">⚠ 오더지 부문('+esc(o.div)+')이 신청 부문과 달라요 — 열어서 저장하면 맞춰집니다</small>':'')+'</td><td>'+(o&&o.kits?sw(K[0])+' '+(K[1].none?(K[1].color?sw(K[1])+'<small style="color:#6b7280"> 운영</small>':'<small style="color:#C41E2F;font-weight:800">운영조끼 색 미정</small>'):sw(K[1])):'<span class="mr-note">-</span>')+'</td><td>'+n+'명</td><td>'+(o?nn+'/'+n:'-')+'</td><td>'+(o?'<span class="mr-pill" style="background:'+(o.status==='제출'?'#0f766e':o.status==='잠금'?'#153A77':'#b8860b')+'">'+esc(o.status)+'</span>':'<span class="mr-pill">미작성</span>')+'</td><td>'+esc(o&&o.coach&&o.coach.name||c.leader||'')+(o&&o.coach&&o.coach.sign?' ✍':'')+'</td>'
@@ -1579,6 +1580,22 @@ async function entryDivSave(pid,dv){const ref=DB.collection('compSlots').doc(SLO
     const s2=await ref.get();SLOT=s2.data();render();say('✓ 참가 신청 부문을 「'+dv+'」(으)로 바꿨습니다.')}
   catch(e){say('신청 부문 변경 실패: '+(/permission/i.test(String(e))?'권한이 없습니다(관리자·관할 시도연맹 임원만)':(e.message||e))+'\n오더지의 출전 부문은 저장되었습니다.')}}
 function orderPdf(pid){const o=orderOf(pid);if(!o){say('아직 저장된 오더지가 없습니다');return}MR.printOrder(o)}
+/* [2026-10-23] 오더지 전체 내려받기(운영진) — 부문·학교 순. rows 는 참가 신청 팀 전부(미작성 포함), list 는 저장된 오더지만 */
+function ordersAllRows(){const T=teamEntries().map(c=>{const key=entryKey(c);const o=orderOf(key);const dv=lkDiv((c.prefs||[])[0]||(o&&o.div)||'')||'부문 미지정';const K=MR.kitsOf(o||{});const PL=o?(o.players||[]):[];
+  return {div:dv,school:c.teamOrg||o&&o.school||c.name||'',team:c.name||o&&o.team||'',status:o?(o.status||'작성중'):'미작성',n:(c.roster||[]).length,nn:PL.filter(p=>String(p.no||'').trim()!=='').length,coach:(o&&o.coach&&o.coach.name)||c.leader||'',sign:!!(o&&o.coach&&o.coach.sign),o:o,kit1:K[0],kit2:K[1],at:o&&o.updatedAt?MR.tsMs(o.updatedAt):0}});
+  return T.sort((x,y)=>x.div.localeCompare(y.div,'ko')||x.school.localeCompare(y.school,'ko')||x.team.localeCompare(y.team,'ko'))}
+function ordersAllPdf(){if(!STAFF)return;if(!ORDERS_READY){say('오더지를 아직 불러오는 중입니다. 잠시 뒤 다시 눌러 주세요');return}const rows=ordersAllRows();const list=rows.filter(r=>r.o).map(r=>r.o);if(!rows.length){say('참가 신청 팀이 없습니다');return}
+  if(!confirm('오더지 전체를 한 인쇄창에 엽니다 — 제출 현황 1쪽 + 팀별 '+list.length+'쪽 (미작성 '+(rows.length-list.length)+'팀 제외).\n인쇄 창에서 「PDF로 저장」을 고르면 한 파일이 됩니다. 계속할까요?'))return;
+  MR.printOrders(list,SLOT.title||'',rows)}
+async function ordersAllXlsx(){if(!STAFF)return;if(!ORDERS_READY){say('오더지를 아직 불러오는 중입니다. 잠시 뒤 다시 눌러 주세요');return}try{const rows=ordersAllRows();if(!rows.length){say('참가 신청 팀이 없습니다');return}const X=await MR.loadXlsx();const wb=X.utils.book_new();
+  const a=[['번호','부문','학교','팀','상태','1번 경기복','1번 색','2번 경기복','2번 색','순번','배번(1번 옷)','교체 배번(2번 옷)','선수 이름','소속','주장','감독교사','감독교사 서명','제출 시각']];let n=0;
+  rows.forEach(r=>{const PL=r.o?(r.o.players||[]).slice().sort((p,q)=>(+p.no||999)-(+q.no||999)):[];const kn=k=>k.none?'(없음)':(k.name||'');const base=[r.div,r.school,r.team,r.status,r.o?kn(r.kit1):'',r.o?r.kit1.color:'',r.o?kn(r.kit2):'',r.o&&!r.kit2.none?r.kit2.color:''];
+    if(!PL.length){a.push([++n].concat(base,['','','','(명단 없음)','','',r.coach,r.sign?'O':'',r.at?new Date(r.at).toLocaleString('ko-KR'):'']));return}
+    PL.forEach((p,i)=>a.push([++n].concat(base,[i+1,p.no||'',p.subNo||'',p.name||'',p.school||'',p.role==='주장'?'주장':'',r.coach,r.sign?'O':'',r.at?new Date(r.at).toLocaleString('ko-KR'):''])))});
+  const ws=X.utils.aoa_to_sheet(a);ws['!cols']=[4,12,22,18,8,14,9,14,9,5,10,10,12,22,6,10,8,18].map(w=>({wch:w}));X.utils.book_append_sheet(wb,ws,'오더지 전체');
+  const b=[['번호','부문','학교','팀','상태','명단(명)','배번 입력(명)','1번 경기복','2번 경기복','감독교사','서명','제출 시각']];rows.forEach((r,i)=>b.push([i+1,r.div,r.school,r.team,r.status,r.n,r.nn,r.o?(r.kit1.none?'(없음)':r.kit1.name+' '+r.kit1.color):'',r.o?(r.kit2.none?'(없음)':r.kit2.name+' '+r.kit2.color):'',r.coach,r.sign?'O':'',r.at?new Date(r.at).toLocaleString('ko-KR'):'']));
+  const ws2=X.utils.aoa_to_sheet(b);ws2['!cols']=[4,12,22,18,8,8,10,18,18,10,5,18].map(w=>({wch:w}));X.utils.book_append_sheet(wb,ws2,'팀별 현황');
+  X.writeFile(wb,String(SLOT.title||'대회').replace(/[\\/:*?"<>|]+/g,' ').trim().slice(0,40)+'_오더지 전체_'+new Date().toISOString().slice(0,10)+'.xlsx')}catch(e){say('내려받기 실패: '+(e.message||e))}}
 // ══ 기록 콘솔 ══
 let RC_SIG='';
 function rcOpen(id){
