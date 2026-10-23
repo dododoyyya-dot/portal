@@ -1188,9 +1188,9 @@ try{firebase.firestore().collection('siteContent').doc('live').onSnapshot(functi
   var goals=function(m){return (m.events||[]).filter(function(e){return e&&!e.void&&e.type==='goal'})};
   var evWhen=function(e){var c=e.clock||'';if(!c&&e.sec!=null&&e.sec!=='')c=p2(Math.floor(+e.sec/60))+':'+p2(Math.floor(+e.sec%60));if(!c&&e.min!=null&&e.min!=='')c=e.min+"'";return [e.period||'',c].filter(Boolean).join(' ')};
   var roundOf=function(m){var r=String(m.round||''),st=m.stage||'';return r?(st&&r.indexOf(st)!==0?st+' '+r:r):st};
-  var kitOf=function(m,side){var t=m[side]||{};var K=KITS[t.pid];if(!K)return null;var k=((m.kit||{})[side]===1)?(K.k2||K.k1):(K.k1||K.k2);if(!k||k.none)return null;return k};
+  var kitOf=function(m,side){var t=m[side]||{};var K=KITS[t.pid];if(!K)return null;var k=((m.kit||{})[side]===1)?(K.k2||K.k1):(K.k1||K.k2);if(!k)return null;if(k.none)return k.color?{name:'운영조끼',color:k.color,ops:true}:null;return k};
   var kitColor=function(m,side){var k=kitOf(m,side);return k&&k.color?String(k.color):''};
-  var kitName=function(m,side){var k=kitOf(m,side);if(!k)return '';var c=String(k.color||'').toLowerCase();return KITC[c]||((k.name&&!/^\d번 경기복/.test(k.name))?k.name:'')};
+  var kitName=function(m,side){var k=kitOf(m,side);if(!k)return '';var c=String(k.color||'').toLowerCase();if(k.ops)return '운영조끼'+(KITC[c]?'('+KITC[c]+')':'');return KITC[c]||((k.name&&!/^\d번 경기복/.test(k.name))?k.name:'')};
   /* ── 구독 데이터 ── */
   var DAYM={},LIVEM={},KITS={},STATS=null,ALL=[],pend=null,loaded=false;
   var take=function(q){var o={};q.docs.forEach(function(d){var x=d.data()||{};x.id=d.id;o[d.id]=x});return o};
