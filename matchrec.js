@@ -111,15 +111,25 @@
   function qLoad(){try{return JSON.parse(localStorage.getItem(QKEY)||'[]')}catch(e){return []}}
   function qSave(q){try{localStorage.setItem(QKEY,JSON.stringify(q))}catch(e){}}
   function qPush(op){var q=qLoad();q.push(Object.assign({qid:uid8(),at:now()},op));qSave(q)}
+  /* [2026-10-24] 보류 기록 — 재연결 때 입력권이 다른 사람에게 있거나 다른 오류로 못 보낸 것. 버리지 않고 남겨 화면에서 확인 후 보냄 */
+  function qHeld(matchId){return qLoad().filter(function(o){return o.held&&(!matchId||o.id===matchId)})}
+  function qDrop(qids){var k={};(qids||[]).forEach(function(x){k[x]=1});qSave(qLoad().filter(function(o){return !k[o.qid]}))}
+  function qSendHeld(DB,fb,opts,qids){var k={};(qids||[]).forEach(function(x){k[x]=1});var q=qLoad();var sent=[],errs=[];var chain=Promise.resolve();
+    q.filter(function(o){return k[o.qid]}).forEach(function(op){chain=chain.then(function(){var o2=Object.assign({},opts,op.opts||{},{requireCtrl:false});
+      var p=op.kind==='add'?addEvent(DB,fb,op.id,op.ev,o2):op.kind==='void'?voidEvent(DB,fb,op.id,op.evId,o2):Promise.resolve();return p.then(function(){sent.push(op.qid)},function(e){errs.push(String(e&&(e.code||e.message)||''))})})});
+    return chain.then(function(){var sk={};sent.forEach(function(x){sk[x]=1});qSave(qLoad().filter(function(o){return !sk[o.qid]}));return {sent:sent.length,errs:errs}})}
+  /* 보류 득점이 이미 들어간 득점과 같은지 — 배번이 둘 다 있으면 같은 팀·같은 배번·5분 안, 없으면 같은 팀·1분 안 */
+  function heldDup(op,events){var e=op&&op.ev;if(!e||op.kind!=='add'||e.type!=='goal')return false;var no=e.scorer&&e.scorer.no!=null&&e.scorer.no!==''?String(e.scorer.no):'';return (events||[]).some(function(x){if(!x||x.void||x.type!=='goal'||x.side!==e.side||!x.t||!e.t)return false;var dt=Math.abs(new Date(x.t)-new Date(e.t));var xn=x.scorer&&x.scorer.no!=null&&x.scorer.no!==''?String(x.scorer.no):'';return (no&&xn)?(no===xn&&dt<300000):dt<60000})}
   function qCount(matchId){return qLoad().filter(function(o){return !matchId||o.id===matchId}).length}
   var flushing=false;
   function flush(DB,fb,opts,onDone){
     if(flushing)return Promise.resolve();flushing=true;var q=qLoad();var left=[];var fails=[];
     var chain=Promise.resolve();
     q.forEach(function(op){chain=chain.then(function(){
+      if(op.held){left.push(op);return}   /* [2026-10-24] 보류 기록은 사람이 확인해서 보냄 */
       var p=op.kind==='add'?addEvent(DB,fb,op.id,op.ev,Object.assign({},opts,op.opts||{})):op.kind==='void'?voidEvent(DB,fb,op.id,op.evId,Object.assign({},opts,op.opts||{})):Promise.resolve();
-      return p.then(function(){},function(e){var c=String(e&&(e.code||e.message)||'');if(/unavailable|network|deadline|offline|Failed to fetch/i.test(c))left.push(op);else fails.push({op:op,err:c})})})});
-    return chain.then(function(){qSave(left);flushing=false;if(onDone)onDone({sent:q.length-left.length-fails.length,left:left.length,fails:fails})},function(){flushing=false})}
+      return p.then(function(){},function(e){var c=String(e&&(e.code||e.message)||'');if(/unavailable|network|deadline|offline|Failed to fetch/i.test(c))left.push(op);else{op.held=true;op.err=c;left.push(op);fails.push({op:op,err:c})}})})});
+    return chain.then(function(){qSave(left);flushing=false;if(onDone)onDone({sent:q.length-left.length,left:left.length,fails:fails})},function(){flushing=false})}
 
   // ── 기록 권한 ──
   function canRecord(m,uid,my){my=my||{};var roles=[my.role].concat(my.roles||[]);
@@ -438,7 +448,7 @@
     pend(w)}
   window.KFDF_MR={timelineBody:timelineBody,timelineHtml:timelineHtml,printTimeline:printTimeline,sortStatKeys:sortStatKeys,bracketHtml:bracketHtml,isKnockout:isKnockout,statKeyFn:statKeyFn,offList:offList,offOf:offOf,coachesOf:coachesOf,winnerOf:winnerOf,ROLE_LABEL:ROLE_LABEL,roundLabel:roundLabel,CARD_PICK:CARD_PICK,isOff:isOff,KIT_COLORS:KIT_COLORS,kitTextColor:kitTextColor,kitsOf:kitsOf,kitColorName:kitColorName,kitText:kitText,noFor:noFor,secOf:secOf,fmtSec:fmtSec,evSec:evSec,evTime:evTime,clockSetMs:clockSetMs,clockAdd:clockAdd,clockFloorMin:clockFloorMin,brkLeft:brkLeft,timeouts:timeouts,sentOff:sentOff,yellowCount:yellowCount,rankTable:rankTable,loadXlsx:loadXlsx,saveXlsxMatch:saveXlsxMatch,saveXlsxComp:saveXlsxComp,printComp:printComp,teamLabel:teamLabel,
     PERIODS:PERIODS,CARDS:CARDS,esc:esc,uid8:uid8,tsMs:tsMs,score:score,goals:goals,clockMs:clockMs,clockTxt:clockTxt,minuteOf:minuteOf,clockSet:clockSet,clockAct:clockAct,
-    ctrlState:ctrlState,ctrlLabel:ctrlLabel,CTRL_BEAT:CTRL_BEAT,addEvent:addEvent,voidEvent:voidEvent,editEvent:editEvent,qPush:qPush,qCount:qCount,flush:flush,
+    ctrlState:ctrlState,ctrlLabel:ctrlLabel,CTRL_BEAT:CTRL_BEAT,addEvent:addEvent,voidEvent:voidEvent,editEvent:editEvent,qPush:qPush,qCount:qCount,qHeld:qHeld,heldDup:heldDup,qDrop:qDrop,qSendHeld:qSendHeld,flush:flush,
     canRecord:canRecord,isStaffUser:isStaffUser,orderId:orderId,orderFromEntry:orderFromEntry,orderCheck:orderCheck,lineup:lineup,playerStats:playerStats,computeStats:computeStats,
     golfTotals:golfTotals,golfRank:golfRank,evLine:evLine,printOrder:printOrder,printOrders:printOrders,orderPage:orderPage,setOrg:setOrg,orgName:orgName,orgOf:orgOf,printSheet:printSheet,sheetHtml:sheetHtml,sheetBody:sheetBody,printGolf:printGolf};
 })();

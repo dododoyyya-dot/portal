@@ -486,7 +486,7 @@ body:has(#rfModal),body:has(#mfModal),body:has(#odModal){overflow:hidden}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="matchrec.js?v=20261024a"></script><script src="sigclean.js?v=20261021a"></script>
+<script src="matchrec.js?v=20261024b"></script><script src="sigclean.js?v=20261021a"></script>
 <script>
 // ══════════ 경기 기록 (match.html) ══════════
 //   ?slot=참가공고ID            대회의 경기·오더지·디스크골프·순위 (운영진은 경기 생성·심판 배정)
@@ -1630,7 +1630,7 @@ function rcOpen(id){
   if(RC_TICK)clearInterval(RC_TICK);RC_TICK=setInterval(rcTick,1000);
   if(m&&canRec(m)&&rcAutoClaim(m))rcClaim(false);
   rcRender();
-  MR.flush(DB,firebase,Object.assign(whoAmI(),{screen:'match'}),r=>{if(r&&r.fails&&r.fails.length)say('전송하지 못한 기록 '+r.fails.length+'건: '+r.fails.map(f=>f.err).join(', '))});
+  rcFlush('open');
 }
 function rcClose(){RC_ID=null;QK.pend=null;QK.toast=null;QK.setup=null;QK.swap=false;QK.swapSel=null;if(RC_UNSUB){RC_UNSUB();RC_UNSUB=null}if(RC_BEAT){clearInterval(RC_BEAT);RC_BEAT=null}if(RC_TICK){clearInterval(RC_TICK);RC_TICK=null}const ov=document.getElementById('rcOv');if(ov)ov.remove();document.body.style.overflow='';sheetClose();try{history.replaceState(null,'',PAGE+'?slot='+SLOT_ID)}catch(e){}render()}
 /* [2026-10-24 축전] 열 때 입력권을 말없이 잡는 것은 그 경기 기록심(기록원)만 — 감독관·심판위원장·운영진이 먼저 열어도 기록심 화면을 가로채지 않음. 기록심(uid)이 배정되지 않은 경기는 예전처럼 입력 가능한 사람이 잡음. 그 밖에는 「입력 시작」·「▶ 경기 시작」·「넘겨받기」 한 번 누르면 됨 */
@@ -1645,7 +1645,10 @@ async function rcClaim(force){
   }catch(e){say('입력권을 가져오지 못했습니다: '+(/permission/i.test(String(e))?'권한이 없습니다(배정되지 않았거나 보안 규칙 v52 게시 전)':(e.message||e)))}
 }
 async function rcStartTake(){await rcClaim(true);const m=RCM();if(m&&MR.ctrlState(m,ME&&ME.uid)==='mine')await rcStatus('진행');else say('입력권을 가져오지 못해 시작하지 못했습니다')}
-function rcTake(){if(MR.qCount(RC_ID)){say('미전송 기록이 남아 있는 화면이 있습니다. 전송이 끝난 뒤 넘겨받을 수 있습니다.');}if(confirm('지금 입력 중인 화면을 보기 전용으로 바꾸고 이 화면이 입력권을 가져옵니다. 계속할까요?'))rcClaim(true)}
+function rcTake(){const m=RCM();const st=m?MR.ctrlState(m,ME&&ME.uid):'';const who=m?MR.ctrlLabel(m):'';
+  const msg=st==='stale'?'⚠ '+who+' 화면이 1분 넘게 응답이 없습니다(와이파이·데이터 끊김 가능).\n그 기기에 아직 서버에 안 올라간 기록이 있을 수 있습니다.\n\n넘겨받으면: 그 기기가 다시 연결돼도 그 기록은 자동으로 들어오지 않고 그 기기 화면에 「보류」로 남습니다.\n→ 넘겨받은 뒤에는 이 화면 한 곳에서만 입력하고, 끊긴 동안의 득점은 종이 기록과 대조해 빠진 것만 넣어 주세요.\n\n넘겨받을까요?'
+    :'지금 입력 중인 화면('+who+')을 보기 전용으로 바꾸고 이 화면이 입력권을 가져옵니다.\n두 화면에서 같은 득점을 넣지 않도록, 넘겨받았다고 그분께 꼭 알려 주세요.\n\n계속할까요?';
+  if(confirm(msg))rcClaim(true)}
 // ══ [기록 콘솔 2차 2026-10-15 · 시험판] 흰 화면 · 시작 전 경기복 선택 · 주전/후보 끌어 놓기 · 초 단위 시간 · 작전타임/하프타임 별도 타이머 · 풀 기록 ══
 //   경기 문서 추가 필드(모두 선택 사항 — 예전 화면은 무시): kit{a,b}(0|1 경기복) · lineup{a:{on:[선수키]}} · nums{a:{선수키:배번}} · swap(코트 체인지)
 //     · brk{kind:'half'|'to',side,start(ms),dur(초),from,evId} · pulls{전반:'a'|'b',후반,연장} · 기록(events)에 sec(경기 시간 초) — min 은 호환용으로 같이 저장
@@ -1680,12 +1683,12 @@ function rcRender(){
   const c=m.clock||{};const q=MR.qCount(RC_ID);
     const ofs=(function(){const L=MR.offList(m);const g={};L.forEach(x=>{(g[x.role||'심판']=g[x.role||'심판']||[]).push(x.name)});const parts=['감독관','주심','부심','점수심','기록심'].filter(r=>g[r]).map(r=>esc(r)+' <b>'+g[r].map(esc).join('·')+'</b>');
     return '<span class="ofs'+(parts.length?'':' none')+'">'+(parts.join(' <i>·</i> ')||'심판 미배정')+'</span>'+(STAFF?'<button class="ed" onclick="matchForm(\''+m.id+'\')">경기 정보</button>':'')+((!m.locked&&(STAFF||canFix(m)))?'<button class="ed" onclick="offSwapOpen()" title="결근·교체 — 이 경기 심판진만 바꿉니다(감독관·심판위원장·운영진)">심판진 교체</button>':'')+(rec?'<button class="ed u" '+(lastEv(m)?'':'disabled')+' onclick="qkUndoLast()" title="마지막 기록(득점·제재·작전타임)을 취소 표시합니다">↩ 되돌리기</button>':'')+(rec&&m.status!=='예정'?'<span class="tmode"><button class="g'+(QK.mode==='goal'?' on':'')+'" onclick="qkTop(\'goal\')" title="누르면 선수 명단으로 내려갑니다"><svg class="dk" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.5" class="d"/><circle cx="12" cy="12" r="6.2" class="r"/><circle cx="12" cy="12" r="1.9" class="c"/></svg> 득점</button><button class="c'+(QK.mode==='card'?' on':'')+'" onclick="qkTop(\'card\')" title="누르면 선수 명단으로 내려갑니다 · 저장하면 점수판으로">🟨 제재</button><button class="i'+(QK.mode==='injury'?' on':'')+'" onclick="qkTop(\'injury\')" title="부상 선수와 정도를 기록합니다 — 기록지에는 시각만, 상세는 대회 부상 현황에">🩹 부상</button></span>':'')})();
-  const ctrl=!can?'<div class="ctrl"><span>보기 전용'+(m.locked?' · 확정된 경기':'')+'</span>'+ofs+'</div>'+((m.locked||!rcxRefMe(m))?'':'<div class="rcx-note">입력은 이 경기 감독관·기록심만 합니다. 문제가 있으면 감독관에게 알려 주세요</div>')
+  const ctrl=!can?'<div class="ctrl"><span>보기 전용'+(m.locked?' · 확정된 경기':'')+'</span>'+ofs+'</div>'+((m.locked||!rcxRefMe(m))?'':'<div class="rcx-note">입력은 이 경기 감독관·기록심(기록원)만 합니다. 문제가 있으면 감독관에게 알려 주세요</div>')
     :st==='mine'?'<div class="ctrl mine"><span>입력 중 · '+esc(MY.name||'')+(q?' · <b>미전송 '+q+'건</b>':'')+'</span>'+ofs+'</div>'
     :aux?'<div class="ctrl mine" style="background:#eef3fb;color:#1c2e55"><span>'+esc(MR.ctrlLabel(m))+' 입력 중 · <b>보조 입력</b> '+esc(MY.name||'')+'</span>'+ofs+'<button onclick="rcTake()" style="background:#8a919d">넘겨받기</button></div>'
  :st==='other'?'<div class="ctrl other"><span>'+esc(MR.ctrlLabel(m))+' 입력 중 — 보기 전용</span>'+ofs+'<button onclick="rcTake()">넘겨받기</button></div>'
     :'<div class="ctrl"><span>입력권이 비어 있습니다</span>'+ofs+'<button onclick="rcClaim(true)">입력 시작</button></div>';
-  let h='<div class="top"><span class="mr-pill" style="background:'+(STC[m.status]||'#8a919d')+'">'+esc(m.status||'예정')+'</span><b>'+esc(mTitle(m)||'경기')+'</b><span class="meta">'+esc([m.court,dateK(m.day),m.time].filter(Boolean).join(' · '))+'</span>'+(m.locked?'<span class="mr-pill" style="background:#0b6b3a">확정</span>':'')+(STAFF&&!m.locked&&(m.status!=='예정'||(m.events||[]).length||m.kit)?'<button class="hb" onclick="rcReset()" title="시험으로 입력한 기록을 모두 지우고 경기 전으로 (운영진)">🧹 초기화</button>':'')+'<button class="hb" onclick="rcHelp()">사용법</button><button class="x" onclick="rcClose()">✕ 닫기</button></div>'+ctrl;
+  let h='<div class="top"><span class="mr-pill" style="background:'+(STC[m.status]||'#8a919d')+'">'+esc(m.status||'예정')+'</span><b>'+esc(mTitle(m)||'경기')+'</b><span class="meta">'+esc([m.court,dateK(m.day),m.time].filter(Boolean).join(' · '))+'</span>'+(m.locked?'<span class="mr-pill" style="background:#0b6b3a">확정</span>':'')+(STAFF&&!m.locked&&(m.status!=='예정'||(m.events||[]).length||m.kit)?'<button class="hb" onclick="rcReset()" title="시험으로 입력한 기록을 모두 지우고 경기 전으로 (운영진)">🧹 초기화</button>':'')+'<button class="hb" onclick="rcHelp()">사용법</button><button class="x" onclick="rcClose()">✕ 닫기</button></div>'+ctrl+rcHeldHtml(m);
   // ① 시작 전: 경기복·풀 고르기
   if(mine&&m.status==='예정'&&!m.kit){ov.innerHTML=h+'<div class="body">'+rcTipHtml()+setupHtml(m,false)+'</div>';return}
   const [L,R]=sidesLR(m);const per=m.period||'';const curP=per==='하프타임'?'':per;const TO=MR.timeouts(m);
@@ -2045,7 +2048,20 @@ async function sendEvent(op){
   try{if(op.kind==='add')await MR.addEvent(DB,firebase,op.id,op.ev,opts);else if(op.kind==='void')await MR.voidEvent(DB,firebase,op.id,op.evId,opts);}
   catch(e){const c=String(e&&(e.code||e.message)||'');if(/unavailable|network|deadline|offline|Failed to fetch/i.test(c)){MR.qPush(op);say('연결이 끊겨 기기에 저장했습니다. 연결되면 자동 전송됩니다(미전송 '+MR.qCount(RC_ID)+'건)');rcRender()}else say('저장 실패: '+(/permission/i.test(c)?'권한이 없습니다(배정되지 않았거나 보안 규칙 v52 게시 전)':c))}
 }
-window.addEventListener('online',()=>{if(RC_ID)MR.flush(DB,firebase,Object.assign(whoAmI(),{screen:'match'}),()=>rcRender())});
+function rcFlush(why){if(!RC_ID||!MR.qCount(RC_ID))return;MR.flush(DB,firebase,Object.assign(whoAmI(),{screen:'match'}),r=>{rcRender();if(r&&r.fails&&r.fails.length)say('연결이 돌아왔지만 이 기기에 저장된 기록 '+r.fails.length+'건을 자동으로 넣지 않고 「보류」로 남겼습니다.\n'+(r.fails.some(f=>/다른 화면|입력 중/.test(f.err))?'그사이 다른 분이 입력권을 넘겨받았습니다. ':'')+'화면 위쪽 노란 칸에서 이미 입력된 득점과 겹치지 않는지 확인한 뒤 「보내기」 또는 「버리기」를 눌러 주세요.')})}
+window.addEventListener('online',()=>rcFlush('online'));
+setInterval(()=>{if(RC_ID&&MR.qCount(RC_ID)>MR.qHeld(RC_ID).length)rcFlush('retry')},15000);   /* 온라인 신호가 안 오는 망 — 15초마다 다시 보내 봄 */
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)rcFlush('show')});
+/* 보류 기록 칸 */
+function rcHeldHtml(m){const H=MR.qHeld(RC_ID);if(!H.length)return '';const ev=(m.events||[]).filter(e=>e&&!e.void&&e.type==='goal');
+  const rows=H.map(o=>{const e=o.ev||{};const t=e.t?new Date(e.t):null;const side=(m[e.side]||{}).name||'';const dup=MR.heldDup(o,m.events)?' <b style="color:#b91c1c">· 같은 팀·같은 선수 득점이 이미 있음(중복 의심 — 「버리기」)</b>':' <b style="color:#0b6e3b">· 새 득점으로 보임</b>';
+    const what=o.kind==='void'?'기록 취소':e.type==='goal'?'득점 '+esc(side)+(e.scorer&&e.scorer.name?' '+esc((e.scorer.no?e.scorer.no+'번 ':'')+e.scorer.name):''):e.type==='card'?'제재 '+esc(side):e.type==='timeout'?'작전타임 '+esc(side):esc(e.type||'');
+    return '<div style="padding:3px 0;border-top:1px dashed #e6c35a">'+(t?esc(String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')+':'+String(t.getSeconds()).padStart(2,'0'))+' 누름 · ':'')+what+(e.period?' · '+esc(e.period):'')+dup+'</div>'}).join('');
+  return '<div style="background:#fff7d6;border-bottom:2px solid #e6b422;padding:8px 14px;font-size:12.5px;line-height:1.5;color:#5a4300"><b>⚠ 이 기기에만 저장된 보류 기록 '+H.length+'건</b> — 연결이 끊긴 동안 눌렀고, 그사이 입력권이 다른 분에게 넘어가 자동으로 넣지 않았습니다. 종이 기록·지금 점수와 비교해 빠진 것만 보내 주세요.'+rows+'<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><button class="mr-btn" style="padding:6px 12px;font-size:12.5px" onclick="rcHeldSend()">보내기</button><button class="mr-btn ghost" style="padding:6px 12px;font-size:12.5px" onclick="rcHeldDrop()">버리기 (이미 입력됨)</button></div></div>'}
+async function rcHeldSend(){const H=MR.qHeld(RC_ID);if(!H.length)return;const m=RCM()||{};const ev=(m.events||[]).filter(e=>e&&!e.void&&e.type==='goal');const dup=H.filter(o=>MR.heldDup(o,m.events)).length;
+  if(!confirm('보류 기록 '+H.length+'건을 지금 경기에 넣습니다.'+(dup?'\n⚠ 이 중 '+dup+'건은 비슷한 시각에 같은 팀 득점이 이미 있습니다 — 같은 득점이면 「버리기」를 누르세요.':'')+'\n점수가 두 번 올라가지 않는지 확인하셨나요?'))return;
+  const r=await MR.qSendHeld(DB,firebase,Object.assign(whoAmI(),{screen:'match'}),H.map(o=>o.qid));rcRender();say('보류 기록 '+r.sent+'건을 넣었습니다'+(r.errs.length?' · 실패 '+r.errs.length+'건: '+r.errs[0]:''))}
+function rcHeldDrop(){const H=MR.qHeld(RC_ID);if(!H.length)return;if(!confirm('보류 기록 '+H.length+'건을 이 기기에서 지웁니다(경기에는 넣지 않음). 이미 다른 분이 같은 기록을 입력했을 때만 지워 주세요.'))return;MR.qDrop(H.map(o=>o.qid));rcRender()}
 async function evVoid(id){const m=RCM();const e=(m.events||[]).find(x=>x.id===id);if(!e)return;const wasOff=e.type==='card'&&e.target&&e.target.kind!=='coach'&&!!MR.sentOff(m,e.side)['k:'+(e.target.key||'')];const L=MR.evLine(e);if(!confirm('이 기록을 취소할까요?\n'+(m[e.side]||{}).name+' · '+(e.type==='timeout'?'작전타임':L.who)+(L.min?' · '+L.min:'')+'\n(기록은 지워지지 않고 취소 표시만 남습니다)'))return;await sendEvent({kind:'void',id:RC_ID,evId:id});if(m.brk&&m.brk.evId===id)await rcUpdate({brk:null});
   if(wasOff)await capClear(e.side,id)}
 // 퇴장 기록이 취소되어 그 팀에 퇴장 선수가 없어지면 주전 인원 상한(cap)도 풀어 줌 — 화면 자료가 늦게 와도 맞게 취소된 상태로 계산
