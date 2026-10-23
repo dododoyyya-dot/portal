@@ -428,6 +428,10 @@ a.tm-ct:hover{transform:translateY(-2px)}
 .tm-on .hero>.wrap{position:relative;z-index:1}
 .tm-on .tm-deco{display:block;position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
 .tm-deco svg,.tm-deco i{position:absolute;display:block}
+/* [2026-10-24] 햇님 = 운영진 경기 기록·운영 바로가기(티 안 나게, 로그인한 사람만 눌림 — 권한은 경기 기록 화면이 판단) */
+.tm-sun-go{position:absolute;top:17px;right:25px;width:68px;height:68px;border-radius:50%;z-index:6;-webkit-tap-highlight-color:transparent;outline:none}
+body:not(.tm-on) .tm-sun-go{display:none!important}
+@media(min-width:1024px){.tm-sun-go{top:12px;right:calc(2% + 72px);width:96px;height:96px}}
 .tm-d-sun{top:-34px;right:-26px;width:170px;height:170px;animation:tmSpin 40s linear infinite}
 .tm-d-cloud{opacity:.95}
 .tm-d-cloud.c1{top:18px;left:-20px;width:150px;animation:tmDrift 18s ease-in-out infinite}
@@ -487,7 +491,7 @@ a.tm-ct:hover{transform:translateY(-2px)}
   <svg class="tm-d-hill" viewBox="0 0 1200 160" preserveAspectRatio="none"><path d="M0 70 C180 20 360 50 520 80 S860 30 1200 60 V160 H0Z" fill="#9fe3c0"/><path d="M0 110 C220 70 420 100 640 110 S980 80 1200 98 V160 H0Z" fill="#7fd6aa"/></svg>
   <svg class="tm-d-flowers" viewBox="0 0 1200 60" preserveAspectRatio="xMidYMax slice"><g><g transform="translate(80 40)"><circle r="6" fill="#fff"/><circle r="2.6" fill="#ffd23f"/></g><g transform="translate(240 46)"><circle r="5" fill="#ffb3c1"/><circle r="2.2" fill="#fff"/></g><g transform="translate(470 38)"><circle r="6" fill="#fff"/><circle r="2.6" fill="#ffd23f"/></g><g transform="translate(700 48)"><circle r="5" fill="#c9b8ff"/><circle r="2.2" fill="#fff"/></g><g transform="translate(930 40)"><circle r="6" fill="#fff"/><circle r="2.6" fill="#ffd23f"/></g><g transform="translate(1110 46)"><circle r="5" fill="#ffb3c1"/><circle r="2.2" fill="#fff"/></g></g></svg>
   <svg class="tm-d-basket" viewBox="-40 0 80 120"><rect x="-3" y="0" width="6" height="110" rx="3" fill="#fff"/><ellipse cx="0" cy="62" rx="34" ry="8" fill="#d8e3ee"/><path d="M-34 62 v12 a34 8 0 0 0 68 0 v-12" fill="#ffd23f"/><ellipse cx="0" cy="4" rx="30" ry="6" fill="none" stroke="#ffd23f" stroke-width="5"/><g stroke="#e3ebf3" stroke-width="1.6"><path d="M-28 6 Q-20 34 -12 62"/><path d="M-14 8 Q-8 36 -4 62"/><path d="M0 9 V62"/><path d="M14 8 Q8 36 4 62"/><path d="M28 6 Q20 34 12 62"/></g></svg>
-</div><div class="wrap">
+</div><a id="tmSunGo" class="tm-sun-go" href="match.html?slot=DTxbzDpc1D0m1hiEi0lA" aria-label="경기 기록·운영" style="display:none"></a><div class="wrap">
   <div class="h-grid">
     <div>
       <!-- [대회 모드 2026-10-24] 축전 기간 경기용 메인 — body.tm-on 일 때만 보임(평소엔 숨김). 아래 기존 요소는 그대로 두고 CSS 로만 숨김 -->
@@ -1326,7 +1330,7 @@ try{firebase.firestore().collection('siteContent').doc('live').onSnapshot(functi
   /* ── 갱신·구독·부팅 ── */
   var recalc=function(){if(pend)return;pend=setTimeout(function(){pend=null;collect();renderCourts();renderHead();renderTicker()},60)};
   /* 로그인 상태 반영: 비로그인(tm-guest)이면 CTA 줄에 「회원가입」 버튼, 로그인(tm-member)이면 부제의 「(회원)」 숨김 · 구장 칸 링크·자막 가입 문구도 다시 */
-  var onUser=function(user,me){CUR.user=user||null;CUR.me=me||null;root.classList.toggle('tm-guest',!user);root.classList.toggle('tm-member',!!user);if(window.KFDF_CMT)cheerUI(user,me);recalc()};
+  var onUser=function(user,me){try{var sg=document.getElementById('tmSunGo');if(sg)sg.style.display=user?'block':'none'}catch(e){}CUR.user=user||null;CUR.me=me||null;root.classList.toggle('tm-guest',!user);root.classList.toggle('tm-member',!!user);if(window.KFDF_CMT)cheerUI(user,me);recalc()};
   var load=function(){
     try{var db=firebase.firestore();
       db.collection('liveMatches').where('day','==',D).onSnapshot(function(q){DAYM=take(q);loaded=true;recalc()},function(e){console.warn('tm day',e);loaded=true;recalc()});
