@@ -781,12 +781,20 @@ async function exportRosterCsv(id){
   }
   if(!rows.length){alert('내보낼 참가자가 없습니다.');return}
   const head=['연번','구분(팀명)','성명','생년월일','성별','연령','소속(학교·클럽)','연락처','주소','보호자 연락처','부문','명단제공 동의','비고','인솔자'];
-  const csv='\ufeff'+[head].concat(rows.map((r,i)=>[i+1,r.grp,r.name,r.birth,r.gender,r.st,r.org,r.phone,r.addr,r.gphone,r.part,r.consent,r.nonMember,r.leader]))
-    .map(r=>r.map(x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"').join(',')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=(s.title||'대회')+'_참가자명단_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  /* [2026-10-23] CSV 를 엑셀에서 열면 「손상」 안내가 뜨는 환경이 있어 진짜 엑셀(.xlsx)로 — ExcelJS 가 없으면 CSV 로 폴백 */
+  const data=rows.map((r,i)=>[i+1,r.grp,r.name,r.birth,r.gender,r.st,r.org,r.phone,r.addr,r.gphone,r.part,r.consent,r.nonMember,r.leader]);
+  const fname=String(s.title||'대회').replace(/[\\/:*?"<>|]+/g,' ').trim().slice(0,40)+'_참가자명단_'+new Date().toISOString().slice(0,10);
+  if(typeof ExcelJS!=='undefined'){
+    const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet('참가자 명단');
+    ws.addRow(head);data.forEach(r=>ws.addRow(r));
+    ws.columns.forEach((c,i)=>{c.width=[6,18,10,12,6,6,22,15,36,15,14,10,10,10][i]||12});
+    ws.getRow(1).font={bold:true};ws.getRow(1).alignment={horizontal:'center'};ws.views=[{state:'frozen',ySplit:1}];
+    ws.eachRow(row=>row.eachCell(c=>{c.border={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}}}));
+    const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.download=fname+'.xlsx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},5000);
+  }else{
+    const csv='\ufeff'+[head].concat(data).map(r=>r.map(x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=fname+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  }
   const noC=rows.filter(r=>r.consent==='X').length;
   if(noC)alert('명단 '+rows.length+'명을 내려받았습니다.\n\n"명단제공 동의" 열이 X인 '+noC+'명은 주최기관 제3자 제공 동의를 따로 받지 않은 참가자입니다.\n대회 운영·보험 가입 목적(신청 시 동의)으로만 사용해주세요.');
 }
@@ -2169,9 +2177,10 @@ function taParseSheet(ws){
   if(!hdrRow)return {rows:[],errors:['머리글 행을 찾지 못했습니다. 첫 줄에 「성명」(또는 이름·학생명) 칸이 있어야 합니다. 「① 빈 명단 양식 내려받기」로 양식을 받아 그 양식에 적어 주세요.']};
   const H=hdr.map(h=>String(h||'').replace(/\s+/g,''));
   const col=re=>{for(let i=0;i<H.length;i++)if(re.test(H[i]))return i;return -1};
-  const C={name:col(NAME_RE),no:col(/^배번|등번호|등번|^번호$|^no\.?$|^number$/i),birth:col(/생년월일|생일|출생|생년|birth/i),gender:col(/성별|gender|남녀/i),school:col(/학교|소속|팀명|클럽/),phone:col(/연락처|전화|휴대|핸드폰|phone/i),addr:col(/주소/),note:col(/비고|메모|특이/)};
+  const C={name:col(NAME_RE),no:col(/^(배번호?|등번호?|선수번호|유니폼번호|경기복번호|백넘버|번호|no\.?|number)(\(.*\))?$/i),birth:col(/생년월일|생일|출생|생년|birth/i),gender:col(/성별|gender|남녀/i),school:col(/학교|소속|팀명|클럽/),phone:col(/연락처|전화|휴대|핸드폰|phone/i),addr:col(/주소/),note:col(/비고|메모|특이/)};
   if(C.name<0)return {rows:[],errors:['성명 열이 없습니다.']};
   const rows=[],errors=[];
+  if(C.no<0)errors.push('배번 열을 찾지 못했습니다 (머리글: '+H.filter(Boolean).join(' · ')+'). 배번 없이 담기니 오더지에서 배번을 적어 주세요. 엑셀 머리글을 「배번」으로 하면 자동으로 들어갑니다.');   /* [2026-10-23] 배번만 비어 들어가던 것 — 올릴 때 바로 알림 */
   ws.eachRow((row,n)=>{if(n<=hdrRow)return;const v=row.values||[];const g=i=>i>=0?taCell(v[i]):'';
     const name=g(C.name);if(!name)return;
     const birthRaw=C.birth>=0?v[C.birth]:'';const birth=taDate(birthRaw instanceof Date?birthRaw:(typeof birthRaw==='object'&&birthRaw?taCell(birthRaw):birthRaw));
