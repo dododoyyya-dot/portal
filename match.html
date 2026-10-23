@@ -671,12 +671,26 @@ async function lkUnify(div,pid,auto){const T=lkTeams();const t=Object.values(T).
   if(!n)return 0;try{await b.commit();if(!auto)say('✓ 「'+name+'」으로 '+n+'자리를 맞췄습니다.');return n}catch(e){say('표기 통일 실패: '+(e.message||e));return 0}}
 async function lkUnifyAll(){const T=lkTeams();const M=Object.values(T).filter(t=>t.pid&&(t.names||[]).length>1);if(!M.length)return;if(!confirm(M.length+'팀의 이름을 가장 많이 쓰인 표기로 맞춥니다:\n'+M.map(t=>'· '+t.names.join(' / ')+' → '+t.names[0]).join('\n')+'\n\n진행할까요? (팀별로 고르려면 각 줄의 「표기 통일」)'))return;let n=0;for(const t of M)n+=await lkUnify(t.div,t.pid,true);say('✓ '+M.length+'팀 · '+n+'자리의 이름을 맞췄습니다.')}
 /* [2026-10-21] 매칭 점검 요약 — 부문별 연결·미연결·오더지 상태를 글로(복사해 사무국·회장님께) */
-function lkReport(){const T=lkTeams();const L=Object.values(T);const E=teamEntries();const used={};L.forEach(t=>{if(t.pid)used[t.pid]=1});const divs=[...new Set(L.map(t=>t.div))];
+let USCH=null;   /* 관리자: 회원 학교 색인 {정규화 학교명:[{name,type,uid}]} — 미신청 학교에 가입 회원이 있는지 */
+async function lkUserIdx(){if(USCH||!isAdminMe())return USCH;const M={};try{const q=await DB.collection('users').get();q.docs.forEach(d=>{const v=d.data()||{};if(v.deleted)return;[v.school,v.workSchool].forEach(sc=>{const k=lkNorm(sc);if(!k||k.length<2)return;(M[k]=M[k]||[]).push({name:v.name||'',type:v.accountType||'',uid:d.id,st:v.status||''})})})}catch(e){console.warn('users idx',e)}USCH=M;return M}
+async function lkReport(){const T=lkTeams();const L=Object.values(T);const E=teamEntries();const used={};L.forEach(t=>{if(t.pid)used[t.pid]=1});const divs=[...new Set(L.map(t=>t.div))];
+  const UI=await lkUserIdx();
   const out=['['+(SLOT.title||'')+'] 대진 연결 점검 '+new Date().toLocaleString('ko-KR')];
   divs.forEach(dv=>{const TL=L.filter(t=>t.div===dv);const ok=TL.filter(t=>t.pid),un=TL.filter(t=>!t.pid);out.push('');out.push('■ '+dv+' — 대진표 '+TL.length+'팀 · 연결 '+ok.length+' · 미연결 '+un.length);
     un.forEach(t=>{const C=lkCands(t,true);out.push('  ✗ 미연결: '+t.name+' — '+lkWhy(t,C)+(C.exact.length||C.near.length?' (후보: '+C.exact.concat(C.near).map(c=>c.name).join(', ')+')':''))});
     ok.forEach(t=>{const o=orderOf(t.pid);const c=E.find(x=>entryKey(x)===t.pid);const bad=!o||o.status==='작성중';if(bad||(t.names||[]).length>1)out.push('  '+(bad?'△':'·')+' '+t.name+((t.names||[]).length>1?' [표기 '+t.names.join('/')+']':'')+' ← '+(c?c.name:'신청 없음')+' · 오더지 '+(o?o.status||'작성중':'미작성'))})});
   const orphan=E.filter(c=>!used[entryKey(c)]);if(orphan.length){out.push('');out.push('■ 대진표에 없는 참가 신청 '+orphan.length+'팀: '+orphan.map(c=>(c.name||'')+'['+((c.prefs||[])[0]||'')+']').join(', '))}
+  /* [2026-10-23] 오더지 미작성·미연결 학교 분류 — 어디서 막혔는지 */
+  const prob=L.filter(t=>{const o=t.pid?orderOf(t.pid):null;return !t.pid||!o||o.status==='작성중'});
+  if(prob.length){out.push('');out.push('■ 오더지 미제출 학교 분류 '+prob.length+'팀 (원인별)');
+    const members=t=>{if(!UI)return '';const keys=[t.school,t.name].map(lkNorm).filter(Boolean);const hit=[];Object.keys(UI).forEach(k=>{if(keys.some(x=>k===x||(x.length>=3&&(k.indexOf(x)>=0||x.indexOf(k)>=0))))UI[k].forEach(u=>{if(!hit.some(h=>h.uid===u.uid))hit.push(u)})});return hit.length?'가입 회원 '+hit.length+'명: '+hit.slice(0,4).map(u=>u.name+'('+({teacher:'교원',general:'일반',instructor:'지도자',student:'학생'}[u.type]||u.type||'')+(u.st==='approved'?'':'·'+(u.st||'대기'))+')').join(', ')+(hit.length>4?' 외':''):'가입 회원 없음'};
+    prob.forEach(t=>{const c=t.pid?E.find(x=>entryKey(x)===t.pid):null;const o=t.pid?orderOf(t.pid):null;const cand=t.pid?[]:lkCands(t,true).exact.concat(lkCands(t,true).near);
+      let why,who;
+      if(c){why=o?'③ 신청·연결됨, 오더지 작성 중(미제출)':'③ 신청·연결됨, 오더지 미작성';who='대표자 '+(c.leader||c.name||'')+(c.leaderPhone?' '+c.leaderPhone:'')+(c.uid?'':' (계정 없음)')}
+      else if(cand.length){why='② 신청은 있으나 대진표와 연결 안 됨 — 「연결」 필요';who='후보: '+cand.map(x=>(x.name||'')+'/'+(x.leader||'')).join(', ')}
+      else{why='① 참가 신청 자체가 없음';who=members(t)}
+      out.push('  '+t.div+' · '+t.name+' — '+why+(who?' · '+who:''))});
+    out.push('  ①은 학교가 신청 안 한 것(회원 있으면 신청 독촉, 없으면 가입부터) · ②는 오더지 탭에서 연결 · ③은 선생님께 오더지 제출 독촉 (운영진이 「오더지 직접 입력」도 가능)')}
   const txt=out.join('\n');
   modal('lkRepModal','<b style="font-size:16px">📋 대진 연결 점검 요약</b><div class="mr-note" style="margin:4px 0 8px">✗ 미연결 · △ 오더지 미제출 · [표기] 이름 두 가지. 아래 글을 복사해 보내 주세요.</div><textarea class="mr-in" id="lkRepTxt" style="width:100%;min-height:50vh;font-size:12.5px;line-height:1.5" readonly onclick="this.select()">'+esc(txt)+'</textarea><div class="mr-row" style="justify-content:flex-end;margin-top:10px"><button class="mr-btn g" onclick="lkRepCopy()">📋 복사</button><button class="mr-btn s" onclick="document.getElementById(\'lkRepModal\').remove()">닫기</button></div>')}
 function lkRepCopy(){const t=document.getElementById('lkRepTxt');if(!t)return;t.select();try{navigator.clipboard.writeText(t.value).then(()=>say('복사했습니다'))}catch(e){document.execCommand('copy');say('복사했습니다')}}
