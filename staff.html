@@ -2084,14 +2084,15 @@ function confirmPanelHtml(dd,dayApps,canDecideNow,viewerManage){
 // ══════════════ [임무배정] 버튼형 선택 모달 ══════════════
 // 기존에는 prompt()로 임무·수당을 두 번 직접 타이핑해야 했습니다.
 // 이제 공고에 등록된 임무를 버튼으로 눌러 고르고, 수당은 공고 기준값이 자동 채워집니다.
+/* [2026-10-23] 임무 이름 표기 차이를 흡수 — 「부심 (선심)」=「부심」=「선심」, 「기록원」=「기록심」, 「점수원」=「점수심」, 「심판위원장」=「위원장」, 띄어쓰기·괄호 무시. 정확히 같은 것 → 서로 포함 → 기본표 순 */
+function _dutyKey(x){x=String(x||'').replace(/\([^)]*\)/g,'').replace(/[\s·,/]/g,'');const M={기록원:'기록심',점수원:'점수심',선심:'부심',부심선심:'부심',심판위원장:'위원장',심판장:'위원장',심판총괄:'위원장',주심판:'주심',스코어:'점수심',기록:'기록심'};return M[x]||x}
+function _payPick(items,duty){const k=_dutyKey(duty);if(!k)return null;const L=(items||[]).map(i2=>({i:i2,k:_dutyKey(i2.role||i2[0])})).filter(x=>x.k);
+  return (L.find(x=>x.k===k)||L.find(x=>k.indexOf(x.k)>=0||x.k.indexOf(k)>=0)||{}).i||null}
 function _payFor(dd,duty){
-  if(duty==='기록원'&&!(dd&&dd.allowance&&(dd.allowance.items||[]).some(i2=>i2.role==='기록원')))duty='기록심';   /* [2026-10-20] 기록원 → 기록심 */
-  if(dd&&dd.allowance&&dd.allowance.mode==='직접입력'){
-    const f=(dd.allowance.items||[]).find(i2=>duty.indexOf(i2.role)>=0||i2.role.indexOf(duty)>=0);
-    if(f)return f.amount||'';
-  }
-  const g=DEFAULT_PAY.find(x=>duty.indexOf(x[0])>=0||x[0].indexOf(duty)>=0);
-  return g?g[1]:'';
+  duty=String(duty||'').trim();if(!duty)return '';
+  if(dd&&dd.allowance&&dd.allowance.mode==='직접입력'){const f=_payPick(dd.allowance.items||[],duty);if(f&&f.amount)return f.amount}
+  const g=_payPick(DEFAULT_PAY.map(x=>({role:x[0],amount:x[1]})),duty);
+  return g?g.amount:'';
 }
 function openDutyPicker(appId,date){
   const app=Object.values(APPS).flat().find(a=>a.id===appId);if(!app)return;
@@ -2464,7 +2465,7 @@ function exportPayExcel(postId){
         '연락처':a.phone||'',
         '자격증':topLic(a.lic||''),
         '배정임무':asg.duty||'',
-        '수당':asg.pay||'',
+        '수당':asg.pay||_payFor(dd,asg.duty)||'',
         '동의서':a.agree&&a.agree.signature?'서명완료':a.agree&&a.agree.privacy?'체크완료':'미완',
         '확정일시':asg.assignedAt?String(asg.assignedAt).slice(0,10):''
       });
@@ -2582,7 +2583,7 @@ async function exportPayReport(postId){
       row.getCell(4).value=a.name||'';
       row.getCell(5).value=asg.duty||(((a.prefs||{})[dd.date]||[]).join(', '))||'';
       row.getCell(6).value=1;
-      const base=_payNum(asg.pay);
+      let base=_payNum(asg.pay);if(base==='')base=_payNum(_payFor(dd,asg.duty));   /* [2026-10-23] 확정 때 금액이 안 들어갔으면 임무 기준 수당표로 */
       if(base!=='')row.getCell(7).value=base;
       row.getCell(10).value={formula:'SUM(G'+rIdx+':I'+rIdx+')'};
       const _fb=_bankMap[a.uid]||{};
@@ -2599,7 +2600,7 @@ async function exportPayReport(postId){
           const b64=sig.split(',')[1];
           const ext=sig.indexOf('image/jpeg')>=0?'jpeg':'png';
           const imgId=wb.addImage({base64:b64,extension:ext});
-          ws.addImage(imgId,{tl:{col:14.12,row:rIdx-1+0.12},ext:{width:82,height:28},editAs:'oneCell'});
+          ws.addImage(imgId,{tl:{col:14.08,row:rIdx-1+0.1},br:{col:14.92,row:rIdx-1+0.9},editAs:'twoCell'});   /* [2026-10-23] 셀에 맞춰 이동·크기 조정 — 행을 끼워 넣거나 옮겨도 서명이 그 줄을 따라감 */
         }catch(e){}
       }else if(sig&&sig.indexOf('http')===0){
         row.getCell(15).value='서명등록됨(링크)'; // [서명연동] 이미지 변환이 막힌 경우에도 서명 사실은 표기
