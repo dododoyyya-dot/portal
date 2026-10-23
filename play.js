@@ -61,7 +61,7 @@ async function shareCard(o,name){const cv=await makeCard(o);const url=cv.toDataU
 let ME=null,MYD=null,BD=null,BST=null,BLOAD=false,TAB='dex';
 const TABS=[['dex','배지 도감','medal','모으기'],['hall','명예의 전당','trophy','대회 기록'],['game','원반 골프','target','미니게임'],['quiz','룰 퀴즈','book','10문제'],['type','포지션 테스트','users','성향'],['luck','오늘의 운세','sparkle','하루 1번'],['rank','랭킹·예측','trend','함께 겨루기']];
 function tabsHtml(){document.getElementById('pgTabs').innerHTML=TABS.map(t=>'<button class="'+(TAB===t[0]?'on':'')+'" onclick="go(\''+t[0]+'\')"><i>'+I(t[2],{size:22,color:TAB===t[0]?'#ffd23f':'#13306b'})+'</i>'+t[1]+'<small>'+t[3]+'</small></button>').join('')}
-function go(t){if(!TABS.some(x=>x[0]===t))t='dex';if(TAB==='game'&&t!=='game')gmStop();TAB=t;try{history.replaceState(null,'','#'+t)}catch(e){}tabsHtml();render()}
+function go(t){if(!TABS.some(x=>x[0]===t))t='dex';if(TAB==='game'&&t!=='game')gmStop();TAB=t;try{history.replaceState(null,'','#'+t)}catch(e){}tabsHtml();render();try{const el=document.querySelector('.pg-tabs button.on');if(el&&el.scrollIntoView)el.scrollIntoView({block:'nearest',inline:'center'})}catch(e){}}
 function render(){const el=document.getElementById('pgMain');if(!el)return;const fn=window[{dex:'dexRender',hall:'hallRender',game:'gameRender',quiz:'quizRender',type:'typeRender',luck:'luckRender',rank:'rankRender'}[TAB]||'dexRender'];
   if(typeof fn!=='function'){clearTimeout(render._t);render._t=setTimeout(render,120);return}   // play_fun.js 가 아직 안 올라왔으면 잠시 뒤
   if(TAB==='game'&&GM&&document.getElementById('gmCv'))return;   // 게임 중 로그인 상태 갱신으로 판이 다시 그려지지 않게
