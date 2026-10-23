@@ -406,7 +406,9 @@ body:has(#rfModal),body:has(#mfModal),body:has(#odModal){overflow:hidden}
 .bd-day{border:1.5px solid #dfe5ee;background:#fff;border-radius:999px;padding:6px 13px;font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit}.bd-day.on{background:#16181d;color:#fff;border-color:#16181d}
 .bd-tray{background:#f6f8fb;border:2px dashed #c3d4ed;border-radius:16px;padding:10px;min-height:76px;display:flex;gap:8px;overflow-x:auto;align-items:stretch}
 .bd-tray.over,.bd-cell.over{background:#eaf3ff;border-color:#1F4E9C}
-.bd-wrap{overflow:auto;margin-top:10px;border:1.5px solid #e2e7f0;border-radius:16px;background:#fff;max-height:72vh}
+.bd-wrap{overflow:auto;margin-top:10px;border:1.5px solid #e2e7f0;border-radius:16px;background:#fff;max-height:72vh;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;cursor:grab}
+.bd-wrap.panning{cursor:grabbing;user-select:none}.bd-wrap.panning *{cursor:grabbing!important}
+.bd-wrap.edit .bd-card{touch-action:none;cursor:grab}   /* [2026-10-24] 시간표 편집 중에만 카드 끌어 옮기기 — 평소엔 손가락·마우스로 끌어 화면 밀기 */
 .bd-grid{border-collapse:separate;border-spacing:0;min-width:100%}
 .bd-grid th{position:sticky;top:0;z-index:2;background:#16181d;color:#fff;font-size:12.5px;padding:8px 6px;min-width:150px}
 .bd-grid th.tm{left:0;z-index:3;min-width:62px;width:62px}
@@ -414,7 +416,7 @@ body:has(#rfModal),body:has(#mfModal),body:has(#odModal){overflow:hidden}
 .bd-cell{border:1px solid #eef1f5;border-width:0 0 1px 1px;padding:5px;height:74px;vertical-align:top;transition:background .12s}
 .bd-cell .emp{height:100%;border:1.5px dashed transparent;border-radius:11px;display:flex;align-items:center;justify-content:center;color:#c3c9d4;font-size:18px}
 .bd-cell:hover .emp{border-color:#dfe5ee}
-.bd-card{position:relative;background:#fff;border:1.5px solid #dfe5ee;border-left:5px solid #153A77;border-radius:11px;padding:6px 8px;font-size:12px;line-height:1.3;cursor:grab;user-select:none;touch-action:none;min-width:140px;box-shadow:0 2px 6px rgba(17,17,20,.05)}
+.bd-card{position:relative;background:#fff;border:1.5px solid #dfe5ee;border-left:5px solid #153A77;border-radius:11px;padding:6px 8px;font-size:12px;line-height:1.3;cursor:pointer;user-select:none;touch-action:pan-x pan-y;min-width:140px;box-shadow:0 2px 6px rgba(17,17,20,.05)}
 .bd-card:hover{box-shadow:0 6px 16px rgba(17,17,20,.12)}
 .bd-card .dv{font-size:10.5px;color:#6b7280;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bd-card .vs{font-weight:900;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bd-card .vs .sc{color:#C41E2F;font-variant-numeric:tabular-nums}
@@ -1093,13 +1095,23 @@ function bdNudge(dir){if(!BD_SEL||!bdEditable())return;const m=MATCHES.find(x=>x
     if(ti<0||ti>=times.length){qkToastLite(ti<0?'맨 위 시간입니다':'맨 아래 시간입니다');return}if(ci<0||ci>=courts.length){qkToastLite(ci<0?'맨 왼쪽 구장입니다':'맨 오른쪽 구장입니다');return}}
   bdDrop(BD_SEL,{dataset:{drop:'cell',time:times[ti],court:courts[ci]}})}
 document.addEventListener('keydown',e=>{if(TAB!=='board'||!BD_SEL||!bdEditable())return;if(/input|textarea|select/i.test((e.target||{}).tagName||''))return;const k={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right'}[e.key];if(k){e.preventDefault();bdNudge(k)}else if(e.key==='Escape'){BD_SEL=null;render()}});
-function bdBind(){ if(BD_SEL){const se=document.querySelector('.bd-card.sel');if(se)try{se.scrollIntoView({block:'nearest',inline:'nearest'})}catch(e){}}
+let BD_PANNED=0;   /* 방금 끌어 밀었으면 그 뒤 클릭(칸 누르기·카드 누르기)은 무시 */
+function bdPanBind(){const w=document.querySelector('.bd-wrap');if(!w||w.dataset.pan)return;w.dataset.pan='1';
+  w.addEventListener('pointerdown',ev=>{if(ev.pointerType!=='mouse'||ev.button!==0)return;if(ev.target.closest('button,input,select,textarea,a,.bd-ed'))return;if(bdEditable()&&ev.target.closest('.bd-card'))return;   /* 편집 중 카드는 옮기기 */
+    const sx=ev.clientX,sy=ev.clientY,sl=w.scrollLeft,st=w.scrollTop;let on=false;
+    const mv=e=>{const dx=e.clientX-sx,dy=e.clientY-sy;if(!on&&Math.hypot(dx,dy)<6)return;if(!on){on=true;w.classList.add('panning')}e.preventDefault();w.scrollLeft=sl-dx;w.scrollTop=st-dy};
+    const up=()=>{window.removeEventListener('pointermove',mv);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);if(on){w.classList.remove('panning');BD_PANNED=Date.now()}};
+    window.addEventListener('pointermove',mv,{passive:false});window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up)});
+  w.addEventListener('click',e=>{if(Date.now()-BD_PANNED<250){e.stopPropagation();e.preventDefault()}},true)}
+function bdBind(){ bdPanBind();{const w=document.querySelector('.bd-wrap');if(w)w.classList.toggle('edit',!!bdEditable())}
+  if(BD_SEL){const se=document.querySelector('.bd-card.sel');if(se)try{se.scrollIntoView({block:'nearest',inline:'nearest'})}catch(e){}}
   document.querySelectorAll('.bd-card').forEach(el=>{
-    el.addEventListener('pointerdown',ev=>{if(ev.button!==0&&ev.pointerType==='mouse')return;if(ev.target.closest('.bd-ed'))return;const id=el.dataset.mid;const sx=ev.clientX,sy=ev.clientY;let moved=false,ghost=null,over=null;
-      const mv=e=>{if(!bdEditable())return;if(!moved&&Math.hypot(e.clientX-sx,e.clientY-sy)<8)return;if(!moved){moved=true;BD_DRAG=id;ghost=el.cloneNode(true);ghost.classList.add('bd-ghost');ghost.style.width=el.offsetWidth+'px';document.body.appendChild(ghost);el.style.opacity='.35'}
+    el.addEventListener('pointerdown',ev=>{if(ev.button!==0&&ev.pointerType==='mouse')return;if(ev.target.closest('.bd-ed'))return;const id=el.dataset.mid;const sx=ev.clientX,sy=ev.clientY;let moved=false,ghost=null,over=null,far=false;
+      const mv=e=>{if(!far&&Math.hypot(e.clientX-sx,e.clientY-sy)>=8)far=true;if(!bdEditable())return;if(!moved&&Math.hypot(e.clientX-sx,e.clientY-sy)<8)return;if(!moved){moved=true;BD_DRAG=id;ghost=el.cloneNode(true);ghost.classList.add('bd-ghost');ghost.style.width=el.offsetWidth+'px';document.body.appendChild(ghost);el.style.opacity='.35'}
         e.preventDefault();ghost.style.left=e.clientX+'px';ghost.style.top=e.clientY+'px';const t=document.elementFromPoint(e.clientX,e.clientY);const d=t&&t.closest('[data-drop]');if(over&&over!==d)over.classList.remove('over');if(d){d.classList.add('over');over=d}
         const wrap=document.querySelector('.bd-wrap');if(wrap){const r=wrap.getBoundingClientRect();if(e.clientY>r.bottom-40)wrap.scrollTop+=12;else if(e.clientY<r.top+40&&e.clientY>r.top)wrap.scrollTop-=12}};
       const up=e=>{window.removeEventListener('pointermove',mv);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);
+        if(!moved&&(e.type==='pointercancel'||far||Date.now()-BD_PANNED<250))return;   /* [2026-10-24] 손가락·마우스로 화면을 민 것 — 카드 누름으로 치지 않음 */
         if(moved){if(ghost)ghost.remove();el.style.opacity='';if(over)over.classList.remove('over');const t=document.elementFromPoint(e.clientX,e.clientY);const d=t&&t.closest('[data-drop]');BD_DRAG=null;if(d)bdDrop(id,d);else render();return}
         // 누름: 운영진은 선택 → 칸 누르기 / 같은 카드 다시 누르면 콘솔
         const _now=Date.now();const _dbl=BD_TAP&&BD_TAP.id===id&&_now-BD_TAP.t<450;BD_TAP={id:id,t:_now};
