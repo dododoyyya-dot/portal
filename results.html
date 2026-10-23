@@ -131,7 +131,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
 <script src="career.js?v=20261020a"></script>
-<script src="matchrec.js?v=20261023a"></script><script src="sigclean.js?v=20261021a"></script>
+<script src="matchrec.js?v=20261023b"></script><script src="sigclean.js?v=20261021a"></script>
 <script>
 // ══════════ 대회 결과 (공개) — eventReports(연맹 대회 종료 보고) + schoolClubEvents(학교스포츠클럽 결과 요약, admin 업로드 도구가 생성) ══════════
 //  이름 공개 범위 = siteContent/results.nameMode : 'masked'(기본, 홍*동) | 'full' | 'hidden'(팀·학교와 인원수만). 생년월일·학년은 어디에도 싣지 않습니다.
@@ -158,7 +158,7 @@ async function rsLoad(){
     if(b)b.docs.forEach(d=>{const x=d.data();if(x.source==='kfdf')return;ITEMS.push({id:'s_'+d.id,src:'school',title:x.competitionName||'',date:x.date||'',organizer:x.organizer||'',place:'',sport:x.sport||'',divisions:x.divisions||{},sido:x.sido||'',slotId:x.slotId||''})});
     // [경기 기록 2026-10-13] 종료 처리 전이라도 경기 기록(compStats)이 있는 대회는 「경기 기록」 항목으로 목록에 — 진행 중인 대회의 대진·결과·순위를 누구나 봅니다
     try{const c=await DB.collection('compStats').limit(200).get();c.docs.forEach(d=>{const x=d.data();if(!x.slotId)return;if(ITEMS.some(it=>it.slotId===x.slotId))return;
-      ITEMS.push({id:'slot_'+x.slotId,src:'live',title:x.title||'',date:x.date||'',organizer:'대한민국플라잉디스크연맹',place:'',sport:'',awards:[],stats:{},summary:'',slotId:x.slotId,live:x.stats||{},golfN:Object.keys(x.golf||{}).length})})}catch(e){}
+      ITEMS.push({id:'slot_'+x.slotId,src:'live',title:x.title||'',date:x.date||'',organizer:/학교스포츠클럽축전/.test(x.title||'')?'교육부':'대한민국플라잉디스크연맹',   /* [2026-10-23] 축전은 교육부 명의 */place:'',sport:'',awards:[],stats:{},summary:'',slotId:x.slotId,live:x.stats||{},golfN:Object.keys(x.golf||{}).length})})}catch(e){}
     ITEMS.sort((a2,b2)=>String(b2.date||'').localeCompare(String(a2.date||'')));
     rsRender();
     const id=new URLSearchParams(location.search).get('id');if(id)rsOpen(id);
@@ -261,12 +261,12 @@ function rsRecRender(){const el=document.getElementById('rsRec');if(!el)return;c
 async function rsOrders(){const MR=window.KFDF_MR;const out={};if(!(firebase.auth&&firebase.auth().currentUser)||!CUR||!CUR.slotId)return out;
   try{const q=await DB.collection('compOrders').where('slotId','==',CUR.slotId).get();q.docs.forEach(d=>{out[d.id]=d.data()})}catch(e){}return out}
 function rsOrderOf(O,pid){const MR=window.KFDF_MR;return (pid&&O[MR.orderId(CUR.slotId,pid)])||{}}
-async function rsTimelinePdf(id){const MR=window.KFDF_MR;const m=REC.matches.find(x=>x.id===id);if(!m)return;let O={};try{O=await rsOrders()}catch(e){}MR.printTimeline(m,rsOrderOf(O,(m.a||{}).pid),rsOrderOf(O,(m.b||{}).pid))}
+async function rsTimelinePdf(id){const MR=window.KFDF_MR;const m=REC.matches.find(x=>x.id===id);if(!m)return;let O={};try{O=await rsOrders()}catch(e){}rsOrg(MR);MR.printTimeline(m,rsOrderOf(O,(m.a||{}).pid),rsOrderOf(O,(m.b||{}).pid))}
 async function rsSheetPdf(id){const MR=window.KFDF_MR;const m=REC.matches.find(x=>x.id===id);if(!m)return;const O=await rsOrders();let signs={};
   if(firebase.auth&&firebase.auth().currentUser){try{const d=await DB.collection('compSigns').doc(id).get();signs=d.exists?d.data():{}}catch(e){}}
   const oa=rsOrderOf(O,(m.a||{}).pid),ob=rsOrderOf(O,(m.b||{}).pid);if(!signs.coachA&&oa.coach&&oa.coach.name)signs.coachA={name:oa.coach.name,img:oa.coach.sign};if(!signs.coachB&&ob.coach&&ob.coach.name)signs.coachB={name:ob.coach.name,img:ob.coach.sign};
   if(window.KFDF_SIG)signs=await window.KFDF_SIG.cleanSigns(signs);   /* [2026-10-21] 서명 배경 제거 */
-  MR.printSheet(m,oa,ob,signs)}
+  rsOrg(MR);MR.printSheet(m,oa,ob,signs)} function rsOrg(MR){try{MR.setOrg(MR.orgOf({title:(CUR&&CUR.title)||'',compKind:(CUR&&CUR.src==='school')?'schoolclub':''}))}catch(e){}}   /* [2026-10-23] 자료 명의 — 축전·학교스포츠클럽 대회는 「주관 교육부」 */
 async function rsMatchXlsx(id){const MR=window.KFDF_MR;const m=REC.matches.find(x=>x.id===id);if(!m)return;const O=await rsOrders();try{await MR.saveXlsxMatch(m,rsOrderOf(O,(m.a||{}).pid),rsOrderOf(O,(m.b||{}).pid))}catch(e){alert('엑셀 만들기 실패: '+(e.message||e))}}
 function rsCompPdf(){const MR=window.KFDF_MR;MR.printComp((CUR&&CUR.title)||'',MR.computeStats(REC.matches,{},(CUR&&CUR.lots)||{}),REC.matches)}
 async function rsCompXlsx(){const MR=window.KFDF_MR;try{await MR.saveXlsxComp((CUR&&CUR.title)||'',MR.computeStats(REC.matches,{},(CUR&&CUR.lots)||{}),REC.matches)}catch(e){alert('엑셀 만들기 실패: '+(e.message||e))}}
