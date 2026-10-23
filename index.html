@@ -491,7 +491,7 @@ body:not(.tm-on) .tm-sun-go{display:none!important}
   <svg class="tm-d-hill" viewBox="0 0 1200 160" preserveAspectRatio="none"><path d="M0 70 C180 20 360 50 520 80 S860 30 1200 60 V160 H0Z" fill="#9fe3c0"/><path d="M0 110 C220 70 420 100 640 110 S980 80 1200 98 V160 H0Z" fill="#7fd6aa"/></svg>
   <svg class="tm-d-flowers" viewBox="0 0 1200 60" preserveAspectRatio="xMidYMax slice"><g><g transform="translate(80 40)"><circle r="6" fill="#fff"/><circle r="2.6" fill="#ffd23f"/></g><g transform="translate(240 46)"><circle r="5" fill="#ffb3c1"/><circle r="2.2" fill="#fff"/></g><g transform="translate(470 38)"><circle r="6" fill="#fff"/><circle r="2.6" fill="#ffd23f"/></g><g transform="translate(700 48)"><circle r="5" fill="#c9b8ff"/><circle r="2.2" fill="#fff"/></g><g transform="translate(930 40)"><circle r="6" fill="#fff"/><circle r="2.6" fill="#ffd23f"/></g><g transform="translate(1110 46)"><circle r="5" fill="#ffb3c1"/><circle r="2.2" fill="#fff"/></g></g></svg>
   <svg class="tm-d-basket" viewBox="-40 0 80 120"><rect x="-3" y="0" width="6" height="110" rx="3" fill="#fff"/><ellipse cx="0" cy="62" rx="34" ry="8" fill="#d8e3ee"/><path d="M-34 62 v12 a34 8 0 0 0 68 0 v-12" fill="#ffd23f"/><ellipse cx="0" cy="4" rx="30" ry="6" fill="none" stroke="#ffd23f" stroke-width="5"/><g stroke="#e3ebf3" stroke-width="1.6"><path d="M-28 6 Q-20 34 -12 62"/><path d="M-14 8 Q-8 36 -4 62"/><path d="M0 9 V62"/><path d="M14 8 Q8 36 4 62"/><path d="M28 6 Q20 34 12 62"/></g></svg>
-</div><a id="tmSunGo" class="tm-sun-go" href="match.html?slot=DTxbzDpc1D0m1hiEi0lA" aria-label="경기 기록·운영" style="display:none"></a><div class="wrap">
+</div><a id="tmSunGo" class="tm-sun-go" href="match.html?slot=DTxbzDpc1D0m1hiEi0lA" aria-label="경기 기록·운영" style="display:none" tabindex="-1"></a><div class="wrap">
   <div class="h-grid">
     <div>
       <!-- [대회 모드 2026-10-24] 축전 기간 경기용 메인 — body.tm-on 일 때만 보임(평소엔 숨김). 아래 기존 요소는 그대로 두고 CSS 로만 숨김 -->
@@ -1330,7 +1330,11 @@ try{firebase.firestore().collection('siteContent').doc('live').onSnapshot(functi
   /* ── 갱신·구독·부팅 ── */
   var recalc=function(){if(pend)return;pend=setTimeout(function(){pend=null;collect();renderCourts();renderHead();renderTicker()},60)};
   /* 로그인 상태 반영: 비로그인(tm-guest)이면 CTA 줄에 「회원가입」 버튼, 로그인(tm-member)이면 부제의 「(회원)」 숨김 · 구장 칸 링크·자막 가입 문구도 다시 */
-  var onUser=function(user,me){try{var sg=document.getElementById('tmSunGo');if(sg)sg.style.display=user?'block':'none'}catch(e){}CUR.user=user||null;CUR.me=me||null;root.classList.toggle('tm-guest',!user);root.classList.toggle('tm-member',!!user);if(window.KFDF_CMT)cheerUI(user,me);recalc()};
+  /* [2026-10-24] 햇님 = 기록실 바로가기 — 축전 운영진에게만 눌림(다른 회원·비회원에겐 그냥 그림). 입력 권한은 기록실이 따로 판단 */
+window.__SUN=window.__SUN||{u:null,me:null,ref:[],vot:[],vl:0};
+window.tmSunUpd=function(){var S=window.__SUN,sg=document.getElementById('tmSunGo');if(!sg)return;var u=S.u,my=S.me||{};var roles=[my.role].concat(my.roles||[]);
+  var ok=!!u&&(my.owner===true||roles.indexOf('admin')>=0||roles.indexOf('sidoOfficer')>=0||my.liveScorer===true||S.ref.indexOf(u.uid)>=0||S.vot.indexOf(u.uid)>=0);sg.style.display=ok?'block':'none'};
+var onUser=function(user,me){try{var S=window.__SUN;S.u=user||null;S.me=me||null;window.tmSunUpd();if(user&&!S.vl){S.vl=1;firebase.firestore().collection('photoVoters').doc(TMC.slotId).get().then(function(d){S.vot=(d.exists&&(d.data()||{}).uids)||[];window.tmSunUpd()}).catch(function(){S.vl=0})}}catch(e){}CUR.user=user||null;CUR.me=me||null;root.classList.toggle('tm-guest',!user);root.classList.toggle('tm-member',!!user);if(window.KFDF_CMT)cheerUI(user,me);recalc()};
   var load=function(){
     try{var db=firebase.firestore();
       db.collection('liveMatches').where('day','==',D).onSnapshot(function(q){DAYM=take(q);loaded=true;recalc()},function(e){console.warn('tm day',e);loaded=true;recalc()});
@@ -1338,7 +1342,7 @@ try{firebase.firestore().collection('siteContent').doc('live').onSnapshot(functi
       try{firebase.auth().onAuthStateChanged(function(u){if(u&&!(CUR&&CUR.user&&CUR.user.uid===u.uid)){db.collection('users').doc(u.uid).get().then(function(d){onUser(u,d.exists?d.data():null)}).catch(function(){onUser(u,null)})}else if(!u&&CUR&&CUR.user)onUser(null,null)})}catch(e){}   /* 느린 망에서 KFDF.ready(6초)가 비로그인으로 끝나도 뒤늦게 로그인 반영 */
       /* [2026-10-24] 라이브 중계 타일 — 중계가 켜지면(siteContent/live.on) 「LIVE」 깜빡임 */
       db.collection('siteContent').doc('live').onSnapshot(function(d){var v=d.exists?(d.data()||{}):{};var on=!!(v.on&&(v.streams||[]).length);var t=$('tmLiveTag'),sb=$('tmLiveSub');if(t){t.textContent=on?'LIVE':'10.25';t.classList.toggle('on',on)}if(sb)sb.textContent=on?'지금 생중계 중 · 눌러서 보기':'본선 1개 구장 유튜브 생중계'},function(){});
-      db.collection('compStats').doc(TMC.slotId).onSnapshot(function(d){var x=d.exists?(d.data()||{}):{};KITS=x.kits||{};STATS=x.stats||null;recalc()},function(e){console.warn('tm stats',e)});
+      db.collection('compStats').doc(TMC.slotId).onSnapshot(function(d){var x=d.exists?(d.data()||{}):{};KITS=x.kits||{};STATS=x.stats||null;try{window.__SUN=window.__SUN||{u:null,me:null,ref:[],vot:[],vl:0};window.__SUN.ref=(x.refUids||[]).concat(x.evalUids||[]);window.tmSunUpd&&window.tmSunUpd()}catch(e){}recalc()},function(e){console.warn('tm stats',e)});
     }catch(e){console.warn('tm load',e)}
     if(window.KFDF_CMT){try{KFDF_CMT.listen(ROOM,onCheer,{limit:40})}catch(e){console.warn('tm cheer',e)}}
     phLoad();setInterval(phLoad,180000);   /* 사진은 3분마다 새로 받음(구독 대신 — 읽기 비용) */
