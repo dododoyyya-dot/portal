@@ -110,6 +110,19 @@
 .rs-members{display:none;padding:6px 12px 10px 86px;font-size:13px;color:#374151;line-height:1.9}
 .rs-team.open + .rs-members{display:block}
 .rs-name{display:inline-block;background:#f4f6fa;border-radius:8px;padding:2px 9px;margin:2px 4px 2px 0;font-weight:700}
+/* [회원 안내 2026-10-24] 축전 공고 비로그인 안내 카드 (접두어 rsg-) */
+.rsg-wrap{position:relative;min-height:320px;border-radius:16px;overflow:hidden;margin-top:14px}
+.rsg-prev{filter:blur(4px);opacity:.55;pointer-events:none;user-select:none;-webkit-user-select:none}
+.rsg-over{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:linear-gradient(180deg,rgba(246,248,251,.35),rgba(246,248,251,.85))}
+.rsg-card{background:#fff;border:1.5px solid #e2e7f0;border-radius:18px;padding:22px 18px 18px;max-width:420px;width:100%;text-align:center;box-shadow:0 16px 40px rgba(21,58,119,.18);word-break:keep-all}
+.rsg-card h3{font-size:18px;font-weight:900;margin:8px 0 6px;color:#153A77}
+.rsg-card p{font-size:13.5px;color:#374151;line-height:1.65;margin:0 0 14px}
+.rsg-card p b{color:#153A77}
+.rsg-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.rsg-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 20px;border-radius:12px;font-weight:900;font-size:14px;text-decoration:none;color:#fff;background:#C41E2F;white-space:nowrap}
+.rsg-btn.blue{background:#153A77}
+.rsg-card small{display:block;margin-top:12px;font-size:11.5px;color:#6b7280;line-height:1.6}
+.rsg-card small a{color:#153A77;font-weight:800}
 @media(max-width:640px){.rs-grid{grid-template-columns:1fr}.rs-members{padding-left:12px}.rs-detail{padding:16px 14px}}
 </style>
 <section style="padding:44px 0 70px"><div class="rs-wrap">
@@ -154,11 +167,11 @@ async function rsLoad(){
       DB.collection('schoolClubEvents').limit(300).get().catch(()=>null)
     ]);
     ITEMS=[];
-    if(a)a.docs.forEach(d=>{const x=d.data();if(!(x.awards&&x.awards.length)&&!(x.stats&&x.stats.teams))return;ITEMS.push({id:'r_'+d.id,src:'fed',title:x.title||'',date:x.date||'',endDate:x.endDate||'',organizer:'대한민국플라잉디스크연맹',place:x.place||'',sport:x.sport||'',awards:x.awards||[],stats:x.stats||{},summary:x.summary||'',slotId:x.refId||''})});
+    if(a)a.docs.forEach(d=>{const x=d.data();if(!(x.awards&&x.awards.length)&&!(x.stats&&x.stats.teams))return;ITEMS.push({id:'r_'+d.id,src:'fed',title:x.title||'',date:x.date||'',endDate:x.endDate||'',organizer:rsOrgOf(x.title),place:x.place||'',sport:x.sport||'',awards:x.awards||[],stats:x.stats||{},summary:x.summary||'',slotId:x.refId||''})});
     if(b)b.docs.forEach(d=>{const x=d.data();if(x.source==='kfdf')return;ITEMS.push({id:'s_'+d.id,src:'school',title:x.competitionName||'',date:x.date||'',organizer:x.organizer||'',place:'',sport:x.sport||'',divisions:x.divisions||{},sido:x.sido||'',slotId:x.slotId||''})});
     // [경기 기록 2026-10-13] 종료 처리 전이라도 경기 기록(compStats)이 있는 대회는 「경기 기록」 항목으로 목록에 — 진행 중인 대회의 대진·결과·순위를 누구나 봅니다
     try{const c=await DB.collection('compStats').limit(200).get();c.docs.forEach(d=>{const x=d.data();if(!x.slotId)return;if(ITEMS.some(it=>it.slotId===x.slotId))return;
-      ITEMS.push({id:'slot_'+x.slotId,src:'live',title:x.title||'',date:x.date||'',organizer:/학교스포츠클럽축전/.test(x.title||'')?'교육부':'대한민국플라잉디스크연맹',   /* [2026-10-23] 축전은 교육부 명의 */place:'',sport:'',awards:[],stats:{},summary:'',slotId:x.slotId,live:x.stats||{},golfN:Object.keys(x.golf||{}).length})})}catch(e){}
+      ITEMS.push({id:'slot_'+x.slotId,src:'live',title:x.title||'',date:x.date||'',organizer:rsOrgOf(x.title),   /* [2026-10-23] 축전은 교육부 명의 */place:'',sport:'',awards:[],stats:{},summary:'',slotId:x.slotId,live:x.stats||{},golfN:Object.keys(x.golf||{}).length})})}catch(e){}
     ITEMS.sort((a2,b2)=>String(b2.date||'').localeCompare(String(a2.date||'')));
     rsRender();
     const id=new URLSearchParams(location.search).get('id');if(id)rsOpen(id);
@@ -191,13 +204,15 @@ function rsRender(){
 }
 async function rsOpen(id){
   CUR=ITEMS.find(x=>x.id===id);
-  if(!CUR&&/^slot_/.test(id)){const sid=id.slice(5);CUR=ITEMS.find(x=>x.slotId===sid);if(!CUR){try{const c=await DB.collection('compStats').doc(sid).get();if(c.exists){const x=c.data();CUR={id:id,src:'live',title:x.title||'',date:x.date||'',organizer:'대한민국플라잉디스크연맹',place:'',awards:[],stats:{},summary:'',slotId:sid,live:x.stats||{},lots:x.lots||{}};ITEMS.push(CUR)}}catch(e){}}
-    if(!CUR){try{const s=await DB.collection('compSlots').doc(sid).get();if(s.exists){CUR={id:id,src:'live',title:s.data().title||'',date:s.data().date||'',organizer:'대한민국플라잉디스크연맹',place:s.data().place||'',awards:[],stats:{},summary:'',slotId:sid,live:{}};ITEMS.push(CUR)}}catch(e){}}}
+  if(!CUR&&/^slot_/.test(id)){const sid=id.slice(5);CUR=ITEMS.find(x=>x.slotId===sid);if(!CUR){try{const c=await DB.collection('compStats').doc(sid).get();if(c.exists){const x=c.data();CUR={id:id,src:'live',title:x.title||'',date:x.date||'',organizer:rsOrgOf(x.title),place:'',awards:[],stats:{},summary:'',slotId:sid,live:x.stats||{},lots:x.lots||{}};ITEMS.push(CUR)}}catch(e){}}
+    if(!CUR){try{const s=await DB.collection('compSlots').doc(sid).get();if(s.exists){CUR={id:id,src:'live',title:s.data().title||'',date:s.data().date||'',organizer:rsOrgOf(s.data().title),place:s.data().place||'',awards:[],stats:{},summary:'',slotId:sid,live:{}};ITEMS.push(CUR)}}catch(e){}}}
   if(!CUR)return;
   const d=document.getElementById('rsDetail');d.style.display='block';
   try{history.replaceState(null,'','results.html?id='+id)}catch(e){}
   // [개별 페이지] 상세를 열면 목록·필터는 감추고(닫으면 복귀)
   const l=document.getElementById('rsList');if(l)l.style.display='none';const t=document.querySelector('.rs-top');if(t)t.style.display='none';
+  // [회원 안내 2026-10-24] 축전 공고는 비로그인 때 기록지·타임라인·순위 대신 회원 안내 카드만(tourney.html 과 같은 문구) — 로그인(승인 무관)하면 그대로
+  if(CUR.slotId===RS_FEST_SLOT&&!(await rsAuthUser())){d.innerHTML='<div class="rs-detail"><a href="#" onclick="rsClose();return false" style="font-weight:800;color:#153A77;font-size:13px">← 대회 결과 목록</a><h3 style="font-size:22px;font-weight:900;margin:10px 0 4px;word-break:keep-all">'+esc(CUR.title||'')+'</h3><div style="font-size:13px;color:#6b7280">'+ico('calendar',{size:13,color:'#6b7280'})+' '+esc(fmtD(CUR.date))+(CUR.organizer?' · '+ico('shield',{size:13,color:'#6b7280'})+' '+rsOrgLabel(CUR)+' '+esc(CUR.organizer):'')+'</div>'+rsGuardHtml(id)+'</div>';d.scrollIntoView({behavior:'smooth',block:'start'});return}
   let body='';
   if(CUR.src==='live'){body='<div class="rs-stat" style="margin-top:8px"><span>경기 기록이 올라오는 대로 자동 갱신됩니다. 종료 처리 뒤에는 입상 기록과 함께 표시됩니다.</span></div>'}
   else if(CUR.src==='school'){
@@ -221,7 +236,7 @@ async function rsOpen(id){
   d.innerHTML='<div class="rs-detail">'
     +'<a href="#" onclick="rsClose();return false" style="font-weight:800;color:#153A77;font-size:13px">← 대회 결과 목록</a>'
     +'<h3 style="font-size:22px;font-weight:900;margin:10px 0 4px;word-break:keep-all">'+esc(CUR.title||'')+'</h3>'
-    +'<div style="font-size:13px;color:#6b7280">'+ico('calendar',{size:13,color:'#6b7280'})+' '+esc(fmtD(CUR.date))+(CUR.organizer?' · '+ico('shield',{size:13,color:'#6b7280'})+' 주최 '+esc(CUR.organizer):'')+(CUR.place?' · '+ico('pin',{size:13,color:'#6b7280'})+' '+esc(CUR.place):'')+(CUR.sport?' · '+ico('disc',{size:13,color:'#6b7280'})+' '+esc(CUR.sport):'')+'</div>'
+    +'<div style="font-size:13px;color:#6b7280">'+ico('calendar',{size:13,color:'#6b7280'})+' '+esc(fmtD(CUR.date))+(CUR.organizer?' · '+ico('shield',{size:13,color:'#6b7280'})+' '+rsOrgLabel(CUR)+' '+esc(CUR.organizer):'')+(CUR.place?' · '+ico('pin',{size:13,color:'#6b7280'})+' '+esc(CUR.place):'')+(CUR.sport?' · '+ico('disc',{size:13,color:'#6b7280'})+' '+esc(CUR.sport):'')+'</div>'
     +(CUR.src==='school'?'<div style="font-size:12px;color:#8a5a00;background:#fff8e6;border:1.5px solid #f1dfa6;border-radius:10px;padding:8px 12px;margin-top:10px;line-height:1.6">이 결과는 주최기관('+esc(CUR.organizer||'교육청 등')+')이 제공한 명단을 대한민국플라잉디스크연맹이 기록·관리한 것입니다. 본인의 기록은 회원가입 후 마이페이지 [나의 선수 경력 → 내 기록 찾기]로 가져올 수 있습니다.</div>':'')
     +body+(CUR.slotId?'<div id="rsRec" style="margin-top:18px"><div class="bempty">경기 기록 불러오는 중…</div></div>':'')+'</div>';
   if(CUR.slotId)rsRecLoad(CUR.slotId);
@@ -271,6 +286,16 @@ async function rsMatchXlsx(id){const MR=window.KFDF_MR;const m=REC.matches.find(
 function rsCompPdf(){const MR=window.KFDF_MR;MR.printComp((CUR&&CUR.title)||'',MR.computeStats(REC.matches,{},(CUR&&CUR.lots)||{}),REC.matches)}
 async function rsCompXlsx(){const MR=window.KFDF_MR;try{await MR.saveXlsxComp((CUR&&CUR.title)||'',MR.computeStats(REC.matches,{},(CUR&&CUR.lots)||{}),REC.matches)}catch(e){alert('엑셀 만들기 실패: '+(e.message||e))}}
 function rsClose(){document.getElementById('rsDetail').style.display='none';try{history.replaceState(null,'','results.html')}catch(e){}CUR=null;const l=document.getElementById('rsList');if(l)l.style.display='';const t=document.querySelector('.rs-top');if(t)t.style.display='';try{window.scrollTo(0,0)}catch(e){}}
+// ── [회원 안내 2026-10-24] 축전 공고(slot_DTxb…)는 비로그인이면 기록지·타임라인·순위 대신 회원 안내 카드만 — 회원 유입용. 로그인 판별은 이 페이지가 쓰는 firebase.auth() 그대로(첫 onAuthStateChanged 를 기다림) ──
+const RS_FEST_SLOT='DTxbzDpc1D0m1hiEi0lA';
+/* [2026-10-24] 명의 표기 — 축전은 「주관 교육부」(기록지 MR.orgOf 와 같은 표기 · 통화 [09:12] 주관 단체만 교육부), 그 밖은 「주최 연맹」 */
+function rsOrgOf(t){return /학교스포츠클럽축전/.test(String(t||''))?'교육부':'대한민국플라잉디스크연맹'}
+function rsOrgLabel(x){return (x&&x.src!=='school'&&(x.slotId===RS_FEST_SLOT||/학교스포츠클럽축전/.test(String(x.title||''))))?'주관':'주최'}
+let _rsAuthP=null;
+function rsAuthUser(){if(!_rsAuthP)_rsAuthP=new Promise(ok=>{try{if(!firebase.auth)return ok(null);const un=firebase.auth().onAuthStateChanged(u=>{try{un()}catch(e){}ok(u||null)},()=>ok(null))}catch(e){ok(null)}});return _rsAuthP}
+function rsGuardHtml(id){const nx=encodeURIComponent('results.html?id='+id);
+  const prev='<div class="rs-top" style="margin-top:0"><span class="rs-chip on">🏁 대진 · 결과</span><span class="rs-chip">📋 순위표</span><span class="rs-chip">⚡ 득점 · 어시스트</span></div>'+[['10:00','1구장'],['10:35','2구장'],['11:10','3구장'],['11:45','4구장'],['12:20','5구장']].map((x,i)=>'<div class="rs-team" style="cursor:default"><span class="rs-rank" style="color:#fff;background:#153A77">종료</span><b style="flex:1;font-size:14px">○○중학교 <span style="color:#C41E2F">'+(i+2)+' : '+(i+1)+'</span> △△중학교</b><span style="font-size:12px;color:#6b7280;font-weight:700">예선 · '+x[1]+' · '+x[0]+'</span></div>').join('');
+  return '<div class="rsg-wrap"><div class="rsg-prev" aria-hidden="true">'+prev+'</div><div class="rsg-over"><div class="rsg-card"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#153A77" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><circle cx="12" cy="16" r="1.3" fill="#153A77"/></svg><h3>회원만 볼 수 있어요</h3><p>회원 가입(무료, 바로 승인)하면 <b>전체 경기 · 지난 경기 · 순위 · 득점/어시스트 순위 · 경기 타임라인</b>을 실시간으로 볼 수 있어요.</p><div class="rsg-btns"><a class="rsg-btn" href="login.html?tab=signup&amp;next='+nx+'">회원가입</a><a class="rsg-btn blue" href="login.html?next='+nx+'">로그인</a></div><small>이미 회원이면 로그인만 하면 바로 보여요 · 지금 경기 점수와 최근 득점은 <a href="tourney.html">대회 현황</a>에서 누구나 볼 수 있어요</small></div></div></div>'}
 </script>
 <footer><div class="wrap">
   <div class="top">
@@ -290,6 +315,6 @@ function rsClose(){document.getElementById('rsDetail').style.display='none';try{
   </div>
 </div></footer>
 <script src="auth_ui.js?v=20261020a"></script>
-<script src="firstguide.js?v=20261020c"></script>
+<script src="firstguide.js?v=20261024a"></script>
 </body>
 </html>

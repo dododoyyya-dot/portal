@@ -77,6 +77,7 @@
 .sc-msg{display:flex;gap:8px;align-items:flex-start}.sc-msg .nm{font-weight:900;white-space:nowrap;color:#153A77;font-size:12.5px}.sc-msg .nm.op{color:#C41E2F}.sc-msg .tx{background:#fff;border:1px solid #e9edf3;border-radius:0 12px 12px 12px;padding:6px 10px;line-height:1.5;min-width:0;word-break:keep-all;overflow-wrap:break-word}.sc-msg .tm{font-size:10.5px;color:#8a919d;white-space:nowrap;align-self:flex-end}.sc-msg .del{border:none;background:none;color:#C41E2F;cursor:pointer;font-size:11px;font-weight:800}
 .sc-in{display:flex;gap:6px;padding:8px 10px;border-top:1px solid #eef1f5;background:#fff}.sc-in input{flex:1;min-width:0;padding:9px 11px;border:1.5px solid #d5dce8;border-radius:10px;font-size:13.5px;font-family:inherit}.sc-in button{border:none;background:#153A77;color:#fff;font-weight:900;border-radius:10px;padding:0 14px;cursor:pointer;font-family:inherit}
 .sc-note{padding:8px 12px;font-size:12px;color:#6b7280;border-top:1px solid #eef1f5;background:#fff;text-align:center}
+.lvc-why{display:none;padding:4px 12px 6px;font-size:11.5px;color:#C41E2F;font-weight:700;background:#fff;word-break:keep-all;overflow-wrap:break-word;line-height:1.45}
 /* 전체화면(채팅 포함) — 브라우저 전체화면 또는 대체(theater) */
 .lv-vwrap{position:relative}.lv-fsbtn{position:absolute;right:10px;bottom:10px;z-index:3;border:none;border-radius:10px;background:rgba(0,0,0,.6);color:#fff;font-weight:900;font-size:12.5px;padding:7px 12px;cursor:pointer;font-family:inherit}
 .lv-main.fs{position:fixed;inset:0;z-index:9998;background:#000;margin:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:0;overflow:hidden}
@@ -230,6 +231,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
 <script src="matchrec.js?v=20261023b"></script>
+<script src="comments.js?v=20261024b"></script>
 <script>
 // ══════════ 라이브 중계 (공개) ══════════
 //   설정: siteContent/live = {on, title, comp, streams:[{videoId,label}], chat('youtube'|'off'), featured(경기 ID), note}
@@ -276,19 +278,23 @@ function renderChat(){
     +'<iframe src="https://www.youtube.com/live_chat?v='+esc(s.videoId)+'&embed_domain='+esc(location.hostname)+'" title="라이브 채팅"></iframe><div class="sc-note">채팅이 비어 보이면 <a href="https://www.youtube.com/watch?v='+esc(s.videoId)+'" target="_blank" rel="noopener" style="font-weight:800;color:#C41E2F">유튜브에서 보기 ↗</a>'+(modes.indexOf('site')>=0?' 또는 「연맹 채팅」 탭':'')+'</div>'}
   else{const can=!!(ME&&MY&&MY.status==='approved');
     body='<div class="ch">💬 연맹 채팅 <span style="font-size:11.5px;color:#8a919d;font-weight:700">'+esc(streamLabel(s.videoId)||'홈페이지 회원')+'</span>'+tabs+'</div><div class="sc-list" id="scList"></div>'
-      +(can?'<div class="sc-in"><input id="scIn" maxlength="300" placeholder="응원 메시지를 남겨 주세요 (300자)" onkeydown="if(event.key===\'Enter\')chatSend()"><button onclick="chatSend()">보내기</button></div><div class="sc-note">실명(가림)으로 표시됩니다 · 비방·개인정보는 사무국이 삭제합니다</div>'
+      +(can?'<div class="sc-in"><input id="scIn" maxlength="300" placeholder="응원 메시지를 남겨 주세요 (300자)" onkeydown="if(event.key===\'Enter\')chatSend()" oninput="lvcWhy(\'\')"><button onclick="chatSend()">보내기</button></div><div class="lvc-why" id="lvcWhy"></div><div class="sc-note">'+(window.KFDF_CMT?KFDF_CMT.guideHtml({size:'11px'}):'실명(가림)으로 표시됩니다 · 비방·개인정보는 사무국이 삭제합니다')+'</div>'
         :'<div class="sc-note">'+(ME?'사무국 승인 후 참여할 수 있습니다.':'<a href="login.html" style="font-weight:800;color:#153A77">로그인</a>하면 채팅에 참여할 수 있습니다.')+'</div>')}
   c.innerHTML=body;c.dataset.tab=key;if(CHAT_TAB==='site'){chatListen(s.videoId);chatDraw()}
 }
-function chatName(m){const n=String(m.name||'');if(m.op)return n;return n.length>=3?n[0]+'○'+n.slice(2):(n.length===2?n[0]+'○':n)}
+function chatName(m){const n=String(m.name||'');if(m.op)return n;if(window.KFDF_CMT)return KFDF_CMT.mask(n);return n.length>=3?n[0]+'*'.repeat(n.length-2)+n[n.length-1]:(n.length===2?n[0]+'*':n)}   /* [2026-10-24] 홈·사진 댓글과 같은 김*수 표기 */
 function chatDraw(){const el=document.getElementById('scList');if(!el)return;const atBottom=el.scrollHeight-el.scrollTop-el.clientHeight<40;
   el.innerHTML=CHAT.length?CHAT.slice().reverse().map(m=>'<div class="sc-msg"><span class="nm'+(m.op?' op':'')+'">'+(m.op?'🎙 ':'')+esc(chatName(m))+'</span><span class="tx">'+esc(m.text||'')+'</span><span class="tm">'+esc(hm(m.at))+'</span>'+(CAN_OP?'<button class="del" onclick="chatDel(\''+m.id+'\')" title="삭제">✕</button>':'')+'</div>').join(''):'<div style="color:#8a919d;text-align:center;padding:20px 0;font-size:12.5px">첫 응원 메시지를 남겨 보세요!</div>';
   if(atBottom||!el.dataset.init){el.scrollTop=el.scrollHeight;el.dataset.init='1'}}
 function chatListen(room){room=room||curVid();if(!room)return;if(CHAT_UNSUB&&CHAT_ROOM===room)return;if(CHAT_UNSUB){CHAT_UNSUB();CHAT_UNSUB=null;CHAT=[]}CHAT_ROOM=room;
   CHAT_UNSUB=DB.collection('liveChat').doc(room).collection('msgs').orderBy('at','desc').limit(150).onSnapshot(sn=>{CHAT=sn.docs.map(d=>Object.assign({id:d.id},d.data())).filter(m=>!m.del);chatDraw()},e=>{console.warn('liveChat',e);const el=document.getElementById('scList');if(el)el.innerHTML='<div style="color:#8a919d;text-align:center;padding:20px 0;font-size:12.5px">채팅을 불러오지 못했습니다 (보안 규칙 v45 게시 전)</div>'})}
-async function chatSend(){const i=document.getElementById('scIn');if(!i||!ME)return;const t=i.value.trim();if(!t)return;if(t.length>300){alert('300자 이내로 적어 주세요');return}
+// [2026-10-24] 보내기 전에 공용 모듈(comments.js · KFDF_CMT.clean)로 욕설·비방·전화번호·링크를 거릅니다 — 막히면 입력칸 아래 안내(lvcWhy)만 보이고 보내지 않음, 통과하면 약한 말은 별표로 가려진 글을 보냄. 모듈이 없으면 예전처럼 길이만 검사.
+//   운영자(CAN_OP · 🎙 표시 공지)는 거르지 않고 예전처럼 길이(300자)만 검사 — 공지에 중계 링크·문의 전화번호·강조 기호를 넣을 수 있게. 일반 회원 채팅은 그대로 거름.
+function lvcWhy(msg){const el=document.getElementById('lvcWhy');if(!el){if(msg)alert(msg);return}el.textContent=msg||'';el.style.display=msg?'block':'none'}
+async function chatSend(){const i=document.getElementById('scIn');if(!i||!ME)return;const t=i.value.trim();if(!t)return;
+  let text=t;if(!CAN_OP&&window.KFDF_CMT&&KFDF_CMT.clean){const c=KFDF_CMT.clean(t);if(!c.ok){lvcWhy(c.why||'보낼 수 없는 내용입니다');i.focus();return}text=c.text}else if(t.length>300){alert('300자 이내로 적어 주세요');return}
   const room=curVid();if(!room){alert('중계가 켜져 있을 때만 채팅할 수 있습니다');return}
-  i.disabled=true;try{await DB.collection('liveChat').doc(room).collection('msgs').add({uid:ME.uid,name:(MY&&MY.name)||'',text:t,op:!!CAN_OP,room:room,at:firebase.firestore.FieldValue.serverTimestamp()});i.value=''}catch(e){alert('전송 실패: '+(/permission/i.test(String(e))?'권한이 없습니다 (승인 회원만 · 보안 규칙 v44)':(e.message||e)))}i.disabled=false;i.focus()}
+  lvcWhy('');i.disabled=true;try{await DB.collection('liveChat').doc(room).collection('msgs').add({uid:ME.uid,name:(MY&&MY.name)||'',text:text,op:!!CAN_OP,room:room,at:firebase.firestore.FieldValue.serverTimestamp()});i.value=''}catch(e){alert('전송 실패: '+(/permission/i.test(String(e))?'권한이 없습니다 (승인 회원만 · 보안 규칙 v44)':(e.message||e)))}i.disabled=false;i.focus()}
 async function chatDel(id){if(!CAN_OP||!CHAT_ROOM)return;try{await DB.collection('liveChat').doc(CHAT_ROOM).collection('msgs').doc(id).update({del:true,delBy:(MY&&MY.name)||''})}catch(e){alert('삭제 실패: '+(e.message||e))}}
 // 중계가 끝난 방의 채팅 정리 — 중계 시작부터 종료까지만 남깁니다 (운영자, 400건씩 삭제)
 async function chatPurge(room){let n=0;for(let k=0;k<20;k++){const q=await DB.collection('liveChat').doc(room).collection('msgs').limit(400).get();if(q.empty)break;const b=DB.batch();q.docs.forEach(d=>b.delete(d.ref));await b.commit();n+=q.size;if(q.size<400)break}return n}
@@ -302,7 +308,7 @@ function clockMs(m){const c=m.clock||{};return (+c.base||0)+(c.running&&c.starte
 function clockTxt(m){if(isRec(m))return KFDF_MR.clockTxt(m);const t=Math.floor(clockMs(m)/1000);return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0')}
 function clockHtml(m){const c=m.clock||{};if(!c.running&&!(+c.base))return '';return '<span class="lv-clock" data-mid="'+esc(m.id)+'">'+(c.running?'⏱ ':'⏸ ')+clockTxt(m)+'</span>'}
 setInterval(function(){document.querySelectorAll('.lv-clock[data-mid]').forEach(function(el){const m=MATCHES.find(x=>x.id===el.dataset.mid);if(m&&(m.clock||{}).running)el.textContent='⏱ '+clockTxt(m)})},1000);
-function evHtml(m,n){if(isRec(m)){const g=(m.events||[]).filter(e=>e&&!e.void&&e.type==='goal').slice(-(n||6));if(!g.length)return '';const pn=p=>p?((p.no?'#'+p.no+' ':'')+(p.name||'')):'';return '<div class="lv-ev">'+g.map(e=>'<span class="'+esc(e.side)+'">🥏 '+esc(((m[e.side]||{}).name)||'')+' '+esc(pn(e.scorer)||'득점')+(e.assist?' (도움 '+esc(pn(e.assist))+')':'')+(e.sec!=null?' · '+esc(KFDF_MR.evTime(e)):'')+'</span>').join('')+'</div>'}
+function evHtml(m,n){if(isRec(m)){const g=(m.events||[]).filter(e=>e&&!e.void&&e.type==='goal').slice(-(n||6));if(!g.length)return '';const pn=p=>p?((p.no?'#'+p.no+' ':'')+(window.KFDF_CMT?KFDF_CMT.mask(p.name||''):(p.name||''))):'';   /* [2026-10-24] 공개 화면 — 선수 이름 가림(김*수) */return '<div class="lv-ev">'+g.map(e=>'<span class="'+esc(e.side)+'">🥏 '+esc(((m[e.side]||{}).name)||'')+' '+esc(pn(e.scorer)||'득점')+(e.assist?' (도움 '+esc(pn(e.assist))+')':'')+(e.sec!=null?' · '+esc(KFDF_MR.evTime(e)):'')+'</span>').join('')+'</div>'}
   const ev=(m.events||[]).filter(e=>e&&!e.void&&(e.type==null||e.type==='goal')).slice(-(n||6));if(!ev.length)return '';return '<div class="lv-ev">'+ev.map(e=>'<span class="'+esc(e.side)+'">'+(e.d>0?'⚡ ':'↩ ')+esc(e.team||'')+' '+esc(e.score||'')+(e.clock?' · '+esc(e.clock):'')+'</span>').join('')+'</div>'}
 // ── 스코어 ──
 function scoreRow(m,side){const me=m[side]||{};const S=scoreOf(m);const my=S[side],ot=S[side==='a'?'b':'a'];const win=m.status==='종료'&&my>ot;return '<div class="row'+(win?' w':'')+'"><span class="n">'+(win?'🏆 ':'')+esc(me.name||'-')+'</span><span class="s">'+esc(my)+'</span></div>'}
@@ -320,8 +326,11 @@ function render(){
     +'<div class="mt">'+clockHtml(feat)+(feat.note?' '+esc(feat.note)+' · ':' ')+(feat.updatedAt?esc(hm(feat.updatedAt))+' 갱신':'')+'</div>'+evHtml(feat,6)}
   else now.style.display='none';
   const g=(id,cnt,arr)=>{document.getElementById(id).innerHTML=arr.map(card).join('');document.getElementById(cnt).textContent=arr.length?arr.length+'경기':''};
-  g('gridLive','cntLive',live);g('gridNext','cntNext',next.slice(0,12));
-  document.getElementById('secLive').style.display=live.length?'':'none';document.getElementById('secNext').style.display=next.length?'':'none';
+  g('gridLive','cntLive',live);g('gridNext','cntNext',ME?next.slice(0,12):[]);
+  document.getElementById('secLive').style.display=live.length?'':'none';document.getElementById('secNext').style.display=(ME&&next.length)?'':'none';
+ /* [2026-10-24] 회원 유입 — 비회원은 진행 중 경기·최근 득점만. 예정·종료 결과는 로그인 뒤(대회 현황과 같은 기준) */
+ (function(){var sd=document.getElementById('secDone'),gd=document.getElementById('lvGuard');if(!sd)return;if(!ME){sd.style.display='none';if(!gd){gd=document.createElement('div');gd.id='lvGuard';gd.className='lv-sec';gd.innerHTML='<div style="border:1px solid #e5e8ef;border-radius:14px;padding:18px;text-align:center;background:#fff;word-break:keep-all"><b style="font-size:16px;color:#153A77">예정 경기·종료 결과는 회원만 볼 수 있어요</b><div style="font-size:13.5px;color:#4b5563;margin:6px 0 12px;line-height:1.6">회원 가입(무료, 바로 승인)하면 전체 경기·지난 경기·순위·득점/어시스트 순위를 실시간으로 볼 수 있어요.</div><a href="login.html?tab=signup&next=live.html" style="display:inline-block;background:#C41E2F;color:#fff;font-weight:800;border-radius:10px;padding:10px 18px;text-decoration:none;margin:3px">회원가입</a><a href="login.html?next=live.html" style="display:inline-block;background:#153A77;color:#fff;font-weight:800;border-radius:10px;padding:10px 18px;text-decoration:none;margin:3px">로그인</a></div>';sd.parentNode.insertBefore(gd,sd)}gd.style.display='';return}sd.style.display='';if(gd)gd.style.display='none'})();
+
   // 종료 — 날짜 선택
   const sel=document.getElementById('doneDay');const days=[...new Set(doneAll.map(m=>m.day||'').filter(Boolean))].sort().reverse();
   const cur=sel.value||days[0]||'';sel.innerHTML='<option value="">전체</option>'+days.map(d=>'<option value="'+esc(d)+'"'+(d===cur?' selected':'')+'>'+esc(d)+'</option>').join('');if(!days.includes(sel.value))sel.value=cur;
@@ -349,7 +358,7 @@ function applySlot(){if(LIVE.slotId!==SLOT_ON){SLOT_ON=LIVE.slotId||'';if(SLOT_U
 DB.collection('siteContent').doc('live').onSnapshot(d=>{LIVE=d.exists?(d.data()||{}):{};applySlot();renderStream();render()},e=>console.warn('live cfg',e));
 DB.collection('liveMatches').orderBy('updatedAt','desc').limit(200).onSnapshot(s=>{ALLM=s.docs.map(d=>Object.assign({id:d.id},d.data()));applySlot();render()},e=>{console.warn('liveMatches',e);document.getElementById('lvNone').style.display='block';document.getElementById('lvNone').textContent='경기 정보를 불러오지 못했습니다 (보안 규칙 v43 게시 전이면 표시되지 않습니다).'});
 // ── 운영 콘솔 (사무국·시도임원·스코어 입력 권한자) ──
-AUTH.onAuthStateChanged(async u=>{ME=u;if(!u)return;try{const d=await DB.collection('users').doc(u.uid).get();MY=d.exists?(d.data()||{}):{};
+AUTH.onAuthStateChanged(async u=>{ME=u;try{render()}catch(e){}if(!u)return;try{const d=await DB.collection('users').doc(u.uid).get();MY=d.exists?(d.data()||{}):{};
   const roles=[MY.role].concat(MY.roles||[]);CAN_OP=MY.owner===true||roles.indexOf('admin')>=0||roles.indexOf('sidoOfficer')>=0||MY.liveScorer===true;
   if(CAN_OP){document.getElementById('opBar').style.display='block';if(/[?&]op=1/.test(location.search))opToggle()}
   const c=document.getElementById('lvChat');c.dataset.tab='';renderChat()}catch(e){}});
@@ -489,6 +498,6 @@ async function opEdit(id){const m=MATCHES.find(x=>x.id===id);if(!m)return;
 async function opDel(id){const m=MATCHES.find(x=>x.id===id);if(!m)return;if(!confirm('['+((m.a||{}).name||'')+' vs '+((m.b||{}).name||'')+'] 경기를 삭제할까요? (되돌릴 수 없습니다)'))return;try{await DB.collection('liveMatches').doc(id).delete();if(m.scSynced)DB.collection('scMatches').doc('live_'+id).delete().catch(function(){})}catch(e){alert('삭제 실패: '+(e.message||e))}}
 </script>
 <script src="auth_ui.js?v=20261020a"></script>
-<script src="firstguide.js?v=20261020c"></script>
+<script src="firstguide.js?v=20261024a"></script>
 </body>
 </html>

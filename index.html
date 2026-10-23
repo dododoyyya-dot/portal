@@ -21,8 +21,14 @@
 @media(max-width:1080px){#heroNotice{display:none!important}}
 @keyframes kfdfPulse{0%,100%{box-shadow:0 0 0 2px rgba(255,255,255,.25),0 6px 18px rgba(31,78,156,.55)}50%{box-shadow:0 0 0 5px rgba(31,78,156,.15),0 6px 22px rgba(31,78,156,.8)}}
 </style>
+<script>
+/* [대회 모드 2026-10-24] 축전 기간(한국 시간 from~to)에는 메인 히어로를 경기용 화면으로 바꿉니다 — ?tm=1 강제 켬 · ?tm=0 끔 · ?tmday=YYYY-MM-DD 로 날짜 시험. 켜지면 <body> 에 class tm-on */
+var TM={slotId:'DTxbzDpc1D0m1hiEi0lA',from:'2026-10-24',to:'2026-10-25',title:'제19회 전국학교스포츠클럽축전 플라잉디스크대회',place:'포항 양덕스포츠타운'};
+(function(){try{var q=new URLSearchParams(location.search);var kst=new Date(Date.now()+9*3600e3).toISOString().slice(0,10);var d=q.get('tmday')||'';window.TM_DAY=/^\d{4}-\d{2}-\d{2}$/.test(d)?d:kst;var f=q.get('tm');window.TM_ON=f==='1'?true:(f==='0'?false:(kst>=TM.from&&kst<=TM.to))}catch(e){window.TM_ON=false;window.TM_DAY=''}})();
+</script>
 </head>
 <body>
+<script>if(window.TM_ON)document.body.classList.add('tm-on')</script>
 <div class="util"><div class="wrap">
   <div><b>대한민국플라잉디스크연맹</b> · 대한체육회 인정단체</div>
   <div><a href="mailto:kfdf60@hanmail.net">kfdf60@hanmail.net</a> &nbsp;|&nbsp; 031-984-3248 &nbsp;|&nbsp; <a href="login.html" id="utilAuth" style="color:#fff;font-weight:700">로그인</a> · <a href="mypage.html" style="color:#fff;font-weight:700">마이페이지</a></div>
@@ -217,9 +223,262 @@
 }
 @media(max-width:480px){.qm-grid{grid-template-columns:1fr}.hero .slogan-en{font-size:30px}.hero h1{font-size:21px}}
 </style>
+<style id="tmCss">
+/* ══════════ [대회 모드 2026-10-24 · 2차 디자인] 중계 서비스(티빙·쿠팡플레이 스포츠) 느낌 — 어두운 바탕 한 가지, 강조색은 LIVE 빨강 하나, 아이콘은 같은 굵기 선 아이콘, 버튼은 한 가지 모양.
+   사진은 배경에 깔지 않고 「방금 올라온 사진」 무대(16:9)에 또렷하게. body.tm-on 일 때만 적용 (?tm=1 강제 켬 · ?tm=0 끔). 기존 히어로 요소는 숨기기만 ══════════ */
+#tmHero{display:none}
+.tm-on .hero{min-height:0;background:#07090e!important}
+.tm-on .hero .kb-layer,.tm-on .hero .kb-dots,.tm-on .hero .kb-cap{display:none!important}   /* 배경 슬라이드 끔 — 반투명 카드 아래 사진이 비쳐 얼룩덜룩하던 것. 사진은 무대에서 보여 줌 */
+.tm-on .hero::before,.tm-on .hero::after{display:none!important}
+.tm-on .hero .wrap{padding:14px 16px 22px;max-width:1240px}
+.tm-on .hero .h-grid{grid-template-columns:1fr;gap:0;align-items:start}
+.tm-on .hero .h-grid>div{min-width:0}
+.tm-on .hero .h-grid>div:first-child>.tag,.tm-on .hero .slogan-en,.tm-on .hero h1,.tm-on .hero .h-grid>div:first-child>p,.tm-on .hero .hcta,.tm-on .hero .kpis,.tm-on #dday,.tm-on #liveHero,.tm-on #courtTicker,.tm-on .hero .side{display:none!important}
+.tm-on #tmHero{
+  --tm-bg:#07090e;--tm-s1:#10131b;--tm-s2:#161a24;--tm-line:rgba(255,255,255,.08);--tm-line2:rgba(255,255,255,.14);
+  --tm-tx:#f4f6fa;--tm-mu:#9aa3b5;--tm-mu2:#6c7488;--tm-red:#ff3347;--tm-acc:#ffffff;
+  display:grid;grid-template-columns:minmax(0,1fr);gap:14px;color:var(--tm-tx);word-break:keep-all;overflow-wrap:break-word;min-width:0;
+  font-feature-settings:"tnum" 1;letter-spacing:-.01em}
+#tmHero .tm-col{display:flex;flex-direction:column;gap:14px;min-width:0}
+/* 섹션 제목 — 작은 영문 라벨 + 한글 */
+.tm-sh{display:flex;align-items:baseline;gap:8px;margin:2px 2px 0;min-width:0}
+.tm-sh b{font-size:15px;font-weight:800;color:var(--tm-tx);letter-spacing:-.02em}
+.tm-sh small{font-size:11.5px;color:var(--tm-mu2);font-weight:600}
+.tm-sh a{margin-left:auto;font-size:12px;color:var(--tm-mu);font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:2px;flex:none}
+.tm-sh a:hover{color:#fff}
+/* 머리 줄 */
+.tm-head{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;padding:2px 2px 12px;border-bottom:1px solid var(--tm-line);min-width:0}
+.tm-live{display:inline-flex;align-items:center;gap:6px;background:var(--tm-red);color:#fff;font-size:11px;font-weight:800;letter-spacing:.06em;padding:4px 9px;border-radius:4px;flex:none;line-height:1}
+.tm-live i{width:6px;height:6px;border-radius:50%;background:#fff;animation:tmBlink 1.2s infinite}
+.tm-live.idle{background:var(--tm-s2);color:var(--tm-mu);letter-spacing:0;border:1px solid var(--tm-line2)}
+.tm-live.idle i{display:none}
+@keyframes tmBlink{50%{opacity:.25}}
+.tm-head .tm-title{flex:1 1 220px;min-width:0;font-size:16px;font-weight:800;line-height:1.35;letter-spacing:-.02em}
+.tm-head .tm-title small{display:block;font-size:11.5px;color:var(--tm-mu);font-weight:600;letter-spacing:0;margin-top:1px}
+.tm-head .tm-day{font-size:12px;color:var(--tm-mu);font-weight:700;white-space:nowrap}
+/* 사진 무대 — 방금 올라온 사진 */
+.tm-stage{position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:16/9;min-width:0;box-shadow:0 18px 40px rgba(0,0,0,.45)}
+.tm-ph{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1s ease;transform:scale(1.02)}
+.tm-ph.on{opacity:1}
+.tm-stage::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.35) 0,rgba(0,0,0,0) 26%,rgba(0,0,0,0) 55%,rgba(0,0,0,.78) 100%);pointer-events:none}
+.tm-stg-top{position:absolute;left:12px;right:12px;top:10px;z-index:2;display:flex;align-items:center;gap:8px}
+.tm-stg-tag{font-size:10.5px;font-weight:800;letter-spacing:.08em;color:#fff;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.22);padding:4px 8px;border-radius:4px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.tm-stg-n{margin-left:auto;font-size:11px;color:#fff;font-weight:700;background:rgba(0,0,0,.45);padding:3px 8px;border-radius:999px}
+.tm-stg-bot{position:absolute;left:14px;right:14px;bottom:12px;z-index:2;display:flex;align-items:flex-end;gap:10px}
+.tm-stg-cap{flex:1;min-width:0}
+.tm-stg-cap b{display:block;font-size:clamp(15px,2.4vw,20px);font-weight:800;line-height:1.3;text-shadow:0 1px 8px rgba(0,0,0,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm-stg-cap small{display:block;font-size:12px;color:rgba(255,255,255,.78);font-weight:600;margin-top:2px}
+.tm-stg-go{flex:none;display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:999px;background:#fff;color:#0b0d12;font-size:13px;font-weight:800;text-decoration:none}
+.tm-stg-go svg{width:16px;height:16px}
+.tm-stg-nav{position:absolute;top:50%;z-index:2;width:36px;height:36px;margin-top:-18px;border-radius:50%;border:0;background:rgba(0,0,0,.4);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.85}
+.tm-stg-nav.p{left:8px}.tm-stg-nav.n{right:8px}
+.tm-stg-nav svg{width:18px;height:18px}
+.tm-stg-bar{position:absolute;left:0;right:0;bottom:0;height:2px;z-index:3;background:rgba(255,255,255,.15)}
+.tm-stg-bar i{display:block;height:100%;width:0;background:#fff}
+.tm-stg-bar i.run{width:100%;transition:width 6s linear}
+.tm-stage.empty .tm-stg-bot,.tm-stage.empty .tm-stg-nav,.tm-stage.empty .tm-stg-bar{display:none}
+.tm-stg-emp{position:absolute;inset:0;z-index:2;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--tm-mu);font-size:13.5px;font-weight:600;text-align:center;padding:16px;background:radial-gradient(ellipse at center,#1a1f2b 0,#07090e 70%)}
+.tm-stage.empty .tm-stg-emp{display:flex}
+/* 썸네일 줄 */
+.tm-thumbs{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:2px;scrollbar-width:none;min-width:0}
+.tm-thumbs::-webkit-scrollbar{display:none}
+.tm-th{flex:none;width:88px;aspect-ratio:4/3;border-radius:8px;background:#1a1f2b center/cover no-repeat;border:2px solid transparent;cursor:pointer;scroll-snap-align:start;opacity:.6;transition:opacity .2s,border-color .2s;padding:0}
+.tm-th.on{opacity:1;border-color:#fff}
+.tm-thumbs:empty{display:none}
+/* 주 버튼 줄 (흰색 = 주행동, 테두리 = 보조) */
+.tm-cta{display:grid;grid-template-columns:1fr 1fr;gap:8px;min-width:0}
+.tm-pb{display:flex;align-items:center;gap:10px;min-height:56px;padding:9px 14px;border-radius:10px;text-decoration:none;font-family:inherit;cursor:pointer;min-width:0;border:1px solid transparent;transition:background .15s,border-color .15s,transform .1s}
+.tm-pb:active{transform:scale(.985)}
+.tm-pb svg{flex:none;width:22px;height:22px}
+.tm-pb .tm-bx{min-width:0;flex:1}
+.tm-pb .t{display:block;font-size:14.5px;font-weight:800;line-height:1.2;letter-spacing:-.02em}
+.tm-pb .s{display:block;font-size:11.5px;font-weight:600;margin-top:3px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm-pb.pri{background:#fff;color:#0b0d12}
+.tm-pb.pri .s{color:#d1182c}
+.tm-pb.pri:hover{background:#e9ecf2}
+.tm-pb.sec{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
+.tm-pb.sec .s{color:var(--tm-mu)}
+.tm-pb.sec:hover{border-color:#fff;background:rgba(255,255,255,.06)}
+.tm-pb.join{display:none}
+.tm-guest .tm-pb.join{display:flex}
+.tm-member .tm-cta{grid-template-columns:1fr}
+.tm-member .tm-mem{display:none}
+/* 뉴스 자막 */
+.tm-ticker{position:relative;overflow:hidden;background:var(--tm-s1);border-top:1px solid var(--tm-line);border-bottom:1px solid var(--tm-line);height:40px;display:flex;align-items:center;min-width:0;touch-action:pan-y;border-radius:0}
+.tm-ticker::before{content:"NEWS";position:absolute;left:0;top:0;bottom:0;z-index:2;display:flex;align-items:center;padding:0 12px 0 10px;background:var(--tm-s1);color:var(--tm-red);font-size:11px;font-weight:900;letter-spacing:.1em;box-shadow:12px 0 14px var(--tm-s1)}
+.tm-tk-track{display:inline-flex;white-space:nowrap;will-change:transform;animation:tmMarquee 60s linear infinite;padding-left:64px}
+.tm-ticker.paused .tm-tk-track,.tm-ticker:hover .tm-tk-track{animation-play-state:paused}
+.tm-tk-seg{display:inline-block;padding-right:40px;font-size:13.5px;font-weight:600;color:#e6e9f0;word-break:normal}
+.tm-tk-seg b,.tm-tk-seg strong{color:#fff;font-weight:800}
+.tm-tk-seg i{font-style:normal;color:var(--tm-mu2);margin:0 14px}
+.tm-tk-seg a{color:#fff;font-weight:800;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.4)}
+@keyframes tmMarquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+/* 구장 스코어보드 — 팀 두 줄 + 오른쪽 점수(중계 화면 스코어버그 형식) */
+.tm-courts{display:grid;grid-template-columns:1fr;gap:8px;min-width:0}
+.tm-ct{display:block;position:relative;background:var(--tm-s1);border:1px solid var(--tm-line);border-radius:12px;padding:11px 14px 10px;color:var(--tm-tx);text-decoration:none;min-width:0;transition:background .15s,border-color .15s;overflow:hidden}
+a.tm-ct:hover{background:var(--tm-s2);border-color:var(--tm-line2)}
+.tm-ct.live{border-color:rgba(255,51,71,.45)}
+.tm-ct.live::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--tm-red)}
+.tm-ct.none{opacity:.55}
+.tm-ct .r1{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--tm-mu);font-weight:600;min-width:0}
+.tm-ct .r1 b{color:var(--tm-tx);font-size:12.5px;font-weight:800;flex:none;letter-spacing:-.01em}
+.tm-ct .r1 .lab{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+.tm-chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;padding:3px 7px;border-radius:4px;background:var(--tm-s2);color:var(--tm-mu);white-space:nowrap;flex:none;line-height:1;letter-spacing:.02em}
+.tm-chip.live{background:var(--tm-red);color:#fff}
+.tm-chip.live i{width:5px;height:5px;border-radius:50%;background:#fff;animation:tmBlink 1.2s infinite}
+.tm-chip.done{background:transparent;border:1px solid var(--tm-line2);color:var(--tm-mu)}
+.tm-chip.next{background:transparent;border:1px solid var(--tm-line2);color:#dfe4ee}
+.tm-rows{margin-top:8px;display:grid;gap:4px}
+.tm-row{display:flex;align-items:center;gap:10px;min-width:0}
+.tm-row .nm{flex:1;min-width:0;font-size:14.5px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#e9ecf3}
+.tm-row .pt{flex:none;min-width:30px;text-align:right;font-size:24px;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums;color:#fff;letter-spacing:-.02em}
+.tm-row.lose .nm,.tm-row.lose .pt{color:var(--tm-mu2)}
+.tm-row.win .nm{color:#fff;font-weight:800}
+.tm-row .pt.pre{font-size:13px;font-weight:700;color:var(--tm-mu2)}
+.tm-dot{display:inline-block;width:8px;height:8px;border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,.35);flex:none}
+.tm-dot.no{background:transparent;box-shadow:0 0 0 1px rgba(255,255,255,.15)}
+.tm-ct .r3{font-size:12px;color:var(--tm-mu);margin-top:8px;padding-top:8px;border-top:1px solid var(--tm-line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tm-ct .r3 em{font-style:normal;color:#fff;font-weight:800;margin-right:4px}
+.tm-ct .r3 .gl{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--tm-red);margin-right:6px;vertical-align:1px}
+/* 메뉴 타일 — 모두 같은 모양 */
+.tm-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;min-width:0}
+.tm-btn{display:flex;align-items:center;gap:11px;min-height:60px;padding:10px 12px;border-radius:12px;background:var(--tm-s1);border:1px solid var(--tm-line);color:var(--tm-tx);text-decoration:none;font-family:inherit;cursor:pointer;text-align:left;transition:background .15s,border-color .15s;min-width:0;width:100%}
+.tm-btn:hover{background:var(--tm-s2);border-color:var(--tm-line2)}
+.tm-btn .ic{flex:none;width:36px;height:36px;border-radius:50%;background:var(--tm-s2);display:flex;align-items:center;justify-content:center;color:#fff}
+.tm-btn .ic svg{width:19px;height:19px}
+.tm-btn .tm-bx{min-width:0;flex:1}
+.tm-btn .t{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;line-height:1.25;letter-spacing:-.02em}
+.tm-btn .s{display:block;font-size:11.5px;color:var(--tm-mu);margin-top:3px;line-height:1.3;font-weight:600}
+.tm-btn .chev{flex:none;width:16px;height:16px;color:var(--tm-mu2)}
+.tm-btn .tg{font-size:9.5px;font-weight:800;letter-spacing:.06em;color:#0b0d12;background:#fff;padding:2px 5px;border-radius:3px;line-height:1.1}
+.tm-btn.wide{grid-column:1/-1}
+/* 응원톡 — 중계 채팅처럼 */
+.tm-cheer{background:var(--tm-s1);border:1px solid var(--tm-line);border-radius:12px;padding:12px 14px;min-width:0}
+.tm-cheer-lab{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:800;color:#fff;letter-spacing:-.02em}
+.tm-cheer-lab svg{flex:none;width:18px;height:18px;color:#fff}
+.tm-cheer-lab span{color:var(--tm-mu);font-weight:600;font-size:11.5px;margin-left:auto;letter-spacing:0}
+.tm-cheer-win{position:relative;height:96px;overflow:hidden;margin-top:8px;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18px);mask-image:linear-gradient(to bottom,transparent 0,#000 18px)}
+.tm-cheer-list{position:absolute;left:0;right:0;bottom:0}
+.tm-cm{height:0;opacity:0;overflow:hidden;transition:height .5s ease,opacity .5s ease;font-size:13.5px;line-height:24px;white-space:nowrap;text-overflow:ellipsis;color:#e6e9f0}
+.tm-cm.on{height:24px;opacity:1}
+.tm-cm b{color:var(--tm-mu);font-weight:700;margin-right:6px}
+.tm-cm small{color:var(--tm-mu2);font-size:11px;margin-left:6px}
+.tm-cheer-empty{position:absolute;inset:0;display:flex;align-items:center;font-size:13px;color:var(--tm-mu)}
+.tm-cheer-in{display:flex;gap:6px;margin-top:10px;align-items:center;flex-wrap:wrap}
+.tm-cheer-in input{flex:1 1 160px;min-width:0;height:44px;border-radius:999px;border:1px solid var(--tm-line2);background:var(--tm-bg);color:#fff;padding:0 16px;font-family:inherit;font-size:14px;outline:none}
+.tm-cheer-in input:focus{border-color:rgba(255,255,255,.5)}
+.tm-cheer-in input::placeholder{color:var(--tm-mu2)}
+.tm-cheer-in button,.tm-cheer-in a{flex:none;height:44px;padding:0 18px;border-radius:999px;border:0;background:#fff;color:#0b0d12;font-weight:800;font-family:inherit;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;text-decoration:none}
+.tm-cheer-in a.lite{background:transparent;color:#fff;border:1px solid var(--tm-line2)}
+.tm-cheer-in button:disabled{opacity:.5;cursor:default}
+.tm-cheer-note{font-size:12.5px;color:var(--tm-mu);font-weight:600}
+.tm-cheer-msg{font-size:12px;color:#ff8a96;font-weight:700;margin-top:6px}
+.tm-cheer-msg:empty{display:none}
+.tm-cheer .cmt-guide{margin-top:8px;color:var(--tm-mu2)!important}
+.tm-rl{display:inline-flex;align-items:center;min-height:40px;padding:0 16px;margin-top:8px;border-radius:999px;border:1px solid var(--tm-line2);background:transparent;color:#fff;font-family:inherit;font-weight:800;font-size:13.5px;cursor:pointer}
+/* 경상권역 대회 안내창 */
+.tm-modal{position:fixed;inset:0;z-index:9500;display:none;align-items:flex-end;justify-content:center;background:rgba(3,5,10,.7);padding:0}
+.tm-modal.open{display:flex}
+.tm-modal .tm-md{background:#10131b;color:#eef1f6;width:100%;max-width:520px;max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:22px 20px 24px;box-shadow:0 -10px 40px rgba(0,0,0,.5);word-break:keep-all;overflow-wrap:break-word;border:1px solid rgba(255,255,255,.08)}
+.tm-md .ey{font-size:11px;font-weight:800;letter-spacing:.1em;color:#ff3347;margin-bottom:6px}
+.tm-md h3{font-size:19px;font-weight:800;color:#fff;margin:0 0 10px;line-height:1.35;letter-spacing:-.02em}
+.tm-md .d{font-size:14px;line-height:1.7;color:#c9cfdb}
+.tm-md .d b{color:#fff}
+.tm-md ul{list-style:none;margin:12px 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tm-md li{font-size:13.5px;color:#e6e9f0;background:#161a24;border-radius:8px;padding:9px 11px;line-height:1.4}
+.tm-md .acts{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.tm-md .acts a,.tm-md .acts button{flex:1 1 130px;min-height:48px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;font-weight:800;font-size:14px;text-decoration:none;font-family:inherit;cursor:pointer;border:1px solid transparent}
+.tm-md .acts .tel{background:#fff;color:#0b0d12}.tm-md .acts .sms{background:transparent;color:#fff;border-color:rgba(255,255,255,.3)}.tm-md .acts .cl{background:#161a24;color:#c9cfdb}
+/* 1023px 이하: 두 칸을 풀어서 순서 지정 — 머리 → 사진 → 썸네일 → 버튼(예측·가입) → 자막 → 구장 → 메뉴 → 응원톡 (예측 버튼·자막이 첫 화면 안에) */
+/* 639px 이하(세로 폰): 구장 카드는 옆으로 넘기는 한 줄(중계 앱 스코어 카드처럼) — 아래 버튼·응원톡이 멀리 밀리지 않게 */
+@media(max-width:639px){
+  .tm-courts{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:8px;margin-left:-16px;margin-right:-16px;padding:0 16px 4px;scrollbar-width:none}
+  .tm-courts::-webkit-scrollbar{display:none}
+  .tm-courts>.tm-ct{flex:0 0 80%;scroll-snap-align:center}
+  /* 주 버튼 부제는 두 줄까지(말줄임으로 남은 시간이 잘리던 것) */
+  .tm-pb{align-items:flex-start;padding:11px 12px}.tm-pb svg{margin-top:1px}
+  .tm-pb .s{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  /* 메뉴는 앱 바로가기처럼 3칸 아이콘 격자 — 제목만 크게, 부제 한 줄, 화살표 숨김 */
+  .tm-btns{grid-template-columns:repeat(3,1fr);gap:6px}
+  .tm-btn{flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;gap:7px;min-height:96px;padding:12px 6px 10px}
+  .tm-btn .tm-bx{flex:none;width:100%}
+  .tm-btn .t{justify-content:center;flex-wrap:wrap;font-size:13px;gap:4px}
+  .tm-btn .s{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tm-btn .chev{display:none}
+  .tm-btn .tg{font-size:9px}
+}
+@media(max-width:1023px){
+  #tmHero .tm-col{display:contents}
+  #tmHero>.tm-head{order:0}#tmHero .tm-stage{order:1}#tmHero .tm-thumbs{order:2;margin-top:-6px}#tmHero .tm-cta{order:3}#tmHero>.tm-ticker{order:4}
+  #tmHero .tm-sh{order:5}#tmHero .tm-courts{order:6;margin-top:-6px}#tmHero .tm-btns{order:7}#tmHero .tm-cheer{order:8}
+}
+/* 640~: 구장 2열 · 메뉴 3열 */
+@media(min-width:640px){.tm-modal{align-items:center;padding:16px}.tm-modal .tm-md{border-radius:16px}.tm-courts{grid-template-columns:1fr 1fr}.tm-btns{grid-template-columns:repeat(3,1fr)}.tm-btn.wide{grid-column:auto}.tm-th{width:110px}}
+/* 1024~: 왼쪽(사진·구장) · 오른쪽(버튼·메뉴·응원톡) 두 칸 */
+@media(min-width:1024px){
+  .tm-on .hero .wrap{padding:22px 32px 30px}
+  .tm-on #tmHero{grid-template-columns:minmax(0,1.6fr) minmax(320px,1fr);gap:18px 22px;align-items:start}
+  .tm-on #tmHero>.tm-head{grid-column:1/-1;order:0}
+  .tm-on #tmHero>.tm-ticker{grid-column:1/-1;order:1}
+  .tm-on #tmHero .tm-col{order:2}
+  .tm-courts.tm-swipe{display:grid}
+  .tm-head .tm-title{font-size:18px}
+  .tm-courts{grid-template-columns:1fr 1fr 1fr}
+  .tm-btns{grid-template-columns:1fr 1fr}.tm-btn.wide{grid-column:1/-1}
+  .tm-cta{grid-template-columns:1fr}
+  .tm-cheer-win{height:168px}
+}
+/* 가로 회전 휴대폰: 사진은 낮게(21:9), 구장 2열, 메뉴 3열 */
+@media(orientation:landscape) and (max-height:520px){
+  .tm-on .hero .wrap{padding:10px 14px 14px}.tm-on #tmHero{gap:10px}.tm-head{padding-bottom:8px}.tm-head .tm-title{font-size:14px}
+  .tm-stage{aspect-ratio:auto;height:52vh;min-height:170px}.tm-th{width:84px}
+  .tm-courts{grid-template-columns:1fr 1fr}.tm-btns{grid-template-columns:repeat(3,1fr)}.tm-btn{min-height:52px}.tm-btn.wide{grid-column:auto}
+  .tm-cheer-win{height:72px}.tm-cheer .cmt-guide{display:none}
+}
+@media(prefers-reduced-motion:reduce){.tm-ph{transition:none}.tm-stg-bar i.run{transition:none}.tm-tk-track{animation-duration:200s!important}}
+</style>
 <div class="hero"><div class="wrap">
   <div class="h-grid">
     <div>
+      <!-- [대회 모드 2026-10-24] 축전 기간 경기용 메인 — body.tm-on 일 때만 보임(평소엔 숨김). 아래 기존 요소는 그대로 두고 CSS 로만 숨김 -->
+      <div id="tmHero" class="tm-guest">
+        <div class="tm-head"><span class="tm-live" id="tmLiveBadge"><i></i>LIVE</span><span class="tm-title">제19회 전국학교스포츠클럽축전 플라잉디스크<small>포항 양덕스포츠타운 · 6개 구장</small></span><span class="tm-day" id="tmDay"></span></div>
+        <div class="tm-col main">
+          <div class="tm-stage empty" id="tmStage">
+            <div class="tm-stg-top"><span class="tm-stg-tag">방금 올라온 사진</span><span class="tm-stg-n" id="tmStgN"></span></div>
+            <button type="button" class="tm-stg-nav p" id="tmStgP" aria-label="이전 사진"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <button type="button" class="tm-stg-nav n" id="tmStgN2" aria-label="다음 사진"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+            <div class="tm-stg-bot"><div class="tm-stg-cap" id="tmStgCap"><b></b><small></small></div><a class="tm-stg-go" href="photo.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>사진 올리기</a></div>
+            <div class="tm-stg-bar"><i id="tmStgBar"></i></div>
+            <div class="tm-stg-emp">경기 사진을 기다리고 있어요<a class="tm-stg-go" href="photo.html">첫 사진 올리기</a></div>
+          </div>
+          <div class="tm-thumbs" id="tmThumbs" aria-label="최근 사진"></div>
+          <div class="tm-sh"><b>구장별 실시간</b><small id="tmCourtsSub">경기 중인 구장이 먼저 보여요</small><a href="tourney.html#live">대회 현황<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></a></div>
+          <div class="tm-courts" id="tmCourts" aria-live="polite"></div>
+        </div>
+        <div class="tm-col sd">
+          <div class="tm-cta" id="tmCta">
+            <a class="tm-pb pri" id="tmBtnPick" href="play.html#rank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg><span class="tm-bx"><span class="t">승부 예측 하기</span><span class="s" id="tmPickSub">10/24 오전 10시 마감 · 원반 선물</span></span></a>
+            <a class="tm-pb sec join" id="tmBtnJoin" href="login.html?tab=signup&next=index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg><span class="tm-bx"><span class="t">회원가입</span><span class="s">무료 · 바로 승인 · 전체 기록 보기</span></span></a>
+          </div>
+          <div class="tm-btns" id="tmBtns">
+            <a class="tm-btn" href="tourney.html#rank"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg></span><span class="tm-bx"><span class="t">현재 순위</span><span class="s">부문·조별 순위표<span class="tm-mem"> · 회원</span></span></span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></a>
+            <a class="tm-btn" href="tourney.html#all"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span><span class="tm-bx"><span class="t">전체 경기</span><span class="s">지난·예정 경기<span class="tm-mem"> · 회원</span></span></span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></a>
+            <a class="tm-btn" href="tourney.html#scorers"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M8.5 11.5L7 21l5-3 5 3-1.5-9.5"/></svg></span><span class="tm-bx"><span class="t">득점 · 어시스트</span><span class="s">선수 순위<span class="tm-mem"> · 회원</span></span></span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></a>
+            <a class="tm-btn" href="photo.html"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="2"/><circle cx="12" cy="13" r="3.5"/><path d="M8 6l1.5-2h5L16 6"/></svg></span><span class="tm-bx"><span class="t">사진첩</span><span class="s">학교별 앨범 · 댓글</span></span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></a>
+            <button type="button" class="tm-btn" id="tmBtnCheer"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-5.1A8 8 0 1 1 21 12z"/></svg></span><span class="tm-bx"><span class="t">응원톡</span><span class="s">선수들에게 한마디</span></span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+            <button type="button" class="tm-btn" id="tmBtnGy"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18c2 0 2-1.5 4-1.5S8 18 10 18s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><path d="M17 14V4l-7 4"/><path d="M12 14l5-10"/></svg></span><span class="tm-bx"><span class="t">경상권역 대회 <span class="tg">11.28</span></span><span class="s">해운대 비치 · 초등 선착순 250명</span></span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+          </div>
+          <div class="tm-cheer" id="tmCheer">
+            <div class="tm-cheer-lab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-5.1A8 8 0 1 1 21 12z"/></svg>응원톡 <span id="tmCheerCnt"></span></div>
+            <div class="tm-cheer-win"><div class="tm-cheer-list" id="tmCheerList"></div><div class="tm-cheer-empty" id="tmCheerEmpty">첫 응원을 남겨 주세요. 선수들에게 큰 힘이 돼요</div></div>
+            <div class="tm-cheer-in" id="tmCheerIn"><span class="tm-cheer-note">불러오는 중…</span></div>
+            <div class="tm-cheer-msg" id="tmCheerMsg" aria-live="polite"></div>
+            <div id="tmCheerGuide"></div>
+          </div>
+        </div>
+        <div class="tm-ticker" id="tmTicker" aria-label="안내 자막"><div class="tm-tk-track" id="tmTkTrack"><span class="tm-tk-seg" id="tmTk1"></span><span class="tm-tk-seg" id="tmTk2"></span></div></div>
+      </div>
       <span class="tag">KOREA FLYING DISC FEDERATION</span>
       <div class="slogan-en">PLAY THE DISC, <em>MOVE TOGETHER</em></div>
       <h1>모두가 즐기는 원반 스포츠, <span class="pt">함께 만드는</span> 대한민국플라잉디스크연맹</h1>
@@ -264,6 +523,23 @@
     </div>
   </div>
 </div></div>
+<!-- [대회 모드 2026-10-24] 경상권역 대회 안내창 (메인 버튼 「경상권역 대회 11/28 해운대」) -->
+<div id="tmGyeong" class="tm-modal" role="dialog" aria-modal="true" aria-labelledby="tmGyTitle">
+  <div class="tm-md">
+    <div class="ey">EVENT · 11월 28일(토)</div><h3 id="tmGyTitle">2026 유소년 스포츠 기반구축사업 경상권역 대회</h3>
+    <div class="d"><b>11월 28일(토) 해운대 해수욕장 비치</b>에서 열립니다. 참가 학교 초등학생 <b>선착순 250명</b>.</div>
+    <ul>
+      <li>단체 버스 지원</li>
+      <li>도시락 지급</li>
+      <li>기념 티셔츠</li>
+      <li>원반 선물</li>
+      <li>이벤트 경기 1·2·3위 선물</li>
+      <li>그 외 신나는 경기가 가득!</li>
+    </ul>
+    <div class="d" style="margin-top:8px">해운대에서 만나요. 문의 부산시플라잉디스크연맹 010-9317-1532</div>
+    <div class="acts"><a class="tel" href="tel:010-9317-1532">문의 010-9317-1532</a><a class="sms" href="sms:010-9317-1532">문자 보내기</a><button type="button" class="cl" id="tmGyClose">닫기</button></div>
+  </div>
+</div>
 
 <!-- ── 분야별 바로가기 (누르면 세부 항목) ── -->
 <section class="qm"><div class="wrap">
@@ -629,7 +905,7 @@
         const ph=pq.docs.map(d=>Object.assign({id:d.id},d.data())).filter(x=>x.img).sort((a,b)=>(+b.atMs||0)-(+a.atMs||0)).slice(0,10).map(x=>({id:x.id,title:[x.school,x.title].filter(Boolean).join(' · ')||'플라잉디스크 사진 공모전',cover:x.img,date:''}));all=ph.concat(all)}}catch(e){console.warn('photoContest banner',e)}
       if(all.length&&window.KFDF_BANNER){
         let cfg={};try{const c=await firebase.firestore().collection('siteContent').doc('homeBanner').get();if(c.exists)cfg=c.data()||{}}catch(e){}
-        if(cfg.enabled!==false){const hero=document.querySelector('.hero');if(hero)KFDF_BANNER.mount(hero,all.slice(0,Math.max(1,Math.min(10,+cfg.max||5))),{interval:+cfg.interval||3,caption:false,kenburns:cfg.kenburns!==false})}
+        if(cfg.enabled!==false){const hero=document.querySelector('.hero');if(hero)KFDF_BANNER.mount(hero,all.slice(0,Math.max(1,Math.min(10,+cfg.max||5))),{interval:+cfg.interval||3,caption:false,kenburns:cfg.kenburns!==false&&!window.TM_ON})}
       }
     }catch(e){console.warn('gallery/banner',e)}
     })();
@@ -828,7 +1104,7 @@ try{firebase.firestore().collection('siteContent').doc('live').onSnapshot(functi
 </script>
 <script>
 // [2026-10-19] 구장별 실시간 스코어 — 오늘(한국 시간) 경기 중 진행 중인 경기를 구장마다 10초씩. 없으면 30분 안에 끝난 경기. 로그인 없이 보임
-(function(){try{var D=new Date(Date.now()+9*3600e3).toISOString().slice(0,10);var L=[],I=0,T=null;
+(function(){if(window.TM_ON)return;try{var D=new Date(Date.now()+9*3600e3).toISOString().slice(0,10);var L=[],I=0,T=null;
   var sc=function(m){var a=0,b=0,ev=m.events||[];if(m.rec||ev.some(function(e){return e&&e.type}))ev.forEach(function(e){if(!e||e.void)return;if(e.type==='goal'){if(e.side==='a')a++;else if(e.side==='b')b++}else if(e.type==null&&typeof e.d==='number'){if(e.side==='a')a=Math.max(0,a+e.d);else if(e.side==='b')b=Math.max(0,b+e.d)}});else{a=+((m.a||{}).score)||0;b=+((m.b||{}).score)||0}return [a,b]};
   var tsec=function(x){return x&&x.toMillis?x.toMillis():(x&&x.seconds?x.seconds*1000:0)};
   var lab=function(m){var r=String(m.round||'');var st=m.stage||'';var sr=r?(st&&r.indexOf(st)!==0?st+' '+r:r):st;return [m.div,sr].filter(Boolean).join(' ')||m.title||''};
@@ -845,7 +1121,188 @@ try{firebase.firestore().collection('siteContent').doc('live').onSnapshot(functi
   firebase.firestore().collection('liveMatches').where('status','==','진행').onSnapshot(function(q){LIVEM=take(q);recalc()},function(e){console.warn('courtTicker live',e)});
   firebase.firestore().collection('liveMatches').where('day','==',D).onSnapshot(function(q){DAYM=take(q);recalc()},function(e){console.warn('courtTicker day',e)})}catch(e){}})();
 </script>
+<script src="kfdf.js?v=20260914a"></script>
+<script src="comments.js?v=20261024b"></script>
+<script>
+/* ══════════ [대회 모드 2026-10-24] 축전 메인 — 6개 구장 실시간 스코어+최근 득점 · 응원 댓글 띠(comments.js) · 큰 버튼 · 뉴스 자막 · 경상권역 안내창
+ *  상단 TM 상수(body.tm-on) 일 때만 동작. 데이터: liveMatches(day==오늘 KST + status=='진행', test·다른 slotId 제외) · compStats/{slotId}(kits·stats) · liveChat/cheer_{slotId}
+ *  구장별 표시 우선순위: 진행 중 > 30분 안에 끝난 경기 > 다음 예정 경기(가장 이른 것) > 마지막 종료. 선수 이름은 KFDF_CMT.mask 로 가림. 전역 오염 없음(IIFE) */
+(function(){
+  if(!window.TM_ON||!window.TM)return;
+  var root=document.getElementById('tmHero');if(!root)return;
+  var TMC=window.TM,D=window.TM_DAY||'';
+  var PICK_END=Date.parse('2026-10-24T01:00:00Z');    /* 승부 예측 마감 10/24 10:00 KST */
+  var CHAMP_END=Date.parse('2026-10-24T23:30:00Z');   /* 부문별 1·2위 맞히기 마감 10/25 08:30 KST */
+  var COURTS=['1구장','2구장','3구장','4구장','5구장','6구장'];
+  var KITC={'#ffffff':'흰색','#1f2329':'검정','#d62839':'빨강','#f28c28':'주황','#f6c90e':'노랑','#1f9d55':'초록','#4fb3f6':'하늘','#1f5fd6':'파랑','#1b2a5e':'남색','#7b4bd1':'보라','#f06aa6':'분홍','#9aa1ad':'회색'};
+  var $=function(id){return document.getElementById(id)};
+  var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
+  var mask=function(n){return window.KFDF_CMT?KFDF_CMT.mask(n):String(n||'')};
+  var tsec=function(x){try{if(!x)return 0;if(x.toMillis)return x.toMillis();if(x.seconds)return x.seconds*1000;if(typeof x==='number')return x;var t=Date.parse(x);return isNaN(t)?0:t}catch(e){return 0}};
+  var p2=function(n){return String(n).padStart(2,'0')};
+  /* 머리 줄 날짜: 10.24(토) · 1일차 예선 */
+  (function(){var el=$('tmDay');if(!el||!D)return;var d=new Date(D+'T12:00:00Z');var w=['일','월','화','수','목','금','토'][d.getUTCDay()];var k=D===TMC.from?'1일차 예선':(D===TMC.to?'2일차 본선':'');el.textContent=D.slice(5).replace('-','.')+'('+w+')'+(k?' · '+k:'')})();
+  /* ── 경기 데이터 도우미 (matchrec.js 는 메인에 싣지 않으므로 점수 계산은 courtTicker 와 같은 식) ── */
+  var score=function(m){var a=0,b=0,ev=m.events||[];if(m.rec||ev.some(function(e){return e&&e.type}))ev.forEach(function(e){if(!e||e.void)return;if(e.type==='goal'){if(e.side==='a')a++;else if(e.side==='b')b++}else if(e.type==null&&typeof e.d==='number'){if(e.side==='a')a=Math.max(0,a+e.d);else if(e.side==='b')b=Math.max(0,b+e.d)}});else{a=+((m.a||{}).score)||0;b=+((m.b||{}).score)||0}return [a,b]};
+  var goals=function(m){return (m.events||[]).filter(function(e){return e&&!e.void&&e.type==='goal'})};
+  var evWhen=function(e){var c=e.clock||'';if(!c&&e.sec!=null&&e.sec!=='')c=p2(Math.floor(+e.sec/60))+':'+p2(Math.floor(+e.sec%60));if(!c&&e.min!=null&&e.min!=='')c=e.min+"'";return [e.period||'',c].filter(Boolean).join(' ')};
+  var roundOf=function(m){var r=String(m.round||''),st=m.stage||'';return r?(st&&r.indexOf(st)!==0?st+' '+r:r):st};
+  var kitOf=function(m,side){var t=m[side]||{};var K=KITS[t.pid];if(!K)return null;var k=((m.kit||{})[side]===1)?(K.k2||K.k1):(K.k1||K.k2);if(!k||k.none)return null;return k};
+  var kitColor=function(m,side){var k=kitOf(m,side);return k&&k.color?String(k.color):''};
+  var kitName=function(m,side){var k=kitOf(m,side);if(!k)return '';var c=String(k.color||'').toLowerCase();return KITC[c]||((k.name&&!/^\d번 경기복/.test(k.name))?k.name:'')};
+  /* ── 구독 데이터 ── */
+  var DAYM={},LIVEM={},KITS={},STATS=null,ALL=[],pend=null,loaded=false;
+  var take=function(q){var o={};q.docs.forEach(function(d){var x=d.data()||{};x.id=d.id;o[d.id]=x});return o};
+  var isLive=function(m){return m.status==='진행'&&Date.now()-tsec(m.updatedAt)<6*3600e3};   /* 오래 방치된 '진행' 제외 */
+  var endMs=function(m){return tsec(m.endAt||m.updatedAt)};
+  var collect=function(){var o=Object.assign({},DAYM,LIVEM);ALL=Object.keys(o).map(function(k){return o[k]}).filter(function(m){return m&&!m.test&&m.slotId===TMC.slotId&&(m.day===D||isLive(m))})};
+  var pickFor=function(court){var ms=ALL.filter(function(m){return String(m.court||'')===court});var now=Date.now();
+    var live=ms.filter(isLive).sort(function(a,b){return tsec(b.updatedAt)-tsec(a.updatedAt)})[0];if(live)return {m:live,k:'live'};
+    var done=ms.filter(function(m){return m.status==='종료'}).sort(function(a,b){return endMs(b)-endMs(a)});
+    if(done[0]&&now-endMs(done[0])<30*60e3)return {m:done[0],k:'done'};
+    var next=ms.filter(function(m){return m.status==='예정'}).sort(function(a,b){return String(a.time||'').localeCompare(String(b.time||''))||(+a.order||0)-(+b.order||0)})[0];
+    if(next)return {m:next,k:'next'};
+    if(done[0])return {m:done[0],k:'done'};return null};
+  var card=function(court,p){
+    if(!p)return '<div class="tm-ct none"><div class="r1"><b>'+esc(court)+'</b><span class="tm-chip">'+(loaded?'경기 없음':'불러오는 중')+'</span></div><div class="r3">'+(loaded?'오늘 이 구장에는 남은 경기가 없어요':'실시간 스코어를 불러오고 있어요')+'</div></div>';
+    var m=p.m,k=p.k,s=score(m),ta=m.a||{},tb=m.b||{};
+    var chip=k==='live'?'<span class="tm-chip live"><i></i>LIVE'+(m.period?' · '+esc(m.period):'')+'</span>':(k==='done'?'<span class="tm-chip done">종료</span>':'<span class="tm-chip next">예정 '+esc(m.time||'')+'</span>');
+    var lab=[m.div,roundOf(m)].filter(Boolean).join(' · ');
+    var dot=function(side){var c=kitColor(m,side);return c&&/^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{3,20})$/.test(c)?'<i class="tm-dot" style="background:'+esc(c)+'"></i>':'<i class="tm-dot no"></i>'};
+    var r3;
+    if(k==='next'){var ka=kitName(m,'a'),kb=kitName(m,'b');r3=esc(m.time||'')+' 시작'+((ka||kb)?' · 경기복: '+esc(ka||'-')+' vs '+esc(kb||'-'):'')}
+    else{var g=goals(m),e=g[g.length-1];if(!e)r3=k==='live'?'아직 득점이 없어요':'득점 기록 없음';else{var t=e.side==='b'?tb:ta;r3=(k==='live'?'<span class="gl"></span>':'')+'<em>GOAL</em>'+esc(t.name||'')+(e.scorer&&e.scorer.name?' '+(e.scorer.no!=null&&e.scorer.no!==''?esc(e.scorer.no)+'번 ':'')+esc(mask(e.scorer.name)):'')+(e.assist&&e.assist.name?' · 도움 '+esc(mask(e.assist.name)):'')+(evWhen(e)?' · '+esc(evWhen(e)):'')}}
+    var href=(k!=='next'&&!(CUR&&CUR.user))?'tourney.html#live':'tourney.html?m='+encodeURIComponent(m.id);   /* 비회원의 진행·종료 칸 → 누구나 보는 「지금 경기」 탭(?m= 은 회원 전용 전체 경기 탭을 열어 잠금 화면이 먼저 뜸) · 예정 칸·회원은 해당 경기로 */
+    return '<a class="tm-ct '+k+'" href="'+href+'">'
+      +'<div class="r1"><b>'+esc(court)+'</b>'+chip+'<span class="lab">'+esc(lab)+'</span></div>'
+      +'<div class="tm-rows">'+['a','b'].map(function(sd,i){var t=sd==='a'?ta:tb,me=s[i],op=s[1-i];var cls=k==='done'&&me!==op?(me>op?' win':' lose'):'';return '<div class="tm-row'+cls+'">'+dot(sd)+'<span class="nm">'+esc(t.name||'')+'</span><span class="pt'+(k==='next'?' pre':'')+'">'+(k==='next'?(i?'':'VS'):me)+'</span></div>'}).join('')+'</div>'
+      +'<div class="r3">'+r3+'</div></a>'};
+  /* 바뀐 칸만 바꿔 끼움 — 통째로 다시 그리면 aria-live 가 매번 6칸을 다 읽고 LIVE 깜빡임이 처음부터 다시 시작 */
+  var ctLast={};
+  var renderCourts=function(){var el=$('tmCourts');if(!el)return;var hs=COURTS.map(function(c){return card(c,pickFor(c))});
+    if(el.children.length!==COURTS.length){ctLast={};el.innerHTML=hs.join('');hs.forEach(function(h,i){ctLast[COURTS[i]]=h});return}
+    hs.forEach(function(h,i){var c=COURTS[i];if(h===ctLast[c])return;ctLast[c]=h;var tmp=document.createElement('div');tmp.innerHTML=h;var nw=tmp.firstElementChild;if(nw)el.replaceChild(nw,el.children[i])})};
+  /* 머리 줄 배지: 진행 경기가 있을 때만 빨간 LIVE 깜빡임, 아니면 「첫 경기 10:00」·「다음 경기 10:35」·「오늘 경기 종료」 */
+  var renderHead=function(){var b=$('tmLiveBadge');if(!b)return;var live=ALL.some(isLive),txt='LIVE';
+    if(!live&&loaded){var td=ALL.filter(function(m){return m.day===D});var nx=td.filter(function(m){return m.status==='예정'}).map(function(m){return String(m.time||'')}).filter(Boolean).sort()[0];var began=td.some(function(m){return m.status!=='예정'});
+      txt=nx?((began?'다음 경기 ':'첫 경기 ')+nx):(td.length?'오늘 경기 종료':'경기 없음')}
+    b.classList.toggle('idle',!live);if(b.getAttribute('data-t')!==txt){b.setAttribute('data-t',txt);b.innerHTML='<i></i>'+esc(txt)}};
+  /* ── 뉴스 자막 ── */
+  var recentGoals=function(n){var out=[];ALL.forEach(function(m){var a=0,b=0,ev=m.events||[],base=tsec(m.updatedAt);ev.forEach(function(e,i){if(!e||e.void||e.type!=='goal')return;if(e.side==='a')a++;else if(e.side==='b')b++;else return;var t=m[e.side]||{},o=m[e.side==='a'?'b':'a']||{};var mine=e.side==='a'?a:b,his=e.side==='a'?b:a;
+      out.push({t:tsec(e.t)||(base-(ev.length-i)*1000),s:esc(t.name||'')+(e.scorer&&e.scorer.name?' '+esc(mask(e.scorer.name)):'')+' 득점'+(e.assist&&e.assist.name?'(도움 '+esc(mask(e.assist.name))+')':'')+' '+mine+':'+his+' vs '+esc(o.name||'')})})});
+    return out.sort(function(x,y){return y.t-x.t}).slice(0,n).map(function(x){return x.s})};
+  var tickerItems=function(){var now=Date.now(),it=[],guest=!(CUR&&CUR.user);
+    it.push(guest?'<a href="login.html?tab=signup&next=index.html">회원 가입하면 전체 경기·지난 경기·순위·득점/어시스트 순위를 볼 수 있어요 (가입 즉시 승인) — 가입하기 ▶</a>':'<a href="tourney.html#all">회원 전용 — 전체 경기·지난 경기·순위·득점/어시스트 순위 보기 ▶</a>');
+    if(now<PICK_END)it.push('<a href="play.html#rank">승부 예측 10/24 오전 10시 마감 — 적중 상위 10명에게 원반 선물(연맹 협찬) ▶</a>');
+    else if(now<CHAMP_END)it.push('<a href="play.html#rank">지금 부문별 1·2위 맞히기 참여 — 10/25(일) 오전 8:30 마감 · 적중 상위 10명 원반 선물(연맹 협찬) ▶</a>');
+    else it.push('<a href="play.html#rank">승부 예측·1·2위 맞히기가 모두 마감됐어요 — 적중 결과는 승부 예측 페이지에서 ▶</a>');
+    recentGoals(5).forEach(function(s){it.push(s)});
+    var sc=(STATS&&STATS.scorers)||[];var tg=sc.filter(function(p){return +p.g>0}).sort(function(x,y){return y.g-x.g||y.a-x.a}).slice(0,2);var ta=sc.filter(function(p){return +p.a>0}).sort(function(x,y){return y.a-x.a||y.g-x.g}).slice(0,2);
+    var fp=function(p,u){return esc(p.team||p.school||'')+' '+esc(mask(p.name))+' '+(u==='g'?(+p.g)+'골':(+p.a)+'도움')};
+    if(tg.length||ta.length){var st='';if(tg.length)st+='득점 1위 '+fp(tg[0],'g')+(tg[1]?' · 2위 '+fp(tg[1],'g'):'');if(ta.length)st+=(st?' ◇ ':'')+'어시스트 1위 '+fp(ta[0],'a')+(ta[1]?' · 2위 '+fp(ta[1],'a'):'');it.push(st+' — 전체 순위는 회원만 (경기 시작·종료 때 갱신)')}
+    else it.push('지금 득점 1위·어시스트 1위는 누구일까요? 경기가 끝나면 여기에 나와요 — 전체 순위는 회원만');
+    it.push('<a href="#" data-tm-gy="1">2026 유소년 스포츠 기반구축사업 경상권역 대회 — 11월 28일(토) 해운대 해수욕장 비치 · 참가 학교 초등학생 선착순 250명 · 단체 버스·도시락·기념 티셔츠·원반 선물·이벤트 경기 1·2·3위 선물 · 문의 부산시플라잉디스크연맹 010-9317-1532 · 안내 보기 ▶</a>');
+    if(D===TMC.to&&now<CHAMP_END)it.push('<a href="play.html#rank">부문별 1·2위 맞히기 08:30 마감 — 승부 예측 페이지에서 참여하세요 ▶</a>');
+    return it};
+  var tkLast='',tkPend=null,tkPendAt=0;
+  var tkFit=function(){var tk=$('tmTicker'),tr=$('tmTkTrack'),s1=$('tmTk1'),s2=$('tmTk2');if(!tk||!tr||!s1||!s2)return;var w=tk.clientWidth||320;s1.style.minWidth=w+'px';s2.style.minWidth=w+'px';var sw=s1.offsetWidth||w;tr.style.animationDuration=Math.max(12,Math.round(sw/70))+'s'};   /* 초당 ~70px */
+  var tkApply=function(html){tkLast=html;tkPend=null;var tr=$('tmTkTrack'),s1=$('tmTk1'),s2=$('tmTk2');if(!tr||!s1||!s2)return;s1.innerHTML=html;s2.innerHTML=html;tr.style.animation='none';void tr.offsetWidth;tr.style.animation='';tkFit()};
+  /* 득점이 들어올 때마다 자막을 되감으면 뒤쪽 항목(1위·경상권역 안내)이 영영 안 보임 → 바뀐 내용은 보류했다가 한 바퀴 끝(animationiteration)에 바꿔 끼움. 처음 한 번만 즉시 */
+  var renderTicker=function(){var html=tickerItems().join('<i>◆</i>')+'<i>◆</i>';if(html===tkLast){tkPend=null;return}if(!tkLast){tkApply(html);return}if(tkPend!==html){tkPend=html;tkPendAt=Date.now()}};
+  (function(){var tk=$('tmTicker'),tr=$('tmTkTrack');if(!tk)return;tk.addEventListener('touchstart',function(){tk.classList.add('paused')},{passive:true});var off=function(){tk.classList.remove('paused')};tk.addEventListener('touchend',off,{passive:true});tk.addEventListener('touchcancel',off,{passive:true});
+    if(tr)tr.addEventListener('animationiteration',function(){if(tkPend)tkApply(tkPend)});
+    tk.addEventListener('click',function(e){var a=e.target&&e.target.closest?e.target.closest('a[data-tm-gy]'):null;if(a){e.preventDefault();gyOpen()}})})();
+  /* ── 승부 예측 버튼 부제 (1분마다) ── */
+  var leftTxt=function(ms){var m=Math.max(0,Math.ceil(ms/60000));var h=Math.floor(m/60),r=m%60,s=[];if(h)s.push(h+'시간');if(r||!h)s.push(r+'분');return s.join(' ')};
+  var pickSub=function(){var el=$('tmPickSub');if(!el)return;var now=Date.now(),t;
+    if(now<PICK_END)t='마감까지 '+leftTxt(PICK_END-now)+' · 원반 선물';
+    else if(now<CHAMP_END)t='부문별 1·2위 맞히기 · 마감까지 '+leftTxt(CHAMP_END-now);
+    else t='예측 마감 · 적중 결과 보기';
+    el.textContent=t};
+  /* ── 응원 댓글 띠 ── */
+  var ROOM='cheer_'+TMC.slotId,SEEN={},CUR={user:null,me:null};
+  var cheerRow=function(x){return '<b>'+esc(mask(x.name))+'</b> <span>'+esc(x.text)+'</span><small>'+esc(KFDF_CMT.timeAgo(x.at))+'</small>'};
+  var onCheer=function(list,err){var L=$('tmCheerList'),E=$('tmCheerEmpty'),C=$('tmCheerCnt');if(!L||!E)return;
+    if(err){E.textContent='응원 댓글을 불러오지 못했어요';E.style.display='flex';return}
+    var ids={};list.forEach(function(x){ids[x.id]=1});
+    Array.prototype.slice.call(L.children).forEach(function(el){var id=el.getAttribute('data-id');if(!ids[id]){L.removeChild(el);delete SEEN[id]}});
+    var first=!L.children.length;
+    list.forEach(function(x){if(SEEN[x.id])return;SEEN[x.id]=1;var d=document.createElement('div');d.className='tm-cm'+(first?' on':'');d.setAttribute('data-id',x.id);d.setAttribute('data-ts',String(tsec(x.at)||Date.now()));d.innerHTML=cheerRow(x);L.appendChild(d);if(!first){void d.offsetWidth;d.classList.add('on')}});
+    while(L.children.length>40)L.removeChild(L.firstChild);
+    E.style.display=L.children.length?'none':'flex';if(C)C.textContent=list.length?'최근 '+list.length+'개':''};
+  var cheerTimes=function(){if(!window.KFDF_CMT)return;var L=$('tmCheerList');if(!L)return;Array.prototype.forEach.call(L.querySelectorAll('.tm-cm'),function(el){var s=el.querySelector('small');if(s)s.textContent=KFDF_CMT.timeAgo(+el.getAttribute('data-ts'))})};
+  var sendCheer=function(){var inp=$('tmCheerTxt'),btn=$('tmCheerSend'),msg=$('tmCheerMsg');if(!inp||!btn||!msg)return;var t=inp.value.trim();msg.style.color='#ffb4b4';
+    if(!t){msg.textContent='응원 한마디를 적어 주세요';return}if(t.length>200){msg.textContent='200자 이내로 적어 주세요';return}
+    btn.disabled=true;msg.textContent='';
+    KFDF_CMT.send(ROOM,t,CUR.user,CUR.me).then(function(){inp.value='';msg.style.color='#9be7c4';msg.textContent='응원이 전해졌어요!';setTimeout(function(){if(msg.textContent==='응원이 전해졌어요!')msg.textContent=''},2500)})
+      .catch(function(e){msg.style.color='#ffb4b4';msg.textContent=(e&&e.message)||'보내지 못했어요. 잠시 뒤 다시 시도해 주세요'})
+      .then(function(){btn.disabled=false;try{inp.focus()}catch(_){}})};
+  var cheerUI=function(user,me){var box=$('tmCheerIn');if(!box)return;CUR.user=user;CUR.me=me;
+    if(user&&KFDF_CMT.canWrite(user,me)){box.innerHTML='<input id="tmCheerTxt" maxlength="200" placeholder="선수들에게 응원 한마디 (200자)" autocomplete="off" enterkeyhint="send"><button type="button" id="tmCheerSend">보내기</button>';
+      $('tmCheerSend').addEventListener('click',sendCheer);$('tmCheerTxt').addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.isComposing){e.preventDefault();sendCheer()}})}
+    else if(user)box.innerHTML='<span class="tm-cheer-note">가입 승인 뒤에 응원을 남길 수 있어요</span>';
+    else box.innerHTML='<a href="login.html?tab=signup&next=index.html">가입하고 응원하기</a><a class="lite" href="login.html?next=index.html">로그인</a>';
+    var g=$('tmCheerGuide');if(g)g.innerHTML=KFDF_CMT.guideHtml({size:'11px',color:'#6c7488'})};
+  /* ── 버튼: 응원 댓글로 스크롤 · 경상권역 안내창(버튼·자막 공용 gyOpen) ── */
+  var gyMd=$('tmGyeong');
+  var gyOpen=function(){if(!gyMd)return;gyMd.classList.add('open');document.body.style.overflow='hidden'};
+  var gyClose=function(){if(!gyMd)return;gyMd.classList.remove('open');document.body.style.overflow=''};
+  (function(){var b=$('tmBtnCheer');if(b)b.addEventListener('click',function(){var c=$('tmCheer');if(c)c.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){var i=$('tmCheerTxt');if(i)i.focus()},450)});
+    var g=$('tmBtnGy'),cl=$('tmGyClose');
+    if(g)g.addEventListener('click',gyOpen);if(cl)cl.addEventListener('click',gyClose);
+    if(gyMd)gyMd.addEventListener('click',function(e){if(e.target===gyMd)gyClose()});
+    document.addEventListener('keydown',function(e){if(e.key==='Escape'&&gyMd&&gyMd.classList.contains('open'))gyClose()})})();
+  /* ── [2차 디자인] 사진 무대 — 사진 공모전(photoContest, 공개 읽기)에서 방금 올라온 사진 12장을 16:9 무대에 6초마다 바꿔 보여 줌. 없으면 홈 배너 사진. 누르면 그 학교 앨범 ── */
+  var PH=[],PI=0,PT=null,PHk='';
+  var phShow=function(i){var st=$('tmStage');if(!st||!PH.length)return;PI=(i+PH.length)%PH.length;var L=st.querySelectorAll('.tm-ph');
+    Array.prototype.forEach.call(L,function(el,j){el.classList.toggle('on',j===PI)});var x=PH[PI]||{};var cap=$('tmStgCap');
+    if(cap)cap.innerHTML='<b>'+esc(x.cap||'')+'</b><small>'+esc(x.sub||'')+'</small>';var n=$('tmStgN');if(n)n.textContent=(PI+1)+' / '+PH.length;
+    var th=$('tmThumbs');if(th)Array.prototype.forEach.call(th.children,function(el,j){el.classList.toggle('on',j===PI);if(j===PI&&th.scrollWidth>th.clientWidth){var l=el.offsetLeft-th.clientWidth/2+el.clientWidth/2;th.scrollTo?th.scrollTo({left:l,behavior:'smooth'}):(th.scrollLeft=l)}});
+    var bar=$('tmStgBar');if(bar){bar.classList.remove('run');void bar.offsetWidth;if(PH.length>1)bar.classList.add('run')}
+    clearTimeout(PT);if(PH.length>1&&!document.hidden)PT=setTimeout(function(){phShow(PI+1)},6000)};
+  var phRender=function(){var st=$('tmStage'),th=$('tmThumbs');if(!st)return;var key=PH.map(function(x){return x.img}).join('|');if(key===PHk)return;PHk=key;
+    Array.prototype.forEach.call(st.querySelectorAll('.tm-ph'),function(el){el.remove()});
+    st.classList.toggle('empty',!PH.length);if(th)th.innerHTML='';if(!PH.length)return;
+    var bar=st.querySelector('.tm-stg-bar');PH.forEach(function(x,j){var d=document.createElement('a');d.className='tm-ph';d.href=x.href||'photo.html';d.setAttribute('aria-label',x.cap||'사진');d.style.backgroundImage='url("'+String(x.img).replace(/"/g,'%22')+'")';st.insertBefore(d,bar);
+      if(th){var b=document.createElement('button');b.type='button';b.className='tm-th';b.setAttribute('aria-label',(j+1)+'번째 사진');b.style.backgroundImage='url("'+String(x.img).replace(/"/g,'%22')+'")';b.addEventListener('click',function(){phShow(j)});th.appendChild(b)}});
+    phShow(Math.min(PI,PH.length-1))};
+  var phFallback=function(){if(PH.length)return;var u=[];Array.prototype.forEach.call(document.querySelectorAll('.kb-slide'),function(el){var m=/url\(["']?([^"')]+)["']?\)/.exec(el.style.backgroundImage||'');if(m&&u.indexOf(m[1])<0)u.push(m[1])});
+    if(u.length){PH=u.slice(0,8).map(function(x){return {img:x,cap:'연맹 사진첩',sub:'대회 사진은 사진 공모전에 올려 주세요',href:'photo.html'}});phRender()}};
+  var phLoad=function(){try{firebase.firestore().collection('photoContest').orderBy('atMs','desc').limit(30).get().then(function(q){
+      var L=[];q.docs.forEach(function(d){var x=d.data()||{};if(x.contest!=='2026-ultimate'||!x.img||L.length>=12)return;var sch=String(x.school||'').trim();
+        L.push({img:x.img,cap:[sch,String(x.title||'').trim()].filter(Boolean).join(' · ')||'경기 사진',sub:[x.level,x.atMs?KFDF_CMT&&KFDF_CMT.timeAgo?KFDF_CMT.timeAgo(x.atMs):'':''].filter(Boolean).join(' · '),href:x.fk?'photo.html#f='+encodeURIComponent(x.fk):'photo.html'})});
+      if(L.length){PH=L;phRender()}else setTimeout(phFallback,2500)}).catch(function(e){console.warn('tm photo',e);setTimeout(phFallback,2500)})}catch(e){console.warn('tm photo',e)}};
+  (function(){var p=$('tmStgP'),n=$('tmStgN2'),st=$('tmStage');if(p)p.addEventListener('click',function(e){e.preventDefault();phShow(PI-1)});if(n)n.addEventListener('click',function(e){e.preventDefault();phShow(PI+1)});
+    if(st){var sx=0;st.addEventListener('touchstart',function(e){sx=e.touches[0].clientX},{passive:true});st.addEventListener('touchend',function(e){var dx=e.changedTouches[0].clientX-sx;if(Math.abs(dx)>45){e.preventDefault();phShow(PI+(dx<0?1:-1))}})}
+    document.addEventListener('visibilitychange',function(){if(document.hidden)clearTimeout(PT);else if(PH.length)phShow(PI)})})();
+  /* ── 갱신·구독·부팅 ── */
+  var recalc=function(){if(pend)return;pend=setTimeout(function(){pend=null;collect();renderCourts();renderHead();renderTicker()},60)};
+  /* 로그인 상태 반영: 비로그인(tm-guest)이면 CTA 줄에 「회원가입」 버튼, 로그인(tm-member)이면 부제의 「(회원)」 숨김 · 구장 칸 링크·자막 가입 문구도 다시 */
+  var onUser=function(user,me){CUR.user=user||null;CUR.me=me||null;root.classList.toggle('tm-guest',!user);root.classList.toggle('tm-member',!!user);if(window.KFDF_CMT)cheerUI(user,me);recalc()};
+  var load=function(){
+    try{var db=firebase.firestore();
+      db.collection('liveMatches').where('day','==',D).onSnapshot(function(q){DAYM=take(q);loaded=true;recalc()},function(e){console.warn('tm day',e);loaded=true;recalc()});
+      /* [2026-10-24] status=='진행' 구독은 뺌 — 당일 경기는 day 구독에 다 들어 있어 같은 문서를 두 번 받던 것(읽기 2배) */
+      try{firebase.auth().onAuthStateChanged(function(u){if(u&&!(CUR&&CUR.user&&CUR.user.uid===u.uid)){db.collection('users').doc(u.uid).get().then(function(d){onUser(u,d.exists?d.data():null)}).catch(function(){onUser(u,null)})}else if(!u&&CUR&&CUR.user)onUser(null,null)})}catch(e){}   /* 느린 망에서 KFDF.ready(6초)가 비로그인으로 끝나도 뒤늦게 로그인 반영 */
+      db.collection('compStats').doc(TMC.slotId).onSnapshot(function(d){var x=d.exists?(d.data()||{}):{};KITS=x.kits||{};STATS=x.stats||null;recalc()},function(e){console.warn('tm stats',e)});
+    }catch(e){console.warn('tm load',e)}
+    if(window.KFDF_CMT){try{KFDF_CMT.listen(ROOM,onCheer,{limit:40})}catch(e){console.warn('tm cheer',e)}}
+    phLoad();setInterval(phLoad,180000);   /* 사진은 3분마다 새로 받음(구독 대신 — 읽기 비용) */
+    setInterval(function(){try{if(new Date(Date.now()+9*3600e3).toISOString().slice(0,10)!==D&&!/[?&]tmday=/.test(location.search))location.reload()}catch(e){}try{pickSub()}catch(e){}try{cheerTimes()}catch(e){}if(tkPend&&Date.now()-tkPendAt>120e3)tkApply(tkPend);recalc()},60000)};
+  /* firestore-compat 는 평소 위쪽(클럽 카드) 로더가 10초(40×250ms) 안에만 실어 줌 → 느린 경기장 망에서 firebase 초기화가 10초를 넘기면 비로그인 관람객은 영영 못 받음. 그 뒤엔 여기서 직접 실음(같은 주소가 이미 있으면 기다리고, 50초 넘게 안 오면 한 번 더). 120초 넘으면 「연결이 늦어요 — 새로고침」 */
+  var fsMine=false;
+  var tmFsInject=function(force){try{if(fsMine)return;if(!force&&document.querySelector('script[src*="firebase-firestore-compat"]'))return;fsMine=true;var sc=document.createElement('script');sc.src='https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js';document.head.appendChild(sc)}catch(e){}};
+  var bootFail=function(){var el=$('tmCourts');if(!el||loaded)return;el.innerHTML='<div class="tm-ct none" style="grid-column:1/-1;opacity:1"><div class="r1"><b>실시간 스코어</b><span class="tm-chip">연결이 늦어요</span></div><div class="r3" style="white-space:normal">경기장 통신이 느려 점수를 아직 못 받았어요. 잠시 뒤 새로고침해 주세요.</div><button type="button" class="tm-rl" id="tmReload">새로고침</button></div>';var b=$('tmReload');if(b)b.addEventListener('click',function(){location.reload()})};
+  var boot=function(n){if(window.firebase&&firebase.apps&&firebase.apps.length&&firebase.firestore&&firebase.auth){load();return}
+    if(window.firebase&&firebase.apps&&firebase.apps.length&&!firebase.firestore){if(n>=200)tmFsInject(true);else if(n>=44)tmFsInject(false)}
+    if(n>480){bootFail();return}setTimeout(function(){boot(n+1)},250)};
+  var rz=null;window.addEventListener('resize',function(){clearTimeout(rz);rz=setTimeout(tkFit,200)});
+  renderCourts();renderHead();renderTicker();pickSub();
+  if(window.KFDF&&KFDF.ready)KFDF.ready(onUser);else onUser(null,null);
+  boot(0);
+})();
+</script>
 <script src="auth_ui.js?v=20261020a"></script>
-<script src="firstguide.js?v=20261020c" data-auto="1"></script>
+<script>/* [대회 모드 2026-10-24] 축전 기간(TM_ON)에는 「처음 오신 분 안내」 자동 열기를 끔 — 경기용 첫 화면을 팝업이 가리지 않게. 왼쪽 아래 ❓ 버튼은 그대로 */(function(){var s=document.createElement('script');s.src='firstguide.js?v=20261024a';if(!window.TM_ON)s.setAttribute('data-auto','1');document.body.appendChild(s)})();</script>
 </body>
 </html>
