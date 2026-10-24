@@ -722,7 +722,7 @@ const REF_ROLE_ANY=/감독관|주심|기록|점수|심판위원장|심판장|심
 /* [2026-10-24 축전] 콘솔 입력(득점·제재·시계·구간·입력권 잡기/넘겨받기)은 그 경기의 감독관·기록심(기록원)만. 주심·부심·점수심과 다른 경기 심판은 점수 화면만 봄(교육 안 받은 주심이 자기 폰에서 눌러 이중 입력되던 것). 심판위원장·심판장·심판총괄(compStats.refRoles)·운영진(STAFF)은 그대로 */
 const REC_ROLE=/감독관|기록|심판위원장|심판장|심판총괄/;
 function recSupMe(){return !!ME&&/심판위원장|심판장|심판총괄/.test(((SLOT_ROLES||{})[ME.uid]||[]).join(' '))}   /* 대회 심판위원장급(전 경기 입력 가능) */
-function canRec(m){if(!ME||!m)return false;if(STAFF)return true;if(m.slotId===SLOT_ID&&recSupMe())return true;const me=MR.offOf(m,ME.uid);if(me&&REC_ROLE.test(String(me.role||'')))return true;return recOrphan(m)}
+function canRec(m){if(!ME||!m)return false;if(STAFF)return true;if(m.slotId===SLOT_ID&&recSupMe())return true;const me=MR.offOf(m,ME.uid);if(me&&REC_ROLE.test(String(me.role||'')))return true;if(courtCrewMe(m))return true;return recOrphan(m)}   /* [2026-10-24] 구장 공유 — 같은 날 같은 구장에 배정된 심판이면 그 구장 모든 경기 입력(한 기기·한 계정으로 계속). 경기별 배정 정보는 그대로 */
 /* [2026-10-24 안전망] 그 경기에 계정(uid)으로 배정된 감독관·기록심이 한 명도 없으면(이름만 배정·빈 칸) 대회 확정 심판이 입력·종료 — 아무도 못 누르는 경기가 생기지 않게 */
 function recOrphan(m){return !!ME&&!!m&&m.slotId===SLOT_ID&&SLOT_REFS.indexOf(ME.uid)>=0&&!MR.offList(m).some(x=>x.uid&&/감독관|기록/.test(String(x.role||'')))}
 function rcxRefMe(m){return !!ME&&!!m&&(!!MR.offOf(m,ME.uid)||SLOT_REFS.indexOf(ME.uid)>=0||SLOT_EVALS.indexOf(ME.uid)>=0)}   /* [2026-10-24] 「입력은 감독관·기록심만」 안내를 받을 사람 — 이 경기 배정자·대회 확정 심판. 비로그인 관람객·일반 회원은 「보기 전용」만 */
@@ -1648,7 +1648,7 @@ function rcOpen(id){
 }
 function rcClose(){if(RC_ID&&MR.qCount(RC_ID)&&!confirm('이 기기에 아직 서버에 안 올라간 기록이 '+MR.qCount(RC_ID)+'건 있습니다.\n닫아도 기기에 남아 있다가 이 경기를 다시 열면 전송됩니다. 닫을까요?'))return;RC_ID=null;QK.pend=null;QK.toast=null;QK.setup=null;QK.swap=false;QK.swapSel=null;if(RC_UNSUB){RC_UNSUB();RC_UNSUB=null}if(RC_BEAT){clearInterval(RC_BEAT);RC_BEAT=null}if(RC_TICK){clearInterval(RC_TICK);RC_TICK=null}const ov=document.getElementById('rcOv');if(ov)ov.remove();document.body.style.overflow='';sheetClose();try{history.replaceState(null,'',PAGE+'?slot='+SLOT_ID)}catch(e){}render()}
 /* [2026-10-24 축전] 열 때 입력권을 말없이 잡는 것은 그 경기 기록심(기록원)만 — 감독관·심판위원장·운영진이 먼저 열어도 기록심 화면을 가로채지 않음. 기록심(uid)이 배정되지 않은 경기는 예전처럼 입력 가능한 사람이 잡음. 그 밖에는 「입력 시작」·「▶ 경기 시작」·「넘겨받기」 한 번 누르면 됨 */
-function rcAutoClaim(m){if(!ME||!m)return false;const me=MR.offOf(m,ME.uid);if(me&&/기록/.test(String(me.role||'')))return true;return !MR.offList(m).some(x=>x.uid&&/기록/.test(String(x.role||'')))}
+function rcAutoClaim(m){if(!ME||!m)return false;const me=MR.offOf(m,ME.uid);if(me&&/기록/.test(String(me.role||'')))return true;if(courtCrewMe(m)&&MR.ctrlState(m,ME.uid)!=='other')return true;   /* 구장 공유 — 입력권이 비었거나 끊긴 경기는 이 구장 기기가 자동으로 잡음(다른 사람이 입력 중이면 안 뺏음) */return !MR.offList(m).some(x=>x.uid&&/기록/.test(String(x.role||'')))}
 async function rcClaim(force){
   const m=MATCHES.find(x=>x.id===RC_ID);if(!m||!canRec(m))return;
   const st=MR.ctrlState(m,ME.uid);if(st==='other'&&!force)return;
@@ -1697,7 +1697,7 @@ function rcRender(){
   const c=m.clock||{};const q=MR.qCount(RC_ID);
     const ofs=(function(){const L=MR.offList(m);const g={};L.forEach(x=>{(g[x.role||'심판']=g[x.role||'심판']||[]).push(x.name)});const parts=['감독관','주심','부심','점수심','기록심'].filter(r=>g[r]).map(r=>esc(r)+' <b>'+g[r].map(esc).join('·')+'</b>');
     return '<span class="ofs'+(parts.length?'':' none')+'">'+(parts.join(' <i>·</i> ')||'심판 미배정')+'</span>'+(STAFF?'<button class="ed" onclick="matchForm(\''+m.id+'\')">경기 정보</button>':'')+((!m.locked&&(STAFF||canFix(m)))?'<button class="ed" onclick="offSwapOpen()" title="결근·교체 — 이 경기 심판진만 바꿉니다(감독관·심판위원장·운영진)">심판진 교체</button>':'')+(rec?'<button class="ed u" '+(lastEv(m)?'':'disabled')+' onclick="qkUndoLast()" title="마지막 기록(득점·제재·작전타임)을 취소 표시합니다">↩ 되돌리기</button>':'')+(rec&&m.status!=='예정'?'<span class="tmode"><button class="g'+(QK.mode==='goal'?' on':'')+'" onclick="qkTop(\'goal\')" title="누르면 선수 명단으로 내려갑니다"><svg class="dk" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.5" class="d"/><circle cx="12" cy="12" r="6.2" class="r"/><circle cx="12" cy="12" r="1.9" class="c"/></svg> 득점</button><button class="c'+(QK.mode==='card'?' on':'')+'" onclick="qkTop(\'card\')" title="누르면 선수 명단으로 내려갑니다 · 저장하면 점수판으로">🟨 제재</button><button class="i'+(QK.mode==='injury'?' on':'')+'" onclick="qkTop(\'injury\')" title="부상 선수와 정도를 기록합니다 — 기록지에는 시각만, 상세는 대회 부상 현황에">🩹 부상</button></span>':'')})();
-  const ctrl=!can?'<div class="ctrl"><span>보기 전용'+(m.locked?' · 확정된 경기':'')+'</span>'+ofs+'</div>'+((m.locked||!rcxRefMe(m))?'':'<div class="rcx-note">입력은 이 경기 감독관·기록심(기록원)만 합니다. 문제가 있으면 감독관에게 알려 주세요</div>')
+  const ctrl=!can?'<div class="ctrl"><span>보기 전용'+(m.locked?' · 확정된 경기':'')+'</span>'+ofs+'</div>'+((m.locked||!rcxRefMe(m))?'':'<div class="rcx-note">입력은 이 구장 담당 심판진만 합니다. 문제가 있으면 감독관에게 알려 주세요</div>')
     :st==='mine'?'<div class="ctrl mine"><span>입력 중 · '+esc(MY.name||'')+(q?' · <b>미전송 '+q+'건</b>':'')+'</span>'+ofs+'</div>'
     :aux?'<div class="ctrl mine" style="background:#eef3fb;color:#1c2e55"><span>'+esc(MR.ctrlLabel(m))+' 입력 중 · <b>보조 입력</b> '+esc(MY.name||'')+'</span>'+ofs+'<button onclick="rcTake()" style="background:#8a919d">넘겨받기</button></div>'
  :st==='other'?'<div class="ctrl other"><span>'+esc(MR.ctrlLabel(m))+' 입력 중 — 보기 전용</span>'+ofs+'<button onclick="rcTake()">넘겨받기</button></div>'
