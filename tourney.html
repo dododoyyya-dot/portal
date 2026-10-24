@@ -275,7 +275,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="matchrec.js?v=20261024c"></script>
+<script src="matchrec.js?v=20261025a"></script>
 <script src="comments.js?v=20261024e"></script>
 <script>
 // ══════════ 대회 현황 (tourney.html · 2026-10-24) — 회원 유입용 공개 화면 ══════════
@@ -306,8 +306,9 @@ function tnKoNo(r){const m=/(\d+)\s*경기/.exec(String(r||''));return m?+m[1]:0
 function tnKst(x){const t=TN_MR.tsMs(x);if(!t)return '';const d=new Date(t+9*3600e3);const hm=String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0');const day=d.toISOString().slice(0,10);return day===TN_TODAY?hm:day.slice(5).replace('-','/')+' '+hm}
 function tnDay(d){d=String(d||'');return d?d.slice(5).replace('-','/'):''}
 function tnDow(d){try{const x=new Date(String(d)+'T00:00:00Z');const w=['일','월','화','수','목','금','토'][x.getUTCDay()];return w||''}catch(e){return ''}}
-function tnKit(pid){const k=pid&&(TN.kits||{})[pid];const c=k&&k.k1&&!k.k1.none&&String(k.k1.color||'').trim();return c&&/^(#[0-9a-f]{3,8}|[a-z]{3,20}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\))$/i.test(c)?c:''} /* 색 형식(#hex·이름·rgb())만 — style 속성 주입 방지 */
-function tnDot(pid){const c=tnKit(pid);return c?'<span class="tn-dot" style="background:'+tnEsc(c)+'" title="경기복 색"></span>':''}
+function tnKit(pid,idx){const k=pid&&(TN.kits||{})[pid];if(idx==null)idx=0;const kk=k&&(idx===1?(k.k2||k.k1):(k.k1||k.k2));const c=kk&&String(kk.color||(kk.none?'#9ca3af':'')).trim();   /* [2026-10-25] 그 경기에 입은 옷(운영조끼 포함) */return c&&/^(#[0-9a-f]{3,8}|[a-z]{3,20}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\))$/i.test(c)?c:''} /* 색 형식(#hex·이름·rgb())만 — style 속성 주입 방지 */
+function tnIdx(m,side,pid){const v=((m||{}).kit||{})[side];if(v===0||v===1)return v;const k=pid&&(TN.kits||{})[pid];return (k&&k.wear===1)?1:0}
+function tnDot(pid,idx){const c=tnKit(pid,idx);return c?'<span class="tn-dot" style="background:'+tnEsc(c)+'" title="경기복 색"></span>':''}
 function tnPn(p){if(!p||!p.name)return '';const no=p.no!=null?String(p.no).trim():'';return (no?no+'번 ':'')+tnMask(p.name)}
 function tnStLabel(m){return m.status==='진행'?'진행'+(m.period?' · '+m.period:''):m.status==='종료'?'종료':(m.status||'예정')}
 function tnStCls(m){return m.status==='진행'?'live':m.status==='종료'?'done':'next'}
@@ -315,7 +316,7 @@ function tnMeta(m){return [m.div,m.group,m.round].filter(Boolean).join(' · ')}
 function tnSortM(){TN.M.sort((a,b)=>String(a.day||'').localeCompare(String(b.day||''))||String(a.time||'').localeCompare(String(b.time||''))||tnCourtNo(a.court)-tnCourtNo(b.court)||(+a.order||0)-(+b.order||0))}
 function tnDivs(){const s=new Set();TN.M.forEach(m=>s.add(m.div||''));Object.keys((TN.stats||{}).byDiv||{}).forEach(k=>s.add(String(k).split(' · ')[0]));return Array.from(s).filter(Boolean).sort((a,b)=>{const ia=TN_DIVS.indexOf(a),ib=TN_DIVS.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b,'ko')})}
 function tnTeam(m,side){const t=m[side]||{};const n=t.name||t.school||'';const ph=tnIsPh(n);const sc=TN_MR.score(m.events||[]);const win=m.status==='종료'&&(side==='a'?sc.a>sc.b:sc.b>sc.a);
-  return '<span class="tn-tm '+side+(win?' win':'')+(ph?' ph':'')+'">'+(side==='a'?tnDot(t.pid):'')+'<span class="nm">'+tnEsc(n||(side==='a'?'A':'B'))+'</span>'+(side==='b'?tnDot(t.pid):'')+'</span>'}
+  return '<span class="tn-tm '+side+(win?' win':'')+(ph?' ph':'')+'">'+(side==='a'?tnDot(t.pid,tnIdx(m,side,t.pid)):'')+'<span class="nm">'+tnEsc(n||(side==='a'?'A':'B'))+'</span>'+(side==='b'?tnDot(t.pid):'')+'</span>'}
 function tnLastGoal(m){const g=(m.events||[]).filter(e=>e&&!e.void&&e.type==='goal');return g.length?g[g.length-1]:null}
 function tnGoalTxt(m,e){const t=m[e.side]||{};return '<b>'+tnEsc(t.name||t.school||'')+'</b> '+tnEsc(tnPn(e.scorer)||'득점')+(e.assist&&e.assist.name?' · 도움 '+tnEsc(tnPn(e.assist)):'')+' · '+tnEsc([e.period||'',TN_MR.evTime(e)||''].filter(Boolean).join(' '))}
 function tnFeed(n){const G=[];TN.M.forEach(m=>(m.events||[]).forEach((e,i)=>{if(e&&!e.void&&e.type==='goal')G.push({m:m,e:e,t:TN_MR.tsMs(e.t)||0,i:i})}));G.sort((x,y)=>y.t-x.t||y.i-x.i);return G.slice(0,n||10)}
