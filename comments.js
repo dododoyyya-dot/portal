@@ -39,9 +39,11 @@
   function mask(n){n=String(n||'').trim();if(!n)return '익명';if(n.length<2)return n;if(n.length===2)return n[0]+'*';return n[0]+'*'.repeat(n.length-2)+n[n.length-1]}
   function canWrite(me,my){return !!(me&&my&&my.status==='approved'&&my.name)}
   function db(){return firebase.firestore()}
+  /* [2026-10-24] 실명 전환 전에 가린 이름(김*수)으로 저장된 글 — 관리자 화면이 열리면 회원 문서의 실명으로 고침(규칙 v73: 관리자만 name 수정) */
+  var _fixTried={},_last={};function fixAll(){Object.keys(_last).forEach(function(r){fixNames(r,_last[r])})}function fixNames(room,L){try{if(!window.__CMT_ADMIN)return;(L||[]).forEach(function(m){if(!m||!m.id||!m.uid||String(m.name||'').indexOf('*')<0||_fixTried[m.id])return;_fixTried[m.id]=1;db().collection('users').doc(m.uid).get().then(function(d){var n=d.exists?String((d.data()||{}).name||'').trim():'';if(n&&n!==m.name)return db().collection('liveChat').doc(room).collection('msgs').doc(m.id).update({name:n.slice(0,20)})}).catch(function(e){console.warn('cmt fix',e)})})}catch(e){}}
   function listen(room,cb,opt){opt=opt||{};var lim=+opt.limit||60;
     return db().collection('liveChat').doc(room).collection('msgs').orderBy('at','desc').limit(lim).onSnapshot(function(q){
-      var L=q.docs.map(function(d){var x=d.data()||{};x.id=d.id;return x}).filter(function(m){return !m.del}).reverse();cb(L)},function(e){console.warn('comments',room,e);cb([],e)})}
+      var L=q.docs.map(function(d){var x=d.data()||{};x.id=d.id;return x}).filter(function(m){return !m.del}).reverse();_last[room]=L;fixNames(room,L);cb(L)},function(e){console.warn('comments',room,e);cb([],e)})}
   function send(room,text,me,my){
     if(!me)return Promise.reject(new Error('로그인 후 적을 수 있어요'));
     if(!canWrite(me,my))return Promise.reject(new Error('가입 승인 뒤에 적을 수 있어요'));
@@ -52,5 +54,5 @@
   function timeAgo(ts){try{var d=ts&&ts.toDate?ts.toDate():(ts?new Date(ts):null);if(!d||isNaN(d))return '';var s=(Date.now()-d.getTime())/1000;if(s<60)return '방금';if(s<3600)return Math.floor(s/60)+'분 전';return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}catch(e){return ''}}
   function guideHtml(opt){opt=opt||{};return '<div class="cmt-guide" style="font-size:'+(opt.size||'11.5px')+';color:'+(opt.color||'#6b7280')+';line-height:1.55;word-break:keep-all">'
     +(opt.title?'<b>'+esc(opt.title)+'</b> ':'')+'이름은 실명으로 표시되고 누구나 볼 수 있어요. 욕설·비방·놀림·개인정보(전화번호 등)·광고는 보낼 수 없고, 운영진이 지울 수 있어요. 선수와 학교를 응원하는 따뜻한 말을 남겨 주세요.</div>'}
-  window.KFDF_CMT={clean:clean,listen:listen,send:send,del:del,mask:mask,guideHtml:guideHtml,canWrite:canWrite,timeAgo:timeAgo,esc:esc};
+  window.KFDF_CMT={clean:clean,listen:listen,fixNames:fixNames,fixAll:fixAll,send:send,del:del,mask:mask,guideHtml:guideHtml,canWrite:canWrite,timeAgo:timeAgo,esc:esc};
 })();

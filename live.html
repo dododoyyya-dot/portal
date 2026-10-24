@@ -233,7 +233,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
 <script src="matchrec.js?v=20261024c"></script>
-<script src="comments.js?v=20261024d"></script>
+<script src="comments.js?v=20261024e"></script>
 <script>
 // ══════════ 라이브 중계 (공개) ══════════
 //   설정: siteContent/live = {on, title, comp, streams:[{videoId,label}], chat('youtube'|'off'), featured(경기 ID), note}
@@ -289,7 +289,7 @@ function chatDraw(){const el=document.getElementById('scList');if(!el)return;con
   el.innerHTML=CHAT.length?CHAT.slice().reverse().map(m=>'<div class="sc-msg"><span class="nm'+(m.op?' op':'')+'">'+(m.op?'🎙 ':'')+esc(chatName(m))+'</span><span class="tx">'+esc(m.text||'')+'</span><span class="tm">'+esc(hm(m.at))+'</span>'+(CAN_OP?'<button class="del" onclick="chatDel(\''+m.id+'\')" title="삭제">✕</button>':'')+'</div>').join(''):'<div style="color:#8a919d;text-align:center;padding:20px 0;font-size:12.5px">첫 응원 메시지를 남겨 보세요!</div>';
   if(atBottom||!el.dataset.init){el.scrollTop=el.scrollHeight;el.dataset.init='1'}}
 function chatListen(room){room=room||curVid();if(!room)return;if(CHAT_UNSUB&&CHAT_ROOM===room)return;if(CHAT_UNSUB){CHAT_UNSUB();CHAT_UNSUB=null;CHAT=[]}CHAT_ROOM=room;
-  CHAT_UNSUB=DB.collection('liveChat').doc(room).collection('msgs').orderBy('at','desc').limit(150).onSnapshot(sn=>{CHAT=sn.docs.map(d=>Object.assign({id:d.id},d.data())).filter(m=>!m.del);chatDraw()},e=>{console.warn('liveChat',e);const el=document.getElementById('scList');if(el)el.innerHTML='<div style="color:#8a919d;text-align:center;padding:20px 0;font-size:12.5px">채팅을 불러오지 못했습니다 (보안 규칙 v45 게시 전)</div>'})}
+  CHAT_UNSUB=DB.collection('liveChat').doc(room).collection('msgs').orderBy('at','desc').limit(150).onSnapshot(sn=>{CHAT=sn.docs.map(d=>Object.assign({id:d.id},d.data())).filter(m=>!m.del);try{KFDF_CMT.fixNames&&KFDF_CMT.fixNames(room,CHAT)}catch(e){}chatDraw()},e=>{console.warn('liveChat',e);const el=document.getElementById('scList');if(el)el.innerHTML='<div style="color:#8a919d;text-align:center;padding:20px 0;font-size:12.5px">채팅을 불러오지 못했습니다 (보안 규칙 v45 게시 전)</div>'})}
 // [2026-10-24] 보내기 전에 공용 모듈(comments.js · KFDF_CMT.clean)로 욕설·비방·전화번호·링크를 거릅니다 — 막히면 입력칸 아래 안내(lvcWhy)만 보이고 보내지 않음, 통과하면 약한 말은 별표로 가려진 글을 보냄. 모듈이 없으면 예전처럼 길이만 검사.
 //   운영자(CAN_OP · 🎙 표시 공지)는 거르지 않고 예전처럼 길이(300자)만 검사 — 공지에 중계 링크·문의 전화번호·강조 기호를 넣을 수 있게. 일반 회원 채팅은 그대로 거름.
 function lvcWhy(msg){const el=document.getElementById('lvcWhy');if(!el){if(msg)alert(msg);return}el.textContent=msg||'';el.style.display=msg?'block':'none'}
@@ -371,7 +371,7 @@ DB.collection('siteContent').doc('live').onSnapshot(d=>{LIVE=d.exists?(d.data()|
 DB.collection('liveMatches').orderBy('updatedAt','desc').limit(200).onSnapshot(s=>{ALLM=s.docs.map(d=>Object.assign({id:d.id},d.data()));applySlot();render()},e=>{console.warn('liveMatches',e);document.getElementById('lvNone').style.display='block';document.getElementById('lvNone').textContent='경기 정보를 불러오지 못했습니다 (보안 규칙 v43 게시 전이면 표시되지 않습니다).'});
 // ── 운영 콘솔 (사무국·시도임원·스코어 입력 권한자) ──
 AUTH.onAuthStateChanged(async u=>{ME=u;try{render()}catch(e){}if(!u)return;try{const d=await DB.collection('users').doc(u.uid).get();MY=d.exists?(d.data()||{}):{};
-  const roles=[MY.role].concat(MY.roles||[]);CAN_OP=MY.owner===true||roles.indexOf('admin')>=0||roles.indexOf('sidoOfficer')>=0||MY.liveScorer===true;
+  const roles=[MY.role].concat(MY.roles||[]);window.__CMT_ADMIN=roles.indexOf('admin')>=0;CAN_OP=MY.owner===true||roles.indexOf('admin')>=0||roles.indexOf('sidoOfficer')>=0||MY.liveScorer===true;
   if(CAN_OP){document.getElementById('opBar').style.display='block';if(/[?&]op=1/.test(location.search))opToggle()}
   const c=document.getElementById('lvChat');c.dataset.tab='';renderChat()}catch(e){}});
 let OP_SLOTS=null;

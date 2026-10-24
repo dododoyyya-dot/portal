@@ -1168,7 +1168,7 @@ try{firebase.firestore().collection('siteContent').doc('live').onSnapshot(functi
   firebase.firestore().collection('liveMatches').where('day','==',D).onSnapshot(function(q){DAYM=take(q);recalc()},function(e){console.warn('courtTicker day',e)})}catch(e){}})();
 </script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="comments.js?v=20261024d"></script>
+<script src="comments.js?v=20261024e"></script>
 <script>
 /* ══════════ [대회 모드 2026-10-24] 축전 메인 — 6개 구장 실시간 스코어+최근 득점 · 응원 댓글 띠(comments.js) · 큰 버튼 · 뉴스 자막 · 경상권역 안내창
  *  상단 TM 상수(body.tm-on) 일 때만 동작. 데이터: liveMatches(day==오늘 KST + status=='진행', test·다른 slotId 제외) · compStats/{slotId}(kits·stats) · liveChat/cheer_{slotId}
@@ -1332,7 +1332,7 @@ try{firebase.firestore().collection('siteContent').doc('live').onSnapshot(functi
   /* 로그인 상태 반영: 비로그인(tm-guest)이면 CTA 줄에 「회원가입」 버튼, 로그인(tm-member)이면 부제의 「(회원)」 숨김 · 구장 칸 링크·자막 가입 문구도 다시 */
   /* [2026-10-24] 햇님 = 기록실 바로가기 — 축전 운영진에게만 눌림(다른 회원·비회원에겐 그냥 그림). 입력 권한은 기록실이 따로 판단 */
 window.__SUN=window.__SUN||{u:null,me:null,ref:[],vot:[],vl:0};
-window.tmSunUpd=function(){var S=window.__SUN,sg=document.getElementById('tmSunGo');if(!sg)return;var u=S.u,my=S.me||{};var roles=[my.role].concat(my.roles||[]);
+window.tmSunUpd=function(){var S=window.__SUN,sg=document.getElementById('tmSunGo');if(!sg)return;var u=S.u,my=S.me||{};var roles=[my.role].concat(my.roles||[]);window.__CMT_ADMIN=!!u&&roles.indexOf('admin')>=0;if(window.__CMT_ADMIN&&window.KFDF_CMT&&KFDF_CMT.fixAll)KFDF_CMT.fixAll();
   var ok=!!u&&(my.owner===true||roles.indexOf('admin')>=0||roles.indexOf('sidoOfficer')>=0||my.liveScorer===true||S.ref.indexOf(u.uid)>=0||S.vot.indexOf(u.uid)>=0);sg.style.display=ok?'block':'none'};
 var onUser=function(user,me){try{var S=window.__SUN;S.u=user||null;S.me=me||null;window.tmSunUpd();if(user&&!S.vl){S.vl=1;firebase.firestore().collection('photoVoters').doc(TMC.slotId).get().then(function(d){S.vot=(d.exists&&(d.data()||{}).uids)||[];window.tmSunUpd()}).catch(function(){S.vl=0})}}catch(e){}CUR.user=user||null;CUR.me=me||null;root.classList.toggle('tm-guest',!user);root.classList.toggle('tm-member',!!user);if(window.KFDF_CMT)cheerUI(user,me);recalc()};
   var load=function(){
