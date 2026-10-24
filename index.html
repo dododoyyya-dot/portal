@@ -1183,7 +1183,7 @@ try{firebase.firestore().collection('siteContent').doc('live').onSnapshot(functi
   var KITC={'#ffffff':'흰색','#1f2329':'검정','#d62839':'빨강','#f28c28':'주황','#f6c90e':'노랑','#1f9d55':'초록','#4fb3f6':'하늘','#1f5fd6':'파랑','#1b2a5e':'남색','#7b4bd1':'보라','#f06aa6':'분홍','#9aa1ad':'회색'};
   var $=function(id){return document.getElementById(id)};
   var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
-  var mask=function(n){return window.KFDF_CMT?KFDF_CMT.mask(n):String(n||'')};
+  var mask=function(n){return String(n||'')};   /* [2026-10-24] 경기 기록(득점·어시스트·순위)은 실명 — 응원톡 이름만 가림(cheerRow) */
   var tsec=function(x){try{if(!x)return 0;if(x.toMillis)return x.toMillis();if(x.seconds)return x.seconds*1000;if(typeof x==='number')return x;var t=Date.parse(x);return isNaN(t)?0:t}catch(e){return 0}};
   var p2=function(n){return String(n).padStart(2,'0')};
   /* 머리 줄 날짜: 10.24(토) · 1일차 예선 */
@@ -1273,7 +1273,7 @@ try{firebase.firestore().collection('siteContent').doc('live').onSnapshot(functi
     el.textContent=t};
   /* ── 응원 댓글 띠 ── */
   var ROOM='cheer_'+TMC.slotId,SEEN={},CUR={user:null,me:null};
-  var cheerRow=function(x){return '<b>'+esc(mask(x.name))+'</b> <span>'+esc(x.text)+'</span><small>'+esc(KFDF_CMT.timeAgo(x.at))+'</small>'};
+  var cheerRow=function(x){return '<b>'+esc(window.KFDF_CMT?KFDF_CMT.mask(x.name):String(x.name||''))+'</b> <span>'+esc(x.text)+'</span><small>'+esc(KFDF_CMT.timeAgo(x.at))+'</small>'};
   var onCheer=function(list,err){var L=$('tmCheerList'),E=$('tmCheerEmpty'),C=$('tmCheerCnt');if(!L||!E)return;
     if(err){E.textContent='응원 댓글을 불러오지 못했어요';E.style.display='flex';return}
     var ids={};list.forEach(function(x){ids[x.id]=1});
