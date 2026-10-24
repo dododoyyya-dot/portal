@@ -723,18 +723,20 @@ const REF_ROLE_ANY=/감독관|주심|기록|점수|심판위원장|심판장|심
 /* [2026-10-24 축전] 콘솔 입력(득점·제재·시계·구간·입력권 잡기/넘겨받기)은 그 경기의 감독관·기록심(기록원)만. 주심·부심·점수심과 다른 경기 심판은 점수 화면만 봄(교육 안 받은 주심이 자기 폰에서 눌러 이중 입력되던 것). 심판위원장·심판장·심판총괄(compStats.refRoles)·운영진(STAFF)은 그대로 */
 const REC_ROLE=/감독관|기록|심판위원장|심판장|심판총괄/;
 function recSupMe(){return !!ME&&/심판위원장|심판장|심판총괄/.test(((SLOT_ROLES||{})[ME.uid]||[]).join(' '))}   /* 대회 심판위원장급(전 경기 입력 가능) */
-function canRec(m){if(!ME||!m)return false;if(STAFF)return true;if(m.slotId===SLOT_ID&&recSupMe())return true;const me=MR.offOf(m,ME.uid);if(me&&REC_ROLE.test(String(me.role||'')))return true;if(courtCrewMe(m))return true;return recOrphan(m)}   /* [2026-10-24] 구장 공유 — 같은 날 같은 구장에 배정된 심판이면 그 구장 모든 경기 입력(한 기기·한 계정으로 계속). 경기별 배정 정보는 그대로 */
+function canRec(m){if(!ME||!m)return false;if(STAFF)return true;if(m.slotId===SLOT_ID&&fieldMe())return true;if(m.slotId===SLOT_ID&&recSupMe())return true;const me=MR.offOf(m,ME.uid);if(me&&REC_ROLE.test(String(me.role||'')))return true;if(courtCrewMe(m))return true;return recOrphan(m)}   /* [2026-10-24] 구장 공유 — 같은 날 같은 구장에 배정된 심판이면 그 구장 모든 경기 입력(한 기기·한 계정으로 계속). 경기별 배정 정보는 그대로 */
 /* [2026-10-24 안전망] 그 경기에 계정(uid)으로 배정된 감독관·기록심이 한 명도 없으면(이름만 배정·빈 칸) 대회 확정 심판이 입력·종료 — 아무도 못 누르는 경기가 생기지 않게 */
 function recOrphan(m){return !!ME&&!!m&&m.slotId===SLOT_ID&&SLOT_REFS.indexOf(ME.uid)>=0&&!MR.offList(m).some(x=>x.uid&&/감독관|기록/.test(String(x.role||'')))}
 function rcxRefMe(m){return !!ME&&!!m&&(!!MR.offOf(m,ME.uid)||SLOT_REFS.indexOf(ME.uid)>=0||SLOT_EVALS.indexOf(ME.uid)>=0)}   /* [2026-10-24] 「입력은 감독관·기록심만」 안내를 받을 사람 — 이 경기 배정자·대회 확정 심판. 비로그인 관람객·일반 회원은 「보기 전용」만 */
 function canOfficial(){return !!ME&&(STAFF||SLOT_REFS.indexOf(ME.uid)>=0)}
+/* [2026-10-24 대회 중] 현장 운영진 — 운영본부·확정 심판·평가자·배정 심판 전원. 권한 구분 없이 모든 경기 입력·종료·정정·오더지 수정(사용자 지시: 「권한 분리할 때가 아님」, 규칙 v75) */
+function fieldMe(){if(!ME)return false;if(STAFF)return true;const u=ME.uid;return (SLOT_REFS||[]).indexOf(u)>=0||(SLOT_EVALS||[]).indexOf(u)>=0||(SLOT_CREW||[]).indexOf(u)>=0}
 /* [2026-10-24] 경기복·조끼 수정 권한 — 운영진·확정 심판·이 구장 심판진(배정 심판 전원 명단 crewUids 포함) */
-function kitCan(m){if(!ME)return false;if(STAFF||canOfficial())return true;if(SLOT_CREW&&SLOT_CREW.indexOf(ME.uid)>=0)return true;const mm=m||RCM();return !!(mm&&courtCrewMe(mm))}
+function kitCan(m){if(!ME)return false;if(STAFF||canOfficial()||fieldMe())return true;if(SLOT_CREW&&SLOT_CREW.indexOf(ME.uid)>=0)return true;const mm=m||RCM();return !!(mm&&courtCrewMe(mm))}
 function teamCrewMe(pid){return !!ME&&!!pid&&MATCHES.some(m=>m.slotId===SLOT_ID&&(((m.a||{}).pid===pid)||((m.b||{}).pid===pid))&&courtCrewMe(m))}
 function canEval(){return !!ME&&(STAFF||SLOT_REFS.indexOf(ME.uid)>=0||SLOT_EVALS.indexOf(ME.uid)>=0)}/* 팀·학교 평가: 이 대회 확정 심판 전원 */
 function myRole(m){const me=MR.offOf(m,ME&&ME.uid);return me?me.key:''}   /* [2026-10-21] 운영진이 열어도 기록심 칸에 서명하지 않음(기록원이 문현민으로 바뀌던 원인) */
 /* [2026-10-21] 보조 입력 — 입력권은 기록심 1명이 갖고, 관리자·그 경기 감독관(심판위원장)은 입력권 없이도 득점·제재·부상을 기록. 시계·구간은 입력권자만 */
-function isAssist(m){if(!ME||!m)return false;if(STAFF)return true;const me=MR.offOf(m,ME.uid);return !!((me&&me.role==='감독관')||recSupMe())}   /* [2026-10-24] 다른 경기의 감독관은 보조 입력 불가 */
+function isAssist(m){if(!ME||!m)return false;if(STAFF)return true;if(m.slotId===SLOT_ID&&fieldMe())return true;const me=MR.offOf(m,ME.uid);return !!((me&&me.role==='감독관')||recSupMe())}   /* [2026-10-24] 다른 경기의 감독관은 보조 입력 불가 */
 // ── 로그인·시작 ──
 AUTH.onAuthStateChanged(async u=>{ME=u;MY=null;STAFF=false;
   if(u){try{const d=await DB.collection('users').doc(u.uid).get();MY=d.exists?(d.data()||{}):{};STAFF=MR.isStaffUser(MY)}catch(e){MY={}}}
@@ -999,7 +1001,7 @@ function sigStRender(){const S=SIGST;const mark=v=>v===true?'<b style="color:#0f
 async function sigNotify(){const L=(SIGST&&SIGST.miss)||[];if(!L.length)return;if(!confirm('서명이 없는 '+L.length+'명에게 「서명 등록」 알림을 보낼까요? (사이트 알림 → 마이페이지 서명 칸으로 연결)'))return;let n=0;
   for(const u of L){try{await KFDF.notify(u,'✍ ['+(SLOT.title||'대회')+'] 서명을 등록해 주세요 — 오더지·경기 결과지에 자동으로 들어갑니다','mypage.html#sigBox');n++}catch(e){}}say('✓ '+n+'명에게 알림을 보냈습니다.')}
 /* [2026-10-21] 확정된 경기의 정정 권한 — 그 경기 감독관 · 대회 심판위원장(심판장·심판총괄) · 회장(owner, 비상용). 사무국·시도임원·기록심은 불가(규칙 v62) */
-function canFix(m){if(!ME||!m)return false;if(MY&&MY.owner===true)return true;if(PRACTICE)return true;const me=MR.offOf(m,ME.uid);if(me&&(me.key==='supervisor'||me.role==='감독관'))return true;return /심판위원장|심판장|심판총괄/.test(((SLOT_ROLES||{})[ME.uid]||[]).join(' '))}
+function canFix(m){if(!ME||!m)return false;if(MY&&MY.owner===true)return true;if(PRACTICE)return true;if(m.slotId===SLOT_ID&&fieldMe())return true;const me=MR.offOf(m,ME.uid);if(me&&(me.key==='supervisor'||me.role==='감독관'))return true;return /심판위원장|심판장|심판총괄/.test(((SLOT_ROLES||{})[ME.uid]||[]).join(' '))}
 function isAdminMe(){if(!MY)return false;const roles=[MY.role].concat(MY.roles||[]);return MY.owner===true||roles.indexOf('admin')>=0}
 /* [2026-10-19] 참가 공고 하나만 삭제 — 시험 공고가 실제 대회에 붙어 있을 때 대회 전체 삭제 대신. 되돌릴 수 없음 */
 /* 참가 공고 하나를 그 경기·오더지·집계·서명·평가와 함께 지우고, 대회 slotIds 에서 뺌. 남은 대회 문서 목록을 돌려줌 */
@@ -1502,7 +1504,7 @@ async function orderOpen(pid){
 }
 let OD_KIT=false,OD_REF=false;
 /* [2026-10-24] 경기 중 오더지 정정 — 이 팀 경기의 감독관·기록심(기록원), 대회 심판위원장급은 명단·배번·경기복을 고칠 수 있음(시작 뒤에도). 잠금 오더지·서명·제출 상태는 그대로(규칙 v71) */
-function odRefCan(pid){if(!ME||STAFF)return false;if(recSupMe()&&canOfficial())return true;if(teamCrewMe(pid))return true;return MATCHES.some(m=>m.slotId===SLOT_ID&&(((m.a||{}).pid===pid)||((m.b||{}).pid===pid))&&(()=>{const me=MR.offOf(m,ME.uid);return !!(me&&REC_ROLE.test(String(me.role||'')))})())}
+function odRefCan(pid){if(!ME||STAFF)return false;if(fieldMe())return true;if(recSupMe()&&canOfficial())return true;if(teamCrewMe(pid))return true;return MATCHES.some(m=>m.slotId===SLOT_ID&&(((m.a||{}).pid===pid)||((m.b||{}).pid===pid))&&(()=>{const me=MR.offOf(m,ME.uid);return !!(me&&REC_ROLE.test(String(me.role||'')))})())}
 async function orderRefSave(pid){const id=MR.orderId(SLOT_ID,pid);const prev=orderOf(pid);if(!prev){say('아직 저장된 오더지가 없습니다. 팀 대표자나 운영본부가 먼저 작성해야 합니다.');return}
   const chk=MR.orderCheck(OD);const subs={};(OD.players||[]).forEach(p=>{const n=String(p.subNo||'').trim();if(!n)return;if(!/^\d{1,3}$/.test(n))chk.errs.push(p.name+' 2번 옷 배번은 숫자(1~3자리)');else if(subs[n])chk.errs.push('2번 옷 배번 '+n+' 중복('+subs[n]+'·'+p.name+')');else subs[n]=p.name});
   if(chk.errs.length&&!confirm('확인해 주세요:\n· '+chk.errs.join('\n· ')+'\n\n그대로 저장할까요?'))return;
@@ -1716,7 +1718,7 @@ function rcRender(){
   const c=m.clock||{};const q=MR.qCount(RC_ID);
     const ofs=(function(){const L=MR.offList(m);const g={};L.forEach(x=>{(g[x.role||'심판']=g[x.role||'심판']||[]).push(x.name)});const parts=['감독관','주심','부심','점수심','기록심'].filter(r=>g[r]).map(r=>esc(r)+' <b>'+g[r].map(esc).join('·')+'</b>');
     return '<span class="ofs'+(parts.length?'':' none')+'">'+(parts.join(' <i>·</i> ')||'심판 미배정')+'</span>'+(STAFF?'<button class="ed" onclick="matchForm(\''+m.id+'\')">경기 정보</button>':'')+((!m.locked&&(STAFF||canFix(m)))?'<button class="ed" onclick="offSwapOpen()" title="결근·교체 — 이 경기 심판진만 바꿉니다(감독관·심판위원장·운영진)">심판진 교체</button>':'')+(rec?'<button class="ed u" '+(lastEv(m)?'':'disabled')+' onclick="qkUndoLast()" title="마지막 기록(득점·제재·작전타임)을 취소 표시합니다">↩ 되돌리기</button>':'')+(rec&&m.status!=='예정'?'<span class="tmode"><button class="g'+(QK.mode==='goal'?' on':'')+'" onclick="qkTop(\'goal\')" title="누르면 선수 명단으로 내려갑니다"><svg class="dk" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.5" class="d"/><circle cx="12" cy="12" r="6.2" class="r"/><circle cx="12" cy="12" r="1.9" class="c"/></svg> 득점</button><button class="c'+(QK.mode==='card'?' on':'')+'" onclick="qkTop(\'card\')" title="누르면 선수 명단으로 내려갑니다 · 저장하면 점수판으로">🟨 제재</button><button class="i'+(QK.mode==='injury'?' on':'')+'" onclick="qkTop(\'injury\')" title="부상 선수와 정도를 기록합니다 — 기록지에는 시각만, 상세는 대회 부상 현황에">🩹 부상</button></span>':'')})();
-  const ctrl=!can?'<div class="ctrl"><span>보기 전용'+(m.locked?' · 확정된 경기':'')+'</span>'+ofs+'</div>'+((m.locked||!rcxRefMe(m))?'':'<div class="rcx-note">입력은 이 구장 담당 심판진만 합니다. 문제가 있으면 감독관에게 알려 주세요</div>')
+  const ctrl=!can?'<div class="ctrl"><span>보기 전용'+(m.locked?' · 확정된 경기':'')+'</span>'+ofs+'</div>'+((m.locked||!rcxRefMe(m))?'':'<div class="rcx-note">입력은 대회 심판·운영진만 합니다. 문제가 있으면 운영본부에 알려 주세요</div>')
     :st==='mine'?'<div class="ctrl mine"><span>입력 중 · '+esc(MY.name||'')+(q?' · <b>미전송 '+q+'건</b>':'')+'</span>'+ofs+'</div>'
     :aux?'<div class="ctrl mine" style="background:#eef3fb;color:#1c2e55"><span>'+esc(MR.ctrlLabel(m))+' 입력 중 · <b>보조 입력</b> '+esc(MY.name||'')+'</span>'+ofs+'<button onclick="rcTake()" style="background:#8a919d">넘겨받기</button></div>'
  :st==='other'?'<div class="ctrl other"><span>'+esc(MR.ctrlLabel(m))+' 입력 중 — 보기 전용</span>'+ofs+'<button onclick="rcTake()">넘겨받기</button></div>'
@@ -2065,7 +2067,7 @@ async function rcReset(){if(!STAFF)return;const m=RCM();if(!m)return;if(m.locked
   await rcUpdate({status:'예정',period:'',events:[],clock:{running:false,base:0,startedAt:0},brk:D,pulls:{},kit:D,plen:D,lineup:D,nums:D,swap:false,clockLog:{},fairplay:D,coachScore:D,mvps:D,mvp:D,bestCoach:D,winner:D,startAt:null,endAt:null,locked:false,resetLog:FV.arrayUnion({by:whoAmI().name,uid:whoAmI().uid,at:new Date().toISOString(),events:n,was:m.status||''})},'초기화 실패');
   if(m.status==='종료'&&typeof statsSave==='function')setTimeout(()=>{try{statsSave(true)}catch(e){}},1500);
   qkToast('경기 기록을 초기화했습니다 — 경기 전 상태')}
-async function rcUnlock(){const m0=RCM();if(!canFix(m0)){say('확정된 경기의 정정은 그 경기 감독관이나 대회 심판위원장만 할 수 있습니다.');return}const r=prompt('잠금을 해제하고 정정합니다. 사유를 적어 주세요');if(r==null)return;await rcUpdate({locked:false,unlockLog:FV.arrayUnion({by:whoAmI().name,uid:whoAmI().uid,at:new Date().toISOString(),reason:r})})}
+async function rcUnlock(){const m0=RCM();if(!canFix(m0)){say('확정된 경기의 정정은 현장 운영진(심판·운영본부)만 할 수 있습니다.');return}const r=prompt('잠금을 해제하고 정정합니다. 사유를 적어 주세요');if(r==null)return;await rcUpdate({locked:false,unlockLog:FV.arrayUnion({by:whoAmI().name,uid:whoAmI().uid,at:new Date().toISOString(),reason:r})})}
 async function rcXlsx(id){const m=MATCHES.find(x=>x.id===id);if(!m)return;try{await MR.saveXlsxMatch(m,orderOf((m.a||{}).pid)||{},orderOf((m.b||{}).pid)||{})}catch(e){say('엑셀 만들기 실패: '+(e.message||e))}}
 // ── 바텀 시트 공통 ──
 function sheet(html){const old=document.getElementById('rcSheet');if(old)old.remove();const d=document.createElement('div');d.id='rcSheet';d.className='sh';d.innerHTML='<div class="pn">'+html+'</div>';d.addEventListener('click',e=>{if(e.target===d)sheetClose()});document.body.appendChild(d)}
@@ -2122,7 +2124,7 @@ async function clockSave(){const m=RCM();const sec=+SHEET.sec;const c=MR.clockSe
 // ── 종료·확정 시트: 페어플레이·지도자 가점(5~−3) → 최우수선수(팀마다 1명) → 서명 자동 기입 → 감독관이 종료·확정 ──
 const FP_SCALE=[5,4,3,2,1,0,-1,-2,-3];
 function endRoleInfo(m){const me=MR.offOf(m,ME&&ME.uid);const hasSup=MR.offList(m).some(x=>x.role==='감독관'&&x.uid);const uid=ME&&ME.uid;const compSup=!!uid&&/심판위원장|심판장|심판총괄/.test(((SLOT_ROLES||{})[uid]||[]).join(' '));   /* [2026-10-24] 공고 확정 '감독관' 은 제외(canRec·isAssist 와 같은 심판위원장급만) — 결근 대체 감독관은 「심판진 교체」로 officials 에 넣은 뒤 종료 */
-  const isSup=!!(me&&me.role==='감독관')||compSup;const isRecMe=!!(me&&/기록/.test(String(me.role||'')));return {me,hasSup,isSup,can:STAFF||isSup||(!hasSup&&isRecMe)||recOrphan(m)||courtCrewMe(m)}}
+  const isSup=!!(me&&me.role==='감독관')||compSup;const isRecMe=!!(me&&/기록/.test(String(me.role||'')));return {me,hasSup,isSup,can:STAFF||isSup||(!hasSup&&isRecMe)||recOrphan(m)||courtCrewMe(m)||(m.slotId===SLOT_ID&&fieldMe())}}
 /* [2026-10-24] 구장 심판진 — 같은 날 같은 구장 경기에 한 번이라도 배정된 사람(감독관·주심·부심·점수심·기록심)은 그 구장 경기를 종료·확정할 수 있음(규칙 v72: compStats.crewUids) */
 let SLOT_CREW=null,_crewT=null;
 function crewSyncSoon(){if(!STAFF||!SLOT_ID)return;clearTimeout(_crewT);_crewT=setTimeout(async()=>{if(SLOT_CREW===null)return;const all=new Set(SLOT_CREW);MATCHES.filter(m=>m.slotId===SLOT_ID).forEach(m=>MR.offList(m).forEach(x=>{if(x.uid)all.add(x.uid)}));const L=[...all].sort();if(L.length===SLOT_CREW.length)return;try{await DB.collection('compStats').doc(SLOT_ID).set({crewUids:L},{merge:true});SLOT_CREW=L}catch(e){console.warn('crew',e)}},4000)}   /* 더하기만 — 교체로 빠진 사람도 남음(종료 권한만 관련) */
