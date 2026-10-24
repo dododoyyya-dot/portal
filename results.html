@@ -153,7 +153,7 @@ const DB=firebase.firestore();
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let ITEMS=[],FILTER='all',NAME_MODE='masked',CUR=null;
 function ico(n,o){return CAREER.svg(n,Object.assign({size:14,stroke:2.2},o||{}))}
-function maskName(n){n=String(n||'');if(NAME_MODE==='full')return n;if(NAME_MODE==='hidden')return '';if(n.length<2)return n;return n[0]+'*'.repeat(Math.max(1,n.length-2))+(n.length>2?n[n.length-1]:'')}
+function maskName(n){n=String(n||'');return n;   /* [2026-10-24] 실명 */if(NAME_MODE==='full')return n;if(NAME_MODE==='hidden')return '';if(n.length<2)return n;return n[0]+'*'.repeat(Math.max(1,n.length-2))+(n.length>2?n[n.length-1]:'')}
 function rankOf(r){r=String(r||'');if(/1위|우승|금/.test(r)&&!/준우승/.test(r))return 1;if(/2위|준우승|은/.test(r))return 2;if(/3위|동/.test(r))return 3;if(/MVP/i.test(r))return 4;if(!r||/참가/.test(r))return 9;return 5}
 const RANK_STYLE={1:['#fff','linear-gradient(135deg,#d4a017,#f6d365)','trophy'],2:['#fff','linear-gradient(135deg,#8a9bb0,#c9d3dd)','medal'],3:['#fff','linear-gradient(135deg,#b87333,#e0a878)','medal'],4:['#fff','#7c3aed','star'],5:['#8a5a00','#fff8e6','sparkle'],9:['#153A77','#eef3fa','disc']};
 function rankHtml(r){const k=rankOf(r);const s=RANK_STYLE[k];return '<span class="rs-rank" style="color:'+s[0]+';background:'+s[1]+'">'+ico(s[2],{size:13,color:s[0]})+esc(r||'참가')+'</span>'}

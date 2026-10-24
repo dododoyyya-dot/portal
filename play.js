@@ -9,7 +9,7 @@ const C=window.CAREER,MR=window.KFDF_MR;
 const SLOT='DTxbzDpc1D0m1hiEi0lA';
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const I=(n,o)=>C.svg(n,Object.assign({size:20,stroke:2},o||{}));
-function mask(n){n=String(n||'').trim();if(!n)return '익명';if(n.length<2)return n;return n[0]+'*'.repeat(Math.max(1,n.length-2))+(n.length>2?n[n.length-1]:'')}
+function mask(n){n=String(n||'').trim();if(!n)return '익명';return n;   /* [2026-10-24] 실명 */return n[0]+'*'.repeat(Math.max(1,n.length-2))+(n.length>2?n[n.length-1]:'')}
 function myName(){return mask((MYD&&MYD.name)||(ME&&ME.displayName)||'')}
 function myBadges(){return ((MYD&&MYD.badgeShow)||[]).slice(0,3)}
 function badgeMini(ids,sz){return (ids||[]).map(id=>{const b=C.BADGES.find(x=>x.id===id);return b?'<span title="'+esc(b.name)+'" style="display:inline-flex">'+C.medal({icon:b.icon,rarity:b.rarity,size:sz||22})+'</span>':''}).join('')}
@@ -106,7 +106,7 @@ async function dexShow(id){if(!ME)return;const cur=myBadges();const i=cur.indexO
 
 /* ══ B. 명예의 전당 ══ */
 let HL={slot:SLOT,list:null,data:{},nameMode:'masked'};
-function recName(n){return HL.nameMode==='hidden'?'비공개':(HL.nameMode==='full'?String(n||''):mask(n))}   /* [2026-10-24] 공개 화면 — 학생 이름 가림(김*수) */
+function recName(n){return String(n||'')}   /* [2026-10-24] 실명 */   /* [2026-10-24] 공개 화면 — 학생 이름 가림(김*수) */
 async function hallRender(el){
   if(!HL.list){el.innerHTML='<div class="pg-card"><div class="pg-empty">대회 기록을 모으는 중…</div></div>';
     try{const s=await DB.collection('siteContent').doc('results').get();if(s.exists&&s.data().nameMode)HL.nameMode=s.data().nameMode}catch(e){}
@@ -135,7 +135,7 @@ async function hallRender(el){
     +'<div class="pg-card"><h3 class="pg-h" style="font-size:20px">'+I('pulse',{color:'#ff6b6b'})+' 명승부</h3><ul class="hl-l">'
       +(D.best?'<li><em>'+I('bolt',{size:16,color:'#e6a700'})+'</em><span>최다 득점 경기<br><b>'+esc(D.best.a)+' '+D.best.sa+' : '+D.best.sb+' '+esc(D.best.b)+'</b></span></li>':'')
       +'<li><em>'+I('scale',{size:16,color:'#13306b'})+'</em><span>1점 차 승부</span><b class="n">'+D.close+'경기</b></li><li><em>'+I('swap',{size:16,color:'#8b7cf6'})+'</em><span>역전승</span><b class="n">'+D.comeback+'경기</b></li><li><em>'+I('wall',{size:16,color:'#2ec4a0'})+'</em><span>무실점 승리</span><b class="n">'+D.shutout+'경기</b></li></ul></div>'
-    +'<div class="pg-card"><h3 class="pg-h" style="font-size:20px">'+I('whistle',{color:'#b8860b'})+' 최다 출장 주심</h3><ul class="hl-l">'+(D.refs.length?D.refs.slice(0,6).map((r,i)=>'<li><em>'+(i+1)+'</em><span><b>'+esc(mask(r.name))+'</b> 심판</span><b class="n">'+r.n+'경기</b></li>').join(''):'<li><span style="color:var(--ink2)">배정 기록이 아직 없어요</span></li>')+'</ul></div>'
+    +'<div class="pg-card"><h3 class="pg-h" style="font-size:20px">'+I('whistle',{color:'#b8860b'})+' 최다 출장 주심</h3><ul class="hl-l">'+(D.refs.length?D.refs.slice(0,6).map((r,i)=>'<li><em>'+(i+1)+'</em><span><b>'+esc(String(r.name||''))+'</b> 심판</span><b class="n">'+r.n+'경기</b></li>').join(''):'<li><span style="color:var(--ink2)">배정 기록이 아직 없어요</span></li>')+'</ul></div>'
     +'</div>';
   el.innerHTML=h}
 function hallCalc(ms){const live=e=>e&&!e.void;const S={},A={},T={},R={};let fin=0,close=0,comeback=0,shutout=0,best=null;const mvps=[],champs=[];

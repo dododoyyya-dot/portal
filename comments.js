@@ -46,11 +46,11 @@
     if(!me)return Promise.reject(new Error('로그인 후 적을 수 있어요'));
     if(!canWrite(me,my))return Promise.reject(new Error('가입 승인 뒤에 적을 수 있어요'));
     var c=clean(text);if(!c.ok)return Promise.reject(new Error(c.why));
-    return db().collection('liveChat').doc(room).collection('msgs').add({uid:me.uid,name:mask(my.name||''),text:c.text,op:false,room:room,at:firebase.firestore.FieldValue.serverTimestamp()})
+    return db().collection('liveChat').doc(room).collection('msgs').add({uid:me.uid,name:String(my.name||'').slice(0,20),text:c.text,op:false,room:room,at:firebase.firestore.FieldValue.serverTimestamp()})
       .catch(function(e){throw new Error(/permission/i.test(String(e))?'권한이 없어요 (가입 승인 뒤에 적을 수 있어요)':(e.message||String(e)))})}
   function del(room,id,by){return db().collection('liveChat').doc(room).collection('msgs').doc(id).update({del:true,delBy:by||''})}
   function timeAgo(ts){try{var d=ts&&ts.toDate?ts.toDate():(ts?new Date(ts):null);if(!d||isNaN(d))return '';var s=(Date.now()-d.getTime())/1000;if(s<60)return '방금';if(s<3600)return Math.floor(s/60)+'분 전';return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}catch(e){return ''}}
   function guideHtml(opt){opt=opt||{};return '<div class="cmt-guide" style="font-size:'+(opt.size||'11.5px')+';color:'+(opt.color||'#6b7280')+';line-height:1.55;word-break:keep-all">'
-    +(opt.title?'<b>'+esc(opt.title)+'</b> ':'')+'이름은 일부가 가려져(예: 김*수) 표시되고 누구나 볼 수 있어요. 욕설·비방·놀림·개인정보(전화번호 등)·광고는 보낼 수 없고, 운영진이 지울 수 있어요. 선수와 학교를 응원하는 따뜻한 말을 남겨 주세요.</div>'}
+    +(opt.title?'<b>'+esc(opt.title)+'</b> ':'')+'이름은 실명으로 표시되고 누구나 볼 수 있어요. 욕설·비방·놀림·개인정보(전화번호 등)·광고는 보낼 수 없고, 운영진이 지울 수 있어요. 선수와 학교를 응원하는 따뜻한 말을 남겨 주세요.</div>'}
   window.KFDF_CMT={clean:clean,listen:listen,send:send,del:del,mask:mask,guideHtml:guideHtml,canWrite:canWrite,timeAgo:timeAgo,esc:esc};
 })();

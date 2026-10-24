@@ -1168,7 +1168,7 @@ try{firebase.firestore().collection('siteContent').doc('live').onSnapshot(functi
   firebase.firestore().collection('liveMatches').where('day','==',D).onSnapshot(function(q){DAYM=take(q);recalc()},function(e){console.warn('courtTicker day',e)})}catch(e){}})();
 </script>
 <script src="kfdf.js?v=20260914a"></script>
-<script src="comments.js?v=20261024c"></script>
+<script src="comments.js?v=20261024d"></script>
 <script>
 /* ══════════ [대회 모드 2026-10-24] 축전 메인 — 6개 구장 실시간 스코어+최근 득점 · 응원 댓글 띠(comments.js) · 큰 버튼 · 뉴스 자막 · 경상권역 안내창
  *  상단 TM 상수(body.tm-on) 일 때만 동작. 데이터: liveMatches(day==오늘 KST + status=='진행', test·다른 slotId 제외) · compStats/{slotId}(kits·stats) · liveChat/cheer_{slotId}
@@ -1273,7 +1273,7 @@ try{firebase.firestore().collection('siteContent').doc('live').onSnapshot(functi
     el.textContent=t};
   /* ── 응원 댓글 띠 ── */
   var ROOM='cheer_'+TMC.slotId,SEEN={},CUR={user:null,me:null};
-  var cheerRow=function(x){return '<b>'+esc(window.KFDF_CMT?KFDF_CMT.mask(x.name):String(x.name||''))+'</b> <span>'+esc(x.text)+'</span><small>'+esc(KFDF_CMT.timeAgo(x.at))+'</small>'};
+  var cheerRow=function(x){return '<b>'+esc(String(x.name||''))+'</b> <span>'+esc(x.text)+'</span><small>'+esc(KFDF_CMT.timeAgo(x.at))+'</small>'};
   var onCheer=function(list,err){var L=$('tmCheerList'),E=$('tmCheerEmpty'),C=$('tmCheerCnt');if(!L||!E)return;
     if(err){E.textContent='응원 댓글을 불러오지 못했어요';E.style.display='flex';return}
     var ids={};list.forEach(function(x){ids[x.id]=1});
