@@ -195,7 +195,11 @@ function pkMs(x){try{return MR.tsMs(x)||0}catch(e){return 0}}
 const pkPid=t=>{t=t||{};return t.pid||(t.name?'name:'+String(t.name):'')};   // pid 없는 팀은 'name:팀명' — 규칙 v64 의 first.pid != second.pid(둘 다 '' 이면 거부)를 통과시킴
 function pkSame(x,y){x=x||{};y=y||{};if(!x.name&&!x.pid)return false;const px=String(x.pid||''),py=String(y.pid||'');return (px&&py&&px.indexOf('name:')!==0&&py.indexOf('name:')!==0)?px===py:String(x.name||'')===String(y.name||'')}
 function pkClosed(){return Date.now()>=PICK_DEADLINE}
-function pkChampClosed(){return Date.now()>=CHAMP_DEADLINE}
+/* [10/25] 고등부 여자는 밤새 실수로 「종료」된 결승 때문에 1·2위 맞히기가 막혔음 — 10:40 까지 다시 열고(본선 시작 잠금 예외), 본선에서 진 팀은 후보에서 뺌 */
+const HSW_KEY='고등부여자',HSW_UNTIL=Date.parse('2026-10-25T10:40:00+09:00');
+function pkHswOpen(k){return pkDivKey(k||'')===HSW_KEY&&Date.now()<HSW_UNTIL}
+function pkKOLosers(d){const out=[];(RK.ms||[]).forEach(m=>{if(!pkKO(m)||(m.div||'기타')!==d)return;const w=pkWinner(m);if(!w)return;const l=m[w==='a'?'b':'a']||{};out.push(l)});return out}
+function pkChampClosed(k){if(k&&pkHswOpen(k))return false;return Date.now()>=CHAMP_DEADLINE}
 function pkDivSort(a,b){const ia=PK_DIVS.indexOf(a),ib=PK_DIVS.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b,'ko')}
 function pkLeft(ms){const tm=Math.max(1,Math.ceil(ms/60000)),d=Math.floor(tm/1440),h=Math.floor(tm%1440/60),m=tm%60;return (d?d+'일 ':'')+((d||h)?h+'시간 ':'')+m+'분'}
 /* [2026-10-24] 로그인·가입 뒤 복귀 — login.html 의 next 는 '#' 이 든 값을 버리므로 play.html?tab=rank 로 돌아옴 → 해시로 바꿔 play.js(DOMContentLoaded 에서 location.hash 를 읽음)가 그 탭을 열게 함 */
@@ -309,10 +313,10 @@ function pkChampResults(){const R={};(RK.ms||[]).forEach(m=>{if(!pkKO(m)||!/^결
 function pkChampPts(p,r){if(!r||!pkSame(p.first,r.first))return 0;return pkSame(p.second,r.second)?2:1}
 function pkMineSel(key){const m=ME?(RK.cpicks||[]).find(p=>p.uid===ME.uid&&pkDivKey(p.div)===key):null;return m?{first:{pid:pkPid(m.first),name:(m.first||{}).name||''},second:{pid:pkPid(m.second),name:(m.second||{}).name||''}}:{}}   // 저장본의 pid 가 비어 있어도 'name:팀명' 으로 — 규칙의 first.pid != second.pid
 function pkChampHtml(){const T=pkChampTeams();if(!Object.keys(T).length)return '';const CR=pkChampResults(),closed=pkChampClosed();const byD={};(RK.cpicks||[]).forEach(p=>{const k=pkDivKey(p.div);(byD[k]=byD[k]||[]).push(p)});RK._ct={};
-  const cards=Object.keys(T).map(d=>{const key=pkDivKey(d),teams=T[d],L=byD[key]||[],r=CR[key];RK._ct[key]={div:d,list:teams};const mine=ME?L.find(p=>p.uid===ME.uid):null;const sel=RK.champSel[key]||(mine?pkMineSel(key):{});
+  const cards=Object.keys(T).map(d=>{const key=pkDivKey(d),L=byD[key]||[],r=CR[key];const hsw=pkHswOpen(key);const closed=pkChampClosed(key);const teams=hsw?T[d].filter(t=>!pkKOLosers(d).some(x=>pkSame(x,t))):T[d];RK._ct[key]={div:d,list:teams};const mine=ME?L.find(p=>p.uid===ME.uid):null;const sel=RK.champSel[key]||(mine?pkMineSel(key):{});
     const more=(RK.ms||[]).some(m=>pkKO(m)&&(m.div||'기타')===d&&(pkPh((m.a||{}).name)||pkPh((m.b||{}).name)));
     const c1={};L.forEach(p=>{const id=(p.first||{}).pid||(p.first||{}).name;if(id)c1[id]=(c1[id]||0)+1});const topId=Object.keys(c1).sort((a,b)=>c1[b]-c1[a])[0];const topT=topId?teams.find(t=>(t.pid||t.name)===topId):null;
-    const started=(RK.ms||[]).some(m=>pkKO(m)&&(m.div||'기타')===d&&m.status!=='예정');   // 본선이 시작된 부문은 시각과 상관없이 잠금
+    const started=hsw?false:(RK.ms||[]).some(m=>pkKO(m)&&(m.div||'기타')===d&&m.status!=='예정');   // 본선이 시작된 부문은 시각과 상관없이 잠금(고등부 여자는 10:40 까지 예외)
     const dis=closed||!!r||started;
     const chips=slot=>'<div class="pk-chips">'+teams.map((t,i)=>{const on=pkSame(sel[slot],t),oth=pkSame(sel[slot==='first'?'second':'first'],t);return '<button class="pk-chip'+(on?' on':'')+'" '+((dis||oth)?'disabled':'')+' onclick="champSet(\''+key+'\',\''+slot+'\','+i+')">'+esc(t.name)+'</button>'}).join('')+'</div>';
     let foot='';
@@ -323,13 +327,13 @@ function pkChampHtml(){const T=pkChampTeams();if(!Object.keys(T).length)return '
     else if(closed||started)foot='<div class="pk-res" style="color:var(--ink2)">'+(started?'본선이 시작되어 마감되었어요':'마감되었어요')+'</div>';
     else if(sel.first||sel.second)foot='<div class="pk-res" style="color:var(--pn)">'+(sel.first?'1위 '+esc(sel.first.name)+' 선택 — 이제 2위를 골라 주세요':'2위 '+esc(sel.second.name)+' 선택 — 이제 1위를 골라 주세요')+'</div>';
     const pre=!!RK._cpre[d];
-    return '<div class="pk-chd"><h4>'+esc(d)+' <small style="font-weight:800;color:var(--ink2);font-size:12px">'+(pre?'예선 참가 '+teams.length+'팀 · 본선 진출팀이 정해지면 그 팀들로 좁혀져요':'본선 '+teams.length+'팀'+(more?' · 진출팀이 더 정해지면 늘어나요':''))+'</small></h4><div class="pk-pc" style="justify-content:flex-start;gap:8px;margin:0 0 4px"><span>'+L.length+'명 참여</span>'+(topT?'<span>· 1위 예측 최다 '+esc(topT.name)+' ('+Math.round(c1[topId]/L.length*100)+'%)</span>':'')+'</div><div class="pk-chl">1위</div>'+chips('first')+'<div class="pk-chl">2위</div>'+chips('second')+foot+'</div>'}).join('');
+    return '<div class="pk-chd"><h4>'+esc(d)+(hsw?' <span style="background:#ff7a93;color:#fff;border-radius:999px;padding:2px 8px;font-size:11px">10:40까지 다시 열림</span>':'')+' <small style="font-weight:800;color:var(--ink2);font-size:12px">'+(pre?'예선 참가 '+teams.length+'팀 · 본선 진출팀이 정해지면 그 팀들로 좁혀져요':'본선 '+teams.length+'팀'+(more?' · 진출팀이 더 정해지면 늘어나요':''))+'</small></h4><div class="pk-pc" style="justify-content:flex-start;gap:8px;margin:0 0 4px"><span>'+L.length+'명 참여</span>'+(topT?'<span>· 1위 예측 최다 '+esc(topT.name)+' ('+Math.round(c1[topId]/L.length*100)+'%)</span>':'')+'</div><div class="pk-chl">1위</div>'+chips('first')+'<div class="pk-chl">2위</div>'+chips('second')+foot+'</div>'}).join('');
   return '<div class="pg-card" style="margin-top:14px"><h3 class="pg-h" style="font-size:20px">'+I('trophy',{color:'#e6a700'})+' 부문별 1·2위 맞히기 <small style="font-size:12px;color:var(--ink2);font-weight:800">2일차 본선</small></h3><p class="pg-sub">본선에 오른 팀 중에서 <b>1위</b>와 <b>2위</b>를 골라 주세요(같은 팀은 안 돼요). 본선 진출팀이 아직 안 정해진 부문은 예선 참가팀 전체에서 고르고, 정해지면 목록이 좁혀져요 — 본선에 못 오른 팀을 골랐다면 마감 전에 바꿔 주세요. 1위 적중 1점, 1·2위 모두 적중 2점 — 승부 예측 적중과 합쳐 예측왕 순위를 매겨요. 마감 10/25(일) 오전 08:30, 본선 시작 전.'+(ME?'':' <a href="login.html?next=play.html%3Ftab%3Drank" style="font-weight:900;color:var(--pn)">로그인</a>하면 참여할 수 있어요.')+'</p>'
     +(RK.cerr?'<div class="pg-note" style="margin-bottom:10px">1·2위 맞히기는 보안 규칙 v64 게시 후 열려요.</div>':'')+'<div class="pk-ch">'+cards+'</div></div>'}
 function pkChampRefresh(){const w=document.getElementById('pkChamp');if(w)w.innerHTML=pkChampHtml();else render()}
-async function champSet(key,slot,idx){if(!ME){pkLoginAsk();return}if(pkChampClosed()){say('1·2위 맞히기가 마감되었어요 (10/25 오전 08:30)');return}
+async function champSet(key,slot,idx){if(!ME){pkLoginAsk();return}if(pkChampClosed(key)){say('1·2위 맞히기가 마감되었어요 (10/25 오전 08:30)');return}
   const T=RK._ct[key];const t=T&&T.list[idx];if(!t)return;
-  if((RK.ms||[]).some(m=>pkKO(m)&&(m.div||'기타')===T.div&&m.status!=='예정')){say('본선이 시작되어 1·2위 맞히기가 마감되었어요');return}
+  if(!pkHswOpen(key)&&(RK.ms||[]).some(m=>pkKO(m)&&(m.div||'기타')===T.div&&m.status!=='예정')){say('본선이 시작되어 1·2위 맞히기가 마감되었어요');return}
   const sel=RK.champSel[key]=RK.champSel[key]||pkMineSel(key);
   if(pkSame(sel[slot==='first'?'second':'first'],t)){say('1위와 2위는 다른 팀이어야 해요');return}
   sel[slot]={pid:pkPid(t),name:t.name||''};
