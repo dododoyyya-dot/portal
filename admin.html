@@ -619,6 +619,20 @@ function eduWho(v){return (v.name||'')+' ('+(v.birth||'생년월일 없음')+' �
         <button class="btn-sub afl" data-f="방과후" onclick="appFilter('방과후',this)" style="background:#8a919d">🌱 방과후·늘봄</button>
         <button class="btn-sub" style="background:#0f766e" onclick="matchCityAll()">🧭 시군구 일괄 매칭</button>
       </div>
+      <!-- [2026-10-27] 선정교 모아보기 — 선정된 학교만 모아 권역·시도별로 보며 강사 미배정 건을 정리 -->
+      <div style="display:flex;gap:8px;margin:0 0 10px;flex-wrap:wrap;align-items:center;background:#eef3fb;border:1.5px solid #c9d8ef;border-radius:12px;padding:8px 12px">
+        <b style="font-size:13px;color:#153A77">🎯 선정교 모아보기</b>
+        <button class="btn-sub asel on" data-s="all" onclick="appSel('all',this)">전체 신청</button>
+        <button class="btn-sub asel" data-s="sel" onclick="appSel('sel',this)" style="background:#8a919d">선정교만</button>
+        <button class="btn-sub asel" data-s="un" onclick="appSel('un',this)" style="background:#8a919d">🚨 강사 미배정</button>
+        <button class="btn-sub asel" data-s="self" onclick="appSel('self',this)" style="background:#8a919d">◉ 본인지도 미연결</button>
+        <button class="btn-sub asel" data-s="done" onclick="appSel('done',this)" style="background:#8a919d">✅ 배정완료</button>
+        <select id="appGrp" onchange="AGRP=this.value;renderApps()" style="width:auto;padding:7px 10px;border:1.5px solid #c9d8ef;border-radius:10px;font-weight:700">
+          <option value="">묶지 않음</option><option value="region">권역별로 묶기</option><option value="sido">시도별로 묶기</option>
+        </select>
+        <span style="font-size:11.5px;color:#6b7280">미배정 = 선정됐지만 강사 이름이 없는 학교(용품만 제외) · 본인지도 미연결 = 담당교사 본인 지도인데 회원 계정이 안 붙은 학교</span>
+      </div>
+      <div id="selSummary"></div>
       <div style="display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap">
         <select id="appSido" onchange="renderApps()" style="width:auto;padding:8px 12px;border:1.5px solid #dfe5ee;border-radius:10px;font-weight:700">
           <option value="">시도 전체</option>
@@ -1006,7 +1020,7 @@ function bulkSmsCopy(){
   if(navigator.clipboard)navigator.clipboard.writeText(txt).then(done).catch(()=>prompt('아래 내용을 복사하세요',txt));
   else prompt('아래 내용을 복사하세요',txt);
 }
-let APPS=[];let AFL='전체';let TRASH={apps:[],users:[]};
+let APPS=[];let AFL='전체';let ASEL='all',AGRP='';   /* [2026-10-27] 선정교 모아보기 · 묶음 */let TRASH={apps:[],users:[]};
 // ══════════ [팝업] 홈페이지 팝업 관리 ══════════
 let PP_LIST=[],PP_EDIT=null,PP_IMGDATA=null,PP_IMGURL='';
 document.addEventListener('change',function(e){
@@ -1183,6 +1197,24 @@ function previewPopup(){
     +'</div>';
   document.body.appendChild(d);
 }
+/* [2026-10-27] 선정교 모아보기 */
+function appSel(v,btn){ASEL=v;document.querySelectorAll('.asel').forEach(b=>{b.style.background=b.dataset.s===v?'':'#8a919d'});renderApps()}
+function appIsSel(s){const st=s.status||'접수';return st==='선정'||st==='배정완료'}
+function appNeedsInst(s){return appIsSel(s)&&s.support!=='용품만'&&!s.assignedName}   // 강사 이름이 아직 없는 선정교
+function appSelfUnlinked(s){return appIsSel(s)&&!!s.selfTeach&&s.support!=='용품만'&&!s.selfUid&&!s.assignedName}
+function appSelPass(s){if(ASEL==='all')return true;if(ASEL==='sel')return appIsSel(s);if(ASEL==='un')return appNeedsInst(s);if(ASEL==='self')return appSelfUnlinked(s);if(ASEL==='done')return (s.status||'')==='배정완료';return true}
+function appGroupKey(s){if(AGRP==='region')return appRegion(s)||'권역 미상';if(AGRP==='sido')return String(s.region||'').trim()||'시도 미상';return ''}
+function appGroupHeader(g,docs){const L=docs.filter(d=>appGroupKey(d.data())===g).map(d=>d.data());const sel=L.filter(appIsSel).length,un=L.filter(appNeedsInst).length,sf=L.filter(appSelfUnlinked).length,dn=L.filter(x=>x.status==='배정완료').length;
+  return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#153A77;color:#fff;border-radius:10px;padding:8px 14px;margin:14px 0 6px;font-weight:900"><span style="font-size:15px">📍 '+esc(g)+'</span><span style="font-size:12px;opacity:.9">'+L.length+'건</span>'
+    +(sel?'<span style="font-size:12px;background:rgba(255,255,255,.15);border-radius:999px;padding:2px 10px">선정교 '+sel+'</span>':'')+(dn?'<span style="font-size:12px;background:#0f766e;border-radius:999px;padding:2px 10px">배정완료 '+dn+'</span>':'')
+    +(un?'<span style="font-size:12px;background:#C41E2F;border-radius:999px;padding:2px 10px">🚨 미배정 '+un+'</span>':'')+(sf?'<span style="font-size:12px;background:#b8860b;border-radius:999px;padding:2px 10px">◉ 본인지도 미연결 '+sf+'</span>':'')+'</div>'}
+function selSummary(docs){const el=document.getElementById('selSummary');if(!el)return;if(ASEL==='all'&&!AGRP){el.innerHTML='';return}
+  const REG=['서울·경기','강원','충청','전라','경상','제주'];const all=APPS.map(d=>d.data()).filter(appIsSel);const row=r=>{const L=all.filter(x=>appRegion(x)===r);return {n:L.length,dn:L.filter(x=>x.status==='배정완료').length,un:L.filter(appNeedsInst).length,sf:L.filter(appSelfUnlinked).length,g:L.filter(x=>x.support==='용품만').length}};
+  const T=row('__');const tot={n:all.length,dn:all.filter(x=>x.status==='배정완료').length,un:all.filter(appNeedsInst).length,sf:all.filter(appSelfUnlinked).length,g:all.filter(x=>x.support==='용품만').length};
+  el.innerHTML='<div style="overflow-x:auto;margin:0 0 12px"><table class="rtbl" style="min-width:560px"><thead><tr><th>권역</th><th>선정교</th><th>배정완료</th><th>🚨 미배정</th><th>◉ 본인지도 미연결</th><th>🎁 용품만</th></tr></thead><tbody>'
+    +REG.map(r=>{const x=row(r);if(!x.n)return '';return '<tr><td class="nm">'+r+'</td><td>'+x.n+'</td><td style="color:#0f766e;font-weight:800">'+x.dn+'</td><td style="color:'+(x.un?'#C41E2F':'#0f766e')+';font-weight:900">'+x.un+'</td><td style="color:'+(x.sf?'#b8860b':'#6b7280')+';font-weight:800">'+x.sf+'</td><td>'+x.g+'</td></tr>'}).join('')
+    +'<tr style="background:#f6f8fb"><td class="nm">합계</td><td><b>'+tot.n+'</b></td><td><b>'+tot.dn+'</b></td><td><b style="color:#C41E2F">'+tot.un+'</b></td><td><b>'+tot.sf+'</b></td><td>'+tot.g+'</td></tr></tbody></table>'
+    +'<div style="font-size:11.5px;color:#6b7280;margin-top:4px">선정교 = 상태 「선정」+「배정완료」 · 미배정은 「🎯 강사 직접 배정」으로, 본인지도 미연결은 담당교사 회원 검색 후 배정하면 정리됩니다 · 지역 필터(시도·권역)와 무관하게 전체 기준</div></div>'}
 function appFilter(f,btn){
   AFL=f;
   document.querySelectorAll('.afl').forEach(b=>{b.style.background=b.dataset.f===f?'':'#8a919d'});
@@ -1633,6 +1665,7 @@ function renderApps(){
     if(_rf&&appRegion(d.data())!==_rf)return false;
     const s=d.data();
     if(AFL!=='전체'&&appTypeOf(s).indexOf(AFL)<0)return false;
+    if(!appSelPass(s))return false;   /* [2026-10-27] 선정교 모아보기 */
     if(sido){
       const c=String(s.city||'');
       if(!(SIDO_ALIAS[sido]||[sido]).some(a=>c.indexOf(a)===0))return false;
@@ -1643,11 +1676,13 @@ function renderApps(){
     }
     return true;
   });
+  if(AGRP)docs.sort((a,b)=>appGroupKey(a.data()).localeCompare(appGroupKey(b.data()),'ko')||String(a.data().school||'').localeCompare(String(b.data().school||''),'ko'));   /* [2026-10-27] 묶어 보기 */
   const cnt=document.getElementById('appCount');
-  if(cnt)cnt.textContent=docs.length+'건'+((sido||q)?' (전체 '+APPS.length+'건 중)':'');
+  if(cnt)cnt.textContent=docs.length+'건'+((sido||q||ASEL!=='all')?' (전체 '+APPS.length+'건 중)':'')+(ASEL==='un'?' · 강사 배정이 필요한 학교':ASEL==='self'?' · 담당교사 계정 연결이 필요한 학교':'');
+  selSummary(docs);
   const el=document.getElementById('appList');
-  el.innerHTML=docs.length?docs.map(d=>{
-    const s=d.data();
+  el.innerHTML=docs.length?docs.map((d,_i)=>{
+    const s=d.data();const _g=AGRP?appGroupKey(s):'';const _hd=(AGRP&&(_i===0||appGroupKey(docs[_i-1].data())!==_g))?appGroupHeader(_g,docs):'';
     const tc=classifySchoolTimeConflict(s,SCHOOL_HOURS_POLICY);  // ▶ [시간대검증] 'overlap'|'clear'|'unknown'
     // ▶ [시간대검증·범위축소 2026-08-30] 정규수업시간 겹침 판정은 '본인지도 희망' 건에만 표시합니다.
     //   외부 강사가 파견되는 일반 건은 정규 체육수업 시간에 진행되는 것이 정상이라 겹침이 문제가 아니며,
@@ -1657,7 +1692,7 @@ function renderApps(){
     const st=s.status||'접수';
     const gc=(window.GOODS||{})[d.id];
     const stc={'접수':'#8a919d','대기':'#e6b422','선정':'#1F4E9C','배정완료':'#0f766e','미선정':'#C41E2F','취소':'#555555'}[st]||'#8a919d';
-    return '<div class="urow"><div class="grow"><b>'+esc(s.school)+'</b> '
+    return _hd+'<div class="urow"><div class="grow"><b>'+esc(s.school)+'</b> '
       +'<span style="font-size:12px;font-weight:800;color:#fff;background:'+stc+';padding:2px 10px;border-radius:999px">'+st+(st==='대기'&&s.waitNo?' '+s.waitNo+'번':'')+'</span>'
       +(s.eduName?' <span style="font-size:11px;font-weight:800;color:#C41E2F">★이수자교('+esc(s.eduName)+')</span>':'')
       +((s.selfTeach&&s.support!=='용품만')?' <span style="font-size:11px;font-weight:800;color:#0f766e">◉본인지도 희망'+(s.selfName?'('+esc(s.selfName)+')':'')+'</span>':'')
@@ -1691,7 +1726,7 @@ function renderApps(){
       +'<button class="btn-sub" style="background:#fff;color:#C41E2F;border:1.5px solid #C41E2F" onclick="delApp(\''+d.id+'\')">🗑</button>'
       +'</div></div>'
       +'<div id="logs_'+d.id+'" style="display:none;background:var(--bg-soft);border-radius:12px;padding:14px 18px;margin:-6px 0 10px"></div>';
-  }).join(''):'<div class="bempty">해당 유형의 신청이 없습니다.</div>';
+  }).join(''):'<div class="bempty">'+(ASEL==='un'?'강사 미배정 선정교가 없습니다 — 모두 배정됐습니다.':ASEL==='self'?'본인지도 미연결 학교가 없습니다.':'해당 유형의 신청이 없습니다.')+'</div>';
 }
 // ── 문자 발송용 명단 복사 (이름[탭]전화) — 실제 발송은 별도 문자 서비스 ──
 function copyPhoneList(kind){
