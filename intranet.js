@@ -12,13 +12,13 @@ var V={mod:'home',folder:'a_wait',q:'',from:'',to:'',kind:'',page:1,size:15,sel:
 var IDLE_MS=30*60*1000;
 var KIND={draft:'내부결재',coop:'협조문',official:'일반공문',seal:'직인',notice:'공람',ext:'접수'};
 var KINDL={draft:'내부결재 문서',coop:'협조문 (연맹 간)',official:'일반기안 (일반공문)',seal:'직인 날인 요청',notice:'공람 · 공지',ext:'외부 문서 접수'};
-var MODS=[['mail','쪽지'],['board','게시판'],['appr','결재'],['docs','문서함'],['task','업무요청'],['poll','설문'],['org','조직도'],['seal','직인'],['set','환경설정']];
+var MODS=[['mail','쪽지'],['board','게시판'],['appr','결재'],['docs','문서함'],['task','업무요청'],['poll','설문'],['org','조직도'],['seal','직인'],['help','도움말'],['set','환경설정']];
 var TREE={
   appr:[['기안',[['f_all','서식함'],['p_temp','임시보관']]],
-    ['결재',[['a_wait','결재대기'],['a_prog','결재진행'],['a_mine','기안한 문서'],['a_done','결재완료'],['a_rej','반려·회수']]],
+    ['결재',[['a_wait','결재할 문서'],['a_prog','결재 진행 중'],['a_mine','보낸 문서'],['a_done','결재완료'],['a_rej','반려·회수']]],
     ['공람',[['n_wait','공람대기'],['n_done','공람완료']]],
     ['발송',[['s_wait','발송대기'],['s_out','발송완료'],['s_back','수신반송']]],
-    ['접수',[['r_wait','접수대기'],['r_me','개인접수'],['r_done','접수완료']]]],
+    ['접수',[['r_wait','확인할 공문'],['r_me','내가 처리할 공문'],['r_done','확인한 공문']]]],
   docs:[['대장',[['reg','문서 등록대장'],['x_reg','접수 대장'],['all','전체 문서']]],['수발신',[['d_out','발신함'],['r_all','수신함']]]],
   seal:[['직인',[['k_wait','직인대기'],['k_reg','직인 대장']]]]
 };
@@ -47,6 +47,7 @@ var IC={
 };
 function ic(k,s){return '<svg class="gw-ic" viewBox="0 0 24 24" width="'+(s||16)+'" height="'+(s||16)+'" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+IC[k]+'</svg>'}
 function $(id){return document.getElementById(id)}
+IC.help='<circle cx="12" cy="12" r="9"/><path d="M9.6 9.6a2.4 2.4 0 1 1 3.4 2.2c-.7.4-1 .9-1 1.7"/><path d="M12 17h.01"/>';IC.send='<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>';IC.inbox='<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-7A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1z"/>';
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function nl(s){return esc(s).replace(/\n/g,'<br>')}
 function now(){return new Date().toISOString()}
@@ -220,20 +221,22 @@ function renderLeft(){
   if(!ORG)return;
   renderTop();
   if(V.mod==='home'){
-    var G=[['결재',[['a_wait','결재대기'],['a_prog','결재진행'],['a_rej','반려·회수']]],['발송',[['s_wait','발송대기'],['s_back','수신반송']]],['접수',[['r_wait','접수대기'],['r_me','개인접수'],['n_wait','공람대기']]],['직인',[['k_wait','직인대기']]]];
+    var G=[['결재',[['a_wait','결재할 문서'],['a_prog','결재 진행 중'],['a_rej','반려·회수']]],['발송',[['s_wait','발송대기'],['s_back','수신반송']]],['접수',[['r_wait','확인할 공문'],['r_me','내가 처리할 공문'],['n_wait','공람대기']]],['직인',[['k_wait','직인대기']]]];
     var ex=Object.keys(EXT).map(function(k){try{return EXT[k].alarm?EXT[k].alarm():null}catch(e){return null}}).filter(Boolean);
     $('gwLeft').innerHTML='<div class="gw-alarm"><h3>업무알림</h3>'+G.map(function(g){return '<div class="ag"><b>'+g[0]+'</b><div>'+g[1].map(function(f){var n=count(f[0]);return '<a onclick="INTRA.setFolder(\''+f[0]+'\')"><span>'+f[1]+'</span><em>'+(n||'')+'</em></a>'}).join('')+'</div></div>'}).join('')
       +ex.map(function(g){return '<div class="ag"><b>'+esc(g[0])+'</b><div>'+g[1].map(function(x){return '<a onclick="'+x[2]+'"><span>'+esc(x[0])+'</span><em>'+(x[1]||'')+'</em></a>'}).join('')+'</div></div>'}).join('')+'</div>'
-      +'<div class="gw-new" style="margin-top:14px"><button class="main" onclick="INTRA.compose(\'draft\')">'+ic('pen',14)+' 기안하기</button></div>';
+      +'<div class="gw-new" style="margin-top:14px"><button class="main" onclick="INTRA.compose(\'draft\')">'+ic('pen',14)+' 공문 작성</button></div>';
     return}
   if(EXT[V.mod]&&EXT[V.mod].left){$('gwLeft').innerHTML=EXT[V.mod].left();return}
-  var q=[['a_wait','결재대기'],['r_wait','접수대기'],['r_me','개인접수'],['s_wait','발송대기']];
-  var h='<div class="gw-new"><button class="main" onclick="INTRA.compose(\'draft\')">'+ic('pen',14)+' 기안하기</button><button class="dd" onclick="INTRA.newMenu(event)" title="문서 종류 선택">▾</button>'
+  var q=[['a_wait','결재할 문서'],['r_wait','확인할 공문'],['r_me','내가 처리할'],['s_wait','발송대기']];
+  var h='<div class="gw-new"><button class="main" onclick="INTRA.compose(\'draft\')">'+ic('pen',14)+' 공문 작성</button><button class="dd" onclick="INTRA.newMenu(event)" title="문서 종류 바로 고르기">▾</button>'
     +'<div class="menu" id="gwNewMenu"><a onclick="INTRA.compose(\'draft\')">내부결재</a><a onclick="INTRA.compose(\'coop\')">협조문 (연맹 간)</a><a onclick="INTRA.compose(\'official\')">일반기안 (일반공문)</a><a onclick="INTRA.compose(\'seal\')">직인 날인 요청</a><a onclick="INTRA.compose(\'notice\')">공람 · 공지</a><a onclick="INTRA.compose(\'ext\')">외부 문서 접수 등록</a><a onclick="INTRA.setFolder(\'f_all\')">서식함에서 고르기</a></div></div>'
     +'<div class="gw-quick">'+q.map(function(x){var n=count(x[0]);return '<button onclick="INTRA.setFolder(\''+x[0]+'\')"><span class="c'+(n?' on':'')+'">'+ic('file',18)+(n?'<em>'+(n>99?'99+':n)+'</em>':'')+'</span><i>'+x[1]+'</i></button>'}).join('')+'</div>'
     +'<div class="gw-tree">';
   var tm=TREE[V.mod]?V.mod:'appr';
-  treeOf(tm).forEach(function(g){h+='<div class="grp">'+ic('fold',14)+' '+g[0]+'</div>'+g[1].map(function(f){var n=count(f[0]);var hot=(/_wait$|^r_me$|^s_back$/.test(f[0]))&&n;return '<a class="'+(V.folder===f[0]&&TREE[V.mod]?'on':'')+'" onclick="INTRA.setFolder(\''+f[0]+'\')">'+ic('fold',13)+' '+esc(f[1])+(n?' <b'+(hot?' class="hot"':'')+'>'+n+'</b>':'')+'</a>'}).join('')});
+  var BASIC=['p_temp','a_wait','a_prog','a_mine','a_done','r_wait','r_me','s_wait','k_wait','reg','r_all','d_out'];   /* [2026-10-27] 기본 문서함만 — 나머지는 「전체 문서함 보기」 */
+  treeOf(tm).forEach(function(g){var fs=g[1].filter(function(f){return V.treeAll||BASIC.indexOf(f[0])>=0||V.folder===f[0]||/^c_/.test(f[0])});if(!fs.length)return;h+='<div class="grp">'+ic('fold',14)+' '+g[0]+'</div>'+fs.map(function(f){var n=count(f[0]);var hot=(/_wait$|^r_me$|^s_back$/.test(f[0]))&&n;return '<a class="'+(V.folder===f[0]&&TREE[V.mod]?'on':'')+'" onclick="INTRA.setFolder(\''+f[0]+'\')">'+ic('fold',13)+' '+esc(f[1])+(n?' <b'+(hot?' class="hot"':'')+'>'+n+'</b>':'')+'</a>'}).join('')});
+  h+='<a class="more" onclick="INTRA.treeAll()">'+(V.treeAll?'▴ 기본 문서함만':'▾ 전체 문서함 보기')+'</a>';
   $('gwLeft').innerHTML=h+'</div>';
 }
 function newMenu(e){e.stopPropagation();var m=$('gwNewMenu');m.style.display=m.style.display==='block'?'none':'block'}
@@ -256,7 +259,7 @@ function renderMain(){
       +'<label>구분</label><select onchange="INTRA.setV(\'kind\',this.value)"><option value="">전체</option>'+Object.keys(KIND).map(function(k){return '<option value="'+k+'"'+(V.kind===k?' selected':'')+'>'+KIND[k]+'</option>'}).join('')+'</select></div>'
     +'<div class="gw-search"><label>제목</label><input id="gwQ" value="'+esc(V.q)+'" onkeydown="if(event.key===\'Enter\')INTRA.setV(\'q\',this.value)"><label>기안일자</label><input type="date" id="gwFrom" value="'+esc(V.from)+'"><span>~</span><input type="date" id="gwTo" value="'+esc(V.to)+'">'
       +'<button class="gw-b" onclick="INTRA.search()">검색</button><button class="gw-b" onclick="INTRA.resetSearch()">초기화</button><span id="gwMsg" class="gw-say"></span></div>'
-    +'<div class="gw-tool"><button class="gw-b" onclick="INTRA.openSel()">문서정보</button><button class="gw-b" onclick="INTRA.recvSel(\'접수\')">접수</button><button class="gw-b" onclick="INTRA.recvSel(\'확인\')">공람확인</button><button class="gw-b" onclick="INTRA.sendSel()">발송</button><button class="gw-b" onclick="INTRA.compose(\'draft\')">기안</button>'
+    +'<div class="gw-tool"><button class="gw-b" onclick="INTRA.openSel()">열기</button><button class="gw-b pri" onclick="INTRA.compose(\'draft\')">'+ic('pen',13)+' 공문 작성</button><details class="gw-more"><summary>더 보기</summary><div><button class="gw-b" onclick="INTRA.recvSel(\'접수\')">선택 확인(접수)</button><button class="gw-b" onclick="INTRA.recvSel(\'확인\')">공람확인</button><button class="gw-b" onclick="INTRA.sendSel()">발송</button></div></details>'
       +'<span class="sp"></span><select onchange="INTRA.setV(\'size\',+this.value)">'+[15,30,50].map(function(n){return '<option'+(V.size===n?' selected':'')+'>'+n+'</option>'}).join('')+'</select><button class="gw-b" title="새로 고침" onclick="INTRA.refresh()">'+ic('ref',13)+'</button></div>'
     +'<div class="gw-tblw"><table class="gw-tbl"><colgroup><col style="width:34px"><col style="width:58px"><col><col style="width:132px"><col style="width:84px"><col style="width:150px"><col style="width:118px"><col style="width:118px"><col style="width:84px"></colgroup>'
       +'<thead><tr><th><input type="checkbox" onclick="INTRA.selAll(this.checked)"></th><th>구분</th><th>제목</th><th>문서번호</th><th>기안자</th><th>기안부서</th><th>기안일시</th><th>처리일시</th><th>처리현황</th></tr></thead><tbody>'
@@ -311,10 +314,10 @@ function homeList(f,n,who){var c=ctx(),L=inFolder(f).sort(function(a,b){return S
 function homeCard(cls,title,f,n,who){return '<section class="gw-card '+cls+'"><h3>'+ic('pen',14)+' '+title+'<button title="전체 보기" onclick="INTRA.setFolder(\''+f+'\')">＋</button></h3><div class="hl">'+homeList(f,n,who)+'</div></section>'}
 function homeHtml(){
   var n=apprMinOf(ORG.key,ORGDIR);
-  var tiles=[['내부결재','draft','pen'],['협조문','coop','org'],['일반공문','official','file'],['서식함','','fold']];
+  var tiles=[['공문 작성','draft','pen'],['직인 요청','seal','file'],['공람·공지','notice','org'],['서식함','','fold']];
   var links=[['임시보관','p_temp'],['기안한 문서','a_mine'],['결재완료','a_done'],['문서 등록대장','reg'],['접수 대장','x_reg']];
   var ex=function(k,fn){try{return EXT[k]&&EXT[k][fn]?EXT[k][fn]():''}catch(e){return ''}};
-  return '<div class="gw-home"><div class="gw-banner"><b>'+esc(ORG.name)+'</b><span>'+esc(MY.name||'')+(myTitle()?' '+esc(myTitle()):'')+' 님 · 결재 방식 '+(n<=1?'1인 전결':n+'인 이상 결재')+'</span>'
+  return '<div class="gw-home">'+todoBand()+'<div class="gw-banner"><b>'+esc(ORG.name)+'</b><span>'+esc(MY.name||'')+(myTitle()?' '+esc(myTitle()):'')+' 님 · 결재 방식 '+(n<=1?'1인 전결':n+'인 이상 결재')+'</span>'
       +(ORGS.length>1?'<select onchange="INTRA.setOrg(this.value)" title="소속 전환">'+ORGS.map(function(o){return '<option value="'+esc(o.key)+'"'+(o.key===ORG.key?' selected':'')+'>'+esc(o.name)+'</option>'}).join('')+'</select>':'')+'<span id="gwMsg" class="gw-say"></span></div>'
     +'<div class="gw-grid">'+homeCard('c1','결재대기','a_wait',6)
     +'<section class="gw-card c2"><h3>'+ic('file',14)+' 바로가기 메뉴</h3><div class="gw-tiles"><div class="tl">'+tiles.map(function(t,i){return '<button class="'+(i?'':'y')+'" onclick="'+(t[1]?'INTRA.compose(\''+t[1]+'\')':'INTRA.setFolder(\'f_all\')')+'">'+ic(t[2],26)+'<span>'+t[0]+'</span></button>'}).join('')+'</div>'
@@ -343,7 +346,7 @@ function senderOf(d){return d.sender||((d.orgName||'')+'회장')}
 function paperHtml(d){var fl=(d.files||[]).map(function(x){return x.name});
   return '<div class="gw-paper view"><div class="pm">'+MOTTO+'</div><div class="ph"><img src="kfdf_logo.png" alt=""><b>'+esc(d.orgName||'')+'</b><span></span></div>'
     +'<table class="pk"><tr><th>수 신</th><td>'+esc(d.kind==='ext'?(d.orgName||''):recvText(d))+'</td></tr><tr><th>(경유)</th><td></td></tr><tr><th>제 목</th><td><b>'+esc(d.title||'')+'</b></td></tr></table>'
-    +'<div class="pb">'+nl(d.body||'')+'</div>'
+    +'<div class="pb">'+bodyView(d)+'</div>'
     +(d.kind==='ext'?'':'<div class="pf">'+esc(senderOf(d))+'</div>')+'</div>'}
 function apprBox(d){var l=d.line||[];var cols=[{t:l.length?'기안':'기안 · 전결',n:d.authorName,p:d.authorTitle,s:'',d:locd(d.createdAt),cur:false,rej:false,fin:!l.length&&d.status==='완료'}].concat(l.map(function(x,i){return {t:x.type||'결재',n:x.name,p:x.title,s:x.status==='승인'?x.sign:'',d:x.status==='승인'?locd(x.at):(x.status==='반려'?'반려':''),cur:d.status==='진행'&&curStep(d)===i,rej:x.status==='반려',ok:x.status==='승인'}}));
   return '<table class="gw-appr"><tr>'+cols.map(function(c){return '<th>'+esc(c.t)+'</th>'}).join('')+'</tr><tr>'+cols.map(function(c){return '<td class="sg'+(c.cur?' cur':'')+(c.rej?' rej':'')+'">'+(c.s?'<img src="'+esc(c.s)+'" alt="">':(c.fin?'<em>전결</em>':c.ok?'<em>승인</em>':c.rej?'<em>반려</em>':c.cur?'<em>대기</em>':''))+'</td>'}).join('')+'</tr><tr>'+cols.map(function(c){return '<td>'+esc(c.n||'')+(c.p?'<br><small>'+esc(c.p)+'</small>':'')+'</td>'}).join('')+'</tr><tr>'+cols.map(function(c){return '<td class="dt">'+esc(c.d||'')+'</td>'}).join('')+'</tr></table>'}
@@ -354,7 +357,8 @@ function openDoc(id,keep){
   if(mine&&d.status==='진행'&&!acted)a.push('<button class="gw-b" onclick="INTRA.withdraw(\''+id+'\')">회수</button>');
   if(mine&&(d.status==='반려'||d.status==='회수'))a.push('<button class="gw-b pri" onclick="INTRA.compose(\''+d.kind+'\',\''+id+'\')">재기안</button><button class="gw-b" onclick="INTRA.del(\''+id+'\')">삭제</button>');
   if(sendPending(d)&&(mine||d.org===c.orgKey))a.push('<button class="gw-b pri" onclick="INTRA.sendDoc(\''+id+'\')">발송</button>');
-  if(needRecv(d,c.orgKey))a.push(d.kind==='notice'?'<button class="gw-b pri" onclick="INTRA.recv(\''+id+'\',\'확인\')">공람확인</button>':'<button class="gw-b pri" onclick="INTRA.recvOpen(\''+id+'\')">접수 · 담당자 지정</button><button class="gw-b" onclick="INTRA.recvBack(\''+id+'\')">반송</button>');
+  if(d.org!==c.orgKey&&(d.toOrgs||[]).indexOf(c.orgKey)>=0&&sentOf(d)&&d.kind!=='notice'&&d.kind!=='seal')a.push('<button class="gw-b pri" onclick="INTRA.replyDoc(\''+id+'\')">'+ic('send',13)+' 회신 공문 쓰기</button>');
+  if(needRecv(d,c.orgKey)){if(d.kind==='notice')a.push('<button class="gw-b pri" onclick="INTRA.recv(\''+id+'\',\'확인\')">공람확인</button>');else{if(!keep)autoRecv(id);a.push('<button class="gw-b" onclick="INTRA.recvOpen(\''+id+'\')">담당자 지정</button><button class="gw-b" onclick="INTRA.recvBack(\''+id+'\')">반송</button>')}}
   var myRecv=(d.recv||{})[c.orgKey];
   if(myRecv&&(myRecv.status==='접수'||myRecv.status==='처리중')&&d.kind!=='notice')a.push('<button class="gw-b" onclick="INTRA.recvOpen(\''+id+'\')">담당자 변경</button>');
   if(d.kind==='ext'&&myRecv&&myRecv.status!=='완료')a.push('<button class="gw-b pri" onclick="INTRA.recv(\''+id+'\',\'완료\')">처리완료</button>');
@@ -365,7 +369,7 @@ function openDoc(id,keep){
   var hint=d.status==='진행'?(turn?'내 결재 차례입니다. [결재] 또는 [반려]를 눌러 주세요.':mine?(acted?'결재가 시작되어 회수할 수 없습니다. 내용을 고치려면 결재자에게 [반려]를 요청하세요 — 반려되면 [재기안]으로 붙임을 바꿔 다시 올릴 수 있습니다.':'아직 결재 전입니다. 붙임을 잘못 올렸으면 [회수] → 반려·회수함에서 [재기안]으로 고쳐 다시 올리세요.'):'결재 진행 중입니다.')
     :(d.status==='반려'||d.status==='회수')?(mine?'[재기안]을 누르면 내용·붙임을 고쳐 새 문서로 다시 올립니다. 필요 없으면 [삭제]하세요.':'')
     :sendPending(d)?((mine||d.org===c.orgKey)?(d.kind==='official'?'결재가 끝났습니다. [시행문 인쇄]로 출력해 보낸 뒤 [발송]을 눌러 발송 기록을 남기세요.':'결재가 끝났습니다. [발송]을 눌러야 수신 기관에 보입니다.'+(d.seal&&d.seal.status==='요청'?' (직인 날인 대기 중 — 날인 후 발송을 권합니다)':'')):'')
-    :needRecv(d,c.orgKey)?(d.kind==='notice'?'[공람확인]을 눌러 확인해 주세요.':'[접수 · 담당자 지정]으로 접수하거나, 잘못 온 문서면 [반송]하세요.'):'';
+    :needRecv(d,c.orgKey)?(d.kind==='notice'?'[공람확인]을 눌러 확인해 주세요.':'열어 보면 확인(접수)됩니다. 답이 필요하면 [회신 공문 쓰기], 다른 사람이 처리할 문서면 [담당자 지정], 잘못 온 문서면 [반송]하세요.'):'';
   var cabs=((ORGDIR[c.orgKey]||{}).cabinets)||[];var showCab=cabs.length&&d.status==='완료'&&(d.org===c.orgKey||(d.toOrgs||[]).indexOf(c.orgKey)>=0);
   var cabRow=showCab?'<tr><th>기록물철</th><td colspan="3"><select onchange="INTRA.setCab(\''+id+'\',this.value)" style="width:240px"><option value="">(분류 안 함)</option>'+cabs.map(function(x){return '<option value="'+esc(x.id)+'"'+((d.cab||{})[c.orgKey]===x.id?' selected':'')+'>'+esc(x.name)+'</option>'}).join('')+'</select> <small>우리 기관 문서함의 기록물철로 분류합니다.</small></td></tr>':'';
   a.push('<button class="gw-b" onclick="INTRA.closeW(\'gwDoc\')">닫기</button>');
@@ -404,34 +408,129 @@ function compose(kind,fromId,opt){
     seal:{on:kind==='seal'||!!(src&&src.seal&&src.seal.orgKey),org:ss.orgKey||ss.org||ORG.key,mode:ss.mode||(kind==='seal'?'file':'doc'),purpose:ss.purpose||''}};
   if(kind==='draft')CP.to=[];
   // 먼저 결재정보(제목 · 수신자 · 결재선)를 정하고, [확인]하면 본문 작성 창(cpEditor)이 열립니다
-  CP.title=src?(src.title||''):'';CP.body=src?(src.body||''):'';CP.first=true;closeW('gwCp');ciOpen('doc');
+  CP.title=src?(src.title||''):'';CP.body=src?(src.body||''):'';CP.bodyHtml=src?(src.bodyHtml||''):'';CP.first=true;closeW('gwCp');
+  if(opt.reply){var rd=opt.reply;if(ORGDIR[rd.org]&&rd.org!==ORG.key)CP.to=[rd.org];CP.title='회신: '+String(rd.title||'').replace(/^회신: /,'').slice(0,110);CP.body='1. 관련: '+(rd.orgName||'')+' '+(rd.docNo||'')+' ('+(rd.title||'')+')\n2. 위 호와 관련하여 아래와 같이 회신합니다.\n\n  가. \n  나. \n\n끝.';CP.bodyHtml=''}
+  if(kind==='seal'||kind==='notice')ciOpen('doc');else wzOpen(opt);
 }
-function cpEditor(){
-  var h='<div class="gw-wtool"><button class="gw-b" onclick="INTRA.closeW(\'gwCp\')">닫기</button><button class="gw-b" onclick="INTRA.ciOpen(\'doc\')">'+ic('file',13)+' 결재정보</button><button class="gw-b pri" id="cpGo" onclick="INTRA.submit()">'+ic('pen',13)+' 기안 (결재상신)</button>'
+function cpEditor(){wzDraw(2)}
+/* ══ [2026-10-27] 공문 작성 3단계 — ① 받는 곳 → ② 제목·내용·붙임 → ③ 보내기 확인. 문서 종류(내부결재·협조문·일반공문)는 받는 곳으로 자동. 결재선·직인·긴급은 ③에서 필요할 때만 ══ */
+var WZ=null;
+function wzOpen(opt){opt=opt||{};CP.first=false;var ext=String(CP.extTo||'').split(',').map(function(x){return x.trim()}).filter(Boolean);
+  WZ={step:1,ext:ext,open:{},intra:CP.kind==='draft'&&!(CP.to||[]).length&&!ext.length};
+  if(opt.reply||opt.form||opt.temp||(CP.to||[]).length||ext.length)WZ.step=(opt.reply||opt.form||opt.temp)?2:1;
+  wzDraw(WZ.step)}
+function wzKind(){if(WZ.intra)return 'draft';if(WZ.ext.length)return 'official';return 'coop'}
+function wzApply(){CP.kind=wzKind();if(CP.kind==='draft'){CP.to=[];CP.extTo=''}else CP.extTo=CP.kind==='official'?WZ.ext.join(', '):'';if(!CP.sender)CP.sender=ORG.name+'회장';if(CP.auto==null)CP.auto=true}
+function wzStepBar(st){return '<div class="gw-steps">'+[[1,'받는 곳'],[2,'제목 · 내용 · 붙임'],[3,'보내기 확인']].map(function(x){return '<a class="'+(x[0]===st?'on':x[0]<st?'done':'')+'" onclick="INTRA.wzStep('+x[0]+')"><em>'+x[0]+'</em>'+x[1]+'</a>'}).join('')+'<span class="kd">'+(WZ?esc(KIND[wzKind()]||''):'')+(WZ&&wzKind()==='coop'?' · 인트라넷으로 전달':WZ&&wzKind()==='official'?' · 인쇄해서 발송':WZ&&wzKind()==='draft'?' · 우리 연맹 안에서 결재':'')+'</span></div>'}
+function wzDraw(st){if(!WZ)WZ={step:1,ext:[],open:{},intra:CP.kind==='draft'};WZ.step=st;var box=$('gwCp');
+  var ed=box&&$('wzEd');var keepEd=ed?ed.outerHTML:'';   /* ②의 편집 내용은 DOM 그대로 유지 */
+  if(!box){win('gwCp','공문 작성','<div id="wzBar"></div><div id="wzTo" class="wz-pane"></div><div id="wzEd" class="wz-pane"></div><div id="wzCf" class="wz-pane"></div>',1120);box=$('gwCp')}
+  $('wzBar').innerHTML=wzStepBar(st);
+  ['wzTo','wzEd','wzCf'].forEach(function(id,i){$(id).style.display=(i+1===st)?'':'none'});
+  if(st===1)wzToHtml();
+  if(st===2){if(!$('cpBody'))wzEdHtml();cpDraw()}
+  if(st===3){wzApply();wzCfHtml();cpDraw()}
+  var w=$('gwCp');if(w)w.scrollTop=0}
+function wzStep(n){if(!WZ)return;if(n>=2&&!WZ.intra&&!(CP.to||[]).length&&!WZ.ext.length){var m=$('wzMsg');if(m)m.textContent='받는 곳을 하나 이상 고르세요';return}
+  if(n===3){var t=$('cpTitle')?$('cpTitle').value.trim():'';var b=cpBodyGet().text;if(t.length<2){alert('제목을 입력하세요');wzDraw(2);setTimeout(function(){try{$('cpTitle').focus()}catch(e){}},50);return}if(b.length<2){alert('내용을 입력하세요');wzDraw(2);return}CP.title=t}
+  wzDraw(n)}
+function wzToHtml(){var keys=orgKeysSorted(),me=ORG.key;var sidos=keys.filter(function(k){return ORGDIR[k].level===1&&k!==me}),central=ORGDIR.central&&me!=='central';
+  var gg=function(sk){return keys.filter(function(k){return ORGDIR[k].level===2&&k!==me&&ORGDIR[k].sido===ORDIR_SIDO(sk)})};
+  var chip=function(k){var on=(CP.to||[]).indexOf(k)>=0;return '<label class="wz-org'+(on?' on':'')+'"><input type="checkbox"'+(on?' checked':'')+' onchange="INTRA.wzPickOrg(\''+esc(k)+'\',this.checked)"> '+esc(ORGDIR[k].name)+'</label>'};
+  var myGugun=ORG.level===1?keys.filter(function(k){return ORGDIR[k].level===2&&ORGDIR[k].sido===ORG.sido}):[];
+  var h='<div class="wz-two"><div class="wz-l"><div class="wz-h">어디로 보낼까요? <small>여러 곳을 함께 고를 수 있어요</small></div>'
+    +'<label class="wz-big'+(WZ.intra?' on':'')+'"><input type="radio" name="wzDest"'+(WZ.intra?' checked':'')+' onchange="INTRA.wzIntra(true)"> <b>우리 연맹 안에서 결재만</b><small>밖으로 보내지 않고 결재·보관합니다(내부결재)</small></label>'
+    +'<label class="wz-big'+(!WZ.intra?' on':'')+'"><input type="radio" name="wzDest"'+(!WZ.intra?' checked':'')+' onchange="INTRA.wzIntra(false)"> <b>다른 기관에 보내기</b><small>아래에서 받는 곳을 고릅니다</small></label>'
+    +'<div class="wz-dest'+(WZ.intra?' off':'')+'">'
+    +(central?'<div class="wz-grp"><b>중앙</b>'+chip('central')+'</div>':'')
+    +(sidos.length?'<div class="wz-grp"><b>시도연맹</b><a class="all" onclick="INTRA.wzPickAll(1)">전체 선택</a><div class="wz-list">'+sidos.map(function(k){var g=keys.filter(function(x){return ORGDIR[x].level===2&&x!==me&&ORGDIR[x].sido===ORGDIR[k].sido});return '<div class="wz-row">'+chip(k)+(g.length?'<a class="tg" onclick="INTRA.wzToggle(\''+esc(k)+'\')">'+(WZ.open[k]?'▴':'▾')+' 구군 '+g.length+'</a>':'')+(WZ.open[k]&&g.length?'<div class="wz-sub">'+g.map(chip).join('')+'</div>':'')+'</div>'}).join('')+'</div></div>':'')
+    +(myGugun.length?'<div class="wz-grp"><b>우리 시도 구군연맹</b><a class="all" onclick="INTRA.wzPickAll(2)">전체 선택</a><div class="wz-list">'+myGugun.map(chip).join('')+'</div></div>':'')
+    +'<div class="wz-grp"><b>외부 기관 (인트라넷에 없는 곳)</b><div class="gw-row"><input id="wzExt" maxlength="80" placeholder="예: ○○교육지원청 교육장" onkeydown="if(event.key===\'Enter\'){INTRA.wzExtAdd();return false}" style="flex:1"><button class="gw-b" onclick="INTRA.wzExtAdd()">추가</button></div><small>외부 기관이 들어가면 일반공문이 되어, 결재 뒤 인쇄해서 보냅니다.</small></div>'
+    +'</div></div>'
+    +'<div class="wz-r"><div class="wz-h">받는 곳</div><div id="wzSel" class="wz-selbox"></div><div class="wz-note" id="wzKindNote"></div><div class="gw-row" style="margin-top:14px"><button class="gw-b pri" onclick="INTRA.wzStep(2)">다음 ▶ 제목·내용 쓰기</button><button class="gw-b" onclick="INTRA.closeW(\'gwCp\')">닫기</button></div><span id="wzMsg" class="gw-say bad"></span></div></div>';
+  $('wzTo').innerHTML=h;wzSelDraw()}
+function ORDIR_SIDO(k){return (ORGDIR[k]||{}).sido}
+function wzSelDraw(){var el=$('wzSel');if(!el)return;var L=WZ.intra?[]:(CP.to||[]).map(function(k){return '<span class="wz-chip">'+esc(orgName(k))+'<a onclick="INTRA.wzPickOrg(\''+esc(k)+'\',false)">✕</a></span>'}).concat(WZ.ext.map(function(x,i){return '<span class="wz-chip ext">'+esc(x)+'<a onclick="INTRA.wzExtDel('+i+')">✕</a></span>'}));
+  el.innerHTML=WZ.intra?'<small>우리 연맹 안에서 결재만 합니다</small>':(L.length?L.join(''):'<small>왼쪽에서 받는 곳을 고르세요</small>');
+  var n=$('wzKindNote');if(n)n.textContent=WZ.intra?'문서 종류: 내부결재':WZ.ext.length?'문서 종류: 일반공문 — 결재가 끝나면 시행문을 인쇄해 보내고 [발송]을 눌러 기록합니다':(CP.to||[]).length?'문서 종류: 협조문 — 결재가 끝나면 받는 연맹의 「확인할 공문」에 바로 들어갑니다':'';
+  var bar=$('wzBar');if(bar)bar.innerHTML=wzStepBar(WZ.step);var m=$('wzMsg');if(m)m.textContent=''}
+function wzIntra(on){WZ.intra=!!on;if(on){CP.to=[];WZ.ext=[]}wzToHtml()}
+function wzPickOrg(k,on){if(!ORGDIR[k]||k===ORG.key)return;WZ.intra=false;var i=CP.to.indexOf(k);if(on&&i<0)CP.to.push(k);if(!on&&i>=0)CP.to.splice(i,1);wzToHtml()}
+function wzPickAll(lv){WZ.intra=false;Object.keys(ORGDIR).forEach(function(k){if(ORGDIR[k].level===lv&&k!==ORG.key&&CP.to.indexOf(k)<0&&(lv!==2||ORG.level!==1||ORGDIR[k].sido===ORG.sido))CP.to.push(k)});wzToHtml()}
+function wzToggle(k){WZ.open[k]=!WZ.open[k];wzToHtml()}
+function wzExtAdd(){var i=$('wzExt');var v=(i&&i.value||'').trim();if(v.length<2)return;WZ.intra=false;if(WZ.ext.indexOf(v)<0)WZ.ext.push(v);i.value='';wzToHtml();setTimeout(function(){try{$('wzExt').focus()}catch(e){}},30)}
+function wzExtDel(i){WZ.ext.splice(i,1);wzToHtml()}
+function wzEdHtml(){
+  var h='<div class="gw-wtool"><button class="gw-b" onclick="INTRA.wzStep(1)">◀ 받는 곳</button><button class="gw-b pri" onclick="INTRA.wzStep(3)">다음 ▶ 보내기 확인</button>'
       +'<button class="gw-b" onclick="INTRA.saveTemp()">임시저장</button><button class="gw-b" onclick="INTRA.cpSaveForm()">서식으로 저장</button><label class="gw-b" style="cursor:pointer">'+ic('clip',13)+' 붙임문서<input type="file" id="cpFiles" multiple style="display:none" onchange="INTRA.cpFiles(this)"></label><span id="cpMsg" class="gw-say"></span></div>'
-    +'<div id="cpSum" class="gw-cpsum"></div>'
+    +edBar()
     +'<div class="gw-cpwrap"><div class="gw-paper"><div class="pm">'+MOTTO+'</div><div class="ph"><img src="kfdf_logo.png" alt=""><b>'+esc(ORG.name)+'</b><span></span></div>'
-      +'<table class="pk"><tr><th>수 신</th><td><a id="cpToTxt" title="수신자 지정" onclick="INTRA.ciOpen(\'to\')"></a></td></tr><tr><th>(경유)</th><td></td></tr>'
+      +'<table class="pk"><tr><th>수 신</th><td><a id="cpToTxt" title="받는 곳 바꾸기" onclick="INTRA.wzStep(1)"></a></td></tr><tr><th>(경유)</th><td></td></tr>'
       +'<tr><th>제 목</th><td><input id="cpTitle" maxlength="120" value="'+esc(CP.title||'')+'" placeholder="제목을 입력하세요"></td></tr></table>'
-      +'<textarea id="cpBody" maxlength="6000" placeholder="1. 귀 기관의 무궁한 발전을 기원합니다.&#10;&#10;2. 관련: &#10;&#10;3. 위 호와 관련하여 아래와 같이 …&#10;&#10;  가. &#10;  나. &#10;&#10;붙임  1부.  끝.">'+esc(CP.body||'')+'</textarea>'
+      +'<div id="cpBody" class="ed" contenteditable="true" spellcheck="false" data-ph="1. 귀 기관의 무궁한 발전을 기원합니다.&#10;2. 관련: &#10;3. 위 호와 관련하여 아래와 같이 …&#10;  가. &#10;  나. &#10;붙임  1부.  끝."></div>'
       +'<div class="pf" id="cpSender"></div></div>'
     +'<aside class="gw-cpatt"><b>붙임목록</b><div id="cpFileList" class="gw-chips"></div><small>PDF · 이미지 · 한글 · 워드 · 엑셀<br>파일당 20MB, 10개까지</small></aside></div>';
-  win('gwCp','기안하기',h,1120);cpDraw();setTimeout(function(){try{$('cpBody').focus()}catch(e){}},60);
-}
-// 외부에서 받은 문서의 접수 등록(결재 없음)
-function composeExt(){closeW('gwDoc');var nm=$('gwNewMenu');if(nm)nm.style.display='none';
-  CP={kind:'ext',line:[],to:[],files:[],keep:[],from:'',tempId:'',extTo:'',auto:true,seal:{on:false}};
-  var mem=MEMBERS.filter(function(m){return m.orgKey===ORG.key});
-  var h='<div class="gw-wtool"><button class="gw-b pri" id="cpGo" onclick="INTRA.submit()">접수 등록</button><button class="gw-b" onclick="INTRA.closeW(\'gwCp\')">취소</button><span id="cpMsg" class="gw-say"></span></div>'
-    +'<table class="gw-form"><tr><th>문서 구분</th><td>'+esc(KINDL.ext)+'</td><th>등록일</th><td>'+esc(locd(now()))+'</td></tr>'
-    +'<tr><th>접수 기관</th><td>'+esc(ORG.name)+'</td><th>등록자</th><td>'+esc(MY.name||'')+' '+esc(myTitle())+'</td></tr>'
-    +'<tr><th>발신처 <em>*</em></th><td><input id="cpExtFrom" maxlength="80" placeholder="예: ○○교육지원청" style="width:100%"></td><th>발신 문서번호</th><td><input id="cpExtNo" maxlength="60" placeholder="예: 체육건강과-1234" style="width:100%"></td></tr>'
-    +'<tr><th>시행일</th><td><input type="date" id="cpExtDate"></td><th>담당자</th><td><select id="cpAssign" style="width:100%">'+mem.map(function(m){return '<option value="'+esc(m.uid)+'"'+(m.uid===ME.uid?' selected':'')+'>'+esc(m.name)+' '+esc(m.title||'')+'</option>'}).join('')+'</select></td></tr>'
-    +'<tr><th>제목 <em>*</em></th><td colspan="3"><input id="cpTitle" maxlength="120"></td></tr>'
-    +'<tr><th>요지 <em>*</em></th><td colspan="3"><textarea id="cpBody" rows="5" maxlength="6000" placeholder="받은 문서의 주요 내용 · 처리할 일"></textarea></td></tr>'
-    +'<tr><th>붙임</th><td colspan="3"><input type="file" id="cpFiles" multiple onchange="INTRA.cpFiles(this)"><div id="cpFileList" class="gw-chips"></div><small>받은 공문 스캔본을 붙이세요 (파일당 20MB, 10개까지)</small></td></tr></table>';
-  win('gwCp','외부 문서 접수 등록',h,900);cpDraw();
-}
+  $('wzEd').innerHTML=h;var b=$('cpBody');b.innerHTML=CP.bodyHtml?cleanHtml(CP.bodyHtml):(CP.body?nl(CP.body):'');edBind(b);setTimeout(function(){try{(CP.title?b:$('cpTitle')).focus()}catch(e){}},60)}
+function wzCfHtml(){var need=apprMinOf(ORG.key,ORGDIR);var files=CP.keep.length+CP.files.length;var sealOpts=Object.keys(ORGDIR).filter(function(o){return o===ORG.key||o==='central'||(ORG.level===2&&o==='sido_'+ORG.sido)});
+  var h='<div class="wz-cf"><div class="wz-h">이대로 보낼까요?</div><table class="gw-form">'
+    +'<tr><th>받는 곳</th><td>'+esc(recvText({toNames:CP.to.map(orgName),extTo:CP.kind==='official'?CP.extTo:'',toLabel:CP.toLabel}))+' <a class="wz-lnk" onclick="INTRA.wzStep(1)">바꾸기</a></td></tr>'
+    +'<tr><th>문서 종류</th><td>'+esc(KINDL[CP.kind]||'')+' <small>(받는 곳에 따라 자동)</small></td></tr>'
+    +'<tr><th>제목</th><td>'+esc(CP.title||'')+' <a class="wz-lnk" onclick="INTRA.wzStep(2)">고치기</a></td></tr>'
+    +'<tr><th>붙임</th><td>'+(files?files+'개':'없음')+'</td></tr>'
+    +'<tr><th>결재</th><td>'+(CP.line.length?'기안 '+esc(MY.name||'')+CP.line.map(function(x){return ' → '+esc(x.name)+'('+esc(x.type)+')'}).join(''):'기안자 전결 — 보내면 바로 시행됩니다')+(need>1&&CP.line.length<need-1?' <b style="color:#c0392b">· 이 기관은 '+need+'인 이상 결재: 결재자 '+(need-1)+'명 이상 필요</b>':'')+' <a class="wz-lnk" onclick="INTRA.ciOpen(\'line\')">결재 받을 사람 '+(CP.line.length?'바꾸기':'추가')+'</a></td></tr>'
+    +'<tr><th>발신 명의</th><td><select onchange="INTRA.wzSet(\'sender\',this.value)">'+[ORG.name+'회장',ORG.name].map(function(x){return '<option'+(CP.sender===x?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select></td></tr>'
+    +'</table><details class="wz-adv"'+((CP.seal&&CP.seal.on)||CP.urgent||CP.auto===false?' open':'')+'><summary>더 보기 — 직인 · 긴급 · 발송 · 기록물철</summary><table class="gw-form">'
+    +'<tr><th>직인 날인</th><td><label class="ck"><input type="checkbox"'+(CP.seal&&CP.seal.on?' checked':'')+' onchange="INTRA.wzSet(\'seal\',this.checked)"> 직인 날인을 요청합니다</label>'+(CP.seal&&CP.seal.on?'<div class="gw-row"><label>직인</label><select onchange="INTRA.wzSet(\'sealOrg\',this.value)">'+sealOpts.map(function(o){return '<option value="'+esc(o)+'"'+(CP.seal.org===o?' selected':'')+'>'+esc(orgName(o))+'</option>'}).join('')+'</select><label>방식</label><select onchange="INTRA.wzSet(\'sealMode\',this.value)"><option value="doc"'+(CP.seal.mode!=='file'?' selected':'')+'>시행문에 날인</option><option value="file"'+(CP.seal.mode==='file'?' selected':'')+'>붙임 문서에 날인</option></select></div>':'')+'<br><small>결재가 끝난 뒤 직인 관리자가 승인하면 날인됩니다.</small></td></tr>'
+    +'<tr><th>긴급</th><td><label class="ck"><input type="checkbox"'+(CP.urgent?' checked':'')+' onchange="INTRA.wzSet(\'urgent\',this.checked)"> 긴급결재로 표시</label></td></tr>'
+    +(CP.kind==='coop'?'<tr><th>발송</th><td><label class="ck"><input type="checkbox"'+(CP.auto!==false?' checked':'')+' onchange="INTRA.wzSet(\'auto\',this.checked)"> 결재가 끝나면 바로 전달</label><br><small>끄면 「발송대기」에 머물고 [발송]을 눌러야 받는 곳에 보입니다(직인 날인 후 보낼 때).</small></td></tr>':'')
+    +'<tr><th>그 밖에</th><td><a class="wz-lnk" onclick="INTRA.ciOpen(\'doc\')">기록물철 · 수신자 표기 등 자세한 설정 열기</a></td></tr></table></details>'
+    +'<div class="gw-row" style="margin-top:16px"><button class="gw-b" onclick="INTRA.wzStep(2)">◀ 내용 고치기</button><button class="gw-b pri" id="cpGo" onclick="INTRA.submit()">'+ic('send',13)+' 보내기</button><button class="gw-b" onclick="INTRA.saveTemp()">임시저장</button><span id="cpMsg2" class="gw-say"></span></div></div>';
+  $('wzCf').innerHTML=h}
+function wzSet(k,v){if(k==='sender')CP.sender=v;else if(k==='urgent')CP.urgent=!!v;else if(k==='auto')CP.auto=!!v;else if(k==='seal'){CP.seal=CP.seal||{org:ORG.key,mode:'doc',purpose:''};CP.seal.on=!!v}else if(k==='sealOrg')CP.seal.org=v;else if(k==='sealMode')CP.seal.mode=v;if(k==='seal')wzCfHtml()}
+function treeAll(){V.treeAll=!V.treeAll;renderLeft()}
+function todoBand(){var items=[['a_wait','결재할 문서'],['r_wait','확인할 공문'],['r_me','내가 처리할 공문'],['s_wait','발송할 문서'],['k_wait','직인 요청'],['n_wait','공람']];var any=items.some(function(x){return count(x[0])});
+  return '<div class="gw-todo"><b>지금 할 일</b>'+items.map(function(x){var n=count(x[0]);return '<a class="'+(n?'on':'')+'" onclick="INTRA.setFolder(\''+x[0]+'\')">'+esc(x[1])+'<em>'+n+'</em></a>'}).join('')+(any?'':'<span class="ok">처리할 일이 없습니다</span>')+'<button class="gw-b pri" onclick="INTRA.compose(\'draft\')">'+ic('pen',13)+' 공문 작성</button></div>'}
+function replyDoc(id){var d=DOCS[id];if(!d)return;closeW('gwDoc');compose('coop','',{reply:d})}
+var _autoRecv={};
+function autoRecv(id){if(_autoRecv[id])return;_autoRecv[id]=1;recvDo(id,'접수','',{uid:ME.uid,name:MY.name||''}).then(function(){say('확인(접수)했습니다 — 답이 필요하면 [회신 공문 쓰기]')}).catch(function(){delete _autoRecv[id]})}
+/* ══ 본문 편집기 — 글꼴 크기·굵게·기울임·밑줄·취소선·글자색·형광·정렬·번호·표. 저장은 정리된 HTML(bodyHtml)과 글자만(body) 두 가지 ══ */
+var ED_OK={P:1,DIV:1,BR:1,B:1,STRONG:1,I:1,EM:1,U:1,S:1,STRIKE:1,SPAN:1,FONT:1,TABLE:1,TBODY:1,THEAD:1,TR:1,TD:1,TH:1,UL:1,OL:1,LI:1,H3:1,H4:1,H5:1,SUP:1,SUB:1,HR:1};
+var ED_CSS=['color','background-color','font-size','font-weight','font-style','text-decoration','text-decoration-line','text-align','border','border-collapse','padding','width','vertical-align','margin-left','line-height'];
+function cleanStyle(v){return String(v||'').split(';').map(function(p){var i=p.indexOf(':');if(i<0)return '';var k=p.slice(0,i).trim().toLowerCase(),val=p.slice(i+1).trim();if(ED_CSS.indexOf(k)<0||/url\(|expression|javascript|@import/i.test(val)||val.length>60)return '';return k+':'+val}).filter(Boolean).join(';')}
+function cleanHtml(html){var doc;try{doc=new DOMParser().parseFromString('<!doctype html><body>'+String(html||''),'text/html')}catch(e){return esc(String(html||''))}
+  var walk=function(n){Array.prototype.slice.call(n.childNodes).forEach(function(c){if(c.nodeType===3)return;if(c.nodeType!==1){c.remove();return}var tag=c.tagName;
+      if(!ED_OK[tag]){if(/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|LINK|META|SVG|IMG|VIDEO|AUDIO)$/.test(tag)){c.remove();return}var f=doc.createDocumentFragment();while(c.firstChild)f.appendChild(c.firstChild);c.replaceWith(f);walk(n);return}
+      Array.prototype.slice.call(c.attributes).forEach(function(a){var nm=a.name.toLowerCase();if(nm==='style'){var cs=cleanStyle(a.value);if(cs)c.setAttribute('style',cs);else c.removeAttribute('style')}else if(!(nm==='colspan'||nm==='rowspan'||(tag==='FONT'&&(nm==='color'||nm==='size'))))c.removeAttribute(a.name)});
+      if(tag==='TABLE')c.className='gt';walk(c)})};walk(doc.body);return doc.body.innerHTML.slice(0,30000)}
+function cpBodyGet(){var el=$('cpBody');if(!el)return {text:'',html:''};if(el.tagName==='TEXTAREA')return {text:el.value.trim(),html:''};var html=cleanHtml(el.innerHTML);
+  var tmp=document.createElement('div');tmp.innerHTML=html.replace(/<br\s*\/?>/gi,'\n').replace(/<\/(p|div|tr|li|h\d)>/gi,'\n').replace(/<\/t[dh]>/gi,'\t');var text=(tmp.textContent||'').replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+  var plain=!/<(?!\/?(br|div|p)\b)[a-z]/i.test(html);return {text:text.slice(0,8000),html:plain?'':html}}
+function bodyView(d){return d.bodyHtml?'<div class="html">'+cleanHtml(d.bodyHtml)+'</div>':nl(d.body||'')}
+function edBar(){var B=function(cmd,lab,title,val){return '<button type="button" title="'+esc(title||lab)+'" onmousedown="event.preventDefault()" onclick="INTRA.edCmd(\''+cmd+'\''+(val!=null?',\''+val+'\'':'')+')">'+lab+'</button>'};
+  return '<div class="gw-edbar" id="edBar"><select title="글자 크기" onmousedown="event.stopPropagation()" onchange="INTRA.edCmd(\'fontSize\',this.value);this.value=\'\'"><option value="">크기</option><option value="2">작게</option><option value="3">보통</option><option value="4">조금 크게</option><option value="5">크게</option><option value="6">제목</option></select>'
+    +B('bold','<b>가</b>','굵게 (Ctrl+B)')+B('italic','<i>가</i>','기울임 (Ctrl+I)')+B('underline','<u>가</u>','밑줄 (Ctrl+U)')+B('strikeThrough','<s>가</s>','취소선')
+    +'<label class="clr" title="글자색"><span style="border-bottom:3px solid #c0392b">가</span><input type="color" value="#c0392b" oninput="INTRA.edCmd(\'foreColor\',this.value)"></label><label class="clr" title="형광펜"><span style="background:#fff59d">가</span><input type="color" value="#fff59d" oninput="INTRA.edCmd(\'hiliteColor\',this.value)"></label>'
+    +'<i class="sp"></i>'+B('justifyLeft','≡','왼쪽 정렬')+B('justifyCenter','☰','가운데 정렬')+B('justifyRight','≡','오른쪽 정렬')+B('insertOrderedList','1.','번호 목록')+B('insertUnorderedList','•','글머리 기호')+B('outdent','⇤','내어쓰기')+B('indent','⇥','들여쓰기')
+    +'<i class="sp"></i><span class="tb"><button type="button" title="표 넣기" onmousedown="event.preventDefault()" onclick="INTRA.edTablePick(this)">▦ 표</button><div class="tp" id="edTp"></div></span>'
+    +B('tRowAdd','행+','아래에 행 추가')+B('tRowDel','행−','이 행 삭제')+B('tColAdd','열+','오른쪽에 열 추가')+B('tColDel','열−','이 열 삭제')+B('tDel','표✕','표 삭제')
+    +'<i class="sp"></i>'+B('removeFormat','지우기','서식 지우기')+B('undo','↶','되돌리기')+B('redo','↷','다시 실행')+'<small>글은 한글(HWP)·워드에서 붙여 넣어도 됩니다 — 표·굵게·색은 유지, 글꼴은 공문 글꼴로</small></div>'}
+function edBind(b){try{document.execCommand('styleWithCSS',false,true)}catch(e){}
+  b.addEventListener('paste',function(e){var cd=e.clipboardData;if(!cd)return;var html=cd.getData('text/html'),txt=cd.getData('text/plain');if(!html&&!txt)return;e.preventDefault();var ins=html?cleanHtml(html.replace(/<!--[\s\S]*?-->/g,'')):nl(txt);document.execCommand('insertHTML',false,ins)});
+  b.addEventListener('keydown',function(e){if(e.key==='Tab'){var td=edCell();if(td){e.preventDefault();var cells=Array.prototype.slice.call(td.closest('table').querySelectorAll('td,th'));var i=cells.indexOf(td)+(e.shiftKey?-1:1);if(cells[i]){var r=document.createRange();r.selectNodeContents(cells[i]);r.collapse(true);var s=window.getSelection();s.removeAllRanges();s.addRange(r)}}}})}
+function edCell(){var s=window.getSelection();if(!s||!s.anchorNode)return null;var n=s.anchorNode.nodeType===1?s.anchorNode:s.anchorNode.parentElement;var td=n&&n.closest?n.closest('td,th'):null;return td&&$('cpBody')&&$('cpBody').contains(td)?td:null}
+function edCmd(cmd,val){var b=$('cpBody');if(!b)return;b.focus();
+  if(/^t(RowAdd|RowDel|ColAdd|ColDel|Del)$/.test(cmd)){var td=edCell();if(!td){say('표 안에 커서를 둔 뒤 누르세요',true);return}var tr=td.parentElement,tb=td.closest('table'),ci=Array.prototype.indexOf.call(tr.children,td);
+    if(cmd==='tRowAdd'){var nr=tr.cloneNode(true);Array.prototype.forEach.call(nr.children,function(c){c.innerHTML='<br>'});tr.after(nr)}
+    else if(cmd==='tRowDel'){if(tb.rows.length<=1)tb.remove();else tr.remove()}
+    else if(cmd==='tColAdd'){Array.prototype.forEach.call(tb.rows,function(r){var c=r.children[Math.min(ci,r.children.length-1)];var n=document.createElement(c?c.tagName:'td');n.innerHTML='<br>';if(c)c.after(n);else r.appendChild(n)})}
+    else if(cmd==='tColDel'){var cols=tr.children.length;if(cols<=1)tb.remove();else Array.prototype.forEach.call(tb.rows,function(r){if(r.children[ci])r.children[ci].remove()})}
+    else if(cmd==='tDel'){tb.remove()}
+    return}
+  try{document.execCommand(cmd,false,val==null?null:val)}catch(e){}}
+function edTablePick(btn){var tp=$('edTp');if(!tp)return;if(tp.style.display==='block'){tp.style.display='none';return}var h='';for(var r=1;r<=6;r++){for(var c=1;c<=6;c++)h+='<i data-r="'+r+'" data-c="'+c+'" onmouseover="INTRA.edTableHover('+r+','+c+')" onmousedown="event.preventDefault()" onclick="INTRA.edTable('+r+','+c+')"></i>';h+='<br>'}
+  tp.innerHTML=h+'<small id="edTpL">행 × 열</small>';tp.style.display='block'}
+function edTableHover(r,c){var tp=$('edTp');if(!tp)return;Array.prototype.forEach.call(tp.querySelectorAll('i'),function(i){i.className=(+i.dataset.r<=r&&+i.dataset.c<=c)?'on':''});var l=$('edTpL');if(l)l.textContent=r+'행 × '+c+'열'}
+function edTable(r,c){var tp=$('edTp');if(tp)tp.style.display='none';var h='<table class="gt"><tbody>';for(var i=0;i<r;i++){h+='<tr>';for(var j=0;j<c;j++)h+='<td><br></td>';h+='</tr>'}h+='</tbody></table><p><br></p>';edCmd('insertHTML',h)}
 function cpDraw(){
   var f=$('cpFileList');if(f)f.innerHTML=(CP.keep.map(function(x,i){return '<span>'+esc(x.name)+' <a onclick="INTRA.cpDelKeep('+i+')">✕</a></span>'}).concat(CP.files.map(function(x,i){return '<span>'+esc(x.name)+' <small>'+Math.round(x.size/1024)+'KB</small> <a onclick="INTRA.cpDelFile('+i+')">✕</a></span>'})).join(''))||(CP.kind==='ext'?'':'<small>붙임 없음</small>');
   var t=$('cpToTxt');if(t)t.textContent=recvText({toNames:CP.to.map(orgName),extTo:CP.kind==='official'?CP.extTo:'',toLabel:CP.toLabel})+(CP.kind==='draft'?'':'  ✎');
@@ -446,7 +545,7 @@ var CI=null;
 function ciOpen(tab){if(!CP||CP.kind==='ext')return;
   CI={tab:tab||'doc',first:!!CP.first,kind:CP.kind,fixed:CP.kind==='seal'||CP.kind==='notice',title:$('cpTitle')?$('cpTitle').value:(CP.title||''),urgent:!!CP.urgent,cab:CP.cab||'',line:clone(CP.line),to:CP.to.slice(),
     ext:String(CP.extTo||'').split(',').map(function(x){return x.trim()}).filter(Boolean),auto:CP.auto!==false,seal:clone(CP.seal),sender:CP.sender,toLabel:CP.toLabel||'',toLabelOn:!!CP.toLabel,selM:'',selL:-1,selO:'',selT:-1,sub:'org',type:'결재'};
-  win('gwCi',CI.first?'기안하기 — 결재정보':'결재정보','<div id="ciBody"></div>',860);ciDraw();if(CI.first)setTimeout(function(){try{$('ciTitle').focus()}catch(e){}},60)}
+  win('gwCi',CI.first?'공문 작성 — 자세한 설정':'자세한 설정 (결재정보)','<div id="ciBody"></div>',860);ciDraw();if(CI.first)setTimeout(function(){try{$('ciTitle').focus()}catch(e){}},60)}
 function ciSet(k,v){if(!CI)return;if(k.indexOf('seal.')===0)CI.seal[k.slice(5)]=v;else CI[k]=v}
 function ciTab(t){CI.tab=t;ciDraw()}
 function ciKind(k){CI.kind=k;ciDraw()}
@@ -533,12 +632,12 @@ function cpAddLine(){ciOpen('line')}
 function cpDelLine(i){CP.line.splice(i,1);cpDraw()}
 function cpLoadLine(){ciOpen('line')}
 function cpSaveLine(){ciOpen('line')}
-async function cpSaveForm(){var t=$('cpTitle').value.trim(),b=$('cpBody').value;if(b.trim().length<2){alert('본문을 입력한 뒤 저장하세요.');return}var n=prompt('서식 이름',t||KIND[CP.kind]);if(!n||!n.trim())return;
+async function cpSaveForm(){var t=$('cpTitle').value.trim(),b=cpBodyGet().text;if(b.trim().length<2){alert('본문을 입력한 뒤 저장하세요.');return}var n=prompt('서식 이름',t||KIND[CP.kind]);if(!n||!n.trim())return;
   var bk=(PREFS.forms||[]).slice();PREFS.forms=bk.concat([{name:n.trim().slice(0,40),kind:CP.kind,title:t.slice(0,120),body:b.slice(0,6000),to:CP.to.slice()}]).slice(-20);
   try{await prefsSave();var m=$('cpMsg');m.textContent='내 서식으로 저장했습니다 (서식함)';m.className='gw-say'}catch(e){PREFS.forms=bk;alert('저장 실패: '+(e.code||e.message)+'\n(보안 규칙 v48 이상 게시가 필요합니다)')}}
-async function saveTemp(){var m=$('cpMsg');var title=$('cpTitle').value.trim();if(!title&&!$('cpBody').value.trim()){m.textContent='제목이나 내용을 입력하세요';m.className='gw-say bad';return}
+async function saveTemp(){var m=$('cpMsg')||$('cpMsg2');var title=$('cpTitle')?$('cpTitle').value.trim():(CP.title||'');var _bg=cpBodyGet();if(!title&&!_bg.text){m.textContent='제목이나 내용을 입력하세요';m.className='gw-say bad';return}
   var ref=CP.tempId?DB.collection('intraTemp').doc(CP.tempId):DB.collection('intraTemp').doc();
-  var t={uid:ME.uid,org:ORG.key,kind:CP.kind,title:title.slice(0,120),body:$('cpBody').value.slice(0,6000),line:CP.line,to:CP.to,extTo:String(CP.extTo||'').slice(0,300),auto:CP.auto!==false,urgent:!!CP.urgent,cabId:CP.cab||'',sender:CP.sender||'',toLabel:CP.toLabel||'',
+  var t={uid:ME.uid,org:ORG.key,kind:CP.kind,title:title.slice(0,120),body:_bg.text.slice(0,6000),line:CP.line,to:CP.to,extTo:String(CP.extTo||'').slice(0,300),auto:CP.auto!==false,urgent:!!CP.urgent,cabId:CP.cab||'',sender:CP.sender||'',toLabel:CP.toLabel||'',
     seal:CP.seal&&CP.seal.on?{orgKey:CP.seal.org,mode:CP.seal.mode,purpose:CP.seal.purpose||''}:null,updatedAt:now()};
   try{await ref.set(t);CP.tempId=ref.id;m.textContent='임시저장했습니다'+(CP.files.length?' (붙임 파일은 저장되지 않습니다)':'');m.className='gw-say'}catch(e){m.textContent='임시저장 실패: '+(e.code||e.message)+(/permission/i.test(String(e.code||e.message))?' (보안 규칙 v48 이상 게시 필요)':'');m.className='gw-say bad'}}
 function cpAddTo(){var v=$('cpToWho').value;if(v&&CP.to.indexOf(v)<0)CP.to.push(v);cpDraw()}
@@ -550,8 +649,8 @@ function cpFiles(inp){var ok=/\.(pdf|png|jpe?g|gif|webp|hwp|hwpx|docx?|xlsx?|ppt
 function mimeOf(f){if(f.type)return f.type;var e=(f.name.split('.').pop()||'').toLowerCase();return {hwp:'application/x-hwp',hwpx:'application/vnd.hancom.hwpx',pdf:'application/pdf',zip:'application/zip',txt:'text/plain'}[e]||'application/octet-stream'}
 async function nextNo(tx,orgKey,rcv){var y=new Date().getFullYear();var ref=DB.collection('intraCounters').doc(orgKey+'__'+y+(rcv?'__r':''));var g=await tx.get(ref);var n=((g.exists&&g.data().n)||0)+1;tx.set(ref,{org:orgKey,year:y,n:n,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});var p=(ORGDIR[orgKey]&&ORGDIR[orgKey].docPrefix)||'문서';return rcv?docNoOf(p+' 접수',y,n):docNoOf(p,y,n)}
 async function submit(){
-  var m=$('cpMsg'),bad=function(t){m.textContent=t;m.className='gw-say bad'};var kind=CP.kind,ext=kind==='ext',off=kind==='official';
-  var title=$('cpTitle').value.trim(),body=$('cpBody').value.trim();
+  var m=$('cpMsg')||$('cpMsg2'),bad=function(t){if(m){m.textContent=t;m.className='gw-say bad'}else alert(t)};var kind=CP.kind,ext=kind==='ext',off=kind==='official';
+  var title=($('cpTitle')?$('cpTitle').value:(CP.title||'')).trim(),bg=cpBodyGet(),body=bg.text;if(!$('cpMsg')&&$('cpMsg2'))m=$('cpMsg2');
   if(title.length<2)return bad('제목을 입력하세요');if(body.length<2)return bad(ext?'요지를 입력하세요':'내용을 입력하세요');
   if((kind==='coop'||kind==='notice')&&!CP.to.length)return bad('수신 기관을 지정하세요 — [결재정보] › 수신자');
   var extTo=off?String(CP.extTo||'').trim():'';if(off&&extTo.length<2&&!CP.to.length)return bad('수신자를 지정하세요 — [결재정보] › 수신자');
@@ -563,17 +662,18 @@ async function submit(){
     if(mode==='file'&&!(CP.files.concat(CP.keep)).some(function(f){return /\.(pdf|png|jpe?g)$/i.test(f.name)}))return bad('붙임 문서에 날인하려면 PDF 또는 이미지 파일을 붙이세요');
     if(!((ORGDIR[so]||{}).sealKeepers||[]).length&&!confirm(orgName(so)+'에 직인 관리자가 지정되어 있지 않습니다.\n지정되기 전에는 직인대기 상태로 남습니다. 그래도 상신할까요?'))return;
     seal={orgKey:so,orgName:orgName(so),mode:mode,purpose:String(CP.seal.purpose||'').trim().slice(0,120),status:'요청'}}
-  var b=$('cpGo');b.disabled=true;m.className='gw-say';
+  var b=$('cpGo');if(b)b.disabled=true;if(m)m.className='gw-say';
   try{
     var ref=DB.collection('intraDocs').doc();var files=CP.keep.slice();
     for(var i=0;i<CP.files.length;i++){var f=CP.files[i];m.textContent='파일 올리는 중 ('+(i+1)+'/'+CP.files.length+')';
       var path='intranet/'+ref.id+'/'+Date.now()+'_'+i+'.'+(f.name.split('.').pop()||'bin').toLowerCase();
       await firebase.storage().ref(path).put(f,{contentType:mimeOf(f),customMetadata:{name:encodeURIComponent(f.name)}});files.push({name:f.name,path:path,size:f.size,by:ME.uid})}
-    m.textContent=ext?'등록하는 중':'상신하는 중';
+    m.textContent=ext?'등록하는 중':'보내는 중';
     var line=ext?[]:CP.line,done=!line.length,t=now();
     var d={kind:kind,title:title,body:body,org:ORG.key,orgName:ORG.name,authorUid:ME.uid,authorName:MY.name||'',authorTitle:myTitle(),
       line:line.map(function(x){return {uid:x.uid,name:x.name,orgName:x.orgName,title:x.title||'',type:x.type,status:'대기',at:'',comment:'',sign:''}}),
       toOrgs:CP.to.slice(),toNames:CP.to.map(orgName),status:done?'완료':'진행',docNo:'',files:files,recv:{},replies:[],seal:seal,log:[logOf(ext?'외부 문서 접수 등록':done?'기안 · 전결 시행(1인 결재)':'기안')],createdAt:t,updatedAt:t,doneAt:done?t:''};
+    if(!ext&&bg.html)d.bodyHtml=bg.html;
     if(off){d.extTo=extTo.slice(0,300);d.send={auto:false,status:''}}
     else if(CP.to.length)d.send={auto:CP.auto!==false,status:''};
     if(!ext){d.urgent=!!CP.urgent;d.sender=CP.sender||'';d.toLabel=CP.toLabel||'';if(CP.cab){d.cab={};d.cab[ORG.key]=CP.cab}}
@@ -588,8 +688,8 @@ async function submit(){
     if(CP.tempId){try{await DB.collection('intraTemp').doc(CP.tempId).delete()}catch(e){}}
     if(ext){if(asg.uid!==ME.uid)try{KFDF.notify(asg.uid,'['+ORG.name+'] 접수 문서 담당 지정 — '+title,'intranet.html')}catch(e){}}
     else if(done)afterDone(Object.assign({_id:ref.id},d));else try{KFDF.notify(d.line[0].uid,'['+ORG.name+'] '+(d.line[0].type)+' 요청 — '+title,'intranet.html')}catch(e){}
-    closeW('gwCi');closeW('gwCp');setFolder(ext?'x_reg':(done&&sendPending(d)?'s_wait':'a_mine'));say((ext?'접수 등록했습니다':'상신했습니다')+(d.docNo?' — '+d.docNo:'')+(done&&sendPending(d)?' · 발송대기':''));
-  }catch(e){b.disabled=false;bad((ext?'등록':'상신')+' 실패: '+(e.code||e.message||e)+(/permission/i.test(String(e.code||e.message))&&(ext||off)?' (보안 규칙 v48 게시 필요)':''))}
+    closeW('gwCi');closeW('gwCp');setFolder(ext?'x_reg':(done&&sendPending(d)?'s_wait':'a_mine'));say((ext?'접수 등록했습니다':done?'보냈습니다':'결재를 요청했습니다')+(d.docNo?' — '+d.docNo:'')+(done&&sendPending(d)?' · 발송대기(직인 뒤 [발송])':''));
+  }catch(e){if(b)b.disabled=false;bad((ext?'등록':'보내기')+' 실패: '+(e.code||e.message||e)+(/permission/i.test(String(e.code||e.message))&&(ext||off)?' (보안 규칙 v48 게시 필요)':''))}
 }
 function afterDone(d){if(sentOf(d))(d.toOrgs||[]).forEach(function(k){notifyOrg(k,'['+d.orgName+'] '+(KIND[d.kind]||'')+' 도착 — '+d.title)});
   else if(sendPending(d)&&d.authorUid!==ME.uid)try{KFDF.notify(d.authorUid,'결재 완료 · 발송대기 — '+d.title,'intranet.html')}catch(e){}
@@ -780,11 +880,11 @@ function print(id){var d=DOCS[id];if(!d)return;var w=window.open('','_blank');if
     +'@page{size:A4;margin:20mm 18mm}*{box-sizing:border-box}body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;font-size:11.5pt;line-height:1.8;color:#111;word-break:keep-all;margin:0}'
     +'.mt{text-align:center;font-size:10.5pt;letter-spacing:1px;margin-bottom:3mm}.hd{text-align:center;font-size:21pt;font-weight:800;letter-spacing:2px;padding-bottom:6mm;border-bottom:2.2px solid #111}.kv{margin:7mm 0 0}.kv div{display:flex;gap:4mm}.kv b{flex:none;width:18mm}'
     +'h1{font-size:12.5pt;margin:3mm 0 0;display:flex;gap:4mm}h1 b{flex:none;width:18mm}.rule{border-top:1px solid #111;margin:4mm 0 6mm}.body{min-height:95mm;white-space:pre-wrap}'
-    +'.att{margin-top:6mm}.from{text-align:center;font-size:19pt;font-weight:800;letter-spacing:3px;margin:16mm 0 10mm}.from span{position:relative;display:inline-block}.seal{position:absolute;right:-22mm;top:50%;transform:translateY(-50%);width:30mm;height:30mm;object-fit:contain;mix-blend-mode:multiply;opacity:.93}'
+    +'.body.html{white-space:normal}.body table{border-collapse:collapse;margin:2mm 0;max-width:100%}.body td,.body th{border:1px solid #111;padding:1mm 2.5mm;vertical-align:top}.body p{margin:0}.att{margin-top:6mm}.from{text-align:center;font-size:19pt;font-weight:800;letter-spacing:3px;margin:16mm 0 10mm}.from span{position:relative;display:inline-block}.seal{position:absolute;right:-22mm;top:50%;transform:translateY(-50%);width:30mm;height:30mm;object-fit:contain;mix-blend-mode:multiply;opacity:.93}'
     +'.ft{border-top:2.2px solid #111;padding-top:3mm;font-size:9.5pt;line-height:1.7}.ft .ln{display:flex;flex-wrap:wrap;gap:1mm 7mm}.np{text-align:center;margin:0 0 10px}@media print{.np{display:none}}'
     +'</style></head><body><div class="np"><button onclick="window.print()" style="padding:6px 18px;font-size:13px">인쇄 · PDF로 저장</button></div>'
     +'<div class="mt">'+MOTTO+'</div><div class="hd">'+esc(d.orgName)+'</div><div class="kv"><div><b>수신</b><span>'+esc(d.toLabel||((d.toNames||[]).length+(d.extTo?1:0)>4?'수신처 참조':recvText(d)))+'</span></div><div><b>(경유)</b><span></span></div></div>'
-    +'<h1><b>제목</b><span>'+esc(d.title)+'</span></h1><div class="rule"></div><div class="body">'+esc(d.body)+'</div>'
+    +'<h1><b>제목</b><span>'+esc(d.title)+'</span></h1><div class="rule"></div><div class="body'+(d.bodyHtml?' html':'')+'">'+(d.bodyHtml?cleanHtml(d.bodyHtml):esc(d.body))+'</div>'
     +((d.files||[]).length?'<div class="att"><b>붙임</b>&nbsp; '+d.files.map(function(f,i){return (i+1)+'. '+esc(f.name)+' 1부'}).join(' &nbsp;')+'. &nbsp;끝.</div>':'<div class="att">끝.</div>')
     +'<div class="from"><span>'+esc(senderOf(d))+seal+'</span></div>'+(((d.toNames||[]).length+(d.extTo?1:0)>4||d.toLabel)&&((d.toNames||[]).length||d.extTo)?'<div style="font-size:10pt;margin-bottom:6mm"><b>수신처</b>&nbsp; '+esc((d.toNames||[]).concat(d.extTo?[d.extTo]:[]).join(', '))+'</div>':'')
     +'<div class="ft"><div class="ln"><span><b>기안</b> '+esc(d.authorTitle||'')+' '+esc(d.authorName||'')+'</span>'+l.map(function(x){return '<span><b>'+esc(x.type||'결재')+'</b> '+esc(x.title||'')+' '+esc(x.name||'')+(x.status==='승인'?' ('+esc(locd(x.at))+')':'')+'</span>'}).join('')+'</div>'
@@ -794,7 +894,41 @@ function print(id){var d=DOCS[id];if(!d)return;var w=window.open('','_blank');if
 window.INTRA={login:login,lock:lock,logout:logout,setOrg:setOrg,setMod:setMod,setFolder:setFolder,setV:setV,search:search,resetSearch:resetSearch,refresh:refresh,go:go,sel:sel,selAll:selAll,openSel:openSel,recvSel:recvSel,newMenu:newMenu,
   openDoc:openDoc,closeW:closeW,openFile:openFile,openStamped:openStamped,compose:compose,cpAddLine:cpAddLine,cpDelLine:cpDelLine,cpAddTo:cpAddTo,cpAddToAll:cpAddToAll,cpDelTo:cpDelTo,cpDelKeep:cpDelKeep,cpDelFile:cpDelFile,cpFiles:cpFiles,submit:submit,approve:approve,withdraw:withdraw,del:del,recv:recv,reply:reply,
   sealOpen:sealOpen,sealReject:sealReject,stLoad:stLoad,stLocal:stLocal,stPage:stPage,stSize:stSize,stMake:stMake,settings:settings,home:home,saveAppr:saveAppr,sendSel:sendSel,sendDoc:sendDoc,recvOpen:recvOpen,recvGo:recvGo,recvBack:recvBack,setCab:setCab,saveTemp:saveTemp,tempOpen:tempOpen,tempDel:tempDel,formUse:formUse,formDel:formDel,cpLoadLine:cpLoadLine,cpSaveLine:cpSaveLine,cpSaveForm:cpSaveForm,ciOpen:ciOpen,ciSet:ciSet,ciTab:ciTab,ciKind:ciKind,ciPick:ciPick,ciAddLine:ciAddLine,ciDelLine:ciDelLine,ciMove:ciMove,ciLoadLine:ciLoadLine,ciSaveLine:ciSaveLine,ciAddTo:ciAddTo,ciDelTo:ciDelTo,ciOk:ciOk,ciNext:ciNext,saveAbsent:saveAbsent,addCab:addCab,delCab:delCab,saveTitle:saveTitle,saveOrg:saveOrg,saveHide:saveHide,saveKeepers:saveKeepers,saveSeal:saveSeal,print:print,
+  wzStep:wzStep,wzIntra:wzIntra,wzPickOrg:wzPickOrg,wzPickAll:wzPickAll,wzToggle:wzToggle,wzExtAdd:wzExtAdd,wzExtDel:wzExtDel,wzSet:wzSet,treeAll:treeAll,replyDoc:replyDoc,edCmd:edCmd,edTablePick:edTablePick,edTableHover:edTableHover,edTable:edTable,helpSearch:helpSearch,helpRole:helpRole,helpPrint:helpPrint,
   _sim:function(o){ME=o.me;MY=o.my;ORGS=myOrgsOf(MY);ORG=ORGS[0];MEMBERS=o.members||[];ORGDIR=o.orgs||{};DOCS=o.docs||{};TEMPS=o.temps||{};PREFS=o.prefs||{lines:[],forms:[]};$('gwLogin').style.display='none';$('gwApp').style.display='flex';renderAll()}};
+/* ══ [2026-10-27] 도움말 — 역할별 3단계 + 자주 묻는 질문(검색) + 한 장 요약 인쇄 ══ */
+var HELP_ROLES=[
+ {k:'sido',name:'시도·구군연맹 임원',steps:[['로그인','회원 아이디(이메일)와 비밀번호로 들어옵니다. 30분 동안 쓰지 않으면 잠깁니다.',''],['공문 보내기','[공문 작성] → ① 받는 곳에서 「중앙」이나 다른 연맹을 고르고 → ② 제목·내용·붙임을 쓰고 → ③ [보내기]. 결재 받을 사람을 넣지 않으면 바로 시행됩니다.','INTRA.compose(\'draft\')'],['받은 공문 확인','첫 화면 「확인할 공문」을 누르고 문서를 엽니다. 열면 확인(접수)되고, 답이 필요하면 [회신 공문 쓰기]를 누릅니다.','INTRA.setFolder(\'r_wait\')'],['직인 요청','[공문 작성 ▾] › 직인 날인 요청에서 파일을 올리고 요청하면, 직인 담당자가 날인한 파일을 같은 문서에서 내려받습니다.','INTRA.compose(\'seal\')'],['내 문서 찾기','「보낸 문서」「결재완료」에서 찾고, 시행문은 문서 안의 [시행문 인쇄]로 출력합니다.','INTRA.setFolder(\'a_mine\')']]},
+ {k:'central',name:'중앙 사무국',steps:[['받은 공문 처리','「확인할 공문」에서 열어 확인하고, [담당자 지정]으로 담당자를 두거나 [회신 공문 쓰기]로 답합니다.','INTRA.setFolder(\'r_wait\')'],['전체 연맹에 공문','[공문 작성] → 받는 곳에서 「시도연맹 전체 선택」 → 내용 → [보내기]. 협조문은 각 연맹 「확인할 공문」에 바로 들어갑니다.','INTRA.compose(\'coop\')'],['직인 승인','「직인대기」에서 요청을 열어 [직인 날인]을 누릅니다. 직인 관리자로 지정된 사람만 보입니다.','INTRA.setFolder(\'k_wait\')'],['다른 기관 문서 열람','문서함 › 「전체 문서함 보기」 › 중앙 열람 › 다른 기관 문서(읽기만).','INTRA.setFolder(\'z_org\')'],['환경설정','결재 방식(1인 전결·2인 이상), 직인 관리자, 기록물철, 조직도 표시는 [환경설정]에서 바꿉니다.','INTRA.setMod(\'set\')']]},
+ {k:'appr',name:'결재자',steps:[['결재할 문서','첫 화면 「결재할 문서」를 누르면 내 차례인 문서만 보입니다.','INTRA.setFolder(\'a_wait\')'],['결재 또는 반려','문서를 열고 [결재] 또는 [반려]를 누릅니다. 반려하면 기안자가 고쳐 다시 올릴 수 있습니다.',''],['부재 설정','출장·휴가 중이면 환경설정에서 부재 기간과 대결자를 정해 두세요. 결재선에 넣을 때 대결자로 바꿀지 묻습니다.','INTRA.setMod(\'set\')']]}];
+var HELP_FAQ=[
+ ['중앙에 공문을 보냈는데 중앙에 안 갔어요','받는 곳을 고르지 않고 「우리 연맹 안에서 결재만」(내부결재)으로 보내면 밖으로 나가지 않습니다. [공문 작성] ① 받는 곳에서 「중앙」을 체크한 뒤 보내세요. 이미 보낸 내부결재 문서는 고칠 수 없으니, 같은 내용으로 다시 작성해 중앙으로 보내면 됩니다.'],
+ ['보낸 공문을 고치고 싶어요','아직 결재가 시작되지 않았으면 문서를 열어 [회수] → 「반려·회수」에서 [재기안]으로 고쳐 다시 보냅니다. 결재가 끝난 문서는 고칠 수 없고, 정정 공문을 새로 보냅니다.'],
+ ['협조문과 일반공문은 뭐가 달라요','받는 곳이 인트라넷에 있는 연맹이면 협조문(상대 연맹 화면에 바로 들어감), 인트라넷에 없는 외부 기관이면 일반공문(결재 뒤 인쇄해서 보내고 [발송]으로 기록)입니다. 받는 곳을 고르면 자동으로 정해집니다.'],
+ ['결재 받을 사람을 꼭 넣어야 하나요','아니요. 기본은 기안자 1인 전결이라 비워 두면 보내는 즉시 시행됩니다. 회장 결재가 필요하면 ③ 보내기 확인에서 [결재 받을 사람 추가]로 넣습니다. (중앙 환경설정에서 2인 이상 결재로 정한 기관은 반드시 넣어야 합니다)'],
+ ['직인은 어떻게 찍나요','공문 작성 ③에서 「더 보기 › 직인 날인을 요청합니다」를 켜거나, [공문 작성 ▾] › 직인 날인 요청으로 파일을 올립니다. 결재가 끝나면 직인 관리자가 승인하고, 날인된 파일이 문서에 붙습니다.'],
+ ['받은 공문은 어떻게 처리해요','「확인할 공문」에서 열기만 하면 확인(접수)됩니다. 답이 필요하면 [회신 공문 쓰기], 다른 임원이 처리할 문서면 [담당자 지정], 잘못 온 문서면 [반송]입니다.'],
+ ['문서번호는 언제 붙나요','결재가 모두 끝나 시행될 때 「연맹 약칭 연도-번호」로 자동으로 붙습니다. 보내기 전에는 비어 있습니다.'],
+ ['붙임 파일은 무엇을 올릴 수 있나요','PDF·이미지·한글(hwp)·워드·엑셀, 파일당 20MB, 10개까지입니다. 직인을 붙임 문서에 찍으려면 PDF나 이미지여야 합니다.'],
+ ['본문에 표를 넣고 싶어요','② 내용 쓰기 화면 위 편집 줄에서 「▦ 표」를 누르고 행·열을 고릅니다. 한글이나 워드에서 표를 복사해 붙여 넣어도 됩니다. 행·열 추가는 표 안에 커서를 두고 「행+」「열+」를 누릅니다.'],
+ ['로그인이 자꾸 풀려요','보안을 위해 30분 동안 쓰지 않으면 잠깁니다. 아이디와 비밀번호를 다시 넣으면 하던 곳으로 돌아옵니다.'],
+ ['우리 연맹 임원이 결재선에 안 보여요','그 임원이 인트라넷에 한 번 로그인해야 조직도에 등록됩니다. 먼저 로그인해 달라고 부탁하세요.'],
+ ['다른 임원이 쓴 문서가 안 보여요','기안자·결재선·받는 기관 임원만 봅니다. 같은 연맹이라도 결재선에 없으면 보이지 않습니다. 중앙 사무국은 모든 문서를 읽을 수 있습니다.'],
+ ['임시저장한 글은 어디 있나요','문서함 › 「임시보관」에 있습니다. 열어서 이어 쓰고 보내면 임시보관에서 사라집니다.'],
+ ['문의는 어디로 하나요','연맹 사무국 031-984-3248, kfdf60@hanmail.net. 화면 오른쪽 위 업무요청으로 남겨도 됩니다.']];
+function helpMain(m){var q=String(V.helpQ||'').trim();var L=HELP_FAQ.filter(function(f){return !q||(f[0]+f[1]).indexOf(q)>=0});var role=V.helpRole||(ORG&&ORG.key==='central'?'central':'sido');var R=HELP_ROLES.find(function(r){return r.k===role})||HELP_ROLES[0];
+  m.innerHTML='<div class="gw-help"><div class="gw-bar"><h2>도움말</h2><span class="sp"></span><button class="gw-b" onclick="INTRA.helpPrint()">'+ic('file',13)+' 한 장 요약 인쇄</button></div>'
+    +'<div class="hp-roles">'+HELP_ROLES.map(function(r){return '<a class="'+(r.k===role?'on':'')+'" onclick="INTRA.helpRole(\''+r.k+'\')">'+esc(r.name)+'</a>'}).join('')+'</div>'
+    +'<div class="hp-steps">'+R.steps.map(function(st,i){return '<div class="st"><em>'+(i+1)+'</em><div><b>'+esc(st[0])+'</b><p>'+esc(st[1])+'</p>'+(st[2]?'<a class="go" onclick="'+st[2]+'">바로 가기 →</a>':'')+'</div></div>'}).join('')+'</div>'
+    +'<div class="hp-faqh"><h3>이럴 땐 이렇게</h3><input id="hpQ" value="'+esc(q)+'" placeholder="궁금한 말을 적어 보세요 (예: 직인, 회수, 중앙)" oninput="INTRA.helpSearch(this.value)"></div>'
+    +'<div class="hp-faq">'+(L.length?L.map(function(f,i){return '<details'+(q||i<2?' open':'')+'><summary>'+esc(f[0])+'</summary><p>'+esc(f[1])+'</p></details>'}).join(''):'<p class="empty">찾는 내용이 없습니다. 사무국 031-984-3248 로 물어보세요.</p>')+'</div></div>'}
+function helpSearch(v){V.helpQ=v;var m=$('gwMain');var a=document.activeElement;helpMain(m);if(a&&a.id==='hpQ'){var i=$('hpQ');i.focus();i.setSelectionRange(i.value.length,i.value.length)}}
+function helpRole(k){V.helpRole=k;renderMain()}
+function helpPrint(){var w=window.open('','_blank');if(!w){alert('팝업이 차단되었습니다.');return}
+  w.document.write('<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>인트라넷 한 장 요약</title><style>@page{size:A4;margin:16mm}body{font-family:"Malgun Gothic",sans-serif;font-size:11pt;line-height:1.6;color:#111}h1{font-size:17pt;margin:0 0 4mm}h2{font-size:12.5pt;margin:6mm 0 2mm;border-bottom:1.5px solid #111;padding-bottom:1mm}ol{margin:0 0 0 5mm;padding:0}li{margin:1mm 0}dl{margin:0}dt{font-weight:700;margin-top:2mm}dd{margin:0 0 0 4mm}.np{text-align:center;margin-bottom:4mm}@media print{.np{display:none}}</style></head><body><div class="np"><button onclick="window.print()">인쇄</button></div><h1>대한민국플라잉디스크연맹 인트라넷 — 한 장 요약</h1>'
+    +HELP_ROLES.map(function(r){return '<h2>'+esc(r.name)+'</h2><ol>'+r.steps.map(function(s){return '<li><b>'+esc(s[0])+'</b> — '+esc(s[1])+'</li>'}).join('')+'</ol>'}).join('')
+    +'<h2>이럴 땐 이렇게</h2><dl>'+HELP_FAQ.slice(0,8).map(function(f){return '<dt>'+esc(f[0])+'</dt><dd>'+esc(f[1])+'</dd></dl>'.replace('</dl>','')}).join('')+'</dl><p style="margin-top:6mm;font-size:10pt">문의 031-984-3248 · kfdf60@hanmail.net · 인트라넷 상단 [도움말]에서 더 많은 질문을 찾을 수 있습니다.</p></body></html>');w.document.close()}
+EXT.help={left:function(){return '<div class="gw-alarm"><h3>도움말</h3>'+HELP_ROLES.map(function(r){return '<div class="ag"><a onclick="INTRA.helpRole(\''+r.k+'\')"><span>'+esc(r.name)+'</span></a></div>'}).join('')+'<div class="ag"><a onclick="INTRA.helpPrint()"><span>한 장 요약 인쇄</span></a></div></div>'},main:helpMain};
 // 확장 모듈(intranet2.js)이 쓰는 연결점 — reg(이름, {left, main, count, alarm, home, start})
 window.INTRA_X={reg:function(k,o){EXT[k]=o},db:function(){return DB},me:function(){return ME},my:function(){return MY},org:function(){return ORG},orgs:function(){return ORGS},members:function(){return MEMBERS},dir:function(){return ORGDIR},V:V,
   esc:esc,nl:nl,ic:ic,loc:loc,locd:locd,now:now,$:$,win:win,closeW:closeW,say:say,orgName:orgName,myTitle:myTitle,mimeOf:mimeOf,pager:pager,isCentral:function(){return !!ORG&&ORG.key==='central'},
