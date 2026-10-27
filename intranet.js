@@ -469,8 +469,8 @@ function wzEdHtml(){
       +'<tr><th>제 목</th><td><input id="cpTitle" maxlength="120" value="'+esc(CP.title||'')+'" placeholder="제목을 입력하세요"></td></tr></table>'
       +'<div id="cpBody" class="ed" contenteditable="true" spellcheck="false" data-ph="1. 귀 기관의 무궁한 발전을 기원합니다.&#10;2. 관련: &#10;3. 위 호와 관련하여 아래와 같이 …&#10;  가. &#10;  나. &#10;붙임  1부.  끝."></div>'
       +'<div class="pf" id="cpSender"></div></div>'
-    +'<aside class="gw-cpatt"><b>붙임목록</b><div id="cpFileList" class="gw-chips"></div><small>PDF · 이미지 · 한글 · 워드 · 엑셀<br>파일당 20MB, 10개까지</small></aside></div>';
-  $('wzEd').innerHTML=h;var b=$('cpBody');b.innerHTML=CP.bodyHtml?cleanHtml(CP.bodyHtml):(CP.body?nl(CP.body):'');edBind(b);setTimeout(function(){try{(CP.title?b:$('cpTitle')).focus()}catch(e){}},60)}
+    +'<aside class="gw-cpatt" id="cpDropZone"><b>붙임목록</b><div id="cpFileList" class="gw-chips"></div><div class="dz"><label for="cpFiles">'+ic('clip',16)+'<br>파일을 여기에 끌어다 놓거나<br><u>눌러서 고르기</u></label></div><small>PDF · 이미지 · 한글 · 워드 · 엑셀<br>파일당 20MB, 10개까지</small></aside></div>';
+  $('wzEd').innerHTML=h;cpDropBind();var b=$('cpBody');b.innerHTML=CP.bodyHtml?cleanHtml(CP.bodyHtml):(CP.body?nl(CP.body):'');edBind(b);setTimeout(function(){try{(CP.title?b:$('cpTitle')).focus()}catch(e){}},60)}
 function wzCfHtml(){var need=apprMinOf(ORG.key,ORGDIR);var files=CP.keep.length+CP.files.length;var sealOpts=Object.keys(ORGDIR).filter(function(o){return o===ORG.key||o==='central'||(ORG.level===2&&o==='sido_'+ORG.sido)});
   var h='<div class="wz-cf"><div class="wz-h">이대로 보낼까요?</div><table class="gw-form">'
     +'<tr><th>받는 곳</th><td>'+esc(recvText({toNames:CP.to.map(orgName),extTo:CP.kind==='official'?CP.extTo:'',toLabel:CP.toLabel}))+' <a class="wz-lnk" onclick="INTRA.wzStep(1)">바꾸기</a></td></tr>'
@@ -645,7 +645,14 @@ function cpAddToAll(lv){Object.keys(ORGDIR).forEach(function(k){if(ORGDIR[k].lev
 function cpDelTo(i){CP.to.splice(i,1);cpDraw()}
 function cpDelKeep(i){CP.keep.splice(i,1);cpDraw()}
 function cpDelFile(i){CP.files.splice(i,1);cpDraw()}
-function cpFiles(inp){var ok=/\.(pdf|png|jpe?g|gif|webp|hwp|hwpx|docx?|xlsx?|pptx?|txt|zip)$/i;[].slice.call(inp.files||[]).forEach(function(f){if(!ok.test(f.name)){alert(f.name+' — 올릴 수 없는 형식입니다.');return}if(f.size>20*1024*1024){alert(f.name+' — 20MB 이하만 올릴 수 있습니다.');return}if(CP.files.length+CP.keep.length>=10){alert('붙임은 10개까지입니다.');return}CP.files.push(f)});inp.value='';cpDraw()}
+function cpFiles(inp){cpAddFiles(inp.files);inp.value=''}
+/* [2026-10-27] 붙임 — 파일 선택과 끌어다 놓기 공통 */
+function cpAddFiles(list){if(!CP)return;var ok=/\.(pdf|png|jpe?g|gif|webp|hwp|hwpx|docx?|xlsx?|pptx?|txt|zip)$/i;var n0=CP.files.length;[].slice.call(list||[]).forEach(function(f){if(!ok.test(f.name)){alert(f.name+' — 올릴 수 없는 형식입니다.');return}if(f.size>20*1024*1024){alert(f.name+' — 20MB 이하만 올릴 수 있습니다.');return}if(CP.files.length+CP.keep.length>=10){alert('붙임은 10개까지입니다.');return}CP.files.push(f)});cpDraw();var m=$('cpMsg');if(m&&CP.files.length>n0){m.textContent='붙임 '+(CP.files.length-n0)+'개 추가';m.className='gw-say';setTimeout(function(){if(m.textContent.indexOf('붙임')===0)m.textContent=''},2500)}}
+function cpDropBind(){var w=$('gwCp');if(!w||w._drop)return;w._drop=1;var over=0;var isF=function(e){return !!(e.dataTransfer&&[].slice.call(e.dataTransfer.types||[]).indexOf('Files')>=0)};var on=function(f){var a=$('cpDropZone');if(a)a.classList.toggle('drag',!!f)};
+  w.addEventListener('dragenter',function(e){if(!isF(e))return;e.preventDefault();over++;on(true)});
+  w.addEventListener('dragover',function(e){if(!isF(e))return;e.preventDefault();e.dataTransfer.dropEffect='copy'});
+  w.addEventListener('dragleave',function(e){if(!isF(e))return;over=Math.max(0,over-1);if(!over)on(false)});
+  w.addEventListener('drop',function(e){if(!(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length))return;e.preventDefault();over=0;on(false);if(!$('cpBody'))wzDraw(2);cpAddFiles(e.dataTransfer.files)})}
 function mimeOf(f){if(f.type)return f.type;var e=(f.name.split('.').pop()||'').toLowerCase();return {hwp:'application/x-hwp',hwpx:'application/vnd.hancom.hwpx',pdf:'application/pdf',zip:'application/zip',txt:'text/plain'}[e]||'application/octet-stream'}
 async function nextNo(tx,orgKey,rcv){var y=new Date().getFullYear();var ref=DB.collection('intraCounters').doc(orgKey+'__'+y+(rcv?'__r':''));var g=await tx.get(ref);var n=((g.exists&&g.data().n)||0)+1;tx.set(ref,{org:orgKey,year:y,n:n,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});var p=(ORGDIR[orgKey]&&ORGDIR[orgKey].docPrefix)||'문서';return rcv?docNoOf(p+' 접수',y,n):docNoOf(p,y,n)}
 async function submit(){
