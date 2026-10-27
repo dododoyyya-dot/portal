@@ -12,7 +12,7 @@ var V={mod:'home',folder:'a_wait',q:'',from:'',to:'',kind:'',page:1,size:15,sel:
 var IDLE_MS=30*60*1000;
 var KIND={draft:'내부결재',coop:'협조문',official:'일반공문',seal:'직인',notice:'공람',ext:'접수'};
 var KINDL={draft:'내부결재 문서',coop:'협조문 (연맹 간)',official:'일반기안 (일반공문)',seal:'직인 날인 요청',notice:'공람 · 공지',ext:'외부 문서 접수'};
-var MODS=[['mail','쪽지'],['board','게시판'],['appr','결재'],['docs','문서함'],['task','업무요청'],['poll','설문'],['org','조직도'],['seal','직인'],['help','도움말'],['set','환경설정']];
+var MODS=[['mail','쪽지'],['board','게시판'],['appr','결재'],['docs','문서함'],['task','업무요청'],['collect','자료 제출'],['poll','설문'],['org','조직도'],['seal','직인'],['help','도움말'],['set','환경설정']];
 var TREE={
   appr:[['기안',[['f_all','서식함'],['p_temp','임시보관']]],
     ['결재',[['a_wait','결재할 문서'],['a_prog','결재 진행 중'],['a_mine','보낸 문서'],['a_done','결재완료'],['a_rej','반려·회수']]],
@@ -47,7 +47,7 @@ var IC={
 };
 function ic(k,s){return '<svg class="gw-ic" viewBox="0 0 24 24" width="'+(s||16)+'" height="'+(s||16)+'" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+IC[k]+'</svg>'}
 function $(id){return document.getElementById(id)}
-IC.help='<circle cx="12" cy="12" r="9"/><path d="M9.6 9.6a2.4 2.4 0 1 1 3.4 2.2c-.7.4-1 .9-1 1.7"/><path d="M12 17h.01"/>';IC.send='<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>';IC.inbox='<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-7A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1z"/>';
+IC.collect='<path d="M4 4h16v6H4z"/><path d="M4 10l2 10h12l2-10"/><path d="M12 13v4M10 15l2 2 2-2"/>';IC.help='<circle cx="12" cy="12" r="9"/><path d="M9.6 9.6a2.4 2.4 0 1 1 3.4 2.2c-.7.4-1 .9-1 1.7"/><path d="M12 17h.01"/>';IC.send='<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>';IC.inbox='<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-7A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1z"/>';
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function nl(s){return esc(s).replace(/\n/g,'<br>')}
 function now(){return new Date().toISOString()}
@@ -174,6 +174,7 @@ async function enter(u){
   $('gwLogin').style.display='none';$('gwApp').style.display='flex';LAST=Date.now();
   if(!TICK)TICK=setInterval(function(){if(Date.now()-LAST>IDLE_MS)lock('30분 동안 사용하지 않아 잠겼습니다. 다시 로그인하세요.');else{var g=gateGet();if(g){g.act=LAST;try{sessionStorage.setItem('kfdfIntraGate',JSON.stringify(g))}catch(e){}}}},20000);
   listen();renderAll();
+  try{var qs=new URLSearchParams(location.search);Object.keys(EXT).forEach(function(k){if(EXT[k].deep)EXT[k].deep(qs)})}catch(e){}
 }
 async function register(){
   for(var i=0;i<ORGS.length;i++){var o=ORGS[i];
@@ -488,8 +489,8 @@ function wzCfHtml(){var need=apprMinOf(ORG.key,ORGDIR);var files=CP.keep.length+
   $('wzCf').innerHTML=h}
 function wzSet(k,v){if(k==='sender')CP.sender=v;else if(k==='urgent')CP.urgent=!!v;else if(k==='auto')CP.auto=!!v;else if(k==='seal'){CP.seal=CP.seal||{org:ORG.key,mode:'doc',purpose:''};CP.seal.on=!!v}else if(k==='sealOrg')CP.seal.org=v;else if(k==='sealMode')CP.seal.mode=v;if(k==='seal')wzCfHtml()}
 function treeAll(){V.treeAll=!V.treeAll;renderLeft()}
-function todoBand(){var items=[['a_wait','결재할 문서'],['r_wait','확인할 공문'],['r_me','내가 처리할 공문'],['s_wait','발송할 문서'],['k_wait','직인 요청'],['n_wait','공람']];var any=items.some(function(x){return count(x[0])});
-  return '<div class="gw-todo"><b>지금 할 일</b>'+items.map(function(x){var n=count(x[0]);return '<a class="'+(n?'on':'')+'" onclick="INTRA.setFolder(\''+x[0]+'\')">'+esc(x[1])+'<em>'+n+'</em></a>'}).join('')+(any?'':'<span class="ok">처리할 일이 없습니다</span>')+'<button class="gw-b pri" onclick="INTRA.compose(\'draft\')">'+ic('pen',13)+' 공문 작성</button></div>'}
+function todoBand(){var items=[['a_wait','결재할 문서'],['r_wait','확인할 공문'],['r_me','내가 처리할 공문'],['s_wait','발송할 문서'],['k_wait','직인 요청'],['n_wait','공람']];var ex=[];Object.keys(EXT).forEach(function(k){try{if(EXT[k].todo)ex=ex.concat(EXT[k].todo()||[])}catch(e){}});var any=items.some(function(x){return count(x[0])})||ex.some(function(x){return x[1]});
+  return '<div class="gw-todo"><b>지금 할 일</b>'+items.map(function(x){var n=count(x[0]);return '<a class="'+(n?'on':'')+'" onclick="INTRA.setFolder(\''+x[0]+'\')">'+esc(x[1])+'<em>'+n+'</em></a>'}).join('')+ex.map(function(x){return '<a class="'+(x[1]?'on':'')+'" onclick="'+x[2]+'">'+esc(x[0])+'<em>'+(x[1]||0)+'</em></a>'}).join('')+(any?'':'<span class="ok">처리할 일이 없습니다</span>')+'<button class="gw-b pri" onclick="INTRA.compose(\'draft\')">'+ic('pen',13)+' 공문 작성</button></div>'}
 function replyDoc(id){var d=DOCS[id];if(!d)return;closeW('gwDoc');compose('coop','',{reply:d})}
 var _autoRecv={};
 function autoRecv(id){if(_autoRecv[id])return;_autoRecv[id]=1;recvDo(id,'접수','',{uid:ME.uid,name:MY.name||''}).then(function(){say('확인(접수)했습니다 — 답이 필요하면 [회신 공문 쓰기]')}).catch(function(){delete _autoRecv[id]})}
@@ -909,6 +910,8 @@ var HELP_ROLES=[
  {k:'central',name:'중앙 사무국',steps:[['받은 공문 처리','「확인할 공문」에서 열어 확인하고, [담당자 지정]으로 담당자를 두거나 [회신 공문 쓰기]로 답합니다.','INTRA.setFolder(\'r_wait\')'],['전체 연맹에 공문','[공문 작성] → 받는 곳에서 「시도연맹 전체 선택」 → 내용 → [보내기]. 협조문은 각 연맹 「확인할 공문」에 바로 들어갑니다.','INTRA.compose(\'coop\')'],['직인 승인','「직인대기」에서 요청을 열어 [직인 날인]을 누릅니다. 직인 관리자로 지정된 사람만 보입니다.','INTRA.setFolder(\'k_wait\')'],['다른 기관 문서 열람','문서함 › 「전체 문서함 보기」 › 중앙 열람 › 다른 기관 문서(읽기만).','INTRA.setFolder(\'z_org\')'],['환경설정','결재 방식(1인 전결·2인 이상), 직인 관리자, 기록물철, 조직도 표시는 [환경설정]에서 바꿉니다.','INTRA.setMod(\'set\')']]},
  {k:'appr',name:'결재자',steps:[['결재할 문서','첫 화면 「결재할 문서」를 누르면 내 차례인 문서만 보입니다.','INTRA.setFolder(\'a_wait\')'],['결재 또는 반려','문서를 열고 [결재] 또는 [반려]를 누릅니다. 반려하면 기안자가 고쳐 다시 올릴 수 있습니다.',''],['부재 설정','출장·휴가 중이면 환경설정에서 부재 기간과 대결자를 정해 두세요. 결재선에 넣을 때 대결자로 바꿀지 묻습니다.','INTRA.setMod(\'set\')']]}];
 var HELP_FAQ=[
+  ['자료를 내라는 링크(카톡)를 받았어요','링크를 누르고 인트라넷에 로그인하면 그 요청 화면이 바로 열립니다. [제출하기]에서 파일을 올리고 [제출]을 누르면 끝입니다. 다시 올리면 마지막 것으로 바뀝니다. 메뉴 「자료 제출 › 제출할 자료」에서도 찾을 수 있습니다.'],
+  ['여러 연맹에서 자료를 걷고 싶어요','위 메뉴 「자료 제출」 › [자료 제출 요청]에서 제목·기한·대상 연맹·양식을 넣고 요청합니다. 요청 화면의 현황판에서 연맹별 제출·미제출이 보이고, [카톡용 링크 복사]로 링크를 단체방에 올리거나 [미제출 독촉]으로 쪽지를 한 번에 보냅니다.'],
  ['중앙에 공문을 보냈는데 중앙에 안 갔어요','받는 곳을 고르지 않고 「우리 연맹 안에서 결재만」(내부결재)으로 보내면 밖으로 나가지 않습니다. [공문 작성] ① 받는 곳에서 「중앙」을 체크한 뒤 보내세요. 이미 보낸 내부결재 문서는 고칠 수 없으니, 같은 내용으로 다시 작성해 중앙으로 보내면 됩니다.'],
  ['보낸 공문을 고치고 싶어요','아직 결재가 시작되지 않았으면 문서를 열어 [회수] → 「반려·회수」에서 [재기안]으로 고쳐 다시 보냅니다. 결재가 끝난 문서는 고칠 수 없고, 정정 공문을 새로 보냅니다.'],
  ['협조문과 일반공문은 뭐가 달라요','받는 곳이 인트라넷에 있는 연맹이면 협조문(상대 연맹 화면에 바로 들어감), 인트라넷에 없는 외부 기관이면 일반공문(결재 뒤 인쇄해서 보내고 [발송]으로 기록)입니다. 받는 곳을 고르면 자동으로 정해집니다.'],
@@ -948,5 +951,5 @@ var first=true;
 AUTH.onAuthStateChanged(function(u){
   if(!first){if(!u&&$('gwApp').style.display!=='none')showLogin('로그아웃되었습니다.');return}first=false;
   // 새 창에서는 항상 아이디·비밀번호를 다시 입력합니다. 같은 창을 새로 고친 경우에만(30분 안) 이어서 씁니다.
-  if(u&&gateOk(gateGet(),u.uid,Date.now())){gateSet(u.uid);enter(u)}else showLogin('')});
+  if(u&&gateOk(gateGet(),u.uid,Date.now())){gateSet(u.uid);enter(u)}else showLogin(/[?&]collect=/.test(location.search)?'로그인하면 요청받은 자료 제출 화면이 바로 열립니다.':'')});
 })();
