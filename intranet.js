@@ -380,7 +380,8 @@ function openDoc(id,keep){
   var recv=(d.toOrgs||[]).length?('<h4>수신 현황</h4><table class="gw-tbl sm"><thead><tr><th>수신 기관</th><th>처리현황</th><th>처리자</th><th>처리일시</th><th>회신 내용</th></tr></thead><tbody>'+d.toOrgs.map(function(o,i){var r=(d.recv||{})[o];return '<tr><td>'+esc((d.toNames||[])[i]||orgName(o))+'</td><td class="c">'+(r?esc(r.status):(sentOf(d)?'미접수':(d.status==='완료'?'발송대기':'결재 후 발송')))+'</td><td class="c">'+esc(r?r.byName:'')+(r&&r.assignee?'<br><small>담당 '+esc(r.assignee.name)+'</small>':'')+'</td><td class="c">'+esc(r?loc(r.at):'')+'</td><td>'+(r&&r.note?nl(r.note):'')+'</td></tr>'}).join('')+'</tbody></table>'):'';
   var rep='<h4>의견 ('+((d.replies||[]).length)+')</h4>'+((d.replies||[]).length?'<table class="gw-tbl sm"><tbody>'+d.replies.map(function(r){return '<tr><td style="width:170px">'+esc(r.name)+'<br><small>'+esc(r.orgName||'')+'</small></td><td>'+nl(r.text)+'</td><td class="c" style="width:120px">'+esc(loc(r.at))+'</td></tr>'}).join('')+'</tbody></table>':'')
     +'<div class="gw-rep"><input id="gwRep" maxlength="500" placeholder="의견을 입력하세요" onkeydown="if(event.key===\'Enter\')INTRA.reply(\''+id+'\')"><button class="gw-b" onclick="INTRA.reply(\''+id+'\')">등록</button></div>';
-  var h='<div class="gw-wtool">'+a.join('')+'<span id="gwDocMsg" class="gw-say"></span></div>'+(hint?'<div class="gw-hint">'+esc(hint)+'</div>':'')
+  var colBand='';try{if(EXT.collect&&EXT.collect.docBand)colBand=EXT.collect.docBand(d,c.orgKey)||''}catch(e){}
+  var h='<div class="gw-wtool">'+a.join('')+'<span id="gwDocMsg" class="gw-say"></span></div>'+(hint?'<div class="gw-hint">'+esc(hint)+'</div>':'')+colBand
     +'<div class="gw-dochd"><div class="ttl"><small>'+esc(KINDL[d.kind]||'')+(d.urgent?' · <b style="color:#c0392b">긴급</b>':'')+'</small><h3>'+esc(d.title||'')+'</h3></div>'+apprBox(d)+'</div>'
     +'<table class="gw-form"><tr><th>문서번호</th><td>'+esc(d.docNo||'(결재 완료 시 부여)')+'</td><th>처리현황</th><td>'+esc(stateOf(d,c))+'</td></tr>'
     +'<tr><th>기안부서</th><td>'+esc(d.orgName||'')+'</td><th>기안자</th><td>'+esc(d.authorName||'')+' '+esc(d.authorTitle||'')+'</td></tr>'
@@ -479,6 +480,7 @@ function wzCfHtml(){var need=apprMinOf(ORG.key,ORGDIR);var files=CP.keep.length+
     +'<tr><th>제목</th><td>'+esc(CP.title||'')+' <a class="wz-lnk" onclick="INTRA.wzStep(2)">고치기</a></td></tr>'
     +'<tr><th>붙임</th><td>'+(files?files+'개':'없음')+'</td></tr>'
     +'<tr><th>결재</th><td>'+(CP.line.length?'기안 '+esc(MY.name||'')+CP.line.map(function(x){return ' → '+esc(x.name)+'('+esc(x.type)+')'}).join(''):'기안자 전결 — 보내면 바로 시행됩니다')+(need>1&&CP.line.length<need-1?' <b style="color:#c0392b">· 이 기관은 '+need+'인 이상 결재: 결재자 '+(need-1)+'명 이상 필요</b>':'')+' <a class="wz-lnk" onclick="INTRA.ciOpen(\'line\')">결재 받을 사람 '+(CP.line.length?'바꾸기':'추가')+'</a></td></tr>'
+    +(CP.kind==='coop'&&CP.to.length?'<tr><th>자료 제출</th><td><label class="ck"><input type="checkbox"'+(CP.collect&&CP.collect.on?' checked':'')+' onchange="INTRA.wzSet(\'collect\',this.checked)"> 이 공문으로 <b>자료 제출 요청</b>도 만듭니다</label>'+(CP.collect&&CP.collect.on?' &nbsp;기한 <input type="date" value="'+esc(CP.collect.due||'')+'" onchange="INTRA.wzSet(\'collectDue\',this.value)"><br><small>공문이 시행되면 받는 연맹 '+CP.to.length+'곳에 같은 제목·붙임으로 자료 제출 요청이 자동으로 만들어집니다. 연맹별 제출 현황과 카톡용 링크는 문서를 열면 보입니다.</small>':'<br><small>회신 자료를 걷는 공문이면 켜 두세요 — 연맹별 제출·미제출이 한눈에 보이고 미제출 독촉이 한 번에 됩니다.</small>')+'</td></tr>':'')
     +'<tr><th>발신 명의</th><td><select onchange="INTRA.wzSet(\'sender\',this.value)">'+[ORG.name+'회장',ORG.name].map(function(x){return '<option'+(CP.sender===x?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select></td></tr>'
     +'</table><details class="wz-adv"'+((CP.seal&&CP.seal.on)||CP.urgent||CP.auto===false?' open':'')+'><summary>더 보기 — 직인 · 긴급 · 발송 · 기록물철</summary><table class="gw-form">'
     +'<tr><th>직인 날인</th><td><label class="ck"><input type="checkbox"'+(CP.seal&&CP.seal.on?' checked':'')+' onchange="INTRA.wzSet(\'seal\',this.checked)"> 직인 날인을 요청합니다</label>'+(CP.seal&&CP.seal.on?'<div class="gw-row"><label>직인</label><select onchange="INTRA.wzSet(\'sealOrg\',this.value)">'+sealOpts.map(function(o){return '<option value="'+esc(o)+'"'+(CP.seal.org===o?' selected':'')+'>'+esc(orgName(o))+'</option>'}).join('')+'</select><label>방식</label><select onchange="INTRA.wzSet(\'sealMode\',this.value)"><option value="doc"'+(CP.seal.mode!=='file'?' selected':'')+'>시행문에 날인</option><option value="file"'+(CP.seal.mode==='file'?' selected':'')+'>붙임 문서에 날인</option></select></div>':'')+'<br><small>결재가 끝난 뒤 직인 관리자가 승인하면 날인됩니다.</small></td></tr>'
@@ -487,7 +489,7 @@ function wzCfHtml(){var need=apprMinOf(ORG.key,ORGDIR);var files=CP.keep.length+
     +'<tr><th>그 밖에</th><td><a class="wz-lnk" onclick="INTRA.ciOpen(\'doc\')">기록물철 · 수신자 표기 등 자세한 설정 열기</a></td></tr></table></details>'
     +'<div class="gw-row" style="margin-top:16px"><button class="gw-b" onclick="INTRA.wzStep(2)">◀ 내용 고치기</button><button class="gw-b pri" id="cpGo" onclick="INTRA.submit()">'+ic('send',13)+' 보내기</button><button class="gw-b" onclick="INTRA.saveTemp()">임시저장</button><span id="cpMsg2" class="gw-say"></span></div></div>';
   $('wzCf').innerHTML=h}
-function wzSet(k,v){if(k==='sender')CP.sender=v;else if(k==='urgent')CP.urgent=!!v;else if(k==='auto')CP.auto=!!v;else if(k==='seal'){CP.seal=CP.seal||{org:ORG.key,mode:'doc',purpose:''};CP.seal.on=!!v}else if(k==='sealOrg')CP.seal.org=v;else if(k==='sealMode')CP.seal.mode=v;if(k==='seal')wzCfHtml()}
+function wzSet(k,v){if(k==='collect'){CP.collect=CP.collect||{due:''};CP.collect.on=!!v;if(v&&!CP.collect.due){var dd=new Date();dd.setDate(dd.getDate()+10);CP.collect.due=dd.toISOString().slice(0,10)}wzCfHtml();return}if(k==='collectDue'){CP.collect=CP.collect||{on:true};CP.collect.due=v;return}if(k==='sender')CP.sender=v;else if(k==='urgent')CP.urgent=!!v;else if(k==='auto')CP.auto=!!v;else if(k==='seal'){CP.seal=CP.seal||{org:ORG.key,mode:'doc',purpose:''};CP.seal.on=!!v}else if(k==='sealOrg')CP.seal.org=v;else if(k==='sealMode')CP.seal.mode=v;if(k==='seal')wzCfHtml()}
 function treeAll(){V.treeAll=!V.treeAll;renderLeft()}
 function todoBand(){var items=[['a_wait','결재할 문서'],['r_wait','확인할 공문'],['r_me','내가 처리할 공문'],['s_wait','발송할 문서'],['k_wait','직인 요청'],['n_wait','공람']];var ex=[];Object.keys(EXT).forEach(function(k){try{if(EXT[k].todo)ex=ex.concat(EXT[k].todo()||[])}catch(e){}});var any=items.some(function(x){return count(x[0])})||ex.some(function(x){return x[1]});
   return '<div class="gw-todo"><b>지금 할 일</b>'+items.map(function(x){var n=count(x[0]);return '<a class="'+(n?'on':'')+'" onclick="INTRA.setFolder(\''+x[0]+'\')">'+esc(x[1])+'<em>'+n+'</em></a>'}).join('')+ex.map(function(x){return '<a class="'+(x[1]?'on':'')+'" onclick="'+x[2]+'">'+esc(x[0])+'<em>'+(x[1]||0)+'</em></a>'}).join('')+(any?'':'<span class="ok">처리할 일이 없습니다</span>')+'<button class="gw-b pri" onclick="INTRA.compose(\'draft\')">'+ic('pen',13)+' 공문 작성</button></div>'}
@@ -685,6 +687,7 @@ async function submit(){
     if(off){d.extTo=extTo.slice(0,300);d.send={auto:false,status:''}}
     else if(CP.to.length)d.send={auto:CP.auto!==false,status:''};
     if(!ext){d.urgent=!!CP.urgent;d.sender=CP.sender||'';d.toLabel=CP.toLabel||'';if(CP.cab){d.cab={};d.cab[ORG.key]=CP.cab}}
+    if(kind==='coop'&&CP.collect&&CP.collect.on&&/^\d{4}-\d{2}-\d{2}$/.test(CP.collect.due||''))d.collect={due:CP.collect.due};
     var asg=null;
     if(ext){var au=$('cpAssign').value;var am=MEMBERS.find(function(x){return x.uid===au&&x.orgKey===ORG.key})||{uid:ME.uid,name:MY.name||''};asg={uid:am.uid,name:am.name};
       d.extFrom=extFrom.slice(0,80);d.extNo=$('cpExtNo').value.trim().slice(0,60);d.extDate=$('cpExtDate').value||'';
@@ -699,13 +702,14 @@ async function submit(){
     closeW('gwCi');closeW('gwCp');setFolder(ext?'x_reg':(done&&sendPending(d)?'s_wait':'a_mine'));say((ext?'접수 등록했습니다':done?'보냈습니다':'결재를 요청했습니다')+(d.docNo?' — '+d.docNo:'')+(done&&sendPending(d)?' · 발송대기(직인 뒤 [발송])':''));
   }catch(e){if(b)b.disabled=false;bad((ext?'등록':'보내기')+' 실패: '+(e.code||e.message||e)+(/permission/i.test(String(e.code||e.message))&&(ext||off)?' (보안 규칙 v48 게시 필요)':''))}
 }
-function afterDone(d){if(sentOf(d))(d.toOrgs||[]).forEach(function(k){notifyOrg(k,'['+d.orgName+'] '+(KIND[d.kind]||'')+' 도착 — '+d.title)});
+function hookCollect(d){try{if(d&&d.collect&&d.collect.due&&EXT.collect&&EXT.collect.fromDoc)EXT.collect.fromDoc(d)}catch(e){}}
+function afterDone(d){if(sentOf(d)){(d.toOrgs||[]).forEach(function(k){notifyOrg(k,'['+d.orgName+'] '+(KIND[d.kind]||'')+' 도착 — '+d.title)});hookCollect(d)}
   else if(sendPending(d)&&d.authorUid!==ME.uid)try{KFDF.notify(d.authorUid,'결재 완료 · 발송대기 — '+d.title,'intranet.html')}catch(e){}
   if(d.seal&&d.seal.status==='요청')((ORGDIR[d.seal.orgKey]||{}).sealKeepers||[]).forEach(function(u){if(u!==ME.uid)try{KFDF.notify(u,'직인 날인 요청 — '+d.title+' ('+d.orgName+')','intranet.html')}catch(e){}})}
 // ── 발송 ──
 async function sendDo(id,method){var d=DOCS[id];if(!d||!sendPending(d))throw new Error('발송대기 문서가 아닙니다');
   await DB.collection('intraDocs').doc(id).update({send:{auto:false,status:'발송',at:now(),by:ME.uid,byName:MY.name||'',method:String(method||'').slice(0,40)},readOrgs:readOrgsOf(d,true),updatedAt:now(),log:firebase.firestore.FieldValue.arrayUnion(logOf('발송'+(method?' ('+method+')':'')))});
-  (d.toOrgs||[]).forEach(function(k){notifyOrg(k,'['+d.orgName+'] '+(KIND[d.kind]||'')+' 도착 — '+d.title)})}
+  (d.toOrgs||[]).forEach(function(k){notifyOrg(k,'['+d.orgName+'] '+(KIND[d.kind]||'')+' 도착 — '+d.title)});hookCollect(Object.assign({},d,{send:{auto:false,status:'발송'}}))}
 async function sendDoc(id){var d=DOCS[id];if(!d)return;var method='';
   if(d.seal&&d.seal.status==='요청'&&!confirm('직인 날인이 아직 끝나지 않았습니다. 그래도 발송할까요?'))return;
   if(d.kind==='official'){method=prompt('발송 방법을 적어 주세요 (예: 우편, 전자우편, 팩스, 직접 전달)','전자우편');if(method===null)return}
@@ -911,6 +915,7 @@ var HELP_ROLES=[
  {k:'appr',name:'결재자',steps:[['결재할 문서','첫 화면 「결재할 문서」를 누르면 내 차례인 문서만 보입니다.','INTRA.setFolder(\'a_wait\')'],['결재 또는 반려','문서를 열고 [결재] 또는 [반려]를 누릅니다. 반려하면 기안자가 고쳐 다시 올릴 수 있습니다.',''],['부재 설정','출장·휴가 중이면 환경설정에서 부재 기간과 대결자를 정해 두세요. 결재선에 넣을 때 대결자로 바꿀지 묻습니다.','INTRA.setMod(\'set\')']]}];
 var HELP_FAQ=[
   ['자료를 내라는 링크(카톡)를 받았어요','링크를 누르고 인트라넷에 로그인하면 그 요청 화면이 바로 열립니다. [제출하기]에서 파일을 올리고 [제출]을 누르면 끝입니다. 다시 올리면 마지막 것으로 바뀝니다. 메뉴 「자료 제출 › 제출할 자료」에서도 찾을 수 있습니다.'],
+  ['공문으로 회신 자료를 걷고 싶어요','공문 작성 ③ 보내기 확인에서 「이 공문으로 자료 제출 요청도 만듭니다」를 켜고 기한을 정하면, 공문이 시행될 때 같은 제목·붙임으로 자료 제출 요청이 자동으로 만들어집니다. 보낸 공문을 열면 연맹별 제출 현황과 [카톡용 링크 복사]가 보이고, 받는 연맹은 공문을 열어 [자료 제출하기]로 올립니다. 이미 보낸 공문이면 문서를 열어 [이 공문으로 자료 제출 요청 만들기]를 누르세요.'],
   ['여러 연맹에서 자료를 걷고 싶어요','위 메뉴 「자료 제출」 › [자료 제출 요청]에서 제목·기한·대상 연맹·양식을 넣고 요청합니다. 요청 화면의 현황판에서 연맹별 제출·미제출이 보이고, [카톡용 링크 복사]로 링크를 단체방에 올리거나 [미제출 독촉]으로 쪽지를 한 번에 보냅니다.'],
  ['중앙에 공문을 보냈는데 중앙에 안 갔어요','받는 곳을 고르지 않고 「우리 연맹 안에서 결재만」(내부결재)으로 보내면 밖으로 나가지 않습니다. [공문 작성] ① 받는 곳에서 「중앙」을 체크한 뒤 보내세요. 이미 보낸 내부결재 문서는 고칠 수 없으니, 같은 내용으로 다시 작성해 중앙으로 보내면 됩니다.'],
  ['보낸 공문을 고치고 싶어요','아직 결재가 시작되지 않았으면 문서를 열어 [회수] → 「반려·회수」에서 [재기안]으로 고쳐 다시 보냅니다. 결재가 끝난 문서는 고칠 수 없고, 정정 공문을 새로 보냅니다.'],
@@ -940,6 +945,7 @@ function helpPrint(){var w=window.open('','_blank');if(!w){alert('팝업이 차�
     +'<h2>이럴 땐 이렇게</h2><dl>'+HELP_FAQ.slice(0,8).map(function(f){return '<dt>'+esc(f[0])+'</dt><dd>'+esc(f[1])+'</dd></dl>'.replace('</dl>','')}).join('')+'</dl><p style="margin-top:6mm;font-size:10pt">문의 031-984-3248 · kfdf60@hanmail.net · 인트라넷 상단 [도움말]에서 더 많은 질문을 찾을 수 있습니다.</p></body></html>');w.document.close()}
 EXT.help={left:function(){return '<div class="gw-alarm"><h3>도움말</h3>'+HELP_ROLES.map(function(r){return '<div class="ag"><a onclick="INTRA.helpRole(\''+r.k+'\')"><span>'+esc(r.name)+'</span></a></div>'}).join('')+'<div class="ag"><a onclick="INTRA.helpPrint()"><span>한 장 요약 인쇄</span></a></div></div>'},main:helpMain};
 // 확장 모듈(intranet2.js)이 쓰는 연결점 — reg(이름, {left, main, count, alarm, home, start})
+window.INTRA._doc=function(id){return DOCS[id]||null};
 window.INTRA_X={reg:function(k,o){EXT[k]=o},db:function(){return DB},me:function(){return ME},my:function(){return MY},org:function(){return ORG},orgs:function(){return ORGS},members:function(){return MEMBERS},dir:function(){return ORGDIR},V:V,
   esc:esc,nl:nl,ic:ic,loc:loc,locd:locd,now:now,$:$,win:win,closeW:closeW,say:say,orgName:orgName,myTitle:myTitle,mimeOf:mimeOf,pager:pager,isCentral:function(){return !!ORG&&ORG.key==='central'},
   render:function(){renderLeft();renderMain()},setMod:setMod,

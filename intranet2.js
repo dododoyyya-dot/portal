@@ -1,9 +1,9 @@
-// intranet2.js v20261027d · 연맹 인트라넷 확장 — 쪽지 · 게시판 · 업무요청 · 자료 제출 · 설문(투표)
+// intranet2.js v20261027e · 연맹 인트라넷 확장 — 쪽지 · 게시판 · 업무요청 · 자료 제출 · 설문(투표)
 //   intranet.js 의 INTRA_X 연결점에 모듈을 등록합니다. 저장: intraMsgs · intraPosts · intraTasks · intraPolls (보안 규칙 v48)
 //   · 쪽지: 보낸 사람과 받는 사람(parts)만 봅니다. 읽음(readBy)·지움(del)만 고칠 수 있습니다.
 //   · 게시판: 공지사항(중앙 작성)·자료실·자유게시판은 임원 전체(scope 'all'), 기관 게시판은 그 기관 임원만(readOrgs).
 //   · 업무요청: 요청자와 담당자(parts)만. 담당자가 진행·완료·반려, 양쪽이 의견을 남깁니다.
-//   · 자료 제출(intraCollects, 규칙 v80): 요청 기관이 대상 기관·기한·양식을 정해 걷습니다. 대상 기관 임원은 자기 기관 칸(subs.{기관 키})만 씁니다. ?collect=ID 링크로 바로 엽니다.
+//   · 자료 제출(intraCollects, 규칙 v80): 요청 기관이 대상 기관·기한·양식을 정해 걷습니다. 공문(intraDocs.collect.due)과 연동: 시행될 때 자동 생성(docId·docNo), 문서 보기에 띠. 대상 기관 임원은 자기 기관 칸(subs.{기관 키})만 씁니다. ?collect=ID 링크로 바로 엽니다.
 //   · 설문: 전체 또는 우리 기관 대상. 한 사람이 자기 응답(votes.{uid})만 쓸 수 있습니다.
 (function(){
 'use strict';
@@ -216,6 +216,27 @@ function cOf(f){var k=cOrg();return vals(COLS).filter(function(c){return f==='to
 function cStat(c){var to=c.toOrgs||[],n=to.filter(function(k){return !!cSub(c,k)}).length;return n+'/'+to.length}
 function cSiteUrl(){return /xn--3e0bs9hwxbnzdb8dgzd5uq6mgd1dcu4a8tlm1a/.test(location.hostname)?'https://대한민국플라잉디스크연맹.com':location.origin}
 function cLink(id){return cSiteUrl()+'/intranet.html?collect='+id}
+function cOfDoc(docId){return vals(COLS).find(function(c){return c.docId===docId})||null}
+function cBodyOf(d){var t=String(d.body||'').trim();return (t.length>1200?t.slice(0,1200)+'…':t)+(d.docNo?'\n\n(관련 공문: '+d.docNo+')':'')}
+// 공문이 시행될 때 자동 생성(intranet.js hookCollect) — 같은 공문으로는 한 번만
+async function colFromDoc(d){if(!d||!d.collect||!d.collect.due||!(d.toOrgs||[]).length)return;if(cOfDoc(d._id))return;
+  try{var q=await X.db().collection('intraCollects').where('docId','==',d._id).limit(1).get();if(!q.empty)return}catch(e){}
+  var ref=X.db().collection('intraCollects').doc(),to=d.toOrgs.slice();
+  try{await ref.set({title:d.title,body:cBodyOf(d),due:d.collect.due,org:cOrg(),orgName:X.org().name,authorUid:me(),authorName:X.my().name||'',toOrgs:to,readOrgs:[cOrg()].concat(to),files:(d.files||[]).map(function(f){return {name:f.name,path:f.path,size:f.size||0}}),status:'진행',subs:{},remind:[],docId:d._id,docNo:d.docNo||'',createdAt:X.now(),updatedAt:X.now()});
+    var n=0;X.members().forEach(function(mm){if(to.indexOf(mm.orgKey)>=0&&mm.uid!==me()&&n<300){n++;X.notify(mm.uid,'자료 제출 요청 — '+d.title+' (기한 '+d.collect.due+')')}});
+    X.say('자료 제출 요청도 만들었습니다 (기한 '+d.collect.due+')')}catch(e){alert('자료 제출 요청을 만들지 못했습니다: '+denied(e)+'\n문서를 열어 [이 공문으로 자료 제출 요청 만들기]로 다시 시도할 수 있습니다.')}}
+// 문서 보기 띠 — 요청 기관: 현황·카톡 링크 / 받는 기관: 제출하기
+function colDocBand(d,orgKey){if(!d||d.kind!=='coop'||d.status!=='완료'||!(d.toOrgs||[]).length)return '';var c=cOfDoc(d._id),isReq=d.org===orgKey||X.isCentral(),isTo=(d.toOrgs||[]).indexOf(orgKey)>=0;
+  if(c){var sub=cSub(c,orgKey);
+    if(isTo&&!isReq)return '<div class="gw-colband'+(sub?' done':'')+'">'+ic('collect',16)+' <b>자료 제출 요청이 연결된 공문입니다</b> 기한 '+esc(c.due)+' '+cDdHtml(c)+(sub?' · 우리 연맹 제출 완료('+esc(sub.name||'')+' '+esc(loc(sub.at).slice(0,16))+')':'')+'<span class="sp"></span><button class="gw-b'+(sub?'':' pri')+'" onclick="INTRA2.colOpen(\''+c._id+'\')">'+(sub?'제출 내용 보기':'자료 제출하기')+'</button></div>';
+    if(isReq)return '<div class="gw-colband">'+ic('collect',16)+' <b>자료 제출 요청 연결됨</b> 기한 '+esc(c.due)+' '+cDdHtml(c)+' · 제출 '+cStat(c)+'곳'+(c.status==='종료'?' · 마감':'')+'<span class="sp"></span><button class="gw-b pri" onclick="INTRA2.colOpen(\''+c._id+'\')">제출 현황 · 카톡용 링크</button></div>';
+    return ''}
+  if(isReq&&(d.org===orgKey)&&(d.send&&d.send.status==='발송'||!d.send||d.send.auto!==false))return '<div class="gw-colband" style="background:#f7f8fa;border-color:#d7dde6;border-left-color:#999">'+ic('collect',16)+' '+(d.collect&&d.collect.due?'자료 제출 요청(기한 '+esc(d.collect.due)+')이 아직 만들어지지 않았습니다.':'이 공문으로 회신 자료를 걷으려면')+'<span class="sp"></span><button class="gw-b" onclick="INTRA2.colNewFromDoc(\''+d._id+'\')">이 공문으로 자료 제출 요청 만들기</button></div>';
+  return ''}
+function colNewFromDoc(docId){var d=(window.INTRA&&INTRA._doc)?INTRA._doc(docId):null;if(!d){alert('문서를 찾지 못했습니다.');return}if(cOfDoc(docId)){colOpen(cOfDoc(docId)._id);return}
+  colNew();CC.doc={id:docId,no:d.docNo||''};CC.keep=(d.files||[]).map(function(f){return {name:f.name,path:f.path,size:f.size||0}});(d.toOrgs||[]).forEach(function(k){CC.to[k]=1});
+  $('ccTitle').value=d.title||'';$('ccBody').value=cBodyOf(d);if(d.collect&&d.collect.due)$('ccDue').value=d.collect.due;colDraw();
+  var w=document.querySelector('#gwCol .gw-wtit b');if(w)w.textContent='자료 제출 요청 — 공문 '+(d.docNo||'')+' 연동'}
 function cDow(d){try{return ['일','월','화','수','목','금','토'][new Date(d+'T00:00:00').getDay()]}catch(e){return ''}}
 var COLLECT={
   start:function(){clear(COLS);var k=cOrg();if(X.isCentral())watch(X.db().collection('intraCollects').limit(500),COLS,'collect');else watch(X.db().collection('intraCollects').where('readOrgs','array-contains',k).limit(300),COLS,'collect')},
@@ -230,11 +251,12 @@ var COLLECT={
         return '<tr class="'+(cIsTo(c)&&!sub&&c.status==='진행'?'todo':'')+'"><td class="c">'+cDdHtml(c)+'<br><small>'+esc(c.due||'')+'</small></td><td class="t"><a onclick="INTRA2.colOpen(\''+c._id+'\')">'+esc(c.title||'')+'</a>'+((c.files||[]).length?' <span class="clip">'+ic('clip',12)+'</span>':'')+(sub&&cLate(c,sub)?' <small style="color:#e6a23c">(지각 제출)</small>':'')+'</td><td>'+esc(c.orgName||'')+'<br><small>'+esc(c.authorName||'')+'</small></td><td class="c">'+(c.toOrgs||[]).length+'곳</td><td class="c">'+(cIsReq(c)?'<b>'+cStat(c)+'</b>':(sub?'제출':'-'))+'</td><td class="c">'+esc(loc(c.createdAt).slice(0,10))+'</td></tr>'}),f==='todo'?'제출할 자료가 없습니다.':'자료 제출 요청이 없습니다.')},
   home:function(){var L=cOf('todo').slice(0,6);if(!L.length&&!cOf('mine').length)return '';
     return '<section class="gw-card c3"><h3>'+ic('collect',14)+' 제출할 자료<button title="전체 보기" onclick="INTRA2.go(\'collect\',\'todo\')">＋</button></h3><div class="hl">'+(L.length?L.map(function(c){return '<a class="hr" onclick="INTRA2.colOpen(\''+c._id+'\')"><span class="t"><i class="nw">N</i>'+esc(c.title||'')+'</span><span class="w">'+esc(c.orgName||'')+'</span><span class="d">'+cDdHtml(c)+' '+esc(c.due||'')+'</span></a>'}).join(''):'<div class="he">제출할 자료가 없습니다.</div>')+'</div></section>'},
+  fromDoc:colFromDoc,docBand:colDocBand,
   deep:function(qs){var id=qs.get('collect');if(!id)return;var tries=0,t=setInterval(function(){tries++;if(COLS[id]){clearInterval(t);go('collect',cIsTo(COLS[id])?'todo':'mine');colOpen(id)}else if(tries>20){clearInterval(t);X.say('링크의 자료 제출 요청을 찾지 못했습니다. 우리 연맹이 대상이 아니거나 삭제된 요청입니다.',true)}},500)}
 };
 var CC=null;
 function colNew(){var dir=X.dir(),keys=Object.keys(dir).filter(function(k){return k!==cOrg()}).sort(function(a,b){return (dir[a].level-dir[b].level)||String(dir[a].sido||'').localeCompare(String(dir[b].sido||''),'ko')||String(dir[a].name).localeCompare(String(dir[b].name),'ko')});
-  CC={to:{},files:[]};var d=new Date();d.setDate(d.getDate()+7);
+  CC={to:{},files:[],keep:[],doc:null};var d=new Date();d.setDate(d.getDate()+7);
   X.win('gwCol','자료 제출 요청','<div class="gw-wtool"><button class="gw-b pri" id="ccGo" onclick="INTRA2.colSave()">요청 보내기</button><button class="gw-b" onclick="INTRA.closeW(\'gwCol\')">취소</button><span id="ccMsg" class="gw-say"></span></div>'
     +'<table class="gw-form"><tr><th>제목 <em>*</em></th><td><input id="ccTitle" maxlength="120" style="width:100%" placeholder="예: 대의원 등기용 임원 정보 회신"></td></tr>'
     +'<tr><th>기한 <em>*</em></th><td><input type="date" id="ccDue" value="'+d.toISOString().slice(0,10)+'"> <small>기한이 지나도 제출은 받되 「지각」으로 표시됩니다.</small></td></tr>'
@@ -242,15 +264,17 @@ function colNew(){var dir=X.dir(),keys=Object.keys(dir).filter(function(k){retur
       +'<div id="ccTo" class="gw-colst" style="max-height:220px;overflow:auto">'+keys.map(function(k){return '<div class="no" id="cc_'+esc(k)+'" onclick="INTRA2.colPick(\''+esc(k)+'\')" style="cursor:pointer"><b>'+esc(dir[k].name)+'</b><small>'+['중앙','시도','구군'][dir[k].level]+' · 임원 '+X.members().filter(function(m){return m.orgKey===k}).length+'명</small></div>'}).join('')+'</div></td></tr>'
     +'<tr><th>안내 내용 <em>*</em></th><td><textarea id="ccBody" rows="6" maxlength="4000" placeholder="무엇을, 어떤 양식으로, 어떻게 작성해 올리면 되는지 적어 주세요."></textarea></td></tr>'
     +'<tr><th>양식 · 참고 파일</th><td><input type="file" multiple onchange="INTRA2.colFiles(this)"><div id="ccFiles" class="gw-chips"></div><small>작성할 양식(엑셀·한글 등)을 올려 두면 대상 연맹이 내려받아 씁니다. 파일당 20MB, 5개까지</small></td></tr></table>',860);colDraw()}
-function colDraw(){var n=Object.keys(CC.to).length;var c=$('ccCnt');if(c)c.textContent=n?n+'곳 선택':'대상 기관을 누르세요';Object.keys(X.dir()).forEach(function(k){var e=$('cc_'+k);if(e)e.className=CC.to[k]?'ok':'no'});var f=$('ccFiles');if(f)f.innerHTML=CC.files.map(function(x){return '<span>'+esc(x.name)+'</span>'}).join('')}
+function colDraw(){var n=Object.keys(CC.to).length;var c=$('ccCnt');if(c)c.textContent=n?n+'곳 선택':'대상 기관을 누르세요';Object.keys(X.dir()).forEach(function(k){var e=$('cc_'+k);if(e)e.className=CC.to[k]?'ok':'no'});var f=$('ccFiles');if(f)f.innerHTML=(CC.keep||[]).map(function(x){return '<span title="공문 붙임">'+ic('clip',11)+' '+esc(x.name)+'</span>'}).join('')+CC.files.map(function(x){return '<span>'+esc(x.name)+'</span>'}).join('')}
 function colPick(k){if(CC.to[k])delete CC.to[k];else CC.to[k]=1;colDraw()}
 function colPickAll(lv){var dir=X.dir();if(!lv)CC.to={};else Object.keys(dir).forEach(function(k){if(dir[k].level===lv&&k!==cOrg()&&(lv!==2||X.org().level!==1||dir[k].sido===X.org().sido))CC.to[k]=1});colDraw()}
 function colFiles(inp){CC.files=pickFiles(inp,5);colDraw()}
 async function colSave(){var m=$('ccMsg'),bad=function(t){m.textContent=t;m.className='gw-say bad'};var title=$('ccTitle').value.trim(),body=$('ccBody').value.trim(),due=$('ccDue').value,to=Object.keys(CC.to);
   if(title.length<2)return bad('제목을 입력하세요');if(!due)return bad('기한을 정하세요');if(!to.length)return bad('대상 기관을 고르세요');if(body.length<2)return bad('안내 내용을 입력하세요');
   var b=$('ccGo');b.disabled=true;m.textContent='보내는 중…';m.className='gw-say';
-  try{var ref=X.db().collection('intraCollects').doc();var files=CC.files.length?await upload(CC.files,'collect_'+ref.id):[];
-    await ref.set({title:title.slice(0,120),body:body.slice(0,4000),due:due,org:cOrg(),orgName:X.org().name,authorUid:me(),authorName:X.my().name||'',toOrgs:to,readOrgs:[cOrg()].concat(to),files:files,status:'진행',subs:{},remind:[],createdAt:X.now(),updatedAt:X.now()});
+  try{var ref=X.db().collection('intraCollects').doc();var files=(CC.keep||[]).concat(CC.files.length?await upload(CC.files,'collect_'+ref.id):[]);
+    var doc={title:title.slice(0,120),body:body.slice(0,4000),due:due,org:cOrg(),orgName:X.org().name,authorUid:me(),authorName:X.my().name||'',toOrgs:to,readOrgs:[cOrg()].concat(to),files:files,status:'진행',subs:{},remind:[],createdAt:X.now(),updatedAt:X.now()};
+    if(CC.doc){doc.docId=CC.doc.id;doc.docNo=CC.doc.no||''}
+    await ref.set(doc);
     var n=0;X.members().forEach(function(mm){if(to.indexOf(mm.orgKey)>=0&&mm.uid!==me()&&n<300){n++;X.notify(mm.uid,'자료 제출 요청 — '+title+' (기한 '+due+')')}});
     X.closeW('gwCol');go('collect','mine');X.say('요청을 보냈습니다. 현황판에서 [카톡용 링크 복사]로 단체방에도 올려 두세요.');setTimeout(function(){if(COLS[ref.id])colOpen(ref.id)},700)}catch(e){b.disabled=false;bad('요청 실패: '+denied(e))}}
 function colOpen(id){var c=COLS[id];if(!c)return;var req=cIsReq(c),to=cIsTo(c),sub=cSub(c),dir=X.dir(),a=[];
@@ -261,7 +285,7 @@ function colOpen(id){var c=COLS[id];if(!c)return;var req=cIsReq(c),to=cIsTo(c),s
   a.push('<button class="gw-b" onclick="INTRA.closeW(\'gwCol\')">닫기</button>');
   var h='<div class="gw-wtool">'+a.join('')+'<span id="ccMsg" class="gw-say"></span></div>'
     +'<table class="gw-form"><tr><th>기한</th><td><b>'+esc(c.due||'-')+'</b> ('+cDow(c.due)+') '+cDdHtml(c)+(c.status==='종료'?' · <b style="color:#c0392b">마감됨</b>':'')+'</td><th>요청 기관</th><td>'+esc(c.orgName||'')+' · '+esc(c.authorName||'')+'</td></tr>'
-    +'<tr><th>제목</th><td colspan="3"><b>'+esc(c.title||'')+'</b></td></tr><tr><th>안내 내용</th><td colspan="3" class="body" style="height:auto;min-height:70px">'+nl(c.body||'')+'</td></tr>'
+    +'<tr><th>제목</th><td colspan="3"><b>'+esc(c.title||'')+'</b></td></tr>'+(c.docId?'<tr><th>관련 공문</th><td colspan="3">'+esc(c.docNo||'')+' <a class="wz-lnk" onclick="INTRA.closeW(\'gwCol\');INTRA.openDoc(\''+esc(c.docId)+'\')">공문 열기</a> <small style="color:#555">— 이 요청은 공문이 시행될 때 함께 만들어졌습니다.</small></td></tr>':'')+'<tr><th>안내 내용</th><td colspan="3" class="body" style="height:auto;min-height:70px">'+nl(c.body||'')+'</td></tr>'
     +'<tr><th>양식 · 참고</th><td colspan="3">'+(fileLinks(c.files)||'<small style="color:#777">없음</small>')+'</td></tr></table>';
   if(to){var late=c.due&&today()>c.due;
     h+='<div class="gw-sub'+(sub?' done':'')+'"><h4>'+(sub?'✔ 우리 연맹 제출 완료':'우리 연맹 제출하기')+'</h4>'
@@ -305,7 +329,7 @@ window.INTRA2={go:go,file:openPath,parseQs:parseQs,
   mailNew:mailNew,mailAdd:mailAdd,mailGroup:mailGroup,mailDelTo:function(i){MC.to.splice(i,1);mailDraw()},mailFiles:function(inp){MC.files=pickFiles(inp,5);mailDraw()},mailSend:mailSend,mailOpen:mailOpen,mailReply:mailReply,mailDel:mailDel,
   postNew:postNew,postFiles:function(inp){PC.files=pickFiles(inp,Math.max(0,5-PC.keep.length));postDraw()},postDelKeep:function(i){PC.keep.splice(i,1);postDraw()},postSave:postSave,postOpen:postOpen,postCmt:postCmt,postDel:postDel,
   taskNew:taskNew,taskSave:taskSave,taskOpen:taskOpen,taskSet:taskSet,taskNote:taskNote,taskDel:taskDel,
-  colNew:colNew,colSave:colSave,colOpen:colOpen,colFiles:colFiles,colSubFiles:colSubFiles,colSubmit:colSubmit,colShare:colShare,colRemind:colRemind,colSet:colSet,colDue:colDue,colDel:colDel,colPick:colPick,colPickAll:colPickAll,colUnsub:colUnsub,
+  colNew:colNew,colNewFromDoc:colNewFromDoc,colSave:colSave,colOpen:colOpen,colFiles:colFiles,colSubFiles:colSubFiles,colSubmit:colSubmit,colShare:colShare,colRemind:colRemind,colSet:colSet,colDue:colDue,colDel:colDel,colPick:colPick,colPickAll:colPickAll,colUnsub:colUnsub,
   pollNew:pollNew,pollSave:pollSave,pollOpen:pollOpen,pollVote:pollVote,pollClose:pollClose,pollDel:pollDel,
   _sim:function(o){[['msgs',MSGS],['posts',POSTS],['tasks',TASKS],['cols',COLS],['polls',POLLS]].forEach(function(p){clear(p[1]);Object.assign(p[1],o[p[0]]||{})});X.render()}};
 })();
