@@ -315,15 +315,15 @@ function homeCard(cls,title,f,n,who){return '<section class="gw-card '+cls+'"><h
 function homeHtml(){
   var n=apprMinOf(ORG.key,ORGDIR);
   var tiles=[['공문 작성','draft','pen'],['직인 요청','seal','file'],['공람·공지','notice','org'],['서식함','','fold']];
-  var links=[['임시보관','p_temp'],['기안한 문서','a_mine'],['결재완료','a_done'],['문서 등록대장','reg'],['접수 대장','x_reg']];
+  var links=[['임시보관','p_temp'],['보낸 문서','a_mine'],['결재완료','a_done'],['확인한 공문','r_done'],['문서 등록대장','reg']];
   var ex=function(k,fn){try{return EXT[k]&&EXT[k][fn]?EXT[k][fn]():''}catch(e){return ''}};
   return '<div class="gw-home">'+todoBand()+'<div class="gw-banner"><b>'+esc(ORG.name)+'</b><span>'+esc(MY.name||'')+(myTitle()?' '+esc(myTitle()):'')+' 님 · 결재 방식 '+(n<=1?'1인 전결':n+'인 이상 결재')+'</span>'
       +(ORGS.length>1?'<select onchange="INTRA.setOrg(this.value)" title="소속 전환">'+ORGS.map(function(o){return '<option value="'+esc(o.key)+'"'+(o.key===ORG.key?' selected':'')+'>'+esc(o.name)+'</option>'}).join('')+'</select>':'')+'<span id="gwMsg" class="gw-say"></span></div>'
-    +'<div class="gw-grid">'+homeCard('c1','결재대기','a_wait',6)
+    +'<div class="gw-grid">'+homeCard('c1','결재할 문서','a_wait',6)
     +'<section class="gw-card c2"><h3>'+ic('file',14)+' 바로가기 메뉴</h3><div class="gw-tiles"><div class="tl">'+tiles.map(function(t,i){return '<button class="'+(i?'':'y')+'" onclick="'+(t[1]?'INTRA.compose(\''+t[1]+'\')':'INTRA.setFolder(\'f_all\')')+'">'+ic(t[2],26)+'<span>'+t[0]+'</span></button>'}).join('')+'</div>'
       +'<div class="lk">'+links.map(function(l){return '<a onclick="INTRA.setFolder(\''+l[1]+'\')">'+ic('fold',13)+' '+l[0]+'<em>'+(count(l[1])||'')+'</em></a>'}).join('')+'</div></div></section>'
-    +homeCard('c3','결재진행','a_prog',6)+(ex('board','home')||homeCard('c4','최근 수신 문서','r_all',6,'org'))
-    +(EXT.board?homeCard('c1','접수대기 · 최근 수신 문서','r_all',6,'org'):'')+ex('task','home')+'</div></div>'}
+    +homeCard('c3','결재 진행 중','a_prog',6)+(ex('board','home')||homeCard('c4','최근 받은 공문','r_all',6,'org'))
+    +(EXT.board?homeCard('c1','최근 받은 공문','r_all',6,'org'):'')+ex('task','home')+'</div></div>'}
 function orgHtml(){var day=now().slice(0,10);
   var ks=Object.keys(ORGDIR).sort(function(a,b){var A=ORGDIR[a],B=ORGDIR[b];return String(A.level?A.sido:'').localeCompare(String(B.level?B.sido:''),'ko')||(A.level-B.level)||String(A.name).localeCompare(String(B.name),'ko')});
   var abs=MEMBERS.filter(function(m){return isAbsent(m,day)}).length;
