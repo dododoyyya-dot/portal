@@ -2957,10 +2957,12 @@ function cc2AddFee(label,amount){
 }
 function cc2EntryInit(c){
   const e=(c&&c.entry)||{};
+  // [2026-10-29] 수정할 때는 저장된 부문을 그대로 — 예전엔 개인전·단체전이 비어 있으면 기본 부문(디스크골프 남·여 등)을 다시 끼워 넣어, 다시 저장하면 없던 부문이 생겼음
+  const has=k=>!!(c&&c.entry)||!!(e[k]&&e[k].length);
   CC2_ENTRY={
     // [날짜별 부문] divDates: {부문명: [날짜...]} — 비어 있으면 대회 전 일정에 열리는 부문
-    indiv:(e.indiv&&e.indiv.length?e.indiv:[{name:'디스크골프',divs:['남자부','여자부']}]).map(x=>({name:x.name||'',divs:(x.divs||[]).slice(),divDates:Object.assign({},x.divDates||{})})),
-    team:(e.team&&e.team.length?e.team:[
+    indiv:(has('indiv')?(e.indiv||[]):[{name:'디스크골프',divs:['남자부','여자부']}]).map(x=>({name:x.name||'',divs:(x.divs||[]).slice(),divDates:Object.assign({},x.divDates||{})})),
+    team:(has('team')?(e.team||[]):[
       {name:'얼티미트',divs:['남자','여자','혼성']},
       {name:'디스크골프',divs:['남자','여자','혼성']},
       {name:'원반윷놀이',divs:['남자','여자','혼성']}]).map(x=>({name:x.name||'',divs:(x.divs||[]).slice(),divDates:Object.assign({},x.divDates||{})})),
