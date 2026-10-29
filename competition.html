@@ -974,7 +974,7 @@ async function cfClubAward(r,s,base){
   if(!r.team&&!r.award)return;
   // [다중 소속] 클럽팀은 신청 때 고른 클럽(teamOrgId), 개인은 신청서의 소속 클럽(clubId)으로 정확히 연결 — 없을 때만 이름·소속으로 추정
   let clubs=[];
-  if(r.team&&r.teamType==='클럽팀'&&r.teamOrgId)clubs=[{id:r.teamOrgId,name:r.name}];
+  if(r.team&&ttKind(r.teamType)==='club'&&r.teamOrgId)clubs=[{id:r.teamOrgId,name:r.name}];
   else if(!r.team&&r.clubId)clubs=[{id:r.clubId,name:r.club||''}];
   else clubs=await CAREER.findClubs(DB,r.team?{name:r.name,uid:r.uid}:{uid:r.uid});
   if(!clubs.length)return;
@@ -1050,7 +1050,7 @@ async function cfSave(){
   }
   // [학교스포츠클럽] 학교팀 결과를 학교스포츠클럽 대회 기록에 — 팀 홈의 대회 이력·전적에 바로 반영 (연맹 대회 = 문서 kfdf_공고ID)
   let scNote='';
-  try{const st=rows.filter(r=>r.team&&r.teamType==='학교팀');
+  try{const st=rows.filter(r=>r.team&&ttKind(r.teamType)==='school');
     if(st.length&&window.SCC){const dvs={};const sc={};
       st.forEach(r=>{const dv=r.div||'전체';const D=dvs[dv]=dvs[dv]||{teams:{}};const school=r.teamOrg||r.name;const tk=school+(r.name&&r.name!==school?'|'+r.name:'');
         D.teams[tk]={school:school,team:r.name||'',result:r.award||'참가',rank:SCC.rankOf(r.award||'참가'),scid:r.teamSchoolClubId||'',code:r.teamSchoolCode||'',members:(r.roster||[]).filter(m=>m&&m.name&&!m.self).map(m=>m.name),src:'kfdf'};if(r.teamSchoolClubId)sc[r.teamSchoolClubId]=1});
@@ -2044,16 +2044,19 @@ function taPickAll(){
     if(r.name&&names.indexOf(r.name)<0)taPickMember(j);
   });
 }
+// [2026-10-29] 팀 단위 이름 정규화 — 대회 등록 마법사는 「시도연맹클럽·학교클럽·기타팀」, 예전 공고는 「클럽팀·학교팀·자유팀」.
+//   예전엔 「학교팀」「클럽팀」 글자만 비교해서 「학교클럽」을 고르면 소속 학교 칸·학교스포츠클럽 연결이 안 떴음
+function ttKind(t){t=String(t||'').replace(/\s/g,'');if(t==='학교팀'||t.indexOf('학교')>=0)return 'school';if(t==='클럽팀'||/클럽$/.test(t))return 'club';return 'free'}
 function taTypeUI(){
   const t=document.getElementById('taType').value;
   const row=document.getElementById('taOrgRow');
   const lb=document.getElementById('taLoadClub');
-  if(t==='클럽팀'){
+  if(ttKind(t)==='club'){
     const cl=window.TA_MYCLUBS||[];
     row.innerHTML=cl.length?'소속 클럽: <select id="taOrg" style="padding:8px 11px;border:1.5px solid #d5dce8;border-radius:9px;font-size:13px">'+cl.map(c=>'<option value="'+c.id+'">'+cesc(c.name)+'</option>').join('')+'</select>'
       :'<span style="font-size:12.5px;color:#C41E2F;font-weight:700">내가 클럽장인 클럽이 없습니다 — 학교팀/자유팀을 선택하거나 클럽을 먼저 만들어주세요.</span>';
     if(lb)lb.style.display=cl.length?'':'none';
-  }else if(t==='학교팀'){
+  }else if(ttKind(t)==='school'){
     const scs=window.TA_MYSC||[];
     row.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span>학교스포츠클럽:</span><select id="taSC" onchange="taSCPick()" style="padding:8px 11px;border:1.5px solid #bfe0da;border-radius:9px;font-size:13px;max-width:320px"><option value="">(학교스포츠클럽 없이 신청)</option>'+scs.map(c=>'<option value="'+cesc(c.id)+'">'+cesc((c.teamName||c.schoolName)+' · '+((window.SCC&&SCC.DIV[c.division])||'')+' · '+(c.schoolName||''))+'</option>').join('')+'</select>'
       +'<a href="schoolclub.html" target="_blank" style="font-size:12px;font-weight:800;color:#0f766e">우리 학교 클럽 등록 신청 →</a></div>'
@@ -2650,7 +2653,7 @@ async function submitTeam(){
   if(!divName)return alert('참가 부문을 골라 주세요.');
   const orgEl=document.getElementById('taOrg');
   let teamOrg='',teamOrgId='',teamSchoolCode='';
-  if(teamType==='클럽팀'){
+  if(ttKind(teamType)==='club'){
     if(!orgEl||!orgEl.value)return alert('소속 클럽을 선택해주세요.');
     teamOrgId=orgEl.value;
     teamOrg=((window.TA_MYCLUBS||[]).find(c=>c.id===orgEl.value)||{}).name||'';
@@ -2665,9 +2668,9 @@ async function submitTeam(){
     }
   }else{
     teamOrg=orgEl?orgEl.value.trim():'';
-    if(teamType==='학교팀'){const scSel=document.getElementById('taSC');window.__TA_SCID=scSel?scSel.value:''}else window.__TA_SCID='';
-    if(teamType==='학교팀'&&!teamOrg)return alert('소속 학교를 입력해주세요.');
-    teamSchoolCode=(teamType==='학교팀'&&orgEl&&orgEl.dataset&&orgEl.dataset.code)||'';   // [학교 자동완성] 학교코드(있을 때만)
+    if(ttKind(teamType)==='school'){const scSel=document.getElementById('taSC');window.__TA_SCID=scSel?scSel.value:''}else window.__TA_SCID='';
+    if(ttKind(teamType)==='school'&&!teamOrg)return alert('소속 학교를 입력해주세요.');
+    teamSchoolCode=(ttKind(teamType)==='school'&&orgEl&&orgEl.dataset&&orgEl.dataset.code)||'';   // [학교 자동완성] 학교코드(있을 때만)
   }
   if(TA_EDIT&&!teamOrg){teamOrg=TA_EDIT.teamOrg||'';if(!teamOrgId)teamOrgId=TA_EDIT.teamOrgId||'';if(!teamSchoolCode)teamSchoolCode=TA_EDIT.teamSchoolCode||''}   // [2026-10-20] 수정 때 소속이 비면 원래 소속
   try{await taResolveMembers()}catch(e){}   // [회원 색인] 직접 입력한 팀원도 회원이면 회원으로 저장
@@ -2713,7 +2716,7 @@ async function submitTeam(){
       const sameDiv=!!(TA_EDIT&&((TA_EDIT.prefs||[])[0]===divName));
       if(dv&&dv.cap&&!sameDiv&&divActiveCount(s,dv.name)>=dv.cap)throw new Error('['+dv.name+'] 부문 정원이 마감되었습니다');
       const claimed=(s.claimed||[]).slice();
-      claimed.push({uid:CME.uid,pid:pid,team:true,name:teamName,teamType:teamType,teamOrg:teamOrg,teamOrgId:teamOrgId,teamSchoolCode:teamSchoolCode,teamSchoolClubId:(teamType==='학교팀'?(window.__TA_SCID||''):''),
+      claimed.push({uid:CME.uid,pid:pid,team:true,name:teamName,teamType:teamType,teamOrg:teamOrg,teamOrgId:teamOrgId,teamSchoolCode:teamSchoolCode,teamSchoolClubId:(ttKind(teamType)==='school'?(window.__TA_SCID||''):''),
         teamGender:(function(){const g=document.getElementById('taGender');return (g&&g.value)||taGenderOf(divName)})(),   // [팀 구분 자동] 선택칸이 없어도 부문명에서 읽음
         leader:CMY.name||'',leaderRole:document.getElementById('taRole').value,leaderPhone:CMY.phone||'',
         staff:taStaffList(),   // [추가 인솔자] 감독·코치·지도자
@@ -2736,7 +2739,7 @@ async function submitTeam(){
     const allFiles=wasEdit?keptFiles.concat(files):files;
     if(allFiles.length||wasEdit)await DB.collection('teamConsents').doc(TA_ID+'_'+pid).set({slotId:TA_ID,pid:pid,uid:CME.uid,files:allFiles,at:now}).catch(()=>{});
     // [학교스포츠클럽] 신청 명단을 그 팀의 이번 학년도 명단에 더합니다 (지도교사·관리자 권한 — 실패해도 신청은 유지)
-    if(teamType==='학교팀'&&window.__TA_SCID)try{await taSCSaveRoster(window.__TA_SCID,roster,s0.data())}catch(e){console.warn('sc roster',e)}
+    if(ttKind(teamType)==='school'&&window.__TA_SCID)try{await taSCSaveRoster(window.__TA_SCID,roster,s0.data())}catch(e){console.warn('sc roster',e)}
     // [보호자 알림 2026-09-11] 팀 명단의 미성년 팀원이 보호자 계정에 연동돼 있으면(자녀 프로필·연동 코드) 보호자에게, 본인 계정이 있으면 본인에게 알립니다
     //   (팀 신청의 보호자 동의는 종전대로 인솔자가 수합·첨부하는 서면 동의서로 확인합니다 — 이 알림은 안내용)
     try{const _t=(s0.data().title||'대회');const _sent={};
