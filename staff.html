@@ -2542,6 +2542,15 @@ async function exportPayReport(postId){
       if(typeof du==='string'&&du.indexOf('data:image')===0)_SIGB64[s]=du;
     }catch(e){}
   }));
+  // [서명 비율 · 2026-10-29] 서명 이미지의 원본 가로·세로를 미리 읽어 칸 안에 비율대로 넣습니다(예전엔 칸 크기로 늘려 찌그러짐)
+  const _SIGDIM={};
+  const _dimOf=src=>new Promise(ok=>{try{const im=new Image();im.onload=()=>ok({w:im.naturalWidth||im.width,h:im.naturalHeight||im.height});im.onerror=()=>ok(null);im.src=src}catch(e){ok(null)}});
+  await Promise.all(apps.map(async a=>{
+    let s=((a.payInfo&&a.payInfo.signature)||(a.agree&&a.agree.signature))||null;
+    if(s&&s.indexOf('http')===0)s=_SIGB64[s]||null;
+    if(!s||s.indexOf('data:image')!==0||_SIGDIM[s])return;
+    _SIGDIM[s]=await _dimOf(s);
+  }));
   const wb=new ExcelJS.Workbook();
   let made=0;
   (p.dates||[]).forEach(dd=>{
@@ -2603,7 +2612,9 @@ async function exportPayReport(postId){
           const b64=sig.split(',')[1];
           const ext=sig.indexOf('image/jpeg')>=0?'jpeg':'png';
           const imgId=wb.addImage({base64:b64,extension:ext});
-          ws.addImage(imgId,{tl:{col:14.08,row:rIdx-1+0.1},br:{col:14.92,row:rIdx-1+0.9},editAs:'twoCell'});   /* [2026-10-23] 셀에 맞춰 이동·크기 조정 — 행을 끼워 넣거나 옮겨도 서명이 그 줄을 따라감 */
+          /* [2026-10-29] 칸(O열 14자≈103px × 30pt≈40px) 안에 원본 비율로 가운데 맞춤. oneCell: 행을 끼워 넣거나 옮겨도 따라가되 칸 크기로 늘어나지 않음 */
+          const dim=_SIGDIM[sig]||{w:3,h:1};const boxW=95,boxH=34;const k=Math.min(boxW/dim.w,boxH/dim.h);const iw=Math.max(8,dim.w*k),ih=Math.max(6,dim.h*k);
+          ws.addImage(imgId,{tl:{col:14+(103-iw)/2/103,row:rIdx-1+(40-ih)/2/40},ext:{width:iw,height:ih},editAs:'oneCell'});
         }catch(e){}
       }else if(sig&&sig.indexOf('http')===0){
         row.getCell(15).value='서명등록됨(링크)'; // [서명연동] 이미지 변환이 막힌 경우에도 서명 사실은 표기
