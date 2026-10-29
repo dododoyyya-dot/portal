@@ -42,7 +42,7 @@
     {t:'사업안내',h:'business.html?view=youth',d:[
       ['유소년 스포츠 기반구축사업','business.html?view=youth'],['학교체육 강습','business.html?view=school'],
       ['방과후 · 늘봄','business.html?view=after'],['교원연수 · 교재개발','business.html?view=train'],['학교 강습 신청','apply.html'],
-      ['선정학교 현황','selected.html','','admin'],['학교별 운영일지','schoollogs.html','','admin'],['연맹 인트라넷','intranet.html','','admin']]},
+      ['선정학교 현황','selected.html','','admin'],['학교별 운영일지','schoollogs.html','','admin'],['강습 완료 학교·선생님','completed.html','','admin'],['연맹 인트라넷','intranet.html','','admin']]},
     {t:'대회',h:'competition.html?view=list',d:[
       ['대회 일정 · 안내','competition.html?view=list'],['참가 신청','competition.html?view=entry'],
       ['심판 · 운영요원 모집','competition.html?view=list&kind=staff'],['라이브 중계','live.html'],['경기 기록 · 운영','match.html'],['대회 결과','results.html'],['사진첩','gallery.html'],['원반 놀이터','play.html'],
