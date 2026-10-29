@@ -167,6 +167,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
 <script src="logbook.js?v=20261014a"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 KFDF.initApp();
 const DB=firebase.firestore(),AUTH=firebase.auth();
@@ -200,7 +201,7 @@ async function load(){
     APPS=aq.docs.map(d=>({id:d.id,s:d.data()||{}})).filter(x=>!x.s.deleted&&(x.s.status==='선정'||x.s.status==='배정완료'||(LOGS[x.id]||[]).length)).map(x=>{const s=x.s,L=LOGS[x.id]||[];
       const conf=L.filter(l=>l.teacherConfirm).length,fix=L.filter(l=>l.fixReq).length,photos=L.reduce((n,l)=>n+((l.photos||[]).length),0);
       const last=L.reduce((m,l)=>String(l.date||'')>m?String(l.date||''):m,'');const sessions=new Set(L.map(l=>+l.session||0).filter(Boolean));
-      return {id:x.id,school:s.school||'',city:s.city||'',region:regionOf(s),sido:sidoOf(s),type:typeOf(s),status:s.status||'',instructor:s.assignedName||s.selfName||'',instructorUid:s.assignedUid||s.selfUid||'',teacher:s.teacher||'',
+      return {id:x.id,school:s.school||'',city:s.city||'',region:regionOf(s),sido:sidoOf(s),type:typeOf(s),status:s.status||'',instructor:s.assignedName||s.selfName||'',instructorUid:s.assignedUid||s.selfUid||'',teacher:s.teacher||'',tPhone:s.phone||'',pend:L.filter(l=>!l.teacherConfirm&&!l.fixReq).map(l=>l._id),
         n:L.length,done:sessions.size,conf:conf,fix:fix,photos:photos,last:last,ppl:L.reduce((n,l)=>n+(+l.count||0),0)}});
     const app=new URLSearchParams(location.search).get('app');if(app){OPEN[app]=true;ST.q='';}
     render();
@@ -226,7 +227,7 @@ function render(){
     +'<select onchange="setV(\'conf\',this.value)"><option value="">교사 확인 전체</option><option value="unconf"'+(ST.conf==='unconf'?' selected':'')+'>미확인 회차 있음</option><option value="fix"'+(ST.conf==='fix'?' selected':'')+'>정정 요청 있음</option><option value="all"'+(ST.conf==='all'?' selected':'')+'>전부 확인됨</option></select>'
     +'<select onchange="setV(\'sort\',this.value)"><option value="recent"'+(ST.sort==='recent'?' selected':'')+'>최근 작성순</option><option value="area"'+(ST.sort==='area'?' selected':'')+'>권역·시도·학교명순</option><option value="prog"'+(ST.sort==='prog'?' selected':'')+'>진행률 높은순</option><option value="low"'+(ST.sort==='low'?' selected':'')+'>진행률 낮은순</option></select>'
     +'<input type="search" placeholder="학교 · 시군구 · 강사 · 교사 검색" value="'+esc(ST.q)+'" oninput="setV(\'q\',this.value)">'
-    +'<button class="pg-btn o" onclick="csv()">📥 현황 CSV</button><button class="pg-btn s" onclick="toggleAll(true)">모두 펼치기</button><button class="pg-btn s" onclick="toggleAll(false)">모두 접기</button><a class="pg-btn g" href="selected.html" style="text-decoration:none">🏫 선정학교 현황</a><a class="pg-btn" href="completed.html" style="text-decoration:none">✅ 강습 완료 학교·선생님</a>';
+    +'<button class="pg-btn o" onclick="csv()">📥 현황 CSV</button><button class="pg-btn r" onclick="cfmAll()" title="미확인 회차가 있는 학교의 담당교사·연락처·서명 링크를 한 번에 복사">📋 미확인 링크 모음</button><button class="pg-btn s" onclick="toggleAll(true)">모두 펼치기</button><button class="pg-btn s" onclick="toggleAll(false)">모두 접기</button><a class="pg-btn g" href="selected.html" style="text-decoration:none">🏫 선정학교 현황</a><a class="pg-btn" href="completed.html" style="text-decoration:none">✅ 강습 완료 학교·선생님</a>';
   const out=document.getElementById('lgOut');
   if(!list.length){out.innerHTML='<div class="pg-empty">조건에 맞는 학교가 없습니다.</div>';return}
   if(ST.view==='school')out.innerHTML=list.map(card).join('');
@@ -241,7 +242,7 @@ function card(a){const L=LOGS[a.id]||[];const pct=Math.min(100,Math.round(a.done
     +'<div style="min-width:0;flex:1 1 260px"><div class="ttl">'+esc(a.school)+' <span class="pg-pill" style="background:'+(a.type==='학교체육'?'#153A77':'#0f766e')+'">'+esc(a.type)+'</span>'+progPill(a)+'<small>'+esc([a.region,a.sido,a.city].filter(Boolean).join(' · '))+'</small></div>'
     +'<div class="meta" style="margin-top:4px"><span>강사 <b>'+esc(a.instructor||'미배정')+'</b></span><span>담당교사 <b>'+esc(a.teacher||'-')+'</b></span><span>일지 <b>'+a.n+'</b>회차</span><span>교사 확인 <b style="color:'+(a.conf===a.n&&a.n?'#0f766e':'#b8860b')+'">'+a.conf+'/'+a.n+'</b></span>'+(a.fix?'<span style="color:#C41E2F;font-weight:800">✏️ 정정 요청 '+a.fix+'</span>':'')+'<span>사진 <b>'+a.photos+'</b>장</span>'+(a.last?'<span>최근 <b>'+esc(a.last)+'</b></span>':'')+'</div></div>'
     +'<div class="sc-prog"><i><span>진행률</span><span>'+a.done+' / 24회 ('+pct+'%)</span></i><u><b style="width:'+pct+'%"></b></u></div>'
-    +'<div class="acts" onclick="event.stopPropagation()"><button class="pg-btn o" style="padding:5px 10px;min-height:0" onclick="pdf(\''+a.id+'\')" title="학교 단위 운영일지 보고서(인쇄 → PDF 저장)">📄 PDF</button>'+(a.instructorUid?'<a class="pg-btn s" style="padding:5px 10px;min-height:0;text-decoration:none" href="participant.html?uid='+encodeURIComponent(a.instructorUid)+'" target="_blank" title="강사 참가자 기록">📁 강사</a>':'')+'<button class="pg-btn" style="padding:5px 10px;min-height:0" onclick="toggle(\''+a.id+'\')">'+(OPEN[a.id]?'접기 ▲':'일지 보기 ▼')+'</button></div></div>'
+    +'<div class="acts" onclick="event.stopPropagation()">'+(a.pend.length?'<button class="pg-btn r" style="padding:5px 10px;min-height:0" onclick="cfmOpen(\''+a.id+'\')" title="담당교사에게 보낼 서명 링크·QR — 미확인 회차 일괄">📱 교사 확인 링크 ('+a.pend.length+')</button>':'')+'<button class="pg-btn o" style="padding:5px 10px;min-height:0" onclick="pdf(\''+a.id+'\')" title="학교 단위 운영일지 보고서(인쇄 → PDF 저장)">📄 PDF</button>'+(a.instructorUid?'<a class="pg-btn s" style="padding:5px 10px;min-height:0;text-decoration:none" href="participant.html?uid='+encodeURIComponent(a.instructorUid)+'" target="_blank" title="강사 참가자 기록">📁 강사</a>':'')+'<button class="pg-btn" style="padding:5px 10px;min-height:0" onclick="toggle(\''+a.id+'\')">'+(OPEN[a.id]?'접기 ▲':'일지 보기 ▼')+'</button></div></div>'
     +'<div class="bd">'+(OPEN[a.id]?(L.length?'<div class="lgcards">'+L.map(lg).join('')+'</div>':'<div class="pg-empty">아직 올라온 일지가 없습니다.</div>'):'')+'</div></div>'}
 function lg(l){let dow='';try{const d=new Date(String(l.date||'')+'T00:00:00');if(!isNaN(d))dow=' ('+DOWK[d.getDay()]+')'}catch(e){}
   const ck=l.check;const ckN=Array.isArray(ck)?ck.filter(Boolean).length:(ck&&typeof ck==='object'?Object.keys(ck).filter(k=>ck[k]).length:0);
@@ -261,6 +262,24 @@ async function pdf(id){const w=KFDF_LOGBOOK.prep();if(!w)return;
     let deleted=[];try{const ds=await DB.collection('sessionLogArchive').where('appId','==',id).get();deleted=ds.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>!x.restoredAt)}catch(e){}
     KFDF_LOGBOOK.render(w,{app:s,appId:id,logs:logs,deleted:deleted,instructor:ins,printedBy:(MY&&MY.name)||'',printedRole:'사무국'});
   }catch(e){KFDF_LOGBOOK.fail(w,e)}}
+// ══ [2026-10-29] 담당교사 서명 링크(confirm.html?ids=) — 강사 마이페이지와 같은 링크. 사무국이 직접 보낼 때 ══
+function cfmUrl(a){return new URL('confirm.html?ids='+a.pend.join(','),location.href).href}
+function cfmMsg(a){return '[대한민국플라잉디스크연맹] '+a.school+' '+(a.teacher||'')+' 선생님, 플라잉디스크 강습 운영일지 '+a.pend.length+'회차의 담당교사 확인(서명)을 부탁드립니다. 아래 링크를 눌러 내용을 보시고 성명·서명을 한 번 남겨 주시면 됩니다(로그인 필요 없음).\n'+cfmUrl(a)+'\n문의 031-984-3248'}
+function cfmOpen(id){const a=APPS.find(x=>x.id===id);if(!a||!a.pend.length)return;const old=document.getElementById('cfmBox');if(old)old.remove();
+  const d=document.createElement('div');d.id='cfmBox';d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  d.innerHTML='<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:22px;text-align:center"><b style="font-size:17px">📱 담당교사 확인 요청</b>'
+    +'<div style="font-size:13px;font-weight:800;color:#153A77;margin:4px 0 2px">'+esc(a.school)+' · 미확인 '+a.pend.length+'회차</div>'
+    +'<div style="font-size:12.5px;color:#374151">담당교사 <b>'+esc(a.teacher||'-')+'</b>'+(a.tPhone?' · '+esc(a.tPhone):'')+' · 강사 '+esc(a.instructor||'-')+'</div>'
+    +'<div id="cfmQr2" style="display:flex;justify-content:center;margin:12px 0;min-height:180px;align-items:center"></div>'
+    +'<textarea id="cfmTxt" readonly style="width:100%;height:110px;font-size:12px;border:1.5px solid #e3e6ea;border-radius:9px;padding:8px">'+esc(cfmMsg(a))+'</textarea>'
+    +'<div style="display:flex;gap:8px;margin-top:10px"><button class="pg-btn" style="flex:1" onclick="cfmCopy(document.getElementById(\'cfmTxt\').value)">문구 복사(문자·카톡용)</button><button class="pg-btn s" style="flex:1" onclick="document.getElementById(\'cfmBox\').remove()">닫기</button></div>'
+    +'<div style="font-size:11.5px;color:#8a919d;margin-top:8px;line-height:1.5">강사 마이페이지의 「교사 확인 요청」과 같은 링크입니다. 선생님이 서명하면 미확인 회차가 모두 확인됩니다.</div></div>';
+  d.addEventListener('click',e=>{if(e.target===d)d.remove()});document.body.appendChild(d);
+  const q=document.getElementById('cfmQr2');if(window.QRCode){try{new QRCode(q,{text:cfmUrl(a),width:180,height:180,correctLevel:QRCode.CorrectLevel.L})}catch(e){q.textContent='QR 생성 실패 — 문구의 링크를 보내 주세요'}}else q.textContent='QR 로딩 중 — 문구의 링크를 보내 주세요'}
+function cfmCopy(t){const ok=()=>alert('✓ 복사했습니다.');if(navigator.clipboard)navigator.clipboard.writeText(t).then(ok,()=>prompt('아래 글을 복사하세요',t));else prompt('아래 글을 복사하세요',t)}
+function cfmAll(){const L=filtered().filter(a=>a.pend.length);if(!L.length){alert('미확인 회차가 있는 학교가 없습니다.');return}
+  const t=L.map((a,i)=>(i+1)+'. '+a.school+' · 담당교사 '+(a.teacher||'-')+(a.tPhone?' '+a.tPhone:'')+' · 강사 '+(a.instructor||'-')+' · 미확인 '+a.pend.length+'회차\n   '+cfmUrl(a)).join('\n');
+  cfmCopy('[담당교사 확인 대기 '+L.length+'개교]\n'+t)}
 function csv(){const L=filtered();csvDown('학교별_운영일지_현황_'+ymd()+'.csv',[['연번','권역','시도','시군구','학교','유형','상태','강사','담당교사','일지 회차','완료 회차(24 기준)','진행','교사 확인 회차','정정 요청','활동 사진','참여 인원 합계','최근 수업일']].concat(L.map((a,i)=>[i+1,a.region,a.sido,a.city,a.school,a.type,a.status,a.instructor,a.teacher,a.n,a.done,progOf(a),a.conf,a.fix,a.photos,a.ppl,a.last])))}
 window.addEventListener('resize',()=>{clearTimeout(window.__rz);window.__rz=setTimeout(()=>{if(ST.view==='table')render()},200)});
 AUTH.onAuthStateChanged(async u=>{ME=u;if(!u){deny('로그인 후 볼 수 있습니다. <a href="login.html" style="color:#153A77">로그인</a>');return}
