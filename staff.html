@@ -750,8 +750,8 @@ function openPostForm(editId){
     +'<div id="pfTplMsg" style="font-size:12px;font-weight:700;margin-top:4px;min-height:14px"></div>'
     +'<label class="stlabel">서면 동의서 양식 (내려받아 작성·제출하는 파일)</label>'
     +'<input type="hidden" id="pfForm" value="'+esc(ed?(ed.consentForm||'none'):'pay')+'">'
-    +'<input type="hidden" id="pfFormUrl" value="'+esc(ed?(ed.consentFormUrl||''):'files/거래처등록_개인정보동의서.hwp')+'">'
-    +'<input type="hidden" id="pfFormName" value="'+esc(ed?(ed.consentFormName||''):'거래처 등록(수당지급) 개인정보 동의서')+'">'
+    +'<input type="hidden" id="pfFormUrl" value="'+esc(ed?(ed.consentFormUrl||''):'files/수당지급_개인정보동의서_연맹.pdf')+'">'
+    +'<input type="hidden" id="pfFormName" value="'+esc(ed?(ed.consentFormName||''):'수당 지급 개인정보 수집·이용·제공 동의서(연맹)')+'">'
     +'<div id="pfPaperChips" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px"></div>'
     +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">'
     +'<label class="stbtn stbtn-soft" style="padding:6px 12px;font-size:12px;cursor:pointer;margin:0">📎 새 양식 올리기 (PDF·이미지·HWP)<input type="file" id="pfPaperFile" accept=".pdf,.hwp,.hwpx,.docx,image/*" style="display:none" onchange="pfPaperUpload(this)"></label>'
@@ -1253,7 +1253,8 @@ async function pfTplDel(){
   catch(e){pfTplMsg('삭제 실패: '+(e.code||e.message),true)}
 }
 // 서면 양식 파일 — 기본: 선택 안 함 / 거래처 등록(수당지급) 동의서 HWP(사이트 파일) + 올려 둔 양식(consentTemplates kind:paperForm, 대회 공고와 공유)
-const PF_PAPER_BUILTIN=[['none','선택 안 함',''],['pay','📄 거래처 등록(수당지급) 개인정보 동의서 — HWP','files/거래처등록_개인정보동의서.hwp','거래처 등록(수당지급) 개인정보 동의서']];
+// [2026-10-30] 기본 양식을 연맹용으로 — 예전 기본 HWP는 「부산광역시교육감배·부산광역시교육청」 문구가 든 부산 교육청 서식이라 부산 교육감배 전용으로 따로 둠
+const PF_PAPER_BUILTIN=[['none','선택 안 함',''],['pay','📄 수당 지급 개인정보 동의서 (연맹) — PDF','files/수당지급_개인정보동의서_연맹.pdf','수당 지급 개인정보 수집·이용·제공 동의서(연맹)'],['pay','📄 거래처 등록 동의서 (부산광역시교육청 교육감배 전용) — HWP','files/거래처등록_개인정보동의서.hwp','거래처 등록(수당지급) 개인정보 동의서(부산교육청)']];
 function pfPaperMsg(t,bad){const m=document.getElementById('pfPaperMsg');if(m){m.textContent=t||'';m.style.color=bad?'#C41E2F':'#0f766e'}}
 function pfPaperSet(form,url,name){
   const h=document.getElementById('pfForm'),hu=document.getElementById('pfFormUrl'),hn=document.getElementById('pfFormName');
@@ -1264,7 +1265,7 @@ function pfPaperDraw(){
   const box=document.getElementById('pfPaperChips');if(!box)return;
   const form=(document.getElementById('pfForm')||{}).value||'none',url=(document.getElementById('pfFormUrl')||{}).value||'';
   const chip=(on,onclick,label,title)=>'<button type="button" class="stbtn '+(on?'stbtn-main':'stbtn-soft')+'" style="padding:6px 12px;font-size:12px" onclick="'+onclick+'" title="'+esc(title||'')+'">'+label+'</button>';
-  let h=PF_PAPER_BUILTIN.map(b=>chip(form===b[0],"pfPaperSet('"+b[0]+"','"+esc(b[2])+"','"+esc(b[3]||'')+"')",b[1],b[2])).join('');
+  let h=PF_PAPER_BUILTIN.map(b=>chip(form===b[0]&&(!b[2]||!url||url===b[2]),"pfPaperSet('"+b[0]+"','"+esc(b[2])+"','"+esc(b[3]||'')+"')",b[1],b[2])).join('');
   h+=PF_PAPERS.map(p=>'<span style="display:inline-flex;align-items:center">'+chip(form==='file'&&url===p.url,"pfPaperSet('file','"+esc(p.url)+"','"+esc(p.name)+"')",'📎 '+esc(p.name),p.fileName||'')
     +'<button type="button" onclick="pfPaperDel(\''+p.id+'\',\''+esc(p.name)+'\')" title="보관함에서 삭제" style="border:none;background:none;color:#C41E2F;font-weight:900;cursor:pointer;margin:0 4px 0 -2px">×</button></span>').join('');
   if(form!=='none'&&url)h+='<a href="'+esc(url)+'" target="_blank" style="font-size:12px;font-weight:800;color:#153A77;margin-left:4px">파일 열기 →</a>';
