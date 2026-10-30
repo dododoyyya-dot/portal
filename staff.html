@@ -1733,9 +1733,9 @@ async function _renderDetailInner(isStale){
     // [UI 정리] '수당지급 엑셀'은 아래 '수당지급내역서(서식·서명)'와 내용이 중복되어 숨김 처리.
     //           함수(exportPayExcel)는 그대로 두어 필요 시 되살릴 수 있습니다.
     +((_decide&&hasPledge(p)&&(APPS[p.id]||[]).length)?'<button class="stbtn" style="background:#f5f3ff;color:#5b21b6;border:1.5px solid #ddd6fe" onclick="printPledgeDocs(\''+p.id+'\',\'\')" title="전 신청자의 서약서를 서명과 함께 한 번에 — 인쇄 창에서 「PDF로 저장」하면 파일 하나로 보관됩니다">📜 서약서 일괄 출력</button>':'')
-    +((_decide&&payConsentReady(p))?'<button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #b9cdec" onclick="printPayConsent(\''+p.id+'\',\'\')" title="확정된 신청자의 수당 정보·전자서명이 기입된 동의서를 한 번에 인쇄">📄 수당 동의서 출력</button>':'')
+    +((_decide&&payConsentReady(p))?'<button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #b9cdec" onclick="printPayConsent(\''+p.id+'\',\'\')" title="확정된 신청자의 수당 정보·전자서명이 기입된 동의서를 한 번에 인쇄">📄 수당 동의서 출력</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px dashed #b9cdec" onclick="printPayConsentEach(\''+p.id+'\',this)" title="확정자마다 PDF 하나씩 — ZIP 한 개로 받습니다(e나라도움 건별 증빙용)">📦 수당 동의서 개인별 PDF</button>':'')
   +(_decide?'<button class="stbtn" style="background:'+(p.reportId?'#f0fdf4':'#f5f3ff')+';color:'+(p.reportId?'#0f766e':'#5b21b6')+';border:1.5px solid '+(p.reportId?'#a7f3d0':'#ddd6fe')+'" onclick="openStaffReport(\''+p.id+'\')" title="약식 종료 보고 — 기록 보관 + 사진첩 초안"><span style="display:inline-flex;align-items:center;gap:5px">'+CAREER.svg('doc',{size:14,stroke:2.2})+(p.reportId?'종료 보고 완료 (수정)':'종료 보고')+'</span></button>':'')
-  +(_decide?'<button class="stbtn" style="background:#fffbeb;color:#8a5a00;border:1.5px solid #fde68a" onclick="exportPayReport(\''+p.id+'\')">📄 수당지급내역서 (서식·서명)</button><button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="openNotifyModal(\''+p.id+'\')">📣 확정자 단체 알림</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="exportLicZip(\''+p.id+'\')">📦 자격증 일괄 다운로드</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
+  +(_decide?'<button class="stbtn" style="background:#fffbeb;color:#8a5a00;border:1.5px solid #fde68a" onclick="exportPayReport(\''+p.id+'\')">📄 수당지급내역서 (서식·서명)</button><button class="stbtn" style="background:#fffbeb;color:#8a5a00;border:1.5px dashed #fde68a" onclick="exportPayReportEach(\''+p.id+'\',this)" title="확정자마다 엑셀 하나씩 — ZIP 한 개로 받습니다">📦 수당지급내역서 개인별 엑셀</button><button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="openNotifyModal(\''+p.id+'\')">📣 확정자 단체 알림</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="viewAllLicenses(\''+p.id+'\')">🎖 자격증 일괄확인</button><button class="stbtn" style="background:#eef3fa;color:#153A77;border:1.5px solid #c3d4ed" onclick="exportLicZip(\''+p.id+'\')">📦 자격증 일괄 다운로드</button>'+(dd.date&&dd.date<new Date().toISOString().slice(0,10)?'<button class="stbtn" style="background:#f5f0ff;color:#7c3aed;border:1.5px solid #c4b5fd" onclick="registerCareer(\''+p.id+'\',\''+dd.date+'\')">📝 경력 일괄등록</button>':''):'')
     +((SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid))?'<button class="stbtn" style="padding:11px 18px;background:#fff;color:#C41E2F;border:1.5px solid #f1c7cc" onclick="cancelApply(\''+p.id+'\')">🚫 신청 취소</button>':'')
     +stApplyBtn(p,'padding:11px 26px','✍️ 신청하기 (날짜 선택)')
     +((hasPledge(p)&&SME&&(APPS[p.id]||[]).some(a=>a.uid===SME.uid))?'<button class="stbtn stbtn-soft" style="padding:11px 18px" onclick="printPledgeDocs(\''+p.id+'\',SME.uid)">📜 내 서약서 출력</button>':'')
@@ -2518,21 +2518,23 @@ async function printPayConsent(postId,onlyUid){
   w.document.write('<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{-webkit-text-size-adjust:100%;text-size-adjust:100%}</style><title>'+esc(p.competitionName||'')+' 수당 지급 동의서</title></head><body style="margin:0">'+pages.join('')+'<script>'+CAREER.OVL_PRINT_JS+'setTimeout(function(){window.print()},800)<\/script></body></html>');
   w.document.close();
 }
-async function exportPayReport(postId){
+async function exportPayReport(postId,opt){
+  opt=opt||{};   // [개인별 파일 · 2026-10-30] opt.only=신청 ID(그 사람만) · opt.asBuffer=파일 대신 버퍼 반환 · opt.cache=회원·서명 조회 결과 재사용
   if(typeof ExcelJS==='undefined'){alert('서식 엑셀 라이브러리 로딩 중입니다. 잠시 후 다시 눌러주세요.');return}
+  const _C=opt.cache||{};const _cached=!!_C.bank;
   const p=POSTS.find(x=>x.id===postId);if(!p)return;
   const apps=APPS[p.id]||[];
   // [v7] payInfo 미입력자는 마이페이지(users) 은행·계좌로 자동 보완
   const _uidSet=new Set();
   (p.dates||[]).forEach(dd=>apps.filter(a=>a.status&&a.status[dd.date]==='확정').forEach(a=>_uidSet.add(a.uid)));
-  const _bankMap={};
-  await Promise.all([..._uidSet].map(async uid=>{
+  const _bankMap=_C.bank||{};
+  await Promise.all((_cached?[]:[..._uidSet]).map(async uid=>{
     try{const d=await DB.collection('users').doc(uid).get();
       if(d.exists){const u=d.data();_bankMap[uid]={bank:u.bank||'',account:u.accountNum||'',phone:u.phone||'',addr:String(u.address||'').trim()};}}catch(e){}
   }));
   // [서명연동] 링크형 서명(원본 URL로 저장된 분)을 엑셀 삽입용 base64로 미리 변환 (변환 실패 시 텍스트로 표기)
-  const _SIGB64={};
-  await Promise.all(apps.map(async a=>{
+  const _SIGB64=_C.sig||{};
+  await Promise.all((_cached?[]:apps).map(async a=>{
     const s=((a.payInfo&&a.payInfo.signature)||(a.agree&&a.agree.signature))||null;
     if(!s||s.indexOf('http')!==0||_SIGB64[s]!==undefined)return;
     _SIGB64[s]=null;
@@ -2544,18 +2546,19 @@ async function exportPayReport(postId){
     }catch(e){}
   }));
   // [서명 비율 · 2026-10-29] 서명 이미지의 원본 가로·세로를 미리 읽어 칸 안에 비율대로 넣습니다(예전엔 칸 크기로 늘려 찌그러짐)
-  const _SIGDIM={};
+  const _SIGDIM=_C.dim||{};
   const _dimOf=src=>new Promise(ok=>{try{const im=new Image();im.onload=()=>ok({w:im.naturalWidth||im.width,h:im.naturalHeight||im.height});im.onerror=()=>ok(null);im.src=src}catch(e){ok(null)}});
-  await Promise.all(apps.map(async a=>{
+  await Promise.all((_cached?[]:apps).map(async a=>{
     let s=((a.payInfo&&a.payInfo.signature)||(a.agree&&a.agree.signature))||null;
     if(s&&s.indexOf('http')===0)s=_SIGB64[s]||null;
     if(!s||s.indexOf('data:image')!==0||_SIGDIM[s])return;
     _SIGDIM[s]=await _dimOf(s);
   }));
+  if(opt.cache&&!_cached){opt.cache.bank=_bankMap;opt.cache.sig=_SIGB64;opt.cache.dim=_SIGDIM}
   const wb=new ExcelJS.Workbook();
   let made=0;
   (p.dates||[]).forEach(dd=>{
-    const conf=apps.filter(a=>a.status&&a.status[dd.date]==='확정');
+    const conf=apps.filter(a=>a.status&&a.status[dd.date]==='확정'&&(!opt.only||a.id===opt.only));
     if(!conf.length)return;
     made++;
     let shName=fmtD(dd.date)||('일자'+made);
@@ -2629,7 +2632,8 @@ async function exportPayReport(postId){
     ['G','H','I','J'].forEach(c=>{sr.getCell(c.charCodeAt(0)-64).value={formula:'SUM('+c+'5:'+c+(rIdx-1)+')'}});
     for(let c=1;c<=16;c++){const cell=sr.getCell(c);cell.border=bAll;cell.alignment={horizontal:'center',vertical:'middle'};cell.font={bold:true,size:10};}
   });
-  if(!made){alert('확정된 신청자가 없습니다. 먼저 신청자를 확정해주세요.');return}
+  if(!made){if(opt.only)return null;alert('확정된 신청자가 없습니다. 먼저 신청자를 확정해주세요.');return}
+  if(opt.asBuffer)return await wb.xlsx.writeBuffer();
   try{
     const buf=await wb.xlsx.writeBuffer();
     const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -2639,6 +2643,79 @@ async function exportPayReport(postId){
     a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href),5000);
   }catch(e){alert('내역서 생성 실패: '+e.message)}
+}
+// ══════════════ [개인별 파일 · 2026-10-30] 수당지급내역서·수당 동의서를 확정자마다 파일 하나씩 → ZIP 한 개 ══════════════
+function _pfSafe(t){return String(t||'').replace(/[\\/:*?"<>|\n\r\t]/g,' ').replace(/\s+/g,' ').trim().slice(0,60)||'무명'}
+function _pfBusy(btn,t){if(!btn)return;if(!btn._t0)btn._t0=btn.textContent;btn.disabled=!!t;btn.textContent=t||btn._t0}
+function _pfZipDown(zip,name){return zip.generateAsync({type:'blob'}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),8000)})}
+function _pfConfirmed(p){return (APPS[p.id]||[]).filter(a=>Object.values(a.status||{}).indexOf('확정')>=0)}
+async function exportPayReportEach(postId,btn){
+  if(typeof ExcelJS==='undefined'||typeof JSZip==='undefined'){alert('파일 라이브러리 로딩 중입니다. 잠시 후 다시 눌러주세요.');return}
+  const p=POSTS.find(x=>x.id===postId);if(!p)return;
+  const conf=_pfConfirmed(p);if(!conf.length){alert('확정된 신청자가 없습니다. 먼저 신청자를 확정해주세요.');return}
+  if(!confirm('확정자 '+conf.length+'명의 수당지급내역서를 사람마다 엑셀 파일 하나씩 만들어 ZIP 한 개로 받습니다.\n(전체를 한 파일로 받는 기존 버튼은 그대로입니다)\n계속할까요?'))return;
+  const zip=new JSZip(),cache={},used={};let n=0;
+  try{
+    for(let i=0;i<conf.length;i++){const a=conf[i];_pfBusy(btn,'만드는 중… '+(i+1)+'/'+conf.length);
+      const buf=await exportPayReport(postId,{only:a.id,asBuffer:true,cache:cache});if(!buf)continue;
+      let nm=String(i+1).padStart(String(conf.length).length,'0')+'_'+_pfSafe(a.name);if(used[nm])nm+='_'+(++used[nm]);else used[nm]=1;
+      zip.file(nm+'_수당지급내역서.xlsx',buf);n++}
+    _pfBusy(btn,'압축 중…');
+    await _pfZipDown(zip,_pfSafe(p.competitionName||'대회')+'_수당지급내역서_개인별_'+n+'명.zip');
+  }catch(e){alert('개인별 파일 만들기 실패: '+(e.message||e))}
+  _pfBusy(btn,'');
+}
+async function _pfImg(src){
+  let url=src,tmp=null;
+  try{if(/^https?:/.test(src)){const r=await fetch(src);if(r.ok){tmp=URL.createObjectURL(await r.blob());url=tmp}}}catch(e){}
+  return await new Promise((ok,no)=>{const im=new Image();im.crossOrigin='anonymous';im.onload=()=>ok(im);im.onerror=()=>no(new Error('이미지를 불러오지 못했습니다'));im.src=url});
+}
+// 공고의 동의서 이미지 + 기입 위치(consentOverlays)를 그대로 캔버스에 그림 — 인쇄 화면(printPayConsent)과 같은 값·같은 비율(이미지 폭 680px 기준)
+function _pfDrawPage(bg,ovs,vals,signImg){
+  const W=bg.naturalWidth||bg.width,H=bg.naturalHeight||bg.height,k=W/680;
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d');
+  g.fillStyle='#fff';g.fillRect(0,0,W,H);g.drawImage(bg,0,0,W,H);g.fillStyle='#111';g.strokeStyle='#111';
+  (ovs||[]).forEach(f=>{const x=(f.x||0)*W,y=(f.y||0)*H,cen=f.a==='c';
+    if(f.f==='check'){const z=k*(f.fs||18),x0=cen?x-z/2:x,y0=cen?y-z/2:y;g.save();g.lineWidth=z*0.1;g.lineCap='round';g.lineJoin='round';g.beginPath();
+      g.moveTo(x0+z*4/24,y0+z*12.5/24);g.lineTo(x0+z*9/24,y0+z*17.5/24);g.lineTo(x0+z*20/24,y0+z*6/24);g.stroke();g.restore();return}
+    if(f.f==='sign'){if(!signImg)return;const h=k*(f.fs||30),w=h*((signImg.naturalWidth||signImg.width)/((signImg.naturalHeight||signImg.height)||1));
+      g.drawImage(signImg,cen?x-w/2:x,cen?y-h/2:y,w,h);return}
+    const t=f.f==='num'?String(f.v||''):String(vals[f.f]||'');if(!t)return;const fs=k*(f.fs||14);
+    g.font='500 '+fs+'px "Malgun Gothic","맑은 고딕",sans-serif';g.textBaseline='middle';g.textAlign=cen?'center':'left';
+    g.fillText(t,x,cen?y:y+fs*0.65)});
+  return cv;
+}
+async function printPayConsentEach(postId,btn){
+  const p=POSTS.find(x=>x.id===postId);if(!p||!payConsentReady(p))return;
+  const JSPDF=(window.jspdf&&window.jspdf.jsPDF)||null;
+  if(!JSPDF||typeof JSZip==='undefined'){alert('PDF 라이브러리 로딩 중입니다. 잠시 후 다시 눌러주세요.');return}
+  const apps=(APPS[p.id]||[]).filter(a=>a.payInfo&&Object.values(a.status||{}).indexOf('확정')>=0);
+  if(!apps.length){alert('수당 정보를 입력한 확정 신청자가 없습니다.');return}
+  if(!confirm('확정자 '+apps.length+'명의 수당 동의서를 사람마다 PDF 하나씩 만들어 ZIP 한 개로 받습니다.\n(한 번에 인쇄하는 기존 버튼은 그대로입니다)\n계속할까요?'))return;
+  try{
+    _pfBusy(btn,'양식 불러오는 중…');
+    const bgs=[];for(const src of (p.consentImgs||[]))bgs.push(await _pfImg(src));
+    const um={};
+    await Promise.all([...new Set(apps.map(a=>a.uid))].map(async uid=>{try{const d=await DB.collection('users').doc(uid).get();if(d.exists)um[uid]=d.data()}catch(e){}}));
+    const zip=new JSZip(),used={};let n=0;const miss=[];
+    for(let i=0;i<apps.length;i++){const a=apps[i];_pfBusy(btn,'만드는 중… '+(i+1)+'/'+apps.length);
+      const pi=a.payInfo||{},u=um[a.uid]||{};
+      const sign=pi.signature||(a.agree&&a.agree.signature)||'';
+      const vals={name:a.name||u.name||'',rrn:pi.rrn||'',phone:a.phone||u.phone||'',addr:u.address||'',bank:pi.bank||u.bank||'',acct:pi.account||u.accountNum||'',holder:u.accountHolder||a.name||'',date:pcFmtDate(pi.at||new Date().toISOString()),sign:''};
+      let signImg=null;if(sign){try{signImg=await _pfImg(sign)}catch(e){miss.push(a.name||'')}}
+      let pdf=null;
+      bgs.forEach((bg,pi2)=>{const cv=_pfDrawPage(bg,(p.consentOverlays||{})[String(pi2)]||[],vals,signImg);
+        const pw=595.28,ph=pw*cv.height/cv.width;
+        if(!pdf)pdf=new JSPDF({unit:'pt',format:[pw,ph],orientation:ph>=pw?'portrait':'landscape'});else pdf.addPage([pw,ph],ph>=pw?'portrait':'landscape');
+        pdf.addImage(cv.toDataURL('image/jpeg',0.9),'JPEG',0,0,pw,ph)});
+      if(!pdf)continue;
+      let nm=String(i+1).padStart(String(apps.length).length,'0')+'_'+_pfSafe(vals.name);if(used[nm])nm+='_'+(++used[nm]);else used[nm]=1;
+      zip.file(nm+'_수당동의서.pdf',pdf.output('blob'));n++}
+    _pfBusy(btn,'압축 중…');
+    await _pfZipDown(zip,_pfSafe(p.competitionName||'대회')+'_수당동의서_개인별_'+n+'명.zip');
+    if(miss.length)alert('서명 이미지를 불러오지 못한 '+miss.length+'명은 서명 없이 만들었습니다: '+miss.join(', '));
+  }catch(e){alert('개인별 PDF 만들기 실패: '+(e.message||e))}
+  _pfBusy(btn,'');
 }
 // ══════════════ [v7] 확정자 자격증 일괄 다운로드 (공식 서식 이미지 → ZIP, 주최측 전달용) ══════════════
 async function _drawLicPng(name,birth,l,licNo){
