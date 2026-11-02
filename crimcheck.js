@@ -40,12 +40,13 @@
   async function upload(opt){
     var f=opt.file;
     if(!f)throw new Error('사진을 골라 주세요');
-    if(!/^image\//.test(f.type||''))throw new Error('사진 파일만 올릴 수 있습니다 (회보서·PDF는 받지 않습니다)');
+    // [2026-11-02] 일부 휴대폰·앱은 파일 형식(type)을 비워 보냄 — 비어 있으면 확장자로 판단
+    if(f.type?!/^image\//.test(f.type):!/\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(f.name||''))throw new Error('사진 파일만 올릴 수 있습니다 (회보서·PDF는 받지 않습니다)');
     var blob=f;
     if(opt.compress){try{blob=(await opt.compress(f))||f}catch(e){blob=f}}
     if(blob.size>8*1024*1024)throw new Error('사진이 8MB를 넘습니다 — 해상도를 낮춰 다시 찍어 주세요');
     var path='docs/'+opt.uid+'/crim_'+opt.app.id+'_'+Date.now()+'.jpg';
-    await opt.fb.storage().ref(path).put(blob,{contentType:'image/jpeg'});
+    await opt.fb.storage().ref(path).put(blob,{contentType:(blob===f&&/^image\//.test(f.type||''))?f.type:'image/jpeg'});
     var ref=opt.db.collection('crimChecks').doc(opt.app.id);
     var cur=null;
     try{var g=await ref.get();cur=g.exists?g.data():null}catch(e){cur=null}
