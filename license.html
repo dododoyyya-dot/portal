@@ -555,7 +555,8 @@ function feeOf(n,tg,tp,g){const F=(n&&n.fees)||{};if(tp==='신규'){const k=tg+'
 function feesText(n){const w=v=>!v?'없음':(v>=10000&&v%10000===0?(v/10000)+'만원':v.toLocaleString('ko-KR')+'원');const out=[];
   const tgs=String((n&&n.target)||'지도자·심판 공통').indexOf('공통')>=0?['지도자','심판']:[String(n.target)];
   const tps=String((n&&n.type)||'신규·갱신·보수(역량강화)');
-  if(tps.indexOf('신규')>=0)tgs.forEach(tg=>out.push('신규 '+tg+' '+['3','2','1'].map(x=>x+'급 '+w(feeOf(n,tg,'신규',x))).join('·')));
+  const F=(n&&n.fees)||{};   // 옛 공고(급수 없이 「지도자|신규」만 저장)는 예전처럼 금액 하나로 표시
+  if(tps.indexOf('신규')>=0)tgs.forEach(tg=>out.push('신규 '+tg+' '+(F[tg+'|신규']&&!['3','2','1'].some(x=>F[tg+'|신규|'+x+'급']!=null)?w(F[tg+'|신규']):['3','2','1'].map(x=>x+'급 '+w(feeOf(n,tg,'신규',x))).join('·'))));
   [['갱신','갱신'],['보수','보수(역량강화)']].forEach(p=>{if(tps.indexOf(p[0])>=0)out.push(p[1]+' '+tgs.map(tg=>tg+' '+w(feeOf(n,tg,p[1]))).join('·'))});
   return out.join(' / ')}
 function ntypeVal(){
