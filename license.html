@@ -189,16 +189,16 @@ const AUTH=firebase.auth();const DB=firebase.firestore();
         <div><label class="lclab">주관</label><select id="nSido" class="lcin"><option>전국(중앙)</option><option>경기</option><option>강원</option><option>부산</option><option>경남</option><option>경북</option><option>전남광주</option><option>전북</option></select></div>
         <div><label class="lclab">일시</label><input id="nDate" class="lcin" placeholder="예: 2026. 9. 12.(토) 10:00"></div>
         <div><label class="lclab">장소</label><input id="nPlace" class="lcin" placeholder="예: 김포 연맹 교육장"></div>
-        <div style="grid-column:1/-1"><label class="lclab">응시료·갱신료 <span style="font-weight:600;color:var(--gray)">— 칸마다 금액 하나만, 원 단위 숫자 (예: 150000). 해당 없으면 비움. 신청자가 고른 등급·코스의 금액이 자동 합산됩니다</span></label>
+        <div style="grid-column:1/-1"><label class="lclab">응시료·갱신료 <span style="font-weight:600;color:var(--gray)">— 기본 금액이 채워져 있습니다. 그대로 두면 이 금액이 적용되고, 다르면 숫자만 고치세요 (원 단위). 받지 않는 코스는 0. 신청자가 고른 등급·코스의 금액이 자동 합산됩니다</span></label>
           <div style="display:grid;grid-template-columns:70px repeat(3,1fr);gap:6px;margin-top:4px;align-items:center;font-size:12.5px;font-weight:800">
             <span></span><span style="text-align:center;color:#153A77">3급</span><span style="text-align:center;color:#153A77">2급</span><span style="text-align:center;color:#153A77">1급</span>
-            <span>신규 지도자</span><input id="nFLn3" class="lcin" placeholder="150000" inputmode="numeric"><input id="nFLn2" class="lcin" placeholder="200000" inputmode="numeric"><input id="nFLn1" class="lcin" placeholder="300000" inputmode="numeric">
-            <span>신규 심판</span><input id="nFRn3" class="lcin" placeholder="50000" inputmode="numeric"><input id="nFRn2" class="lcin" placeholder="70000" inputmode="numeric"><input id="nFRn1" class="lcin" placeholder="100000" inputmode="numeric">
+            <span>신규 지도자</span><input id="nFLn3" class="lcin" placeholder="기본값" inputmode="numeric"><input id="nFLn2" class="lcin" placeholder="기본값" inputmode="numeric"><input id="nFLn1" class="lcin" placeholder="기본값" inputmode="numeric">
+            <span>신규 심판</span><input id="nFRn3" class="lcin" placeholder="기본값" inputmode="numeric"><input id="nFRn2" class="lcin" placeholder="기본값" inputmode="numeric"><input id="nFRn1" class="lcin" placeholder="기본값" inputmode="numeric">
           </div>
           <div style="display:grid;grid-template-columns:70px 1fr 1fr;gap:6px;margin-top:6px;align-items:center;font-size:12.5px;font-weight:800">
             <span></span><span style="text-align:center;color:#153A77">지도자</span><span style="text-align:center;color:#153A77">심판</span>
-            <span>갱신</span><input id="nFLg" class="lcin" placeholder="40000" inputmode="numeric"><input id="nFRg" class="lcin" placeholder="30000" inputmode="numeric">
-            <span>보수(역량강화)</span><input id="nFLb" class="lcin" placeholder="20000" inputmode="numeric"><input id="nFRb" class="lcin" placeholder="20000" inputmode="numeric">
+            <span>갱신</span><input id="nFLg" class="lcin" placeholder="기본값" inputmode="numeric"><input id="nFRg" class="lcin" placeholder="기본값" inputmode="numeric">
+            <span>보수(역량강화)</span><input id="nFLb" class="lcin" placeholder="기본값" inputmode="numeric"><input id="nFRb" class="lcin" placeholder="기본값" inputmode="numeric">
           </div>
           <input id="nFee" class="lcin" style="margin-top:6px" placeholder="(구버전 호환) 금액 안내 문구 — 비워도 됩니다"></div>
         <div><label class="lclab">수수료 입금 계좌 (주관 연맹)</label><input id="nAcct" class="lcin" placeholder="예: 농협 000-0000-0000-00 ○○연맹"></div>
@@ -535,23 +535,28 @@ async function nFilesUpload(m){
 }
 function nPosterDel(){N_POSTER_DEL=true;document.getElementById('nPoster').value='';document.getElementById('nPosterNow').innerHTML='<b style="color:#C41E2F">포스터 삭제 예정</b> — [✏️ 수정 저장]을 누르면 반영됩니다 (새 파일을 고르면 그 파일로 교체)';}
 function nFormReset(){
-  try{for(const id in FEE_IDS){const e=document.getElementById(id);if(e)e.value=''}}catch(e){}
-  ['nTitle','nDate','nPlace','nFee','nAcct','nUntil','nDesc','nSched'].concat(Object.keys(FEE_IDS)).forEach(i=>{const e=document.getElementById(i);if(e)e.value=''});
+  try{for(const id in FEE_IDS){const e=document.getElementById(id);if(e)e.value=FEE_DEF[FEE_IDS[id]]}}catch(e){}
+  ['nTitle','nDate','nPlace','nFee','nAcct','nUntil','nDesc','nSched'].forEach(i=>{const e=document.getElementById(i);if(e)e.value=''});
   document.getElementById('nPoster').value='';document.getElementById('nPosterNow').textContent='';document.getElementById('nShowBanner').checked=false;
   N_ATT=[];N_POSTER_DEL=false;nFileDraw();
 }
 // [급수별 응시료 2026-10-14] fees 키: 신규는 「지도자|신규|3급」처럼 급수까지, 갱신·보수는 「지도자|갱신」. 옛 공고의 「지도자|신규」(급수 없음)는 모든 급수에 같은 금액으로 봄
 const FEE_IDS={nFLn3:'지도자|신규|3급',nFLn2:'지도자|신규|2급',nFLn1:'지도자|신규|1급',nFRn3:'심판|신규|3급',nFRn2:'심판|신규|2급',nFRn1:'심판|신규|1급',nFLg:'지도자|갱신',nFRg:'심판|갱신',nFLb:'지도자|보수(역량강화)',nFRb:'심판|보수(역량강화)'};
+// [응시료 기본값 2026-11-03] 논의로 정한 금액. 공고에서 고치지 않으면 이 금액 적용(저장된 금액이 없는 공고 포함). 받지 않는 코스는 칸에 0
+const FEE_DEF={'지도자|신규|3급':150000,'지도자|신규|2급':200000,'지도자|신규|1급':300000,'심판|신규|3급':50000,'심판|신규|2급':70000,'심판|신규|1급':100000,'지도자|갱신':40000,'심판|갱신':30000,'지도자|보수(역량강화)':20000,'심판|보수(역량강화)':20000};
+for(const id in FEE_IDS){const e=document.getElementById(id);if(e)e.value=FEE_DEF[FEE_IDS[id]]}
 function feesVal(){
   const f={};
-  for(const id in FEE_IDS){const raw=String(document.getElementById(id).value||'').trim();if(!raw)continue;const v=parseInt(raw.replace(/[^0-9]/g,''),10);if(v>0)f[FEE_IDS[id]]=v}
+  for(const id in FEE_IDS){const k=FEE_IDS[id];const raw=String(document.getElementById(id).value||'').trim();if(!raw){f[k]=FEE_DEF[k];continue}const v=parseInt(raw.replace(/[^0-9]/g,''),10);f[k]=v>0?v:0}
   if(f['지도자|신규|3급'])f['지도자|신규']=f['지도자|신규|3급'];if(f['심판|신규|3급'])f['심판|신규']=f['심판|신규|3급'];   // 옛 화면 호환
   return f;
 }
-function feeOf(n,tg,tp,g){const F=(n&&n.fees)||{};if(tp==='신규'){const k=tg+'|신규|'+(g||'')+'급';if(F[k]!=null)return F[k];return F[tg+'|신규']||0}return F[tg+'|'+tp]||0}
-function feesText(n){const F=(n&&n.fees)||{};if(!Object.keys(F).length)return '';const w=v=>v>=10000&&v%10000===0?(v/10000)+'만원':v.toLocaleString('ko-KR')+'원';const out=[];
-  ['지도자','심판'].forEach(tg=>{const g=['3급','2급','1급'].map(x=>F[tg+'|신규|'+x]!=null?x+' '+w(F[tg+'|신규|'+x]):'').filter(Boolean);if(g.length)out.push('신규 '+tg+' '+g.join('·'));else if(F[tg+'|신규'])out.push('신규 '+tg+' '+w(F[tg+'|신규']))});
-  ['갱신','보수(역량강화)'].forEach(tp=>{const g=['지도자','심판'].map(tg=>F[tg+'|'+tp]!=null?tg+' '+w(F[tg+'|'+tp]):'').filter(Boolean);if(g.length)out.push(tp+' '+g.join('·'))});
+function feeOf(n,tg,tp,g){const F=(n&&n.fees)||{};if(tp==='신규'){const k=tg+'|신규|'+(g||'')+'급';if(F[k]!=null)return F[k];return F[tg+'|신규']||FEE_DEF[k]||0}const k=tg+'|'+tp;return F[k]!=null?F[k]:(FEE_DEF[k]||0)}
+function feesText(n){const w=v=>!v?'없음':(v>=10000&&v%10000===0?(v/10000)+'만원':v.toLocaleString('ko-KR')+'원');const out=[];
+  const tgs=String((n&&n.target)||'지도자·심판 공통').indexOf('공통')>=0?['지도자','심판']:[String(n.target)];
+  const tps=String((n&&n.type)||'신규·갱신·보수(역량강화)');
+  if(tps.indexOf('신규')>=0)tgs.forEach(tg=>out.push('신규 '+tg+' '+['3','2','1'].map(x=>x+'급 '+w(feeOf(n,tg,'신규',x))).join('·')));
+  [['갱신','갱신'],['보수','보수(역량강화)']].forEach(p=>{if(tps.indexOf(p[0])>=0)out.push(p[1]+' '+tgs.map(tg=>tg+' '+w(feeOf(n,tg,p[1]))).join('·'))});
   return out.join(' / ')}
 function ntypeVal(){
   const t=[];if(document.getElementById('nT1').checked)t.push('신규');
@@ -624,7 +629,7 @@ function editNotice(id){
   document.getElementById('nTitle').value=n.title||'';
   document.getElementById('nDesc').value=n.desc||'';
   document.getElementById('nSched').value=n.schedule||'';
-  for(const id in FEE_IDS){const k=FEE_IDS[id];let val=(n.fees&&n.fees[k]);if(val==null&&/\|신규\|/.test(k))val=(n.fees&&n.fees[k.split('|신규|')[0]+'|신규']);document.getElementById(id).value=val||''}   // 옛 공고(급수 없음)는 세 급수 칸에 같은 금액
+  for(const id in FEE_IDS){const k=FEE_IDS[id];let val=(n.fees&&n.fees[k]);if(val==null&&/\|신규\|/.test(k))val=(n.fees&&n.fees[k.split('|신규|')[0]+'|신규']);document.getElementById(id).value=val!=null?val:FEE_DEF[k]}   // 옛 공고(급수 없음)는 세 급수 칸에 같은 금액, 금액이 없으면 기본값
   document.getElementById('nPoster').value='';
   document.getElementById('nPosterNow').innerHTML=n.posterUrl?('현재 포스터 등록됨 — <a href="'+n.posterUrl+'" target="_blank" style="font-weight:800;color:#153A77">보기</a> (새 파일 선택 시 교체) · <a href="javascript:nPosterDel()" style="font-weight:800;color:#C41E2F">✕ 포스터 삭제</a>'):'등록된 포스터 없음';
   N_POSTER_DEL=false;N_ATT=(n.attachments||[]).map(function(x){return {name:x.name||'첨부파일',url:x.url}});nFileDraw();
