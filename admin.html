@@ -627,6 +627,7 @@ function eduWho(v){return (v.name||'')+' ('+(v.birth||'생년월일 없음')+' �
         <button class="btn-sub asel" data-s="un" onclick="appSel('un',this)" style="background:#8a919d">🚨 강사 미배정</button>
         <button class="btn-sub asel" data-s="self" onclick="appSel('self',this)" style="background:#8a919d">◉ 본인지도 미연결</button>
         <button class="btn-sub asel" data-s="done" onclick="appSel('done',this)" style="background:#8a919d">✅ 배정완료</button>
+        <button class="btn-sub asel" data-s="time" id="aselTimeBtn" onclick="appSel('time',this)" style="background:#8a919d" title="강사가 배정된 선정교를 배정 시각 순서로 봅니다 — 한 번 더 누르면 순서가 뒤집힙니다 (배정 시각 = 강사 활동기록 「[위촉] … 강사 배정」)">🕒 강사 배정 시간순</button>
         <select id="appGrp" onchange="AGRP=this.value;renderApps()" style="width:auto;padding:7px 10px;border:1.5px solid #c9d8ef;border-radius:10px;font-weight:700">
           <option value="">묶지 않음</option><option value="region">권역별로 묶기</option><option value="sido">시도별로 묶기</option>
         </select>
@@ -1199,11 +1200,36 @@ function previewPopup(){
   document.body.appendChild(d);
 }
 /* [2026-10-27] 선정교 모아보기 */
-function appSel(v,btn){ASEL=v;document.querySelectorAll('.asel').forEach(b=>{b.style.background=b.dataset.s===v?'':'#8a919d'});renderApps()}
+function appSel(v,btn){if(v==='time'&&ASEL==='time')ASG_DESC=!ASG_DESC;ASEL=v;document.querySelectorAll('.asel').forEach(b=>{b.style.background=b.dataset.s===v?'':'#8a919d'});asgBtnLabel();renderApps();if(v==='time')asgTimeLoad()}
+/* [2026-11-05] 강사 배정 시간순 — 배정 시각은 강사 활동기록(users/{uid}/activities 「[위촉] 학교 강사 배정」)에서, 없으면 지명 슬롯 claimedAt */
+let ASG_AT={},ASG_DESC=true,__asgLoading=false,__asgLoadedAt=0;
+function asgBtnLabel(){const b=document.getElementById('aselTimeBtn');if(b)b.textContent='🕒 강사 배정 시간순'+(ASEL==='time'?(ASG_DESC?' ↓최신 먼저':' ↑오래된 먼저'):'')}
+function asgFmt(ms){if(!ms)return '';const d=new Date(ms),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())}
+async function asgTimeLoad(force){
+  if(__asgLoading)return;if(!force&&__asgLoadedAt&&Date.now()-__asgLoadedAt<120000)return;
+  __asgLoading=true;const cnt=document.getElementById('appCount');if(cnt)cnt.textContent='배정 시각 불러오는 중…';
+  try{
+    const tgt=APPS.filter(d=>{const s=d.data();return appIsSel(s)&&s.assignedName});
+    const uids=[...new Set(tgt.map(d=>d.data().assignedUid).filter(Boolean))];const acts={};
+    await Promise.all(uids.map(async u=>{try{const q=await DB.collection('users').doc(u).collection('activities').get();acts[u]=q.docs.map(x=>x.data()).filter(x=>String(x.label||'').indexOf('[위촉]')===0)}catch(e){acts[u]=[]}}));
+    const nm=x=>String(x||'').replace(/\s/g,'');const M={};
+    await Promise.all(tgt.map(async d=>{const s=d.data();const isA=appTypeOf(s).indexOf('방과후')>=0;
+      const L=(acts[s.assignedUid]||[]).filter(x=>nm(x.label).indexOf(nm(s.school))>=0);
+      const same=L.filter(x=>{const lb=String(x.label);return lb.indexOf('본인지도 ·')>=0||((lb.indexOf('방과후')>=0)===isA)});
+      const ms=(same.length?same:L).map(x=>x.createdAt&&x.createdAt.toMillis?x.createdAt.toMillis():(x.date?Date.parse(x.date):0)).filter(Boolean);
+      if(ms.length){M[d.id]={t:Math.max.apply(null,ms),src:'활동기록'};return}
+      try{const sl=await DB.collection('openSlots').doc(d.id).get();const c=sl.exists&&sl.data().claimedAt;if(c&&c.toMillis){M[d.id]={t:c.toMillis(),src:'지명 신청'};return}}catch(e){}
+      M[d.id]={t:0,src:''}}));
+    ASG_AT=M;__asgLoadedAt=Date.now();
+  }catch(e){console.warn('asgTimeLoad',e)}
+  __asgLoading=false;if(ASEL==='time')renderApps();
+}
+function asgChip(id){const x=ASG_AT[id];if(!x)return '<div style="font-size:12px;color:#8a919d;margin:10px 0 2px">🕒 배정 시각 불러오는 중…</div>';
+  return '<div style="font-size:12.5px;font-weight:900;color:#153A77;margin:10px 0 2px">🕒 '+(x.t?'배정 '+asgFmt(x.t)+' <span style="font-weight:700;color:#6b7280;font-size:11.5px">('+x.src+')</span>':'<span style="color:#b8860b">배정 시각 기록 없음</span>')+'</div>'}
 function appIsSel(s){const st=s.status||'접수';return st==='선정'||st==='배정완료'}
 function appNeedsInst(s){return appIsSel(s)&&s.support!=='용품만'&&!s.assignedName}   // 강사 이름이 아직 없는 선정교
 function appSelfUnlinked(s){return appIsSel(s)&&!!s.selfTeach&&s.support!=='용품만'&&!s.selfUid&&!s.assignedName}
-function appSelPass(s){if(ASEL==='all')return true;if(ASEL==='sel')return appIsSel(s);if(ASEL==='un')return appNeedsInst(s);if(ASEL==='self')return appSelfUnlinked(s);if(ASEL==='done')return (s.status||'')==='배정완료';return true}
+function appSelPass(s){if(ASEL==='all')return true;if(ASEL==='sel')return appIsSel(s);if(ASEL==='un')return appNeedsInst(s);if(ASEL==='self')return appSelfUnlinked(s);if(ASEL==='done')return (s.status||'')==='배정완료';if(ASEL==='time')return appIsSel(s)&&!!s.assignedName;return true}
 function appGroupKey(s){if(AGRP==='region')return appRegion(s)||'권역 미상';if(AGRP==='sido')return String(s.region||'').trim()||'시도 미상';return ''}
 function appGroupHeader(g,docs){const L=docs.filter(d=>appGroupKey(d.data())===g).map(d=>d.data());const sel=L.filter(appIsSel).length,un=L.filter(appNeedsInst).length,sf=L.filter(appSelfUnlinked).length,dn=L.filter(x=>x.status==='배정완료').length;
   return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#153A77;color:#fff;border-radius:10px;padding:8px 14px;margin:14px 0 6px;font-weight:900"><span style="font-size:15px">📍 '+esc(g)+'</span><span style="font-size:12px;opacity:.9">'+L.length+'건</span>'
@@ -1679,12 +1705,13 @@ function renderApps(){
     return true;
   });
   if(AGRP)docs.sort((a,b)=>appGroupKey(a.data()).localeCompare(appGroupKey(b.data()),'ko')||String(a.data().school||'').localeCompare(String(b.data().school||''),'ko'));   /* [2026-10-27] 묶어 보기 */
+  if(ASEL==='time')docs.sort((a,b)=>{const g=AGRP?appGroupKey(a.data()).localeCompare(appGroupKey(b.data()),'ko'):0;if(g)return g;const ta=(ASG_AT[a.id]||{}).t||0,tb=(ASG_AT[b.id]||{}).t||0;if(!ta!==!tb)return ta?-1:1;return ASG_DESC?tb-ta:ta-tb});   /* [2026-11-05] 강사 배정 시간순 */
   const cnt=document.getElementById('appCount');
-  if(cnt)cnt.textContent=docs.length+'건'+((sido||q||ASEL!=='all')?' (전체 '+APPS.length+'건 중)':'')+(ASEL==='un'?' · 강사 배정이 필요한 학교':ASEL==='self'?' · 담당교사 계정 연결이 필요한 학교':'');
+  if(cnt)cnt.textContent=docs.length+'건'+((sido||q||ASEL!=='all')?' (전체 '+APPS.length+'건 중)':'')+(ASEL==='un'?' · 강사 배정이 필요한 학교':ASEL==='self'?' · 담당교사 계정 연결이 필요한 학교':ASEL==='time'?' · 강사 배정 시각 '+(ASG_DESC?'최신':'오래된')+' 순':'');
   selSummary(docs);
   const el=document.getElementById('appList');
   el.innerHTML=docs.length?docs.map((d,_i)=>{
-    const s=d.data();const _g=AGRP?appGroupKey(s):'';const _hd=(AGRP&&(_i===0||appGroupKey(docs[_i-1].data())!==_g))?appGroupHeader(_g,docs):'';
+    const s=d.data();const _g=AGRP?appGroupKey(s):'';const _hd=((AGRP&&(_i===0||appGroupKey(docs[_i-1].data())!==_g))?appGroupHeader(_g,docs):'')+(ASEL==='time'?asgChip(d.id):'');
     const tc=classifySchoolTimeConflict(s,SCHOOL_HOURS_POLICY);  // ▶ [시간대검증] 'overlap'|'clear'|'unknown'
     // ▶ [시간대검증·범위축소 2026-08-30] 정규수업시간 겹침 판정은 '본인지도 희망' 건에만 표시합니다.
     //   외부 강사가 파견되는 일반 건은 정규 체육수업 시간에 진행되는 것이 정상이라 겹침이 문제가 아니며,
