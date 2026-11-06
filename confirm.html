@@ -24,10 +24,10 @@
   .big{font-size:17px;color:var(--blue);font-weight:900}
   table.sess{width:100%;border-collapse:collapse;margin:6px 0 4px;font-size:13.5px}
   table.sess th{background:#f5f8fc;color:var(--gray);font-weight:700;padding:8px 6px;font-size:12px}
-  table.sess td{border-top:1px solid var(--line);padding:9px 6px;text-align:center}
+  table.sess td{border-top:1px solid var(--line);padding:9px 4px;text-align:center}
   table.sess td.l{text-align:left}
-  .ok-badge{color:#0f766e;font-weight:800}
-  .wait-badge{color:#b8860b;font-weight:800}
+  .ok-badge{color:#0f766e;font-weight:800;white-space:nowrap}
+  .wait-badge{color:#b8860b;font-weight:800;white-space:nowrap}
   label.fl{display:block;font-size:13.5px;font-weight:800;margin:2px 0 7px}
   input[type=text]{width:100%;padding:13px 14px;border:1.6px solid var(--line);border-radius:11px;font-size:16px;font-family:inherit}
   input[type=text]:focus{outline:none;border-color:var(--blue)}
@@ -45,6 +45,16 @@
   .done{text-align:center;padding:8px 0}
   .done .chk{font-size:52px}
   .done h2{font-size:20px;margin:6px 0 4px;color:#0f766e}
+  /* [2026-11-06] 회차별 일지 상세 보기 (담당교사가 내용·사진을 보고 확인) */
+  .dbtn{background:#eef3fb;color:var(--blue);border:none;border-radius:8px;padding:5px 9px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap}
+  tr.dt td{background:#fafbfd;text-align:left;padding:12px 12px 14px;border-top:none}
+  .dl{font-size:13px;line-height:1.65;color:#333}
+  .dl .lb{display:block;font-size:11.5px;color:var(--gray);font-weight:800;margin:8px 0 2px}
+  .dl .lb:first-child{margin-top:0}
+  .dl .tx{white-space:pre-wrap;word-break:keep-all;overflow-wrap:break-word}
+  .dl .ph{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+  .dl .ph img{width:96px;height:96px;object-fit:cover;border-radius:9px;border:1px solid var(--line)}
+  .allbtn{background:none;border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-size:12.5px;font-weight:800;color:var(--blue);cursor:pointer;font-family:inherit;float:right;margin-top:-4px}
   .note{background:#f5f8fc;border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--gray);line-height:1.6;margin-top:14px}
 </style>
 </head>
@@ -96,12 +106,37 @@ async function boot(){
   }catch(e){stage.innerHTML='<div class="state">불러오기 실패: '+esc(e.message)+'</div>'}
 }
 
+const SAFE_LB={level:'수준·속도에 맞춘 안전 지도',fit:'수업 장소·방식 적합(장소 안전)',time:'수업 시간 준수',notice:'공단 지원 사업 안내'};
+function logDetail(l){
+  let h='<div class="dl">';
+  h+='<span class="lb">수업 내용</span><div class="tx">'+(l.content?esc(l.content):'<span style="color:#aaa">(내용 없음)</span>')+'</div>';
+  const mf=(l.male!=null&&l.male!==''||l.female!=null&&l.female!=='')?' (남 '+esc(l.male||0)+' · 여 '+esc(l.female||0)+')':'';
+  h+='<span class="lb">참여 인원</span>'+(l.count?esc(l.count)+'명':'-')+mf;
+  if(l.classTime)h+='<span class="lb">수업 시간</span>'+esc(l.classTime);
+  if(l.check&&typeof l.check==='object'){const ks=Object.keys(SAFE_LB).filter(k=>l.check[k]);if(ks.length)h+='<span class="lb">안전 지도 점검</span>'+ks.map(k=>'✓ '+SAFE_LB[k]).join('<br>')}
+  if(l.note)h+='<span class="lb">비고</span><div class="tx">'+esc(l.note)+'</div>';
+  const ph=(l.photos||[]).filter(u=>/^https:\/\//.test(u));
+  if(ph.length)h+='<span class="lb">수업 사진 ('+ph.length+'장 · 누르면 크게)</span><div class="ph">'+ph.map(u=>'<a href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="수업 사진" loading="lazy"></a>').join('')+'</div>';
+  return h+'</div>';
+}
+function toggleDt(i,force){
+  const tr=document.getElementById('dt'+i),b=document.getElementById('db'+i);if(!tr)return;
+  const open=force!=null?force:tr.style.display==='none';
+  tr.style.display=open?'':'none';if(b)b.textContent=open?'닫기 ▲':'일지 ▼';
+}
+function toggleAll(){
+  const anyClosed=ALLLOGS.some((l,i)=>{const t=document.getElementById('dt'+i);return t&&t.style.display==='none'});
+  ALLLOGS.forEach((l,i)=>toggleDt(i,anyClosed));
+  const a=document.getElementById('allbtn');if(a)a.textContent=anyClosed?'전체 접기':'일지 전체 펼치기';
+}
 function sessTable(markConfirmTarget){
-  let h='<table class="sess"><tr><th>회차</th><th>일자</th><th>인원</th><th>상태</th></tr>';
-  ALLLOGS.forEach(l=>{
+  let h='<table class="sess"><tr><th>회차</th><th>일자</th><th>인원</th><th>상태</th><th>일지</th></tr>';
+  ALLLOGS.forEach((l,i)=>{
     const done=!!l.teacherConfirm;
-    h+='<tr><td><b>'+esc(l.session)+'</b></td><td>'+esc(l.date)+(l.classTime?'<br><small>'+esc(l.classTime)+'</small>':'')+'</td><td>'+(l.count?esc(l.count)+'명':'-')+'</td>'
-      +'<td>'+(done?'<span class="ok-badge">✓ 확인됨</span>':(markConfirmTarget?'<span class="wait-badge">확인 대상</span>':'-'))+'</td></tr>';
+    h+='<tr><td><b>'+esc(l.session)+'</b></td><td style="white-space:nowrap;font-size:12.5px">'+esc(l.date)+(l.classTime?'<br><small>'+esc(l.classTime)+'</small>':'')+'</td><td>'+(l.count?esc(l.count)+'명':'-')+'</td>'
+      +'<td>'+(done?'<span class="ok-badge">✓ 확인됨</span>':(markConfirmTarget?'<span class="wait-badge">확인 대상</span>':'-'))+'</td>'
+      +'<td><button type="button" class="dbtn" id="db'+i+'" onclick="toggleDt('+i+')">일지 ▼</button></td></tr>'
+      +'<tr class="dt" id="dt'+i+'" style="display:none"><td colspan="5">'+logDetail(l)+'</td></tr>';
   });
   return h+'</table>';
 }
@@ -115,7 +150,8 @@ function renderForm(){
     +'<div class="row"><span class="k">학교</span><span class="v big">'+esc(INFO.school)+'</span></div>'
     +(INFO.type?'<div class="row"><span class="k">유형</span><span class="v">'+esc(INFO.type)+'</span></div>':'')
     +'<div class="row"><span class="k">담당 강사</span><span class="v">'+esc(INFO.name)+'</span></div>'
-    +'<div style="margin-top:12px"><label class="fl">'+(multi?'확인 대상 회차 ('+PENDING.length+'개)':'회차')+'</label>'+sessTable(true)+'</div>'
+    +'<div style="margin-top:12px"><button type="button" class="allbtn" id="allbtn" onclick="toggleAll()">일지 전체 펼치기</button><label class="fl">'+(multi?'확인 대상 회차 ('+PENDING.length+'개)':'회차')+'</label>'
+    +'<div style="font-size:12px;color:var(--gray);margin:-2px 0 4px">각 회차의 [일지 ▼]를 누르면 수업 내용·사진을 볼 수 있습니다.</div>'+sessTable(true)+'</div>'
     +'<div style="margin-top:18px"><label class="fl">담당교사 성명</label>'
     +'<input type="text" id="tname" placeholder="예: 홍길동" autocomplete="name" maxlength="20"></div>'
     +'<div class="sigwrap"><label class="fl">서명 <span style="font-weight:600;color:var(--gray)">(손가락/펜으로 서명해주세요)</span></label>'
