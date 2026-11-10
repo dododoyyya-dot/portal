@@ -146,7 +146,7 @@ KFDF.initApp();
 (function(){try{const q=new URLSearchParams(location.search);if(q.get('all')||q.get('id'))return;let n=0;(function chk(){if(window.firebase&&firebase.apps&&firebase.apps.length&&firebase.firestore){firebase.firestore().collection('siteContent').doc('galleryMode').get().then(d=>{if(d.exists&&(d.data()||{}).contest===true)location.replace('photo.html')}).catch(()=>{});return}if(++n<60)setTimeout(chk,150)})()}catch(e){}})();
 let GM_ON=false;
 async function gmLoad(){try{const d=await DB.collection('siteContent').doc('galleryMode').get();GM_ON=!!(d.exists&&(d.data()||{}).contest===true)}catch(e){}gmPaint()}
-function gmPaint(){const b=document.getElementById('gmBtn');if(!b)return;b.style.display=HB_ADMIN?'inline-flex':'none';b.textContent=GM_ON?'사진 공모전 화면: 켜짐 (끄기)':'사진 공모전 화면: 꺼짐 (켜기)';b.style.background=GM_ON?'#C41E2F':'#5b6472';b.title=GM_ON?'지금은 메뉴의 사진첩을 누르면 사진 공모전 화면으로 갑니다':'지금은 메뉴의 사진첩을 누르면 이 사진첩이 나옵니다'}
+function gmPaint(){const b=document.getElementById('gmBtn');if(!b)return;b.style.display=HB_ADMIN?'inline-flex':'none';b.textContent=GM_ON?'공모전 화면 내리기 (지금: 사진첩 메뉴 → 공모전)':'사진첩 메뉴를 공모전 화면으로 바꾸기';b.style.background=GM_ON?'#C41E2F':'#5b6472';b.title=GM_ON?'지금은 메뉴의 사진첩을 누르면 사진 공모전 화면으로 갑니다':'지금은 메뉴의 사진첩을 누르면 이 사진첩이 나옵니다'}
 async function gmToggle(){const on=!GM_ON;if(!confirm(on?'메뉴의 「사진첩」을 사진 공모전 화면(photo.html)으로 바꿀까요?':'사진 공모전 화면을 내리고 메뉴의 「사진첩」을 원래 사진첩으로 돌릴까요?'))return;
   try{await DB.collection('siteContent').doc('galleryMode').set({contest:on,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:(ME||{}).email||''},{merge:true});GM_ON=on;gmPaint()}catch(e){alert('저장 실패: '+(e.code||e.message))}}
 const DB=firebase.firestore(),AUTH=firebase.auth();

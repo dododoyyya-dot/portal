@@ -302,7 +302,14 @@ function norm(s){s=String(s||'').replace(/\s+/g,'').replace(/[()·.,\-]/g,'').re
 function lvOf(div){div=String(div||'');return /초/.test(div)?'초등부':/중/.test(div)?'중등부':/고/.test(div)?'고등부':''}
 function fkOf(level,name){return level+'|'+norm(name)}
 try{document.querySelector('.pk-mascot').innerHTML=MASCOT}catch(e){}
-KFDF.ready(async function(user,me){ME=user;MY=me;ADMIN=!!(me&&KFDF.isAdmin(me));if(PC_STAFF===null){PC_STAFF=[];DB.collection('compStats').doc(SLOT).get().then(d=>{const v=d.exists?(d.data()||{}):{};PC_STAFF=[...new Set((v.refUids||[]).concat(v.evalUids||[]))];try{pcUpRender()}catch(e){}}).catch(()=>{})}if(ME)pvVotersLoad().then(()=>ADMIN?pvSync():null).then(()=>pvLoad()).then(()=>{try{pcAdminBar();if(OPEN)pcRender();if(LB)lbDraw()}catch(e){}}).catch(()=>{});PCC_OP=pccOpOf(me);pccQueryToHash();await Promise.all([pcTeams(),pcLoad(true)]);pcFromHash();pcUpRender();pcRender()});
+/* [2026-11-10] 사진첩 메뉴 연결 상태(siteContent/galleryMode.contest) — 켜져 있으면 중앙관리자에게 「원래 사진첩으로 돌리기」 띠 */
+async function pcGmBar(){try{const d=await DB.collection('siteContent').doc('galleryMode').get();if(!(d.exists&&(d.data()||{}).contest===true))return;
+  if(document.getElementById('pcGmBar'))return;const bar=document.createElement('div');bar.id='pcGmBar';
+  bar.style.cssText='position:sticky;top:0;z-index:50;background:#0B192C;color:#fff;padding:10px 16px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:14px;font-weight:700';
+  bar.innerHTML='<span>관리자 안내: 지금 메뉴의 「사진첩」이 이 공모전 화면으로 연결돼 있습니다.</span><button type="button" style="background:#fff;color:#0B192C;border:0;border-radius:999px;padding:7px 16px;font-weight:800;cursor:pointer;font-family:inherit">공모전 화면 내리기 (원래 사진첩으로)</button>';
+  bar.querySelector('button').onclick=async function(){if(!confirm('공모전 화면을 내리고 메뉴의 「사진첩」을 원래 사진첩으로 돌릴까요?'))return;try{await DB.collection('siteContent').doc('galleryMode').set({contest:false,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:(ME||{}).email||''},{merge:true});location.href='gallery.html'}catch(e){alert('저장 실패: '+(e.code||e.message))}};
+  document.body.insertBefore(bar,document.body.firstChild)}catch(e){}}
+KFDF.ready(async function(user,me){ME=user;MY=me;ADMIN=!!(me&&KFDF.isAdmin(me));if(ADMIN)pcGmBar();if(PC_STAFF===null){PC_STAFF=[];DB.collection('compStats').doc(SLOT).get().then(d=>{const v=d.exists?(d.data()||{}):{};PC_STAFF=[...new Set((v.refUids||[]).concat(v.evalUids||[]))];try{pcUpRender()}catch(e){}}).catch(()=>{})}if(ME)pvVotersLoad().then(()=>ADMIN?pvSync():null).then(()=>pvLoad()).then(()=>{try{pcAdminBar();if(OPEN)pcRender();if(LB)lbDraw()}catch(e){}}).catch(()=>{});PCC_OP=pccOpOf(me);pccQueryToHash();await Promise.all([pcTeams(),pcLoad(true)]);pcFromHash();pcUpRender();pcRender()});
 window.addEventListener('hashchange',()=>{pcFromHash();pcRender()});
 function pcFromHash(){const m=/f=([^&]+)/.exec(location.hash||'');OPEN=m?decodeURIComponent(m[1]):''}
 function open_(){return Date.now()<=DEADLINE}
