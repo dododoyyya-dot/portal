@@ -64,16 +64,17 @@
       function draw(){
         var svg='<svg viewBox="0 0 450 480" style="width:100%;max-width:470px;display:block" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="권역 지도">'
           +'<defs><linearGradient id="'+uid+'l" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F1F5F9"/><stop offset="1" stop-color="#E2E8F0"/></linearGradient>'
+          +'<pattern id="'+uid+'d" width="8" height="8" patternUnits="userSpaceOnUse"><circle class="km-dot" cx="4" cy="4" r="1.9" fill="#94A3B8"/></pattern>'
           +'<filter id="'+uid+'s" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#0F172A" flood-opacity=".10"/></filter></defs>'
-          +'<path d="'+LAND+'" fill="url(#'+uid+'l)" stroke="#CBD5E1" stroke-width="1.5" stroke-linejoin="round"/>'
-          +'<ellipse cx="'+JEJU.cx+'" cy="'+JEJU.cy+'" rx="'+JEJU.rx+'" ry="'+JEJU.ry+'" fill="url(#'+uid+'l)" stroke="#CBD5E1" stroke-width="1.5"/>'
-          +ISLES.map(function(i){return '<ellipse cx="'+i.x+'" cy="'+i.y+'" rx="'+i.r+'" ry="'+Math.max(3,i.r*0.7)+'" fill="url(#'+uid+'l)" stroke="#CBD5E1" stroke-width="1.5"/>'}).join('')
+          +'<path d="'+LAND+'" class="km-land" fill="url(#'+uid+'d)" stroke-linejoin="round"/>'
+          +'<ellipse cx="'+JEJU.cx+'" cy="'+JEJU.cy+'" rx="'+JEJU.rx+'" ry="'+JEJU.ry+'" class="km-land" fill="url(#'+uid+'d)"/>'
+          +ISLES.map(function(i){return '<ellipse cx="'+i.x+'" cy="'+i.y+'" rx="'+i.r+'" ry="'+Math.max(3,i.r*0.7)+'" class="km-land" fill="url(#'+uid+'d)"/>'}).join('')
           // 동해·서해·남해 표기 + 울릉도·독도(실제 위치, 동해)
           +'<text x="372" y="62" text-anchor="middle" font-size="12" font-weight="800" fill="#94A3B8" letter-spacing="3">동 해</text>'
           +'<text x="372" y="75" text-anchor="middle" font-size="7.5" font-weight="700" fill="#CBD5E1" letter-spacing="1">EAST SEA</text>'
           +'<text x="24" y="250" text-anchor="middle" font-size="10" font-weight="800" fill="#CBD5E1" letter-spacing="2">서해</text>'
           +'<text x="200" y="430" text-anchor="middle" font-size="10" font-weight="800" fill="#CBD5E1" letter-spacing="2">남해</text>'
-          +'<ellipse cx="'+ULL.x+'" cy="'+ULL.y+'" rx="7" ry="5.5" fill="url(#'+uid+'l)" stroke="#CBD5E1" stroke-width="1.5"/>'
+          +'<ellipse cx="'+ULL.x+'" cy="'+ULL.y+'" rx="7" ry="5.5" class="km-land" fill="url(#'+uid+'d)"/>'
           +'<text x="'+ULL.x+'" y="'+(ULL.y+17)+'" text-anchor="middle" font-size="9.5" font-weight="800" fill="#64748B">울릉도</text>'
           +'<ellipse cx="'+(DOK.x-2)+'" cy="'+DOK.y+'" rx="2.6" ry="2" fill="#1D4ED8" stroke="#1D4ED8"/><ellipse cx="'+(DOK.x+3)+'" cy="'+(DOK.y+2)+'" rx="1.9" ry="1.5" fill="#1D4ED8" stroke="#1D4ED8"/>'
           +'<text x="'+DOK.x+'" y="'+(DOK.y+16)+'" text-anchor="middle" font-size="9.5" font-weight="900" fill="#0F172A">독도</text>'
@@ -82,19 +83,24 @@
         REGIONS.forEach(function(r){
           var p=PIN[r],on=sel.indexOf(r)>=0;
           var cnt=(opts.counts&&opts.counts[r]!=null)?String(opts.counts[r]):'';
-          var w=Math.max(tw(r)*15+26,cnt?tw(cnt)*11.5+22:0),h=cnt?46:30;
+          /* [2026-11-11] 표지: 흰 알약(이름+건수) · compact 면 이름과 첫 숫자만 한 줄로 */
+          var cp=!!opts.compact,num=cp?((cnt.match(/\d+/)||[''])[0]):'';
+          var w=cp?(tw(r)*14+(num?tw(num)*9+16:0)+40):Math.max(tw(r)*14+36,cnt?tw(cnt)*10.5+26:0),h=(cnt&&!cp)?44:30;
           var x=p.x-w/2,y=p.y-h/2;
-          var fill=on?'#0B192C':'#fff',stroke=on?'#0B192C':'#CBD5E1',txt=on?'#fff':'#0F172A',sub=on?'rgba(255,255,255,.85)':'#64748B';
+          var fill=on?'#0B192C':'#fff',stroke=on?'#0B192C':'#E2E8F0',txt=on?'#fff':'#0F172A',sub=on?'rgba(255,255,255,.85)':'#64748B';
           var cursor=(mode==='display')?'default':'pointer';
-          svg+='<g data-r="'+esc(r)+'" style="cursor:'+cursor+'" filter="url(#'+uid+'s)">'
-            +'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="10" fill="'+fill+'" stroke="'+stroke+'" stroke-width="1.2"/>'
-            +'<circle cx="'+(x+12)+'" cy="'+(cnt?y+15:y+15)+'" r="4" fill="'+(on?'#fff':p.c)+'"/>'
-            +'<text x="'+(p.x+6)+'" y="'+(y+(cnt?19:20))+'" text-anchor="middle" font-size="14" font-weight="900" fill="'+txt+'" style="pointer-events:none">'+esc(r)+'</text>'
-            +(cnt?'<text x="'+p.x+'" y="'+(y+36)+'" text-anchor="middle" font-size="11" font-weight="700" fill="'+sub+'" style="pointer-events:none">'+esc(cnt)+'</text>':'')
+          svg+='<g class="km-pin'+(on?' on':'')+'" data-r="'+esc(r)+'" style="cursor:'+cursor+'" filter="url(#'+uid+'s)">'
+            +'<rect class="km-chip" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+(cp?15:10)+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="1"/>'
+            +'<circle class="km-mark" cx="'+(x+14)+'" cy="'+(y+15)+'" r="3.5" fill="'+(on?'#fff':'#1D4ED8')+'"/>'
+            +(cp
+              ?'<text class="km-nm" x="'+(x+24)+'" y="'+(y+19.5)+'" font-size="13" font-weight="700" fill="'+txt+'" style="pointer-events:none">'+esc(r)+'</text>'
+                +(num?'<text class="km-num" x="'+(x+w-13)+'" y="'+(y+19.5)+'" text-anchor="end" font-size="13" font-weight="800" fill="'+(on?'#fff':'#1D4ED8')+'" style="pointer-events:none">'+esc(num)+'</text>':'')
+              :'<text class="km-nm" x="'+(p.x+6)+'" y="'+(y+(cnt?19:20))+'" text-anchor="middle" font-size="13.5" font-weight="800" fill="'+txt+'" style="pointer-events:none">'+esc(r)+'</text>'
+                +(cnt?'<text class="km-cnt" x="'+p.x+'" y="'+(y+35)+'" text-anchor="middle" font-size="10.5" font-weight="600" fill="'+sub+'" style="pointer-events:none">'+esc(cnt)+'</text>':''))
             +(on&&mode!=='display'?'<circle cx="'+(x+w-2)+'" cy="'+(y+2)+'" r="8" fill="#F97316"/><text x="'+(x+w-2)+'" y="'+(y+6)+'" text-anchor="middle" font-size="10" font-weight="900" fill="#fff" style="pointer-events:none">✓</text>':'')
             +'</g>';
         });
-        svg+='</svg>';
+        svg+='</svg>';try{el.__kmCounts=opts.counts||null}catch(e){}
         // [세부 지역] 권역이 선택되면 그 권역의 시도별 건수 칩을 지도 아래에 표시 (opts.subCounts {권역:{시도:건수}}, 칩 클릭 → opts.onSub(시도))
         var subHtml='';
         if(opts.subCounts&&sel.length===1&&opts.subCounts[sel[0]]){var sc=opts.subCounts[sel[0]];var keys=Object.keys(sc);
