@@ -1225,17 +1225,20 @@ body:not(.tm-on) .tm-sun-go{display:none!important}
       if(sec&&lst&&items.length){
         lst.innerHTML=items.map(x=>'<a href="gallery.html?id='+x.id+'" style="display:block;position:relative;border-radius:16px;overflow:hidden;background:#153A77;text-decoration:none;color:#fff;min-height:150px">'
           +(x.cover?'<img src="'+x.cover.replace(/"/g,'&quot;')+'" alt="" style="width:100%;aspect-ratio:16/10;object-fit:cover;display:block">':'<div style="aspect-ratio:16/10;display:flex;align-items:center;justify-content:center"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="8" ry="3"/></svg></div>')
-          +(x.featured?'<span style="position:absolute;top:10px;left:10px;font-size:11px;font-weight:900;color:#fff;background:#C41E2F;border-radius:999px;padding:3px 9px">배너</span>':'')
+
           +'<div style="position:absolute;left:0;right:0;bottom:0;padding:26px 12px 10px;background:linear-gradient(transparent,rgba(0,0,0,.8))"><div style="font-size:14px;font-weight:900;line-height:1.35">'+String(x.title||'').replace(/</g,'&lt;')+'</div><div style="font-size:11.5px;color:#d7dce6;margin-top:3px">'+String(x.date||'').replace(/-/g,'.')+(x.place?' · '+String(x.place).replace(/</g,'&lt;'):'')+(x.media&&x.media.length?' · '+x.media.length+'장':'')+'</div></div></a>').join('');
         sec.style.display='block';
       }
       // [홈 배너 슬라이드] ★배너 항목의 대표 사진을 메인 배너(.hero) 배경에 — 설정 siteContent/homeBanner {enabled,interval,caption,kenburns,max}
       let all=pub.filter(x=>x.featured);
+      let _hbc=null;try{const c=await firebase.firestore().collection('siteContent').doc('homeBanner').get();if(c.exists)_hbc=c.data()||{}}catch(e){}
+      // [2026-11-10] 배너 사진을 한 장씩 고른 뒤(photosMode)에는 고른 사진만, 그 순서대로 — 대회 앨범 자동 노출 안 함
+      if(_hbc&&(Array.isArray(_hbc.photos)&&_hbc.photos.length||_hbc.photosMode))all=(_hbc.photos||[]).filter(p=>p&&p.url).map(p=>({id:p.album||'',title:p.title||'',date:p.date||'',cover:p.url}));
       // [사진 공모전 2026-10-19] ~ 11/6 동안 공모전에 올라온 최신 사진 10장을 메인 배너 앞쪽에 순환(올리는 대로 최신 순) — 아직 한 장도 없으면 기존 사진첩 배너 그대로
       try{const _n=Date.now();if(_n<Date.parse('2026-11-07T00:00:00+09:00')){const pq=await firebase.firestore().collection('photoContest').where('contest','==','2026-ultimate').limit(300).get();
         const ph=pq.docs.map(d=>Object.assign({id:d.id},d.data())).filter(x=>x.img).sort((a,b)=>(+b.atMs||0)-(+a.atMs||0)).slice(0,10).map(x=>({id:x.id,title:[x.school,x.title].filter(Boolean).join(' · ')||'플라잉디스크 사진 공모전',cover:x.img,date:''}));all=ph.concat(all)}}catch(e){console.warn('photoContest banner',e)}
       if(all.length&&window.KFDF_BANNER){
-        let cfg={};try{const c=await firebase.firestore().collection('siteContent').doc('homeBanner').get();if(c.exists)cfg=c.data()||{}}catch(e){}
+        let cfg=_hbc||{};
         if(cfg.enabled!==false){const hero=document.querySelector('.hero');if(hero)KFDF_BANNER.mount(hero,all.slice(0,Math.max(1,Math.min(10,+cfg.max||5))),{interval:+cfg.interval||3,caption:false,kenburns:cfg.kenburns!==false&&!window.TM_ON})}
       }
     }catch(e){console.warn('gallery/banner',e)}
