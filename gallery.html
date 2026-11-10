@@ -125,7 +125,7 @@
     <span class="gl-chip on" data-f="all" onclick="glFilter('all',this)">전체</span>
     <span class="gl-chip" data-f="year" onclick="glFilter('year',this)">올해</span>
     <span id="glAdminChips" style="display:none"><span class="gl-chip" data-f="draft" onclick="glFilter('draft',this)" style="border-color:#b8860b;color:#8a5a00;display:inline-flex;align-items:center;gap:4px"><i data-ci="edit"></i>초안 <b id="glDraftN">0</b></span>
-      <button class="gl-btn gold" onclick="glNew()" style="display:inline-flex;align-items:center;gap:5px"><i data-ci="plus"></i>새 사진첩</button> <button class="gl-btn" onclick="hbOpen()" style="display:inline-flex;align-items:center;gap:5px;background:#0b1a3a" title="홈 화면 메인 배너에 ★배너 항목을 슬라이드로 보여주는 설정과 미리보기"><i data-ci="home"></i>홈 배너 설정·미리보기</button></span>
+      <button class="gl-btn gold" onclick="glNew()" style="display:inline-flex;align-items:center;gap:5px"><i data-ci="plus"></i>새 사진첩</button> <button class="gl-btn" onclick="hbOpen()" style="display:inline-flex;align-items:center;gap:5px;background:#0b1a3a" title="홈 화면 메인 배너에 ★배너 항목을 슬라이드로 보여주는 설정과 미리보기"><i data-ci="home"></i>홈 배너 설정·미리보기</button> <button id="gmBtn" class="gl-btn" onclick="gmToggle()" style="display:none;align-items:center;gap:5px;color:#fff"></button></span>
   </div>
   <div id="glList" class="gl-grid"><div class="bempty" style="grid-column:1/-1">불러오는 중…</div></div>
   <div id="glDetail" style="display:none;margin-top:10px"></div>
@@ -142,7 +142,13 @@
 //  공개 열람은 published 만, 관리자·시도임원은 초안(draft)도 보고 편집·공개·대표(배너) 지정을 합니다.
 KFDF.initApp();
 /* [2026-10-19] 「사진첩」은 지금부터 플라잉디스크 사진 공모전(photo.html)으로(회장님 지시로 10/22 → 즉시) — 이전 사진첩은 photo.html 맨 아래 링크(gallery.html?all=1), 개별 앨범 링크(?id=)는 그대로 */
-(function(){try{const q=new URLSearchParams(location.search);if(!q.get('all')&&!q.get('id'))location.replace('photo.html')}catch(e){}})();
+/* [2026-11-10] 공모전 끝 — 이제는 설정 단추(사진첩 위 [공모전 화면 켜기/끄기], 중앙관리자)로 정함: siteContent/galleryMode {contest:true} 일 때만 photo.html 로 넘김. 문서가 없으면 원래 사진첩 */
+(function(){try{const q=new URLSearchParams(location.search);if(q.get('all')||q.get('id'))return;let n=0;(function chk(){if(window.firebase&&firebase.apps&&firebase.apps.length&&firebase.firestore){firebase.firestore().collection('siteContent').doc('galleryMode').get().then(d=>{if(d.exists&&(d.data()||{}).contest===true)location.replace('photo.html')}).catch(()=>{});return}if(++n<60)setTimeout(chk,150)})()}catch(e){}})();
+let GM_ON=false;
+async function gmLoad(){try{const d=await DB.collection('siteContent').doc('galleryMode').get();GM_ON=!!(d.exists&&(d.data()||{}).contest===true)}catch(e){}gmPaint()}
+function gmPaint(){const b=document.getElementById('gmBtn');if(!b)return;b.style.display=HB_ADMIN?'inline-flex':'none';b.textContent=GM_ON?'사진 공모전 화면: 켜짐 (끄기)':'사진 공모전 화면: 꺼짐 (켜기)';b.style.background=GM_ON?'#C41E2F':'#5b6472';b.title=GM_ON?'지금은 메뉴의 사진첩을 누르면 사진 공모전 화면으로 갑니다':'지금은 메뉴의 사진첩을 누르면 이 사진첩이 나옵니다'}
+async function gmToggle(){const on=!GM_ON;if(!confirm(on?'메뉴의 「사진첩」을 사진 공모전 화면(photo.html)으로 바꿀까요?':'사진 공모전 화면을 내리고 메뉴의 「사진첩」을 원래 사진첩으로 돌릴까요?'))return;
+  try{await DB.collection('siteContent').doc('galleryMode').set({contest:on,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),by:(ME||{}).email||''},{merge:true});GM_ON=on;gmPaint()}catch(e){alert('저장 실패: '+(e.code||e.message))}}
 const DB=firebase.firestore(),AUTH=firebase.auth();
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let ME=null,MY=null,CAN=false,ITEMS=[],FILTER='all',CUR=null;
@@ -152,7 +158,7 @@ KFDF.ready(async function(user,me){
   ME=user;MY=me;CAN=!!(me&&(KFDF.isAdmin(me)||KFDF.isSidoOfficer(me)));
   document.getElementById('glAdminChips').style.display=CAN?'':'none';
   HB_ADMIN=!!(me&&KFDF.isAdmin(me));   // [홈 배너] 설정 저장은 중앙관리자만(siteContent 규칙), 미리보기는 임원 모두
-  if(HB_ADMIN)await hbEnsure();
+  if(HB_ADMIN){await hbEnsure();gmLoad()}
   await glLoad();
   const id=new URLSearchParams(location.search).get('id');
   if(id)glOpen(id);
