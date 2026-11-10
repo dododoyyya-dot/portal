@@ -27,6 +27,9 @@ var TM={slotId:'DTxbzDpc1D0m1hiEi0lA',from:'2026-10-24',to:'2026-10-25',title:'�
 (function(){try{var q=new URLSearchParams(location.search);var kst=new Date(Date.now()+9*3600e3).toISOString().slice(0,10);var d=q.get('tmday')||'';window.TM_DAY=/^\d{4}-\d{2}-\d{2}$/.test(d)?d:kst;var f=q.get('tm');window.TM_ON=f==='1'?true:(f==='0'?false:(kst>=TM.from&&kst<=TM.to))}catch(e){window.TM_ON=false;window.TM_DAY=''}})();
 </script>
 <link rel="stylesheet" href="theme.css?v=20261111c">
+<link rel="stylesheet" href="theme_a.css?v=1">
+<link rel="stylesheet" href="theme_b.css?v=1">
+<link rel="stylesheet" href="theme_c.css?v=1">
 <script src="shell.js?v=20261111a"></script>
 </head>
 <body class="k-home k-top">
@@ -498,6 +501,13 @@ var TM={slotId:'DTxbzDpc1D0m1hiEi0lA',from:'2026-10-24',to:'2026-10-25',title:'�
 .k-rg-r.t{border-bottom:0}
 .k-rg-n{margin-top:12px;font-size:13px;color:#94A3B8}
 @media(max-width:1080px){#lsMapWrap[style*="block"]{grid-template-columns:minmax(0,1fr);padding:22px 18px!important}.k-rg-h,.k-rg-r{grid-template-columns:76px minmax(0,1fr) minmax(0,1fr);gap:0 14px}.k-rg-r b{font-size:15px}.k-rg-r .m em{font-size:15.5px;min-width:44px}#liveStats .wrap>div[style*="grid"]>div>div:nth-child(2){font-size:32px!important}}
+/* ── [2026-11-11 · 5] 일정 카드가 적을 땐 폭을 채우고 넘김 단추 숨김 · 현황의 청록 글자 정리 ── */
+.scard{flex:1 0 292px;max-width:440px}
+.k-sch-nav.off{display:none}
+.sch-grid{padding-bottom:30px}
+#liveStats [style*="#2dd4bf"],#lsUniq,#liveStats [style*="color:#5eead4"],#liveStats [style*="color:#2dd4bf"]{color:#7FB0FF!important}
+#liveStats .wrap>div[style*="grid"]>div>div:nth-child(3){color:#94A3B8!important;font-size:13.5px!important;font-weight:600!important}
+#liveStats h2.sec-title{font-size:clamp(26px,2.4vw,34px)}
 </style>
 <style id="tmCss">
 /* ══════════ [대회 모드 2026-10-24 · 3차 디자인] 원반 놀이터(play.html)와 같은 느낌 — 파란 하늘 바탕, 흰 둥근 카드, 노란 주 버튼, 파스텔 아이콘, Jua 제목 글꼴.
@@ -1669,6 +1679,9 @@ var onUser=function(user,me){try{var S=window.__SUN;S.u=user||null;S.me=me||null
       +'<div class="k-rg-r t"><b>합계</b><div class="m"><span></span><em>'+ta+'</em></div><div class="m w"><span></span><em>'+tb+'</em></div></div>'
       +'<div class="k-rg-n">+숫자는 다른 권역에서 이동해 올 수 있는 강사 수입니다.</div>';}
   var lm=document.getElementById('lsMap');if(lm&&window.MutationObserver){new MutationObserver(function(){setTimeout(rgList,30)}).observe(lm,{childList:true});setTimeout(rgList,1500)}
+  /* 일정 카드가 한 줄에 다 들어오면 좌우 넘김 단추를 숨김 */
+  function schNav(){var g=document.getElementById('schGrid'),n=document.querySelector('.k-sch-nav');if(g&&n)n.classList.toggle('off',g.scrollWidth<=g.clientWidth+4)}
+  var sg=document.getElementById('schGrid');if(sg&&window.MutationObserver){new MutationObserver(function(){setTimeout(schNav,30)}).observe(sg,{childList:true});window.addEventListener('resize',schNav);setTimeout(schNav,1200)}
   window.kSch=function(dir){var g=document.getElementById('schGrid');if(g)g.scrollBy({left:dir*Math.max(300,g.clientWidth*.8),behavior:'smooth'})};
 })();
 </script>
