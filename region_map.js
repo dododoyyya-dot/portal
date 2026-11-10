@@ -89,9 +89,12 @@
           var x=p.x-w/2,y=p.y-h/2;
           var fill=on?'#0B192C':'#fff',stroke=on?'#0B192C':'#E2E8F0',txt=on?'#fff':'#0F172A',sub=on?'rgba(255,255,255,.85)':'#64748B';
           var cursor=(mode==='display')?'default':'pointer';
-          svg+='<g class="km-pin'+(on?' on':'')+'" data-r="'+esc(r)+'" style="cursor:'+cursor+'" filter="url(#'+uid+'s)">'
-            +'<rect class="km-chip" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+(cp?15:10)+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="1"/>'
-            +'<circle class="km-mark" cx="'+(x+14)+'" cy="'+(y+15)+'" r="3.5" fill="'+(on?'#fff':'#1D4ED8')+'"/>'
+          var hot=!!opts.pulse&&/(^|\D)[1-9]\d*/.test(cnt);   /* [2026-11-10] 공고가 올라온 권역 강조 */
+          if(hot&&!on)stroke='#1D4ED8';
+          svg+='<g class="km-pin'+(on?' on':'')+(hot?' km-hot':'')+'" data-r="'+esc(r)+'" style="cursor:'+cursor+'" filter="url(#'+uid+'s)">'
+            +'<rect class="km-chip" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+(cp?15:10)+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+(hot?1.6:1)+'"/>'
+            +(hot?'<circle class="km-ring" cx="'+(x+14)+'" cy="'+(y+15)+'" r="3.5" fill="none" stroke="'+(on?'#fff':'#F97316')+'" stroke-width="2"/><circle class="km-ring km-ring2" cx="'+(x+14)+'" cy="'+(y+15)+'" r="3.5" fill="none" stroke="'+(on?'#fff':'#F97316')+'" stroke-width="2"/>':'')
+            +'<circle class="km-mark" cx="'+(x+14)+'" cy="'+(y+15)+'" r="3.5" fill="'+(on?'#fff':(hot?'#F97316':'#1D4ED8'))+'"/>'
             +(cp
               ?'<text class="km-nm" x="'+(x+24)+'" y="'+(y+19.5)+'" font-size="13" font-weight="700" fill="'+txt+'" style="pointer-events:none">'+esc(r)+'</text>'
                 +(num?'<text class="km-num" x="'+(x+w-13)+'" y="'+(y+19.5)+'" text-anchor="end" font-size="13" font-weight="800" fill="'+(on?'#fff':'#1D4ED8')+'" style="pointer-events:none">'+esc(num)+'</text>':'')
@@ -101,6 +104,14 @@
             +'</g>';
         });
         svg+='</svg>';try{el.__kmCounts=opts.counts||null}catch(e){}
+        if(opts.pulse&&!document.getElementById('kmPulseCss')){var st=document.createElement('style');st.id='kmPulseCss';
+          st.textContent='.km-hot{animation:kmBob 2.6s cubic-bezier(.16,1,.3,1) infinite}'
+            +'.km-ring{transform-box:fill-box;transform-origin:center;animation:kmRing 1.8s cubic-bezier(.16,1,.3,1) infinite;pointer-events:none}'
+            +'.km-ring2{animation-delay:.9s}'
+            +'@keyframes kmRing{0%{transform:scale(1);opacity:.9}100%{transform:scale(4.2);opacity:0}}'
+            +'@keyframes kmBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}'
+            +'@media (prefers-reduced-motion:reduce){.km-hot,.km-ring{animation:none}.km-ring2{display:none}}';
+          document.head.appendChild(st)}
         // [세부 지역] 권역이 선택되면 그 권역의 시도별 건수 칩을 지도 아래에 표시 (opts.subCounts {권역:{시도:건수}}, 칩 클릭 → opts.onSub(시도))
         var subHtml='';
         if(opts.subCounts&&sel.length===1&&opts.subCounts[sel[0]]){var sc=opts.subCounts[sel[0]];var keys=Object.keys(sc);
