@@ -23,12 +23,12 @@
   var ULL={x:ESEA(437),y:115},DOK={x:ESEA(525),y:139};
   // 권역 표식 위치(대략 중심)와 포인트 색
   var PIN={
-    '서울·경기':{x:96,y:118,c:'#1D4ED8'},
-    '강원':{x:214,y:98,c:'#1D4ED8'},
-    '충청':{x:112,y:206,c:'#1D4ED8'},
-    '전라':{x:92,y:322,c:'#1D4ED8'},
-    '경상':{x:240,y:258,c:'#1D4ED8'},
-    '제주':{x:104,y:452,c:'#1D4ED8'}
+    '서울·경기':{x:96,y:118,c:'#1f5fb2'},
+    '강원':{x:214,y:98,c:'#068081'},
+    '충청':{x:112,y:206,c:'#3e9e5f'},
+    '전라':{x:92,y:322,c:'#d99a1e'},
+    '경상':{x:240,y:258,c:'#7c3aed'},
+    '제주':{x:104,y:452,c:'#c41e2f'}
   };
   // 문자열에서 시도 이름(경남·부산 등)을 찾음 — 시도별 집계·필터용
   var FULL={'서울특별시':'서울','인천광역시':'인천','경기도':'경기','강원특별자치도':'강원','강원도':'강원','대전광역시':'대전','세종특별자치시':'세종','충청북도':'충북','충청남도':'충남','광주광역시':'광주','전북특별자치도':'전북','전라북도':'전북','전라남도':'전남','부산광역시':'부산','대구광역시':'대구','울산광역시':'울산','경상북도':'경북','경상남도':'경남','제주특별자치도':'제주','제주도':'제주'};
@@ -63,59 +63,42 @@
       var uid='km'+Math.floor(Math.random()*1e6);
       function draw(){
         var svg='<svg viewBox="0 0 450 480" style="width:100%;max-width:470px;display:block" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="권역 지도">'
-          +'<defs><linearGradient id="'+uid+'l" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F1F5F9"/><stop offset="1" stop-color="#E2E8F0"/></linearGradient>'
-          +'<pattern id="'+uid+'d" width="8" height="8" patternUnits="userSpaceOnUse"><circle class="km-dot" cx="4" cy="4" r="1.9" fill="#94A3B8"/></pattern>'
-          +'<filter id="'+uid+'s" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#0F172A" flood-opacity=".10"/></filter></defs>'
-          +'<path d="'+LAND+'" class="km-land" fill="url(#'+uid+'d)" stroke-linejoin="round"/>'
-          +'<ellipse cx="'+JEJU.cx+'" cy="'+JEJU.cy+'" rx="'+JEJU.rx+'" ry="'+JEJU.ry+'" class="km-land" fill="url(#'+uid+'d)"/>'
-          +ISLES.map(function(i){return '<ellipse cx="'+i.x+'" cy="'+i.y+'" rx="'+i.r+'" ry="'+Math.max(3,i.r*0.7)+'" class="km-land" fill="url(#'+uid+'d)"/>'}).join('')
+          +'<defs><linearGradient id="'+uid+'l" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9f0fb"/><stop offset="1" stop-color="#cfe0f5"/></linearGradient>'
+          +'<filter id="'+uid+'s" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#141d51" flood-opacity=".18"/></filter></defs>'
+          +'<path d="'+LAND+'" fill="url(#'+uid+'l)" stroke="#9db8dd" stroke-width="2" stroke-linejoin="round"/>'
+          +'<ellipse cx="'+JEJU.cx+'" cy="'+JEJU.cy+'" rx="'+JEJU.rx+'" ry="'+JEJU.ry+'" fill="url(#'+uid+'l)" stroke="#9db8dd" stroke-width="2"/>'
+          +ISLES.map(function(i){return '<ellipse cx="'+i.x+'" cy="'+i.y+'" rx="'+i.r+'" ry="'+Math.max(3,i.r*0.7)+'" fill="url(#'+uid+'l)" stroke="#9db8dd" stroke-width="1.5"/>'}).join('')
           // 동해·서해·남해 표기 + 울릉도·독도(실제 위치, 동해)
-          +'<text x="372" y="62" text-anchor="middle" font-size="12" font-weight="800" fill="#94A3B8" letter-spacing="3">동 해</text>'
-          +'<text x="372" y="75" text-anchor="middle" font-size="7.5" font-weight="700" fill="#CBD5E1" letter-spacing="1">EAST SEA</text>'
-          +'<text x="24" y="250" text-anchor="middle" font-size="10" font-weight="800" fill="#CBD5E1" letter-spacing="2">서해</text>'
-          +'<text x="200" y="430" text-anchor="middle" font-size="10" font-weight="800" fill="#CBD5E1" letter-spacing="2">남해</text>'
-          +'<ellipse cx="'+ULL.x+'" cy="'+ULL.y+'" rx="7" ry="5.5" class="km-land" fill="url(#'+uid+'d)"/>'
-          +'<text x="'+ULL.x+'" y="'+(ULL.y+17)+'" text-anchor="middle" font-size="9.5" font-weight="800" fill="#64748B">울릉도</text>'
-          +'<ellipse cx="'+(DOK.x-2)+'" cy="'+DOK.y+'" rx="2.6" ry="2" fill="#1D4ED8" stroke="#1D4ED8"/><ellipse cx="'+(DOK.x+3)+'" cy="'+(DOK.y+2)+'" rx="1.9" ry="1.5" fill="#1D4ED8" stroke="#1D4ED8"/>'
-          +'<text x="'+DOK.x+'" y="'+(DOK.y+16)+'" text-anchor="middle" font-size="9.5" font-weight="900" fill="#0F172A">독도</text>'
-          +'<text x="404" y="470" font-size="10" fill="#CBD5E1" font-weight="700" letter-spacing="1">KOREA</text>'
-          +'<text x="'+(JEJU.cx)+'" y="'+(JEJU.cy+26)+'" text-anchor="middle" font-size="9.5" font-weight="800" fill="#64748B">제주도</text>';
+          +'<text x="372" y="62" text-anchor="middle" font-size="12" font-weight="800" fill="#7f9cc4" letter-spacing="3">동 해</text>'
+          +'<text x="372" y="75" text-anchor="middle" font-size="7.5" font-weight="700" fill="#a9bdd9" letter-spacing="1">EAST SEA</text>'
+          +'<text x="24" y="250" text-anchor="middle" font-size="10" font-weight="800" fill="#a9bdd9" letter-spacing="2">서해</text>'
+          +'<text x="200" y="430" text-anchor="middle" font-size="10" font-weight="800" fill="#a9bdd9" letter-spacing="2">남해</text>'
+          +'<ellipse cx="'+ULL.x+'" cy="'+ULL.y+'" rx="7" ry="5.5" fill="url(#'+uid+'l)" stroke="#9db8dd" stroke-width="1.5"/>'
+          +'<text x="'+ULL.x+'" y="'+(ULL.y+17)+'" text-anchor="middle" font-size="9.5" font-weight="800" fill="#374151">울릉도</text>'
+          +'<ellipse cx="'+(DOK.x-2)+'" cy="'+DOK.y+'" rx="2.6" ry="2" fill="#1f5fb2" stroke="#1f5fb2"/><ellipse cx="'+(DOK.x+3)+'" cy="'+(DOK.y+2)+'" rx="1.9" ry="1.5" fill="#1f5fb2" stroke="#1f5fb2"/>'
+          +'<text x="'+DOK.x+'" y="'+(DOK.y+16)+'" text-anchor="middle" font-size="9.5" font-weight="900" fill="#141d51">독도</text>'
+          +'<text x="404" y="470" font-size="10" fill="#9db8dd" font-weight="700" letter-spacing="1">KOREA</text>'
+          +'<text x="'+(JEJU.cx)+'" y="'+(JEJU.cy+26)+'" text-anchor="middle" font-size="9.5" font-weight="800" fill="#374151">제주도</text>';
         REGIONS.forEach(function(r){
           var p=PIN[r],on=sel.indexOf(r)>=0;
           var cnt=(opts.counts&&opts.counts[r]!=null)?String(opts.counts[r]):'';
-          /* [2026-11-11] 표지: 흰 알약(이름+건수) · compact 면 이름과 첫 숫자만 한 줄로 */
-          var cp=!!opts.compact,num=cp?((cnt.match(/\d+/)||[''])[0]):'';
-          var w=cp?(tw(r)*14+(num?tw(num)*9+16:0)+40):Math.max(tw(r)*14+36,cnt?tw(cnt)*10.5+26:0),h=(cnt&&!cp)?44:30;
+          var w=Math.max(tw(r)*15+26,cnt?tw(cnt)*11.5+22:0),h=cnt?46:30;
           var x=p.x-w/2,y=p.y-h/2;
-          var fill=on?'#0B192C':'#fff',stroke=on?'#0B192C':'#E2E8F0',txt=on?'#fff':'#0F172A',sub=on?'rgba(255,255,255,.85)':'#64748B';
+          var fill=on?p.c:'#fff',stroke=p.c,txt=on?'#fff':'#141d51',sub=on?'rgba(255,255,255,.9)':'#4b5563';
           var cursor=(mode==='display')?'default':'pointer';
-          var hot=!!opts.pulse&&/(^|\D)[1-9]\d*/.test(cnt);   /* [2026-11-10] 공고가 올라온 권역 강조 */
-          if(hot&&!on)stroke='#1D4ED8';
-          svg+='<g class="km-pin'+(on?' on':'')+(hot?' km-hot':'')+'" data-r="'+esc(r)+'" style="cursor:'+cursor+'" filter="url(#'+uid+'s)">'
-            +'<rect class="km-chip" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+(cp?15:10)+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+(hot?1.6:1)+'"/>'
-            +(hot?'<circle class="km-ring" cx="'+(x+14)+'" cy="'+(y+15)+'" r="3.5" fill="none" stroke="'+(on?'#fff':'#F97316')+'" stroke-width="2"/><circle class="km-ring km-ring2" cx="'+(x+14)+'" cy="'+(y+15)+'" r="3.5" fill="none" stroke="'+(on?'#fff':'#F97316')+'" stroke-width="2"/>':'')
-            +'<circle class="km-mark" cx="'+(x+14)+'" cy="'+(y+15)+'" r="3.5" fill="'+(on?'#fff':(hot?'#F97316':'#1D4ED8'))+'"/>'
-            +(cp
-              ?'<text class="km-nm" x="'+(x+24)+'" y="'+(y+19.5)+'" font-size="13" font-weight="700" fill="'+txt+'" style="pointer-events:none">'+esc(r)+'</text>'
-                +(num?'<text class="km-num" x="'+(x+w-13)+'" y="'+(y+19.5)+'" text-anchor="end" font-size="13" font-weight="800" fill="'+(on?'#fff':'#1D4ED8')+'" style="pointer-events:none">'+esc(num)+'</text>':'')
-              :'<text class="km-nm" x="'+(p.x+6)+'" y="'+(y+(cnt?19:20))+'" text-anchor="middle" font-size="13.5" font-weight="800" fill="'+txt+'" style="pointer-events:none">'+esc(r)+'</text>'
-                +(cnt?'<text class="km-cnt" x="'+p.x+'" y="'+(y+35)+'" text-anchor="middle" font-size="10.5" font-weight="600" fill="'+sub+'" style="pointer-events:none">'+esc(cnt)+'</text>':''))
-            +(on&&mode!=='display'?'<circle cx="'+(x+w-2)+'" cy="'+(y+2)+'" r="8" fill="#F97316"/><text x="'+(x+w-2)+'" y="'+(y+6)+'" text-anchor="middle" font-size="10" font-weight="900" fill="#fff" style="pointer-events:none">✓</text>':'')
+          svg+='<g data-r="'+esc(r)+'" style="cursor:'+cursor+'" filter="url(#'+uid+'s)">'
+            +'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="15" fill="'+fill+'" stroke="'+stroke+'" stroke-width="2"/>'
+            +'<circle cx="'+(x+12)+'" cy="'+(cnt?y+15:y+15)+'" r="4" fill="'+(on?'#fff':p.c)+'"/>'
+            +'<text x="'+(p.x+6)+'" y="'+(y+(cnt?19:20))+'" text-anchor="middle" font-size="14" font-weight="900" fill="'+txt+'" style="pointer-events:none">'+esc(r)+'</text>'
+            +(cnt?'<text x="'+p.x+'" y="'+(y+36)+'" text-anchor="middle" font-size="11" font-weight="700" fill="'+sub+'" style="pointer-events:none">'+esc(cnt)+'</text>':'')
+            +(on&&mode!=='display'?'<circle cx="'+(x+w-2)+'" cy="'+(y+2)+'" r="8" fill="#e6b422"/><text x="'+(x+w-2)+'" y="'+(y+6)+'" text-anchor="middle" font-size="10" font-weight="900" fill="#141d51" style="pointer-events:none">✓</text>':'')
             +'</g>';
         });
-        svg+='</svg>';try{el.__kmCounts=opts.counts||null}catch(e){}
-        if(opts.pulse&&!document.getElementById('kmPulseCss')){var st=document.createElement('style');st.id='kmPulseCss';
-          st.textContent='.km-hot{animation:kmBob 2.6s cubic-bezier(.16,1,.3,1) infinite}'
-            +'.km-ring{transform-box:fill-box;transform-origin:center;animation:kmRing 1.8s cubic-bezier(.16,1,.3,1) infinite;pointer-events:none}'
-            +'.km-ring2{animation-delay:.9s}'
-            +'@keyframes kmRing{0%{transform:scale(1);opacity:.9}100%{transform:scale(4.2);opacity:0}}'
-            +'@keyframes kmBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}'
-            +'@media (prefers-reduced-motion:reduce){.km-hot,.km-ring{animation:none}.km-ring2{display:none}}';
-          document.head.appendChild(st)}
+        svg+='</svg>';
         // [세부 지역] 권역이 선택되면 그 권역의 시도별 건수 칩을 지도 아래에 표시 (opts.subCounts {권역:{시도:건수}}, 칩 클릭 → opts.onSub(시도))
         var subHtml='';
         if(opts.subCounts&&sel.length===1&&opts.subCounts[sel[0]]){var sc=opts.subCounts[sel[0]];var keys=Object.keys(sc);
-          if(keys.length)subHtml='<div class="km-sub" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:8px">'+keys.map(function(k){var on=opts.sub===k;return '<button type="button" data-sub="'+esc(k)+'" style="border:1.5px solid '+(on?'#0B192C':'#CBD5E1')+';background:'+(on?'#0B192C':'#fff')+';color:'+(on?'#fff':'#141d51')+';border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:800;font-family:inherit;cursor:pointer">'+esc(k)+' <span style="font-weight:700;opacity:.8">'+esc(sc[k])+'</span></button>'}).join('')+'</div>'}
+          if(keys.length)subHtml='<div class="km-sub" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:8px">'+keys.map(function(k){var on=opts.sub===k;return '<button type="button" data-sub="'+esc(k)+'" style="border:1.5px solid '+(on?'#1f5fb2':'#dfe5ee')+';background:'+(on?'#1f5fb2':'#fff')+';color:'+(on?'#fff':'#141d51')+';border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:800;font-family:inherit;cursor:pointer">'+esc(k)+' <span style="font-weight:700;opacity:.8">'+esc(sc[k])+'</span></button>'}).join('')+'</div>'}
         el.innerHTML=svg+subHtml;
         el.querySelectorAll('.km-sub button').forEach(function(b){b.addEventListener('click',function(){var k=b.getAttribute('data-sub');opts.sub=(opts.sub===k)?'':k;draw();if(opts.onSub)opts.onSub(opts.sub)})});
         if(mode!=='display'){
