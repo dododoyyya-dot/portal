@@ -130,6 +130,7 @@
         var h=(location.hash||'').replace('#','');if(h&&hashMap[h]&&!(new URLSearchParams(location.search)).get('view')){var u=new URL(location.href);u.searchParams.set('view',hashMap[h]);u.hash='';history.replaceState(null,'',u.toString())}
       }catch(e){}
       try{document.querySelectorAll('.subnav .sn-links a').forEach(function(a){var lv=(String(a.getAttribute('href')||'').match(/[?&]view=([^&#]+)/)||[])[1]||cfg.def;var f=String(a.getAttribute('href')||'').split('#')[0].split('?')[0].toLowerCase();var here=(location.pathname.split('/').pop()||'').toLowerCase();var lk=(String(a.getAttribute('href')||'').match(/[?&]kind=([^&#]+)/)||[])[1]||'';var hk=(new URLSearchParams(location.search)).get('kind')||'';if(f===here)a.classList.toggle('on',lv===v&&lk===hk)})}catch(e){}
+      try{document.documentElement.classList.remove("kv-wait")}catch(e){}
       return v;
     }
     // 권한자 전용 링크(sn-admin) 켜기 — 페이지가 권한을 확인한 뒤 호출
