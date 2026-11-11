@@ -39,8 +39,13 @@
 .lcinfo .warn{color:#7a5b00}
 .ntacts{display:flex;gap:5px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
 </style>
+<link rel="stylesheet" href="theme.css?v=20261111f">
+<link rel="stylesheet" href="theme_a.css?v=20261111e">
+<link rel="stylesheet" href="theme_b.css?v=20261111e">
+<link rel="stylesheet" href="theme_c.css?v=20261111e">
+<script src="shell.js?v=20261111a"></script>
 </head>
-<body>
+<body class="k-c">
 <div class="util"><div class="wrap">
   <div><b>대한민국플라잉디스크연맹</b> · 대한체육회 인정단체</div>
   <div><a href="mailto:kfdf60@hanmail.net">kfdf60@hanmail.net</a> &nbsp;|&nbsp; 031-984-3248 &nbsp;|&nbsp; <a href="login.html" id="utilAuth" style="color:#fff;font-weight:700">로그인</a> · <a href="mypage.html" style="color:#fff;font-weight:700">마이페이지</a></div>
@@ -436,20 +441,27 @@ async function loadNotices(){
       const closed=n.status!=='접수중';
       const mine=ISMGR&&(CENTRAL||MFEDS.indexOf(n.sido)>=0);
       const rst=n.reportStatus||'';
-      let html='<div class="lccard" data-nid="'+d.id+'"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center"><div style="flex:1;min-width:240px">'
+      /* [2026-11-11] 공고 카드: 글을 한 줄로 쏟아내던 것을 포스터 · 상태 뱃지 · 일시/장소 표 · 접어 두는 세부 내용으로 나눔 (자료·단추·권한 조건은 그대로) */
+      const _dl=(function(){const m=String(n.until||'').match(/^(\d{4})-(\d{2})-(\d{2})/);if(!m)return null;return Math.ceil((new Date(m[1]+'-'+m[2]+'-'+m[3]+'T23:59:59+09:00')-new Date())/864e5)-1})();
+      const _st=!approved?'<span class="k-nc-st wait">'+(n.approval==='반려'?'반려됨':'승인 대기')+'</span>':(closed?'<span class="k-nc-st off">접수 마감</span>':'<span class="k-nc-st on">접수 중'+(_dl!=null&&_dl>=0?' · '+(_dl===0?'오늘 마감':'D-'+_dl):'')+'</span>');
+      const _meta=[['일시',n.date],['장소',n.place],['주관',n.issuer],['접수 마감',n.until]].filter(x=>x[1]).map(x=>'<div><dt>'+x[0]+'</dt><dd>'+esc(x[1])+'</dd></div>').join('');
+      const _fee=feesText(n)||n.fee||'';
+      const _more=(_fee?'<div class="sec"><b>응시료</b><p>'+esc(_fee)+'</p></div>':'')+(n.acct?'<div class="sec"><b>입금 계좌</b><p>'+esc(n.acct)+'</p></div>':'')+(n.desc?'<div class="sec"><b>안내</b><p>'+esc(n.desc)+'</p></div>':'')
+        +(n.schedule?'<div class="sec"><b>세부 일정</b><p>'+esc(n.schedule).replace(/\n/g,'<br>')+'</p></div>':'')
+        +((n.attachments||[]).length?'<div class="sec"><b>첨부</b><p>'+(n.attachments||[]).map(function(x){return '<a href="'+esc(x.url)+'" target="_blank" rel="noopener">'+esc(x.name||'첨부파일')+'</a>'}).join('')+'</p></div>':'');
+      let html='<div class="lccard k-nc" data-nid="'+d.id+'"><div class="k-nc-row">'
+        +(n.posterUrl?'<a class="k-nc-poster" href="'+n.posterUrl+'" target="_blank" rel="noopener" title="포스터 크게 보기"><img src="'+n.posterUrl+'" alt="공고 포스터" loading="lazy"></a>':'')
+        +'<div class="k-nc-body"><div class="k-nc-tags">'+_st
         +String(n.type||'신규').split('·').map(t=>'<span class="lctag" style="background:'+(t==='갱신'?'#0f766e':(t.indexOf('보수')>=0?'#b8860b':'#153A77'))+'">'+esc(t)+'</span>').join(' ')+' '
         +'<span class="lctag" style="background:#8a919d">'+esc(n.target)+'</span> '
         +(n.sido?'<span class="lctag" style="background:#b8860b">'+esc(n.sido)+'</span> ':'')
         +(!approved?'<span class="lctag" style="background:'+(n.approval==='반려'?'#C41E2F':'#7c3aed')+'">'+(n.approval==='반려'?'반려됨':'중앙승인 대기')+'</span> ':(closed?'<span class="lctag" style="background:#C41E2F">마감</span> ':''))
         +(rst?'<span class="lctag" style="background:'+(rst==='승인'?'#0f766e':(rst==='보완요청'?'#C41E2F':'#b8860b'))+'">보고 '+esc(rst)+'</span> ':'')
         +(n.showOnBanner?'<span class="lctag" style="background:#e6b422;color:#1a2f7a">📢 메인배너노출</span> ':'')
-        +'<b style="font-size:15.5px;display:block;margin-top:6px">'+esc(n.title)+'</b>'
-        +'<div style="font-size:12.5px;color:var(--gray);margin-top:4px;line-height:1.7">'+esc(n.issuer||'')+' · '+esc(n.date||'')+' · '+esc(n.place||'')+(n.until?' · 마감 '+esc(n.until):'')+(feesText(n)?'<br>💰 '+esc(feesText(n)):(n.fee?'<br>💰 '+esc(n.fee):''))
-        +(n.acct?'<br>💳 수수료 입금: '+esc(n.acct):'')
-        +(n.desc?'<br>'+esc(n.desc):'')
-        +(n.schedule?'<div style="margin-top:8px;padding:10px 12px;background:#f4f7fb;border-radius:9px;font-size:12.5px;line-height:1.9"><b style="color:#153A77">📅 세부 일정</b><br>'+esc(n.schedule).replace(/\n/g,'<br>')+'</div>':'')
-        +(n.posterUrl?'<a href="'+n.posterUrl+'" target="_blank" rel="noopener"><img src="'+n.posterUrl+'" alt="공고 포스터" style="display:block;max-width:230px;width:100%;border-radius:10px;margin-top:10px;border:1px solid #dfe5ee" loading="lazy"></a><span style="font-size:11.5px;color:var(--gray)">포스터를 누르면 크게 보입니다</span>':'')
-        +((n.attachments||[]).length?'<div style="margin-top:8px">'+(n.attachments||[]).map(function(x){return '<a href="'+esc(x.url)+'" target="_blank" rel="noopener" style="display:inline-block;margin:2px 6px 2px 0;padding:4px 10px;border:1.5px solid #dbe4f3;border-radius:8px;background:#f5f8fd;font-size:12.5px;font-weight:800;color:#153A77;text-decoration:none">📎 '+esc(x.name||'첨부파일')+'</a>'}).join('')+'</div>':'')
+        +'</div><b class="k-nc-title">'+esc(n.title)+'</b>'
+        +(_meta?'<dl class="k-nc-meta">'+_meta+'</dl>':'')
+        +(_more?'<details class="k-nc-more"><summary>응시료 · 세부 일정 · 안내 보기</summary>'+_more+'</details>':'')
+        +'<div class="k-nc-note">'
         +((mine||CENTRAL)&&n.report?'<br><span style="color:#153A77;font-weight:700">📝 결과보고: '+esc(n.report.date||'')+' · 참석 '+esc(n.report.attend||0)+' · 합격 '+esc(n.report.pass||0)+' · 불합격 '+esc(n.report.fail||0)+' · 수납 '+esc(n.report.fee||'')+(n.report.note?' · '+esc(n.report.note):'')+'</span>':'')
         +((mine||CENTRAL)&&n.approval==='반려'&&n.remandReason?'<br><span style="color:#C41E2F;font-weight:700">⛔ 공고 반려 사유: '+esc(n.remandReason)+'</span>':'')
         +((mine||CENTRAL)&&n.reportStatus==='보완요청'&&n.reportRemand?'<br><span style="color:#C41E2F;font-weight:700">✏️ 보고 보완요청: '+esc(n.reportRemand)+'</span>':'')

@@ -126,8 +126,13 @@ body.onepost #stWriteBox{display:none!important}   /* [1공고 1상세] PC 에�
 .strowlist{border:none;background:transparent;overflow:visible}
 .strhead{background:transparent;border:none;padding:8px 2px;font-size:13px;color:#5b6472}
 </style>
+<link rel="stylesheet" href="theme.css?v=20261111f">
+<link rel="stylesheet" href="theme_a.css?v=20261111e">
+<link rel="stylesheet" href="theme_b.css?v=20261111e">
+<link rel="stylesheet" href="theme_c.css?v=20261111e">
+<script src="shell.js?v=20261111a"></script>
 </head>
-<body>
+<body class="k-c">
 <div class="util"><div class="wrap">
   <div><b>대한민국플라잉디스크연맹</b> · 대한체육회 인정단체</div>
   <div><a href="mailto:kfdf60@hanmail.net">kfdf60@hanmail.net</a> &nbsp;|&nbsp; 031-984-3248 &nbsp;|&nbsp; <a href="login.html" id="utilAuth" style="color:#fff;font-weight:700">로그인</a> · <a href="mypage.html" style="color:#fff;font-weight:700">마이페이지</a></div>
@@ -477,23 +482,20 @@ function expandRowHtml(p){
   const noteRow=!noteHtml&&!rightCol?'':(noteHtml&&rightCol
       ?'<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;margin-bottom:8px">'+noteHtml+rightCol+'</div>'
       :'<div style="margin-bottom:8px">'+(noteHtml||rightCol)+'</div>');
-  return '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px">'
-    +'<span>📍 <b>장소:</b> '+esc(p.location||(comp&&comp.place)||'')+'</span>'
-    +'<span>🕐 <b>경기시간:</b> '+esc(p.time||'')+'</span>'
-    +'<span>🏅 <b>종목:</b> '+esc(p.sport||'')+'</span>'
+  // [theme v3] 글로 나열하던 항목(장소·경기시간·종목·임무·교통비·식사·숙박·심판복·준비물·집합시간)을 라벨·값 표(.ckv)로 — 값·조건은 종전과 같음
+  return '<div class="ckv">'
+    +'<div><i>장소</i><span><b>'+esc(p.location||(comp&&comp.place)||'')+'</b></span></div>'
+    +'<div><i>경기시간</i><span>'+esc(p.time||'')+'</span></div>'
+    +'<div><i>종목</i><span>'+esc(p.sport||'')+'</span></div>'
+    +(p.gatherTime?'<div><i>집합시간</i><span>'+esc(p.gatherTime)+'</span></div>':'')
+    +(roles.length?'<div class="full"><i>모집 임무</i><span>'+esc(roles.join(' · '))+'</span></div>':'')
+    +'<div><i>교통비</i><span>'+esc(p.transportation||'미정')+'</span></div>'
+    +'<div><i>식사</i><span>'+esc(p.meal||'미정')+'</span></div>'
+    +'<div><i>숙박</i><span>'+esc(p.lodging||'미정')+'</span></div>'
+    +'<div><i>심판복</i><span>'+esc(p.uniform||'미정')+'</span></div>'
+    +(p.supplies&&p.supplies.length?'<div class="full"><i>준비물</i><span>'+esc(p.supplies.join(', '))+'</span></div>':'')
     +'</div>'
     +dayListHtml(p)   // [날짜별 정보]
-    +rolesHtml
-    +'<div style="margin-bottom:6px">'
-    +'<span style="font-weight:800">교통비</span> '+esc(p.transportation||'미정')
-    +' &nbsp;·&nbsp; <span style="font-weight:800">식사</span> '+esc(p.meal||'미정')
-    +' &nbsp;·&nbsp; <span style="font-weight:800">숙박</span> '+esc(p.lodging||'미정')
-    +' &nbsp;·&nbsp; <span style="font-weight:800">심판복</span> '+esc(p.uniform||'미정')
-    +'</div>'
-    +(p.supplies&&p.supplies.length?'<div style="margin-bottom:6px"><span style="font-weight:800">준비물:</span> '+esc(p.supplies.join(', '))+'</div>':'')
-    // [시간표기] 집합시간은 경기시간과 다른 별도 항목이라 준비물 아래에 따로 표시합니다.
-    //   기존 공고에는 이 값이 없으므로 입력된 공고에서만 나타납니다 (기존 공고 표시 무변경).
-    +(p.gatherTime?'<div style="margin-bottom:6px"><span style="font-weight:800">🕘 집합시간:</span> '+esc(p.gatherTime)+'</div>':'')
     +noteRow
     +(comp?'<div style="margin-bottom:10px;font-size:12px;color:#7c3aed">🔗 연동된 대회: <b>'+esc(comp.title||p.competitionName||'')+'</b> — 대회 참가자 대상 상세 안내(식사·경기 규정 등)는 대회 페이지에서 확인하세요.</div>':'')
     +(p.contactInfo?'<div style="margin-bottom:10px;color:#6b7280">📞 '+esc(p.contactInfo)+'</div>':'')
@@ -3251,7 +3253,7 @@ async function copyRoster(id){
     <div style="font-size:12.5px">ⓒ Korea Flying Disc Federation. All rights reserved.</div>
   </div>
 </div></footer>
-<script src="region_map.js?v=20260910a"></script>
+<script src="region_map.js?v=20261111b"></script>
 <script src="auth_ui.js?v=20261020a"></script>
 </body>
 </html>
