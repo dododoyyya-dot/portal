@@ -1,4 +1,4 @@
-// intranet2.js v20261027e · 연맹 인트라넷 확장 — 쪽지 · 게시판 · 업무요청 · 자료 제출 · 설문(투표)
+// intranet2.js v20261115a · 연맹 인트라넷 확장 — 쪽지 · 게시판 · 업무요청 · 자료 제출 · 설문(투표)
 //   intranet.js 의 INTRA_X 연결점에 모듈을 등록합니다. 저장: intraMsgs · intraPosts · intraTasks · intraPolls (보안 규칙 v48)
 //   · 쪽지: 보낸 사람과 받는 사람(parts)만 봅니다. 읽음(readBy)·지움(del)만 고칠 수 있습니다.
 //   · 게시판: 공지사항(중앙 작성)·자료실·자유게시판은 임원 전체(scope 'all'), 기관 게시판은 그 기관 임원만(readOrgs).
@@ -41,6 +41,7 @@ function mUnread(){return mIn().filter(function(x){return !((x.readBy||{})[me()]
 var MAIL={
   start:function(){clear(MSGS);watch(X.db().collection('intraMsgs').where('parts','array-contains',me()).limit(300),MSGS,'mail')},
   count:mUnread,
+  todoItems:function(){return mIn().filter(function(x){return !((x.readBy||{})[me()])}).slice(0,5).map(function(x){return {t:'새 쪽지',title:x.title||'(제목 없음)',who:(x.fromName||'')+(x.fromOrg?' ('+x.fromOrg+')':''),at:x.createdAt,act:'열어서 읽기',go:"INTRA2.mailOpen('"+x._id+"')"}})},
   alarm:function(){return ['쪽지',[['안읽은 쪽지',mUnread(),"INTRA2.go('mail','in')"]]]},
   left:function(){return left('쪽지 쓰기','INTRA2.mailNew()','mail',[['쪽지함',[['in','받은 쪽지함',mUnread(),1],['sent','보낸 쪽지함'],['trash','지운 쪽지함']]]])},
   main:function(m){var f=S.mail,L=f==='sent'?mSent():f==='trash'?mTrash():mIn();
@@ -91,7 +92,7 @@ var BOARD={
     m.innerHTML=bar(nm,L.length,'board')+'<div class="gw-tool">'+(canWrite(b)?'<button class="gw-b pri" onclick="INTRA2.postNew()">게시하기</button>':'<small style="color:#777">공지사항은 중앙 사무국이 올립니다.</small>')+'</div>'
       +tbl([['번호',56],['제목'],['',40],['게시자',170],['조회',56],['게시일',130],['종료일',90]],L.map(function(p,i){return '<tr><td class="c">'+(p.pin?'<b style="color:#e8590c">공지</b>':(L.length-i))+'</td><td class="t"><a onclick="INTRA2.postOpen(\''+p._id+'\')">'+(p.pin?'<b>':'')+esc(p.title||'')+(p.pin?'</b>':'')+'</a>'+((p.comments||[]).length?' <small style="color:#e8590c">['+p.comments.length+']</small>':'')+'</td>'
         +'<td class="c">'+((p.files||[]).length?'<span class="clip">'+ic('clip',12)+'</span>':'')+'</td><td>'+esc(p.authorName||'')+' <small style="color:#777">'+esc(p.orgName||'')+'</small></td><td class="c">'+(p.views||0)+'</td><td class="c">'+esc(loc(p.createdAt))+'</td><td class="c">'+esc(p.until||'영구')+'</td></tr>'}),'게시물이 없습니다.')},
-  home:function(){var L=vals(POSTS).sort(byNew).slice(0,6);var wk=new Date(Date.now()-3*86400000).toISOString();
+  home:function(){var L=vals(POSTS).sort(byNew).slice(0,6);if(!L.length)return '';var wk=new Date(Date.now()-3*86400000).toISOString();
     return '<section class="gw-card c4"><h3>'+ic('board',14)+' 최근 게시물<button title="전체 보기" onclick="INTRA2.go(\'board\',\'notice\')">＋</button></h3><div class="hl">'+(L.length?L.map(function(p){return '<a class="hr" onclick="INTRA2.postOpen(\''+p._id+'\')"><span class="t">'+(p.createdAt>wk?'<i class="nw">N</i>':'')+'['+esc((BOARDS.find(function(x){return x[0]===p.board})||[])[1]||'')+'] '+esc(p.title||'')+'</span><span class="w">'+esc(p.authorName||'')+'</span><span class="d">'+esc(loc(p.createdAt).slice(0,10))+'</span></a>'}).join(''):'<div class="he">게시물이 없습니다.</div>')+'</div></section>'}
 };
 var PC=null;
@@ -130,13 +131,14 @@ function tOf(f){var u=me();return vals(TASKS).filter(function(t){return f==='tod
 var TASK={
   start:function(){clear(TASKS);watch(X.db().collection('intraTasks').where('parts','array-contains',me()).limit(300),TASKS,'task')},
   count:function(){return tOf('todo').length},
+  todoItems:function(){return tOf('todo').slice(0,5).map(function(t){return {t:'업무요청',title:t.title||'',who:t.fromName||'',at:t.createdAt,act:t.due?'기한 '+t.due:'열어서 처리',go:"INTRA2.taskOpen('"+t._id+"')"}})},
   alarm:function(){return ['업무요청',[['처리할 업무',tOf('todo').length,"INTRA2.go('task','todo')"],['진행중인 업무',tOf('doing').length,"INTRA2.go('task','doing')"]]]},
   left:function(){return left('업무요청','INTRA2.taskNew()','task',[['업무',[['todo','처리할 업무',tOf('todo').length,1],['doing','진행중인 업무',tOf('doing').length],['done','종료된 업무'],['sent','보낸 업무']]]])},
   main:function(m){var f=S.task,L=tOf(f),td=today();
     m.innerHTML=bar({todo:'처리할 업무',doing:'진행중인 업무',done:'종료된 업무',sent:'보낸 업무'}[f],L.length,'task')
       +tbl([['진행상태',80],['제목'],['요청자',150],['담당자',150],['요청일',130],['기한',96]],L.map(function(t){var late=t.due&&t.due<td&&(t.status==='요청'||t.status==='진행');
         return '<tr class="'+((t.toUid===me()&&t.status==='요청')?'todo':'')+'"><td class="c st">'+esc(t.status)+'</td><td class="t"><a onclick="INTRA2.taskOpen(\''+t._id+'\')">'+esc(t.title||'')+'</a>'+((t.notes||[]).length?' <small style="color:#e8590c">['+t.notes.length+']</small>':'')+'</td><td>'+esc(t.fromName||'')+'</td><td>'+esc(t.toName||'')+'</td><td class="c">'+esc(loc(t.createdAt))+'</td><td class="c"'+(late?' style="color:#c0392b;font-weight:700"':'')+'>'+esc(t.due||'')+'</td></tr>'}),'업무가 없습니다.')},
-  home:function(){var L=tOf('todo').concat(tOf('doing')).slice(0,6);
+  home:function(){var L=tOf('todo').concat(tOf('doing')).slice(0,6);if(!L.length)return '';
     return '<section class="gw-card c3"><h3>'+ic('task',14)+' 처리할 업무<button title="전체 보기" onclick="INTRA2.go(\'task\',\'todo\')">＋</button></h3><div class="hl">'+(L.length?L.map(function(t){return '<a class="hr" onclick="INTRA2.taskOpen(\''+t._id+'\')"><span class="t">'+(t.status==='요청'?'<i class="nw">N</i>':'')+esc(t.title||'')+'</span><span class="w">'+esc(t.fromName||'')+'</span><span class="d">'+esc(t.due?'기한 '+t.due.slice(5):loc(t.createdAt).slice(0,10))+'</span></a>'}).join(''):'<div class="he">처리할 업무가 없습니다.</div>')+'</div></section>'}
 };
 function taskNew(){X.win('gwTask','업무요청','<div class="gw-wtool"><button class="gw-b pri" id="tkGo" onclick="INTRA2.taskSave()">요청</button><button class="gw-b" onclick="INTRA.closeW(\'gwTask\')">취소</button><span id="tkMsg" class="gw-say"></span></div>'
@@ -172,6 +174,7 @@ function parseQs(t){return String(t||'').replace(/\r/g,'').split(/\n\s*\n/).map(
 var POLL={
   start:function(){clear(POLLS);watch(X.db().collection('intraPolls').where('scope','==','all').limit(200),POLLS,'poll');watch(X.db().collection('intraPolls').where('readOrgs','array-contains',X.org().key).limit(200),POLLS,'poll')},
   count:function(){return pollOf('need').length},
+  todoItems:function(){return pollOf('need').slice(0,5).map(function(p){return {t:'설문',title:p.title||'',who:p.orgName||'',at:p.createdAt,act:p.until?'응답 · '+p.until+'까지':'응답하기',go:"INTRA2.pollOpen('"+p._id+"')"}})},
   alarm:function(){return ['설문',[['응답할 설문',pollOf('need').length,"INTRA2.go('poll','need')"]]]},
   left:function(){return left('설문 등록','INTRA2.pollNew()','poll',[['설문 · 투표',[['need','응답할 설문',pollOf('need').length,1],['open','진행중 설문',pollOf('open').length],['closed','종료 설문'],['mine','내가 만든 설문']]]])},
   main:function(m){var f=S.poll,L=pollOf(f);
@@ -241,7 +244,10 @@ function cDow(d){try{return ['일','월','화','수','목','금','토'][new Date
 var COLLECT={
   start:function(){clear(COLS);var k=cOrg();if(X.isCentral())watch(X.db().collection('intraCollects').limit(500),COLS,'collect');else watch(X.db().collection('intraCollects').where('readOrgs','array-contains',k).limit(300),COLS,'collect')},
   count:function(){return cOf('todo').length},
-  todo:function(){return [['제출할 자료',cOf('todo').length,"INTRA2.go('collect','todo')"]]},
+  todoItems:function(){var L=cOf('todo').map(function(c){var dd=cDays(c.due);return {t:dd!==null&&dd<0?'제출할 자료 · 기한 지남':'제출할 자료',title:c.title||'',who:c.orgName||'',at:c.createdAt,act:'기한 '+(c.due||'')+(dd===null?'':' ('+cDday(c.due)+')'),go:"INTRA2.colOpen('"+c._id+"')",urgent:dd!==null&&dd<=3}});
+    /* 내가 걷는 요청 — 기한이 지났는데 안 낸 곳이 남아 있으면 독촉하거나 마감하도록 */
+    cOf('mine').forEach(function(c){if(c.status!=='진행')return;var dd=cDays(c.due),miss=(c.toOrgs||[]).filter(function(k){return !cSub(c,k)}).length;if(dd!==null&&dd<0&&miss)L.push({t:'자료 걷기 · 기한 지남',title:c.title||'',who:'미제출 '+miss+'곳',at:c.updatedAt||c.createdAt,act:'독촉하거나 마감',go:"INTRA2.colOpen('"+c._id+"')"})});
+    return L},
   alarm:function(){var m=cOf('mine').filter(function(c){return c.status==='진행'}).length;return ['자료 제출',[['제출할 자료',cOf('todo').length,"INTRA2.go('collect','todo')"]].concat(m?[['걷는 중인 요청',m,"INTRA2.go('collect','mine')"]]:[])]},
   left:function(){return left('자료 제출 요청','INTRA2.colNew()','collect',[['자료 제출',[['todo','제출할 자료',cOf('todo').length,1],['done','제출한 자료'],['mine','내가 요청한 자료'],['all','전체']]]])},
   main:function(m){var f=S.collect,L=cOf(f);
@@ -249,8 +255,10 @@ var COLLECT={
       +'<div class="gw-note">'+(f==='todo'?'기한 안에 제목을 눌러 파일을 올리세요. 카톡으로 받은 링크를 눌러도 같은 화면이 열립니다.':f==='mine'?'제목을 누르면 연맹별 제출 현황이 보입니다. [카톡용 링크 복사]로 단체방에 올리고, 기한이 지나면 [미제출 독촉]을 누르세요.':'')+'</div>'
       +tbl([['기한',110],['제목'],['요청 기관',170],['대상',60],['현황',70],['요청일',110]],L.map(function(c){var sub=cSub(c);
         return '<tr class="'+(cIsTo(c)&&!sub&&c.status==='진행'?'todo':'')+'"><td class="c">'+cDdHtml(c)+'<br><small>'+esc(c.due||'')+'</small></td><td class="t"><a onclick="INTRA2.colOpen(\''+c._id+'\')">'+esc(c.title||'')+'</a>'+((c.files||[]).length?' <span class="clip">'+ic('clip',12)+'</span>':'')+(sub&&cLate(c,sub)?' <small style="color:#e6a23c">(지각 제출)</small>':'')+'</td><td>'+esc(c.orgName||'')+'<br><small>'+esc(c.authorName||'')+'</small></td><td class="c">'+(c.toOrgs||[]).length+'곳</td><td class="c">'+(cIsReq(c)?'<b>'+cStat(c)+'</b>':(sub?'제출':'-'))+'</td><td class="c">'+esc(loc(c.createdAt).slice(0,10))+'</td></tr>'}),f==='todo'?'제출할 자료가 없습니다.':'자료 제출 요청이 없습니다.')},
-  home:function(){var L=cOf('todo').slice(0,6);if(!L.length&&!cOf('mine').length)return '';
-    return '<section class="gw-card c3"><h3>'+ic('collect',14)+' 제출할 자료<button title="전체 보기" onclick="INTRA2.go(\'collect\',\'todo\')">＋</button></h3><div class="hl">'+(L.length?L.map(function(c){return '<a class="hr" onclick="INTRA2.colOpen(\''+c._id+'\')"><span class="t"><i class="nw">N</i>'+esc(c.title||'')+'</span><span class="w">'+esc(c.orgName||'')+'</span><span class="d">'+cDdHtml(c)+' '+esc(c.due||'')+'</span></a>'}).join(''):'<div class="he">제출할 자료가 없습니다.</div>')+'</div></section>'},
+  home:function(){var T=cOf('todo').slice(0,4),M=cOf('mine').filter(function(c){return c.status==='진행'}).slice(0,4);if(!T.length&&!M.length)return '';
+    var row=function(c,mine){var dd=cDays(c.due);return '<a class="hr" onclick="INTRA2.colOpen(\''+c._id+'\')"><span class="t">'+(mine?'':'<i class="nw">N</i>')+esc(c.title||'')+'</span><span class="w">'+(mine?'제출 '+cStat(c):esc(c.orgName||''))+'</span><span class="d">'+(mine?'<span class="gw-dd'+(dd!==null&&dd<0?' over':'')+'">'+(dd!==null&&dd<0?'기한 지남':esc(cDday(c.due)||'-'))+'</span>':cDdHtml(c))+' '+esc(c.due||'')+'</span></a>'};
+    return '<section class="gw-card c3"><h3>'+ic('collect',14)+' 자료 제출<button title="전체 보기" onclick="INTRA2.go(\'collect\',\''+(T.length?'todo':'mine')+'\')">＋</button></h3><div class="hl">'
+      +(T.length?'<div class="hs">내야 할 자료</div>'+T.map(function(c){return row(c,false)}).join(''):'')+(M.length?'<div class="hs">내가 걷는 중 <small>— 제목을 누르면 연맹별 제출 현황 · 독촉 · 마감</small></div>'+M.map(function(c){return row(c,true)}).join(''):'')+'</div></section>'},
   fromDoc:colFromDoc,docBand:colDocBand,
   deep:function(qs){var id=qs.get('collect');if(!id)return;var tries=0,t=setInterval(function(){tries++;if(COLS[id]){clearInterval(t);go('collect',cIsTo(COLS[id])?'todo':'mine');colOpen(id)}else if(tries>20){clearInterval(t);X.say('링크의 자료 제출 요청을 찾지 못했습니다. 우리 연맹이 대상이 아니거나 삭제된 요청입니다.',true)}},500)}
 };
