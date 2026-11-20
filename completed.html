@@ -148,7 +148,7 @@
   <div class="pg-views" id="cpViews"></div>
   <div class="pg-bar" id="cpBar"></div>
   <div class="pg-bar" id="cpDl" style="background:#f0f7f4;border-color:#bfe3d4"></div>
-  <div class="pg-note">완료는 운영일지 회차(같은 회차 중복 제외)가 24회 이상인 학교입니다. 위 「24회 완료」를 바꾸면 기준이 달라집니다. 담당 선생님은 강습 신청서의 담당교사, 「회원」은 그 선생님이 홈페이지에 가입해 학교와 연결된 경우입니다. <b id="cpMsg" style="color:#0f766e"></b></div>
+  <div class="pg-note">완료는 운영일지 회차(같은 회차 중복 제외)가 24회 이상인 학교입니다. 위 「24회 완료」를 바꾸면 기준이 달라집니다. 담당 선생님은 강습 신청서의 담당교사, 「회원」은 그 선생님이 홈페이지에 가입해 학교와 연결된 경우입니다. 「수당 지급」 칸은 이체를 마친 뒤 눌러서 지급일을 적어 두는 표시입니다. <b id="cpMsg" style="color:#0f766e"></b></div>
   <div id="cpOut"></div></div>
 </section>
 <footer><div class="wrap">
@@ -200,7 +200,7 @@ function isMobile(){return window.innerWidth<=640}
 //   완료 = 일지 회차(중복 제외) 24회 이상. 기준 회차는 화면에서 바꿀 수 있음.
 const DOWN=['일','월','화','수','목','금','토'];
 let APPS=[],ME=null,MY=null,USERS={},GC={};
-const ST={view:'school',goal:'24',region:'',sido:'',type:'',q:'',sort:'area'};
+const ST={view:'school',goal:'24',region:'',sido:'',type:'',q:'',sort:'area',paid:''};
 function digits(s){return String(s||'').replace(/[^0-9]/g,'')}
 function telFmt(s){const d=digits(s);if(d.length===11)return d.slice(0,3)+'-'+d.slice(3,7)+'-'+d.slice(7);if(d.length===10)return d.slice(0,3)+'-'+d.slice(3,6)+'-'+d.slice(6);return String(s||'')}
 function mode(arr){const c={};let best='',n=0;arr.forEach(x=>{if(!x)return;c[x]=(c[x]||0)+1;if(c[x]>n){n=c[x];best=x}});return {v:best,n:n,c:c}}
@@ -229,13 +229,14 @@ async function load(){
     const need=[...new Set(APPS.map(a=>a.insUid).filter(u=>u&&!USERS[u]))];
     await Promise.all(need.map(async u=>{try{const d=await DB.collection('users').doc(u).get();USERS[u]=d.exists?(d.data()||{}):{}}catch(e){USERS[u]={}}}));
     APPS.forEach(a=>{const u=USERS[a.insUid]||{};a.insPhone=u.phone||'';a.insEmail=u.email||u.contactEmail||'';if(!a.instructor)a.instructor=u.name||''});
+    await paidLoad();
     render();
   }catch(e){out.innerHTML='<div class="pg-empty" style="color:#C41E2F">불러오지 못했습니다: '+esc(e.code||e.message||e)+'</div>'}
 }
 function deny(t){document.getElementById('pgBody').style.display='none';const d=document.getElementById('pgDeny');d.style.display='block';d.innerHTML=t}
 function goalN(){return +ST.goal||0}
 function isDone(a){return a.done>=goalN()}
-function filtered(){const q=ST.q.trim().toLowerCase(),g=goalN();return APPS.filter(a=>a.done>=g&&(!ST.region||a.region===ST.region)&&(!ST.sido||a.sido===ST.sido)&&(!ST.type||a.type===ST.type)
+function filtered(){const q=ST.q.trim().toLowerCase(),g=goalN();return APPS.filter(a=>a.done>=g&&(!ST.region||a.region===ST.region)&&(!ST.sido||a.sido===ST.sido)&&(!ST.type||a.type===ST.type)&&(!ST.paid||(ST.paid==='y')===!!PAID[a.id])
   &&(!q||[a.school,a.sigungu,a.instructor,a.teacher,a.sido].join(' ').toLowerCase().indexOf(q)>=0))
   .sort((x,y)=>ST.sort==='last'?String(y.last).localeCompare(String(x.last)):ST.sort==='school'?x.school.localeCompare(y.school,'ko'):
     (REGIONS.indexOf(x.region)+1||99)-(REGIONS.indexOf(y.region)+1||99)||x.sido.localeCompare(y.sido,'ko')||x.type.localeCompare(y.type,'ko')||x.school.localeCompare(y.school,'ko'))}
@@ -244,7 +245,7 @@ function instructorsOf(list){const m={};list.forEach(a=>{const k=a.insUid||a.ins
 function setV(k,v){ST[k]=v;if(k==='region')ST.sido='';render()}
 function render(){
   const list=filtered(),T=teachersOf(list),I=instructorsOf(list);window.__PAY_INS=I;
-  document.getElementById('cpTiles').innerHTML=[['강습 완료 학교',list.length,'건 (학교 × 유형)'],['담당 선생님',T.length,'명 · 회원 '+T.filter(t=>t.member).length],['강사(지도자)',I.length,'명'],['수업 회차',list.reduce((n,a)=>n+a.done,0),'회'],['참여 연인원',list.reduce((n,a)=>n+a.ppl,0).toLocaleString(),'명'],['교사 확인',list.reduce((n,a)=>n+a.conf,0)+' / '+list.reduce((n,a)=>n+a.n,0),'회차']]
+  document.getElementById('cpTiles').innerHTML=[['강습 완료 학교',list.length,'건 (학교 × 유형)'],['담당 선생님',T.length,'명 · 회원 '+T.filter(t=>t.member).length],['강사(지도자)',I.length,'명'],['수업 회차',list.reduce((n,a)=>n+a.done,0),'회'],['참여 연인원',list.reduce((n,a)=>n+a.ppl,0).toLocaleString(),'명'],['교사 확인',list.reduce((n,a)=>n+a.conf,0)+' / '+list.reduce((n,a)=>n+a.n,0),'회차'],['수당 지급 완료',list.filter(a=>PAID[a.id]).length+' / '+list.length,'건']]
     .map(t=>'<div class="pg-tile"><i>'+t[0]+'</i><b>'+t[1]+'</b><small>'+t[2]+'</small></div>').join('');
   const V=[['school','🏫 학교 명단'],['teacher','👩‍🏫 담당 선생님'],['instructor','🧑‍🏫 강사(지도자)']];
   document.getElementById('cpViews').innerHTML=V.map(v=>'<button class="pg-view'+(ST.view===v[0]?' on':'')+'" onclick="setV(\'view\',\''+v[0]+'\')">'+v[1]+'</button>').join('');
@@ -255,6 +256,7 @@ function render(){
     +'<select onchange="setV(\'goal\',this.value)" title="일지 회차(중복 제외) 기준">'+[['24','24회 완료'],['20','20회 이상'],['12','12회 이상'],['1','강습 시작한 학교 전체']].map(o=>'<option value="'+o[0]+'"'+(ST.goal===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>'
     +'<select onchange="setV(\'region\',this.value)">'+opt(regs,ST.region,'권역 전체')+'</select><select onchange="setV(\'sido\',this.value)">'+opt(sidos,ST.sido,'시도 전체')+'</select>'
     +'<select onchange="setV(\'type\',this.value)">'+opt(['학교체육','방과후·늘봄'],ST.type,'유형 전체')+'</select>'
+    +'<select onchange="setV(\'paid\',this.value)" title="수당 지급 완료 표시 기준"><option value="">수당 지급 전체</option><option value="n"'+(ST.paid==='n'?' selected':'')+'>수당 미지급</option><option value="y"'+(ST.paid==='y'?' selected':'')+'>수당 지급 완료</option></select>'
     +'<select onchange="setV(\'sort\',this.value)"><option value="area"'+(ST.sort==='area'?' selected':'')+'>권역·시도·학교명순</option><option value="school"'+(ST.sort==='school'?' selected':'')+'>학교명순</option><option value="last"'+(ST.sort==='last'?' selected':'')+'>최근 수업일순</option></select>'
     +'<input type="search" placeholder="학교 · 시군구 · 강사 · 선생님 검색" value="'+esc(ST.q)+'" oninput="setV(\'q\',this.value)">';
   document.getElementById('cpDl').innerHTML='<b style="font-size:13px">📥 서식 내려받기</b><span class="pg-note" style="margin:0">지금 보이는 조건('+list.length+'건) 그대로 나갑니다.</span><span style="flex:1"></span>'
@@ -265,21 +267,56 @@ function render(){
   const out=document.getElementById('cpOut');
   if(!list.length){out.innerHTML='<div class="pg-empty">조건에 맞는 학교가 없습니다.'+(ST.goal==='24'?' 기준을 「20회 이상」이나 「강습 시작한 학교 전체」로 바꿔 보세요.':'')+'</div>';return}
   const cards=isMobile()?' cards':'';
-  if(ST.view==='school')out.innerHTML='<div class="pg-tblwrap"><table class="pg-tbl'+cards+'"><thead><tr><th>#</th><th>시도</th><th>시군구</th><th>학교</th><th>유형</th><th>학년·대상</th><th>기간</th><th>요일·시간</th><th>회차</th><th>연인원</th><th>강사(지도자)</th><th>담당 선생님</th><th>교사 확인</th><th></th></tr></thead><tbody>'
+  if(ST.view==='school')out.innerHTML='<div class="pg-tblwrap"><table class="pg-tbl'+cards+'"><thead><tr><th>#</th><th>시도</th><th>시군구</th><th>학교</th><th>유형</th><th>학년·대상</th><th>기간</th><th>요일·시간</th><th>회차</th><th>연인원</th><th>강사(지도자)</th><th>담당 선생님</th><th>교사 확인</th><th>수당 지급</th><th></th></tr></thead><tbody>'
     +list.map((a,i)=>'<tr><td data-l="번호">'+(i+1)+'</td><td data-l="시도">'+esc(a.sido||'-')+'</td><td data-l="시군구">'+esc(a.sigungu||'-')+'</td><td class="nm" data-l="학교">'+esc(a.school)+'</td><td data-l="유형"><span class="pg-pill" style="background:'+(a.type==='학교체육'?'#153A77':'#0f766e')+'">'+esc(a.type)+'</span></td>'
       +'<td data-l="학년·대상">'+esc(a.grade||a.students||'-')+'</td><td data-l="기간" style="white-space:nowrap">'+esc(periodOf(a))+'</td><td data-l="요일·시간">'+esc((a.dows.length?a.dows.join('·'):'')+(a.ctime?' '+a.ctime:''))+'</td>'
       +'<td data-l="회차"><b style="color:'+(a.done>=24?'#0f766e':'#b8860b')+'">'+a.done+'</b>/24</td><td data-l="연인원">'+a.ppl.toLocaleString()+'</td>'
       +'<td data-l="강사">'+esc(a.instructor||'-')+(a.selfTeach?' <small style="color:#8a919d">(본인 지도)</small>':'')+(a.insPhone?'<br><small>'+esc(telFmt(a.insPhone))+'</small>':'')+'</td>'
       +'<td data-l="선생님">'+esc(a.teacher||'-')+(a.tMember?' <span class="pg-pill" style="background:#0f766e;font-size:10px">회원</span>':'')+(a.tPhone?'<br><small>'+esc(telFmt(a.tPhone))+'</small>':'')+'</td>'
-      +'<td data-l="교사 확인">'+a.conf+' / '+a.n+'</td><td data-l=""><a class="pg-btn o" style="padding:3px 9px;min-height:0;font-size:11.5px;text-decoration:none" href="schoollogs.html?app='+encodeURIComponent(a.id)+'" target="_blank">일지</a> <button class="pg-btn o" style="padding:3px 9px;min-height:0;font-size:11.5px;border-color:#b8860b;color:#8a6508" onclick="xlsPay([\''+a.id+'\'])" title="이 학교 지도자 수당 서류(엑셀)를 내려받고, 운영일지(홈페이지 양식)를 인쇄·PDF 창으로 엽니다">수당</button></td></tr>').join('')+'</tbody></table></div>';
+      +'<td data-l="교사 확인">'+a.conf+' / '+a.n+'</td><td data-l="수당 지급">'+paidCell(a)+'</td><td data-l=""><a class="pg-btn o" style="padding:3px 9px;min-height:0;font-size:11.5px;text-decoration:none" href="schoollogs.html?app='+encodeURIComponent(a.id)+'" target="_blank">일지</a> <button class="pg-btn o" style="padding:3px 9px;min-height:0;font-size:11.5px;border-color:#b8860b;color:#8a6508" onclick="xlsPay([\''+a.id+'\'])" title="이 학교 지도자 수당 서류(엑셀)를 내려받고, 운영일지(홈페이지 양식)를 인쇄·PDF 창으로 엽니다">수당</button></td></tr>').join('')+'</tbody></table></div>';
   else if(ST.view==='teacher')out.innerHTML='<div class="pg-tblwrap"><table class="pg-tbl'+cards+'"><thead><tr><th>#</th><th>시도</th><th>성명</th><th>휴대전화</th><th>이메일</th><th>회원</th><th>학교</th><th>회차</th><th>교사 확인</th></tr></thead><tbody>'
     +T.map((t,i)=>'<tr><td data-l="번호">'+(i+1)+'</td><td data-l="시도">'+esc(t.sido||'-')+'</td><td class="nm" data-l="성명">'+esc(t.name)+'</td><td data-l="휴대전화">'+esc(telFmt(t.phone)||'-')+'</td><td data-l="이메일">'+esc(t.email||'-')+'</td><td data-l="회원">'+(t.member?'<span class="pg-pill" style="background:#0f766e">가입</span>':'<span style="color:#8a919d">미가입</span>')+'</td>'
       +'<td data-l="학교">'+t.schools.map(a=>esc(a.school)+' <small style="color:#6b7280">'+esc(a.type)+'</small>').join('<br>')+'</td><td data-l="회차">'+t.schools.map(a=>a.done).join(' · ')+'</td><td data-l="교사 확인">'+t.schools.reduce((n,a)=>n+a.conf,0)+' / '+t.schools.reduce((n,a)=>n+a.n,0)+'</td></tr>').join('')+'</tbody></table></div>';
   else out.innerHTML='<div class="pg-tblwrap"><table class="pg-tbl'+cards+'"><thead><tr><th>#</th><th>성명</th><th>휴대전화</th><th>학교 수</th><th>담당 학교</th><th>회차 합계</th><th>연인원</th><th>수당 서류</th></tr></thead><tbody>'
     +I.map((t,i)=>'<tr><td data-l="번호">'+(i+1)+'</td><td class="nm" data-l="성명">'+esc(t.name||'-')+(t.self?' <small style="color:#8a919d">(본인 지도)</small>':'')+'</td><td data-l="휴대전화">'+esc(telFmt(t.phone)||'-')+'</td><td data-l="학교 수">'+t.schools.length+'</td>'
-      +'<td data-l="담당 학교">'+t.schools.map(a=>esc(a.sido)+' '+esc(a.school)+' <small style="color:#6b7280">'+esc(a.type)+'</small>').join('<br>')+'</td><td data-l="회차">'+t.schools.reduce((n,a)=>n+a.done,0)+'</td><td data-l="연인원">'+t.schools.reduce((n,a)=>n+a.ppl,0).toLocaleString()+'</td><td data-l="수당 서류"><button class="pg-btn o" style="padding:3px 9px;min-height:0;font-size:11.5px;border-color:#b8860b;color:#8a6508" onclick="xlsPayIns('+i+')" title="이 지도자가 맡은 학교(지금 보이는 조건)의 수당 서류를 한 파일로 — 학교가 2곳 이하면 운영일지 창도 함께 엽니다">💰 수당 서류</button><div id="psc'+i+'" style="font-size:11px;margin-top:5px;line-height:1.5"></div></td></tr>').join('')+'</tbody></table></div>';
+      +'<td data-l="담당 학교">'+t.schools.map(a=>esc(a.sido)+' '+esc(a.school)+' <small style="color:#6b7280">'+esc(a.type)+'</small> '+paidCell(a)).join('<br>')+'</td><td data-l="회차">'+t.schools.reduce((n,a)=>n+a.done,0)+'</td><td data-l="연인원">'+t.schools.reduce((n,a)=>n+a.ppl,0).toLocaleString()+'</td><td data-l="수당 서류"><button class="pg-btn o" style="padding:3px 9px;min-height:0;font-size:11.5px;border-color:#b8860b;color:#8a6508" onclick="xlsPayIns('+i+')" title="이 지도자가 맡은 학교(지금 보이는 조건)의 수당 서류를 한 파일로 — 학교가 2곳 이하면 운영일지 창도 함께 엽니다">💰 수당 서류</button><div id="psc'+i+'" style="font-size:11px;margin-top:5px;line-height:1.5"></div></td></tr>').join('')+'</tbody></table></div>';
   if(ST.view==='instructor'&&typeof payConsentFill==='function')payConsentFill();
 }
+// ── 수당 지급 완료 표시 (사무국 기록) — privateInfo/{지도자 uid}.feePaid[신청서 ID] {date,sessions,amount,school,type,byUid,byName,at} · 본인과 중앙만 읽히는 곳 ──
+//   이체를 마친 학교(프로그램)에 지급일을 적어 두는 표시입니다. 이체 자체는 하지 않습니다. 지우면 「미지급」으로 돌아갑니다.
+let PAID={};
+function paidToday(){const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())}
+function paidAmt(a){return Math.min(a.done,24)*50000}
+function paidMd(d){const p=String(d||'').split('-');return p.length<3?String(d||''):(+p[1])+'/'+(+p[2])}
+async function paidLoad(){PAID={};const us=[...new Set(APPS.map(a=>a.insUid).filter(Boolean))];
+  await Promise.all(us.map(async u=>{try{const d=await DB.collection('privateInfo').doc(u).get();const fp=(d.exists&&(d.data()||{}).feePaid)||{};APPS.forEach(a=>{if(a.insUid===u&&fp[a.id]&&fp[a.id].date)PAID[a.id]=fp[a.id]})}catch(e){}}))}
+function paidCell(a){if(!a.insUid)return '<small style="color:#8a919d">-</small>';const p=PAID[a.id];
+  return '<a href="#" onclick="paidOpen(\''+a.id+'\');return false" title="'+(p?'지급일 '+esc(p.date)+(p.byName?' · 적은 사람 '+esc(p.byName):'')+' — 눌러서 고치기':'이체를 마쳤으면 눌러서 지급일을 적습니다')+'" style="display:inline-block;white-space:nowrap;font-size:11.5px;font-weight:800;text-decoration:none;border-radius:999px;padding:2px 9px;'+(p?'background:#0f766e;color:#fff':'background:#fff;color:#8a919d;border:1.5px solid #cfd6e0')+'">'+(p?'✔ 지급 '+esc(paidMd(p.date)):'미지급')+'</a>'}
+function paidOpen(id){const a=APPS.find(x=>x.id===id);if(!a)return;
+  if(!(MY&&isAdminDoc(MY))){alert('중앙 사무국(중앙 관리자)만 적을 수 있습니다.');return}
+  if(!a.insUid){alert('회원에 연결된 지도자가 없어 적을 수 없습니다.');return}
+  const p=PAID[id]||{},old=document.getElementById('ppModal');if(old)old.remove();
+  const amt=paidAmt(a),tax=(typeof payTaxOf==='function')?payTaxOf(amt):0;
+  const inp='width:100%;padding:9px 12px;border:1.5px solid #d8dde6;border-radius:9px;margin:4px 0 10px;font-family:inherit;font-size:13.5px',btn='border:none;border-radius:10px;padding:9px 14px;font-weight:800;cursor:pointer;font-family:inherit';
+  const d=document.createElement('div');d.id='ppModal';d.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:10050;display:flex;align-items:center;justify-content:center;padding:16px';
+  d.innerHTML='<div style="background:#fff;border-radius:16px;max-width:470px;width:100%;padding:20px;font-size:13.5px"><b style="font-size:16px">수당 지급 완료 표시 — '+esc(a.instructor||'')+'</b>'
+    +'<div style="color:#4b5563;line-height:1.7;margin:8px 0 12px">'+esc(a.sido)+' '+esc(a.school)+' · '+esc(a.type)+' · 일지 '+a.done+'회<br>지급 회차 '+Math.min(a.done,24)+'회 × 50,000원 = <b>'+amt.toLocaleString()+'원</b>'+(tax?' (원천징수 '+tax.toLocaleString()+'원 · 차인 '+(amt-tax).toLocaleString()+'원)':'')+'<br><b style="color:#C41E2F">실제로 이체를 마친 뒤에</b> 이체한 날을 적어 주세요. 이 표시는 기록일 뿐 이체를 하지는 않습니다.</div>'
+    +'<label style="font-weight:800;font-size:12px">지급일(이체한 날)</label><input type="date" id="ppDate" value="'+esc(p.date||paidToday())+'" style="'+inp+'">'
+    +(p.date?'<div style="font-size:11.5px;color:#6b7280;margin-bottom:8px">지금 기록: '+esc(p.date)+(p.byName?' · 적은 사람 '+esc(p.byName):'')+'</div>':'')
+    +'<div style="display:flex;gap:8px;align-items:center"><button type="button" style="'+btn+';background:#fdf1f1;color:#8c1622'+(p.date?'':';display:none')+'" onclick="paidSave(\''+id+'\',true)">표시 지우기</button><span style="flex:1"></span>'
+    +'<button type="button" style="'+btn+';background:#eceff4" onclick="document.getElementById(\'ppModal\').remove()">취소</button><button type="button" style="'+btn+';background:#0f766e;color:#fff" onclick="paidSave(\''+id+'\',false)">지급 완료로 저장</button></div><div id="ppMsg" style="font-size:12px;color:#C41E2F;margin-top:8px"></div></div>';
+  document.body.appendChild(d)}
+async function paidSave(id,del,dateArg){const a=APPS.find(x=>x.id===id);if(!a||!a.insUid||!(MY&&isAdminDoc(MY)))return false;
+  const msg=document.getElementById('ppMsg'),ref=DB.collection('privateInfo').doc(a.insUid);
+  try{
+    if(del){await ref.set({feePaid:{[id]:firebase.firestore.FieldValue.delete()}},{merge:true});delete PAID[id]}
+    else{const date=dateArg||(document.getElementById('ppDate')||{}).value||'';
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){if(msg)msg.textContent='지급일을 골라 주세요.';return false}
+      if(date>paidToday()){if(msg)msg.textContent='오늘보다 뒤 날짜는 적을 수 없습니다.';return false}
+      const rec={date:date,sessions:Math.min(a.done,24),amount:paidAmt(a),school:a.school,type:a.type,byUid:(ME&&ME.uid)||'',byName:MY.name||'',at:firebase.firestore.FieldValue.serverTimestamp()};
+      await ref.set({feePaid:{[id]:rec}},{merge:true});PAID[id]={date:date,sessions:rec.sessions,amount:rec.amount,byName:rec.byName}}
+    const m=document.getElementById('ppModal');if(m)m.remove();render();return true
+  }catch(e){if(msg)msg.textContent='저장하지 못했습니다: '+(e.code||e.message||e);return false}}
 // ── 엑셀 공통 ──
 function xlNeed(){if(typeof ExcelJS==='undefined'){alert('엑셀 라이브러리를 불러오는 중입니다. 잠시 후 다시 눌러 주세요.');return false}return true}
 async function xlSave(wb,name){const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}
@@ -291,11 +328,11 @@ function xlSheet(wb,name,title,cols,rows,note){const ws=wb.addWorksheet(name,{pa
   rows.forEach((r,ri)=>{const row=ws.getRow(4+ri);r.forEach((v,i)=>{const cell=row.getCell(i+1);cell.value=v;cell.font={name:'맑은 고딕',size:10};cell.border=bAll;cell.alignment={horizontal:cols[i][2]||'center',vertical:'middle',wrapText:true}})});
   ws.autoFilter={from:{row:3,column:1},to:{row:3+rows.length,column:N}};ws.pageSetup.printTitlesRow='3:3';return ws}
 function stamp(){const d=new Date();return d.getFullYear()+'. '+(d.getMonth()+1)+'. '+d.getDate()+'. 기준'}
-function condText(){return [ST.goal==='1'?'강습 시작 학교 전체':ST.goal+'회 이상',ST.region,ST.sido,ST.type,ST.q?'검색 「'+ST.q+'」':''].filter(Boolean).join(' · ')}
+function condText(){return [ST.goal==='1'?'강습 시작 학교 전체':ST.goal+'회 이상',ST.region,ST.sido,ST.type,ST.paid==='y'?'수당 지급 완료':ST.paid==='n'?'수당 미지급':'',ST.q?'검색 「'+ST.q+'」':''].filter(Boolean).join(' · ')}
 async function xlsList(){if(!xlNeed())return;const list=filtered();if(!list.length){alert('내려받을 학교가 없습니다.');return}
   const wb=new ExcelJS.Workbook();wb.creator='대한민국플라잉디스크연맹';const note=condText()+' · '+stamp();
-  xlSheet(wb,'강습 완료 학교','2026 유소년 스포츠 기반구축사업 강습 완료 학교 명단',[['연번',6],['권역',9],['시도',8],['시군구',11],['학교명',20,'left'],['유형',11],['학년·대상',14],['기간',16],['요일',9],['시간',11],['회차',7],['연인원',8],['최대 인원',8],['남',6],['여',6],['강사(지도자)',11],['강사 연락처',15],['담당 선생님',11],['선생님 연락처',15],['선생님 이메일',24,'left'],['회원 가입',8],['교사 확인',9]],
-    list.map((a,i)=>[i+1,a.region,a.sido,a.sigungu,a.school,a.type,a.grade||a.students,periodOf(a),a.dows.length?'매주 '+a.dows.join('·')+'요일':'',a.ctime||'',a.done,a.ppl,a.maxP,a.male||'',a.female||'',a.instructor,telFmt(a.insPhone),a.teacher,telFmt(a.tPhone),a.tEmail,a.tMember?'O':'X',a.conf+'/'+a.n]),note);
+  xlSheet(wb,'강습 완료 학교','2026 유소년 스포츠 기반구축사업 강습 완료 학교 명단',[['연번',6],['권역',9],['시도',8],['시군구',11],['학교명',20,'left'],['유형',11],['학년·대상',14],['기간',16],['요일',9],['시간',11],['회차',7],['연인원',8],['최대 인원',8],['남',6],['여',6],['강사(지도자)',11],['강사 연락처',15],['담당 선생님',11],['선생님 연락처',15],['선생님 이메일',24,'left'],['회원 가입',8],['교사 확인',9],['수당 지급일',12]],
+    list.map((a,i)=>[i+1,a.region,a.sido,a.sigungu,a.school,a.type,a.grade||a.students,periodOf(a),a.dows.length?'매주 '+a.dows.join('·')+'요일':'',a.ctime||'',a.done,a.ppl,a.maxP,a.male||'',a.female||'',a.instructor,telFmt(a.insPhone),a.teacher,telFmt(a.tPhone),a.tEmail,a.tMember?'O':'X',a.conf+'/'+a.n,(PAID[a.id]||{}).date||'']),note);
   const T=teachersOf(list);
   xlSheet(wb,'담당 선생님','강습 완료 학교 담당 선생님 명단',[['연번',6],['시도',8],['성명',11],['휴대전화',15],['이메일',26,'left'],['회원 가입',9],['학교',30,'left'],['유형',14],['회차',9],['교사 확인',10],['비고',18,'left']],
     T.map((t,i)=>[i+1,t.sido,t.name,telFmt(t.phone),t.email,t.member?'O':'X',t.schools.map(a=>a.school).join(', '),[...new Set(t.schools.map(a=>a.type))].join(', '),t.schools.map(a=>a.done).join(', '),t.schools.reduce((n,a)=>n+a.conf,0)+'/'+t.schools.reduce((n,a)=>n+a.n,0),'']),note);
