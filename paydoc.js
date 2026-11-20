@@ -35,6 +35,11 @@ async function xlsPay(ids){
       try{if(p.uid){var cq=await DB.collection('staffCareer').where('uid','==',p.uid).limit(500).get();p.career=cq.docs.map(function(d){return d.data()||{}}).sort(function(x,y){return String(y.date||'').localeCompare(String(x.date||''))})}}catch(e){}
       var qz=u.quals||{};p.selfQual=[qz.leader?'지도자 '+qz.leader:'',qz.referee?'심판 '+qz.referee:'',qz.youth?'유소년스포츠지도사':''].filter(Boolean);
       p.qualDocs=(u.qualDocs||[]).filter(function(x){return /^https?:/.test(String(x))});
+      // 서명 — 본인이 마이페이지에 등록한 서명만 씁니다(등록 화면 안내: 「수당 신청서·계약서에 자동으로 들어갑니다」). 위촉계약서 서명 등 다른 문서의 서명은 옮겨 쓰지 않습니다. 없으면 빈칸.
+      p.sig=null;
+      if(u.signatureImg){try{var sr=await fetch(u.signatureImg),sb=await sr.blob(),bm=await createImageBitmap(sb);
+        var b64=await new Promise(function(ok,no){var fr=new FileReader();fr.onload=function(){ok(fr.result)};fr.onerror=no;fr.readAsDataURL(sb)});
+        p.sig={b64:b64,w:bm.width,h:bm.height,ext:/jpe?g/.test(sb.type)?'jpeg':'png'}}catch(e){p.sig=null}}
       p.apps.sort(function(x,y){return String(x.school).localeCompare(String(y.school),'ko')||String(x.type).localeCompare(String(y.type),'ko')});
       for(var ai=0;ai<p.apps.length;ai++){var a=p.apps[ai];
         var q=await DB.collection('sessionLogs').where('appId','==',a.id).get();
@@ -69,14 +74,17 @@ async function xlsPay(ids){
       cellSet(row.getCell(1),i+1);cellSet(row.getCell(2),p.name);cellSet(row.getCell(3),p.id6);cellSet(row.getCell(4),telFmt(p.phone));
       cellSet(row.getCell(5),p.bank?(p.bank+' '+p.acct+(p.holder&&p.holder!==p.name?' (예금주 '+p.holder+')':'')):'',{h:'left'});
       cellSet(row.getCell(6),p.amt,{fmt:NUM,h:'right'});cellSet(row.getCell(7),p.tax,{fmt:NUM,h:'right'});
-      cellSet(row.getCell(8),{formula:'F'+r+'-G'+r,result:p.amt-p.tax},{fmt:NUM,h:'right'});cellSet(row.getCell(9),'')});
+      cellSet(row.getCell(8),{formula:'F'+r+'-G'+r,result:p.amt-p.tax},{fmt:NUM,h:'right'});cellSet(row.getCell(9),'');
+      if(p.sig){row.height=38;var bw=108,bh=42,k=Math.min(bw/p.sig.w,bh/p.sig.h),iw=Math.max(8,Math.round(p.sig.w*k)),ih=Math.max(8,Math.round(p.sig.h*k));
+        ws.addImage(wb.addImage({base64:p.sig.b64,extension:p.sig.ext}),{tl:{col:8+Math.max(0,(117-iw)/2)/117,row:(r-1)+Math.max(0.04,(50-ih)/2/50)},ext:{width:iw,height:ih}})}});
     var rT=r0+P.length,rowT=ws.getRow(rT),rL=rT-1;rowT.height=26;ws.mergeCells('A'+rT+':E'+rT);cellSet(rowT.getCell(1),'합  계',{bold:true,fill:'FFEDEDED'});
     var sumA=P.reduce(function(n,p){return n+p.amt},0),sumB=P.reduce(function(n,p){return n+p.tax},0);
     cellSet(rowT.getCell(6),{formula:'SUM(F'+r0+':F'+rL+')',result:sumA},{fmt:NUM,h:'right',bold:true});cellSet(rowT.getCell(7),{formula:'SUM(G'+r0+':G'+rL+')',result:sumB},{fmt:NUM,h:'right',bold:true});
     cellSet(rowT.getCell(8),{formula:'SUM(H'+r0+':H'+rL+')',result:sumA-sumB},{fmt:NUM,h:'right',bold:true});cellSet(rowT.getCell(9),'');
     ['※ 예탁계좌에서 보조금 계좌로 통합 이체 후 다수의 대상자에게 지출된 건인 경우 계좌이체 확인증 필수 첨부',
      '※ 원천징수(기타소득): 필요경비 60% → 소득세 20% + 지방소득세 10% = 지급액의 8.8%. 한 달 합산 지급액 125,000원 이하는 0원(사업 지침 ② 수당 지급 공통 사항)',
-     '※ 지급액 = 운영일지 회차(같은 회차 중복 제외, 프로그램당 '+PAY_CAP+'회까지) × '+PAY_UNIT.toLocaleString()+'원 — 산출은 「산출 내역」 시트, 회차별 수업일은 「강습 실시 내역」 시트']
+     '※ 지급액 = 운영일지 회차(같은 회차 중복 제외, 프로그램당 '+PAY_CAP+'회까지) × '+PAY_UNIT.toLocaleString()+'원 — 산출은 「산출 내역」 시트, 회차별 수업일은 「강습 실시 내역」 시트',
+     '※ 서명 칸의 서명은 지도자 본인이 홈페이지(마이페이지)에 등록한 서명입니다. 등록 서명이 없는 사람은 빈칸이니 직접 서명을 받으세요.']
       .forEach(function(t,i){var r=rT+1+i;ws.mergeCells('A'+r+':I'+r);cellSet(ws.getCell('A'+r),t,{h:'left',size:9,border:false,color:'FF444444'})});
     // ── ② 산출 내역 ──
     var w2=wb.addWorksheet('산출 내역',{pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}});
@@ -104,7 +112,7 @@ async function xlsPay(ids){
     ['번호','붙일 서류','근거','지금 상태 (홈페이지 기준)','확인'].forEach(function(h,i){cellSet(w4.getRow(2).getCell(i+1),h,{bold:true,fill:'FFEDEDED'})});
     var st=function(fn){return P.map(function(p){return p.name+': '+fn(p)}).join('\n')};
     var CK=[['내부결재문서 (수당 지급 결재)','정산 기준 운영비 공통 제출서류 1','직접 작성'],
-      ['수당 등 수수료 집행 내역서 — 이 파일 첫 시트, 본인 서명','사업 지침 ② · 정산 기준 [별첨 1]',st(function(p){return (p.id6?'':'주민번호 앞자리 없음 · ')+(p.phone?'':'전화 없음 · ')+'서명 받기'})],
+      ['수당 등 수수료 집행 내역서 — 이 파일 첫 시트, 본인 서명','사업 지침 ② · 정산 기준 [별첨 1]',st(function(p){return (p.id6?'':'주민번호 앞자리 없음 · ')+(p.phone?'':'전화 없음 · ')+(p.sig?'홈페이지 등록 서명 넣음':'등록 서명 없음 — 직접 서명 받기')})],
       ['본인 명의 통장 사본','사업 지침 ② 본인 명의 계좌이체 원칙',st(function(p){return !p.bank?'계좌 미등록':(p.holder&&p.holder!==p.name?'예금주가 다름('+p.holder+') — 본인 계좌로':'계좌 등록됨(예금주 '+(p.holder||'미기재')+')')})],
       ['원천징수영수증 또는 원천징수이행상황신고서','정산 기준 일반수용비 정산 시 첨부서류 3',st(function(p){return p.tax?'원천징수 '+p.tax.toLocaleString()+'원 — 지급 다음 달 10일까지 신고·납부':'원천징수 없음(125,000원 이하)'})],
       ['이력서 · 자격증 등 자격 확인 서류','정산 기준 일반수용비 첨부서류 3 · 사업 지침 ③ 강사 자격 요건',st(function(p){var a=[];a.push(p.lics.length?'연맹 자격 '+p.lics.map(function(l){return (l.type||'')+' '+(l.grade||'')}).join(', '):'연맹 자격 대장 없음');
@@ -150,7 +158,7 @@ async function xlsPay(ids){
     });
     await xlSave(wb,'지도자수당_집행내역서_'+(P.length===1?P[0].name+'_':'')+ymd()+'.xlsx');
     // 3) 화면 안내
-    var warn=[];P.forEach(function(p){if(!p.bank)warn.push(p.name+' 계좌 미등록');else if(p.holder&&p.holder!==p.name)warn.push(p.name+' 예금주 다름');if(!p.id6)warn.push(p.name+' 주민번호 앞자리 없음');
+    var warn=[];P.forEach(function(p){if(!p.bank)warn.push(p.name+' 계좌 미등록');else if(p.holder&&p.holder!==p.name)warn.push(p.name+' 예금주 다름');if(!p.id6)warn.push(p.name+' 주민번호 앞자리 없음');if(!p.sig)warn.push(p.name+' 등록 서명 없음');
       p.apps.forEach(function(a){if(a.conf<a.n)warn.push(a.school+' '+a.type+' 담당교사 확인 '+(a.n-a.conf)+'회 없음');if(a._contract!=='서명 완료')warn.push(a.school+' '+a.type+' 위촉계약서 '+a._contract)})});
     payMsg('수당 서류: '+P.length+'명 · '+totalSess+'회 · '+sumA.toLocaleString()+'원 (원천징수 '+sumB.toLocaleString()+'원)'+(warn.length?' — 확인: '+warn.join(', '):''));
   }catch(e){payMsg('');alert('수당 서류를 만들지 못했습니다: '+(e.code||e.message||e))}
