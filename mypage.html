@@ -2324,7 +2324,7 @@ async function bankbookUp(inp){const f=inp.files&&inp.files[0];if(!f||!AUTH.curr
     if(!isPdf){try{blob=await compressImg(f);if(blob!==f)ct='image/jpeg'}catch(e){}}
     if(blob.size>=8*1024*1024)throw new Error('파일이 8MB를 넘습니다. 더 작은 사진으로 올려 주세요');
     const ref=firebase.storage().ref('docs/'+uid+'/bankbook_'+Date.now()+'.'+ext);await ref.put(blob,{contentType:ct});const url=await ref.getDownloadURL();
-    await DB.collection('privateInfo').doc(uid).set({bankbookDoc:url,bankbookAt:firebase.firestore.FieldValue.serverTimestamp(),name:(MYD&&MYD.name)||''},{merge:true});
+    const bk={bankbookDoc:url,bankbookAt:firebase.firestore.FieldValue.serverTimestamp()};if(MYD&&MYD.name)bk.name=MYD.name;await DB.collection('privateInfo').doc(uid).set(bk,{merge:true});
     bankbookState(url,'방금 올림');inp.value='';
   }catch(e){if(el)el.innerHTML='<b style="color:#C41E2F">올리지 못했습니다: '+esc(e.message||e.code||e)+'</b>';inp.value=''}}
 function compressImg(file){
