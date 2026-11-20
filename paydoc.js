@@ -25,7 +25,7 @@ async function xlsPay(ids){
     for(var pi=0;pi<P.length;pi++){var p=P[pi],u=USERS[p.uid]||{};
       p.name=u.name||p.name;p.phone=u.phone||'';p.bank=u.bank||'';p.acct=u.accountNum||'';p.holder=u.accountHolder||'';p.contracts=u.contracts||{};
       var id6='';
-      try{if(p.uid){var pd=await DB.collection('privateInfo').doc(p.uid).get();if(pd.exists)id6=digits((pd.data()||{}).rrn).slice(0,6)}}catch(e){}
+      try{if(p.uid){var pd=await DB.collection('privateInfo').doc(p.uid).get();if(pd.exists){id6=digits((pd.data()||{}).rrn).slice(0,6);p.bankbook=(pd.data()||{}).bankbookDoc||''}}}catch(e){}
       if(id6.length<6&&u.birth){var b=digits(u.birth);id6=b.length>=8?b.slice(2,8):b.slice(0,6)}
       p.id6=id6.length===6?id6:'';
       // 이력·자격 — 홈페이지에 등록된 것만(자격 대장은 회원에 연결된 것, 이관·승급된 옛 번호 제외). 없으면 없는 대로 둡니다.
@@ -113,7 +113,7 @@ async function xlsPay(ids){
     var st=function(fn){return P.map(function(p){return p.name+': '+fn(p)}).join('\n')};
     var CK=[['내부결재문서 (수당 지급 결재)','정산 기준 운영비 공통 제출서류 1','직접 작성'],
       ['수당 등 수수료 집행 내역서 — 이 파일 첫 시트, 본인 서명','사업 지침 ② · 정산 기준 [별첨 1]',st(function(p){return (p.id6?'':'주민번호 앞자리 없음 · ')+(p.phone?'':'전화 없음 · ')+(p.sig?'홈페이지 등록 서명 넣음':'등록 서명 없음 — 직접 서명 받기')})],
-      ['본인 명의 통장 사본','사업 지침 ② 본인 명의 계좌이체 원칙',st(function(p){return !p.bank?'계좌 미등록':(p.holder&&p.holder!==p.name?'예금주가 다름('+p.holder+') — 본인 계좌로':'계좌 등록됨(예금주 '+(p.holder||'미기재')+')')})],
+      ['본인 명의 통장 사본','사업 지침 ② 본인 명의 계좌이체 원칙',st(function(p){return !p.bank?'계좌 미등록':(p.holder&&p.holder!==p.name?'예금주가 다름('+p.holder+') — 본인 계좌로':'계좌 등록됨(예금주 '+(p.holder||'미기재')+')')+' · '+(p.bankbook?'통장 사본 등록됨(아래 링크)':'통장 사본 없음 — 마이페이지 「수당 지급 계좌」에서 올리거나 사본 받기')})],
       ['원천징수영수증 또는 원천징수이행상황신고서','정산 기준 일반수용비 정산 시 첨부서류 3',st(function(p){return p.tax?'원천징수 '+p.tax.toLocaleString()+'원 — 지급 다음 달 10일까지 신고·납부':'원천징수 없음(125,000원 이하)'})],
       ['이력서 · 자격증 등 자격 확인 서류','정산 기준 일반수용비 첨부서류 3 · 사업 지침 ③ 강사 자격 요건',st(function(p){var a=[];a.push(p.lics.length?'연맹 자격 '+p.lics.map(function(l){return (l.type||'')+' '+(l.grade||'')}).join(', '):'연맹 자격 대장 없음');
         if(p.selfQual.length)a.push('본인 신고 '+p.selfQual.join(', '));a.push(p.qualDocs.length?'자격증 파일 '+p.qualDocs.length+'장':'자격증 파일 없음');
@@ -122,7 +122,9 @@ async function xlsPay(ids){
       ['강사 위촉계약서','연맹 자체 서류 (지침에 이름은 없음)',st(function(p){return p.apps.map(function(a){return a.school+' '+a.type+' '+a._contract}).join(' / ')})],
       ['계좌이체 확인증 (개인별)','정산 기준 [별첨 1] ※','이체 후 첨부']];
     CK.forEach(function(c,i){var row=w4.getRow(3+i);[i+1,c[0],c[1],c[2],'□'].forEach(function(v,j){cellSet(row.getCell(j+1),v,{h:(j===0||j===4)?'center':'left'})});row.height=Math.max(24,16*String(c[2]).split('\n').length+8)});
-    var rN=3+CK.length+1;w4.mergeCells('A'+rN+':E'+rN);cellSet(w4.getCell('A'+rN),'※ 주관단체(연맹) 소속 임직원에게는 수당을 지급할 수 없습니다(사업 지침 ④ · 정산 기준 일반수용비 부당집행 사례 4). 지급 전에 대상자가 연맹 임직원이 아닌지 확인하세요.',{h:'left',size:9,border:false,color:'FFC41E2F'});
+    var rB=3+CK.length;P.forEach(function(p){if(!p.bankbook)return;var row=w4.getRow(rB);cellSet(row.getCell(1),'');cellSet(row.getCell(2),'통장 사본 — '+p.name,{h:'left'});cellSet(row.getCell(3),'본인이 홈페이지에 올린 파일(본인·중앙 사무국만 열람)',{h:'left'});
+      cellSet(row.getCell(4),{text:'올린 파일 열기',hyperlink:p.bankbook},{h:'left',color:'FF153A77'});cellSet(row.getCell(5),'');rB++});
+    var rN=rB+1;w4.mergeCells('A'+rN+':E'+rN);cellSet(w4.getCell('A'+rN),'※ 주관단체(연맹) 소속 임직원에게는 수당을 지급할 수 없습니다(사업 지침 ④ · 정산 기준 일반수용비 부당집행 사례 4). 지급 전에 대상자가 연맹 임직원이 아닌지 확인하세요.',{h:'left',size:9,border:false,color:'FFC41E2F'});
     // ── ⑤ 이력·자격 (홈페이지 회원정보 · 자격 대장 · 활동 이력) ──
     var w5=wb.addWorksheet('이력·자격',{pageSetup:{paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0,margins:{left:0.5,right:0.5,top:0.6,bottom:0.6,header:0.2,footer:0.2}}});
     w5.columns=[14,20,18,14,14,12].map(function(w){return {width:w}});
