@@ -173,6 +173,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="paydoc.js?v=20261120a"></script>
 <script>
 KFDF.initApp();
 const DB=firebase.firestore(),AUTH=firebase.auth();
@@ -241,7 +242,7 @@ function teachersOf(list){const m={};list.forEach(a=>{if(!a.teacher)return;const
 function instructorsOf(list){const m={};list.forEach(a=>{const k=a.insUid||a.instructor;if(!k)return;const t=m[k]=m[k]||{name:a.instructor,phone:a.insPhone,email:a.insEmail,schools:[],self:false};t.self=t.self||a.selfTeach;if(!t.phone&&a.insPhone)t.phone=a.insPhone;t.schools.push(a)});return Object.values(m).sort((x,y)=>y.schools.length-x.schools.length||x.name.localeCompare(y.name,'ko'))}
 function setV(k,v){ST[k]=v;if(k==='region')ST.sido='';render()}
 function render(){
-  const list=filtered(),T=teachersOf(list),I=instructorsOf(list);
+  const list=filtered(),T=teachersOf(list),I=instructorsOf(list);window.__PAY_INS=I;
   document.getElementById('cpTiles').innerHTML=[['강습 완료 학교',list.length,'건 (학교 × 유형)'],['담당 선생님',T.length,'명 · 회원 '+T.filter(t=>t.member).length],['강사(지도자)',I.length,'명'],['수업 회차',list.reduce((n,a)=>n+a.done,0),'회'],['참여 연인원',list.reduce((n,a)=>n+a.ppl,0).toLocaleString(),'명'],['교사 확인',list.reduce((n,a)=>n+a.conf,0)+' / '+list.reduce((n,a)=>n+a.n,0),'회차']]
     .map(t=>'<div class="pg-tile"><i>'+t[0]+'</i><b>'+t[1]+'</b><small>'+t[2]+'</small></div>').join('');
   const V=[['school','🏫 학교 명단'],['teacher','👩‍🏫 담당 선생님'],['instructor','🧑‍🏫 강사(지도자)']];
@@ -258,6 +259,7 @@ function render(){
   document.getElementById('cpDl').innerHTML='<b style="font-size:13px">📥 서식 내려받기</b><span class="pg-note" style="margin:0">지금 보이는 조건('+list.length+'건) 그대로 나갑니다.</span><span style="flex:1"></span>'
     +'<button class="pg-btn g" onclick="xlsList()">📊 완료 명단 엑셀 (학교·선생님·강사 3시트)</button>'
     +'<button class="pg-btn" onclick="xlsOps()" title="체육회 「2026년 유소년 운영현황」 양식의 유형3·유형5 「강습 운영 현황」 표에 채워 내려받습니다">📄 운영현황 서식 (유형3·5)</button>'
+    +'<button class="pg-btn" style="background:#b8860b" onclick="xlsPayAll()" title="정산 기준 [별첨 1] 「수당 등 수수료 집행 내역서」에 지도자·계좌·금액·원천징수를 채우고, 산출 내역·강습 실시 내역·붙임 서류 점검표를 함께 만듭니다">💰 수당 서류 (보이는 조건 전체)</button>'
     +'<a class="pg-btn o" href="schoollogs.html" style="text-decoration:none">📒 학교별 운영일지</a>';
   const out=document.getElementById('cpOut');
   if(!list.length){out.innerHTML='<div class="pg-empty">조건에 맞는 학교가 없습니다.'+(ST.goal==='24'?' 기준을 「20회 이상」이나 「강습 시작한 학교 전체」로 바꿔 보세요.':'')+'</div>';return}
@@ -268,13 +270,13 @@ function render(){
       +'<td data-l="회차"><b style="color:'+(a.done>=24?'#0f766e':'#b8860b')+'">'+a.done+'</b>/24</td><td data-l="연인원">'+a.ppl.toLocaleString()+'</td>'
       +'<td data-l="강사">'+esc(a.instructor||'-')+(a.selfTeach?' <small style="color:#8a919d">(본인 지도)</small>':'')+(a.insPhone?'<br><small>'+esc(telFmt(a.insPhone))+'</small>':'')+'</td>'
       +'<td data-l="선생님">'+esc(a.teacher||'-')+(a.tMember?' <span class="pg-pill" style="background:#0f766e;font-size:10px">회원</span>':'')+(a.tPhone?'<br><small>'+esc(telFmt(a.tPhone))+'</small>':'')+'</td>'
-      +'<td data-l="교사 확인">'+a.conf+' / '+a.n+'</td><td data-l=""><a class="pg-btn o" style="padding:3px 9px;min-height:0;font-size:11.5px;text-decoration:none" href="schoollogs.html?app='+encodeURIComponent(a.id)+'" target="_blank">일지</a></td></tr>').join('')+'</tbody></table></div>';
+      +'<td data-l="교사 확인">'+a.conf+' / '+a.n+'</td><td data-l=""><a class="pg-btn o" style="padding:3px 9px;min-height:0;font-size:11.5px;text-decoration:none" href="schoollogs.html?app='+encodeURIComponent(a.id)+'" target="_blank">일지</a> <button class="pg-btn o" style="padding:3px 9px;min-height:0;font-size:11.5px;border-color:#b8860b;color:#8a6508" onclick="xlsPay([\''+a.id+'\'])" title="이 학교 지도자 수당 서류(집행 내역서) 내려받기">수당</button></td></tr>').join('')+'</tbody></table></div>';
   else if(ST.view==='teacher')out.innerHTML='<div class="pg-tblwrap"><table class="pg-tbl'+cards+'"><thead><tr><th>#</th><th>시도</th><th>성명</th><th>휴대전화</th><th>이메일</th><th>회원</th><th>학교</th><th>회차</th><th>교사 확인</th></tr></thead><tbody>'
     +T.map((t,i)=>'<tr><td data-l="번호">'+(i+1)+'</td><td data-l="시도">'+esc(t.sido||'-')+'</td><td class="nm" data-l="성명">'+esc(t.name)+'</td><td data-l="휴대전화">'+esc(telFmt(t.phone)||'-')+'</td><td data-l="이메일">'+esc(t.email||'-')+'</td><td data-l="회원">'+(t.member?'<span class="pg-pill" style="background:#0f766e">가입</span>':'<span style="color:#8a919d">미가입</span>')+'</td>'
       +'<td data-l="학교">'+t.schools.map(a=>esc(a.school)+' <small style="color:#6b7280">'+esc(a.type)+'</small>').join('<br>')+'</td><td data-l="회차">'+t.schools.map(a=>a.done).join(' · ')+'</td><td data-l="교사 확인">'+t.schools.reduce((n,a)=>n+a.conf,0)+' / '+t.schools.reduce((n,a)=>n+a.n,0)+'</td></tr>').join('')+'</tbody></table></div>';
-  else out.innerHTML='<div class="pg-tblwrap"><table class="pg-tbl'+cards+'"><thead><tr><th>#</th><th>성명</th><th>휴대전화</th><th>학교 수</th><th>담당 학교</th><th>회차 합계</th><th>연인원</th></tr></thead><tbody>'
+  else out.innerHTML='<div class="pg-tblwrap"><table class="pg-tbl'+cards+'"><thead><tr><th>#</th><th>성명</th><th>휴대전화</th><th>학교 수</th><th>담당 학교</th><th>회차 합계</th><th>연인원</th><th>수당 서류</th></tr></thead><tbody>'
     +I.map((t,i)=>'<tr><td data-l="번호">'+(i+1)+'</td><td class="nm" data-l="성명">'+esc(t.name||'-')+(t.self?' <small style="color:#8a919d">(본인 지도)</small>':'')+'</td><td data-l="휴대전화">'+esc(telFmt(t.phone)||'-')+'</td><td data-l="학교 수">'+t.schools.length+'</td>'
-      +'<td data-l="담당 학교">'+t.schools.map(a=>esc(a.sido)+' '+esc(a.school)+' <small style="color:#6b7280">'+esc(a.type)+'</small>').join('<br>')+'</td><td data-l="회차">'+t.schools.reduce((n,a)=>n+a.done,0)+'</td><td data-l="연인원">'+t.schools.reduce((n,a)=>n+a.ppl,0).toLocaleString()+'</td></tr>').join('')+'</tbody></table></div>';
+      +'<td data-l="담당 학교">'+t.schools.map(a=>esc(a.sido)+' '+esc(a.school)+' <small style="color:#6b7280">'+esc(a.type)+'</small>').join('<br>')+'</td><td data-l="회차">'+t.schools.reduce((n,a)=>n+a.done,0)+'</td><td data-l="연인원">'+t.schools.reduce((n,a)=>n+a.ppl,0).toLocaleString()+'</td><td data-l="수당 서류"><button class="pg-btn o" style="padding:3px 9px;min-height:0;font-size:11.5px;border-color:#b8860b;color:#8a6508" onclick="xlsPayIns('+i+')" title="이 지도자가 맡은 학교(지금 보이는 조건)의 수당 서류를 한 파일로">💰 수당 서류</button></td></tr>').join('')+'</tbody></table></div>';
 }
 // ── 엑셀 공통 ──
 function xlNeed(){if(typeof ExcelJS==='undefined'){alert('엑셀 라이브러리를 불러오는 중입니다. 잠시 후 다시 눌러 주세요.');return false}return true}
