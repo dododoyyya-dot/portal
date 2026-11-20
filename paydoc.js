@@ -12,6 +12,8 @@ function payMsg(t,keep){var m=document.getElementById('cpMsg');if(!m)return;m.te
 function xlsPayIns(i){var I=window.__PAY_INS||[];if(!I[i])return;xlsPay(I[i].schools.map(function(a){return a.id}))}
 function xlsPayAll(){var list=filtered();if(list.length>30&&!confirm('지금 보이는 '+list.length+'건 전체의 수당 서류를 한 파일로 만듭니다. 계속할까요?'))return;xlsPay(list.map(function(a){return a.id}))}
 async function xlsPay(ids){
+  // 중앙 사무국(중앙 관리자) 전용 — 계좌·주민번호 앞자리가 들어가므로 화면 권한과 별개로 한 번 더 확인합니다(주민번호는 보안 규칙에서도 중앙·본인만 읽힘).
+  if(!(typeof MY!=='undefined'&&MY&&typeof isAdminDoc==='function'&&isAdminDoc(MY))){alert('수당 서류는 중앙 사무국(중앙 관리자)만 만들 수 있습니다.');return}
   if(!xlNeed())return;
   var list=APPS.filter(function(a){return ids.indexOf(a.id)>=0});
   if(!list.length){alert('수당 서류를 만들 학교가 없습니다.');return}
