@@ -11,6 +11,44 @@ function payDow(d){var t=new Date(String(d).slice(0,10)+'T00:00:00');return isNa
 function payMsg(t,keep){var m=document.getElementById('cpMsg');if(!m)return;m.textContent=t;if(!keep)setTimeout(function(){if(m.textContent===t)m.textContent=''},15000)}
 function xlsPayIns(i){var I=window.__PAY_INS||[];if(!I[i])return;xlsPay(I[i].schools.map(function(a){return a.id}))}
 function xlsPayAll(){var list=filtered();if(list.length>30&&!confirm('지금 보이는 '+list.length+'건 전체의 수당 서류를 한 파일로 만듭니다. 계속할까요?'))return;xlsPay(list.map(function(a){return a.id}))}
+// ── 서명 사용 동의 확인 (사무국 기록) — privateInfo/{uid}.paySignConsent {date,how,byUid,byName,at} · 본인과 중앙만 읽히는 곳 ──
+//   지도자가 「위촉계약서에 한 서명을 수당 집행 내역서에 써도 된다」고 동의한 날짜·방법을 사무국이 적어 둡니다.
+//   기록이 있고 등록 서명이 없는 사람만 계약서 서명이 서류에 들어갑니다. 기록이 없으면 종전대로 빈칸.
+var PAYC={};
+function payToday(){var d=new Date(),p=function(n){return String(n).padStart(2,'0')};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())}
+function payInsUid(t){return ((t&&t.schools&&t.schools[0])||{}).insUid||''}
+function payConsentFill(){var I=window.__PAY_INS||[];I.forEach(function(t,i){var uid=payInsUid(t),el=document.getElementById('psc'+i);if(!el)return;if(!uid){el.textContent='';return}
+  var show=function(){var c=PAYC[uid];el.innerHTML='<span style="font-weight:700;color:'+(c?'#0f766e':'#8a919d')+'">'+(c?'서명 동의 '+esc(c.date)+' '+esc(c.how):'서명 동의 기록 없음')+'</span> <a href="#" onclick="payConsentOpen('+i+');return false" style="color:#153A77;font-weight:800;white-space:nowrap">'+(c?'고치기':'적기')+'</a>'};
+  if(uid in PAYC){show();return}
+  el.textContent='…';DB.collection('privateInfo').doc(uid).get().then(function(d){PAYC[uid]=(d.exists&&(d.data()||{}).paySignConsent)||null;show()}).catch(function(){el.textContent=''})})}
+function payConsentOpen(i){var t=(window.__PAY_INS||[])[i];if(!t)return;var uid=payInsUid(t);
+  if(!(typeof MY!=='undefined'&&MY&&isAdminDoc(MY))){alert('중앙 사무국(중앙 관리자)만 적을 수 있습니다.');return}
+  if(!uid){alert('회원에 연결되지 않은 지도자라 적을 수 없습니다.');return}
+  var c=PAYC[uid]||{},old=document.getElementById('pscModal');if(old)old.remove();
+  var hows=['전화','문자','카카오톡','대면','서면'],inp='width:100%;padding:9px 12px;border:1.5px solid #d8dde6;border-radius:9px;margin:4px 0 10px;font-family:inherit;font-size:13.5px',btn='border:none;border-radius:10px;padding:9px 14px;font-weight:800;cursor:pointer;font-family:inherit';
+  var d=document.createElement('div');d.id='pscModal';d.style.cssText='position:fixed;inset:0;background:rgba(17,17,20,.55);z-index:10050;display:flex;align-items:center;justify-content:center;padding:16px';
+  d.innerHTML='<div style="background:#fff;border-radius:16px;max-width:470px;width:100%;padding:20px;font-size:13.5px"><b style="font-size:16px">서명 사용 동의 확인 — '+esc(t.name||'')+'</b>'
+    +'<div style="color:#4b5563;line-height:1.7;margin:8px 0 12px">지도자가 「위촉계약서에 한 서명을 수당 집행 내역서에 써도 된다」고 동의한 날짜와 방법을 적습니다. 적어 두면 <b>등록 서명이 없는 분</b>은 수당 서류에 계약서 서명이 들어가고 동의 날짜가 함께 찍힙니다. <b style="color:#C41E2F">본인이 실제로 동의한 경우에만</b> 적어 주세요.</div>'
+    +'<label style="font-weight:800;font-size:12px">동의받은 날</label><input type="date" id="pscDate" value="'+esc(c.date||payToday())+'" style="'+inp+'">'
+    +'<label style="font-weight:800;font-size:12px">방법</label><select id="pscHow" style="'+inp+'">'+hows.map(function(h){return '<option'+((c.how||'전화')===h?' selected':'')+'>'+h+'</option>'}).join('')+'</select>'
+    +(c.date?'<div style="font-size:11.5px;color:#6b7280;margin-bottom:8px">지금 기록: '+esc(c.date)+' '+esc(c.how||'')+(c.byName?' · 적은 사람 '+esc(c.byName):'')+'</div>':'')
+    +'<div style="display:flex;gap:8px;align-items:center"><button type="button" style="'+btn+';background:#fdf1f1;color:#8c1622'+(c.date?'':';display:none')+'" onclick="payConsentSave('+i+',true)">기록 지우기</button><span style="flex:1"></span>'
+    +'<button type="button" style="'+btn+';background:#eceff4" onclick="document.getElementById(\'pscModal\').remove()">취소</button><button type="button" id="pscSave" style="'+btn+';background:#153A77;color:#fff" onclick="payConsentSave('+i+',false)">저장</button></div><div id="pscMsg" style="font-size:12px;color:#C41E2F;margin-top:8px"></div></div>';
+  document.body.appendChild(d)}
+async function payConsentSave(i,del){var t=(window.__PAY_INS||[])[i];if(!t)return;var uid=payInsUid(t);if(!uid||!(typeof MY!=='undefined'&&MY&&isAdminDoc(MY)))return;
+  var msg=document.getElementById('pscMsg'),ref=DB.collection('privateInfo').doc(uid);
+  try{
+    if(del){await ref.set({paySignConsent:firebase.firestore.FieldValue.delete()},{merge:true});PAYC[uid]=null}
+    else{var date=(document.getElementById('pscDate')||{}).value||'',how=(document.getElementById('pscHow')||{}).value||'';
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){if(msg)msg.textContent='동의받은 날을 골라 주세요.';return}
+      if(date>payToday()){if(msg)msg.textContent='오늘보다 뒤 날짜는 적을 수 없습니다.';return}
+      var rec={date:date,how:how,byUid:(typeof ME!=='undefined'&&ME&&ME.uid)||'',byName:MY.name||'',at:firebase.firestore.FieldValue.serverTimestamp()};
+      await ref.set({paySignConsent:rec},{merge:true});PAYC[uid]={date:date,how:how,byName:rec.byName}}
+    var m=document.getElementById('pscModal');if(m)m.remove();payConsentFill();
+  }catch(e){if(msg)msg.textContent='저장하지 못했습니다: '+(e.code||e.message||e)}}
+async function paySigLoad(src){var sr=await fetch(src),sb=await sr.blob(),bm=await createImageBitmap(sb);
+  var b64=await new Promise(function(ok,no){var fr=new FileReader();fr.onload=function(){ok(fr.result)};fr.onerror=no;fr.readAsDataURL(sb)});
+  return {b64:b64,w:bm.width,h:bm.height,ext:/jpe?g/.test(sb.type)?'jpeg':'png'}}
 async function xlsPay(ids){
   // 중앙 사무국(중앙 관리자) 전용 — 계좌·주민번호 앞자리가 들어가므로 화면 권한과 별개로 한 번 더 확인합니다(주민번호는 보안 규칙에서도 중앙·본인만 읽힘).
   if(!(typeof MY!=='undefined'&&MY&&typeof isAdminDoc==='function'&&isAdminDoc(MY))){alert('수당 서류는 중앙 사무국(중앙 관리자)만 만들 수 있습니다.');return}
@@ -25,7 +63,7 @@ async function xlsPay(ids){
     for(var pi=0;pi<P.length;pi++){var p=P[pi],u=USERS[p.uid]||{};
       p.name=u.name||p.name;p.phone=u.phone||'';p.bank=u.bank||'';p.acct=u.accountNum||'';p.holder=u.accountHolder||'';p.contracts=u.contracts||{};
       var id6='';
-      try{if(p.uid){var pd=await DB.collection('privateInfo').doc(p.uid).get();if(pd.exists){id6=digits((pd.data()||{}).rrn).slice(0,6);p.bankbook=(pd.data()||{}).bankbookDoc||''}}}catch(e){}
+      try{if(p.uid){var pd=await DB.collection('privateInfo').doc(p.uid).get();if(pd.exists){id6=digits((pd.data()||{}).rrn).slice(0,6);p.bankbook=(pd.data()||{}).bankbookDoc||'';p.consent=(pd.data()||{}).paySignConsent||null;PAYC[p.uid]=p.consent}}}catch(e){}
       if(id6.length<6&&u.birth){var b=digits(u.birth);id6=b.length>=8?b.slice(2,8):b.slice(0,6)}
       p.id6=id6.length===6?id6:'';
       // 이력·자격 — 홈페이지에 등록된 것만(자격 대장은 회원에 연결된 것, 이관·승급된 옛 번호 제외). 없으면 없는 대로 둡니다.
@@ -36,10 +74,11 @@ async function xlsPay(ids){
       var qz=u.quals||{};p.selfQual=[qz.leader?'지도자 '+qz.leader:'',qz.referee?'심판 '+qz.referee:'',qz.youth?'유소년스포츠지도사':''].filter(Boolean);
       p.qualDocs=(u.qualDocs||[]).filter(function(x){return /^https?:/.test(String(x))});
       // 서명 — 본인이 마이페이지에 등록한 서명만 씁니다(등록 화면 안내: 「수당 신청서·계약서에 자동으로 들어갑니다」). 위촉계약서 서명 등 다른 문서의 서명은 옮겨 쓰지 않습니다. 없으면 빈칸.
-      p.sig=null;
-      if(u.signatureImg){try{var sr=await fetch(u.signatureImg),sb=await sr.blob(),bm=await createImageBitmap(sb);
-        var b64=await new Promise(function(ok,no){var fr=new FileReader();fr.onload=function(){ok(fr.result)};fr.onerror=no;fr.readAsDataURL(sb)});
-        p.sig={b64:b64,w:bm.width,h:bm.height,ext:/jpe?g/.test(sb.type)?'jpeg':'png'}}catch(e){p.sig=null}}
+      //   [동의 확인] 등록 서명이 없는 사람은, 본인 동의를 사무국이 적어 둔 경우(paySignConsent)에만 이번 강습 위촉계약서의 서명을 씁니다.
+      p.sig=null;p.sigSrc='';
+      if(u.signatureImg){try{p.sig=await paySigLoad(u.signatureImg);p.sigSrc='profile'}catch(e){p.sig=null}}
+      if(!p.sig&&p.consent){var cs='';p.apps.some(function(a){var c=p.contracts[a.id]||{};if(c.sign){cs=c.sign;return true}return false});
+        if(cs){try{p.sig=await paySigLoad(cs);p.sigSrc='contract'}catch(e){p.sig=null}}}
       p.apps.sort(function(x,y){return String(x.school).localeCompare(String(y.school),'ko')||String(x.type).localeCompare(String(y.type),'ko')});
       for(var ai=0;ai<p.apps.length;ai++){var a=p.apps[ai];
         var q=await DB.collection('sessionLogs').where('appId','==',a.id).get();
@@ -84,7 +123,7 @@ async function xlsPay(ids){
     ['※ 예탁계좌에서 보조금 계좌로 통합 이체 후 다수의 대상자에게 지출된 건인 경우 계좌이체 확인증 필수 첨부',
      '※ 원천징수(기타소득): 필요경비 60% → 소득세 20% + 지방소득세 10% = 지급액의 8.8%. 한 달 합산 지급액 125,000원 이하는 0원(사업 지침 ② 수당 지급 공통 사항)',
      '※ 지급액 = 운영일지 회차(같은 회차 중복 제외, 프로그램당 '+PAY_CAP+'회까지) × '+PAY_UNIT.toLocaleString()+'원 — 산출은 「산출 내역」 시트, 회차별 수업일은 「강습 실시 내역」 시트',
-     '※ 서명 칸의 서명은 지도자 본인이 홈페이지(마이페이지)에 등록한 서명입니다. 등록 서명이 없는 사람은 빈칸이니 직접 서명을 받으세요.']
+     '※ 서명 칸의 서명은 지도자 본인이 홈페이지(마이페이지)에 등록한 서명입니다. 등록 서명이 없는 사람은, 본인 동의를 사무국이 확인해 적어 둔 경우에만 위촉계약서 서명을 넣습니다(동의일·방법은 「붙임 서류 점검」 시트). 그 밖에는 빈칸이니 직접 서명을 받으세요.']
       .forEach(function(t,i){var r=rT+1+i;ws.mergeCells('A'+r+':I'+r);cellSet(ws.getCell('A'+r),t,{h:'left',size:9,border:false,color:'FF444444'})});
     // ── ② 산출 내역 ──
     var w2=wb.addWorksheet('산출 내역',{pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}});
@@ -112,7 +151,7 @@ async function xlsPay(ids){
     ['번호','붙일 서류','근거','지금 상태 (홈페이지 기준)','확인'].forEach(function(h,i){cellSet(w4.getRow(2).getCell(i+1),h,{bold:true,fill:'FFEDEDED'})});
     var st=function(fn){return P.map(function(p){return p.name+': '+fn(p)}).join('\n')};
     var CK=[['내부결재문서 (수당 지급 결재)','정산 기준 운영비 공통 제출서류 1','직접 작성'],
-      ['수당 등 수수료 집행 내역서 — 이 파일 첫 시트, 본인 서명','사업 지침 ② · 정산 기준 [별첨 1]',st(function(p){return (p.id6?'':'주민번호 앞자리 없음 · ')+(p.phone?'':'전화 없음 · ')+(p.sig?'홈페이지 등록 서명 넣음':'등록 서명 없음 — 직접 서명 받기')})],
+      ['수당 등 수수료 집행 내역서 — 이 파일 첫 시트, 본인 서명','사업 지침 ② · 정산 기준 [별첨 1]',st(function(p){return (p.id6?'':'주민번호 앞자리 없음 · ')+(p.phone?'':'전화 없음 · ')+(p.sigSrc==='profile'?'홈페이지 등록 서명 넣음':p.sigSrc==='contract'?'위촉계약서 서명 넣음 — 본인 동의 '+p.consent.date+' '+(p.consent.how||'')+(p.consent.byName?' (확인 '+p.consent.byName+')':''):'등록 서명 없음 — 직접 서명 받기'+(p.consent?' (동의 기록은 있으나 계약서 서명이 없음)':''))+(p.sigSrc==='profile'&&p.consent?' · 서명 사용 동의 '+p.consent.date+' '+(p.consent.how||''):'')})],
       ['본인 명의 통장 사본','사업 지침 ② 본인 명의 계좌이체 원칙',st(function(p){return !p.bank?'계좌 미등록':(p.holder&&p.holder!==p.name?'예금주가 다름('+p.holder+') — 본인 계좌로':'계좌 등록됨(예금주 '+(p.holder||'미기재')+')')+' · '+(p.bankbook?'통장 사본 등록됨(아래 링크)':'통장 사본 없음 — 마이페이지 「수당 지급 계좌」에서 올리거나 사본 받기')})],
       ['원천징수영수증 또는 원천징수이행상황신고서','정산 기준 일반수용비 정산 시 첨부서류 3',st(function(p){return p.tax?'원천징수 '+p.tax.toLocaleString()+'원 — 지급 다음 달 10일까지 신고·납부':'원천징수 없음(125,000원 이하)'})],
       ['이력서 · 자격증 등 자격 확인 서류','정산 기준 일반수용비 첨부서류 3 · 사업 지침 ③ 강사 자격 요건',st(function(p){var a=[];a.push(p.lics.length?'연맹 자격 '+p.lics.map(function(l){return (l.type||'')+' '+(l.grade||'')}).join(', '):'연맹 자격 대장 없음');

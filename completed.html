@@ -173,7 +173,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="kfdf.js?v=20260914a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
-<script src="paydoc.js?v=20261120d"></script>
+<script src="paydoc.js?v=20261120e"></script>
 <script>
 KFDF.initApp();
 const DB=firebase.firestore(),AUTH=firebase.auth();
@@ -276,7 +276,8 @@ function render(){
       +'<td data-l="학교">'+t.schools.map(a=>esc(a.school)+' <small style="color:#6b7280">'+esc(a.type)+'</small>').join('<br>')+'</td><td data-l="회차">'+t.schools.map(a=>a.done).join(' · ')+'</td><td data-l="교사 확인">'+t.schools.reduce((n,a)=>n+a.conf,0)+' / '+t.schools.reduce((n,a)=>n+a.n,0)+'</td></tr>').join('')+'</tbody></table></div>';
   else out.innerHTML='<div class="pg-tblwrap"><table class="pg-tbl'+cards+'"><thead><tr><th>#</th><th>성명</th><th>휴대전화</th><th>학교 수</th><th>담당 학교</th><th>회차 합계</th><th>연인원</th><th>수당 서류</th></tr></thead><tbody>'
     +I.map((t,i)=>'<tr><td data-l="번호">'+(i+1)+'</td><td class="nm" data-l="성명">'+esc(t.name||'-')+(t.self?' <small style="color:#8a919d">(본인 지도)</small>':'')+'</td><td data-l="휴대전화">'+esc(telFmt(t.phone)||'-')+'</td><td data-l="학교 수">'+t.schools.length+'</td>'
-      +'<td data-l="담당 학교">'+t.schools.map(a=>esc(a.sido)+' '+esc(a.school)+' <small style="color:#6b7280">'+esc(a.type)+'</small>').join('<br>')+'</td><td data-l="회차">'+t.schools.reduce((n,a)=>n+a.done,0)+'</td><td data-l="연인원">'+t.schools.reduce((n,a)=>n+a.ppl,0).toLocaleString()+'</td><td data-l="수당 서류"><button class="pg-btn o" style="padding:3px 9px;min-height:0;font-size:11.5px;border-color:#b8860b;color:#8a6508" onclick="xlsPayIns('+i+')" title="이 지도자가 맡은 학교(지금 보이는 조건)의 수당 서류를 한 파일로">💰 수당 서류</button></td></tr>').join('')+'</tbody></table></div>';
+      +'<td data-l="담당 학교">'+t.schools.map(a=>esc(a.sido)+' '+esc(a.school)+' <small style="color:#6b7280">'+esc(a.type)+'</small>').join('<br>')+'</td><td data-l="회차">'+t.schools.reduce((n,a)=>n+a.done,0)+'</td><td data-l="연인원">'+t.schools.reduce((n,a)=>n+a.ppl,0).toLocaleString()+'</td><td data-l="수당 서류"><button class="pg-btn o" style="padding:3px 9px;min-height:0;font-size:11.5px;border-color:#b8860b;color:#8a6508" onclick="xlsPayIns('+i+')" title="이 지도자가 맡은 학교(지금 보이는 조건)의 수당 서류를 한 파일로">💰 수당 서류</button><div id="psc'+i+'" style="font-size:11px;margin-top:5px;line-height:1.5"></div></td></tr>').join('')+'</tbody></table></div>';
+  if(ST.view==='instructor'&&typeof payConsentFill==='function')payConsentFill();
 }
 // ── 엑셀 공통 ──
 function xlNeed(){if(typeof ExcelJS==='undefined'){alert('엑셀 라이브러리를 불러오는 중입니다. 잠시 후 다시 눌러 주세요.');return false}return true}
