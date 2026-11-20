@@ -46,6 +46,17 @@ async function payConsentSave(i,del){var t=(window.__PAY_INS||[])[i];if(!t)retur
       await ref.set({paySignConsent:rec},{merge:true});PAYC[uid]={date:date,how:how,byName:rec.byName}}
     var m=document.getElementById('pscModal');if(m)m.remove();payConsentFill();
   }catch(e){if(msg)msg.textContent='저장하지 못했습니다: '+(e.code||e.message||e)}}
+// ── 운영일지 보고서(홈페이지 양식 · logbook.js) — 수당 서류와 함께 엽니다. 창은 클릭 직후에 열어야 팝업 차단에 걸리지 않습니다 ──
+var PAY_LOG_MAX=2;   // 한 번에 여는 운영일지 창 수(브라우저 팝업 제한)
+function payLogOpen(){try{var w=window.open('','_blank');if(!w)return null;
+  w.document.write('<!doctype html><meta charset="utf-8"><title>운영일지 준비 중…</title><body style="margin:0;font-family:Pretendard,\'Malgun Gothic\',sans-serif;display:flex;align-items:center;justify-content:center;height:90vh;color:#555;font-size:15px">운영일지를 만드는 중입니다… (수당 서류 엑셀이 먼저 내려받아집니다)</body>');return w}catch(e){return null}}
+async function payLogRender(w,a,p){
+  if(!w||!window.KFDF_LOGBOOK)return false;
+  try{var u=p.u||{},ag=(p.contracts||{})[a.id]||{},ins={name:p.name||a.instructor||'',sign:'',signSrc:''};
+    if(ag.sign){ins.sign=ag.sign;ins.signSrc='contract'}else if(u.signatureImg){ins.sign=u.signatureImg;ins.signSrc='profile'}
+    var deleted=[];try{var ds=await DB.collection('sessionLogArchive').where('appId','==',a.id).get();deleted=ds.docs.map(function(d){return Object.assign({_id:d.id},d.data())}).filter(function(x){return !x.restoredAt})}catch(e){}
+    KFDF_LOGBOOK.render(w,{app:a.s||{},appId:a.id,logs:(a._logsFull||[]).slice(),deleted:deleted,instructor:ins,printedBy:(typeof MY!=='undefined'&&MY&&MY.name)||'',printedRole:'사무국'});return true
+  }catch(e){try{KFDF_LOGBOOK.fail(w,e)}catch(_){}return false}}
 async function paySigLoad(src){var sr=await fetch(src),sb=await sr.blob(),bm=await createImageBitmap(sb);
   var b64=await new Promise(function(ok,no){var fr=new FileReader();fr.onload=function(){ok(fr.result)};fr.onerror=no;fr.readAsDataURL(sb)});
   return {b64:b64,w:bm.width,h:bm.height,ext:/jpe?g/.test(sb.type)?'jpeg':'png'}}
@@ -55,6 +66,10 @@ async function xlsPay(ids){
   if(!xlNeed())return;
   var list=APPS.filter(function(a){return ids.indexOf(a.id)>=0});
   if(!list.length){alert('수당 서류를 만들 학교가 없습니다.');return}
+  var LOGW={},logNote='';
+  if(window.KFDF_LOGBOOK){if(list.length<=PAY_LOG_MAX){list.forEach(function(a){LOGW[a.id]=payLogOpen()});var blocked=list.filter(function(a){return !LOGW[a.id]}).length;
+      logNote=blocked?' · 운영일지 창 '+blocked+'개가 팝업 차단으로 열리지 않았습니다(주소창의 팝업 차단을 풀거나 학교 줄 [일지]에서 여세요)':' · 운영일지 창 '+list.length+'개를 열었습니다 — 인쇄 창에서 「PDF로 저장」'}
+    else logNote=' · 운영일지는 학교 줄의 [수당]을 누르면 함께 열립니다'}
   payMsg('수당 서류를 만드는 중… (일지 · 계좌 정보를 읽고 있습니다)',true);
   try{
     // 1) 지도자별로 묶기
@@ -82,6 +97,7 @@ async function xlsPay(ids){
       p.apps.sort(function(x,y){return String(x.school).localeCompare(String(y.school),'ko')||String(x.type).localeCompare(String(y.type),'ko')});
       for(var ai=0;ai<p.apps.length;ai++){var a=p.apps[ai];
         var q=await DB.collection('sessionLogs').where('appId','==',a.id).get();
+        a._logsFull=q.docs.map(function(d){return Object.assign({_id:d.id},d.data()||{})});
         a._logs=q.docs.map(function(d){return d.data()||{}}).filter(function(l){return /^\d{4}-\d{2}-\d{2}/.test(String(l.date||''))})
           .sort(function(x,y){return (+x.session||0)-(+y.session||0)||String(x.date).localeCompare(String(y.date))});
         a._pay=Math.min(a.done,PAY_CAP);a._amt=a._pay*PAY_UNIT;
@@ -198,9 +214,10 @@ async function xlsPay(ids){
       else{val(r5,1,6,'홈페이지 활동 이력(대회 심판·운영·입상) '+NONE,{h:'center'});r5++}
     });
     await xlSave(wb,'지도자수당_집행내역서_'+(P.length===1?P[0].name+'_':'')+ymd()+'.xlsx');
+    for(var li=0;li<P.length;li++){for(var lj=0;lj<P[li].apps.length;lj++){var la=P[li].apps[lj];if(LOGW[la.id])await payLogRender(LOGW[la.id],la,P[li])}}
     // 3) 화면 안내
     var warn=[];P.forEach(function(p){if(!p.bank)warn.push(p.name+' 계좌 미등록');else if(p.holder&&p.holder!==p.name)warn.push(p.name+' 예금주 다름');if(!p.id6)warn.push(p.name+' 주민번호 앞자리 없음');if(!p.sig)warn.push(p.name+' 등록 서명 없음');
       p.apps.forEach(function(a){if(a.conf<a.n)warn.push(a.school+' '+a.type+' 담당교사 확인 '+(a.n-a.conf)+'회 없음');if(a._contract!=='서명 완료')warn.push(a.school+' '+a.type+' 위촉계약서 '+a._contract)})});
-    payMsg('수당 서류: '+P.length+'명 · '+totalSess+'회 · '+sumA.toLocaleString()+'원 (원천징수 '+sumB.toLocaleString()+'원)'+(warn.length?' — 확인: '+warn.join(', '):''));
-  }catch(e){payMsg('');alert('수당 서류를 만들지 못했습니다: '+(e.code||e.message||e))}
+    payMsg('수당 서류: '+P.length+'명 · '+totalSess+'회 · '+sumA.toLocaleString()+'원 (원천징수 '+sumB.toLocaleString()+'원)'+(warn.length?' — 확인: '+warn.join(', '):'')+logNote);
+  }catch(e){payMsg('');try{Object.keys(LOGW).forEach(function(k){if(LOGW[k]&&!LOGW[k].closed)LOGW[k].close()})}catch(_){}alert('수당 서류를 만들지 못했습니다: '+(e.code||e.message||e))}
 }
