@@ -26,6 +26,13 @@ async function xlsPay(ids){
       try{if(p.uid){var pd=await DB.collection('privateInfo').doc(p.uid).get();if(pd.exists)id6=digits((pd.data()||{}).rrn).slice(0,6)}}catch(e){}
       if(id6.length<6&&u.birth){var b=digits(u.birth);id6=b.length>=8?b.slice(2,8):b.slice(0,6)}
       p.id6=id6.length===6?id6:'';
+      // 이력·자격 — 홈페이지에 등록된 것만(자격 대장은 회원에 연결된 것, 이관·승급된 옛 번호 제외). 없으면 없는 대로 둡니다.
+      p.u=u;p.lics=[];p.career=[];
+      try{if(p.uid){var lq=await DB.collection('licenses').where('uid','==',p.uid).get();p.lics=lq.docs.map(function(d){return Object.assign({no:d.id},d.data()||{})}).filter(function(l){return l.status!=='이관'&&l.status!=='승급'})
+        .sort(function(x,y){return String(x.type||'').localeCompare(String(y.type||''),'ko')||String(x.grade||'').localeCompare(String(y.grade||''),'ko')})}}catch(e){}
+      try{if(p.uid){var cq=await DB.collection('staffCareer').where('uid','==',p.uid).limit(500).get();p.career=cq.docs.map(function(d){return d.data()||{}}).sort(function(x,y){return String(y.date||'').localeCompare(String(x.date||''))})}}catch(e){}
+      var qz=u.quals||{};p.selfQual=[qz.leader?'지도자 '+qz.leader:'',qz.referee?'심판 '+qz.referee:'',qz.youth?'유소년스포츠지도사':''].filter(Boolean);
+      p.qualDocs=(u.qualDocs||[]).filter(function(x){return /^https?:/.test(String(x))});
       p.apps.sort(function(x,y){return String(x.school).localeCompare(String(y.school),'ko')||String(x.type).localeCompare(String(y.type),'ko')});
       for(var ai=0;ai<p.apps.length;ai++){var a=p.apps[ai];
         var q=await DB.collection('sessionLogs').where('appId','==',a.id).get();
@@ -98,12 +105,47 @@ async function xlsPay(ids){
       ['수당 등 수수료 집행 내역서 — 이 파일 첫 시트, 본인 서명','사업 지침 ② · 정산 기준 [별첨 1]',st(function(p){return (p.id6?'':'주민번호 앞자리 없음 · ')+(p.phone?'':'전화 없음 · ')+'서명 받기'})],
       ['본인 명의 통장 사본','사업 지침 ② 본인 명의 계좌이체 원칙',st(function(p){return !p.bank?'계좌 미등록':(p.holder&&p.holder!==p.name?'예금주가 다름('+p.holder+') — 본인 계좌로':'계좌 등록됨(예금주 '+(p.holder||'미기재')+')')})],
       ['원천징수영수증 또는 원천징수이행상황신고서','정산 기준 일반수용비 정산 시 첨부서류 3',st(function(p){return p.tax?'원천징수 '+p.tax.toLocaleString()+'원 — 지급 다음 달 10일까지 신고·납부':'원천징수 없음(125,000원 이하)'})],
-      ['이력서 · 자격증 등 자격 확인 서류','정산 기준 일반수용비 첨부서류 3 · 사업 지침 ③ 강사 자격 요건','직접 확인 (스포츠지도사·유소년스포츠지도사 또는 종목단체 지도자 자격증)'],
+      ['이력서 · 자격증 등 자격 확인 서류','정산 기준 일반수용비 첨부서류 3 · 사업 지침 ③ 강사 자격 요건',st(function(p){var a=[];a.push(p.lics.length?'연맹 자격 '+p.lics.map(function(l){return (l.type||'')+' '+(l.grade||'')}).join(', '):'연맹 자격 대장 없음');
+        if(p.selfQual.length)a.push('본인 신고 '+p.selfQual.join(', '));a.push(p.qualDocs.length?'자격증 파일 '+p.qualDocs.length+'장':'자격증 파일 없음');
+        a.push(p.u.degree?'학위 '+p.u.degree+(p.u.degreeDoc?(p.u.degreeApproved?'(증빙 확인)':'(증빙 확인 대기)'):'(증빙 없음)'):'학위 미등록');return a.join(' · ')})+'\n→ 「이력·자격」 시트. 없는 것은 본인에게 받아 붙이기'],
       ['강습 실시 확인 — 운영일지(이 파일 「강습 실시 내역」)','사업 지침 ⑦ 강습 실시·출결 현장점검',st(function(p){return p.apps.map(function(a){return a.school+' '+a.type+' 일지 '+a.done+'회 · 담당교사 확인 '+a.conf+'/'+a.n+(a.selfTeach?' · 본인 지도':'')}).join(' / ')})],
       ['강사 위촉계약서','연맹 자체 서류 (지침에 이름은 없음)',st(function(p){return p.apps.map(function(a){return a.school+' '+a.type+' '+a._contract}).join(' / ')})],
       ['계좌이체 확인증 (개인별)','정산 기준 [별첨 1] ※','이체 후 첨부']];
     CK.forEach(function(c,i){var row=w4.getRow(3+i);[i+1,c[0],c[1],c[2],'□'].forEach(function(v,j){cellSet(row.getCell(j+1),v,{h:(j===0||j===4)?'center':'left'})});row.height=Math.max(24,16*String(c[2]).split('\n').length+8)});
     var rN=3+CK.length+1;w4.mergeCells('A'+rN+':E'+rN);cellSet(w4.getCell('A'+rN),'※ 주관단체(연맹) 소속 임직원에게는 수당을 지급할 수 없습니다(사업 지침 ④ · 정산 기준 일반수용비 부당집행 사례 4). 지급 전에 대상자가 연맹 임직원이 아닌지 확인하세요.',{h:'left',size:9,border:false,color:'FFC41E2F'});
+    // ── ⑤ 이력·자격 (홈페이지 회원정보 · 자격 대장 · 활동 이력) ──
+    var w5=wb.addWorksheet('이력·자격',{pageSetup:{paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0,margins:{left:0.5,right:0.5,top:0.6,bottom:0.6,header:0.2,footer:0.2}}});
+    w5.columns=[14,20,18,14,14,12].map(function(w){return {width:w}});
+    var r5=1,NONE='등록된 내용 없음',td=new Date().toISOString().slice(0,10);
+    var lab=function(r,c,t){cellSet(w5.getRow(r).getCell(c),t,{bold:true,fill:'FFEDEDED'})};
+    var val=function(r,c1,c2,v,o){if(c2>c1)w5.mergeCells(r,c1,r,c2);cellSet(w5.getRow(r).getCell(c1),v,Object.assign({h:'left'},o||{}));for(var c=c1+1;c<=c2;c++)w5.getRow(r).getCell(c).border=bAll};
+    var link=function(text,url){return {text:text,hyperlink:url}};
+    P.forEach(function(p,pi){var u=p.u||{};
+      if(pi)r5+=2;
+      w5.mergeCells(r5,1,r5,6);cellSet(w5.getRow(r5).getCell(1),'지도자 이력 · 자격 확인서',{size:15,bold:true,border:false});w5.getRow(r5).height=30;r5++;
+      w5.mergeCells(r5,1,r5,6);cellSet(w5.getRow(r5).getCell(1),'홈페이지 회원정보 · 자격 대장 · 활동 이력 ('+today+' 기준) — 빈 곳은 등록된 자료가 없는 것입니다',{h:'right',size:9,border:false,color:'FF555555'});r5++;
+      lab(r5,1,'성명');val(r5,2,3,p.name);lab(r5,4,'활동 지역');val(r5,5,6,[u.region,u.baseCity].filter(Boolean).join(' · '));r5++;
+      lab(r5,1,'소속');val(r5,2,3,[].concat(u.affiliation||[],u.org||[],u.orgTitle||[]).filter(Boolean).join(' · '));lab(r5,4,'2026 연수');val(r5,5,6,u.edu2026?'이수':'이수 기록 없음');r5++;
+      lab(r5,1,'학력(학위)');val(r5,2,3,u.degree?(u.degree+(u.degreeDoc?(u.degreeApproved?' — 사무국 확인 완료':' — 사무국 확인 대기'):' — 증빙 없음')):NONE);lab(r5,4,'학위 증빙');
+      val(r5,5,6,u.degreeDoc?link('첨부 파일 열기',u.degreeDoc):'없음',u.degreeDoc?{h:'left',color:'FF153A77'}:{h:'left'});r5++;
+      r5++;w5.mergeCells(r5,1,r5,6);cellSet(w5.getRow(r5).getCell(1),'■ 자격',{h:'left',bold:true,border:false});r5++;
+      ['구분','종류 · 급수','자격번호','발급일','유효기간','상태'].forEach(function(h,i){lab(r5,i+1,h)});r5++;
+      if(p.lics.length)p.lics.forEach(function(l){var ex=(l.status==='만료')||(l.expireAt?String(l.expireAt)<td:false);
+        ['연맹 자격 대장',(l.type||'')+' '+(l.grade||''),l.no,String(l.issuedAt||'').slice(0,10),l.expireAt?'~ '+l.expireAt:'',ex?'만료':(l.status||'유효')].forEach(function(v,i){cellSet(w5.getRow(r5).getCell(i+1),v,{color:(i===5&&ex)?'FFC41E2F':undefined})});r5++});
+      else{cellSet(w5.getRow(r5).getCell(1),'연맹 자격 대장');val(r5,2,6,'회원에 연결된 연맹 자격 없음');r5++}
+      cellSet(w5.getRow(r5).getCell(1),'본인 신고');val(r5,2,6,p.selfQual.length?p.selfQual.join(' · ')+' (본인 신고 · 자격증으로 확인 필요)':NONE);r5++;
+      cellSet(w5.getRow(r5).getCell(1),'자격증 파일');
+      if(p.qualDocs.length){p.qualDocs.slice(0,5).forEach(function(x,i){cellSet(w5.getRow(r5).getCell(2+i),link('자격증 '+(i+1)+' 열기',x),{color:'FF153A77'})});for(var c=2+Math.min(5,p.qualDocs.length);c<=6;c++)cellSet(w5.getRow(r5).getCell(c),'')}
+      else val(r5,2,6,'홈페이지에 올린 자격증 파일 없음 — 본인에게 사본 받기');r5++;
+      r5++;w5.mergeCells(r5,1,r5,6);cellSet(w5.getRow(r5).getCell(1),'■ 경력',{h:'left',bold:true,border:false});r5++;
+      lab(r5,1,'본인 기재');val(r5,2,6,String(u.career||'').trim()||NONE);w5.getRow(r5).height=Math.max(22,15*Math.ceil(String(u.career||'').length/40)+8);r5++;
+      lab(r5,1,'2026 강습');val(r5,2,6,p.apps.map(function(a){return a.school+' '+a.type+' '+a.done+'회 ('+periodOf(a)+')'}).join('\n'));w5.getRow(r5).height=Math.max(22,16*p.apps.length+8);r5++;
+      ['일자','대회 · 행사','','역할','구분','비고'].forEach(function(h,i){lab(r5,i+1,h)});w5.mergeCells(r5,2,r5,3);r5++;
+      if(p.career.length){p.career.slice(0,20).forEach(function(k){w5.mergeCells(r5,2,r5,3);
+        [String(k.date||'').slice(0,10),k.competitionName||'','',k.role||'',k.group||k.kind||'',k.result||k.team||''].forEach(function(v,i){if(i!==2)cellSet(w5.getRow(r5).getCell(i+1),v,{h:i===1?'left':'center',size:9})});w5.getRow(r5).getCell(3).border=bAll;r5++});
+        if(p.career.length>20){val(r5,1,6,'… 활동 이력 모두 '+p.career.length+'건 중 최근 20건만 표시',{h:'left',size:9});r5++}}
+      else{val(r5,1,6,'홈페이지 활동 이력(대회 심판·운영·입상) '+NONE,{h:'center'});r5++}
+    });
     await xlSave(wb,'지도자수당_집행내역서_'+(P.length===1?P[0].name+'_':'')+ymd()+'.xlsx');
     // 3) 화면 안내
     var warn=[];P.forEach(function(p){if(!p.bank)warn.push(p.name+' 계좌 미등록');else if(p.holder&&p.holder!==p.name)warn.push(p.name+' 예금주 다름');if(!p.id6)warn.push(p.name+' 주민번호 앞자리 없음');
